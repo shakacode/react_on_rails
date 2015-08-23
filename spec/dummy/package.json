@@ -1,0 +1,31 @@
+{
+  "name": "react_rails_server_rendering",
+  "version": "0.9.0",
+  "description": "example of server rendering",
+  "main": "server.js",
+  "engines": {
+    "node": "0.12.7"
+  },
+  "scripts": {
+    "postinstall": "cd ./client && npm install",
+    "gulp": "cd ./client && npm run gulp",
+    "test": "rspec && client/bin/lint && (cd client && npm run jscs .)"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shakacode/react_rails_server_rendering.git"
+  },
+  "keywords": [
+    "react",
+    "rails",
+    "server",
+    "rendering"
+  ],
+  "author": "justin808",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shakacode/react_rails_server_rendering/issues"
+  },
+  "homepage": "https://github.com/shakacode/react_rails_server_rendering",
+  "dependencies": {}
+}

@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
 
   spec.summary       = %q{Rails with react server rendering with webpack. }
   spec.description   = %q{See README.md}
-  spec.homepage      = "http://www.railsonmaui.com"
+  spec.homepage      = "https://github.com/shakacode/react_rails_server_rendering"
   spec.license       = "MIT"
 
   # Prevent pushing this gem to RubyGems.org by setting 'allowed_push_host', or

@@ -1,0 +1,3 @@
+server: cd client && $(npm bin)/webpack --config webpack.server.js -w
+client: cd client && $(npm bin)/webpack --config webpack.client.js -w
+web: bin/rails s
