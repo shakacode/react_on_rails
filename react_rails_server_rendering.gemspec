@@ -1,11 +1,11 @@
 # coding: utf-8
 lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'react_webpack/version'
+require 'react_rails_server_rendering/version'
 
 Gem::Specification.new do |spec|
-  spec.name          = "react_webpack"
-  spec.version       = ReactWebpack::VERSION
+  spec.name          = "react_rails_server_rendering"
+  spec.version       = ReactRailsServerRendering::VERSION
   spec.authors       = ["Justin Gordon"]
   spec.email         = ["justin.gordon@gmail.com"]
 
