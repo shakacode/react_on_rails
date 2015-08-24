@@ -1,12 +1,61 @@
 # ReactRailsServerRendering
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/react_rails_server_rendering`. To experiment with that code, run `bin/console` for an interactive prompt.
+Supports:
 
-TODO: Delete this and the text above, and describe your gem
+1. Rails
+2. Webpack
+3. React
+4. Redux
+5. Turbolinks
+6. Server side rendering with fragment caching
+
+# Authors
+The Shaka Code team!
+
+1. [Justin Gordon](https://github.com/justin808/)
+2. [Samnang Chhun)(https://github.com/samnang)
+3. [Alex Fedoseev](https://github.com/alexfedoseev)
+
+# Key Info
+Currently in proof of concept phase.
+
+1. https://github.com/justin808/react-webpack-rails-tutorial/
+2. http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/
+3. http://forum.railsonmaui.com
+4. Lots of work to do in terms of docs, tests
+5. If this project is interesting to you, email me at justin@shakacode.com. We're looking for great
+developers that want to work with Rails + React with a distributed, worldwide team.
+
+
+# Try it out!
+Contributions and pull requests welcome!
+
+1. Setup and run the test app. There's no database.
+  ```bash
+  cd spec/dummy
+  bundle
+  npm i
+  foreman start 
+  ``` 
+2. Caching is turned for development mode. Open the console and run `Rails.cache.clear` to clear
+  the cache. Note, even if you stop the server, you'll still have the cache entries around.
+3. Visit http://localhost:3000
+4. Notice that the first time you hit the page, you'll see a message that server is rendering.
+   See `spec/dummy/app/views/pages/index.html.erb:17` for the generation of that message.
+5. Open up the browser console and see some tracing.
+6. Open up the source for the page and see the server rendered code.
+7. If you want to turn off server caching, run the server like: 
+   `export RAILS_USE_CACHE=N && foreman start`
+8. If you click back and forth between the about and react page links, you can see the rails console
+   log as well as the browser console to see what's going on with regards to server rendering and
+   caching.
+
 
 ## References
 * [Making the helper for server side rendering work with JS created by Webpack] (https://github.com/reactjs/react-rails/issues/301#issuecomment-133098974)
 * [Add Demonstration of Server Side Rendering](https://github.com/justin808/react-webpack-rails-tutorial/issues/2)
+* [Charlie Marsh's article "Rendering React Components on the Server"](http://www.crmarsh.com/react-ssr/)
+* [Node globals](https://nodejs.org/api/globals.html#globals_global)
 
 ## Installation
 
@@ -26,7 +75,7 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+PENDING. See `spec/dummy` for the sample app. 
 
 ## Development
 
@@ -36,37 +85,10 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/react_rails_server_rendering. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](contributor-covenant.org) code of conduct.
+Bug reports and pull requests are welcome on GitHub at https://github.com/shakacode/react_rails_server_rendering. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](contributor-covenant.org) code of conduct.
 
 
 ## License
 
 The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
 
-# Server Rendering with ReactJs, Webpack, and Rails
-
-SPIKE with Samnang and Justin on making React server render with Webpack!
-
-# Setup:
-1. bundle
-2. cd client && npm i
-3. Terminal 1: $(npm bin)/webpack --config webpack.server.js -w
-4. Terminal 2: $(npm bin)/webpack --config webpack.client.js -w
-5. Terminal 3: bin/rails s
-
-
-# Notes:
-1. You can mark the globals to export in one of 2 ways:
-   a. Recommended: See serverGlobals.jsx: 
-      ```javascript
-         import Something from '../Something'; 
-         global.Something = Something;
-      ``` 
-   b. Declare in webpack config file
-2. If you change the code in lib/react_rails_server_rendering/react_renderer
-   then might require a server restart. However, changing the contents
-   of the javascript file don't seem matter, so long as webpack recompiles it.
-
-# References
-1. [Charlie Marsh's article "Rendering React Components on the Server"](http://www.crmarsh.com/react-ssr/)
-2. [Node globals](https://nodejs.org/api/globals.html#globals_global)
