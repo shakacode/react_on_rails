@@ -1,3 +1,5 @@
+<%= render "header" %>
+
 <h1>React Rails Server Rendering</h1>
 
 <hr/>
@@ -9,7 +11,14 @@
 <p>
   That will generate this:
 </p>
-<%= react_component("App", @app_props) %>
+
+<!-- This works if we turn off server side rendering -->
+<!--< % cache @app_props do %>-->
+  <% puts "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" %>
+  <% puts "server rendering react component" %>
+  <% puts "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" %>
+  <%= react_component("App", @app_props) %>
+<!--< % end %>-->
 
 <hr/>
 

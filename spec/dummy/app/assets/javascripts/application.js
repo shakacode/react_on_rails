@@ -13,8 +13,6 @@
 //= require jquery
 //= require jquery_ujs
 
-// todo -- get turbolinks to work!
-// require turbolinks
-
+//= require turbolinks
 //= require generated/client
 

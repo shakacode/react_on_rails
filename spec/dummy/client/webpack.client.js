@@ -14,7 +14,10 @@ module.exports = {
   },
   module: {
     loaders: [
-      { loader: 'babel-loader' }
+      { loader: 'babel-loader' },
+
+      // React is necessary for the client rendering:
+      { test: require.resolve('react'), loader: 'expose?React' },
     ]
   }
 };

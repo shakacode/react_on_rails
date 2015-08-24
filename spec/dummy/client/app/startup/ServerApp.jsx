@@ -1,5 +1,7 @@
 // This is loaded by execJs and Rails to generate the HTML used for server rendering.
 // Compare this file to ./ClientApp.jsx
+// This module should export one default method that take props and returns the react component to
+// render.
 import React                from 'react';
 import { combineReducers }  from 'redux';
 import { applyMiddleware }  from 'redux';
@@ -12,7 +14,6 @@ import reducers        from '../reducers/reducersIndex';
 import HelloWorldContainer  from '../components/HelloWorldContainer';
 
 export default (props) => {
-
   const combinedReducer = combineReducers(reducers);
 
   // This is where we'll put in the middleware for the async function. Placeholder.

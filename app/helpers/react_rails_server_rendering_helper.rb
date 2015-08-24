@@ -24,20 +24,33 @@ module ReactRailsServerRenderingHelper
     # server has already rendered the HTML.
 
     # TODO: Bootstrap the react component on the server, checking if page loaded or document loaded
+
+    dataVariable = "__#{component_name.camelize(:lower)}Data__"
+    reactComponent = component_name.camelize
+    @react_component_index ||= 0
+
+    # TODO: What if you want to render the same component multiple times on the same page?
+    domId = "#{component_name}-react-component-#{@react_component_index}"
+    @react_component_index += 1
+    turbolinks_loaded = Object.const_defined?(:Turbolinks)
+    install_render_events = turbolinks_loaded ? turbolinks_bootstrap : non_turbolinks_bootstrap
+
     page_loaded_js = <<-JS
-        window.__#{component_name.camelize(:lower)}Data__ = #{props.to_json};
-        // Here is where were put the bootstrapping code for the client
+      window.#{dataVariable} = #{props.to_json};
+      #{define_render_if_dom_node_present(reactComponent, dataVariable, domId)}
+      #{install_render_events}
     JS
+
     data_from_server_script_tag = javascript_tag(page_loaded_js)
 
     # Create the HTML rendering part
     render_js_expression = <<-JS
-        renderReactComponent(this.#{component_name.camelize}, #{props.to_json})
+        renderReactComponent(this.#{reactComponent}, #{props.to_json})
     JS
     server_rendered_react_component_html = render_js(render_js_expression)
     rendered_output = content_tag(:div,
                                   server_rendered_react_component_html,
-                                  id: component_name.camelize(:lower))
+                                  id: domId)
 
     <<-HTML.strip_heredoc.html_safe
       #{data_from_server_script_tag}
@@ -51,5 +64,71 @@ module ReactRailsServerRenderingHelper
   # string of proper HTML.
   def render_js(js_expression)
     ReactRailsServerRendering::ReactRenderer.new.render_js(js_expression).html_safe
+  end
+
+  private
+
+  def define_render_if_dom_node_present(reactComponent, dataVariable, domId)
+    <<-JS.strip_heredoc
+      var renderIfDomNodePresent = function() {
+        var appDOMNode = document.getElementById('#{domId}');
+        if (appDOMNode) {
+          console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
+          console.log("DID CLIENT SIDE RENDER");
+          console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
+          var reactComponent = #{reactComponent}(#{dataVariable});
+          React.render(reactComponent, appDOMNode);
+        }
+      }
+    JS
+  end
+
+  def non_turbolinks_bootstrap
+    <<-JS.strip_heredoc
+      document.addEventListener("DOMContentLoaded", function(event) {
+        console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
+        console.log("DOMContentLoaded event fired");
+        console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
+        renderIfDomNodePresent();
+      });
+    JS
+  end
+
+  def turbolinks_bootstrap
+    <<-JS.strip_heredoc
+      var turbolinksInstalled = typeof(Turbolinks) !== 'undefined';
+      console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
+      console.log("turbolinksInstalled is %O", turbolinksInstalled);
+      console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
+      if (!turbolinksInstalled) {
+        console.log("WARNING: NO TurboLinks detected in JS, but it's in your Gemfile");
+        #{non_turbolinks_bootstrap}
+      } else {
+        function onPageChange(event) {
+          console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
+          console.log("page:change event fired");
+          console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
+          var removePageChangeListener = function() {
+            console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
+            console.log("removed page:change event listener fired");
+            console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
+            document.removeEventListener("page:change", onPageChange);
+            document.removeEventListener("page:before-unload", removePageChangeListener);
+            console.log("removed both event listeners");
+          };
+          document.addEventListener("page:before-unload", removePageChangeListener);
+
+          document.addEventListener("page:after-remove", function() {
+            console.log("page:after-remove called")
+          });
+
+          renderIfDomNodePresent();
+        }
+        console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
+        console.log("Add turbolinks handler page:change handler");
+        console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
+        document.addEventListener("page:change", onPageChange);
+      }
+    JS
   end
 end
