@@ -13,7 +13,7 @@ Supports:
 The Shaka Code team!
 
 1. [Justin Gordon](https://github.com/justin808/)
-2. [Samnang Chhun)(https://github.com/samnang)
+2. [Samnang Chhun](https://github.com/samnang)
 3. [Alex Fedoseev](https://github.com/alexfedoseev)
 
 # Key Info
