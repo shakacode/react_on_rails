@@ -12,7 +12,11 @@ Rails.application.configure do
   # Show full error reports and disable caching.
   config.consider_all_requests_local       = true
 
-  config.action_controller.perform_caching = true
+  $rails_perform_caching = ENV["RAILS_USE_CACHE"].nil? || ENV["RAILS_USE_CACHE"][0] != "N"
+  puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+  puts "Using caching = #{$rails_perform_caching}"
+  puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+  config.action_controller.perform_caching = $rails_perform_caching
 
   # Don't care if the mailer can't send.
   config.action_mailer.raise_delivery_errors = false

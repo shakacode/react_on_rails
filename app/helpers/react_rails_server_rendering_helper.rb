@@ -33,7 +33,7 @@ module ReactRailsServerRenderingHelper
     domId = "#{component_name}-react-component-#{@react_component_index}"
     @react_component_index += 1
     turbolinks_loaded = Object.const_defined?(:Turbolinks)
-    install_render_events = turbolinks_loaded ? turbolinks_bootstrap : non_turbolinks_bootstrap
+    install_render_events = turbolinks_loaded ? turbolinks_bootstrap(domId) : non_turbolinks_bootstrap
 
     page_loaded_js = <<-JS
       window.#{dataVariable} = #{props.to_json};
@@ -71,13 +71,13 @@ module ReactRailsServerRenderingHelper
   def define_render_if_dom_node_present(reactComponent, dataVariable, domId)
     <<-JS.strip_heredoc
       var renderIfDomNodePresent = function() {
-        var appDOMNode = document.getElementById('#{domId}');
-        if (appDOMNode) {
+        var domNode = document.getElementById('#{domId}');
+        if (domNode) {
           console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
           console.log("DID CLIENT SIDE RENDER");
           console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
           var reactComponent = #{reactComponent}(#{dataVariable});
-          React.render(reactComponent, appDOMNode);
+          React.render(reactComponent, domNode);
         }
       }
     JS
@@ -94,11 +94,11 @@ module ReactRailsServerRenderingHelper
     JS
   end
 
-  def turbolinks_bootstrap
+  def turbolinks_bootstrap(domId)
     <<-JS.strip_heredoc
       var turbolinksInstalled = typeof(Turbolinks) !== 'undefined';
       console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
-      console.log("turbolinksInstalled is %O", turbolinksInstalled);
+      console.log("Configuring for turbolinks.");
       console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
       if (!turbolinksInstalled) {
         console.log("WARNING: NO TurboLinks detected in JS, but it's in your Gemfile");
@@ -109,12 +109,13 @@ module ReactRailsServerRenderingHelper
           console.log("page:change event fired");
           console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
           var removePageChangeListener = function() {
-            console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
-            console.log("removed page:change event listener fired");
-            console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
             document.removeEventListener("page:change", onPageChange);
             document.removeEventListener("page:before-unload", removePageChangeListener);
-            console.log("removed both event listeners");
+            var domNode = document.getElementById('#{domId}');
+            React.unmountComponentAtNode(domNode);
+            console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
+            console.log("removed both event listeners and component at dom node");
+            console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
           };
           document.addEventListener("page:before-unload", removePageChangeListener);
 

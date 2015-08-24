@@ -9,10 +9,13 @@
   <%%= react_component(\"App\", @app_props) %>
 </code>
 <p>
+  Server Caching (Rails.application.config.perform_caching) is <%= $rails_perform_caching %>
+</p>
+<p>
   That will generate this:
 </p>
 
-<!-- This works if we turn off server side rendering -->
+
 <% cache @app_props do %>
   <% puts "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" %>
   <% puts "server rendering react component" %>
