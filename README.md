@@ -57,9 +57,14 @@ SPIKE with Samnang and Justin on making React server render with Webpack!
 
 # Notes:
 1. You can mark the globals to export in one of 2 ways:
-   a. Use global.Something = Something (see Global.js)
+   a. Recommended: See serverGlobals.jsx: 
+      ```javascript
+         import Something from '../Something'; 
+         global.Something = Something;
+      ``` 
    b. Declare in webpack config file
-2. models/execjs_renderer changes often require a server restart. However, changing the contents
+2. If you change the code in lib/react_rails_server_rendering/react_renderer
+   then might require a server restart. However, changing the contents
    of the javascript file don't seem matter, so long as webpack recompiles it.
 
 # References

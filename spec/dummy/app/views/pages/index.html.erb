@@ -1,19 +1,26 @@
-<h1>
-  React Rails Server Rendering
-</h1>
+<h1>React Rails Server Rendering</h1>
 
-<!-- props should be set in the controller -->
-<% props = { helloWorldData: { name: "Prop from Rails!" } } %>
+<hr/>
 
+<h1>React Component</h1>
+<code>
+  <%%= react_component(\"App\", @app_props) %>
+</code>
+<p>
+  That will generate this:
+</p>
+<%= react_component("App", @app_props) %>
 
-<!--
-CRITICAL NOT to have white space after wrapper div or else React complains
-that the server side HTML does not match client side.
--->
+<hr/>
 
-<!--TODO MOVE THIS to one helper method react_component("App", props) -->
-<!-- This sets the props for the client side app -->
-<!-- Get the id tag by taking lower case version of component name -->
-<!-- Offer option to put in props -->
-<%= javascript_tag "window.__DATA_FROM_RAILS__ = #{props.to_json};" %>
-<div id="app"><%= react_component("App", props) %></div>
+<h1>Non-React Component</h1>
+For example, Suppose you have some JavaScript that generates a string of HTML:
+<br/>
+<code>
+  this.HelloString.world()
+</code>
+<p>
+  That will generate this:
+</p>
+
+<%= render_js("this.HelloString.world()") %>
