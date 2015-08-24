@@ -13,12 +13,12 @@
 </p>
 
 <!-- This works if we turn off server side rendering -->
-<!--< % cache @app_props do %>-->
+<% cache @app_props do %>
   <% puts "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" %>
   <% puts "server rendering react component" %>
   <% puts "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" %>
   <%= react_component("App", @app_props) %>
-<!--< % end %>-->
+<% end %>
 
 <hr/>
 
