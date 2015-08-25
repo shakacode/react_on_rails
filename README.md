@@ -1,5 +1,7 @@
 # ReactRailsServerRendering
 
+Published: https://rubygems.org/gems/react_rails_server_rendering
+
 Supports:
 
 1. Rails
