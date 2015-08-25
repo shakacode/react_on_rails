@@ -18,7 +18,12 @@
     "redux-thunk": "^0.1.0",
     "webpack": "^1.10.1"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "babel-eslint": "^4.0.10",
+    "eslint": "^1.2.1",
+    "eslint-config-airbnb": "0.0.8",
+    "eslint-plugin-react": "^3.2.3"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
