@@ -1,16 +1,14 @@
-import React                    from 'react';
-import { connect }              from 'react-redux';
+import React from 'react';
+import { connect } from 'react-redux';
 
-import HelloWorldRedux               from './HelloWorldRedux';
+import HelloWorldRedux from './HelloWorldRedux';
 
-import * as helloWorldActions   from '../actions/HelloWorldActions';
+import * as helloWorldActions from '../actions/HelloWorldActions';
 
-@connect(state => {
-  return {
-    // This is the slice of the data, named the same as the component
-    helloWorldData: state.helloWorldData
-  }
-}, helloWorldActions)
+@connect(state => ({
+  // This is the slice of the data, named the same as the component
+  helloWorldData: state.helloWorldData,
+}), helloWorldActions)
 
 export default class HelloWorldContainer extends React.Component {
   constructor(props, context) {

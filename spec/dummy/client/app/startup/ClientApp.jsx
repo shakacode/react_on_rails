@@ -1,15 +1,15 @@
 // Top level component for client side.
 // Compare this to the ./ServerApp.jsx file which is used for server side rendering.
 
-import React                from 'react';
-import { combineReducers }  from 'redux';
-import { applyMiddleware }  from 'redux';
-import { createStore }      from 'redux';
-import { Provider }         from 'react-redux';
-import middleware           from 'redux-thunk';
+import React from 'react';
+import { combineReducers } from 'redux';
+import { applyMiddleware } from 'redux';
+import { createStore } from 'redux';
+import { Provider } from 'react-redux';
+import middleware from 'redux-thunk';
 
-import reducers             from '../reducers/reducersIndex';
-import HelloWorldContainer  from '../components/HelloWorldContainer';
+import reducers from '../reducers/reducersIndex';
+import HelloWorldContainer from '../components/HelloWorldContainer';
 
 /*
  *  Export a function that takes the props and returns a ReactComponent.
@@ -17,9 +17,9 @@ import HelloWorldContainer  from '../components/HelloWorldContainer';
  *  React will see that the state is the same and not do anything.
  *
  */
-window.App = (props) => {
+window.App = props => {
   const combinedReducer = combineReducers(reducers);
-  const store = applyMiddleware()(createStore)(combinedReducer, props);
+  const store = applyMiddleware(middleware)(createStore)(combinedReducer, props);
 
   const reactComponent = (
     <Provider store={store}>

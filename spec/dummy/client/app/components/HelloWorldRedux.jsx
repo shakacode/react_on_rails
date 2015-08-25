@@ -1,7 +1,14 @@
-import React from 'react';
+import React, { PropTypes } from 'react';
 
 // Super simple example of the simplest possible React component
 export default class HelloWorldRedux extends React.Component {
+
+  static propTypes = {
+    helloWorldData: PropTypes.shape({
+      name: PropTypes.string,
+    }).isRequired,
+    updateName: PropTypes.func.isRequired,
+  }
 
   // Not necessary if we only call super, but we'll need to initialize state, etc.
   constructor(props, context) {
@@ -14,13 +21,18 @@ export default class HelloWorldRedux extends React.Component {
   }
 
   render() {
+    const { name } = this.props.helloWorldData;
+    // Same:
+    // const name = this.props.helloWorldData.name;
+
     return (
       <div>
         <h3>
-          Redux Hello, {this.props.helloWorldData.name}!
+          Redux Hello, {name}!
         </h3>
         <p>
-          With Redux, say hello to: <input type="text" ref="name" defaultValue={this.props.helloWorldData.name} onChange={::this._handleChange} />
+          With Redux, say hello to:
+          <input type="text" ref="name" defaultValue={name} onChange={::this._handleChange} />
         </p>
       </div>
     );

@@ -15,13 +15,16 @@ export default class HelloWorld extends React.Component {
   }
 
   render() {
+    const { name } = this.state;
+
     return (
       <div>
         <h3>
-          Hello, {this.state.name}!
+          Hello, {name}!
         </h3>
         <p>
-          Say hello to: <input type="text" ref="name" defaultValue={this.state.name} onChange={::this._handleChange} />
+          Say hello to:
+          <input type="text" ref="name" defaultValue={name} onChange={::this._handleChange} />
         </p>
       </div>
     );

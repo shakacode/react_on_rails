@@ -3,15 +3,15 @@ const path = require('path');
 module.exports = {
   entry: [
     'startup/ClientApp',
-    'startup/ClientHelloWorldComponent'
+    'startup/ClientHelloWorldComponent',
   ],
   output: {
     path: '../app/assets/javascripts/generated',
-    filename: "client.js"
+    filename: 'client.js',
   },
   resolve: {
     root: [path.join(__dirname, 'app')],
-    extensions: ['', '.js', '.jsx']
+    extensions: ['', '.js', '.jsx'],
   },
   module: {
     loaders: [
@@ -19,6 +19,6 @@ module.exports = {
 
       // React is necessary for the client rendering:
       { test: require.resolve('react'), loader: 'expose?React' },
-    ]
-  }
+    ],
+  },
 };
