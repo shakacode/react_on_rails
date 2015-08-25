@@ -4,27 +4,48 @@
 
 <hr/>
 
-<h1>React Component</h1>
+<h1>Simple Client Rendered Component</h1>
+<!-- Passing prerender: false to not render on server -->
 <code>
-  <%%= react_component(\"App\", @app_props) %>
+  <%%= react_component("HelloWorldComponent", @app_props_hello, prerender: false, trace: true) %>
 </code>
-<p>
-  Server Caching (Rails.application.config.perform_caching) is <%= $rails_perform_caching %>
-</p>
-<p>
-  That will generate this:
-</p>
+<%= react_component("HelloWorldComponent", @app_props_hello, prerender: false, trace: true) %>
+<hr/>
 
+<h1>Showing you can put the same component twice on a page with different props</h1>
+<code>
+  <%%= react_component("HelloWorldComponent", @app_props_hello_again, prerender: false, trace: true) %>
+</code>
 
-<% cache @app_props do %>
-  <% puts "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" %>
-  <% puts "server rendering react component" %>
-  <% puts "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" %>
-  <%= react_component("App", @app_props) %>
-<% end %>
+<%= react_component("HelloWorldComponent", @app_props_hello_again, prerender: false, trace: true) %>
 
 <hr/>
 
+<h1>Server Rendered/Cached React/Redux Component</h1>
+<p>
+  Server Caching (Rails.application.config.perform_caching) is <%= $rails_perform_caching %>
+  <% if $rails_perform_caching %>
+    <br/><b>WARNING: be sure to clear the cache by opening a console and running Rails.cache.clear</b>
+  <% end %>
+</p>
+<code>
+  <%% cache @app_props_server_render do %><br/>
+  <%%    = react_component("App", @app_props_server_render, trace: true) %><br/>
+  <%% end %>
+</code>
+<p>
+  That will generate this, which is done only once on the server side:
+</p>
+
+<% cache @app_props_server_render do %>
+  <% puts "=" * 80 %>
+  <% puts "server rendering react component" %>
+  <% puts "=" * 80 %>
+  <!-- Default for prerender is true -->
+  <%= react_component("App", @app_props_server_render, trace: true) %>
+<% end %>
+
+<hr/>
 <h1>Non-React Component</h1>
 For example, Suppose you have some JavaScript that generates a string of HTML:
 <br/>

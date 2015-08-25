@@ -16,8 +16,6 @@ import HelloWorldContainer  from '../components/HelloWorldContainer';
  *  This is used for the client rendering hook after the page html is rendered.
  *  React will see that the state is the same and not do anything.
  *
- *  TODO: Seems that we can simplify the duplication with ServerApp.jsx.
- *  TODO: This returns an error when using fragment caching.
  */
 window.App = (props) => {
   const combinedReducer = combineReducers(reducers);

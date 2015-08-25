@@ -1,9 +1,21 @@
 class PagesController < ApplicationController
   def index
     # This is the props used by the React component.
-    @app_props = {
+    @app_props_server_render = {
       helloWorldData: {
-        name: "Prop from Rails from server rendering!"
+        name: "Mr. Server Side Rendering"
+      }
+    }
+
+    @app_props_hello = {
+      helloWorldData: {
+        name: "Mrs. Client Side Rendering"
+      }
+    }
+
+    @app_props_hello_again = {
+      helloWorldData: {
+        name: "Mrs. Client Side Hello Again"
       }
     }
   end

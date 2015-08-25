@@ -1,11 +1,9 @@
 import React                    from 'react';
 import { connect }              from 'react-redux';
 
-import HelloWorld               from './HelloWorld';
+import HelloWorldRedux               from './HelloWorldRedux';
 
 import * as helloWorldActions   from '../actions/HelloWorldActions';
-
-// TODO: Show some comments of what this looks like without ES7 decorator syntax
 
 @connect(state => {
   return {
@@ -21,7 +19,7 @@ export default class HelloWorldContainer extends React.Component {
 
   render() {
     return (
-      <HelloWorld {...this.props} />
+      <HelloWorldRedux {...this.props} />
     );
   }
 }

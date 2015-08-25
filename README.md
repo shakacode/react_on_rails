@@ -16,6 +16,8 @@ The Shaka Code team!
 2. [Samnang Chhun](https://github.com/samnang)
 3. [Alex Fedoseev](https://github.com/alexfedoseev)
 
+And based on the work of the [react-rails gem](https://github.com/reactjs/react-rails)
+
 # Key Info
 Currently in proof of concept phase.
 
