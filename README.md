@@ -54,6 +54,14 @@ Contributions and pull requests welcome!
    log as well as the browser console to see what's going on with regards to server rendering and
    caching.
 
+# Key Tips
+1. See sample app in `spec/dummy` for how to set this up. 
+2. The file used for server rendering is hard coded as generated/server.js
+   (assets/javascripts/generated/server.js)
+3. The default for rendering right now is `prerender: true`. **NOTE:** This does not work for
+   components, namely react-router, that use an async setup for server rendering.
+4. The API for objects exposed differs from the react-rails gem in that you expose a function that
+   returns a react component. We'll be changing that to take either a function or a React component.
 
 ## References
 * [Making the helper for server side rendering work with JS created by Webpack] (https://github.com/reactjs/react-rails/issues/301#issuecomment-133098974)
