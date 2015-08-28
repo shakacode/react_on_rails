@@ -1,6 +1,6 @@
-require 'react_rails_server_rendering/react_renderer'
+require 'react_on_rails/react_renderer'
 
-module ReactRailsServerRenderingHelper
+module ReactOnRailsHelper
 
   # component_name: React component name
   # props: Ruby Hash which contains the properties to pass to the react object
@@ -73,7 +73,7 @@ module ReactRailsServerRenderingHelper
   # This method could be used by itself to render the output of any javascript that returns a
   # string of proper HTML.
   def render_js(js_expression)
-    ReactRailsServerRendering::ReactRenderer.new.render_js(js_expression).html_safe
+    ReactOnRails::ReactRenderer.new.render_js(js_expression).html_safe
   end
 
   private
@@ -87,7 +87,6 @@ module ReactRailsServerRenderingHelper
       ""
     end
   end
-
 
   def define_render_if_dom_node_present(react_component, data_variable, dom_id, trace)
     <<-JS.strip_heredoc

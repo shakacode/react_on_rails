@@ -78,7 +78,7 @@ Contributions and pull requests welcome!
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'react_rails_server_rendering'
+gem 'react_on_rails'
 ```
 
 And then execute:
@@ -87,7 +87,7 @@ And then execute:
 
 Or install it yourself as:
 
-    $ gem install react_rails_server_rendering
+    $ gem install react_on_rails
 
 ## Usage
 
@@ -101,7 +101,7 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/shakacode/react_rails_server_rendering. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](contributor-covenant.org) code of conduct.
+Bug reports and pull requests are welcome on GitHub at https://github.com/shakacode/react_on_rails. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](contributor-covenant.org) code of conduct.
 
 
 ## License

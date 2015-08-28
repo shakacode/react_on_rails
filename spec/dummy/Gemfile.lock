@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_rails_server_rendering (0.1.0)
+    react_on_rails (0.1.0)
       execjs (~> 2.5)
       rails (~> 4.2)
 
@@ -183,7 +183,7 @@ DEPENDENCIES
   pry-rescue
   pry-stack_explorer
   rails (= 4.2.3)
-  react_rails_server_rendering!
+  react_on_rails!
   sass-rails (~> 5.0)
   sdoc (~> 0.4.0)
   spring

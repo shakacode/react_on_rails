@@ -1,4 +1,4 @@
-module ReactRailsServerRendering
+module ReactOnRails
   class ReactRenderer
 
     # "this" does not need a closure as it refers to the "this" defined by the

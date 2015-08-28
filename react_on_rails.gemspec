@@ -1,17 +1,17 @@
 # coding: utf-8
 lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'react_rails_server_rendering/version'
+require 'react_on_rails/version'
 
 Gem::Specification.new do |spec|
-  spec.name          = "react_rails_server_rendering"
-  spec.version       = ReactRailsServerRendering::VERSION
+  spec.name          = "react_on_rails"
+  spec.version       = ReactOnRails::VERSION
   spec.authors       = ["Justin Gordon"]
-  spec.email         = ["justin.gordon@gmail.com"]
+  spec.email         = ["justin@shakacode.com"]
 
   spec.summary       = %q{Rails with react server rendering with webpack. }
   spec.description   = %q{See README.md}
-  spec.homepage      = "https://github.com/shakacode/react_rails_server_rendering"
+  spec.homepage      = "https://github.com/shakacode/react_on_rails"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files -z`.split("\x0").reject { |f| f.match(%r{^(test|spec|features)/}) }

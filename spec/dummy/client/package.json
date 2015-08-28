@@ -4,7 +4,7 @@
   "description": "example of server rendering",
   "repository": {
     "type": "git",
-    "url": "https://github.com/shakacode/react_rails_server_rendering.git"
+    "url": "https://github.com/shakacode/react_on_rails.git"
   },
   "main": "js/app.js",
   "dependencies": {

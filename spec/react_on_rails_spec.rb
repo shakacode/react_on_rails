@@ -1,8 +1,8 @@
 require 'spec_helper'
 
-describe ReactRailsServerRendering do
+describe ReactOnRails do
   it 'has a version number' do
-    expect(ReactRailsServerRendering::VERSION).not_to be nil
+    expect(ReactOnRails::VERSION).not_to be nil
   end
 
   it 'does something useful' do
