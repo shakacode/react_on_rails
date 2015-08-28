@@ -1,6 +1,6 @@
-# ReactRailsServerRendering
+# React On Rails
 
-Published: https://rubygems.org/gems/react_rails_server_rendering
+Published: https://rubygems.org/gems/react_on_rails
 
 Supports:
 
@@ -10,6 +10,7 @@ Supports:
 4. Redux
 5. Turbolinks
 6. Server side rendering with fragment caching
+7. react-router for client side rendering (and maybe server side eventually)
 
 # Authors
 The Shaka Code team!
