@@ -21,7 +21,7 @@ The Shaka Code team!
 And based on the work of the [react-rails gem](https://github.com/reactjs/react-rails)
 
 # Key Info
-Currently in proof of concept phase.
+Currently being implemented in 3 production projects (not yet live).
 
 1. https://github.com/justin808/react-webpack-rails-tutorial/
 2. http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/
@@ -56,10 +56,13 @@ Contributions and pull requests welcome!
 
 # Key Tips
 1. See sample app in `spec/dummy` for how to set this up. 
-2. The file used for server rendering is hard coded as generated/server.js
-   (assets/javascripts/generated/server.js)
+2. The file used for server rendering is hard coded as `generated/server.js`
+   (assets/javascripts/generated/server.js).
+3. If you're only doing client rendering, you still *MUST* create an empty version of this file. This
+   will soon change so that this is not necessary.
 3. The default for rendering right now is `prerender: true`. **NOTE:** This does not work for
-   components, namely react-router, that use an async setup for server rendering.
+   components, namely react-router, that use an async setup for server rendering. *We may change the default
+   to be `prerender: false`, so it's a good idea to specify this.
 4. The API for objects exposed differs from the react-rails gem in that you expose a function that
    returns a react component. We'll be changing that to take either a function or a React component.
 
