@@ -4,6 +4,8 @@ Published: https://rubygems.org/gems/react_on_rails
 
 See [Action Plan for v1.0](https://github.com/shakacode/react_on_rails/issues/1)
 
+Feedback and pull-requests encouraged! Thanks in advance!
+
 Supports:
 
 1. Rails
