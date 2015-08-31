@@ -26,8 +26,8 @@ module ReactOnRailsHelper
     # server has already rendered the HTML.
     @react_component_index ||= 0
 
-    prerender = options[:prerender].nil? ? true : options[:prerender]
-    trace = options[:trace].nil? ? false : options[:trace]
+    prerender = options.fetch(:prerender) { ReactOnRails.configuration.prerender }
+    trace = options.fetch(:trace, false)
 
     dataVariable = "__#{component_name.camelize(:lower)}Data#{@react_component_index}__"
     reactComponent = component_name.camelize
