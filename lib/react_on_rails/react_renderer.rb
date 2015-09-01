@@ -35,10 +35,8 @@ module ReactOnRails
     private
 
     def bundle_js_code
-      # Calling to_s to get contents of sprockets.
-
-      # TODO: Make this file name configurable
-      Rails.application.assets['generated/server.js'].to_s
+      js_file = Rails.root.join(ReactOnRails.configuration.bundle_js_file)
+      File.read(js_file)
     end
   end
 end
