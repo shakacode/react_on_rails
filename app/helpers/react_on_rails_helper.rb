@@ -25,7 +25,6 @@ module ReactOnRailsHelper
     # (re-hydrate the data). This enables react rendered on the client to see that the
     # server has already rendered the HTML.
     @react_component_index ||= 0
-
     prerender = options.fetch(:prerender) { ReactOnRails.configuration.prerender }
     trace = options.fetch(:trace, false)
 
@@ -49,7 +48,6 @@ module ReactOnRailsHelper
 
     # Create the HTML rendering part
     if prerender
-
       render_js_expression = <<-JS
           renderReactComponent(this.#{reactComponent}, #{props.to_json})
       JS

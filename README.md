@@ -65,11 +65,20 @@ Contributions and pull requests welcome!
    (assets/javascripts/generated/server.js).
 3. If you're only doing client rendering, you still *MUST* create an empty version of this file. This
    will soon change so that this is not necessary.
-3. The default for rendering right now is `prerender: true`. **NOTE:** This does not work for
-   components, namely react-router, that use an async setup for server rendering. *We may change the default
-   to be `prerender: false`, so it's a good idea to specify this.
+3. The default for rendering right now is `prerender: false`. **NOTE:**  Server side rendering does 
+   not work for some components, namely react-router, that use an async setup for server rendering. 
+   You can configure the default for prerender in your config. 
 4. The API for objects exposed differs from the react-rails gem in that you expose a function that
    returns a react component. We'll be changing that to take either a function or a React component.
+
+# Example Configuration, config/react_on_rails.rb
+```ruby
+   ReactOnRails.configure do |config|
+     config.bundle_js_file = "app/assets/javascripts/generated/server.js" # This is the default
+     config.prerender = true # default is false
+   end
+```
+
 
 ## References
 * [Making the helper for server side rendering work with JS created by Webpack] (https://github.com/reactjs/react-rails/issues/301#issuecomment-133098974)

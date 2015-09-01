@@ -6,7 +6,7 @@ module ReactOnRails
   def self.configuration
     @configuration ||= Configuration.new(
       bundle_js_file: "app/assets/javascripts/generated/server.js",
-      prerender: true
+      prerender: false
     )
   end
 

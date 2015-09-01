@@ -41,7 +41,7 @@
   <% puts "=" * 80 %>
   <% puts "server rendering react component" %>
   <% puts "=" * 80 %>
-  <!-- Default for prerender is true -->
+  <!-- Default for prerender is true for the app, set in config/react_on_rails.rb -->
   <%= react_component("App", @app_props_server_render, trace: true) %>
 <% end %>
 
