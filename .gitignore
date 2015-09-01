@@ -7,7 +7,7 @@
 /pkg/
 /spec/reports/
 /tmp/
-
+*.gem
 
 /spec/dummy/client/node_modules
 /spec/dummy/app/assets/javascripts/generated/
@@ -15,3 +15,4 @@
 # RVM
 .ruby-version
 .ruby-gemset
+
