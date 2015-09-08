@@ -28,7 +28,7 @@ And based on the work of the [react-rails gem](https://github.com/reactjs/react-
 # Key Info
 Currently being implemented in 3 production projects (not yet live).
 
-1. https://github.com/justin808/react-webpack-rails-tutorial/
+1. https://github.com/justin808/react-webpack-rails-tutorial/ See https://github.com/shakacode/react-webpack-rails-tutorial/pull/84 for how we integrated it!
 2. http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/
 3. http://forum.railsonmaui.com
 4. Lots of work to do in terms of docs, tests
