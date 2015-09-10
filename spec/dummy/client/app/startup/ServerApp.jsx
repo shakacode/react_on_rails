@@ -12,7 +12,9 @@ import middleware from 'redux-thunk';
 
 // Uses the index
 import reducers from '../reducers/reducersIndex';
+
 import HelloWorldContainer from '../components/HelloWorldContainer';
+import HelloWorld from '../components/HelloWorld';
 
 export default props => {
   const combinedReducer = combineReducers(reducers);
@@ -29,3 +31,6 @@ export default props => {
     </Provider>
   );
 };
+
+// This is an example of how to render a React component directly, without using Redux
+export { HelloWorld };

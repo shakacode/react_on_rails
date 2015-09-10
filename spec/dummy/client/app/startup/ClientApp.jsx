@@ -10,6 +10,7 @@ import middleware from 'redux-thunk';
 
 import reducers from '../reducers/reducersIndex';
 import HelloWorldContainer from '../components/HelloWorldContainer';
+import HelloWorld from '../components/HelloWorld';
 
 /*
  *  Export a function that takes the props and returns a ReactComponent.
@@ -28,3 +29,6 @@ window.App = props => {
   );
   return reactComponent;
 };
+
+// This is an example of how to render a React component directly, without using Redux
+window.HelloWorld = HelloWorld;

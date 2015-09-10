@@ -2,13 +2,19 @@ module ReactOnRails
   class ReactRenderer
 
     # "this" does not need a closure as it refers to the "this" defined by the
-    # calling the calling context which is the "this" in the execJs environment.
+    # calling context which is the "this" in the execJs environment.
     def render_js_react_component
       <<-JS.strip_heredoc
-      function renderReactComponent(componentClass, props) {
-        return this.React.renderToString(
-         componentClass(props)
-        );
+      function renderReactComponent(reactComponent, props) {
+        var element;
+
+        if (Object.getPrototypeOf(reactComponent) === this.React.Component) {
+          element = this.React.createElement(reactComponent, props);
+        } else {
+          // when using Redux, we need to pull the component off the wrapper function
+          element = reactComponent(props);
+        }
+        return this.React.renderToString(element);
       }
       JS
     end

@@ -49,7 +49,7 @@ module ReactOnRailsHelper
     # Create the HTML rendering part
     if prerender
       render_js_expression = <<-JS
-          renderReactComponent(this.#{reactComponent}, #{props.to_json})
+        renderReactComponent(this.#{reactComponent}, #{props.to_json})
       JS
       server_rendered_react_component_html = render_js(render_js_expression)
     else
@@ -90,10 +90,18 @@ module ReactOnRailsHelper
     <<-JS.strip_heredoc
       var renderIfDomNodePresent = function() {
         var domNode = document.getElementById('#{dom_id}');
+
         if (domNode) {
           #{debug_js(react_component, data_variable, dom_id, trace)}
-          var reactComponent = #{react_component}(#{data_variable});
-          React.render(reactComponent, domNode);
+          var element;
+
+          if (Object.getPrototypeOf(#{react_component}) === React.Component) {
+            element = React.createElement(#{react_component}, #{data_variable});
+          } else {
+            // when using Redux, we need to pull the component off the wrapper function
+            element = #{react_component}(#{data_variable});
+          }
+          React.render(element, domNode);
         }
       }
     JS
