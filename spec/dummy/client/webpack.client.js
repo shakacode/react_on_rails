@@ -3,7 +3,7 @@ const path = require('path');
 module.exports = {
   entry: [
     'startup/ClientApp',
-    'startup/ClientHelloWorldComponent',
+    'startup/ClientHelloWorldApp',
   ],
   output: {
     path: '../app/assets/javascripts/generated',

@@ -35,7 +35,7 @@
     <%% end %>
   </code>
   <p>
-    And this is an example of the server rendering a React component without Redux
+    And this is an example of a server rendered React component without Redux
   </p>
 
   <%= react_component("HelloWorld", @app_props_server_render, trace: true) %>
@@ -45,16 +45,16 @@
 <h1>Simple Client Rendered Component</h1>
 <!-- Passing prerender: false to not render on server -->
 <code>
-  <%%= react_component("HelloWorldComponent", @app_props_hello, prerender: false, trace: true) %>
+  <%%= react_component("HelloWorldApp", @app_props_hello, prerender: false, trace: true) %>
 </code>
-<%= react_component("HelloWorldComponent", @app_props_hello, prerender: false, trace: true) %>
+<%= react_component("HelloWorldApp", @app_props_hello, prerender: false, trace: true) %>
 <hr/>
 
 <h1>Showing you can put the same component twice on a page with different props</h1>
 <code>
-  <%%= react_component("HelloWorldComponent", @app_props_hello_again, prerender: false, trace: true) %>
+  <%%= react_component("HelloWorldApp", @app_props_hello_again, prerender: false, trace: true) %>
 </code>
-<%= react_component("HelloWorldComponent", @app_props_hello_again, prerender: false, trace: true) %>
+<%= react_component("HelloWorldApp", @app_props_hello_again, prerender: false, trace: true) %>
 <hr/>
 
 <h1>Simple Component Without Redux</h1>
