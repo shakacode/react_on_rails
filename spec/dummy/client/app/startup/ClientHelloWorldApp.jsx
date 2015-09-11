@@ -10,3 +10,11 @@ import HelloWorld from '../components/HelloWorld';
 window.HelloWorldApp = props => {
   return <HelloWorld {...props}/>;
 };
+
+/*
+ * If you wish to create a React component via a function, rather than simply props,
+ * then you need to set the property "generator" on that function to true.
+ * When that is done, the function is invoked with a single parameter of "props",
+ * and that function should return a react element.
+ */
+window.HelloWorldApp.generator = true;

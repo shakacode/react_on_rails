@@ -68,7 +68,7 @@ Contributions and pull requests welcome!
 3. The default for rendering right now is `prerender: false`. **NOTE:**  Server side rendering does
    not work for some components, namely react-router, that use an async setup for server rendering.
    You can configure the default for prerender in your config.
-4. You can expose either a React component or a function that returns a React component.
+4. You can expose either a React component or a function that returns a React component. If you wish to create a React component via a function, rather than simply props, then you need to set the property "generator" on that function to true. When that is done, the function is invoked with a single parameter of "props", and that function should return a React element.
 
 # Example Configuration, config/react_on_rails.rb
 ```ruby

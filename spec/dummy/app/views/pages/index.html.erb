@@ -60,8 +60,10 @@
 <h1>Simple Component Without Redux</h1>
 <code>
   <%%= react_component("HelloWorld", @app_props_hello, prerender: false, trace: true) %>
+  <%%= react_component("HelloES5", @app_props_hello, prerender: false, trace: true) %>
 </code>
 <%= react_component("HelloWorld", @app_props_hello, prerender: false, trace: true) %>
+<%= react_component("HelloES5", @app_props_hello, prerender: false, trace: true) %>
 <hr/>
 
 <h1>Non-React Component</h1>

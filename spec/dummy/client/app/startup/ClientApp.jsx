@@ -11,6 +11,7 @@ import middleware from 'redux-thunk';
 import reducers from '../reducers/reducersIndex';
 import HelloWorldContainer from '../components/HelloWorldContainer';
 import HelloWorld from '../components/HelloWorld';
+import HelloES5 from '../components/HelloES5';
 
 /*
  *  Export a function that takes the props and returns a ReactComponent.
@@ -30,5 +31,14 @@ window.App = props => {
   return reactComponent;
 };
 
+/*
+ * If you wish to create a React component via a function, rather than simply props,
+ * then you need to set the property "generator" on that function to true.
+ * When that is done, the function is invoked with a single parameter of "props",
+ * and that function should return a react element.
+ */
+window.App.generator = true;
+
 // This is an example of how to render a React component directly, without using Redux
 window.HelloWorld = HelloWorld;
+window.HelloES5 = HelloES5;

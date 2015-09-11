@@ -1,26 +1,17 @@
 module ReactOnRails
   class ReactRenderer
 
-    # "this" does not need a closure as it refers to the "this" defined by the
-    # calling context which is the "this" in the execJs environment.
-    def render_js_react_component
-      <<-JS.strip_heredoc
-      function renderReactComponent(reactComponent, props) {
-        var element;
-
-        if (Object.getPrototypeOf(reactComponent) === this.React.Component) {
-          element = this.React.createElement(reactComponent, props);
-        } else {
-          // when using Redux, we need to pull the component off the wrapper function
-          element = reactComponent(props);
-        }
-        return this.React.renderToString(element);
-      }
+    # Returns a React element, unwrapping it if the component is a generator function
+    def render_js_react_element(react_component, props)
+      <<-JS
+        #{react_component}.generator ?
+          #{react_component}(#{props}) :
+          this.React.createElement(#{react_component}, #{props})
       JS
     end
 
     def initialize
-      js_code = "#{bundle_js_code};\n#{render_js_react_component}"
+      js_code = "#{bundle_js_code};"
       @context = ExecJS.compile(js_code)
     end
 
