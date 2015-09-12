@@ -4,7 +4,8 @@ module ReactOnRails
     # Returns the JavaScript code to generate a React element.
     # The parameter react_component_name can be a React component or a generator function
     # that returns a React component. To be invoked as a function, react_component_name
-    # must have the property "generator" set to true
+    # must have the property "generator" set to true and be a function that
+    # takes one parameter, props, that is used to construct the React component.
     def self.render_js_react_element(react_component_name, props_name)
       <<-JS.strip_heredoc
         #{react_component_name}.generator ?
