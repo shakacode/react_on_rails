@@ -28,18 +28,18 @@ module ReactOnRailsHelper
     prerender = options.fetch(:prerender) { ReactOnRails.configuration.prerender }
     trace = options.fetch(:trace, false)
 
-    dataVariable = "__#{component_name.camelize(:lower)}Data#{@react_component_index}__"
-    reactComponent = component_name.camelize
-    domId = "#{component_name}-react-component-#{@react_component_index}"
+    data_variable = "__#{component_name.camelize(:lower)}Data#{@react_component_index}__"
+    react_component_name = component_name.camelize
+    dom_id = "#{component_name}-react-component-#{@react_component_index}"
     @react_component_index += 1
 
     turbolinks_loaded = Object.const_defined?(:Turbolinks)
-    install_render_events = turbolinks_loaded ? turbolinks_bootstrap(domId) : non_turbolinks_bootstrap
+    install_render_events = turbolinks_loaded ? turbolinks_bootstrap(dom_id) : non_turbolinks_bootstrap
 
     page_loaded_js = <<-JS
       (function() {
-        window.#{dataVariable} = #{props.to_json};
-        #{define_render_if_dom_node_present(reactComponent, dataVariable, domId, trace)}
+        window.#{data_variable} = #{props.to_json};
+        #{define_render_if_dom_node_present(react_component_name, data_variable, dom_id, trace)}
         #{install_render_events}
       })();
     JS
@@ -49,7 +49,7 @@ module ReactOnRailsHelper
     # Create the HTML rendering part
     if prerender
       render_js_expression = <<-JS
-        this.React.renderToString(#{render_js_react_element(reactComponent, props.to_json)});
+        this.React.renderToString(#{render_js_react_element(react_component_name, props.to_json)});
       JS
       server_rendered_react_component_html = render_js(render_js_expression)
     else
@@ -58,7 +58,7 @@ module ReactOnRailsHelper
 
     rendered_output = content_tag(:div,
                                   server_rendered_react_component_html,
-                                  id: domId)
+                                  id: dom_id)
 
     <<-HTML.strip_heredoc.html_safe
       #{data_from_server_script_tag}
@@ -76,27 +76,28 @@ module ReactOnRailsHelper
 
   private
 
-  def debug_js(react_component, data_variable, dom_id, trace)
+  def debug_js(react_component_name, data_variable, dom_id, trace)
     if trace
       <<-JS.strip_heredoc
-        console.log("CLIENT SIDE RENDERED #{react_component} with dataVariable #{data_variable} to dom node with id: #{dom_id}");
+        console.log("CLIENT SIDE RENDERED #{react_component_name} with data_variable #{data_variable} to dom node with id: #{dom_id}");
       JS
     else
       ""
     end
   end
 
-  def render_js_react_element(react_component, props)
-    ReactOnRails::ReactRenderer.new.render_js_react_element(react_component, props).html_safe
+  def render_js_react_element(react_component_name, props_name)
+    ReactOnRails::ReactRenderer.render_js_react_element(react_component_name, props_name)
   end
 
-  def define_render_if_dom_node_present(react_component, data_variable, dom_id, trace)
+  def define_render_if_dom_node_present(react_component_name, data_variable, dom_id, trace)
     <<-JS.strip_heredoc
       var renderIfDomNodePresent = function() {
         var domNode = document.getElementById('#{dom_id}');
         if (domNode) {
-          #{debug_js(react_component, data_variable, dom_id, trace)}
-          React.render(#{render_js_react_element(react_component, data_variable)}, domNode);
+          #{debug_js(react_component_name, data_variable, dom_id, trace)}
+          var reactElement = #{render_js_react_element(react_component_name, data_variable)};
+          React.render(reactElement, domNode);
         }
       }
     JS

@@ -1,12 +1,15 @@
 module ReactOnRails
   class ReactRenderer
 
-    # Returns a React element, unwrapping it if the component is a generator function
-    def render_js_react_element(react_component, props)
-      <<-JS
-        #{react_component}.generator ?
-          #{react_component}(#{props}) :
-          this.React.createElement(#{react_component}, #{props})
+    # Returns the JavaScript code to generate a React element.
+    # The parameter react_component_name can be a React component or a generator function
+    # that returns a React component. To be invoked as a function, react_component_name
+    # must have the property "generator" set to true
+    def self.render_js_react_element(react_component_name, props_name)
+      <<-JS.strip_heredoc
+        #{react_component_name}.generator ?
+          #{react_component_name}(#{props_name}) :
+          this.React.createElement(#{react_component_name}, #{props_name})
       JS
     end
 
