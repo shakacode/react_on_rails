@@ -98,7 +98,7 @@ module ReactOnRails
     end
 
     def bundle_js_code
-      js_file = Rails.root.join(ReactOnRails.configuration.bundle_js_file)
+      js_file = Rails.root.join(ReactOnRails.configuration.server_bundle_js_file)
       File.read(js_file)
     end
   end

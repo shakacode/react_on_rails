@@ -23,8 +23,8 @@ module ReactOnRailsHelper
   # props: Ruby Hash which contains the properties to pass to the react object
   #
   #  options:
-  #    prerender: <true/false> defaults to true
-  #    trace: <true/false> defaults to false, set to true to print additional info
+  #    prerender: <true/false> (configurable default), set to false when debugging!
+  #    trace: <true/false>  (configurable default), set to true to print additional info
   def react_component(component_name, props = {}, options = {})
     # Create the JavaScript and HTML to allow either client or server rendering of the
     # react_component.
@@ -32,8 +32,6 @@ module ReactOnRailsHelper
     # Create the JavaScript setup of the global to initialize the client rendering
     # (re-hydrate the data). This enables react rendered on the client to see that the
     # server has already rendered the HTML.
-    generator_function = options.fetch(:generator_function) { ReactOnRails.configuration.generator_function }
-
     # We use this react_component_index in case we have the same component multiple times on the page.
     react_component_index = next_react_component_index
     react_component_name = component_name.camelize # Not sure if we should be doing this (JG)
@@ -41,14 +39,13 @@ module ReactOnRailsHelper
 
     # Setup the page_loaded_js, which is the same regardless of prerendering or not!
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
-    trace = options.fetch(:trace, false)
     data_variable_name = "__#{component_name.camelize(:lower)}Data#{react_component_index}__"
     turbolinks_loaded = Object.const_defined?(:Turbolinks)
     install_render_events = turbolinks_loaded ? turbolinks_bootstrap(dom_id) : non_turbolinks_bootstrap
     page_loaded_js = <<-JS
       (function() {
         window.#{data_variable_name} = #{props.to_json};
-        #{define_render_if_dom_node_present(react_component_name, data_variable_name, dom_id, trace, generator_function)}
+        #{define_render_if_dom_node_present(react_component_name, data_variable_name, dom_id, trace(options), generator_function(options))}
         #{install_render_events}
       })();
     JS
@@ -75,13 +72,10 @@ module ReactOnRailsHelper
   end
 
   def server_rendered_react_component_html(options, props, react_component_name)
-    prerender = options.fetch(:prerender) { ReactOnRails.configuration.prerender }
-    generator_function = options.fetch(:generator_function) { ReactOnRails.configuration.generator_function }
-
-    if prerender
+    if prerender(options)
       render_js_expression = <<-JS
         (function(React) {
-          var reactElement = #{render_js_react_element(react_component_name, props.to_json, generator_function)};
+          var reactElement = #{render_js_react_element(react_component_name, props.to_json, generator_function(options))};
           return React.renderToString(reactElement);
         })(this.React);
       JS
@@ -105,6 +99,18 @@ module ReactOnRailsHelper
   end
 
   private
+
+  def trace(options)
+    options.fetch(:trace) { ReactOnRails.configuration.trace }
+  end
+
+  def generator_function(options)
+    options.fetch(:generator_function) { ReactOnRails.configuration.generator_function }
+  end
+
+  def prerender(options)
+    options.fetch(:prerender) { ReactOnRails.configuration.prerender }
+  end
 
   def debug_js(react_component_name, data_variable, dom_id, trace)
     if trace

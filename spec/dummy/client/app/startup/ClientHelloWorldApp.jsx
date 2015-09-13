@@ -7,5 +7,6 @@ import HelloWorld from '../components/HelloWorld';
  *  This is used for the client rendering hook after the page html is rendered.
  *  React will see that the state is the same and not do anything.
  *  Ensure that option generator_function is set to true when invoking the helper, or as default.
+ *  Note, this is imported as "HelloWorldApp" by "clientGlobals.jsx"
  */
 export default props => <HelloWorld {...props} />;

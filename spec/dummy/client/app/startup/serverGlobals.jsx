@@ -2,6 +2,11 @@
 // Example of React + Redux
 // Shows the mapping from the exported object to the name used by the server rendering.
 import HelloWorld from '../components/HelloWorld';
+
+// TODO
+import HelloWorldApp from './ClientHelloWorldApp';
+
+
 import HelloES5 from '../components/HelloES5';
 
 
@@ -17,6 +22,8 @@ global.App = App;
 global.HelloWorld = HelloWorld;
 global.HelloES5 = HelloES5;
 global.HelloString = HelloString;
+
+global.HelloWorldApp = HelloWorldApp;
 
 // Alternative syntax for exposing Vars
 // require("expose?HelloString!./non_react/HelloString.js");
