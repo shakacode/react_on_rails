@@ -2,44 +2,53 @@ require 'react_on_rails/react_renderer'
 
 module ReactOnRailsHelper
 
-  # component_name: React component name
+  # react_component_name: can be a React component, created using a ES6 class, or
+  #   React.createClass, or a
+  #     `generator function` that returns a React component AND this function must have the
+  #       property "generator" set to true
+  #       using ES6
+  #          let MyReactComponentApp = (props) => <MyReactComponent {...props}/>;
+  #          MyReactComponentApp.generator = true;
+  #       or using ES5
+  #          var MyReactComponentApp = function(props) { return <YourReactComponent {...props}/>; }
+  #          MyReactComponentApp.generator = true;
+  #    Exposing the react_component_name is necessary to both a plain ReactComponent as well as
+  #      a generator:
+  #    For client rendering, expose the react_component_name on window:
+  #      window.MyReactComponentApp = MyReactComponentApp;
+  #    For server rendering, export the react_component_name on global:
+  #      global.MyReactComponentApp = MyReactComponentApp;
+  #    See spec/dummy/client/app/startup/serverGlobals.jsx and
+  #      spec/dummy/client/app/startup/ClientApp.jsx for examples of this
   # props: Ruby Hash which contains the properties to pass to the react object
-  #
-  # Naming Conventions:
-  # Suppose your component is named "App" (can be anything)
-  # 1. Inside app/startup/ServerApp.jsx, setup the component for server rendering. This is used by
-  #    the global exports in step 2
-  # 2. Component_name is changed to CamelizedUpper for the exposed component,
-  #    so we have App as the exposed global (see app/startup/serverGlobals.jsx)
-  # 3. Inside app/startup/ClientApp.jsx, you want to export a function that generates
-  #    your component, and when you generate the component, you must use this naming convention
-  #    to get the data.
-  #    App(__appData__)
-  #    That way it gets the data you pass from the Rails helper.
   #
   #  options:
   #    prerender: <true/false> defaults to true
   #    trace: <true/false> defaults to false, set to true to print additional info
   def react_component(component_name, props = {}, options = {})
+    # Create the JavaScript and HTML to allow either client or server rendering of the
+    # react_component.
+    #
     # Create the JavaScript setup of the global to initialize the client rendering
     # (re-hydrate the data). This enables react rendered on the client to see that the
     # server has already rendered the HTML.
-    @react_component_index ||= 0
-    prerender = options.fetch(:prerender) { ReactOnRails.configuration.prerender }
+    generator_function = options.fetch(:generator_function) { ReactOnRails.configuration.generator_function }
+
+    # We use this react_component_index in case we have the same component multiple times on the page.
+    react_component_index = next_react_component_index
+    react_component_name = component_name.camelize # Not sure if we should be doing this (JG)
+    dom_id = "#{component_name}-react-component-#{react_component_index}"
+
+    # Setup the page_loaded_js, which is the same regardless of prerendering or not!
+    # The reason is that React is smart about not doing extra work if the server rendering did its job.
     trace = options.fetch(:trace, false)
-
-    data_variable = "__#{component_name.camelize(:lower)}Data#{@react_component_index}__"
-    react_component_name = component_name.camelize
-    dom_id = "#{component_name}-react-component-#{@react_component_index}"
-    @react_component_index += 1
-
+    data_variable_name = "__#{component_name.camelize(:lower)}Data#{react_component_index}__"
     turbolinks_loaded = Object.const_defined?(:Turbolinks)
     install_render_events = turbolinks_loaded ? turbolinks_bootstrap(dom_id) : non_turbolinks_bootstrap
-
     page_loaded_js = <<-JS
       (function() {
-        window.#{data_variable} = #{props.to_json};
-        #{define_render_if_dom_node_present(react_component_name, data_variable, dom_id, trace)}
+        window.#{data_variable_name} = #{props.to_json};
+        #{define_render_if_dom_node_present(react_component_name, data_variable_name, dom_id, trace, generator_function)}
         #{install_render_events}
       })();
     JS
@@ -47,31 +56,52 @@ module ReactOnRailsHelper
     data_from_server_script_tag = javascript_tag(page_loaded_js)
 
     # Create the HTML rendering part
-    if prerender
-      render_js_expression = <<-JS
-        this.React.renderToString(#{render_js_react_element(react_component_name, props.to_json)});
-      JS
-      server_rendered_react_component_html = render_js(render_js_expression)
-    else
-      server_rendered_react_component_html = ""
-    end
+    server_rendered_html =
+      server_rendered_react_component_html(options, props, react_component_name)
 
     rendered_output = content_tag(:div,
-                                  server_rendered_react_component_html,
+                                  server_rendered_html,
                                   id: dom_id)
 
     <<-HTML.strip_heredoc.html_safe
-      #{data_from_server_script_tag}
-      #{rendered_output}
+#{data_from_server_script_tag}
+    #{rendered_output}
     HTML
+  end
+
+  def next_react_component_index
+    @react_component_index ||= -1
+    @react_component_index += 1
+  end
+
+  def server_rendered_react_component_html(options, props, react_component_name)
+    prerender = options.fetch(:prerender) { ReactOnRails.configuration.prerender }
+    generator_function = options.fetch(:generator_function) { ReactOnRails.configuration.generator_function }
+
+    if prerender
+      render_js_expression = <<-JS
+        (function(React) {
+          var reactElement = #{render_js_react_element(react_component_name, props.to_json, generator_function)};
+          return React.renderToString(reactElement);
+        })(this.React);
+      JS
+      # create the server generated html of the react component with props
+      options[:react_component_name] = react_component_name
+      server_rendered_react_component_html =
+        render_js(render_js_expression, options)
+    else
+      server_rendered_react_component_html = ""
+    end
+    server_rendered_react_component_html
   end
 
   # Takes javascript code and returns the output from it. This is called by react_component, which
   # sets up the JS code for rendering a react component.
   # This method could be used by itself to render the output of any javascript that returns a
   # string of proper HTML.
-  def render_js(js_expression)
-    ReactOnRails::ReactRenderer.new.render_js(js_expression).html_safe
+  def render_js(js_expression, options = {})
+    ReactOnRails::ReactRenderer.new(options).render_js(js_expression,
+                                                       options).html_safe
   end
 
   private
@@ -86,17 +116,36 @@ module ReactOnRailsHelper
     end
   end
 
-  def render_js_react_element(react_component_name, props_name)
-    ReactOnRails::ReactRenderer.render_js_react_element(react_component_name, props_name)
+  # react_component_name: See app/helpers/react_on_rails_helper.rb:5
+  # props_string: is either the variable name used to hold the props (client side) or the
+  #   stringified hash of props from the Ruby server side. In terms of the view helper, one is
+  #   simply passing in the Ruby Hash of props.
+  #
+  # Returns the JavaScript code to generate a React element.
+  def render_js_react_element(react_component_name, props_string, generator_function)
+    # "this" is defined by the calling context which is "global" in the execJs
+    # environment or window in the client side context.
+    js_create_element = if generator_function
+                          "#{react_component_name}(props)"
+                        else
+                          "React.createElement(#{react_component_name}, props)"
+                        end
+
+    <<-JS.strip_heredoc
+        (function(React) {
+          var props = #{props_string};
+          return #{js_create_element};
+        })(this.React);
+    JS
   end
 
-  def define_render_if_dom_node_present(react_component_name, data_variable, dom_id, trace)
+  def define_render_if_dom_node_present(react_component_name, data_variable, dom_id, trace, generator_function)
     <<-JS.strip_heredoc
       var renderIfDomNodePresent = function() {
         var domNode = document.getElementById('#{dom_id}');
         if (domNode) {
           #{debug_js(react_component_name, data_variable, dom_id, trace)}
-          var reactElement = #{render_js_react_element(react_component_name, data_variable)};
+          var reactElement = #{render_js_react_element(react_component_name, data_variable, generator_function)};
           React.render(reactElement, domNode);
         }
       }

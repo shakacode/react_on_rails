@@ -10,8 +10,6 @@ import middleware from 'redux-thunk';
 
 import reducers from '../reducers/reducersIndex';
 import HelloWorldContainer from '../components/HelloWorldContainer';
-import HelloWorld from '../components/HelloWorld';
-import HelloES5 from '../components/HelloES5';
 
 /*
  *  Export a function that takes the props and returns a ReactComponent.
@@ -19,7 +17,7 @@ import HelloES5 from '../components/HelloES5';
  *  React will see that the state is the same and not do anything.
  *
  */
-window.App = props => {
+let App = props => {
   const combinedReducer = combineReducers(reducers);
   const store = applyMiddleware(middleware)(createStore)(combinedReducer, props);
 
@@ -37,8 +35,5 @@ window.App = props => {
  * When that is done, the function is invoked with a single parameter of "props",
  * and that function should return a react element.
  */
-window.App.generator = true;
 
-// This is an example of how to render a React component directly, without using Redux
-window.HelloWorld = HelloWorld;
-window.HelloES5 = HelloES5;
+export default App;

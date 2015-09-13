@@ -61,14 +61,21 @@ Contributions and pull requests welcome!
 
 # Key Tips
 1. See sample app in `spec/dummy` for how to set this up.
-2. The file used for server rendering is hard coded as `generated/server.js`
+2. The file used for server rendering defaults as `generated/server.js`
    (assets/javascripts/generated/server.js).
-3. If you're only doing client rendering, you still *MUST* create an empty version of this file. This
-   will soon change so that this is not necessary.
 3. The default for rendering right now is `prerender: false`. **NOTE:**  Server side rendering does
    not work for some components, namely react-router, that use an async setup for server rendering.
    You can configure the default for prerender in your config.
-4. You can expose either a React component or a function that returns a React component. If you wish to create a React component via a function, rather than simply props, then you need to set the property "generator" on that function to true. When that is done, the function is invoked with a single parameter of "props", and that function should return a React element.
+4. You can expose either a React component or a function that returns a React component. If you 
+   wish to create a React component via a function, rather than simply props, then you need to set 
+   the property "generator" on that function to true. When that is done, the function is invoked 
+   with a single parameter of "props", and that function should return a React element.
+5. Be sure you can first render your react component client only before you try to debug server
+   rendering!
+
+TODO: Check if this is true still
+3. If you're only doing client rendering, you still *MUST* create an empty version of this file. This
+   will soon change so that this is not necessary.
 
 # Example Configuration, config/react_on_rails.rb
 ```ruby

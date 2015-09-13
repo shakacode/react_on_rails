@@ -25,7 +25,7 @@
   <% puts "server rendering react components" %>
   <% puts "=" * 80 %>
   <!-- Default for prerender is true for the app, set in config/react_on_rails.rb -->
-  <%= react_component("App", @app_props_server_render, trace: true) %>
+  <%= react_component("App", @app_props_server_render, trace: true, generator_function: true) %>
   <hr/>
 
   <h1>Server Rendered/Cached React Component Without Redux</h1>
@@ -35,7 +35,8 @@
     <%% end %>
   </code>
   <p>
-    And this is an example of a server rendered React component without Redux
+    And this is an example of a server rendered React component without Redux.
+    Note, that we don't suffix the component name with "App"
   </p>
 
   <%= react_component("HelloWorld", @app_props_server_render, trace: true) %>
@@ -45,16 +46,16 @@
 <h1>Simple Client Rendered Component</h1>
 <!-- Passing prerender: false to not render on server -->
 <code>
-  <%%= react_component("HelloWorldApp", @app_props_hello, prerender: false, trace: true) %>
+  <%%= react_component("HelloWorldApp", @app_props_hello, prerender: false, trace: true, generator_function: true) %>
 </code>
-<%= react_component("HelloWorldApp", @app_props_hello, prerender: false, trace: true) %>
+<%= react_component("HelloWorldApp", @app_props_hello, prerender: false, trace: true, generator_function: true) %>
 <hr/>
 
 <h1>Showing you can put the same component twice on a page with different props</h1>
 <code>
   <%%= react_component("HelloWorldApp", @app_props_hello_again, prerender: false, trace: true) %>
 </code>
-<%= react_component("HelloWorldApp", @app_props_hello_again, prerender: false, trace: true) %>
+<%= react_component("HelloWorldApp", @app_props_hello_again, prerender: false, trace: true, generator_function: true) %>
 <hr/>
 
 <h1>Simple Component Without Redux</h1>

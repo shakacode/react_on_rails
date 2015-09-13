@@ -14,10 +14,8 @@ import middleware from 'redux-thunk';
 import reducers from '../reducers/reducersIndex';
 
 import HelloWorldContainer from '../components/HelloWorldContainer';
-import HelloWorld from '../components/HelloWorld';
-import HelloES5 from '../components/HelloES5';
 
-export default props => {
+let App = props => {
   const combinedReducer = combineReducers(reducers);
 
   // This is where we'll put in the middleware for the async function. Placeholder.
@@ -33,5 +31,9 @@ export default props => {
   );
 };
 
-// This is an example of how to render a React component directly, without using Redux
-export { HelloWorld, HelloES5 };
+/*
+ *  Export a function that takes the props and returns a ReactComponent.
+ *  Ensure that option generator_function is set to true when invoking the helper, or as the default.
+ */
+
+export default App;

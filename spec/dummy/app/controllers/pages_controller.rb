@@ -1,5 +1,19 @@
 class PagesController < ApplicationController
   def index
+    data
+  end
+
+  def focused
+    data
+  end
+
+  def about
+
+  end
+
+  private
+
+  def data
     # This is the props used by the React component.
     @app_props_server_render = {
       helloWorldData: {
@@ -20,7 +34,4 @@ class PagesController < ApplicationController
     }
   end
 
-  def about
-
-  end
 end
