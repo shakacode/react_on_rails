@@ -8,6 +8,4 @@ import HelloWorld from '../components/HelloWorld';
  *  React will see that the state is the same and not do anything.
  *  Ensure that option generator_function is set to true when invoking the helper, or as default.
  */
-let HelloWorldApp = props => {
-  return <HelloWorld {...props}/>;
-};
+export default props => <HelloWorld {...props} />;

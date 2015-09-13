@@ -1,7 +1,7 @@
 import HelloWorld from '../components/HelloWorld';
 import HelloES5 from '../components/HelloES5';
 import App from './ClientApp';
-import HelloWorldApp from './HelloWorldApp';
+import HelloWorldApp from './ClientHelloWorldApp';
 
 // This is an example of how to render a React component directly, without using Redux
 window.HelloWorld = HelloWorld;
