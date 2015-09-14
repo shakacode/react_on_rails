@@ -92,6 +92,14 @@ end
 
 ```
 
+## JavaScript Runtime
+See this [discussion on JavaScript performance](https://github.com/shakacode/react_on_rails/issues/21).
+The net result is that you want to add this line to your Gemfile to get therubyracer as your default
+JavaScript engine.
+
+```ruby
+gem "therubyracer"
+```
 
 ## References
 * [Making the helper for server side rendering work with JS created by Webpack] (https://github.com/reactjs/react-rails/issues/301#issuecomment-133098974)
@@ -101,10 +109,11 @@ end
 
 ## Installation
 
-Add this line to your application's Gemfile:
+Add these linesto your application's Gemfile, sustituting your preferable JavaScript engine.
 
 ```ruby
-gem 'react_on_rails'
+gem "react_on_rails"
+gem "therubyracer"
 ```
 
 And then execute:
