@@ -1,3 +1,5 @@
+require "coveralls"
+Coveralls.wear!("rails")  # must occur before any of your application code is required
 require 'spec_helper'
 
 describe ReactOnRails do
