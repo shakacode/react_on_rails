@@ -3,14 +3,15 @@
 
 module ReactOnRails
   class ReactRenderer
+    TRACE = true # Set to true to print generated code.
     # Reimplement console methods for replaying on the client
     CONSOLE_POLYFILL = <<-JS
-        var console = { history: [] };
-        ['error', 'log', 'info', 'warn'].forEach(function (level) {
-          console[level] = function () {
-            console.history.push({level: level, arguments: Array.prototype.slice.call(arguments)});
-          };
-        });
+var console = { history: [] };
+['error', 'log', 'info', 'warn'].forEach(function (level) {
+  console[level] = function () {
+    console.history.push({level: level, arguments: Array.prototype.slice.call(arguments)});
+  };
+});
     JS
 
     # Script to write to the browser console.
@@ -18,15 +19,14 @@ module ReactOnRails
     # that we intend to write to the browser. Thus, the script tag will get executed right after
     # the HTML is rendered.
     CONSOLE_REPLAY = <<-JS
-        (function (history) {
-          if (history && history.length > 0) {
-            result += '\\n<script>';
-            history.forEach(function (msg) {
-              result += '\\nconsole.' + msg.level + '.apply(console, ' + JSON.stringify(msg.arguments) + ');';
-            });
-            result += '\\n</script>';
-          }
-        })(console.history);
+var history = console.history;
+if (history && history.length > 0) {
+  result += '\\n<script>';
+  history.forEach(function (msg) {
+    result += '\\nconsole.' + msg.level + '.apply(console, ' + JSON.stringify(msg.arguments) + ');';
+  });
+  result += '\\n</script>';
+}
     JS
 
     DEBUGGER = <<-JS
@@ -34,7 +34,7 @@ module ReactOnRails
     JS
 
     def base_js_code
-      <<-JS.strip_heredoc
+      <<-JS
         #{CONSOLE_POLYFILL}
         #{bundle_js_code};
       JS
@@ -52,43 +52,71 @@ module ReactOnRails
     def render_js(js_code, options = {})
       component_name = options.fetch(:react_component_name, "")
 
-      js_code_wrapper = <<-JS.strip_heredoc
-      (function () {
-        var result = '';
-        try {
-          result = #{js_code}
-        }
-        catch(e) {
-          #{DEBUGGER}
-          var generatorError =
-            'ERROR: You did not specify the option generator_function to be true, but the \\n' +
-            'react component \\'#{component_name}\\' seems to be a generator function.\\n' +
-            'A generator function is on that takes a single arg of props and returns a ReactElement.';
-          var reMatchGeneratorError = /Can't add property context, object is not extensible/;
-          var hasGeneratorError = reMatchGeneratorError.test(e.message);
-          var msg = '';
-          if (hasGeneratorError) {
-            msg = generatorError + '\\n\\n';
-            console.error(generatorError);
-          }
-          console.error('SERVER SIDE: Exception in server side rendering!');
-          if (e.fileName) {
-            console.error('SERVER SIDE: location: ' + e.fileName + ':' + e.lineNumber);
-          }
-          console.error('SERVER SIDE: message: ' + e.message);
-          console.error('SERVER SIDE: stack: ' + e.stack);
-          msg += 'SERVER SIDE Exception in rendering!\\n' +
-            (e.fileName ? '\\nlocation: ' + e.fileName + ':' + e.lineNumber : '') +
-            '\\nMessage: ' + e.message + '\\n\\n' + e.stack;
+      result_js_code = "result = #{js_code}"
 
-          var reactElement = React.createElement('pre', null, msg);
-          result = React.renderToString(reactElement);
-        }
-        #{after_render};
-        return result;
-      })()
+      js_code_wrapper = <<-JS
+(function () {
+  var result = '';
+  #{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(result_js_code, component_name)}
+  #{after_render};
+  return result;
+})()
       JS
+
+      puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+      puts "react_renderer.rb: 92"
+      puts "js_code_wrapper = #{js_code_wrapper.ai}"
+      puts "wrote file server-generated.js"
+      File.write('server-generated.js', js_code_wrapper)
+      puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+
       @context.eval(js_code_wrapper)
+    end
+
+    def self.wrap_code_with_exception_handler(js_code, component_name)
+      <<-JS
+      try {
+        #{js_code}
+      }
+      catch(e) {
+        var lineOne =
+              'ERROR: You specifed the option generator_function (could be in your defaults) to be\\n';
+        var lastLine =
+              'A generator function takes a single arg of props and returns a ReactElement.';
+
+        var msg = '';
+        var shouldBeGeneratorError = lineOne +
+              'false, but the react component \\'#{component_name}\\' seems to be a generator function.\\n' +
+        lastLine;
+        var reMatchShouldBeGeneratorError = /Can't add property context, object is not extensible/;
+        if (reMatchShouldBeGeneratorError.test(e.message)) {
+          msg += shouldBeGeneratorError + '\\n\\n';
+        console.error(shouldBeGeneratorError);
+        }
+
+        var shouldBeGeneratorError = lineOne +
+              'true, but the react component \\'#{component_name}\\' is not a generator function.\\n' +
+        lastLine;
+        var reMatchShouldNotBeGeneratorError = /Cannot call a class as a function/;
+        if (reMatchShouldNotBeGeneratorError.test(e.message)) {
+          msg += shouldBeGeneratorError + '\\n\\n';
+        console.error(shouldBeGeneratorError);
+        }
+
+        console.error('SERVER SIDE: Exception in server side rendering!');
+        if (e.fileName) {
+          console.error('SERVER SIDE: location: ' + e.fileName + ':' + e.lineNumber);
+        }
+        console.error('SERVER SIDE: message: ' + e.message);
+        console.error('SERVER SIDE: stack: ' + e.stack);
+        msg += 'SERVER SIDE Exception in rendering!\\n' +
+          (e.fileName ? '\\nlocation: ' + e.fileName + ':' + e.lineNumber : '') +
+          '\\nMessage: ' + e.message + '\\n\\n' + e.stack;
+
+        var reactElement = React.createElement('pre', null, msg);
+        result = React.renderToString(reactElement);
+      }
+      JS
     end
 
     private

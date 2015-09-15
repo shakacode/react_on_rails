@@ -43,11 +43,11 @@ module ReactOnRailsHelper
     turbolinks_loaded = Object.const_defined?(:Turbolinks)
     install_render_events = turbolinks_loaded ? turbolinks_bootstrap(dom_id) : non_turbolinks_bootstrap
     page_loaded_js = <<-JS
-      (function() {
-        window.#{data_variable_name} = #{props.to_json};
-        #{define_render_if_dom_node_present(react_component_name, data_variable_name, dom_id, trace(options), generator_function(options))}
-        #{install_render_events}
-      })();
+(function() {
+  window.#{data_variable_name} = #{props.to_json};
+  #{define_render_if_dom_node_present(react_component_name, data_variable_name, dom_id, trace(options), generator_function(options))}
+  #{install_render_events}
+})();
     JS
 
     data_from_server_script_tag = javascript_tag(page_loaded_js)
@@ -60,9 +60,10 @@ module ReactOnRailsHelper
                                   server_rendered_html,
                                   id: dom_id)
 
-    <<-HTML.strip_heredoc.html_safe
+    # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
+    <<-HTML.html_safe
 #{data_from_server_script_tag}
-    #{rendered_output}
+#{rendered_output}
     HTML
   end
 
@@ -114,8 +115,8 @@ module ReactOnRailsHelper
 
   def debug_js(react_component_name, data_variable, dom_id, trace)
     if trace
-      <<-JS.strip_heredoc
-        console.log("CLIENT SIDE RENDERED #{react_component_name} with data_variable #{data_variable} to dom node with id: #{dom_id}");
+      <<-JS
+console.log("CLIENT SIDE RENDERED #{react_component_name} with data_variable #{data_variable} to dom node with id: #{dom_id}");
       JS
     else
       ""
@@ -137,56 +138,60 @@ module ReactOnRailsHelper
                           "React.createElement(#{react_component_name}, props)"
                         end
 
-    <<-JS.strip_heredoc
-        (function(React) {
-          var props = #{props_string};
-          return #{js_create_element};
-        })(this.React);
+    <<-JS
+(function(React) {
+  var props = #{props_string};
+  return #{js_create_element};
+})(this.React);
     JS
   end
 
   def define_render_if_dom_node_present(react_component_name, data_variable, dom_id, trace, generator_function)
-    <<-JS.strip_heredoc
-      var renderIfDomNodePresent = function() {
-        var domNode = document.getElementById('#{dom_id}');
-        if (domNode) {
-          #{debug_js(react_component_name, data_variable, dom_id, trace)}
-          var reactElement = #{render_js_react_element(react_component_name, data_variable, generator_function)};
-          React.render(reactElement, domNode);
-        }
-      }
+    inner_js_code = <<-JS_CODE
+    var domNode = document.getElementById('#{dom_id}');
+    if (domNode) {
+      #{debug_js(react_component_name, data_variable, dom_id, trace)}
+      var reactElement = #{render_js_react_element(react_component_name, data_variable, generator_function)};
+      React.render(reactElement, domNode);
+    }
+    JS_CODE
+
+    <<-JS
+var renderIfDomNodePresent = function() {
+  #{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(inner_js_code, react_component_name)}
+}
     JS
   end
 
   def non_turbolinks_bootstrap
-    <<-JS.strip_heredoc
-      document.addEventListener("DOMContentLoaded", function(event) {
-        console.log("DOMContentLoaded event fired");
-        renderIfDomNodePresent();
-      });
+    <<-JS
+document.addEventListener("DOMContentLoaded", function(event) {
+  console.log("DOMContentLoaded event fired");
+  renderIfDomNodePresent();
+});
     JS
   end
 
   def turbolinks_bootstrap(dom_id)
-    <<-JS.strip_heredoc
-      var turbolinksInstalled = typeof(Turbolinks) !== 'undefined';
-      if (!turbolinksInstalled) {
-        console.warn("WARNING: NO TurboLinks detected in JS, but it's in your Gemfile");
-        #{non_turbolinks_bootstrap}
-      } else {
-        function onPageChange(event) {
-          var removePageChangeListener = function() {
-            document.removeEventListener("page:change", onPageChange);
-            document.removeEventListener("page:before-unload", removePageChangeListener);
-            var domNode = document.getElementById('#{dom_id}');
-            React.unmountComponentAtNode(domNode);
-          };
-          document.addEventListener("page:before-unload", removePageChangeListener);
+    <<-JS
+var turbolinksInstalled = typeof(Turbolinks) !== 'undefined';
+if (!turbolinksInstalled) {
+  console.warn("WARNING: NO TurboLinks detected in JS, but it's in your Gemfile");
+  #{non_turbolinks_bootstrap}
+} else {
+  function onPageChange(event) {
+    var removePageChangeListener = function() {
+      document.removeEventListener("page:change", onPageChange);
+      document.removeEventListener("page:before-unload", removePageChangeListener);
+      var domNode = document.getElementById('#{dom_id}');
+      React.unmountComponentAtNode(domNode);
+    };
+    document.addEventListener("page:before-unload", removePageChangeListener);
 
-          renderIfDomNodePresent();
-        }
-        document.addEventListener("page:change", onPageChange);
-      }
+    renderIfDomNodePresent();
+  }
+  document.addEventListener("page:change", onPageChange);
+}
     JS
   end
 end

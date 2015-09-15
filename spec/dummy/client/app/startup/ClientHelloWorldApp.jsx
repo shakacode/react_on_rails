@@ -8,5 +8,8 @@ import HelloWorld from '../components/HelloWorld';
  *  React will see that the state is the same and not do anything.
  *  Ensure that option generator_function is set to true when invoking the helper, or as default.
  *  Note, this is imported as "HelloWorldApp" by "clientGlobals.jsx"
+ *
+ *  Note, this is a fictional example, as you'd only use a generator function if you wanted to run
+ *  some extra code, such as setting up Redux and React-Router.
  */
 export default props => <HelloWorld {...props} />;
