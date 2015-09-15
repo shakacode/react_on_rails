@@ -158,7 +158,7 @@ GEM
       coffee-rails
     tzinfo (1.2.2)
       thread_safe (~> 0.1)
-    uglifier (2.7.1)
+    uglifier (2.7.2)
       execjs (>= 0.3.0)
       json (>= 1.8.0)
     web-console (2.2.1)
@@ -189,8 +189,8 @@ DEPENDENCIES
   spring
   sqlite3
   turbolinks
-  uglifier (>= 1.3.0)
+  uglifier (>= 2.7.2)
   web-console (~> 2.0)
 
 BUNDLED WITH
-   1.10.5
+   1.10.6
