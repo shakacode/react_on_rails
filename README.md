@@ -60,7 +60,7 @@ Contributions and pull requests welcome!
    caching.
 
 # Key Tips
-1. See sample app in `spec/dummy` for how to set this up. 
+1. See sample app in `spec/dummy` for how to set this up. See note below on ensuring you **DO NOT RUN `rails s` and instead     run `foreman start`. 
 2. The file used for server rendering is hard coded as `generated/server.js`
    (assets/javascripts/generated/server.js).
 3. If you're only doing client rendering, you still *MUST* create an empty version of this file. This
@@ -78,7 +78,6 @@ Contributions and pull requests welcome!
      config.prerender = true # default is false
    end
 ```
-
 
 ## References
 * [Making the helper for server side rendering work with JS created by Webpack] (https://github.com/reactjs/react-rails/issues/301#issuecomment-133098974)
@@ -108,7 +107,7 @@ PENDING. See `spec/dummy` for the sample app.
 
 ## Development
 
-After checking out the repo, cd to `spec/dummy` and run `bin/setup` to install dependencies. Then, run `rake rspec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+After checking out the repo, making sure you have rvm and nvm setup (setup ruby and node), cd to `spec/dummy` and run `bin/setup` to install dependencies. Then, run `rake rspec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment. To run the test app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. 
 
 To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
 
