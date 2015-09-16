@@ -132,8 +132,8 @@ Run `rake` for testing the gem and `spec/dummy`. Otherwise, the `rspec` command 
 All linting is performed from the docker container. You will need docker and docker-compose installed
 locally to lint code changes via the lint container. 
 
-[For Mac users install Docker Toolbox](https://www.docker.com/toolbox)
-[For Linux user install Docker Compose](https://docs.docker.com/compose/install/)
+* [Install Docker Toolbox for Mac](https://www.docker.com/toolbox)
+* [Install Docker Compose for Linux](https://docs.docker.com/compose/install/)
 
 Once you have docker and docker-compose running locally, run `docker-compose build lint`. This will build
 the `reactonrails_lint` docker image and docker-compose `lint` container. The inital build is slow,
