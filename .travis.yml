@@ -1,7 +1,10 @@
 language: ruby
 rvm:
   - 2.2.2
-install: spec/dummy/bin/setup
+gemfile:
+  - Gemfile
+  - spec/dummy/Gemfile
+install: bundle install
 script:
   - rake run_rspec:gem
   - rake run_rspec:dummy
