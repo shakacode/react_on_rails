@@ -11,32 +11,27 @@ namespace :lint do
 
   desc "Run Rubocop as shell"
   task :rubocop do
-    cmd = "rubocop ."
-    sh cmd
+    sh "rubocop ."
   end
 
   desc "Run ruby-lint as shell"
   task :ruby do
-    cmd = "ruby-lint app spec lib"
-    sh cmd
+    sh "ruby-lint app spec lib"
   end
 
   desc "Run scss-lint as shell"
   task :scss do
-    cmd = "scss-lint ."
-    sh cmd
+    sh "scss-lint ."
   end
 
   desc "Run eslint as shell"
   task :eslint do
-    cmd = "eslint . --ext .jsx and .js"
-    sh cmd
+    sh "eslint . --ext .jsx and .js"
   end
 
   desc "Run jscs from shell"
   task :jscs do
-    cmd = "jscs ."
-    sh cmd
+    sh "jscs ."
   end
 
   task lint: [:eslint, :rubocop, :ruby, :jscs, :scss] do
@@ -49,37 +44,31 @@ task lint: ["lint:lint"]
 namespace :docker do
   desc "Run Rubocop linter from docker"
   task :rubocop do
-    cmd = "docker-compose run lint rake lint:rubocop"
-    sh cmd
+    sh "docker-compose run lint rake lint:rubocop"
   end
 
   desc "Run ruby-lint linter from docker"
   task :ruby do
-    cmd = "docker-compose run lint rake lint:ruby"
-    sh cmd
+    sh "docker-compose run lint rake lint:ruby"
   end
 
   desc "Run scss-lint linter from docker"
   task :scss do
-    cmd = "docker-compose run lint rake lint:scss"
-    sh cmd
+    sh"docker-compose run lint rake lint:scss"
   end
 
   desc "Run eslint linter from docker"
   task :eslint do
-    cmd = "docker-compose run lint rake lint:eslint"
-    sh cmd
+    sh "docker-compose run lint rake lint:eslint"
   end
 
   desc "Run jscs linter from docker"
   task :jscs do
-    cmd = "docker-compose run lint rake lint:jscs"
-    sh cmd
+    sh "docker-compose run lint rake lint:jscs"
   end
   desc "Run all linting from docker"
   task :lint do
-    cmd = "docker-compose run lint rake lint"
-    sh cmd
+    sh "docker-compose run lint rake lint"
   end
 end
 
