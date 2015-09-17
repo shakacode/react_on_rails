@@ -2,7 +2,6 @@ language: ruby
 rvm:
   - 2.2.2
 gemfile:
-  - Gemfile
   - spec/dummy/Gemfile
 install: bundle install
 script:
