@@ -3,6 +3,6 @@ rvm:
   - 2.2.2
 install:
   - bundle install
-  - cd spec/dummy && bundle install
+  - bundle install --gemfile=spec/dummy/Gemfile
 script:
   - rake
