@@ -4,4 +4,4 @@ rvm:
 install:
   - bundle install
 script:
-  - rake spec
+  - rake
