@@ -5,4 +5,5 @@ install:
   - bundle install
   - bundle install --gemfile=spec/dummy/Gemfile
 script:
-  - rake
+  - rake run_rspec:gem
+  - rake run_rspec:dummy

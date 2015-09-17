@@ -1,11 +1,24 @@
 require "fileutils"
 
-task :run_rspec do
-  sh %{ rspec --exclude-pattern "spec/dummy/**/*_spec.rb" spec }
-  sh %{ cd spec/dummy && rspec }
-end
+namespace :run_rspec do
+  desc "Run RSpec for top level only"
+  task :gem do
+    sh %{ rspec --exclude-pattern "spec/dummy/**/*_spec.rb" spec }
+  end
 
-task :default => :run_rspec
+  desc "Run RSpec for spec/dummy only"
+  task :dummy do
+    sh %{ cd spec/dummy && rspec }
+  end
+
+  task run_rspec: [:gem, :dummy] do
+    puts "Completed all RSpec tests"
+  end
+end
+desc "Runs all tests. Run `rake -D run_rspec` to see all available test options"
+task run_rspec: ["run_rspec:run_rspec"]
+
+task default: :run_rspec
 
 namespace :lint do
 
