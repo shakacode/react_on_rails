@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails)
+[![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
+[![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails)
 # React On Rails
 
 Published: https://rubygems.org/gems/react_on_rails
@@ -60,8 +63,8 @@ Contributions and pull requests welcome!
    caching.
 
 # Key Tips
-1. See sample app in `spec/dummy` for how to set this up.
-2. The file used for server rendering defaults as `generated/server.js`
+1. See sample app in `spec/dummy` for how to set this up. See note below on ensuring you **DO NOT RUN `rails s` and instead     run `foreman start`. 
+2. The file used for server rendering is hard coded as `generated/server.js`
    (assets/javascripts/generated/server.js).
 3. The default for rendering right now is `prerender: false`. **NOTE:**  Server side rendering does
    not work for some components, namely react-router, that use an async setup for server rendering.
@@ -107,7 +110,7 @@ gem "therubyracer"
 * [Charlie Marsh's article "Rendering React Components on the Server"](http://www.crmarsh.com/react-ssr/)
 * [Node globals](https://nodejs.org/api/globals.html#globals_global)
 
-## Installation
+## Application Installation
 
 Add these linesto your application's Gemfile, sustituting your preferable JavaScript engine.
 
@@ -128,11 +131,42 @@ Or install it yourself as:
 
 PENDING. See `spec/dummy` for the sample app.
 
-## Development
+## Development Setup
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake rspec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+### Initial Setup
+After checking out the repo, making sure you have rvm and nvm setup (setup ruby and node), 
+cd to `spec/dummy` and run `bin/setup` to install dependencies.  
+You can also run `bin/console` for an interactive prompt that will allow you to experiment. 
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+### Starting the Dummy App
+To run the test app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. 
+If you don't do this, then `webpack` will not generate a new bundle, 
+and you will be seriously confused when you change JavaScript and the app does not change. 
+
+### Install and Release
+To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, 
+update the version number in `version.rb`, and then run `bundle exec rake release`, 
+which will create a git tag for the version, push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+
+### RSpec Testing
+Run `rake` for testing the gem and `spec/dummy`. Otherwise, the `rspec` command only works for testing within `spec/dummy`.
+
+### Linting
+All linting is performed from the docker container. You will need docker and docker-compose installed
+locally to lint code changes via the lint container. 
+
+* [Install Docker Toolbox for Mac](https://www.docker.com/toolbox)
+* [Install Docker Compose for Linux](https://docs.docker.com/compose/install/)
+
+Once you have docker and docker-compose running locally, run `docker-compose build lint`. This will build
+the `reactonrails_lint` docker image and docker-compose `lint` container. The inital build is slow,
+but after the install, startup is very quick.
+
+### Linting Commands
+Run `rake -D docker` to see all docker linting commands for rake. `rake docker` will run all linters.
+For individual rake linting commands please refer to `rake -D docker` for the list.
+You can run specfic linting for directories or files by using `docker-compose run lint rubocop (file path or directory)`, etc.
+`docker-compose run lint /bin/bash` sets you up to run from the container command line. 
 
 ## Contributing
 

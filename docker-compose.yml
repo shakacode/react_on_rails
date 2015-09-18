@@ -1,0 +1,5 @@
+lint:
+  build: .
+  working_dir: /app/
+  volumes:
+    - '.:/app/'

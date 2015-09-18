@@ -11,6 +11,7 @@ Dir.chdir APP_ROOT do
   puts "== Installing dependencies =="
   system "gem install bundler --conservative"
   system "bundle check || bundle install"
+  system "bundle install --gemfile=Gemfile"
   system "npm i"
 
   # puts "\n== Copying sample files =="
