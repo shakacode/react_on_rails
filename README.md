@@ -112,7 +112,7 @@ gem "therubyracer"
 
 ## Application Installation
 
-Add these linesto your application's Gemfile, sustituting your preferable JavaScript engine.
+Add these lines to your application's Gemfile, sustituting your preferable JavaScript engine.
 
 ```ruby
 gem "react_on_rails"
