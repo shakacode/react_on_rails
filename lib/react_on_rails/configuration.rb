@@ -27,7 +27,7 @@ module ReactOnRails
       self.prerender = prerender
       self.replay_console = replay_console
       self.generator_function = generator_function
-      self.trace = Rails.env.development?
+      self.trace = trace.nil? ? Rails.env.development? : trace
     end
   end
 end

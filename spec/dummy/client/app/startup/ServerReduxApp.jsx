@@ -15,7 +15,7 @@ import reducers from '../reducers/reducersIndex';
 
 import HelloWorldContainer from '../components/HelloWorldContainer';
 
-let ReduxApp = props => {
+const ReduxApp = props => {
   const combinedReducer = combineReducers(reducers);
 
   // This is where we'll put in the middleware for the async function. Placeholder.
