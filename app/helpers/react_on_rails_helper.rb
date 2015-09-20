@@ -4,14 +4,11 @@ module ReactOnRailsHelper
 
   # react_component_name: can be a React component, created using a ES6 class, or
   #   React.createClass, or a
-  #     `generator function` that returns a React component AND this function must have the
-  #       property "generator" set to true
+  #     `generator function` that returns a React component
   #       using ES6
   #          let MyReactComponentApp = (props) => <MyReactComponent {...props}/>;
-  #          MyReactComponentApp.generator = true;
   #       or using ES5
   #          var MyReactComponentApp = function(props) { return <YourReactComponent {...props}/>; }
-  #          MyReactComponentApp.generator = true;
   #    Exposing the react_component_name is necessary to both a plain ReactComponent as well as
   #      a generator:
   #    For client rendering, expose the react_component_name on window:
@@ -23,8 +20,13 @@ module ReactOnRailsHelper
   # props: Ruby Hash which contains the properties to pass to the react object
   #
   #  options:
-  #    prerender: <true/false> (configurable default), set to false when debugging!
-  #    trace: <true/false>  (configurable default), set to true to print additional info
+  #    generator_function: <true/false> default is false, set to true if you want to use a
+  #                        generator function rather than a React Component.
+  #    prerender: <true/false> set to false when debugging!
+  #    trace: <true/false> set to true to print additional debugging information in the browser
+  #           default is true for development, off otherwise
+  #    replay_console: <true/false> Default is true. False will disable echoing server rendering
+  #                    logs, which can make troubleshooting server rendering difficult.
   def react_component(component_name, props = {}, options = {})
     # Create the JavaScript and HTML to allow either client or server rendering of the
     # react_component.

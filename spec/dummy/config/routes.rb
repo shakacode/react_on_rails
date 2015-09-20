@@ -7,7 +7,6 @@ Rails.application.routes.draw do
 
   get "focused" => "pages#focused"
 
-  get 'about' => 'pages#about'
 
   # Example of regular route:
   #   get 'products/:id' => 'catalog#view'

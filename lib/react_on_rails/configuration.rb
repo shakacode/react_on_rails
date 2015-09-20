@@ -9,14 +9,15 @@ module ReactOnRails
       prerender: false,
       replay_console: true,
       generator_function: false,
-      trace: false
+      trace: Rails.env.development?
     )
   end
 
   class Configuration
     attr_accessor :server_bundle_js_file, :prerender, :replay_console, :generator_function, :trace
 
-    def initialize(server_bundle_js_file:, prerender:, replay_console:, generator_function:, trace:)
+    def initialize(server_bundle_js_file: nil, prerender: nil, replay_console: nil,
+                   generator_function: nil, trace: nil)
       self.server_bundle_js_file = server_bundle_js_file
       self.prerender = prerender
       self.replay_console = replay_console

@@ -1,4 +1,3 @@
-// Make sure the following files are
 // Example of React + Redux
 // Shows the mapping from the exported object to the name used by the server rendering.
 import HelloWorld from '../components/HelloWorld';

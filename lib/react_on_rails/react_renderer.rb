@@ -3,7 +3,6 @@
 
 module ReactOnRails
   class ReactRenderer
-    TRACE = true # Set to true to print generated code.
     # Reimplement console methods for replaying on the client
     CONSOLE_POLYFILL = <<-JS
 var console = { history: [] };
@@ -63,12 +62,15 @@ if (history && history.length > 0) {
 })()
       JS
 
-      puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
-      puts "react_renderer.rb: 92"
-      puts "js_code_wrapper = #{js_code_wrapper.ai}"
-      puts "wrote file server-generated.js"
-      File.write('server-generated.js', js_code_wrapper)
-      puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+      trace_rails_on_maui = ENV["TRACE_REACT_ON_RAILS"].present? # Set to anything to print generated code.
+      if trace_rails_on_maui
+        puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+        puts "react_renderer.rb: 92"
+        puts "js_code_wrapper = #{js_code_wrapper.ai}"
+        puts "wrote file tmp/server-generated.js"
+        File.write('tmp/server-generated.js', js_code_wrapper)
+        puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+      end
 
       @context.eval(js_code_wrapper)
     end

@@ -7,10 +7,6 @@ class PagesController < ApplicationController
     data
   end
 
-  def about
-
-  end
-
   private
 
   def data
