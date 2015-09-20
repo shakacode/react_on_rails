@@ -12,6 +12,12 @@ Dir.chdir APP_ROOT do
   system "gem install bundler --conservative"
   system "bundle check || bundle install"
   system "bundle install --gemfile=Gemfile"
+  system "npm i"
+
+  # puts "\n== Copying sample files =="
+  # unless File.exist?("config/database.yml")
+  #   system "cp config/database.yml.sample config/database.yml"
+  # end
 
   puts "\n== Preparing database =="
   system "bin/rake db:setup"
@@ -19,4 +25,7 @@ Dir.chdir APP_ROOT do
   puts "\n== Removing old logs and tempfiles =="
   system "rm -f log/*"
   system "rm -rf tmp/cache"
+
+  puts "\n== Restarting application server =="
+  system "touch tmp/restart.txt"
 end

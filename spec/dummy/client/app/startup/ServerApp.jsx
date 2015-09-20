@@ -12,9 +12,10 @@ import middleware from 'redux-thunk';
 
 // Uses the index
 import reducers from '../reducers/reducersIndex';
+
 import HelloWorldContainer from '../components/HelloWorldContainer';
 
-export default props => {
+let App = props => {
   const combinedReducer = combineReducers(reducers);
 
   // This is where we'll put in the middleware for the async function. Placeholder.
@@ -29,3 +30,10 @@ export default props => {
     </Provider>
   );
 };
+
+/*
+ *  Export a function that takes the props and returns a ReactComponent.
+ *  Ensure that option generator_function is set to true when invoking the helper, or as the default.
+ */
+
+export default App;

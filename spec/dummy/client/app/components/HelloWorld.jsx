@@ -1,7 +1,7 @@
 import React from 'react';
 
 // Super simple example of the simplest possible React component
-export default class HelloWorld extends React.Component {
+class HelloWorld extends React.Component {
 
   // Not necessary if we only call super, but we'll need to initialize state, etc.
   constructor(props, context) {
@@ -30,3 +30,5 @@ export default class HelloWorld extends React.Component {
     );
   }
 }
+
+export default HelloWorld;

@@ -17,7 +17,7 @@ import HelloWorldContainer from '../components/HelloWorldContainer';
  *  React will see that the state is the same and not do anything.
  *
  */
-window.App = props => {
+let App = props => {
   const combinedReducer = combineReducers(reducers);
   const store = applyMiddleware(middleware)(createStore)(combinedReducer, props);
 
@@ -28,3 +28,12 @@ window.App = props => {
   );
   return reactComponent;
 };
+
+/*
+ * If you wish to create a React component via a function, rather than simply props,
+ * then you need to set the property "generator" on that function to true.
+ * When that is done, the function is invoked with a single parameter of "props",
+ * and that function should return a react element.
+ */
+
+export default App;
