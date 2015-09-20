@@ -52,7 +52,8 @@ module ReactOnRailsHelper
     page_loaded_js = <<-JS
 (function() {
   window.#{data_variable_name} = #{props.to_json};
-#{define_render_if_dom_node_present(react_component_name, data_variable_name, dom_id, trace(options), generator_function(options))}
+#{define_render_if_dom_node_present(react_component_name, data_variable_name, dom_id,
+                                    trace(options), generator_function(options))}
 #{install_render_events}
 })();
     JS
@@ -124,9 +125,8 @@ module ReactOnRailsHelper
 
   def debug_js(react_component_name, data_variable, dom_id, trace)
     if trace
-      <<-JS
-console.log("CLIENT SIDE RENDERED #{react_component_name} with data_variable #{data_variable} to dom node with id: #{dom_id}");
-      JS
+      "console.log(\"CLIENT SIDE RENDERED #{react_component_name} with data_variable"\
+      " #{data_variable} to dom node with id: #{dom_id}\");"
     else
       ""
     end
