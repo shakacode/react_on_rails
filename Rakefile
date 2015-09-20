@@ -43,7 +43,7 @@ namespace :lint do
 
   desc "Run jscs from shell"
   task :jscs do
-    sh "jscs ."
+    sh "jscs -e ."
   end
 
   task lint: [:eslint, :rubocop, :ruby, :jscs, :scss] do

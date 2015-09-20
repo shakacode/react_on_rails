@@ -22,6 +22,7 @@ export default class HelloWorldRedux extends React.Component {
 
   render() {
     const { name } = this.props.helloWorldData;
+
     // Same:
     // const name = this.props.helloWorldData.name;
 
