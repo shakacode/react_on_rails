@@ -15,7 +15,7 @@ import reducers from '../reducers/reducersIndex';
 
 import HelloWorldContainer from '../components/HelloWorldContainer';
 
-let App = props => {
+const ReduxApp = props => {
   const combinedReducer = combineReducers(reducers);
 
   // This is where we'll put in the middleware for the async function. Placeholder.
@@ -36,4 +36,4 @@ let App = props => {
  *  Ensure that option generator_function is set to true when invoking the helper, or as the default.
  */
 
-export default App;
+export default ReduxApp;

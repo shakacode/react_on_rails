@@ -1,11 +1,7 @@
 class PagesController < ApplicationController
-  def index
-    data
-  end
+  before_action :data
 
-  def focused
-    data
-  end
+  # See files in spec/dummy/app/views/pages
 
   private
 
@@ -29,5 +25,4 @@ class PagesController < ApplicationController
       }
     }
   end
-
 end

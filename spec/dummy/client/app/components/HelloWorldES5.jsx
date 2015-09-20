@@ -1,7 +1,7 @@
 import React from 'react';
 
 // Super simple example of React component using React.createClass
-const HelloES5 = React.createClass({
+const HelloWorldES5 = React.createClass({
 
   getInitialState() {
     return this.props.helloWorldData;
@@ -29,4 +29,4 @@ const HelloES5 = React.createClass({
   },
 });
 
-export default HelloES5;
+export default HelloWorldES5;

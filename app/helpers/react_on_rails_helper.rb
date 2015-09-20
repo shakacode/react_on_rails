@@ -1,7 +1,11 @@
-require 'react_on_rails/react_renderer'
+require "react_on_rails/react_renderer"
+
+# NOTE:
+# For any heredoc JS:
+# 1. The white spacing in this file matters!
+# 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 
 module ReactOnRailsHelper
-
   # react_component_name: can be a React component, created using a ES6 class, or
   #   React.createClass, or a
   #     `generator function` that returns a React component
@@ -47,8 +51,9 @@ module ReactOnRailsHelper
     page_loaded_js = <<-JS
 (function() {
   window.#{data_variable_name} = #{props.to_json};
-  #{define_render_if_dom_node_present(react_component_name, data_variable_name, dom_id, trace(options), generator_function(options))}
-  #{install_render_events}
+#{define_render_if_dom_node_present(react_component_name, data_variable_name, dom_id,
+                                    trace(options), generator_function(options))}
+#{install_render_events}
 })();
     JS
 
@@ -77,10 +82,10 @@ module ReactOnRailsHelper
   def server_rendered_react_component_html(options, props, react_component_name)
     if prerender(options)
       render_js_expression = <<-JS
-        (function(React) {
-          var reactElement = #{render_js_react_element(react_component_name, props.to_json, generator_function(options))};
-          return React.renderToString(reactElement);
-        })(this.React);
+(function(React) {
+        var reactElement = #{render_js_react_element(react_component_name, props.to_json, generator_function(options))}
+        return React.renderToString(reactElement);
+      })(this.React);
       JS
       # create the server generated html of the react component with props
       options[:react_component_name] = react_component_name
@@ -97,6 +102,8 @@ module ReactOnRailsHelper
   # This method could be used by itself to render the output of any javascript that returns a
   # string of proper HTML.
   def render_js(js_expression, options = {})
+    # TODO: This should be changed so that we don't create a new context every time
+    # Example of doing this here: https://github.com/reactjs/react-rails/tree/master/lib/react/rails
     ReactOnRails::ReactRenderer.new(options).render_js(js_expression,
                                                        options).html_safe
   end
@@ -117,9 +124,8 @@ module ReactOnRailsHelper
 
   def debug_js(react_component_name, data_variable, dom_id, trace)
     if trace
-      <<-JS
-console.log("CLIENT SIDE RENDERED #{react_component_name} with data_variable #{data_variable} to dom node with id: #{dom_id}");
-      JS
+      "console.log(\"CLIENT SIDE RENDERED #{react_component_name} with data_variable"\
+      " #{data_variable} to dom node with id: #{dom_id}\");"
     else
       ""
     end
@@ -142,58 +148,58 @@ console.log("CLIENT SIDE RENDERED #{react_component_name} with data_variable #{d
 
     <<-JS
 (function(React) {
-  var props = #{props_string};
-  return #{js_create_element};
-})(this.React);
+          var props = #{props_string};
+          return #{js_create_element};
+        })(this.React);
     JS
   end
 
   def define_render_if_dom_node_present(react_component_name, data_variable, dom_id, trace, generator_function)
     inner_js_code = <<-JS_CODE
-    var domNode = document.getElementById('#{dom_id}');
-    if (domNode) {
-      #{debug_js(react_component_name, data_variable, dom_id, trace)}
-      var reactElement = #{render_js_react_element(react_component_name, data_variable, generator_function)};
-      React.render(reactElement, domNode);
-    }
-    JS_CODE
+      var domNode = document.getElementById('#{dom_id}');
+      if (domNode) {
+        #{debug_js(react_component_name, data_variable, dom_id, trace)}
+        var reactElement = #{render_js_react_element(react_component_name, data_variable, generator_function)}
+        React.render(reactElement, domNode);
+      }
+JS_CODE
 
     <<-JS
-var renderIfDomNodePresent = function() {
-  #{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(inner_js_code, react_component_name)}
-}
+  var renderIfDomNodePresent = function() {
+#{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(inner_js_code, react_component_name)}
+  }
     JS
   end
 
   def non_turbolinks_bootstrap
     <<-JS
-document.addEventListener("DOMContentLoaded", function(event) {
-  console.log("DOMContentLoaded event fired");
-  renderIfDomNodePresent();
-});
+    document.addEventListener("DOMContentLoaded", function(event) {
+      console.log("DOMContentLoaded event fired");
+      renderIfDomNodePresent();
+    });
     JS
   end
 
   def turbolinks_bootstrap(dom_id)
     <<-JS
-var turbolinksInstalled = typeof(Turbolinks) !== 'undefined';
-if (!turbolinksInstalled) {
-  console.warn("WARNING: NO TurboLinks detected in JS, but it's in your Gemfile");
-  #{non_turbolinks_bootstrap}
-} else {
-  function onPageChange(event) {
-    var removePageChangeListener = function() {
-      document.removeEventListener("page:change", onPageChange);
-      document.removeEventListener("page:before-unload", removePageChangeListener);
-      var domNode = document.getElementById('#{dom_id}');
-      React.unmountComponentAtNode(domNode);
-    };
-    document.addEventListener("page:before-unload", removePageChangeListener);
+  var turbolinksInstalled = typeof(Turbolinks) !== 'undefined';
+  if (!turbolinksInstalled) {
+    console.warn("WARNING: NO TurboLinks detected in JS, but it's in your Gemfile");
+#{non_turbolinks_bootstrap}
+  } else {
+    function onPageChange(event) {
+      var removePageChangeListener = function() {
+        document.removeEventListener("page:change", onPageChange);
+        document.removeEventListener("page:before-unload", removePageChangeListener);
+        var domNode = document.getElementById('#{dom_id}');
+        React.unmountComponentAtNode(domNode);
+      };
+      document.addEventListener("page:before-unload", removePageChangeListener);
 
-    renderIfDomNodePresent();
+      renderIfDomNodePresent();
+    }
+    document.addEventListener("page:change", onPageChange);
   }
-  document.addEventListener("page:change", onPageChange);
-}
     JS
   end
 end

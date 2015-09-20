@@ -27,7 +27,7 @@ module.exports = {
       // MANIFEST of what you expose for the server if you do it here in the config file.
       // However, we recommend using the pattern in /client/app/startup/serverGlobals.jsx
       //{ test: require.resolve('./app/HelloString.js'), loader: 'expose?HelloString' },
-      //{ test: require.resolve('./app/startup/ServerApp.jsx'), loader: 'expose?App' },
+      //{ test: require.resolve('./app/startup/ServerApp.jsx'), loader: 'expose?ReduxApp' },
     ],
   },
 };

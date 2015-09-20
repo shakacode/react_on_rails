@@ -3,12 +3,12 @@ require "fileutils"
 namespace :run_rspec do
   desc "Run RSpec for top level only"
   task :gem do
-    sh %{ rspec --exclude-pattern "spec/dummy/**/*_spec.rb" spec }
+    sh %( rspec --exclude-pattern "spec/dummy/**/*_spec.rb" spec )
   end
 
   desc "Run RSpec for spec/dummy only"
   task :dummy do
-    sh %{ cd spec/dummy && rspec }
+    sh %( cd spec/dummy && rspec )
   end
 
   task run_rspec: [:gem, :dummy] do
@@ -21,7 +21,6 @@ task run_rspec: ["run_rspec:run_rspec"]
 task default: :run_rspec
 
 namespace :lint do
-
   desc "Run Rubocop as shell"
   task :rubocop do
     sh "rubocop ."
@@ -44,7 +43,7 @@ namespace :lint do
 
   desc "Run jscs from shell"
   task :jscs do
-    sh "jscs ."
+    sh "jscs -e ."
   end
 
   task lint: [:eslint, :rubocop, :ruby, :jscs, :scss] do
@@ -67,7 +66,7 @@ namespace :docker do
 
   desc "Run scss-lint linter from docker"
   task :scss do
-    sh"docker-compose run lint rake lint:scss"
+    sh "docker-compose run lint rake lint:scss"
   end
 
   desc "Run eslint linter from docker"
@@ -87,5 +86,3 @@ end
 
 desc "Runs all linters from docker. Run `rake -D docker` to see all available lint options"
 task docker: ["docker:lint"]
-
-

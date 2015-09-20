@@ -1,0 +1,93 @@
+<%= render "header" %>
+
+<% cache @app_props_server_render do %>
+  <!-- print statements to show when server rendering is happening -->
+  <% puts "=" * 80 %>
+  <% puts "server rendering react components" %>
+  <% puts "=" * 80 %>
+  <%= react_component("ReduxApp", @app_props_server_render, prerender: true, trace: true, generator_function: true) %>
+<% end %>
+<hr/>
+
+<h1>Server Rendered/Cached React/Redux Component</h1>
+<p>
+  This example demonstrates server side rendering using Redux. The only difference from client rendering is that
+  the <code>prerender</code> option is true.<br/><br/>
+  The source HTML of this page will show the server rendered HTML.<br/>
+  <pre>
+    <%= '<div id="ReduxApp-react-component-0"><div data-reactid=".uwwa3eq70g" data-react-checksum="-1318287018">' %>
+    <%= '<h3 data-reactid=".uwwa3eq70g.0"><span data-reactid=".uwwa3eq70g.0.0">Redux Hello, </span><span data-reactid=".uwwa3eq70g.0.1">' %>
+    <%= 'Mr. Server Side Rendering</span><span data-reactid=".uwwa3eq70g.0.2">!</span></h3><p data-reactid=".uwwa3eq70g.1">' %>
+    <%= '<span data-reactid=".uwwa3eq70g.1.0">With Redux, say hello to:</span>' %>
+    <%= '<input type="text" value="Mr. Server Side Rendering" data-reactid=".uwwa3eq70g.1.1"></p></div></div>' %>
+  </pre>
+</p>
+
+<hr/>
+<h2>Setup</h2>
+<ol>
+  <li>
+    Create redux listening component: spec/dummy/client/app/components/HelloWorldRedux.jsx
+  </li>
+  <li>
+    Create redux container: spec/dummy/client/app/components/HelloWorldContainer.jsx
+  </li>
+  <li>
+    Create redux app client side: spec/dummy/client/app/startup/ClientReduxApp.jsx
+  </li>
+  <li>
+    Create redux app server side: spec/dummy/client/app/startup/ServerReduxApp.jsx
+  </li>
+  <li>
+    Expose the Redux Component on the client side:
+    spec/dummy/client/app/startup/clientGlobals.jsx
+    <br/>
+    <pre>
+    import ReduxApp from './ClientReduxApp';
+    window.ReduxApp = ReduxApp;
+    </pre>
+  </li>
+  <li>
+    Expose the Redux Component on the server side:
+    spec/dummy/client/app/startup/serverGlobals.jsx
+    <br/>
+    <pre>
+    import ReduxApp from './ServerReduxApp';
+    global.ReduxApp = ReduxApp;
+    </pre>
+  </li>
+  <li>
+    Place the component on the view: spec/dummy/app/views/pages/server_side_redux_app_cached.html.erb.
+    Note the cache block.
+    <br/>
+    <pre>
+    <%% cache @app_props_server_render do %>
+      <%% react_component("ReduxApp", @app_props_server_render, prerender: true, trace: true, generator_function: true) %>
+    <%% end %>
+    </pre>
+  </li>
+</ol>
+<hr/>
+<h2>
+  Notes on Fragment Caching
+</h2>
+<ol>
+  <li>
+    Run `rails c` to open a Rails console, and then run `Rails.cache.clear` to clear the cache.
+  </li>
+  <li>
+    Refresh this page and you will see something like this:
+    <pre>
+      22:55:23 web.1    | ================================================================================
+      22:55:23 web.1    | server rendering react components
+      22:55:23 web.1    | ================================================================================
+    </pre>
+  </li>
+  <li>
+    Refresh the page again and you will not see this print again. This confirms that the fragment
+    of HTML was cached. This can be a big performance boost. Note, we're caching the HTML of server
+    rendered react using Redux.
+  </li>
+</ol>
+
+

@@ -5,8 +5,11 @@ Rails.application.routes.draw do
   # You can have the root of your site routed with "root"
   root 'pages#index'
 
-  get "focused" => "pages#focused"
-
+  get "client_side_hello_world" => "pages#client_side_hello_world"
+  get "server_side_hello_world" => "pages#server_side_hello_world"
+  get "server_side_hello_world_es5" => "pages#server_side_hello_world_es5"
+  get "server_side_redux_app" => "pages#server_side_redux_app"
+  get "server_side_redux_app_cached" => "pages#server_side_redux_app_cached"
 
   # Example of regular route:
   #   get 'products/:id' => 'catalog#view'

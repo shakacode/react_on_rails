@@ -21,6 +21,5 @@ module ReactOnRails
       expect(ReactOnRails.configuration.server_bundle_js_file).to eq("client/dist/something.js")
       expect(ReactOnRails.configuration.prerender).to eq(true)
     end
-
   end
 end

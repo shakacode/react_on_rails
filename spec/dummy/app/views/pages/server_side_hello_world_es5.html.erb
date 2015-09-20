@@ -1,0 +1,50 @@
+<%= render "header" %>
+<%= react_component("HelloWorldES5", @app_props_server_render, prerender: true, trace: true, generator_function: false) %>
+<hr/>
+<h1>React Rails Server Rendering ES5 Style React.createClass</h1>
+<p>
+  This example uses the React.createClass syntax rather than the ES6 class syntax.<br/><br/>
+  This example demonstrates server side rendering. The only difference from client rendering is that
+  the <code>prerender</code> option is true.<br/><br/>
+  The source HTML of this page will only show a DIV with an ID matching HelloWorldES5.<br/>
+  <pre>
+    <%='<div id="HelloWorldES5-react-component-0"><div data-reactid=".uwwa3eq70g" data-react-checksum="-1318287018">'%>
+    <%='<h3 data-reactid=".uwwa3eq70g.0"><span data-reactid=".uwwa3eq70g.0.0">Hello ES5, </span><span data-reactid=".uwwa3eq70g.0.1">'%>
+    <%='Mr. Server Side Rendering</span><span data-reactid=".uwwa3eq70g.0.2">!</span></h3><p data-reactid=".uwwa3eq70g.1">'%>
+    <%='<span data-reactid=".uwwa3eq70g.1.0">Say hello to:</span>'%>
+    <%='<input type="text" value="Mr. Server Side Rendering" data-reactid=".uwwa3eq70g.1.1"></p></div></div>'%>
+  </pre>
+  Compare this to the HTML created for client-only rendering: <%= link_to "Hello World Compnent Client Rendered", client_side_hello_world_path %><br/>
+</p>
+<ol>
+  <li>
+    See spec/dummy/spec/sample_generated_js/server-generated.js to see the JavaScript used for pre-rendering.
+  </li>
+  <li>
+    See spec/dummy/spec/sample_generated_js/client-generated.js to see the JavaScript that is the same as "view source"
+  </li>
+</ol>
+<hr/>
+<h2>Setup</h2>
+<ol>
+  <li>
+    Create component source: spec/dummy/client/app/components/HelloWorld.jsx
+  </li>
+  <li>
+    Expose the HelloWorld Component: spec/dummy/client/app/startup/clientGlobals.jsx
+    <br/>
+    <pre>
+      import HelloWorldES5 from '../components/HelloWorldES5';
+      window.HelloWorldES5 = HelloWorldES5;
+    </pre>
+  </li>
+  <li>
+    Place the component on the view: spec/dummy/app/views/pages/client_side_hello_world.html.erb
+    <br/>
+    <pre>
+      <%% react_component("HelloWorldES5", @app_props_server_render, prerender: true, trace: true, generator_function: false) %>
+    </pre>
+  </li>
+</ol>
+<hr/>
+
