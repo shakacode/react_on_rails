@@ -40,10 +40,6 @@ And then execute:
 
     $ bundle
 
-Or install it yourself as:
-
-    $ gem install react_on_rails
-
 ## Usage
 
 *See section below titled "Try it out"*
@@ -56,33 +52,47 @@ The main API is a helper:
 ```
   
 Params are:
-```  
-react_component_name: can be a React component, created using a ES6 class, or
-  React.createClass, or a
-    `generator function` that returns a React component
-      using ES6
-         let MyReactComponentApp = (props) => <MyReactComponent {...props}/>;
-      or using ES5
-         var MyReactComponentApp = function(props) { return <YourReactComponent {...props}/>; }
-   Exposing the react_component_name is necessary to both a plain ReactComponent as well as
+
+**react_component_name**: can be a React component, created using a ES6 class, or React.createClass,
+  or a `generator function` that returns a React component
+   
+  using ES6
+  ```javascript
+  let MyReactComponentApp = (props) => <MyReactComponent {...props}/>;
+  ```       
+     
+  or using ES5
+  ```javascript
+  var MyReactComponentApp = function(props) { return <YourReactComponent {...props}/>; }
+  ```
+  Exposing the react_component_name is necessary to both a plain ReactComponent as well as
      a generator:
    For client rendering, expose the react_component_name on window:
-     window.MyReactComponentApp = MyReactComponentApp;
-   For server rendering, export the react_component_name on global:
-     global.MyReactComponentApp = MyReactComponentApp;
-   See spec/dummy/client/app/startup/serverGlobals.jsx and
-     spec/dummy/client/app/startup/ClientApp.jsx for examples of this
-props: Ruby Hash which contains the properties to pass to the react object
+   
+  ```javascript
+  window.MyReactComponentApp = MyReactComponentApp;
+  ```       
+  For server rendering, export the react_component_name on global:
+  ```javascript
+  global.MyReactComponentApp = MyReactComponentApp;
+  ```       
+  See `spec/dummy/client/app/startup/serverGlobals.jsx` and 
+  `spec/dummy/client/app/startup/ClientApp.jsx` for examples of this.
+ 
+**props**: Ruby Hash which contains the properties to pass to the react object
 
- options:
-   generator_function: <true/false> default is false, set to true if you want to use a
+**options:**
+
+   **generator_function**: <true/false> default is false, set to true if you want to use a
                        generator function rather than a React Component.
-   prerender: <true/false> set to false when debugging!
-   trace: <true/false> set to true to print additional debugging information in the browser
+                       
+   **prerender**: <true/false> set to false when debugging!
+   
+   **trace**: <true/false> set to true to print additional debugging information in the browser
           default is true for development, off otherwise
-   replay_console: <true/false> Default is true. False will disable echoing server rendering
-                   logs, which can make troubleshooting server rendering difficult.
-```
+          
+   **replay_console**: <true/false> Default is true. False will disable echoing server rendering
+          logs, which can make troubleshooting server rendering difficult.
 
 ## JavaScript
 
