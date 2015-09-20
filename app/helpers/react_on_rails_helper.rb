@@ -1,4 +1,4 @@
-require 'react_on_rails/react_renderer'
+require "react_on_rails/react_renderer"
 
 # NOTE:
 # For any heredoc JS:
@@ -6,7 +6,6 @@ require 'react_on_rails/react_renderer'
 # 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 
 module ReactOnRailsHelper
-
   # react_component_name: can be a React component, created using a ES6 class, or
   #   React.createClass, or a
   #     `generator function` that returns a React component

@@ -59,7 +59,7 @@ var console = { history: [] };
         puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
         puts "react_renderer.rb: 92"
         puts "wrote file tmp/server-generated.js"
-        File.write('tmp/server-generated.js', js_code_wrapper)
+        File.write("tmp/server-generated.js", js_code_wrapper)
         puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
       end
 
@@ -134,7 +134,7 @@ var console = { history: [] };
         @js_context = begin
           server_js_file = ReactOnRails.configuration.server_bundle_js_file
           if server_js_file.present? && File.exist?(server_js_file)
-            js_file = Rails.root.join()
+            js_file = Rails.root.join
             bundle_js_code = File.read(server_js_file)
             ExecJS.compile(base_js_code(bundle_js_code))
           else
