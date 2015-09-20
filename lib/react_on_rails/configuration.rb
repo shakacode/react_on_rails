@@ -18,7 +18,12 @@ module ReactOnRails
 
     def initialize(server_bundle_js_file: nil, prerender: nil, replay_console: nil,
                    generator_function: nil, trace: nil)
-      self.server_bundle_js_file = server_bundle_js_file
+      if File.exist?(server_bundle_js_file)
+        self.server_bundle_js_file = server_bundle_js_file
+      else
+        self.server_bundle_js_file = nil
+      end
+
       self.prerender = prerender
       self.replay_console = replay_console
       self.generator_function = generator_function

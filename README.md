@@ -77,7 +77,7 @@ Params are:
   global.MyReactComponentApp = MyReactComponentApp;
   ```       
   See `spec/dummy/client/app/startup/serverGlobals.jsx` and 
-  `spec/dummy/client/app/startup/ClientApp.jsx` for examples of this.
+  `spec/dummy/client/app/startup/ClientReduxApp.jsx` for examples of this.
   
 * **props**: Ruby Hash which contains the properties to pass to the react object
 
@@ -220,6 +220,11 @@ Start the sample app like this for some debug printing:
 ```bash
 TRACE_REACT_ON_RAILS=true && foreman start
 ```
+
+### Generated JavaScript
+
+1. See spec/dummy/spec/sample_generated_js/server-generated.js to see the JavaScript for typical server rendering.
+2. See spec/dummy/spec/sample_generated_js/client-generated.js to see the JavaScript for typical client rendering.
 
 ### Linting
 All linting is performed from the docker container. You will need docker and docker-compose installed

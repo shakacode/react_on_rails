@@ -1,8 +1,18 @@
 <%= render "header" %>
 
-<h1>React Rails Server Rendering</h1>
+<h1>react_on_rails gem testing</h1>
 <hr/>
+This page demonstrates a few things the other pages do not show:
+<ul>
+  <li>
+    Multiple instance of same component on the page. The ID value of the top level DIVs increments.
+  </li>
+  <li>
+    Rendering a non-react component.
+  </li>
+</ul>
 
+<hr/>
 <h1>Server Rendered/Cached React/Redux Component</h1>
 <p>
   Server Caching (Rails.application.config.perform_caching) is <%= $rails_perform_caching %>
@@ -11,11 +21,11 @@
   <% end %>
 </p>
 
-<code>
+<pre>
   <%% cache @app_props_server_render do %><br/>
-  <%%    = react_component("App", @app_props_server_render, trace: true) %><br/>
+  <%%= react_component("ReduxApp", @app_props_server_render, trace: true) %><br/>
   <%% end %>
-</code>
+</pre>
 <p>
   That will generate this, which is done only once on the server side:
 </p>
@@ -24,16 +34,15 @@
   <% puts "=" * 80 %>
   <% puts "server rendering react components" %>
   <% puts "=" * 80 %>
-  <!-- Default for prerender is true for the app, set in config/react_on_rails.rb -->
-  <%= react_component("App", @app_props_server_render, trace: true, generator_function: true) %>
+  <%= react_component("ReduxApp", @app_props_server_render, trace: true, generator_function: true) %>
   <hr/>
 
   <h1>Server Rendered/Cached React Component Without Redux</h1>
-  <code>
+  <pre>
     <%% cache @app_props_server_render do %><br/>
-    <%%    = react_component("HelloWorld", @app_props_server_render, trace: true) %><br/>
+    <%%= react_component("HelloWorld", @app_props_server_render, trace: true) %><br/>
     <%% end %>
-  </code>
+  </pre>
   <p>
     And this is an example of a server rendered React component without Redux.
     Note, that we don't suffix the component name with "App"
@@ -45,33 +54,33 @@
 
 <h1>Simple Client Rendered Component</h1>
 <!-- Passing prerender: false to not render on server -->
-<code>
+<pre>
   <%%= react_component("HelloWorldApp", @app_props_hello, prerender: false, trace: true, generator_function: true) %>
-</code>
+</pre>
 <%= react_component("HelloWorldApp", @app_props_hello, prerender: false, trace: true, generator_function: true) %>
 <hr/>
 
 <h1>Showing you can put the same component twice on a page with different props</h1>
-<code>
+<pre>
   <%%= react_component("HelloWorldApp", @app_props_hello_again, prerender: false, trace: true) %>
-</code>
+</pre>
 <%= react_component("HelloWorldApp", @app_props_hello_again, prerender: false, trace: true, generator_function: true) %>
 <hr/>
 
 <h1>Simple Component Without Redux</h1>
-<code>
+<pre>
   <%%= react_component("HelloWorld", @app_props_hello, prerender: false, trace: true) %>
   <%%= react_component("HelloES5", @app_props_hello, prerender: false, trace: true) %>
-</code>
+</pre>
 <%= react_component("HelloWorld", @app_props_hello, prerender: false, trace: true) %>
-<%= react_component("HelloES5", @app_props_hello, prerender: false, trace: true) %>
+<%= react_component("HelloWorldES5", @app_props_hello, prerender: false, trace: true) %>
 <hr/>
 
 <h1>Non-React Component</h1>
 <p>For example, Suppose you have some JavaScript that generates a string of HTML:</p>
-<code>
+<pre>
   this.HelloString.world()
-</code>
+</pre>
 <p>
   That will generate this:
 </p>

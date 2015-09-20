@@ -17,7 +17,7 @@ import HelloWorldContainer from '../components/HelloWorldContainer';
  *  React will see that the state is the same and not do anything.
  *
  */
-let App = props => {
+let ReduxApp = props => {
   const combinedReducer = combineReducers(reducers);
   const store = applyMiddleware(middleware)(createStore)(combinedReducer, props);
 
@@ -36,4 +36,4 @@ let App = props => {
  * and that function should return a react element.
  */
 
-export default App;
+export default ReduxApp;
