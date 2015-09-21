@@ -76,8 +76,8 @@ Params are:
   ```javascript
   global.MyReactComponentApp = MyReactComponentApp;
   ```       
-  See `spec/dummy/client/app/startup/serverGlobals.jsx` and 
-  `spec/dummy/client/app/startup/ClientReduxApp.jsx` for examples of this.
+  If you're curious as to what the gem generates for the server and client rendering, see [`spec/dummy/client/app/startup/serverGlobals.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/spec/sample_generated_js/server-generated.js)
+  and [`spec/dummy/client/app/startup/ClientReduxApp.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/spec/sample_generated_js/client-generated.js) for examples of this. Note, this is not the code that you are providing. You can see the client code by viewing the page source.
   
 * **props**: Ruby Hash which contains the properties to pass to the react object
 
@@ -98,11 +98,27 @@ Params are:
    window.HelloWorld = HelloWorld;
    ```   
 3. Follow the examples in `spec/dummy/client/app/startup/serverGlobals.jsx` to expose your react components
-   for client side rendering.
+   for server side rendering.
    ```ruby
    import HelloWorld from '../components/HelloWorld';
    global.HelloWorld = HelloWorld;
    ```
+   
+## Server Rendering Tips
+
+- Your code can't reference `document`. Server side JS execution does not have access to `document`, so jQuery and some
+  other libs won't work in this environment. You can debug this by putting in `console.log`
+  statements in your code.
+- You can conditionally avoid running code that references document by passing in a boolean prop to your top level react
+  component. Since the passed in props Hash from the view helper applies to client and server side code, the best way to
+  do this is to use a generator function.
+
+You might do something like this in some file for your top level component:
+```javascript
+global.App = () => <MyComponent serverSide={true} />;
+```
+
+The point is that you have separate files for top level client or server side, and you pass some extra option indicating that that rendering is happening server sie.
 
 ## Optional Configuration   
 
