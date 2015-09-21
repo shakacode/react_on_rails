@@ -48,12 +48,12 @@ And then execute:
 The main API is a helper:
 
 ```ruby
-  react_component(component_name, props = {}, options = {})
+  <%= react_component(component_name, props = {}, options = {}) %>
 ```
   
 Params are:
 
-* **react_component_name**: can be a React component, created using a ES6 class, or React.createClass,
+* **react_component_name**: [string] can be a React component, created using a ES6 class, or React.createClass,
   or a `generator function` that returns a React component
    
   using ES6
@@ -79,9 +79,9 @@ Params are:
   If you're curious as to what the gem generates for the server and client rendering, see [`spec/dummy/client/app/startup/serverGlobals.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/spec/sample_generated_js/server-generated.js)
   and [`spec/dummy/client/app/startup/ClientReduxApp.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/spec/sample_generated_js/client-generated.js) for examples of this. Note, this is not the code that you are providing. You can see the client code by viewing the page source.
   
-* **props**: Ruby Hash which contains the properties to pass to the react object
+* **props**: [hash] Properties to pass to the react object
 
-* **options:**
+* **options:** [hash]
   * **generator_function**: <true/false> default is false, set to true if you want to use a generator function rather than a React Component.
   * **prerender**: <true/false> set to false when debugging!
   * **trace**: <true/false> set to true to print additional debugging information in the browser default is true for development, off otherwise 
