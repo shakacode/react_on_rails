@@ -118,7 +118,7 @@ You might do something like this in some file for your top level component:
 global.App = () => <MyComponent serverSide={true} />;
 ```
 
-The point is that you have separate files for top level client or server side, and you pass some extra option indicating that that rendering is happening server sie.
+The point is that you have separate files for top level client or server side, and you pass some extra option indicating that rendering is happening server sie.
 
 ## Optional Configuration   
 
