@@ -57,6 +57,6 @@ group :test do
   gem "rspec-rails"
   gem "coveralls", require: false
   gem 'capybara', '~> 2.5.0'
-  gem 'selenium-webdriver'
+  gem 'poltergeist', '~> 1.6.0'
 end
 

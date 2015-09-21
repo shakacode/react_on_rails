@@ -5,6 +5,18 @@ require File.expand_path('../../config/environment', __FILE__)
 abort("The Rails environment is running in production mode!") if Rails.env.production?
 require 'spec_helper'
 require 'rspec/rails'
+require 'capybara/poltergeist'
+
+Capybara.javascript_driver = :poltergeist
+
+Capybara.default_max_wait_time = 8 # Seconds to wait before timeout error. Default is 2
+
+Capybara.register_driver :poltergeist do |app|
+  Capybara::Poltergeist::Driver.new(app, { debug: false, # change this to true to troubleshoot
+                                           window_size: [1300, 1000], # this can affect dynamic layout
+                                           js_errors: false
+  })
+end
 # Add additional requires below this line. Rails is not loaded until this point!
 
 # Requires supporting ruby files with custom matchers and macros, etc, in
