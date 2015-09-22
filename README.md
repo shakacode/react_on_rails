@@ -19,13 +19,27 @@ Supports:
 6. Server side rendering with fragment caching
 7. react-router for client side rendering (and maybe server side eventually)
 
-# Links
+## OPEN ISSUES
+1. We've got many open issues. However, none of these should be stop you from using this gem if you're using React + Webpack with Rails, especially if you are client rendering.
+2. Almost all the open issues are nice to haves like more tests, or some things that would be nice to have for server rendering.
+3. If you want to work on any of the open issues, please comment on the issue. My team is mentoring anybody that's trying to help with the issues. We've got a private slack room for discussing React + Webpack with Rails. 
+
+## Links
 1. https://github.com/justin808/react-webpack-rails-tutorial/ See https://github.com/shakacode/react-webpack-rails-tutorial/pull/84 for how we integrated it!
 2. http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/
 3. http://forum.railsonmaui.com
 5. If this project is interesting to you, email me at justin@shakacode.com. We're looking for great
 developers that want to work with Rails + React with a distributed, worldwide team, for our own
 products, client work, and open source.
+
+## How is different than the [react-rails gem](https://github.com/reactjs/react-rails)?
+1. `react_on_rails` depends on [webpack](http://webpack.github.io/). `react-rails` integrates closely with sprockets and
+    helps you integrate JSX and the react code into a Rails project.
+2. Likewise, using Webpack as show in the [react-webpack-rails-tutorial](https://github.com/justin808/react-webpack-rails-tutorial/)
+   does involve some extra setup. However, we feel that tight and simple integration with the node ecosystem is more than
+   worth any minor setup costs.
+3. `react-rails` depends on `jquery-ujs` for client side rendering. `react_on_rails` has it's own JS code that does not
+   depend on jquery.
 
 ## Application Installation
 
@@ -189,9 +203,6 @@ Contributions and pull requests welcome!
    server rendered react components. When server rendering is turned off, then you'll only see
    the `div` element where the inline JavaScript will render the component. You might also notice
    how the props you pass (a Ruby Hash) becomes inline JavaScript on the HTML page.
-
-TODO: Check if this is true still: If you're only doing client rendering, you still *MUST* create an empty version of this file. This
-will soon change so that this is not necessary.
 
 ## JavaScript Runtime Configuration
 See this [discussion on JavaScript performance](https://github.com/shakacode/react_on_rails/issues/21).
