@@ -20,9 +20,10 @@ Supports:
 7. react-router for client side rendering (and maybe server side eventually)
 
 ## OPEN ISSUES
-1. We've got many open issues. However, none of these should be stop you from using this gem if you're using React + Webpack with Rails, especially if you are client rendering.
+1. We've got many open issues. However, none of these should stop you from using this gem if you're using React + Webpack with Rails, especially if you are client rendering.
 2. Almost all the open issues are nice to haves like more tests, or some things that would be nice to have for server rendering.
-3. If you want to work on any of the open issues, please comment on the issue. My team is mentoring anybody that's trying to help with the issues. We've got a private slack room for discussing React + Webpack with Rails. 
+3. If you want to work on any of the open issues, please comment on the issue. My team is mentoring anybody that's trying to help with the issues. We've got a private slack room for discussing React + Webpack with Rails.
+4. Longer term, we hope to put in many conveniences into this gem, in terms of Webpack + Rails integration.
 
 ## Links
 1. https://github.com/justin808/react-webpack-rails-tutorial/ See https://github.com/shakacode/react-webpack-rails-tutorial/pull/84 for how we integrated it!
