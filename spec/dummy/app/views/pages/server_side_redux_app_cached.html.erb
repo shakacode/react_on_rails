@@ -62,7 +62,7 @@
     <br/>
     <pre>
     <%% cache @app_props_server_render do %>
-      <%% react_component("ReduxApp", @app_props_server_render, prerender: true, trace: true, generator_function: true) %>
+      <%%= react_component("ReduxApp", @app_props_server_render, prerender: true, trace: true, generator_function: true) %>
     <%% end %>
     </pre>
   </li>
@@ -89,5 +89,3 @@
     rendered react using Redux.
   </li>
 </ol>
-
-

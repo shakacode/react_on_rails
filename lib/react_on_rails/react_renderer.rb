@@ -77,7 +77,7 @@ var console = { history: [] };
     }
     catch(e) {
       var lineOne =
-            'ERROR: You specifed the option generator_function (could be in your defaults) to be\\n';
+            'ERROR: You specified the option generator_function (could be in your defaults) to be\\n';
       var lastLine =
             'A generator function takes a single arg of props and returns a ReactElement.';
 
