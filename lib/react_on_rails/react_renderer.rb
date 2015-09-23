@@ -42,13 +42,14 @@ var console = { history: [] };
     # Calling code will probably call 'html_safe' on return value before rendering to the view.
     def render_js(js_code, options = {})
       component_name = options.fetch(:react_component_name, "")
+      prerender = options.fetch(:prerender, false)
 
       result_js_code = "      result = #{js_code}"
 
       js_code_wrapper = <<-JS
   (function () {
     var result = '';
-#{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(result_js_code, component_name)}
+#{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(result_js_code, component_name, prerender)}
 #{after_render}
     return result;
   })()
@@ -70,7 +71,7 @@ var console = { history: [] };
       end
     end
 
-    def self.wrap_code_with_exception_handler(js_code, component_name)
+    def self.wrap_code_with_exception_handler(js_code, component_name, prerender)
       <<-JS
     try {
 #{js_code}
@@ -83,7 +84,7 @@ var console = { history: [] };
 
       var msg = '';
       var shouldBeGeneratorError = lineOne +
-            'false, but the react component \\'#{component_name}\\' seems to be a generator function.\\n' +
+            'false, but the React component \\'#{component_name}\\' seems to be a generator function.\\n' +
       lastLine;
       var reMatchShouldBeGeneratorError = /Can't add property context, object is not extensible/;
       if (reMatchShouldBeGeneratorError.test(e.message)) {
@@ -92,7 +93,7 @@ var console = { history: [] };
       }
 
       var shouldBeGeneratorError = lineOne +
-            'true, but the react component \\'#{component_name}\\' is not a generator function.\\n' +
+            'true, but the React component \\'#{component_name}\\' is not a generator function.\\n' +
       lastLine;
       var reMatchShouldNotBeGeneratorError = /Cannot call a class as a function/;
       if (reMatchShouldNotBeGeneratorError.test(e.message)) {
@@ -100,23 +101,30 @@ var console = { history: [] };
         console.error(shouldBeGeneratorError);
       }
 
-      console.error('SERVER SIDE: Exception in server side rendering!');
-      if (e.fileName) {
-        console.error('SERVER SIDE: location: ' + e.fileName + ':' + e.lineNumber);
-      }
-      console.error('SERVER SIDE: message: ' + e.message);
-      console.error('SERVER SIDE: stack: ' + e.stack);
-      msg += 'SERVER SIDE Exception in rendering!\\n' +
-        (e.fileName ? '\\nlocation: ' + e.fileName + ':' + e.lineNumber : '') +
-        '\\nMessage: ' + e.message + '\\n\\n' + e.stack;
-
-      var reactElement = React.createElement('pre', null, msg);
-      result = React.renderToString(reactElement);
+      #{render_error_messages(prerender)}
     }
       JS
     end
 
     private
+
+    def self.render_error_messages(prerender)
+      side = prerender ? 'SERVER' : 'CLIENT'
+      <<-JS
+      console.error('#{side} SIDE: Exception in #{side.downcase} side rendering!');
+      if (e.fileName) {
+        console.error('#{side} SIDE: location: ' + e.fileName + ':' + e.lineNumber);
+      }
+      console.error('#{side} SIDE: message: ' + e.message);
+      console.error('#{side} SIDE: stack: ' + e.stack);
+      msg += '#{side} SIDE Exception in rendering!\\n' +
+        (e.fileName ? '\\nlocation: ' + e.fileName + ':' + e.lineNumber : '') +
+        '\\nMessage: ' + e.message + '\\n\\n' + e.stack;
+
+      var reactElement = React.createElement('pre', null, msg);
+      result = React.renderToString(reactElement);
+      JS
+    end
 
     def after_render
       @replay_console ? CONSOLE_REPLAY : ""

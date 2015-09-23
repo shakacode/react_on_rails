@@ -89,12 +89,11 @@ module ReactOnRailsHelper
       JS
       # create the server generated html of the react component with props
       options[:react_component_name] = react_component_name
-      server_rendered_react_component_html =
-        render_js(render_js_expression, options)
+      options[:prerender] = true
+      render_js(render_js_expression, options)
     else
-      server_rendered_react_component_html = ""
+      ''
     end
-    server_rendered_react_component_html
   end
 
   # Takes javascript code and returns the output from it. This is called by react_component, which
@@ -166,7 +165,7 @@ JS_CODE
 
     <<-JS
   var renderIfDomNodePresent = function() {
-#{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(inner_js_code, react_component_name)}
+#{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(inner_js_code, react_component_name, false)}
   }
     JS
   end
