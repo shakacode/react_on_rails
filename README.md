@@ -29,7 +29,8 @@ Supports:
 1. https://github.com/justin808/react-webpack-rails-tutorial/ See https://github.com/shakacode/react-webpack-rails-tutorial/pull/84 for how we integrated it!
 2. http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/
 3. http://forum.railsonmaui.com
-5. If this project is interesting to you, email me at justin@shakacode.com. We're looking for great
+4. Interested in consulting for implementing React with Rails, [email us! contact@shakacode.com](mailto: contact@shakacode.com).
+5. If this project is interesting to you, [email us! contact@shakacode.com](mailto: contact@shakacode.com). We're looking for great
 developers that want to work with Rails + React with a distributed, worldwide team, for our own
 products, client work, and open source.
 
