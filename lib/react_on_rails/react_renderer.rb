@@ -42,14 +42,14 @@ var console = { history: [] };
     # Calling code will probably call 'html_safe' on return value before rendering to the view.
     def render_js(js_code, options = {})
       component_name = options.fetch(:react_component_name, "")
-      prerender = options.fetch(:prerender, false)
+      server_side = options.fetch(:server_side, false)
 
       result_js_code = "      result = #{js_code}"
 
       js_code_wrapper = <<-JS
   (function () {
     var result = '';
-#{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(result_js_code, component_name, prerender)}
+#{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(result_js_code, component_name, server_side)}
 #{after_render}
     return result;
   })()
@@ -71,7 +71,7 @@ var console = { history: [] };
       end
     end
 
-    def self.wrap_code_with_exception_handler(js_code, component_name, prerender)
+    def self.wrap_code_with_exception_handler(js_code, component_name, server_side)
       <<-JS
     try {
 #{js_code}
@@ -101,23 +101,23 @@ var console = { history: [] };
         console.error(shouldBeGeneratorError);
       }
 
-      #{render_error_messages(prerender)}
+      #{render_error_messages(server_side)}
     }
       JS
     end
 
     private
 
-    def self.render_error_messages(prerender)
-      side = prerender ? 'SERVER' : 'CLIENT'
+    def self.render_error_messages(server_side)
+      server_or_client = server_side ? 'SERVER' : 'CLIENT'
       <<-JS
-      console.error('#{side} SIDE: Exception in #{side.downcase} side rendering!');
+      console.error('#{server_or_client} SIDE: Exception in #{server_or_client.downcase} side rendering!');
       if (e.fileName) {
-        console.error('#{side} SIDE: location: ' + e.fileName + ':' + e.lineNumber);
+        console.error('#{server_or_client} SIDE: location: ' + e.fileName + ':' + e.lineNumber);
       }
-      console.error('#{side} SIDE: message: ' + e.message);
-      console.error('#{side} SIDE: stack: ' + e.stack);
-      msg += '#{side} SIDE Exception in rendering!\\n' +
+      console.error('#{server_or_client} SIDE: message: ' + e.message);
+      console.error('#{server_or_client} SIDE: stack: ' + e.stack);
+      msg += '#{server_or_client} SIDE Exception in rendering!\\n' +
         (e.fileName ? '\\nlocation: ' + e.fileName + ':' + e.lineNumber : '') +
         '\\nMessage: ' + e.message + '\\n\\n' + e.stack;
 

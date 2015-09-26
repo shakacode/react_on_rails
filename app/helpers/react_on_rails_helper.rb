@@ -89,7 +89,7 @@ module ReactOnRailsHelper
       JS
       # create the server generated html of the react component with props
       options[:react_component_name] = react_component_name
-      options[:prerender] = true
+      options[:server_side] = true
       render_js(render_js_expression, options)
     else
       ''
