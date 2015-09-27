@@ -60,8 +60,9 @@ module ReactOnRailsHelper
     data_from_server_script_tag = javascript_tag(page_loaded_js)
 
     # Create the HTML rendering part
-    server_rendered_html =
-      server_rendered_react_component_html(options, props, react_component_name)
+    server_rendered_html, console_script =
+      server_rendered_react_component_html(options, props, react_component_name,
+                                           data_variable_name, dom_id)
 
     rendered_output = content_tag(:div,
                                   server_rendered_html,
@@ -71,6 +72,7 @@ module ReactOnRailsHelper
     <<-HTML.html_safe
 #{data_from_server_script_tag}
 #{rendered_output}
+#{console_script}
     HTML
   end
 
@@ -79,22 +81,23 @@ module ReactOnRailsHelper
     @react_component_index += 1
   end
 
-  def server_rendered_react_component_html(options, props, react_component_name)
+  # Returns Array [0]: html, [1]: script to console log
+  def server_rendered_react_component_html(options, props, react_component_name, data_variable, dom_id)
     if prerender(options)
       render_js_expression = <<-JS
 (function(React) {
+        #{debug_js(react_component_name, data_variable, dom_id, trace(options))}
         var reactElement = #{render_js_react_element(react_component_name, props.to_json, generator_function(options))}
         return React.renderToString(reactElement);
       })(this.React);
       JS
       # create the server generated html of the react component with props
       options[:react_component_name] = react_component_name
-      server_rendered_react_component_html =
-        render_js(render_js_expression, options)
+      options[:server_side] = true
+      render_js_internal(render_js_expression, options)
     else
-      server_rendered_react_component_html = ""
+      ["",""]
     end
-    server_rendered_react_component_html
   end
 
   # Takes javascript code and returns the output from it. This is called by react_component, which
@@ -102,13 +105,23 @@ module ReactOnRailsHelper
   # This method could be used by itself to render the output of any javascript that returns a
   # string of proper HTML.
   def render_js(js_expression, options = {})
-    # TODO: This should be changed so that we don't create a new context every time
-    # Example of doing this here: https://github.com/reactjs/react-rails/tree/master/lib/react/rails
-    ReactOnRails::ReactRenderer.new(options).render_js(js_expression,
-                                                       options).html_safe
+    result = render_js_internal(js_expression, options)
+    "#{result[0]}\n#{result[1]}".html_safe
   end
 
   private
+  # Takes javascript code and returns the output from it. This is called by react_component, which
+  # sets up the JS code for rendering a react component.
+  # This method could be used by itself to render the output of any javascript that returns a
+  # string of proper HTML.
+  # Returns Array [0]: html, [1]: script to console log
+  def render_js_internal(js_expression, options = {})
+    # TODO: This should be changed so that we don't create a new context every time
+    # Example of doing this here: https://github.com/reactjs/react-rails/tree/master/lib/react/rails
+    ReactOnRails::ReactRenderer.new(options).render_js(js_expression,
+                                                       options)
+  end
+
 
   def trace(options)
     options.fetch(:trace) { ReactOnRails.configuration.trace }
@@ -124,7 +137,7 @@ module ReactOnRailsHelper
 
   def debug_js(react_component_name, data_variable, dom_id, trace)
     if trace
-      "console.log(\"CLIENT SIDE RENDERED #{react_component_name} with data_variable"\
+      "console.log(\"RENDERED #{react_component_name} with data_variable"\
       " #{data_variable} to dom node with id: #{dom_id}\");"
     else
       ""
