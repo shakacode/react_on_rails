@@ -8,7 +8,11 @@ module ReactOnRails
 var console = { history: [] };
 ['error', 'log', 'info', 'warn'].forEach(function (level) {
   console[level] = function () {
-    console.history.push({level: level, arguments: Array.prototype.slice.call(arguments)});
+    var argArray = Array.prototype.slice.call(arguments);
+    if (argArray.length > 0) {
+      argArray[0] = '[SERVER] ' + argArray[0];
+    }
+    console.history.push({level: level, arguments: argArray});
   };
 });
     JS
@@ -20,11 +24,11 @@ var console = { history: [] };
     CONSOLE_REPLAY = <<-JS
     var history = console.history;
     if (history && history.length > 0) {
-      result += '\\n<script>';
+      consoleReplay += '\\n<script>';
       history.forEach(function (msg) {
-        result += '\\nconsole.' + msg.level + '.apply(console, ' + JSON.stringify(msg.arguments) + ');';
+        consoleReplay += '\\nconsole.' + msg.level + '.apply(console, ' + JSON.stringify(msg.arguments) + ');';
       });
-      result += '\\n</script>';
+      consoleReplay += '\\n</script>';
     }
     JS
 
@@ -37,26 +41,28 @@ var console = { history: [] };
     end
 
     # js_code: JavaScript expression that returns a string.
-    # Returns a string of HTML for direct insertion on the page by evaluating js_code.
+    # Returns an Array:
+    # [0]: string of HTML for direct insertion on the page by evaluating js_code
+    # [1]: console messages
     #   Note, js_code does not have to be based on React.
     # Calling code will probably call 'html_safe' on return value before rendering to the view.
     def render_js(js_code, options = {})
       component_name = options.fetch(:react_component_name, "")
       server_side = options.fetch(:server_side, false)
 
-      result_js_code = "      result = #{js_code}"
+      result_js_code = "      htmlResult = #{js_code}"
 
       js_code_wrapper = <<-JS
   (function () {
-    var result = '';
-#{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(result_js_code, component_name, server_side)}
-#{after_render}
-    return result;
+    var htmlResult = '';
+    var consoleReplay = '';
+#{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(result_js_code, component_name)}
+#{console_replay_js_code}
+    return JSON.stringify([htmlResult, consoleReplay]);
   })()
       JS
 
-      trace_rails_on_maui = ENV["TRACE_REACT_ON_RAILS"].present? # Set to anything to print generated code.
-      if trace_rails_on_maui
+      if ENV["TRACE_REACT_ON_RAILS"].present? # Set to anything to print generated code.
         puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
         puts "react_renderer.rb: 92"
         puts "wrote file tmp/server-generated.js"
@@ -65,13 +71,15 @@ var console = { history: [] };
       end
 
       if js_context
-        js_context.eval(js_code_wrapper)
+        json_string = js_context.eval(js_code_wrapper)
       else
-        ExecJS.eval(js_code_wrapper)
+        json_string = ExecJS.eval(js_code_wrapper)
       end
+      # element 0 is the html, element 1 is the script tag for the server console output
+      JSON.parse(json_string)
     end
 
-    def self.wrap_code_with_exception_handler(js_code, component_name, server_side)
+    def self.wrap_code_with_exception_handler(js_code, component_name)
       <<-JS
     try {
 #{js_code}
@@ -101,23 +109,22 @@ var console = { history: [] };
         console.error(shouldBeGeneratorError);
       }
 
-      #{render_error_messages(server_side)}
+      #{render_error_messages}
     }
       JS
     end
 
     private
 
-    def self.render_error_messages(server_side)
-      server_or_client = server_side ? 'SERVER' : 'CLIENT'
+    def self.render_error_messages
       <<-JS
-      console.error('#{server_or_client} SIDE: Exception in #{server_or_client.downcase} side rendering!');
+      console.error('Exception in rendering!');
       if (e.fileName) {
-        console.error('#{server_or_client} SIDE: location: ' + e.fileName + ':' + e.lineNumber);
+        console.error('location: ' + e.fileName + ':' + e.lineNumber);
       }
-      console.error('#{server_or_client} SIDE: message: ' + e.message);
-      console.error('#{server_or_client} SIDE: stack: ' + e.stack);
-      msg += '#{server_or_client} SIDE Exception in rendering!\\n' +
+      console.error('message: ' + e.message);
+      console.error('stack: ' + e.stack);
+      msg += 'Exception in rendering!\\n' +
         (e.fileName ? '\\nlocation: ' + e.fileName + ':' + e.lineNumber : '') +
         '\\nMessage: ' + e.message + '\\n\\n' + e.stack;
 
@@ -126,7 +133,7 @@ var console = { history: [] };
       JS
     end
 
-    def after_render
+    def console_replay_js_code
       @replay_console ? CONSOLE_REPLAY : ""
     end
 
