@@ -102,6 +102,7 @@ Params are:
   * **prerender**: <true/false> set to false when debugging!
   * **trace**: <true/false> set to true to print additional debugging information in the browser default is true for development, off otherwise 
   * **replay_console**: <true/false> Default is true. False will disable echoing server rendering logs, which can make troubleshooting server rendering difficult.
+  * Any other options are passed to the content tag, including the id. 
 
 ## JavaScript
 
