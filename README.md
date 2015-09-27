@@ -102,6 +102,7 @@ Params are:
   * **prerender**: <true/false> set to false when debugging!
   * **trace**: <true/false> set to true to print additional debugging information in the browser default is true for development, off otherwise 
   * **replay_console**: <true/false> Default is true. False will disable echoing server rendering logs, which can make troubleshooting server rendering difficult.
+  * Any other options are passed to the content tag, including the id. 
 
 ## JavaScript
 
@@ -157,6 +158,7 @@ ReactOnRails.configure do |config|
 
   # For server rendering. This can be set to false so that server side messages are discarded.
   config.replay_console = true # Default is true. Be cautious about turning this off.
+  config.logging_on_server = true # Default is true. Logs server rendering messags to Rails.logger.info
 end
 ```
 

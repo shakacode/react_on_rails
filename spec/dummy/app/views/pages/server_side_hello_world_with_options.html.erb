@@ -1,0 +1,38 @@
+<%= render "header" %>
+
+<%= react_component("HelloWorld",
+                    @app_props_server_render.to_json,
+                    prerender: true,
+                    trace: true,
+                    generator_function: false,
+                    id: "my-hello-world-id",
+                    class: "my-hello-world-class",
+                    data: { x: 1, y: 2}
+    ) %>
+<hr/>
+
+<h1>React Rails Server Rendering with options</h1>
+<p>
+  This example demonstrates passing extram options to the example
+  <%= link_to "Hello World Component Server Rendered", server_side_hello_world_path %>
+  The differences include:
+</p>
+<ul>
+  <li>
+    Sending the props as already converted from JSON to a string.
+  </li>
+  <li>
+    Passing extra params that get passed to the tag shown in the HTML, including the option to set
+    the id of the component.
+  </li>
+</ul>
+<pre>
+<%%= react_component("HelloWorld",
+                    @app_props_server_render.to_json,
+                    prerender: true,
+                    trace: true,
+                    generator_function: false,
+                    id: "my-hello-world-id",
+                    class: "my-hello-world-class",
+                    data: { x: 1, y: 2} ) %>
+</pre>

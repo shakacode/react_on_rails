@@ -30,7 +30,10 @@ module ReactOnRailsHelper
   #    trace: <true/false> set to true to print additional debugging information in the browser
   #           default is true for development, off otherwise
   #    replay_console: <true/false> Default is true. False will disable echoing server rendering
-  #                    logs, which can make troubleshooting server rendering difficult.
+  #                    logs to browser. While this can make troubleshooting server rendering difficult,
+  #                    so long as you have the default configuration of logging_on_server set to
+  #                    true, you'll still see the errors on the server.
+  #  Any other options are passed to the content tag, including the id.
   def react_component(component_name, props = {}, options = {})
     # Create the JavaScript and HTML to allow either client or server rendering of the
     # react_component.
@@ -41,16 +44,21 @@ module ReactOnRailsHelper
     # We use this react_component_index in case we have the same component multiple times on the page.
     react_component_index = next_react_component_index
     react_component_name = component_name.camelize # Not sure if we should be doing this (JG)
-    dom_id = "#{component_name}-react-component-#{react_component_index}"
+    if options[:id].nil?
+      dom_id = "#{component_name}-react-component-#{react_component_index}"
+    else
+      dom_id = options[:id]
+    end
 
     # Setup the page_loaded_js, which is the same regardless of prerendering or not!
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
     data_variable_name = "__#{component_name.camelize(:lower)}Data#{react_component_index}__"
     turbolinks_loaded = Object.const_defined?(:Turbolinks)
     install_render_events = turbolinks_loaded ? turbolinks_bootstrap(dom_id) : non_turbolinks_bootstrap
+    props_string = props.is_a?(String) ? props : props.to_json
     page_loaded_js = <<-JS
 (function() {
-  window.#{data_variable_name} = #{props.to_json};
+  window.#{data_variable_name} = #{props_string};
 #{define_render_if_dom_node_present(react_component_name, data_variable_name, dom_id,
                                     trace(options), generator_function(options))}
 #{install_render_events}
@@ -61,18 +69,23 @@ module ReactOnRailsHelper
 
     # Create the HTML rendering part
     server_rendered_html, console_script =
-      server_rendered_react_component_html(options, props, react_component_name,
+      server_rendered_react_component_html(options, props_string, react_component_name,
                                            data_variable_name, dom_id)
+
+    content_tag_options = options.except(:generator_function, :prerender, :trace,
+                                         :replay_console, :id, :react_component_name,
+                                         :server_side)
+    content_tag_options[:id] = dom_id
 
     rendered_output = content_tag(:div,
                                   server_rendered_html,
-                                  id: dom_id)
+                                  content_tag_options)
 
     # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
     <<-HTML.html_safe
 #{data_from_server_script_tag}
 #{rendered_output}
-#{console_script}
+#{replay_console(options) ? console_script : ""}
     HTML
   end
 
@@ -82,12 +95,12 @@ module ReactOnRailsHelper
   end
 
   # Returns Array [0]: html, [1]: script to console log
-  def server_rendered_react_component_html(options, props, react_component_name, data_variable, dom_id)
+  def server_rendered_react_component_html(options, props_string, react_component_name, data_variable, dom_id)
     if prerender(options)
       render_js_expression = <<-JS
 (function(React) {
         #{debug_js(react_component_name, data_variable, dom_id, trace(options))}
-        var reactElement = #{render_js_react_element(react_component_name, props.to_json, generator_function(options))}
+        var reactElement = #{render_js_react_element(react_component_name, props_string, generator_function(options))}
         return React.renderToString(reactElement);
       })(this.React);
       JS
@@ -133,6 +146,10 @@ module ReactOnRailsHelper
 
   def prerender(options)
     options.fetch(:prerender) { ReactOnRails.configuration.prerender }
+  end
+
+  def replay_console(options)
+    options.fetch(:replay_console) { ReactOnRails.configuration.replay_console }
   end
 
   def debug_js(react_component_name, data_variable, dom_id, trace)
