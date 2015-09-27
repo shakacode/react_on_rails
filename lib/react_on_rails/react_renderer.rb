@@ -76,7 +76,20 @@ var console = { history: [] };
         json_string = ExecJS.eval(js_code_wrapper)
       end
       # element 0 is the html, element 1 is the script tag for the server console output
-      JSON.parse(json_string)
+      result = JSON.parse(json_string)
+      if ReactOnRails.configuration.logging_on_server
+        console_script = result[1]
+        console_script_lines = console_script.split("\n")
+        console_script_lines = console_script_lines[2..-2]
+        re = /console\.log\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
+        console_script_lines.each do |line|
+          match = re.match(line)
+          if match
+            Rails.logger.info { "[react_on_rails] #{match[:msg]}"}
+          end
+        end
+      end
+      return result
     end
 
     def self.wrap_code_with_exception_handler(js_code, component_name)
@@ -134,7 +147,7 @@ var console = { history: [] };
     end
 
     def console_replay_js_code
-      @replay_console ? CONSOLE_REPLAY : ""
+      (@replay_console || ReactOnRails.configuration.logging_on_server) ? CONSOLE_REPLAY : ""
     end
 
     def base_js_code(bundle_js_code)

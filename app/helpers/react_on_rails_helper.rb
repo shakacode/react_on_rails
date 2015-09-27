@@ -30,7 +30,9 @@ module ReactOnRailsHelper
   #    trace: <true/false> set to true to print additional debugging information in the browser
   #           default is true for development, off otherwise
   #    replay_console: <true/false> Default is true. False will disable echoing server rendering
-  #                    logs, which can make troubleshooting server rendering difficult.
+  #                    logs to browser. While this can make troubleshooting server rendering difficult,
+  #                    so long as you have the default configuration of logging_on_server set to
+  #                    true, you'll still see the errors on the server.
   #  Any other options are passed to the content tag, including the id.
   def react_component(component_name, props = {}, options = {})
     # Create the JavaScript and HTML to allow either client or server rendering of the
@@ -83,7 +85,7 @@ module ReactOnRailsHelper
     <<-HTML.html_safe
 #{data_from_server_script_tag}
 #{rendered_output}
-#{console_script}
+#{replay_console(options) ? console_script : ""}
     HTML
   end
 
@@ -144,6 +146,10 @@ module ReactOnRailsHelper
 
   def prerender(options)
     options.fetch(:prerender) { ReactOnRails.configuration.prerender }
+  end
+
+  def replay_console(options)
+    options.fetch(:replay_console) { ReactOnRails.configuration.replay_console }
   end
 
   def debug_js(react_component_name, data_variable, dom_id, trace)
