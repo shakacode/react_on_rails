@@ -284,6 +284,10 @@ The gem is available as open source under the terms of the [MIT License](http://
 
 See https://github.com/svenfuchs/gem-release
 
+```bash
+gem bump --tag --release
+```
+
 # Authors
 The Shaka Code team!
 
