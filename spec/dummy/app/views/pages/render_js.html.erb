@@ -1,0 +1,16 @@
+<%= render "header" %>
+<h1>Non-React Component</h1>
+<p>For example, Suppose you have some JavaScript that generates a string of HTML:</p>
+<pre>
+  <%%= render_js("this.HelloString.world(); \nconsole.warn('ran console.warn on the server()');") %>
+</pre>
+<p>
+  That will generate this:
+</p>
+
+<%= render_js("this.HelloString.world(); \nconsole.warn('ran console.warn on the server()');") %>
+
+<hr/>
+And be sure to check your console for the server side warn message.<br/>
+Note, unlike calling <code>react_component</code>, there's no client side code. It's just server
+rendering.

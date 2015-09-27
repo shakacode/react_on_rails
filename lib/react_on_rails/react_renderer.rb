@@ -57,7 +57,7 @@ var console = { history: [] };
     var htmlResult = '';
     var consoleReplay = '';
 #{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(result_js_code, component_name)}
-#{console_replay_js_code}
+      #{console_replay_js_code}
     return JSON.stringify([htmlResult, consoleReplay]);
   })()
       JS
@@ -82,10 +82,12 @@ var console = { history: [] };
         console_script_lines = console_script.split("\n")
         console_script_lines = console_script_lines[2..-2]
         re = /console\.log\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
-        console_script_lines.each do |line|
-          match = re.match(line)
-          if match
-            Rails.logger.info { "[react_on_rails] #{match[:msg]}"}
+        if console_script_lines
+          console_script_lines.each do |line|
+            match = re.match(line)
+            if match
+              Rails.logger.info { "[react_on_rails] #{match[:msg]}" }
+            end
           end
         end
       end
@@ -153,7 +155,7 @@ var console = { history: [] };
     def base_js_code(bundle_js_code)
       <<-JS
 #{CONSOLE_POLYFILL}
-#{bundle_js_code};
+      #{bundle_js_code};
       JS
     end
 

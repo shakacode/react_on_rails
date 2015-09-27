@@ -12,4 +12,5 @@ Rails.application.routes.draw do
   get "server_side_redux_app" => "pages#server_side_redux_app"
   get "server_side_hello_world_with_options" => "pages#server_side_hello_world_with_options"
   get "server_side_redux_app_cached" => "pages#server_side_redux_app_cached"
+  get "render_js" => "pages#render_js"
 end

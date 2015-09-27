@@ -78,7 +78,7 @@ module ReactOnRailsHelper
     content_tag_options[:id] = dom_id
 
     rendered_output = content_tag(:div,
-                                  server_rendered_html,
+                                  server_rendered_html.html_safe,
                                   content_tag_options)
 
     # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
@@ -95,6 +95,7 @@ module ReactOnRailsHelper
   end
 
   # Returns Array [0]: html, [1]: script to console log
+  # NOTE, these are NOT html_safe!
   def server_rendered_react_component_html(options, props_string, react_component_name, data_variable, dom_id)
     if prerender(options)
       render_js_expression = <<-JS
