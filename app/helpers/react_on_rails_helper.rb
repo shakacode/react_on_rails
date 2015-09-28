@@ -54,14 +54,20 @@ module ReactOnRailsHelper
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
     data_variable_name = "__#{component_name.camelize(:lower)}Data#{react_component_index}__"
     turbolinks_loaded = Object.const_defined?(:Turbolinks)
-    install_render_events = turbolinks_loaded ? turbolinks_bootstrap(dom_id) : non_turbolinks_bootstrap
+    # NOTE: props might include closing script tag that might cause XSS
     props_string = props.is_a?(String) ? props : props.to_json
     page_loaded_js = <<-JS
 (function() {
   window.#{data_variable_name} = #{props_string};
-#{define_render_if_dom_node_present(react_component_name, data_variable_name, dom_id,
-                                    trace(options), generator_function(options))}
-#{install_render_events}
+  ReactOnRails.clientRenderReactComponent({
+    componentName: '#{react_component_name}',
+    domId: '#{dom_id}',
+    propsVarName: '#{data_variable_name}',
+    props: window.#{data_variable_name},
+    trace: #{trace(options)},
+    generatorFunction: #{generator_function(options)},
+    expectTurboLinks: #{turbolinks_loaded}
+  });
 })();
     JS
 
@@ -97,6 +103,8 @@ module ReactOnRailsHelper
   # Returns Array [0]: html, [1]: script to console log
   # NOTE, these are NOT html_safe!
   def server_rendered_react_component_html(options, props_string, react_component_name, data_variable, dom_id)
+    return ["", ""]
+
     if prerender(options)
       render_js_expression = <<-JS
 (function(React) {
@@ -121,7 +129,27 @@ module ReactOnRailsHelper
   # This method could be used by itself to render the output of any javascript that returns a
   # string of proper HTML.
   def render_js(js_expression, options = {})
-    result = render_js_internal(js_expression, options)
+    wrapper_js = <<-JS
+(function() {
+  var htmlResult = '';
+  var consoleReplay = '';
+
+  try {
+    htmlResult =
+      (function() {
+        return #{js_expression};
+      })();
+  } catch(e) {
+    htmlResult = handleError(e, null, jsCode);
+  }
+
+  consoleReplay = ReactOnRails.buildConsoleReplay();
+  return JSON.stringify([htmlResult, consoleReplay]);
+})()
+    JS
+
+    result_json = ReactOnRails::ServerRenderingPool.eval_js(wrapper_js)
+    result = JSON.parse(result_json)
     "#{result[0]}\n#{result[1]}".html_safe
   end
 
@@ -153,86 +181,5 @@ module ReactOnRailsHelper
 
   def replay_console(options)
     options.fetch(:replay_console) { ReactOnRails.configuration.replay_console }
-  end
-
-  def debug_js(react_component_name, data_variable, dom_id, trace)
-    if trace
-      "console.log(\"RENDERED #{react_component_name} with data_variable"\
-      " #{data_variable} to dom node with id: #{dom_id}\");"
-    else
-      ""
-    end
-  end
-
-  # react_component_name: See app/helpers/react_on_rails_helper.rb:5
-  # props_string: is either the variable name used to hold the props (client side) or the
-  #   stringified hash of props from the Ruby server side. In terms of the view helper, one is
-  #   simply passing in the Ruby Hash of props.
-  #
-  # Returns the JavaScript code to generate a React element.
-  def render_js_react_element(react_component_name, props_string, generator_function)
-    # "this" is defined by the calling context which is "global" in the execJs
-    # environment or window in the client side context.
-    js_create_element = if generator_function
-                          "#{react_component_name}(props)"
-                        else
-                          "React.createElement(#{react_component_name}, props)"
-                        end
-
-    <<-JS
-(function(React) {
-          var props = #{props_string};
-          return #{js_create_element};
-        })(this.React);
-    JS
-  end
-
-  def define_render_if_dom_node_present(react_component_name, data_variable, dom_id, trace, generator_function)
-    inner_js_code = <<-JS_CODE
-      var domNode = document.getElementById('#{dom_id}');
-      if (domNode) {
-        #{debug_js(react_component_name, data_variable, dom_id, trace)}
-        var reactElement = #{render_js_react_element(react_component_name, data_variable, generator_function)}
-        React.render(reactElement, domNode);
-      }
-JS_CODE
-
-    <<-JS
-  var renderIfDomNodePresent = function() {
-#{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(inner_js_code, react_component_name)}
-  }
-    JS
-  end
-
-  def non_turbolinks_bootstrap
-    <<-JS
-    document.addEventListener("DOMContentLoaded", function(event) {
-      console.log("DOMContentLoaded event fired");
-      renderIfDomNodePresent();
-    });
-    JS
-  end
-
-  def turbolinks_bootstrap(dom_id)
-    <<-JS
-  var turbolinksInstalled = typeof(Turbolinks) !== 'undefined';
-  if (!turbolinksInstalled) {
-    console.warn("WARNING: NO TurboLinks detected in JS, but it's in your Gemfile");
-#{non_turbolinks_bootstrap}
-  } else {
-    function onPageChange(event) {
-      var removePageChangeListener = function() {
-        document.removeEventListener("page:change", onPageChange);
-        document.removeEventListener("page:before-unload", removePageChangeListener);
-        var domNode = document.getElementById('#{dom_id}');
-        React.unmountComponentAtNode(domNode);
-      };
-      document.addEventListener("page:before-unload", removePageChangeListener);
-
-      renderIfDomNodePresent();
-    }
-    document.addEventListener("page:change", onPageChange);
-  }
-    JS
   end
 end

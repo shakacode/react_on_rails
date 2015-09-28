@@ -9,7 +9,7 @@ module ReactOnRails
       @@js_context_pool = ConnectionPool.new(options) { create_js_context }
     end
 
-    def self.render(js_code)
+    def self.eval_js(js_code)
       @@js_context_pool.with do |js_context|
         js_context.eval(js_code)
       end
@@ -22,6 +22,7 @@ module ReactOnRails
         base_js_code = <<-JS
 #{CONSOLE_POLYFILL}
 #{bundle_js_code};
+#{::Rails.application.assets['react_on_rails.js'].to_s};
         JS
         ExecJS.compile(base_js_code)
       else
