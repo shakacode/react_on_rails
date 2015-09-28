@@ -3,7 +3,11 @@ rvm:
 - 2.2.2
 gemfile:
 - spec/dummy/Gemfile
-install: bundle install
+install:
+- bundle install
+- cd spec/dummy && bundle install
+- npm install
+- cd -
 script:
 - rake run_rspec:gem
 - rake run_rspec:dummy
