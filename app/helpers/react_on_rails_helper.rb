@@ -112,6 +112,8 @@ module ReactOnRailsHelper
     else
       ["",""]
     end
+  rescue ExecJS::ProgramError => err
+    raise ReactOnRails::ServerRenderingPool::PrerenderError.new(react_component_name, props_string, err)
   end
 
   # Takes javascript code and returns the output from it. This is called by react_component, which
@@ -132,8 +134,8 @@ module ReactOnRailsHelper
   def render_js_internal(js_expression, options = {})
     # TODO: This should be changed so that we don't create a new context every time
     # Example of doing this here: https://github.com/reactjs/react-rails/tree/master/lib/react/rails
-    ReactOnRails::ReactRenderer.new(options).render_js(js_expression,
-                                                       options)
+    ReactOnRails::ReactRenderer.render_js(js_expression,
+                                          options)
   end
 
 

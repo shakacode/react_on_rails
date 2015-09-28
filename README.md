@@ -159,8 +159,18 @@ ReactOnRails.configure do |config|
   # For server rendering. This can be set to false so that server side messages are discarded.
   config.replay_console = true # Default is true. Be cautious about turning this off.
   config.logging_on_server = true # Default is true. Logs server rendering messags to Rails.logger.info
+  
+  # Settings for the pool of renderers:
+  config.server_renderer_pool_size  ||= 1  # ExecJS doesn't allow more than one on MRI
+  config.server_renderer_timeout    ||= 20 # seconds
 end
 ```
+
+You can configure your pool of JS virtual machines and specify where it should load code:
+
+- On MRI, use `therubyracer` for the best performance (see [discussion](https://github.com/reactjs/react-rails/pull/290))
+- On MRI, you'll get a deadlock with `pool_size` > 1
+- If you're using JRuby, you can increase `pool_size` to have real multi-threaded rendering.
 
 # Try it out in the simple sample app
 Contributions and pull requests welcome!
