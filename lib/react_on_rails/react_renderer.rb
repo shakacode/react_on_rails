@@ -1,22 +1,10 @@
 # Kudos to react-rails for how to do the polyfill of the console!
 # https://github.com/reactjs/react-rails/blob/master/lib/react/server_rendering/sprockets_renderer.rb
 
+# require 'react_on_rails/server_rendering_pool'
+
 module ReactOnRails
   class ReactRenderer
-    # Reimplement console methods for replaying on the client
-    CONSOLE_POLYFILL = <<-JS
-var console = { history: [] };
-['error', 'log', 'info', 'warn'].forEach(function (level) {
-  console[level] = function () {
-    var argArray = Array.prototype.slice.call(arguments);
-    if (argArray.length > 0) {
-      argArray[0] = '[SERVER] ' + argArray[0];
-    }
-    console.history.push({level: level, arguments: argArray});
-  };
-});
-    JS
-
     # Script to write to the browser console.
     # NOTE: result comes from enclosing closure and is the server generated HTML
     # that we intend to write to the browser. Thus, the script tag will get executed right after
@@ -36,17 +24,13 @@ var console = { history: [] };
       if (typeof window !== 'undefined') { debugger; }
     JS
 
-    def initialize(options)
-      @replay_console = options.fetch(:replay_console) { ReactOnRails.configuration.replay_console }
-    end
-
     # js_code: JavaScript expression that returns a string.
     # Returns an Array:
     # [0]: string of HTML for direct insertion on the page by evaluating js_code
     # [1]: console messages
     #   Note, js_code does not have to be based on React.
     # Calling code will probably call 'html_safe' on return value before rendering to the view.
-    def render_js(js_code, options = {})
+    def self.render_js(js_code, options = {})
       component_name = options.fetch(:react_component_name, "")
       server_side = options.fetch(:server_side, false)
 
@@ -57,7 +41,7 @@ var console = { history: [] };
     var htmlResult = '';
     var consoleReplay = '';
 #{ReactOnRails::ReactRenderer.wrap_code_with_exception_handler(result_js_code, component_name)}
-      #{console_replay_js_code}
+#{console_replay_js_code(options)}
     return JSON.stringify([htmlResult, consoleReplay]);
   })()
       JS
@@ -70,13 +54,10 @@ var console = { history: [] };
         puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
       end
 
-      if js_context
-        json_string = js_context.eval(js_code_wrapper)
-      else
-        json_string = ExecJS.eval(js_code_wrapper)
-      end
+      json_string = ReactOnRails::ServerRenderingPool.render(js_code_wrapper)
       # element 0 is the html, element 1 is the script tag for the server console output
       result = JSON.parse(json_string)
+
       if ReactOnRails.configuration.logging_on_server
         console_script = result[1]
         console_script_lines = console_script.split("\n")
@@ -148,33 +129,9 @@ var console = { history: [] };
       JS
     end
 
-    def console_replay_js_code
-      (@replay_console || ReactOnRails.configuration.logging_on_server) ? CONSOLE_REPLAY : ""
-    end
-
-    def base_js_code(bundle_js_code)
-      <<-JS
-#{CONSOLE_POLYFILL}
-      #{bundle_js_code};
-      JS
-    end
-
-    def js_context
-      if @js_context.nil?
-        @js_context = begin
-          server_js_file = ReactOnRails.configuration.server_bundle_js_file
-          if server_js_file.present? && File.exist?(server_js_file)
-            bundle_js_code = File.read(server_js_file)
-            ExecJS.compile(base_js_code(bundle_js_code))
-          else
-            if server_js_file.present?
-              Rails.logger.warn("You specified server rendering JS file: #{server_js_file}, but it cannot be read.")
-            end
-            false # using false so we don't try every time if no server_js file
-          end
-        end
-      end
-      @js_context
+    def self.console_replay_js_code(options)
+      replay_console = options.fetch(:replay_console) { ReactOnRails.configuration.replay_console }
+      (replay_console || ReactOnRails.configuration.logging_on_server) ? CONSOLE_REPLAY : ""
     end
   end
 end
