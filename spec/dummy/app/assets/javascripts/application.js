@@ -14,5 +14,6 @@
 //= require jquery_ujs
 
 //= require turbolinks
+//
+//= require react_on_rails
 //= require generated/client
-
