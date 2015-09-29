@@ -1,5 +1,3 @@
-require "react_on_rails/react_renderer"
-
 # NOTE:
 # For any heredoc JS:
 # 1. The white spacing in this file matters!
@@ -95,6 +93,35 @@ module ReactOnRailsHelper
     HTML
   end
 
+  # Helper method to take javascript expression and returns the output from evaluating it.
+  # If you have more than one line that needs to be executed, wrap it in an IIFE.
+  # JS exceptions are caught and console messages are handled properly.
+  def server_render_js(js_expression, options = {})
+    wrapper_js = <<-JS
+(function() {
+  var htmlResult = '';
+  var consoleReplay = '';
+
+  try {
+    htmlResult =
+      (function() {
+        return #{js_expression};
+      })();
+  } catch(e) {
+    htmlResult = handleError(e, null, '#{escape_javascript(js_expression)}');
+  }
+
+  consoleReplay = ReactOnRails.buildConsoleReplay();
+  return JSON.stringify([htmlResult, consoleReplay]);
+})()
+    JS
+
+    result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
+    "#{result[0]}\n#{result[1]}".html_safe
+  end
+
+  private
+
   def next_react_component_index
     @react_component_index ||= -1
     @react_component_index += 1
@@ -119,39 +146,10 @@ module ReactOnRailsHelper
 })()
     JS
 
-    ReactOnRails::ReactRenderer.server_render_js_with_console_logging(wrapper_js)
+    ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
   rescue ExecJS::ProgramError => err
     raise ReactOnRails::ServerRenderingPool::PrerenderError.new(react_component_name, props_string, err)
   end
-
-  # Helper method to take javascript expression and returns the output from evaluating it.
-  # If you have more than one line that needs to be executed, wrap it in an IIFE.
-  # JS exceptions are caught and console messages are handled properly.
-  def server_render_js(js_expression, options = {})
-    wrapper_js = <<-JS
-(function() {
-  var htmlResult = '';
-  var consoleReplay = '';
-
-  try {
-    htmlResult =
-      (function() {
-        return #{js_expression};
-      })();
-  } catch(e) {
-    htmlResult = handleError(e, null, '#{escape_javascript(js_expression)}');
-  }
-
-  consoleReplay = ReactOnRails.buildConsoleReplay();
-  return JSON.stringify([htmlResult, consoleReplay]);
-})()
-    JS
-
-    result = ReactOnRails::ReactRenderer.server_render_js_with_console_logging(wrapper_js)
-    "#{result[0]}\n#{result[1]}".html_safe
-  end
-
-  private
 
   def trace(options)
     options.fetch(:trace) { ReactOnRails.configuration.trace }
