@@ -1,6 +1,6 @@
 {
   "name": "react_on_rails",
-  "version": "0.9.0",
+  "version": "1.0.8",
   "description": "example of server rendering",
   "main": "server.js",
   "engines": {

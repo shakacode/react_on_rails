@@ -5,7 +5,11 @@ gemfile:
 - spec/dummy/Gemfile
 install:
 - bundle install
-- spec/dummy/bin/setup
+- cd spec/dummy/client && npm install
+- $(npm bin)/webpack -w --config webpack.server.js
+- $(npm bin)/webpack -w --config webpack.client.js
+env:
+ - export RAILS_ENV=test
 before_script:
 - export DISPLAY=:99.0
 - sh -e /etc/init.d/xvfb start
