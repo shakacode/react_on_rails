@@ -11,6 +11,7 @@ install:
 env:
  - export RAILS_ENV=test
 before_script:
+- cd ../../
 - export DISPLAY=:99.0
 - sh -e /etc/init.d/xvfb start
 script:
