@@ -302,7 +302,13 @@ The gem is available as open source under the terms of the [MIT License](http://
 See https://github.com/svenfuchs/gem-release
 
 ```bash
-gem bump --tag --release
+gem bump
+cd spec/dummy
+bundle
+git commit -am "Updated Gemfile.lock"
+cd ../..
+gem tag
+gem release
 ```
 
 # Authors
