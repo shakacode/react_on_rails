@@ -37,7 +37,7 @@ products, client work, and open source.
 ## How is different than the [react-rails gem](https://github.com/reactjs/react-rails)?
 1. `react_on_rails` depends on [webpack](http://webpack.github.io/). `react-rails` integrates closely with sprockets and
     helps you integrate JSX and the react code into a Rails project.
-2. Likewise, using Webpack as show in the [react-webpack-rails-tutorial](https://github.com/justin808/react-webpack-rails-tutorial/)
+2. Likewise, using Webpack as shown in the [react-webpack-rails-tutorial](https://github.com/justin808/react-webpack-rails-tutorial/)
    does involve some extra setup. However, we feel that tight and simple integration with the node ecosystem is more than
    worth any minor setup costs.
 3. `react-rails` depends on `jquery-ujs` for client side rendering. `react_on_rails` has it's own JS code that does not
