@@ -93,8 +93,8 @@ See the next section for a aample webpack.server.rails.config.js.
 3. Set the `output.libraryTarget = 'this'` in your webpack config, like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.config.js#L13)
 4. Expose `React` in your webpack config, like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.config.js#L23)
 
-### Sample webpack.server.rails.config.js
-Be sure to check out the latests sample version of [client/webpack.server.rails.config.js](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.config.js).
+#### Sample webpack.server.rails.config.js (ONLY for server rendering)
+Be sure to check out the latest example version of [client/webpack.server.rails.config.js](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.config.js).
 
 ```javascript
   // Common webpack configuration for server bundle
