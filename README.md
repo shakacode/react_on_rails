@@ -56,6 +56,11 @@ And then execute:
 
     $ bundle
 
+## What Happens?
+
+Here's what the browser will render with a call to the `react_component` helper.
+![2015-09-28_20-24-35](https://cloud.githubusercontent.com/assets/1118459/10157268/41435186-6624-11e5-9341-6fc4cf35ee90.png)
+
 ## Usage
 
 *See section below titled "Try it out"*
