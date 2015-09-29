@@ -5,6 +5,10 @@ require File.expand_path("../../config/environment", __FILE__)
 abort("The Rails environment is running in production mode!") if Rails.env.production?
 require "spec_helper"
 require "rspec/rails"
+
+require "capybara/rspec"
+require "capybara-screenshot/rspec"
+
 # Add additional requires below this line. Rails is not loaded until this point!
 
 # Requires supporting ruby files with custom matchers and macros, etc, in
@@ -49,4 +53,25 @@ RSpec.configure do |config|
   # The different available types are documented in the features, such as in
   # https://relishapp.com/rspec/rspec-rails/docs
   config.infer_spec_type_from_file_location!
+
+  # Capybara config
+  #
+  # selenium_firefox webdriver only works for Travis-CI builds.
+  driver = ENV["DRIVER"].try(:to_sym)
+  if driver.nil? || driver == :selenium_chrome
+    Capybara.register_driver :selenium_chrome do |app|
+      Capybara::Selenium::Driver.new(app, browser: :chrome)
+    end
+    Capybara.javascript_driver = :selenium_chrome
+  else
+    Capybara.register_driver :selenium_firefox do |app|
+      Capybara::Selenium::Driver.new(app, browser: :firefox)
+    end
+    Capybara.javascript_driver = :selenium_firefox
+  end
+
+  puts "Capybara using driver: #{Capybara.javascript_driver}"
+
+  Capybara::Screenshot.prune_strategy = { keep: 10 }
+  # [END] Capybara config
 end

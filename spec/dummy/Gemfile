@@ -56,5 +56,9 @@ end
 group :test do
   gem "rspec-rails"
   gem "coveralls", require: false
+  gem "capybara"
+  gem "capybara-screenshot"
+  gem "selenium-webdriver"
+  gem "chromedriver-helper"
+  gem "launchy"
 end
-
