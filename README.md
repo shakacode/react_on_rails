@@ -26,7 +26,7 @@ Supports:
 4. Longer term, we hope to put in many conveniences into this gem, in terms of Webpack + Rails integration.
 
 ## Links
-1. https://github.com/justin808/react-webpack-rails-tutorial/ See https://github.com/shakacode/react-webpack-rails-tutorial/pull/84 for how we integrated it!
+1. See https://github.com/shakacode/react-webpack-rails-tutorial/ for how to integrate it!
 2. http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/
 3. http://forum.railsonmaui.com
 4. Interested in consulting for implementing React with Rails, [email us! contact@shakacode.com](mailto: contact@shakacode.com).
