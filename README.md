@@ -52,6 +52,12 @@ gem "react_on_rails"
 gem "therubyracer"
 ```
 
+Add this line to `application.js`. It possibly should come after you require `turbolinks`:
+```
+//= require react_on_rails
+```
+
+
 And then execute:
 
     $ bundle
