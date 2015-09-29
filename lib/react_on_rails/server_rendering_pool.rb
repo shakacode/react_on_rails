@@ -11,7 +11,9 @@ module ReactOnRails
 
     def self.eval_js(js_code)
       @@js_context_pool.with do |js_context|
-        js_context.eval(js_code)
+        result = js_context.eval(js_code)
+        js_context.eval(CLEAR_CONSOLE)
+        result
       end
     end
 
@@ -32,6 +34,10 @@ module ReactOnRails
         ExecJS.compile("")
       end
     end
+
+    CLEAR_CONSOLE = <<-JS
+      console.history = []
+    JS
 
     # Reimplement console methods for replaying on the client
     CONSOLE_POLYFILL = <<-JS

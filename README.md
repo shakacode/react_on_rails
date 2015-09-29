@@ -182,17 +182,17 @@ Contributions and pull requests welcome!
   npm i
   foreman start
   ```
-2. Caching is turned for development mode. Open the console and run `Rails.cache.clear` to clear
-  the cache. Note, even if you stop the server, you'll still have the cache entries around.
 3. Visit http://localhost:3000
 4. Notice that the first time you hit the page, you'll see a message that server is rendering.
    See `spec/dummy/app/views/pages/index.html.erb:17` for the generation of that message.
 5. Look at the layouts in `spec/dummy/app/views/pages` for samples of usage.
 5. Open up the browser console and see some tracing.
 6. Open up the source for the page and see the server rendered code.
-7. If you want to turn off server caching, run the server like:
-   `export RAILS_USE_CACHE=N && foreman start`
-8. If you click back and forth between the about and react page links, you can see the rails console
+7. If you want to turn on server caching for development, run the server like:
+   `export RAILS_USE_CACHE=YES && foreman start`
+2. If you're testing with caching, you'll need to open the console and run `Rails.cache.clear` to clear
+  the cache. Note, even if you stop the server, you'll still have the cache entries around.
+8. If you click back and forth between the react page links, you can see the rails console
    log as well as the browser console to see what's going on with regards to server rendering and
    caching.
 

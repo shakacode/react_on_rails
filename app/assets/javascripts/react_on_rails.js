@@ -17,11 +17,11 @@
         var domNode = document.getElementById(domId);
         if (domNode) {
           var reactElement = createReactElement(componentName, propsVarName, props,
-                                                domId, trace, generatorFunction);
+            domId, trace, generatorFunction);
           React.render(reactElement, domNode);
         }
       }
-      catch(e) {
+      catch (e) {
         handleError(e, componentName);
       }
     };
@@ -46,6 +46,7 @@
 
         renderIfDomNodePresent();
       }
+
       document.addEventListener("page:change", onPageChange);
     }
   };
@@ -63,10 +64,10 @@
 
     try {
       var reactElement = createReactElement(componentName, propsVarName, props,
-                                            domId, trace, generatorFunction);
+        domId, trace, generatorFunction);
       htmlResult = React.renderToString(reactElement);
     }
-    catch(e) {
+    catch (e) {
       htmlResult = handleError(e, componentName);
     }
 
@@ -74,24 +75,10 @@
     return JSON.stringify([htmlResult, consoleReplay]);
   };
 
-  ReactOnRails.serverEvalWithExceptionHandling = function(jsCode) {
-    var htmlResult = '';
-    var consoleReplay = '';
-
-    try {
-      htmlResult = eval(jsCode);
-    } catch(e) {
-      htmlResult = handleError(e, null, jsCode);
-    }
-
-    consoleReplay = ReactOnRails.buildConsoleReplay();
-    return JSON.stringify([htmlResult, consoleReplay]);
-  }
-
   function createReactElement(componentName, propsVarName, props, domId, trace, generatorFunction) {
     if (trace) {
       console.log('RENDERED ' + componentName + ' with data_variable ' +
-                  propsVarName + ' to dom node with id: ' + domId);
+        propsVarName + ' to dom node with id: ' + domId);
     }
 
     if (generatorFunction) {
@@ -154,7 +141,7 @@
     var history = console.history;
     if (history && history.length > 0) {
       consoleReplay += '\n<script>';
-      history.forEach(function (msg) {
+      history.forEach(function(msg) {
         consoleReplay += '\nconsole.' + msg.level + '.apply(console, ' +
           JSON.stringify(msg.arguments) + ');';
       });

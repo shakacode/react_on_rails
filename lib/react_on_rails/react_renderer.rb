@@ -5,29 +5,14 @@
 
 module ReactOnRails
   class ReactRenderer
-    # Script to write to the browser console.
-    # NOTE: result comes from enclosing closure and is the server generated HTML
-    # that we intend to write to the browser. Thus, the script tag will get executed right after
-    # the HTML is rendered.
-    CONSOLE_REPLAY = <<-JS
-    var history = console.history;
-    if (history && history.length > 0) {
-      consoleReplay += '\\n<script>';
-      history.forEach(function (msg) {
-        consoleReplay += '\\nconsole.' + msg.level + '.apply(console, ' + JSON.stringify(msg.arguments) + ');';
-      });
-      consoleReplay += '\\n</script>';
-    }
-    JS
-
     # js_code: JavaScript expression that returns a string.
     # Returns an Array:
     # [0]: string of HTML for direct insertion on the page by evaluating js_code
     # [1]: console messages
     #   Note, js_code does not have to be based on React.
-    # js_code must return json stringify array of two elements
+    # js_code MUST RETURN json stringify array of two elements
     # Calling code will probably call 'html_safe' on return value before rendering to the view.
-    def self.render_js(js_code, options = {})
+    def self.server_render_js_with_console_logging(js_code, options = {})
       if ENV["TRACE_REACT_ON_RAILS"].present? # Set to anything to print generated code.
         puts "Z" * 80
         puts "react_renderer.rb: 92"
@@ -54,14 +39,7 @@ module ReactOnRails
           end
         end
       end
-      return result
-    end
-
-    private
-
-    def self.console_replay_js_code(options)
-      replay_console = options.fetch(:replay_console) { ReactOnRails.configuration.replay_console }
-      (replay_console || ReactOnRails.configuration.logging_on_server) ? CONSOLE_REPLAY : ""
+      result
     end
   end
 end

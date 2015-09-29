@@ -2,13 +2,16 @@
 <h1>Non-React Component</h1>
 <p>For example, Suppose you have some JavaScript that generates a string of HTML:</p>
 <pre>
-  <%%= render_js("this.HelloString.world(); \nconsole.warn('ran console.warn on the server()');") %>
+  <%%= server_render_js("(function() { var x = this.HelloString.world(); console.warn('ran console.warn on the server()'); return x;})()") %>
 </pre>
 <p>
   That will generate this:
 </p>
 
-<%= render_js("this.HelloString.world(); \nconsole.warn('ran console.warn on the server()');") %>
+<hr/>
+<pre>
+<%= server_render_js("(function() { var x = this.HelloString.world(); console.warn('ran console.warn on the server()'); return x;})()") %>
+</pre>
 
 <hr/>
 And be sure to check your console for the server side warn message.<br/>

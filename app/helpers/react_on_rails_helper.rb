@@ -102,33 +102,32 @@ module ReactOnRailsHelper
 
   # Returns Array [0]: html, [1]: script to console log
   # NOTE, these are NOT html_safe!
-  def server_rendered_react_component_html(options, props_string, react_component_name, data_variable, dom_id)
-    return ["", ""]
+  def server_rendered_react_component_html(options, props_string, react_component_name, data_variable_name, dom_id)
+    return ["", ""] unless prerender(options)
 
-    if prerender(options)
-      render_js_expression = <<-JS
-(function(React) {
-        #{debug_js(react_component_name, data_variable, dom_id, trace(options))}
-        var reactElement = #{render_js_react_element(react_component_name, props_string, generator_function(options))}
-        return React.renderToString(reactElement);
-      })(this.React);
-      JS
-      # create the server generated html of the react component with props
-      options[:react_component_name] = react_component_name
-      options[:server_side] = true
-      render_js_internal(render_js_expression, options)
-    else
-      ["",""]
-    end
+    wrapper_js = <<-JS
+(function() {
+  var props = #{props_string};
+  return ReactOnRails.serverRenderReactComponent({
+    componentName: '#{react_component_name}',
+    domId: '#{dom_id}',
+    propsVarName: '#{data_variable_name}',
+    props: props,
+    trace: #{trace(options)},
+    generatorFunction: #{generator_function(options)}
+  });
+})()
+    JS
+
+    ReactOnRails::ReactRenderer.server_render_js_with_console_logging(wrapper_js)
   rescue ExecJS::ProgramError => err
     raise ReactOnRails::ServerRenderingPool::PrerenderError.new(react_component_name, props_string, err)
   end
 
-  # Takes javascript code and returns the output from it. This is called by react_component, which
-  # sets up the JS code for rendering a react component.
-  # This method could be used by itself to render the output of any javascript that returns a
-  # string of proper HTML.
-  def render_js(js_expression, options = {})
+  # Helper method to take javascript expression and returns the output from evaluating it.
+  # If you have more than one line that needs to be executed, wrap it in an IIFE.
+  # JS exceptions are caught and console messages are handled properly.
+  def server_render_js(js_expression, options = {})
     wrapper_js = <<-JS
 (function() {
   var htmlResult = '';
@@ -140,7 +139,7 @@ module ReactOnRailsHelper
         return #{js_expression};
       })();
   } catch(e) {
-    htmlResult = handleError(e, null, jsCode);
+    htmlResult = handleError(e, null, '#{escape_javascript(js_expression)}');
   }
 
   consoleReplay = ReactOnRails.buildConsoleReplay();
@@ -148,24 +147,11 @@ module ReactOnRailsHelper
 })()
     JS
 
-    result_json = ReactOnRails::ServerRenderingPool.eval_js(wrapper_js)
-    result = JSON.parse(result_json)
+    result = ReactOnRails::ReactRenderer.server_render_js_with_console_logging(wrapper_js)
     "#{result[0]}\n#{result[1]}".html_safe
   end
 
   private
-  # Takes javascript code and returns the output from it. This is called by react_component, which
-  # sets up the JS code for rendering a react component.
-  # This method could be used by itself to render the output of any javascript that returns a
-  # string of proper HTML.
-  # Returns Array [0]: html, [1]: script to console log
-  def render_js_internal(js_expression, options = {})
-    # TODO: This should be changed so that we don't create a new context every time
-    # Example of doing this here: https://github.com/reactjs/react-rails/tree/master/lib/react/rails
-    ReactOnRails::ReactRenderer.render_js(js_expression,
-                                          options)
-  end
-
 
   def trace(options)
     options.fetch(:trace) { ReactOnRails.configuration.trace }
