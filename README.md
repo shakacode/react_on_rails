@@ -5,9 +5,11 @@
 
 Gem Published: https://rubygems.org/gems/react_on_rails
 
-See [Action Plan for v1.0](https://github.com/shakacode/react_on_rails/issues/1)
+Live example, including server rendering + redux: http://www.reactrails.com/
 
-Feedback and pull-requests encouraged! Thanks in advance!
+See [Action Plan for v1.0](https://github.com/shakacode/react_on_rails/issues/1). We're probably feature complete and ready for v1.0.
+
+Feedback and pull-requests encouraged! Thanks in advance! We've got a private slack channel to discuss react + webpack + rails. [Email us for an invite contact@shakacode.com](mailto: contact@shakacode.com).
 
 Supports:
 
@@ -17,22 +19,20 @@ Supports:
 4. Redux
 5. Turbolinks
 6. Server side rendering with fragment caching
-7. react-router for client side rendering (and maybe server side eventually)
+7. react-router for client side rendering (and server side very soon)
 
 ## OPEN ISSUES
-1. We've got many open issues. However, none of these should stop you from using this gem if you're using React + Webpack with Rails, especially if you are client rendering.
-2. Almost all the open issues are nice to haves like more tests, or some things that would be nice to have for server rendering.
-3. If you want to work on any of the open issues, please comment on the issue. My team is mentoring anybody that's trying to help with the issues. We've got a private slack room for discussing React + Webpack with Rails.
-4. Longer term, we hope to put in many conveniences into this gem, in terms of Webpack + Rails integration.
+1. Almost all the open issues are nice to haves like more tests.
+3. If you want to work on any of the open issues, please comment on the issue. My team is mentoring anybody that's trying to help with the issues.
+4. Longer term, we hope to put in many conveniences into this gem, in terms of Webpack + Rails integration. We're open to suggestions.
 
 ## Links
 1. See https://github.com/shakacode/react-webpack-rails-tutorial/ for how to integrate it!
 2. http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/
-3. http://forum.railsonmaui.com
-4. Interested in consulting for implementing React with Rails, [email us! contact@shakacode.com](mailto: contact@shakacode.com).
-5. If this project is interesting to you, [email us! contact@shakacode.com](mailto: contact@shakacode.com). We're looking for great
-developers that want to work with Rails + React with a distributed, worldwide team, for our own
-products, client work, and open source.
+3. http://forum.shakacode.com
+4. Interested in consulting for a project using React and Rails, [email us! contact@shakacode.com](mailto: contact@shakacode.com)? You can first join our slack room for some free advice.
+5. We're looking for great developers that want to work with Rails + React with a distributed, worldwide team, for our own
+products, client work, and open source. [More info here](http://www.shakacode.com/about/index.html#work-with-us).
 
 ## How is different than the [react-rails gem](https://github.com/reactjs/react-rails)?
 1. `react_on_rails` depends on [webpack](http://webpack.github.io/). `react-rails` integrates closely with sprockets and
