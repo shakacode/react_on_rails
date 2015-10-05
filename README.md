@@ -89,8 +89,7 @@ See the next section for a aample webpack.server.rails.config.js.
    ```javascript
    entry: ['./app/startup/serverGlobals'],
    ```
-2. Ensure the name of your ouput file (shown [here](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/webpack.server.rails.config.js#L9)) of your server bundle corresponds to the configuration of the gem. The default path is `app/assets/javascripts/generated`. See below for customization of configuration variables.
-3. Set the `output.libraryTarget = 'this'` in your webpack config, like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.config.js#L13)
+3. Ensure the name of your ouput file (shown [here](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/webpack.server.rails.config.js#L9)) of your server bundle corresponds to the configuration of the gem. The default path is `app/assets/javascripts/generated`. See below for customization of configuration variables.
 4. Expose `React` in your webpack config, like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.config.js#L23)
 
 #### Sample webpack.server.rails.config.js (ONLY for server rendering)
@@ -108,8 +107,11 @@ module.exports = {
     filename: 'server-bundle.js',
     path: '../app/assets/javascripts/generated',
 
-    // CRITICAL for enabling Rails to find the globally exposed variables.
-    libaryTarget: 'this',
+    // CRITICAL to set libraryTarget: 'this' for enabling Rails to find the exposed modules IF you
+    //   use the "expose" webpackfunctionality. See startup/serverGlobals.jsx.
+    // NOTE: This is NOT necessary if you use the syntax of global.MyComponent = MyComponent syntax.
+    // See http://webpack.github.io/docs/configuration.html#externals for documentation of this option
+    //libraryTarget: 'this',
   },
   resolve: {
     extensions: ['', '.webpack.js', '.web.js', '.js', '.jsx', 'config.js'],
