@@ -77,7 +77,7 @@ products, client work, and open source. [More info here](http://www.shakacode.co
 1. See customization of configuration options below.  
 
 ### Additional Steps For Server Rendering (option `prerender` shown below)
-See the next section for a aample webpack.server.rails.config.js.
+See the next section for a sample webpack.server.rails.config.js.
 1. Expose your server globals like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/app/startup/serverGlobals.jsx#L7)
    
    ```javascript
