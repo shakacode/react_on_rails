@@ -1,0 +1,3 @@
+
+To get started, run 'foreman start -f Procfile.dev'.
+Read client/README.md for more information.

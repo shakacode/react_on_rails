@@ -54,6 +54,24 @@ products, client work, and open source. [More info here](http://www.shakacode.co
   gem "react_on_rails"
   gem "therubyracer"
   ```
+
+### Installing With The Generators
+1. The install generator will get you started with the necessary directories and conifgurations.
+   ```
+   rails generate react_on_rails:install
+   ```
+
+   This will create a client directory in your application root path that contains directories for your React files and Webpack, NPM, and linting configurations.
+
+   The config file will be copied to ```config/initializers/react_on_rails.rb```.
+
+   Foreman can be run with ```foreman start -f Procfile.dev```
+2. Optionally, you can install with Redux support.
+   ```
+   rails generate react_on_rails:install_with_redux
+   ```
+
+### Manual Installation
 1. Globally expose React in your webpack config like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/webpack.client.base.config.js#L31):
   
   ```javascript
