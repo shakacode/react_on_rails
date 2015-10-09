@@ -18,7 +18,7 @@
         if (domNode) {
           var reactElement = createReactElement(componentName, propsVarName, props,
             domId, trace, generatorFunction);
-          React.render(reactElement, domNode);
+          ReactOnRails.provideClientReact().render(reactElement, domNode);
         }
       }
       catch (e) {
@@ -40,7 +40,7 @@
           document.removeEventListener("page:change", onPageChange);
           document.removeEventListener("page:before-unload", removePageChangeListener);
           var domNode = document.getElementById(domId);
-          React.unmountComponentAtNode(domNode);
+          ReactOnRails.provideClientReact().unmountComponentAtNode(domNode);
         };
         document.addEventListener("page:before-unload", removePageChangeListener);
 
@@ -65,7 +65,7 @@
     try {
       var reactElement = createReactElement(componentName, propsVarName, props,
         domId, trace, generatorFunction);
-      htmlResult = React.renderToString(reactElement);
+      htmlResult = ReactOnRails.provideServerReact().renderToString(reactElement);
     }
     catch (e) {
       htmlResult = handleError(e, componentName);
@@ -132,7 +132,7 @@
       '\nMessage: ' + e.message + '\n\n' + e.stack;
 
     var reactElement = React.createElement('pre', null, msg);
-    return React.renderToString(reactElement);
+    return ReactOnRails.provideServerReact().renderToString(reactElement);
   }
 
   ReactOnRails.buildConsoleReplay = function() {
@@ -149,5 +149,20 @@
     }
 
     return consoleReplay;
+  }
+
+  ReactOnRails.provideClientReact = function() {
+    if (window.ReactDOM) {
+      return window.ReactDOM;
+    }
+    return React;
+  }
+
+  ReactOnRails.provideServerReact = function() {
+    if (window.ReactDOMServer) {
+      return window.ReactDOMServer
+    }
+
+    return React;
   }
 }.call(this));
