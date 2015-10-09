@@ -1,0 +1,8 @@
+// The Rails server imports this file via app/assets/stylesheets/application.css.scss
+// The webpack HMR dev server loads this file via client/bootstrap-sass.config.js
+
+// In either case, this file is loaded BEFORE bootstrap has been loaded.
+// Use it to define variables BEFORE bootstrap loads. See http://getbootstrap.com/customize/
+
+// This is a file that provides a fallback for `img-url` and fonts
+@import 'react-on-rails-sass-helper';

@@ -1,4 +1,4 @@
-require "spec_helper"
+require "react_on_rails/spec_helper"
 
 module ReactOnRails
   RSpec.describe Configuration do

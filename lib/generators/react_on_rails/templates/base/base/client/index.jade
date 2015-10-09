@@ -1,0 +1,15 @@
+doctype html
+html
+
+  head
+    title Hello, React
+
+  body
+
+    h1.alert.alert-info.this-works webpack dev server (with HMR)
+    #app
+
+    script(src="vendor-bundle.js")
+    script(src="app-bundle.js")
+    script.
+      ReactDOM.render(React.createElement(HelloWorldApp, {name: "Stranger"}), document.getElementById('app'))

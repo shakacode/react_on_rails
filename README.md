@@ -1,372 +1,221 @@
-[![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails)
-[![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
-[![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails)
-# React On Rails
+[![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails)
 
-**Gem Published:** https://rubygems.org/gems/react_on_rails
+# React on Rails
+React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. Currently, both React v0.14 and v0.13 are supported. See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
 
-**Current Version:** 1.0.0.pre
+Like the [react-rails](https://github.com/reactjs/react-rails) gem, React on Rails is capable of server-side rendering with fragment caching and is compatible with [turbolinks](https://github.com/rails/turbolinks). Unlike react-rails, which depends heavily on sprockets and jquery-ujs, React on Rails uses [webpack](http://webpack.github.io/) and does not depend on jQuery. While the initial setup is slightly more involved, it allows for advanced functionality such as:
 
-**Live example, including server rendering + redux:** http://www.reactrails.com/
++ [Redux](https://github.com/rackt/redux)
++ [Webpack dev server](https://webpack.github.io/docs/webpack-dev-server.html) with [hot module replacement](https://webpack.github.io/docs/hot-module-replacement-with-webpack.html)
++ [Webpack optimization functionality](https://github.com/webpack/docs/wiki/optimization)
++ **(Coming Soon)** [React Router](https://github.com/rackt/react-router)
 
-Sponsored by [ShakaCode.com](http://www.shakacode.com/)
+See the [react-webpack-rails-tutorial](https://github.com/justin808/react-webpack-rails-tutorial/) for an example of a live implementation and code.
 
-See [Action Plan for v1.0](https://github.com/shakacode/react_on_rails/issues/1). We're ready v1.0!
+### Including your React Component in your Rails Views
+Please see [Getting Started](#getting-started) for how to set up your Rails project for React on Rails if you have not already done so.
 
-Feedback and pull-requests encouraged! Thanks in advance! We've got a private slack channel to discuss react + webpack + rails. [Email us for an invite contact@shakacode.com](mailto: contact@shakacode.com).
++ *Normal Mode (JavaScript is rendered on client):*
 
-Supports:
+  ```erb
+  <%= react_component("HelloWorldApp", @some_props) %>
+  ```
++ *Server-Side Rendering:*
 
-1. Rails
-2. Webpack
-3. React, both v0.14 and v0.13.
-4. Redux
-5. Turbolinks
-6. Server side rendering with fragment caching
-7. react-router for client side rendering (and server side very soon)
+  ```erb
+  <%= react_component("HelloWorldApp", @some_props, prerender: true) %>
+  ```
 
-## OPEN ISSUES
-1. Almost all the open issues are nice to haves like more tests.
-2. If you want to work on any of the open issues, please comment on the issue. My team is mentoring anybody that's trying to help with the issues.
-3. Longer term, we hope to put in many conveniences into this gem, in terms of Webpack + Rails integration. We're open to suggestions.
++ The `component_name` parameter here would be a string matching the name you used when globally exposing your React component.
++ `@some_props` can be either a hash or JSON string or {} if you have no props. This will make the data available in your component:
 
-## Links
-1. See https://github.com/shakacode/react-webpack-rails-tutorial/ for how to integrate it!
-2. http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/
-3. http://forum.shakacode.com
-4. If you're looking for consulting on a project using React and Rails, [email us! contact@shakacode.com](mailto: contact@shakacode.com)? You can first join our slack room for some free advice.
-5. We're looking for great developers that want to work with Rails + React with a distributed, worldwide team, for our own
-products, client work, and open source. [More info here](http://www.shakacode.com/about/index.html#work-with-us).
+  ```javascript
+    this.props.name
+  ```
 
-## How is different than the [react-rails gem](https://github.com/reactjs/react-rails)?
-1. `react_on_rails` depends on [webpack](http://webpack.github.io/). `react-rails` integrates closely with sprockets and
-    helps you integrate JSX and the react code into a Rails project.
-2. Likewise, using Webpack as shown in the [react-webpack-rails-tutorial](https://github.com/justin808/react-webpack-rails-tutorial/)
-   does involve some extra setup. However, we feel that tight and simple integration with the node ecosystem is more than
-   worth any minor setup costs.
-3. `react-rails` depends on `jquery-ujs` for client side rendering. `react_on_rails` has it's own JS code that does not
-   depend on jquery.
+### Client-Side Rendering vs. Server-Side Rendering
+In most cases, you should use the provided helper method to render the React component from your Rails views with `prerender: false` (default behavior). In some cases, such as when SEO is vital or many users will not have JavaScript enabled, you can pass the `--server-rendering` option to the generator to configure your application for server-side rendering. Your JavaScript can then be first rendered on the server and passed to the client as HTML.
 
-## Installation Checklist
-1. Include the gems `react_on_rails` and `therubyracer` like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/361f4338ebb39a5d3934b00cb6d6fcf494773000/Gemfile#L42) and run `bundle`. Note, you can sustitute your preferable JavaScript engine.
+In the following screenshot you can see the actual HTML rendered for a side-by-side comparison of a React component left as JavaScript for the client to render followed by the same component rendered on the server to HTML along with any console error messages generated:
+
+![Comparison of a normal React Component with its server-rendered version](https://cloud.githubusercontent.com/assets/1118459/10157268/41435186-6624-11e5-9341-6fc4cf35ee90.png)
+
+## Getting Started
+1. Add the following to your Gemfile and bundle install:
   
   ```ruby
   gem "react_on_rails"
   gem "therubyracer"
   ```
-1. Globally expose React in your webpack config like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/webpack.client.base.config.js#L31):
-  
-  ```javascript
-    module: {
-      loaders: [
-        // React is necessary for the client rendering:
-        { test: require.resolve('react'), loader: 'expose?React' },
-      
-        // For React 0.14
-        { test: require.resolve('react-dom'), loader: 'expose?ReactDOM' }, // not in the server one
-    ```
-    
-    
-1. Require `react_on_rails` in your `application.js` like  [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/361f4338ebb39a5d3934b00cb6d6fcf494773000/app/assets/javascripts/application.js#L15). It possibly should come after you require `turbolinks`:
-  
-  ```
-  //= require react_on_rails
-  ```
-1. Expose your client globals like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/app/startup/clientGlobals.jsx#L3):
-  
-   ```javascript
-   import App from './ClientApp';
-   window.App = App;
-   ```
-1. Put your client globals file as webpack entry points like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/webpack.client.rails.config.js#L22). Similar pattern for server rendering.
-  
-  ```javascript
-  config.entry.app.push('./app/startup/clientGlobals');
-  ```
-1. See customization of configuration options below.  
 
-### Additional Steps For Server Rendering (option `prerender` shown below)
-See the next section for a sample webpack.server.rails.config.js.
-1. Expose your server globals like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/app/startup/serverGlobals.jsx#L7)
-   
-   ```javascript
-   import App from './ServerApp';
-   global.App = App;
-   ```
-2. Make the server globals file an entry point in your webpack config, like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/webpack.server.rails.config.js#L7)
+2. Run the generator with a simple "Hello World" example:
 
-   ```javascript
-   entry: ['./app/startup/serverGlobals'],
-   ```
-3. Ensure the name of your ouput file (shown [here](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/webpack.server.rails.config.js#L9)) of your server bundle corresponds to the configuration of the gem. The default path is `app/assets/javascripts/generated`. See below for customization of configuration variables.
-4. Expose `React` in your webpack config, like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.config.js#L23)
-
-```javascript
-      { test: require.resolve('react'), loader: 'expose?React' },
-      
-      // For React 0.14
-      { test: require.resolve('react-dom/server'), loader: 'expose?ReactDOMServer' }, // not in client one, only server
-```
-
-
-#### Sample webpack.server.rails.config.js (ONLY for server rendering)
-Be sure to check out the latest example version of [client/webpack.server.rails.config.js](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.config.js).
-
-```javascript
-  // Common webpack configuration for server bundle
-
-module.exports = {
-
-  // the project dir
-  context: __dirname,
-  entry: ['./app/startup/serverGlobals'],
-  output: {
-    filename: 'server-bundle.js',
-    path: '../app/assets/javascripts/generated',
-
-    // CRITICAL to set libraryTarget: 'this' for enabling Rails to find the exposed modules IF you
-    //   use the "expose" webpackfunctionality. See startup/serverGlobals.jsx.
-    // NOTE: This is NOT necessary if you use the syntax of global.MyComponent = MyComponent syntax.
-    // See http://webpack.github.io/docs/configuration.html#externals for documentation of this option
-    //libraryTarget: 'this',
-  },
-  resolve: {
-    extensions: ['', '.webpack.js', '.web.js', '.js', '.jsx', 'config.js'],
-  },
-  module: {
-    loaders: [
-      {test: /\.jsx?$/, loader: 'babel-loader', exclude: /node_modules/},
-
-      // React is necessary for the client rendering:
-      { test: require.resolve('react'), loader: 'expose?React' },
-      { test: require.resolve('react-dom/server'), loader: 'expose?ReactDOMServer' },
-    ],
-  },
-};
-```
-
-## What Happens?
-
-Here's what the browser will render with a call to the `react_component` helper.
-![2015-09-28_20-24-35](https://cloud.githubusercontent.com/assets/1118459/10157268/41435186-6624-11e5-9341-6fc4cf35ee90.png)
-
-## Usage
-
-*See section below titled "Try it out"*
-
-### Helper Method
-The main API is a helper:
-
-```ruby
-  <%= react_component(component_name, props = {}, options = {}) %>
-```
-  
-Params are:
-
-* **react_component_name**: [string] can be a React component, created using a ES6 class, or React.createClass,
-  or a `generator function` that returns a React component
-   
-  using ES6
-  ```javascript
-  let MyReactComponentApp = (props) => <MyReactComponent {...props}/>;
-  ```       
-     
-  or using ES5
-  ```javascript
-  var MyReactComponentApp = function(props) { return <YourReactComponent {...props}/>; }
-  ```
-  Exposing the react_component_name is necessary to both a plain ReactComponent as well as
-     a generator:
-   For client rendering, expose the react_component_name on window:
-   
-  ```javascript
-  window.MyReactComponentApp = MyReactComponentApp;
-  ```       
-  For server rendering, export the react_component_name on global:
-  ```javascript
-  global.MyReactComponentApp = MyReactComponentApp;
-  ```       
-  If you're curious as to what the gem generates for the server and client rendering, see [`spec/dummy/client/app/startup/serverGlobals.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/spec/sample_generated_js/server-generated.js)
-  and [`spec/dummy/client/app/startup/ClientReduxApp.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/spec/sample_generated_js/client-generated.js) for examples of this. Note, this is not the code that you are providing. You can see the client code by viewing the page source.
-  
-* **props**: [hash | string of json] Properties to pass to the react object. See this example if you're using Jbuilder: [react-webpack-rails-tutorial view rendering props using jBuilder](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/app/views/pages/index.html.erb#L20)
-
-```erb
-<%= react_component('App', render(template: "/comments/index.json.jbuilder"),
-    generator_function: true, prerender: true) %>
-```
-* **options:** [hash]
-  * **generator_function**: <true/false> default is false, set to true if you want to use a generator function rather than a React Component.
-  * **prerender**: <true/false> set to false when debugging!
-  * **trace**: <true/false> set to true to print additional debugging information in the browser default is true for development, off otherwise 
-  * **replay_console**: <true/false> Default is true. False will disable echoing server rendering logs, which can make troubleshooting server rendering difficult.
-  * Any other options are passed to the content tag, including the id. 
-
-## JavaScript
-
-1. Configure your webpack configuration to create the file used for server rendering if you plan to
-   do server rendering.
-2. Follow the examples in `spec/dummy/client/app/startup/clientGlobals.jsx` to expose your react components
-   for client side rendering.
-   ```ruby   
-   import HelloWorld from '../components/HelloWorld';
-   window.HelloWorld = HelloWorld;
-   ```   
-3. Follow the examples in `spec/dummy/client/app/startup/serverGlobals.jsx` to expose your react components
-   for server side rendering.
-   ```ruby
-   import HelloWorld from '../components/HelloWorld';
-   global.HelloWorld = HelloWorld;
-   ```
-   
-## Server Rendering Tips
-
-- Your code can't reference `document`. Server side JS execution does not have access to `document`, so jQuery and some
-  other libs won't work in this environment. You can debug this by putting in `console.log`
-  statements in your code.
-- You can conditionally avoid running code that references document by passing in a boolean prop to your top level react
-  component. Since the passed in props Hash from the view helper applies to client and server side code, the best way to
-  do this is to use a generator function.
-
-You might do something like this in some file for your top level component:
-```javascript
-global.App = () => <MyComponent serverSide={true} />;
-```
-
-The point is that you have separate files for top level client or server side, and you pass some extra option indicating that rendering is happening server sie.
-
-## Optional Configuration   
-
-Create a file `config/react_on_rails.rb` to override any defaults. If you don't specify this file,
-the default options are below.
-
-The `server_bundle_js_file` must correspond to the bundle you want to use for server rendering.
-
-```ruby
-# Shown below are the defaults for configuration
-ReactOnRails.configure do |config|
-  # Client bundles are configured in application.js
-  # Server bundle is a single file for all server rendering of components.
-  config.server_bundle_js_file = "app/assets/javascripts/generated/server.js" # This is the default
-
-  # Below options can be overriden by passing to the helper method.
-  config.prerender = false # default is false
-  config.generator_function = false # default is false, meaning that you expose ReactComponents directly
-  config.trace = Rails.env.development? # default is true for development, off otherwise
-
-  # For server rendering. This can be set to false so that server side messages are discarded.
-  config.replay_console = true # Default is true. Be cautious about turning this off.
-  config.logging_on_server = true # Default is true. Logs server rendering messags to Rails.logger.info
-  
-  # Settings for the pool of renderers:
-  config.server_renderer_pool_size  ||= 1  # ExecJS doesn't allow more than one on MRI
-  config.server_renderer_timeout    ||= 20 # seconds
-end
-```
-
-You can configure your pool of JS virtual machines and specify where it should load code:
-
-- On MRI, use `therubyracer` for the best performance (see [discussion](https://github.com/reactjs/react-rails/pull/290))
-- On MRI, you'll get a deadlock with `pool_size` > 1
-- If you're using JRuby, you can increase `pool_size` to have real multi-threaded rendering.
-
-# Try it out in the simple sample app
-Contributions and pull requests welcome!
-
-1. Setup and run the test app in `spec/dummy`. Note, there's no database.
   ```bash
-  cd spec/dummy
-  bundle
-  npm i
-  foreman start
+  rails generate react_on_rails:install
   ```
-3. Visit http://localhost:3000
-4. Notice that the first time you hit the page, you'll see a message that server is rendering.
-   See `spec/dummy/app/views/pages/index.html.erb:17` for the generation of that message.
-5. Look at the layouts in `spec/dummy/app/views/pages` for samples of usage.
-5. Open up the browser console and see some tracing.
-6. Open up the source for the page and see the server rendered code.
-7. If you want to turn on server caching for development, run the server like:
-   `export RAILS_USE_CACHE=YES && foreman start`
-2. If you're testing with caching, you'll need to open the console and run `Rails.cache.clear` to clear
-  the cache. Note, even if you stop the server, you'll still have the cache entries around.
-8. If you click back and forth between the react page links, you can see the rails console
-   log as well as the browser console to see what's going on with regards to server rendering and
-   caching.
 
-# Key Tips
-1. See sample app in `spec/dummy` for how to set this up. See note below on ensuring you 
-   **DO NOT RUN `rails s` and instead     run `foreman start`. 
-2. Test out the different options and study the JSX samples in `spec/dummy/client/app/startup`.
-3. Experiment with changing the settings on the `render_component` helper calls in the ERB files.
-2. The file used for server rendering is hard coded as `generated/server.js`
-   (assets/javascripts/generated/server.js).
-3. The default for rendering right now is `prerender: false`. **NOTE:**  Server side rendering does
-   not work for some components, namely react-router, that use an async setup for server rendering.
-   You can configure the default for prerender in your config.
-4. You can expose either a React component or a function that returns a React component. If you 
-   wish to create a React component via a function, rather than simply props, then you need to set 
-   the property "generator" on that function to true. When that is done, the function is invoked 
-   with a single parameter of "props", and that function should return a React element.
-5. Be sure you can first render your react component client only before you try to debug server
-   rendering!
-4. Open up the HTML source and take a look at the generated HTML and the JavaScript to see what's
-   going on under the covers. Not that when server rendering is turned on, then you'll see the
-   server rendered react components. When server rendering is turned off, then you'll only see
-   the `div` element where the inline JavaScript will render the component. You might also notice
-   how the props you pass (a Ruby Hash) becomes inline JavaScript on the HTML page.
+3. NPM install:
 
-## JavaScript Runtime Configuration
-See this [discussion on JavaScript performance](https://github.com/shakacode/react_on_rails/issues/21).
-The net result is that you want to add this line to your Gemfile to get therubyracer as your default
-JavaScript engine.
+  ```bash
+  npm install
+  ```
 
-```ruby
-gem "therubyracer"
-```
+4. Start your Rails server:
 
-## React 0.13 vs. React 0.14
-The main difference for using react_on_rails is that you need to add additional lines in the webpack config files:
+  ```bash
+  foreman start -f Procfile.dev
+  ```
 
-Client side config file:
+5. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world)
+
+## How it Works
+The generator installs your webpack files in the `client` folder. Foreman uses webpack to compile your code and output the bundled results to `app/assets/javascripts/generated`, which are then loaded by sprockets. These generated bundle files have been added to your `.gitignore` for your convenience.
+
+Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails.
+
+### Building the Bundles
+Each time you change your client code, you will need to re-generate the bundles. The included Foreman `Procfile.dev` will take care of this for you by watching your JavaScript code files for changes. Simply run `foreman start -f Procfile.dev`.
+
+### Globally Exposing Your React Components
+Place your JavaScript code inside of the provided `client/app` folder. Use modules just as you would when using webpack alone. The difference here is that instead of mounting React components directly to an element using `React.render`, you **expose your components globally and then mount them with helpers inside of your Rails views**.
+
++ *Normal Mode (JavaScript is Rendered on client):*
+
+  ```javascript
+  window.HelloWorld = HelloWorldAppClient;
+  ```
++ *Server-Side Rendering:*
+
+  ```javascript
+  global.HelloWorld = HelloWorldAppServer;
+  ```
+   
+
+## Generator Options
+Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
 ```
-{ test: require.resolve('react-dom'), loader: 'expose?ReactDOM' },
+Usage:
+  rails generate react_on_rails:install [options]
+
+Options:
+  -R, [--redux], [--no-redux]                        # Setup Redux files
+  -S, [--server-rendering], [--no-server-rendering]  # Configure for server-side rendering of webpack JavaScript
+  -L, [--skip-linters], [--no-skip-linters]          # Don't install linter files
+
+Runtime options:
+  -f, [--force]                    # Overwrite files that already exist
+  -p, [--pretend], [--no-pretend]  # Run but do not make any changes
+  -q, [--quiet], [--no-quiet]      # Suppress status output
+  -s, [--skip], [--no-skip]        # Skip files that already exist
+
+Description:
+    Create react on rails files for install generator.
 ```
 
-Server side config file:
+We have a repo showing the results of running the generator with various combinations of options, each combination on its own branch: [Generator Results](https://github.com/shakacode/react_on_rails-generator-results-pre-0/pulls).
 
-```
-{ test: require.resolve('react-dom/server'), loader: 'expose?ReactDOMServer' },
-```
+### Understanding the Organization of the Generated Client Code
+The generated client code follows our organization scheme. Each unique set of functionality, is given its own folder inside of `client/app/bundles`. This encourages for modularity of DOMAINS.
 
-## References
-* [Making the helper for server side rendering work with JS created by Webpack] (https://github.com/reactjs/react-rails/issues/301#issuecomment-133098974)
-* [Add Demonstration of Server Side Rendering](https://github.com/justin808/react-webpack-rails-tutorial/issues/2)
-* [Charlie Marsh's article "Rendering React Components on the Server"](http://www.crmarsh.com/react-ssr/)
-* [Node globals](https://nodejs.org/api/globals.html#globals_global)
+Inside of the generated "HelloWorld" domain you will find the following folders:
 
-### Generated JavaScript
++  `startup`: two types of files, one that return a container component and implement any code that differs between client and server code (if using server-rendering), and a `clientGlobals` file that exposes the aforementioned files (as well as a `serverGlobals` file if using server rendering). These globals files are what webpack is using as an entry point.
++ `containers`: "smart components" (components that have functionality and logic that is passed to child "dumb components").
++ `components`: includes "dumb components", or components that simply render their properties and call functions given to them as properties by a parent component. Ultimately, at least one of these dumb components will have a parent container component.
 
-1. See [sample_generated_js/server-generated.js](docs/sample_generated_js/server-generated.js) to see the JavaScript for typical server rendering.
-2. See [sample_generated_js/client-generated.js](docs/sample_generated_js/client-generated.js) to see the JavaScript for typical client rendering.
+You may also notice the `app/lib` folder. This is for any code that is common between bundles and therefore needs to be shared (for example, middleware).
+
+#### Additional Redux Folders
+If you have used the `--redux` generator option, you will notice the familiar additional redux folders in addition to the aforementioned folders. In this organization paradigm, each bundle has its own store. We do not set a global store and then use partial stores based off of that. Again, this is for bundle code modularity and isolation. Note that if you want to reuse redux reducers across domains, then you will want to put the shared reducers under `/client/app/lib`.
+
+### Using Images and Fonts
+The generator has amended the folders created in `client/assets/` to Rails's asset path. We would that if you have any existing assets that you want to use with your client code that you should move them to these folders and use webpack as normal.
+
+Alternatively, if you have many existing assets and don't wish to move them, you could consider creating symlinks from client/assets that point to your Rails assets folders inside of `app/assets/`. The assets there will then be visible to both Rails and webpack.
+
+### Bootstrap Integration
+React on Rails ships with Twitter Bootstrap already integrated into the build. Note that the generator removes `require_tree` in both the application.js and application.css.scss files. This is to ensure the correct load order for the bootstrap integration, and is usually a good idea in general. You will therefore need to explicitly require your files.
+
+How the Bootstrap library is loaded depends upon whether one is using the Rails server or the HMR development server.
+
+#### Bootstrap via Rails Server
+In the former case, the Rails server loads `bootstrap-sprockets`, provided by the `bootstrap-sass` ruby gem (added automatically to your Gemfile by the generator) via the `app/assets/stylesheets/_bootstrap-custom.scss` partial.
+
+This allows for using Bootstrap in your regular Rails stylesheets. If you wish to customize any of the Bootstrap variables, you can do so via the `client/assets/stylesheets/_pre-bootstrap.scss` partial.
+
+#### Bootstrap via Webpack HMR Dev Server
+When using the webpack dev server, which does not go through Rails, bootstrap is loaded via the [bootstrap-sass-loader](https://github.com/shakacode/bootstrap-sass-loader) which uses the `client/bootstrap-sass-config.js` file.
+
+#### Keeping Custom Bootstrap Configurations Synced
+Because the HMR dev server and Rails each load Bootstrap via a different file (explained in the two sections immediately above), any changes to the way components are loaded in one file must also be made to the other file in order to keep styling consistent between the two. For example, if an import is excluded in `_bootstrap-custom.scss`, the same import should be excluded in `bootstrap-sass-config.js` so that styling in the Rails server and the webpack dev server will be the same.
+
+## Rails View Helpers In-Depth
+Once the bundled files have been generated in your `app/assets/javascripts/generated` folder and you have exposed your components globally, you will want to run your code in your Rails views using the included helper method.
+
+This is how you actually render the React components you exposed to `window` inside of `clientGlobals` (and `global` inside of `serverGlobals` if you are server rendering).
+
+`react_component(component_name, props = {}, options = {})`
++ **react_component_name:** Can be a React component, created using a ES6 class, or `React.createClass`, or a generator function that returns a React component.
++ **props:** Ruby Hash which contains the properties to pass to the react object
++ **options:**
+  + **generator_function:** default is false, set to true if you want to use a generator function rather than a React Component.
+  + **prerender:** enable server-side rendering of component. Set to false when debugging!
+  + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise.
+  + **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the default configuration of logging_on_server set to true, you'll still see the errors on the server.
++ Any other options are passed to the content tag, including the id
+
+`def server_render_js(js_expression, options = {})`
+
+This is a helper method that takes any JavaScript expression and returns the output from evaluating it. If you have more than one line that needs to be executed, wrap it in an IIFE. JS exceptions will be caught and console messages handled properly.
+
+## Developing with Webpack Dev Server
+One of the benefits of using webpack is access to [webpack's dev server](https://webpack.github.io/docs/webpack-dev-server.html) and its [hot module replacement](https://webpack.github.io/docs/hot-module-replacement-with-webpack.html) functionality.
+
+The webpack dev server with HMR will apply changes from the code (or styles!) to the browser as soon as you save whatever file you're working on. You won't need to reload the page, and your data will still be there. Start foreman as normal (it boots up the Rails server *and* the webpack HMR dev server at the same time).
+
+  ```bash
+  foreman start -f Procfile.dev
+  ```
+
+Open your browser to [localhost:4000](http://localhost:4000). Whenever you make changes to your JavaScript code in the `client` folder, they will automatically show up in the browser. Hot module replacement is already enabled by default.
+
+Note that **React-related error messages are typically significantly more helpful when encountered in the dev server** than the Rails server as they do not include noise added by the React on Rails gem.
+
+### Adding Additional Routes for the Dev Server
+As you add more routes to your front-end application, you will need to make the corresponding API for the dev server in `client/server.js`. See our example `server.js` from our [tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/server.js).
+
+## Additional Documentation:
+
++ [Linters](docs/linters.md)
++ [Manual Configuration](docs/manual_configuration.md)
++ [Node Dependencies and NPM](docs/node_dependencies_and_npm.md)
 
 ## Contributing
+Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant](contributor-covenant.org) code of conduct (see [CODE OF CONDUCT](CODE_OF_CONDUCT.md)).
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/shakacode/react_on_rails. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](contributor-covenant.org) code of conduct.
-
-More [tips on contributing here](docs/Contributing.md)
+See [Contributing](docs/Contributing.md) to get started.
 
 ## License
+The gem is available as open source under the terms of the [MIT License](LICENSE).
 
-The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
-
-# Authors
-
+## Authors
 [The Shaka Code team!](http://www.shakacode.com/about/)
 
 1. [Justin Gordon](https://github.com/justin808/)
 2. [Samnang Chhun](https://github.com/samnang)
 3. [Alex Fedoseev](https://github.com/alexfedoseev)
+4. [Rob Wise](https://github.com/robwise)
+5. [Blaine Hatab](https://github.com/jbhatab)
+6. [Roger Studner](https://github.com/rstudner)
+7. [Aaron Van Bokhoven](https://github.com/aaronvb)
 
 And based on the work of the [react-rails gem](https://github.com/reactjs/react-rails)
+
+## About [ShakaCode](http://www.shakacode.com/)
+
+Visit [our forums!](http://forum.shakacode.com)
+
+If you're looking for consulting on a project using React and Rails, email us ([contact@shakacode.com](mailto: contact@shakacode.com))! You can also join our slack room for some free advice.
+
+We're looking for great developers that want to work with Rails + React with a distributed, worldwide team, for our own products, client work, and open source. [More info here](http://www.shakacode.com/about/index.html#work-with-us).

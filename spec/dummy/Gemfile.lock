@@ -95,6 +95,9 @@ GEM
     erubis (2.7.0)
     execjs (2.6.0)
     ffi (1.9.10)
+    generator_spec (0.9.3)
+      activesupport (>= 3.0.0)
+      railties (>= 3.0.0)
     globalid (0.3.6)
       activesupport (>= 4.1.0)
     http-cookie (1.0.2)
@@ -280,6 +283,7 @@ DEPENDENCIES
   chromedriver-helper
   coffee-rails (~> 4.1.0)
   coveralls
+  generator_spec
   jbuilder (~> 2.0)
   jquery-rails
   launchy

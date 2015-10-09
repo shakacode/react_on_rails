@@ -16,6 +16,7 @@ AllCops:
     - 'client/node_modules/**/*'
     - 'bin/**/*'
     - !ruby/regexp /old_and_unused\.rb$/
+    - 'spec/react_on_rails/dummy-for-generators/**/*'
 
 Metrics/LineLength:
   Max: 120
