@@ -18,7 +18,7 @@
         if (domNode) {
           var reactElement = createReactElement(componentName, propsVarName, props,
             domId, trace, generatorFunction);
-          React.render(reactElement, domNode);
+          provideProperReact().render(reactElement, domNode);
         }
       }
       catch (e) {
@@ -40,7 +40,7 @@
           document.removeEventListener("page:change", onPageChange);
           document.removeEventListener("page:before-unload", removePageChangeListener);
           var domNode = document.getElementById(domId);
-          React.unmountComponentAtNode(domNode);
+          provideProperReact().unmountComponentAtNode(domNode);
         };
         document.addEventListener("page:before-unload", removePageChangeListener);
 
@@ -65,7 +65,7 @@
     try {
       var reactElement = createReactElement(componentName, propsVarName, props,
         domId, trace, generatorFunction);
-      htmlResult = React.renderToString(reactElement);
+      htmlResult = provideProperReact().renderToString(reactElement);
     }
     catch (e) {
       htmlResult = handleError(e, componentName);
@@ -132,7 +132,7 @@
       '\nMessage: ' + e.message + '\n\n' + e.stack;
 
     var reactElement = React.createElement('pre', null, msg);
-    return React.renderToString(reactElement);
+    return provideProperReact().renderToString(reactElement);
   }
 
   ReactOnRails.buildConsoleReplay = function() {
@@ -150,4 +150,15 @@
 
     return consoleReplay;
   }
+
+  function provideProperReact() {
+    if (typeof ReactDOMServer === "undefined") { //not on server
+      if (typeof ReactDOM === "undefined") { //not on 0.14
+        return React;
+      }
+      return ReactDOM;
+    }
+    return ReactDOMServer;
+  }
+
 }.call(this));
