@@ -18,7 +18,7 @@
         if (domNode) {
           var reactElement = createReactElement(componentName, propsVarName, props,
             domId, trace, generatorFunction);
-          React.render(reactElement, domNode);
+          provideClientReact().render(reactElement, domNode);
         }
       }
       catch (e) {
@@ -40,7 +40,7 @@
           document.removeEventListener("page:change", onPageChange);
           document.removeEventListener("page:before-unload", removePageChangeListener);
           var domNode = document.getElementById(domId);
-          React.unmountComponentAtNode(domNode);
+          provideClientReact().unmountComponentAtNode(domNode);
         };
         document.addEventListener("page:before-unload", removePageChangeListener);
 
@@ -65,7 +65,7 @@
     try {
       var reactElement = createReactElement(componentName, propsVarName, props,
         domId, trace, generatorFunction);
-      htmlResult = React.renderToString(reactElement);
+      htmlResult = provideServerReact().renderToString(reactElement);
     }
     catch (e) {
       htmlResult = handleError(e, componentName);
@@ -78,7 +78,7 @@
   function createReactElement(componentName, propsVarName, props, domId, trace, generatorFunction) {
     if (trace) {
       console.log('RENDERED ' + componentName + ' with data_variable ' +
-        propsVarName + ' to dom node with id: ' + domId);
+          propsVarName + ' to dom node with id: ' + domId);
     }
 
     if (generatorFunction) {
@@ -91,17 +91,17 @@
   // Passing either componentName or jsCode
   function handleError(e, componentName, jsCode) {
     var lineOne =
-      'ERROR: You specified the option generator_function (could be in your defaults) to be\n';
+        'ERROR: You specified the option generator_function (could be in your defaults) to be\n';
     var lastLine =
-      'A generator function takes a single arg of props and returns a ReactElement.';
+        'A generator function takes a single arg of props and returns a ReactElement.';
 
     console.error('Exception in rendering!');
 
     var msg = '';
     if (componentName) {
       var shouldBeGeneratorError = lineOne +
-        'false, but the React component \'' + componentName + '\' seems to be a generator function.\n' +
-        lastLine;
+          'false, but the React component \'' + componentName + '\' seems to be a generator function.\n' +
+          lastLine;
       var reMatchShouldBeGeneratorError = /Can't add property context, object is not extensible/;
       if (reMatchShouldBeGeneratorError.test(e.message)) {
         msg += shouldBeGeneratorError + '\n\n';
@@ -109,8 +109,8 @@
       }
 
       var shouldBeGeneratorError = lineOne +
-        'true, but the React component \'' + componentName + '\' is not a generator function.\n' +
-        lastLine;
+          'true, but the React component \'' + componentName + '\' is not a generator function.\n' +
+          lastLine;
       var reMatchShouldNotBeGeneratorError = /Cannot call a class as a function/;
       if (reMatchShouldNotBeGeneratorError.test(e.message)) {
         msg += shouldBeGeneratorError + '\n\n';
@@ -128,11 +128,11 @@
     console.error('message: ' + e.message);
     console.error('stack: ' + e.stack);
     msg += 'Exception in rendering!\n' +
-      (e.fileName ? '\nlocation: ' + e.fileName + ':' + e.lineNumber : '') +
-      '\nMessage: ' + e.message + '\n\n' + e.stack;
+        (e.fileName ? '\nlocation: ' + e.fileName + ':' + e.lineNumber : '') +
+        '\nMessage: ' + e.message + '\n\n' + e.stack;
 
     var reactElement = React.createElement('pre', null, msg);
-    return React.renderToString(reactElement);
+    return provideServerReact().renderToString(reactElement);
   }
 
   ReactOnRails.buildConsoleReplay = function() {
@@ -149,5 +149,20 @@
     }
 
     return consoleReplay;
+  }
+
+  function provideClientReact() {
+    if (ReactDOM) {
+      return ReactDOM;
+    }
+    return React;
+  }
+
+  function provideServerReact() {
+    if (ReactDOMServer) {
+      return ReactDOMServer
+    }
+
+    return React;
   }
 }.call(this));
