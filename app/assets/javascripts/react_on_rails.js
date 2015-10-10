@@ -18,7 +18,7 @@
         if (domNode) {
           var reactElement = createReactElement(componentName, propsVarName, props,
             domId, trace, generatorFunction);
-          ReactOnRails.provideClientReact().render(reactElement, domNode);
+          provideClientReact().render(reactElement, domNode);
         }
       }
       catch (e) {
@@ -40,7 +40,7 @@
           document.removeEventListener("page:change", onPageChange);
           document.removeEventListener("page:before-unload", removePageChangeListener);
           var domNode = document.getElementById(domId);
-          ReactOnRails.provideClientReact().unmountComponentAtNode(domNode);
+          provideClientReact().unmountComponentAtNode(domNode);
         };
         document.addEventListener("page:before-unload", removePageChangeListener);
 
@@ -65,7 +65,7 @@
     try {
       var reactElement = createReactElement(componentName, propsVarName, props,
         domId, trace, generatorFunction);
-      htmlResult = ReactOnRails.provideServerReact().renderToString(reactElement);
+      htmlResult = provideServerReact().renderToString(reactElement);
     }
     catch (e) {
       htmlResult = handleError(e, componentName);
@@ -132,7 +132,7 @@
         '\nMessage: ' + e.message + '\n\n' + e.stack;
 
     var reactElement = React.createElement('pre', null, msg);
-    return ReactOnRails.provideServerReact().renderToString(reactElement);
+    return provideServerReact().renderToString(reactElement);
   }
 
   ReactOnRails.buildConsoleReplay = function() {
@@ -152,15 +152,15 @@
   }
 
   function provideClientReact() {
-    if (window.ReactDOM) {
-      return window.ReactDOM;
+    if (ReactDOM) {
+      return ReactDOM;
     }
     return React;
   }
 
   function provideServerReact() {
-    if (window.ReactDOMServer) {
-      return window.ReactDOMServer
+    if (ReactDOMServer) {
+      return ReactDOMServer
     }
 
     return React;
