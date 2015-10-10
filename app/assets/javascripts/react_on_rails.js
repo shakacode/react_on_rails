@@ -1,79 +1,4 @@
 (function() {
-  function provideClientReact() {
-    if (window.ReactDOM) {
-      return window.ReactDOM;
-    }
-    return React;
-  }
-
-  function provideServerReact() {
-    if (window.ReactDOMServer) {
-      return window.ReactDOMServer
-    }
-
-    return React;
-  }
-
-  function createReactElement(componentName, propsVarName, props, domId, trace, generatorFunction) {
-    if (trace) {
-      console.log('RENDERED ' + componentName + ' with data_variable ' +
-          propsVarName + ' to dom node with id: ' + domId);
-    }
-
-    if (generatorFunction) {
-      return this[componentName](props);
-    } else {
-      return React.createElement(this[componentName], props);
-    }
-  }
-
-  // Passing either componentName or jsCode
-  function handleError(e, componentName, jsCode) {
-    var lineOne =
-        'ERROR: You specified the option generator_function (could be in your defaults) to be\n';
-    var lastLine =
-        'A generator function takes a single arg of props and returns a ReactElement.';
-
-    console.error('Exception in rendering!');
-
-    var msg = '';
-    if (componentName) {
-      var shouldBeGeneratorError = lineOne +
-          'false, but the React component \'' + componentName + '\' seems to be a generator function.\n' +
-          lastLine;
-      var reMatchShouldBeGeneratorError = /Can't add property context, object is not extensible/;
-      if (reMatchShouldBeGeneratorError.test(e.message)) {
-        msg += shouldBeGeneratorError + '\n\n';
-        console.error(shouldBeGeneratorError);
-      }
-
-      var shouldBeGeneratorError = lineOne +
-          'true, but the React component \'' + componentName + '\' is not a generator function.\n' +
-          lastLine;
-      var reMatchShouldNotBeGeneratorError = /Cannot call a class as a function/;
-      if (reMatchShouldNotBeGeneratorError.test(e.message)) {
-        msg += shouldBeGeneratorError + '\n\n';
-        console.error(shouldBeGeneratorError);
-      }
-    }
-
-    if (jsCode) {
-      console.error('JS code was: ' + jsCode);
-    }
-
-    if (e.fileName) {
-      console.error('location: ' + e.fileName + ':' + e.lineNumber);
-    }
-    console.error('message: ' + e.message);
-    console.error('stack: ' + e.stack);
-    msg += 'Exception in rendering!\n' +
-        (e.fileName ? '\nlocation: ' + e.fileName + ':' + e.lineNumber : '') +
-        '\nMessage: ' + e.message + '\n\n' + e.stack;
-
-    var reactElement = React.createElement('pre', null, msg);
-    return ReactOnRails.provideServerReact().renderToString(reactElement);
-  }
-
   this.ReactOnRails = {};
 
   ReactOnRails.clientRenderReactComponent = function(options) {
@@ -150,6 +75,66 @@
     return JSON.stringify([htmlResult, consoleReplay]);
   };
 
+  function createReactElement(componentName, propsVarName, props, domId, trace, generatorFunction) {
+    if (trace) {
+      console.log('RENDERED ' + componentName + ' with data_variable ' +
+          propsVarName + ' to dom node with id: ' + domId);
+    }
+
+    if (generatorFunction) {
+      return this[componentName](props);
+    } else {
+      return React.createElement(this[componentName], props);
+    }
+  }
+
+  // Passing either componentName or jsCode
+  function handleError(e, componentName, jsCode) {
+    var lineOne =
+        'ERROR: You specified the option generator_function (could be in your defaults) to be\n';
+    var lastLine =
+        'A generator function takes a single arg of props and returns a ReactElement.';
+
+    console.error('Exception in rendering!');
+
+    var msg = '';
+    if (componentName) {
+      var shouldBeGeneratorError = lineOne +
+          'false, but the React component \'' + componentName + '\' seems to be a generator function.\n' +
+          lastLine;
+      var reMatchShouldBeGeneratorError = /Can't add property context, object is not extensible/;
+      if (reMatchShouldBeGeneratorError.test(e.message)) {
+        msg += shouldBeGeneratorError + '\n\n';
+        console.error(shouldBeGeneratorError);
+      }
+
+      var shouldBeGeneratorError = lineOne +
+          'true, but the React component \'' + componentName + '\' is not a generator function.\n' +
+          lastLine;
+      var reMatchShouldNotBeGeneratorError = /Cannot call a class as a function/;
+      if (reMatchShouldNotBeGeneratorError.test(e.message)) {
+        msg += shouldBeGeneratorError + '\n\n';
+        console.error(shouldBeGeneratorError);
+      }
+    }
+
+    if (jsCode) {
+      console.error('JS code was: ' + jsCode);
+    }
+
+    if (e.fileName) {
+      console.error('location: ' + e.fileName + ':' + e.lineNumber);
+    }
+    console.error('message: ' + e.message);
+    console.error('stack: ' + e.stack);
+    msg += 'Exception in rendering!\n' +
+        (e.fileName ? '\nlocation: ' + e.fileName + ':' + e.lineNumber : '') +
+        '\nMessage: ' + e.message + '\n\n' + e.stack;
+
+    var reactElement = React.createElement('pre', null, msg);
+    return ReactOnRails.provideServerReact().renderToString(reactElement);
+  }
+
   ReactOnRails.buildConsoleReplay = function() {
     var consoleReplay = '';
 
@@ -164,5 +149,20 @@
     }
 
     return consoleReplay;
+  }
+
+  function provideClientReact() {
+    if (window.ReactDOM) {
+      return window.ReactDOM;
+    }
+    return React;
+  }
+
+  function provideServerReact() {
+    if (window.ReactDOMServer) {
+      return window.ReactDOMServer
+    }
+
+    return React;
   }
 }.call(this));
