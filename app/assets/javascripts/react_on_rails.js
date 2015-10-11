@@ -18,11 +18,11 @@
         if (domNode) {
           var reactElement = createReactElement(componentName, propsVarName, props,
             domId, trace, generatorFunction);
-          React.render(reactElement, domNode);
+          provideClientReact().render(reactElement, domNode);
         }
       }
       catch (e) {
-        handleError(e, componentName);
+        handleError(e, componentName, provideClientReact());
       }
     };
 
@@ -40,7 +40,7 @@
           document.removeEventListener("page:change", onPageChange);
           document.removeEventListener("page:before-unload", removePageChangeListener);
           var domNode = document.getElementById(domId);
-          React.unmountComponentAtNode(domNode);
+          provideClientReact().unmountComponentAtNode(domNode);
         };
         document.addEventListener("page:before-unload", removePageChangeListener);
 
@@ -65,10 +65,10 @@
     try {
       var reactElement = createReactElement(componentName, propsVarName, props,
         domId, trace, generatorFunction);
-      htmlResult = React.renderToString(reactElement);
+      htmlResult = provideServerReact().renderToString(reactElement);
     }
     catch (e) {
-      htmlResult = handleError(e, componentName);
+      htmlResult = handleError(e, componentName, provideServerReact());
     }
 
     consoleReplay = ReactOnRails.buildConsoleReplay();
@@ -89,7 +89,7 @@
   }
 
   // Passing either componentName or jsCode
-  function handleError(e, componentName, jsCode) {
+  function handleError(e, componentName, jsCode, properReact) {
     var lineOne =
       'ERROR: You specified the option generator_function (could be in your defaults) to be\n';
     var lastLine =
@@ -132,7 +132,8 @@
       '\nMessage: ' + e.message + '\n\n' + e.stack;
 
     var reactElement = React.createElement('pre', null, msg);
-    return React.renderToString(reactElement);
+
+    return properReact.renderToString(reactElement);
   }
 
   ReactOnRails.buildConsoleReplay = function() {
@@ -150,4 +151,19 @@
 
     return consoleReplay;
   }
+
+  function provideClientReact() {
+    if (typeof ReactDOM === "undefined") {
+      return React;
+    }
+    return ReactDOM;
+  }
+
+  function provideServerReact() {
+    if (typeof ReactDOMServer === "undefined") {
+      return React;
+    }
+    return ReactDOMServer;
+  }
+
 }.call(this));
