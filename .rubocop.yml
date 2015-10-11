@@ -37,12 +37,16 @@ Lint/HandleExceptions:
 
 # Offense count: 1
 Metrics/AbcSize:
-  Max: 18
+  Max: 23
 
 # Offense count: 1
 # Configuration parameters: CountComments.
 Metrics/ClassLength:
   Max: 114
+
+Metrics/ParameterLists:
+  Max: 5
+  CountKeywordArgs: false
 
 # Offense count: 9
 # Configuration parameters: CountComments.
@@ -52,7 +56,7 @@ Metrics/MethodLength:
 # Offense count: 1
 # Configuration parameters: CountComments.
 Metrics/ModuleLength:
-  Max: 119
+  Max: 110
 
 # Offense count: 3
 # Configuration parameters: AllowedVariables.

@@ -6,6 +6,7 @@ import { combineReducers } from 'redux';
 import { applyMiddleware } from 'redux';
 import { createStore } from 'redux';
 import { Provider } from 'react-redux';
+import Common from '../utils/Common';
 import middleware from 'redux-thunk';
 
 import reducers from '../reducers/reducersIndex';
@@ -21,11 +22,20 @@ const ReduxApp = props => {
   const combinedReducer = combineReducers(reducers);
   const store = applyMiddleware(middleware)(createStore)(combinedReducer, props);
 
-  const reactComponent = (
-    <Provider store={store}>
+  let reactComponent;
+  if (Common.react013()) {
+    reactComponent = (
+      <Provider store={store}>
       {() => <HelloWorldContainer />}
-    </Provider>
-  );
+      </Provider>
+    );
+  } else {
+    reactComponent = (
+      <Provider store={store}>
+        <HelloWorldContainer />
+      </Provider>
+    );
+  }
   return reactComponent;
 };
 
