@@ -22,7 +22,7 @@
         }
       }
       catch (e) {
-        handleError(e, componentName, false);
+        handleError(e, componentName, provideClientReact());
       }
     };
 
@@ -68,7 +68,7 @@
       htmlResult = provideServerReact().renderToString(reactElement);
     }
     catch (e) {
-      htmlResult = handleError(e, componentName, true);
+      htmlResult = handleError(e, componentName, provideServerReact());
     }
 
     consoleReplay = ReactOnRails.buildConsoleReplay();
@@ -89,7 +89,7 @@
   }
 
   // Passing either componentName or jsCode
-  function handleError(e, componentName, jsCode, onServer) {
+  function handleError(e, componentName, jsCode, properReact) {
     var lineOne =
       'ERROR: You specified the option generator_function (could be in your defaults) to be\n';
     var lastLine =
@@ -132,10 +132,8 @@
       '\nMessage: ' + e.message + '\n\n' + e.stack;
 
     var reactElement = React.createElement('pre', null, msg);
-    if (onServer) {
-      return provideServerReact().renderToString(reactElement);
-    }
-    return provideClientReact().renderToString(reactElement);
+
+    return properReact.renderToString(reactElement);
   }
 
   ReactOnRails.buildConsoleReplay = function() {
