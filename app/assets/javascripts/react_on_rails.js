@@ -18,11 +18,11 @@
         if (domNode) {
           var reactElement = createReactElement(componentName, propsVarName, props,
             domId, trace, generatorFunction);
-          provideProperReact().render(reactElement, domNode);
+          provideClientReact().render(reactElement, domNode);
         }
       }
       catch (e) {
-        handleError(e, componentName);
+        handleError(e, componentName, false);
       }
     };
 
@@ -40,7 +40,7 @@
           document.removeEventListener("page:change", onPageChange);
           document.removeEventListener("page:before-unload", removePageChangeListener);
           var domNode = document.getElementById(domId);
-          provideProperReact().unmountComponentAtNode(domNode);
+          provideClientReact().unmountComponentAtNode(domNode);
         };
         document.addEventListener("page:before-unload", removePageChangeListener);
 
@@ -65,10 +65,10 @@
     try {
       var reactElement = createReactElement(componentName, propsVarName, props,
         domId, trace, generatorFunction);
-      htmlResult = provideProperReact().renderToString(reactElement);
+      htmlResult = provideServerReact().renderToString(reactElement);
     }
     catch (e) {
-      htmlResult = handleError(e, componentName);
+      htmlResult = handleError(e, componentName, true);
     }
 
     consoleReplay = ReactOnRails.buildConsoleReplay();
@@ -89,7 +89,7 @@
   }
 
   // Passing either componentName or jsCode
-  function handleError(e, componentName, jsCode) {
+  function handleError(e, componentName, jsCode, onServer) {
     var lineOne =
       'ERROR: You specified the option generator_function (could be in your defaults) to be\n';
     var lastLine =
@@ -132,7 +132,10 @@
       '\nMessage: ' + e.message + '\n\n' + e.stack;
 
     var reactElement = React.createElement('pre', null, msg);
-    return provideProperReact().renderToString(reactElement);
+    if (onServer) {
+      return provideServerReact().renderToString(reactElement);
+    }
+    return provideClientReact().renderToString(reactElement);
   }
 
   ReactOnRails.buildConsoleReplay = function() {
@@ -151,12 +154,16 @@
     return consoleReplay;
   }
 
-  function provideProperReact() {
-    if (typeof ReactDOMServer === "undefined") { //not on server
-      if (typeof ReactDOM === "undefined") { //not on 0.14
-        return React;
-      }
-      return ReactDOM;
+  function provideClientReact() {
+    if (typeof ReactDOM === "undefined") {
+      return React;
+    }
+    return ReactDOM;
+  }
+
+  function provideServerReact() {
+    if (typeof ReactDOMServer === "undefined") {
+      return React;
     }
     return ReactDOMServer;
   }
