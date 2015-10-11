@@ -53,7 +53,7 @@ module ReactOnRailsHelper
     data_variable_name = "__#{component_name.camelize(:lower)}Data#{react_component_index}__"
     turbolinks_loaded = Object.const_defined?(:Turbolinks)
     # NOTE: props might include closing script tag that might cause XSS
-    props_string = props.is_a?(String) ? props : props.to_json
+    props_string = sanitized_props_string(props)
     page_loaded_js = <<-JS
 (function() {
   window.#{data_variable_name} = #{props_string};
@@ -89,8 +89,16 @@ module ReactOnRailsHelper
     <<-HTML.html_safe
 #{data_from_server_script_tag}
 #{rendered_output}
-#{replay_console(options) ? console_script : ""}
+#{replay_console(options) ? console_script : ''}
     HTML
+  end
+
+  def sanitized_props_string(props)
+    props_string = props.is_a?(String) ? props : props.to_json
+    # Need to find something like this:
+    # ActiveSupport::JSON.encode(props_string)
+    # Next PR
+    props_string
   end
 
   # Helper method to take javascript expression and returns the output from evaluating it.
@@ -108,7 +116,8 @@ module ReactOnRailsHelper
         return #{js_expression};
       })();
   } catch(e) {
-    htmlResult = handleError(e, null, '#{escape_javascript(js_expression)}');
+    htmlResult = ReactOnRails.handleError({e: e, componentName: null,
+      jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
   }
 
   consoleReplay = ReactOnRails.buildConsoleReplay();
@@ -117,7 +126,12 @@ module ReactOnRailsHelper
     JS
 
     result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
-    "#{result[0]}\n#{result[1]}".html_safe
+
+    # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
+    <<-HTML.html_safe
+    #{result[0]}
+    #{replay_console(options) ? result[1] : ''}
+    HTML
   end
 
   private

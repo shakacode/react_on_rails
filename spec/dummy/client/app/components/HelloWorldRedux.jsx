@@ -1,4 +1,5 @@
 import React, { PropTypes } from 'react';
+import Common from '../utils/Common';
 
 // Super simple example of the simplest possible React component
 export default class HelloWorldRedux extends React.Component {
@@ -16,7 +17,7 @@ export default class HelloWorldRedux extends React.Component {
   }
 
   _handleChange() {
-    const name = React.findDOMNode(this.refs.name).value;
+    const name = Common.reactFindDOMNode(this.refs.name).value;
     this.props.updateName(name);
   }
 

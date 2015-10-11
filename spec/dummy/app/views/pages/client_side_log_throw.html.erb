@@ -1,0 +1,18 @@
+<%= render "header" %>
+
+<%= react_component("HelloWorldWithLogAndThrow", @app_props_server_render, prerender: false, trace: true, generator_function: false) %>
+<hr/>
+
+<h1>React Rails Client Rendering</h1>
+<p>
+  This example demonstrates client side logging and error handling.<br/>
+  Open up your browser console and see the messages.<br/>
+  <br/>
+  Here's the JS code in from spec/dummy/client/app/components/HelloWorldWithLogAndThrow.jsx:15<br/>
+  <pre>
+    console.log("console.log in HelloWorld")
+    console.warn("console.warn in HelloWorld")
+    console.error("console.error in HelloWorld");
+    throw new Error("throw in HelloWorldContainer");
+  </pre>
+</p>

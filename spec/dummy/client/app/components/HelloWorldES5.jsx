@@ -1,14 +1,18 @@
 import React from 'react';
+import Common from '../utils/Common';
 
 // Super simple example of React component using React.createClass
 const HelloWorldES5 = React.createClass({
+  propTypes: {
+    helloWorldData: React.PropTypes.object,
+  },
 
   getInitialState() {
     return this.props.helloWorldData;
   },
 
   _handleChange() {
-    const name = React.findDOMNode(this.refs.name).value;
+    const name = Common.reactFindDOMNode(this.refs.name).value;
     this.setState({name});
   },
 

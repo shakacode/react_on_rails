@@ -3,6 +3,7 @@ const path = require('path');
 module.exports = {
   entry: [
     'startup/clientGlobals',
+    'react-dom'
   ],
   output: {
     path: '../app/assets/javascripts/generated',
@@ -18,6 +19,7 @@ module.exports = {
 
       // React is necessary for the client rendering:
       { test: require.resolve('react'), loader: 'expose?React' },
+      { test: require.resolve('react-dom'), loader: 'expose?ReactDOM' },
     ],
   },
 };
