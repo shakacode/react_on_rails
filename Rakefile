@@ -54,39 +54,33 @@ desc "Runs all linters. Run `rake -D lint` to see all available lint options"
 task lint: ["lint:lint"]
 
 namespace :docker do
-  def docker_sh(cmd)
-    docker_init = "eval \"$(docker-machine env default)\";"
-    sh "#{docker_init} #{cmd}"
-  end
-
   desc "Run Rubocop linter from docker"
   task :rubocop do
-    docker_sh "#{docker_init} docker-compose run lint rake lint:rubocop"
+    sh "docker-compose run lint rake lint:rubocop"
   end
 
   desc "Run ruby-lint linter from docker"
   task :ruby do
-    docker_sh "docker-compose run lint rake lint:ruby"
+    sh "docker-compose run lint rake lint:ruby"
   end
 
   desc "Run scss-lint linter from docker"
   task :scss do
-    docker_sh "docker-compose run lint rake lint:scss"
+    sh "docker-compose run lint rake lint:scss"
   end
 
   desc "Run eslint linter from docker"
   task :eslint do
-    docker_sh "docker-compose run lint rake lint:eslint"
+    sh "docker-compose run lint rake lint:eslint"
   end
 
   desc "Run jscs linter from docker"
   task :jscs do
-    docker_sh "docker-compose run lint rake lint:jscs"
+    sh "docker-compose run lint rake lint:jscs"
   end
-
   desc "Run all linting from docker"
   task :lint do
-    docker_sh "docker-compose run lint rake lint"
+    sh "docker-compose run lint rake lint"
   end
 end
 
