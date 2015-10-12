@@ -63,11 +63,19 @@ RSpec.configure do |config|
       Capybara::Selenium::Driver.new(app, browser: :chrome)
     end
     Capybara.javascript_driver = :selenium_chrome
+
+    Capybara::Screenshot.register_driver(:selenium_chrome) do |js_driver, path|
+      js_driver.browser.save_screenshot(path)
+    end
   else
     Capybara.register_driver :selenium_firefox do |app|
       Capybara::Selenium::Driver.new(app, browser: :firefox)
     end
     Capybara.javascript_driver = :selenium_firefox
+
+    Capybara::Screenshot.register_driver(:selenium_firefox) do |js_driver, path|
+      js_driver.browser.save_screenshot(path)
+    end
   end
 
   puts "Capybara using driver: #{Capybara.javascript_driver}"

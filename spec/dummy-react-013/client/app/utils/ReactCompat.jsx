@@ -1,17 +1,16 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
 
-const Common = {
+const ReactCompat = {
   react013() {
     return React.version.match(/^0\.13/);
   },
 
   reactFindDOMNode() {
     if (this.react013()) {
-      return React.FindDOMNode;
+      return React.findDOMNode;
     }
-    return ReactDOM.findDOMNode;
+    throw new Error("Not React 0.13!");
   },
 };
 
-export default Common;
+export default ReactCompat;
