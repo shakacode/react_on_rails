@@ -1,4 +1,5 @@
 import React from 'react';
+import Common from '../utils/Common';
 
 // Super simple example of the simplest possible React component
 class HelloWorld extends React.Component {
@@ -10,12 +11,12 @@ class HelloWorld extends React.Component {
   }
 
   _handleChange() {
-    const name = React.findDOMNode(this.refs.name).value;
+    const name = Common.reactFindDOMNode(this.refs.name).value;
     this.setState({name});
   }
 
   render() {
-    console.log("HelloWorld demonstrating a call to console.log in spec/dummy/client/app/components/HelloWorld.jsx:18");
+    console.log('HelloWorld demonstrating a call to console.log in spec/dummy/client/app/components/HelloWorld.jsx:18');
 
     const { name } = this.state;
 

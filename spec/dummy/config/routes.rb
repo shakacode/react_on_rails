@@ -7,6 +7,7 @@ Rails.application.routes.draw do
 
   get "client_side_hello_world" => "pages#client_side_hello_world"
   get "server_side_hello_world" => "pages#server_side_hello_world"
+  get "client_side_log_throw" => "pages#client_side_log_throw"
   get "server_side_log_throw" => "pages#server_side_log_throw"
   get "server_side_hello_world_es5" => "pages#server_side_hello_world_es5"
   get "server_side_redux_app" => "pages#server_side_redux_app"

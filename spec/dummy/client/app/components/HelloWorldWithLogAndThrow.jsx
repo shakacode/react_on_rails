@@ -7,10 +7,10 @@ class HelloWorldWithLogAndThrow extends React.Component {
   }
 
   render() {
-    console.log("console.log in HelloWorld")
-    console.warn("console.warn in HelloWorld")
-    console.error("console.error in HelloWorld");
-    throw "throw in HelloWorldContainer";
+    console.log('console.log in HelloWorld');
+    console.warn('console.warn in HelloWorld');
+    console.error('console.error in HelloWorld');
+    throw new Error('throw in HelloWorldContainer');
   }
 }
 

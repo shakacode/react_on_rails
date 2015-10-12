@@ -13,6 +13,17 @@
     console.log("console.log in HelloWorld")
     console.warn("console.warn in HelloWorld")
     console.error("console.error in HelloWorld");
-    throw "throw in HelloWorldContainer";
+    throw new Error("throw in HelloWorldContainer");
   </pre>
 </p>
+
+<h2>Server render plain JS</h2>
+<p>Suppose you have some JavaScript that generates a string of HTML, but throws this error:</p>
+<pre>
+  <%%= server_render_js("(function() { var x = this.HelloString.world(); console.warn('ran console.warn on the server()'); throw new Error('Error thrown on server'); return x;})()") %>
+</pre>
+
+
+<pre>
+<%= server_render_js("(function() { var x = this.HelloString.world(); console.warn('ran console.warn on the server()'); throw new Error('Error thrown on server'); return x;})()") %>
+</pre>
