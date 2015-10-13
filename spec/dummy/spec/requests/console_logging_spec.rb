@@ -6,7 +6,8 @@ describe "Server Error Logging" do
     html_nodes = Nokogiri::HTML(response.body)
 
     expected = <<-JS
-console.log.apply(console, ["[SERVER] RENDERED HelloWorldWithLogAndThrow with data_variable __helloWorldWithLogAndThrowData0__ to dom node with id: HelloWorldWithLogAndThrow-react-component-0"]);
+console.log.apply(console, ["[SERVER] RENDERED HelloWorldWithLogAndThrow with data_variable \
+__helloWorldWithLogAndThrowData0__ to dom node with id: HelloWorldWithLogAndThrow-react-component-0"]);
 console.log.apply(console, ["[SERVER] console.log in HelloWorld"]);
 console.warn.apply(console, ["[SERVER] console.warn in HelloWorld"]);
 console.error.apply(console, ["[SERVER] console.error in HelloWorld"]);

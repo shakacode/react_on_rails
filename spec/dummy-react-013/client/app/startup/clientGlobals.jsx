@@ -1,4 +1,3 @@
-//import React from 'react';
 import HelloWorld from '../components/HelloWorld';
 import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 import HelloWorldES5 from '../components/HelloWorldES5';
@@ -11,4 +10,3 @@ window.HelloWorldWithLogAndThrow = HelloWorldWithLogAndThrow;
 window.HelloWorldES5 = HelloWorldES5;
 window.ReduxApp = ReduxApp;
 window.HelloWorldApp = HelloWorldApp;
-//window.React = React;

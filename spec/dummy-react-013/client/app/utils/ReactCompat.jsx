@@ -9,7 +9,8 @@ const ReactCompat = {
     if (this.react013()) {
       return React.findDOMNode;
     }
-    throw new Error("Not React 0.13!");
+
+    throw new Error('Not React 0.13!');
   },
 };
 

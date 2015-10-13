@@ -10,6 +10,7 @@ const ReactCompat = {
     if (this.react013()) {
       return React.findDOMNode;
     }
+
     return ReactDOM.findDOMNode;
   },
 };

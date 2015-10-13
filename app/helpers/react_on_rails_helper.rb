@@ -94,11 +94,7 @@ module ReactOnRailsHelper
   end
 
   def sanitized_props_string(props)
-    props_string = props.is_a?(String) ? props : props.to_json
-    # Need to find something like this:
-    # ActiveSupport::JSON.encode(props_string)
-    # Next PR
-    props_string
+    props.is_a?(String) ? json_escape(props) : props.to_json
   end
 
   # Helper method to take javascript expression and returns the output from evaluating it.

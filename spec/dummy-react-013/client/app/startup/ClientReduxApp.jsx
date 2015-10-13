@@ -36,6 +36,7 @@ const ReduxApp = props => {
       </Provider>
     );
   }
+
   return reactComponent;
 };
 

@@ -22,33 +22,38 @@
         }
       }
       catch (e) {
-        ReactOnRails.handleError({e: e, componentName: componentName,
-          serverSide: false});
+        ReactOnRails.handleError({
+          e: e,
+          componentName: componentName,
+          serverSide: false,
+        });
       }
     };
 
-    var turbolinksInstalled = typeof(Turbolinks) !== 'undefined';
+    var turbolinksInstalled = (typeof Turbolinks !== 'undefined');
     if (!expectTurboLinks || (!turbolinksInstalled && expectTurboLinks)) {
       if (expectTurboLinks) {
-        console.warn("WARNING: NO TurboLinks detected in JS, but it's in your Gemfile");
+        console.warn('WARNING: NO TurboLinks detected in JS, but it is in your Gemfile');
       }
-      document.addEventListener("DOMContentLoaded", function(event) {
+
+      document.addEventListener('DOMContentLoaded', function(event) {
         renderIfDomNodePresent();
       });
     } else {
       function onPageChange(event) {
         var removePageChangeListener = function() {
-          document.removeEventListener("page:change", onPageChange);
-          document.removeEventListener("page:before-unload", removePageChangeListener);
+          document.removeEventListener('page:change', onPageChange);
+          document.removeEventListener('page:before-unload', removePageChangeListener);
           var domNode = document.getElementById(domId);
           provideClientReact().unmountComponentAtNode(domNode);
         };
-        document.addEventListener("page:before-unload", removePageChangeListener);
+
+        document.addEventListener('page:before-unload', removePageChangeListener);
 
         renderIfDomNodePresent();
       }
 
-      document.addEventListener("page:change", onPageChange);
+      document.addEventListener('page:change', onPageChange);
     }
   };
 
@@ -69,8 +74,11 @@
       htmlResult = provideServerReact().renderToString(reactElement);
     }
     catch (e) {
-      htmlResult = ReactOnRails.handleError({e: e, componentName: componentName,
-        serverSide: true});
+      htmlResult = ReactOnRails.handleError({
+        e: e,
+        componentName: componentName,
+        serverSide: true,
+      });
     }
 
     consoleReplay = ReactOnRails.buildConsoleReplay();
@@ -119,6 +127,7 @@
     if (e.fileName) {
       console.error('location: ' + e.fileName + ':' + e.lineNumber);
     }
+
     console.error('message: ' + e.message);
     console.error('stack: ' + e.stack);
     if (serverSide) {
@@ -140,6 +149,7 @@
         consoleReplay += '\nconsole.' + msg.level + '.apply(console, ' +
           JSON.stringify(msg.arguments) + ');';
       });
+
       consoleReplay += '\n</script>';
     }
 
@@ -160,16 +170,18 @@
   }
 
   function provideClientReact() {
-    if (typeof ReactDOM === "undefined") {
+    if (typeof ReactDOM === 'undefined') {
       return React;
     }
+
     return ReactDOM;
   }
 
   function provideServerReact() {
-    if (typeof ReactDOMServer === "undefined") {
+    if (typeof ReactDOMServer === 'undefined') {
       return React;
     }
+
     return ReactDOMServer;
   }
 }.call(this));

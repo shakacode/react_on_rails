@@ -14,7 +14,6 @@ import HelloWorldApp from './HelloWorldApp';
 // Example of React + Redux
 import ReduxApp from './ServerReduxApp';
 
-
 // We can use the node global object for exposing.
 // NodeJs: https://nodejs.org/api/globals.html#globals_global
 global.HelloString = HelloString;
