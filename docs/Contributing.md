@@ -4,8 +4,8 @@
 
 ### Checklist before Committing
 1. `rake ci`: runs all linters and specs (you need Docker setup, see below)
-2. 
-
+2. Did you need any more tests for your change?
+3. Did you document your change? Update the README.md?
 
 ### Initial Setup
 After checking out the repo, making sure you have rvm and nvm setup (setup ruby and node), 
