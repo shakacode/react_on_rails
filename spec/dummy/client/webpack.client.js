@@ -3,7 +3,7 @@ const path = require('path');
 module.exports = {
   entry: [
     'startup/clientGlobals',
-    'react-dom'
+    'react-dom',
   ],
   output: {
     path: '../app/assets/javascripts/generated',

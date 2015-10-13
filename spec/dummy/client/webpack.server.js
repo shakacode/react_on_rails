@@ -4,7 +4,7 @@ module.exports = {
   context: __dirname,
   entry: [
     'startup/serverGlobals',
-    'react-dom/server'
+    'react-dom/server',
   ],
   output: {
     path: '../app/assets/javascripts/generated',

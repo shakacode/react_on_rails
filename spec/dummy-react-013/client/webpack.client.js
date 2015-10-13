@@ -3,7 +3,7 @@ const path = require('path');
 module.exports = {
   entry: [
     'startup/clientGlobals',
-    'react'
+    'react',
   ],
   output: {
     path: '../app/assets/javascripts/generated',
@@ -18,7 +18,7 @@ module.exports = {
       { loader: 'babel-loader' },
 
       // React is necessary for the client rendering:
-      { test: require.resolve('react'), loader: 'expose?React' }
+      { test: require.resolve('react'), loader: 'expose?React' },
     ],
   },
 };

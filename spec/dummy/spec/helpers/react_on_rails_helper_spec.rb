@@ -2,21 +2,22 @@ require "rails_helper"
 
 describe ReactOnRailsHelper, type: :helper do
   describe "#sanitized_props_string(props)" do
-    let(:hash) {
+    let(:hash) do
       {
-        :hello => "world",
-        :free => "of charge",
-        :x => "</script><script>alert('foo')</script>"
+        hello: "world",
+        free: "of charge",
+        x: "</script><script>alert('foo')</script>"
       }
-    }
+    end
 
-    let(:hash_sanitized) {
-      "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"\\u003c/script\\u003e\\u003cscript\\u003ealert('foo')\\u003c/script\\u003e\"}"
-    }
+    let(:hash_sanitized) do
+      "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"\\u003c/script\\u003e\\u003cscrip"\
+      "t\\u003ealert('foo')\\u003c/script\\u003e\"}"
+    end
 
-    let(:hash_unsanitized) {
+    let(:hash_unsanitized) do
       "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"</script><script>alert('foo')</script>\"}"
-    }
+    end
 
     it "converts a hash to JSON and escapes </script>" do
       sanitized = helper.sanitized_props_string(hash)

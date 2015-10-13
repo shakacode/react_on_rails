@@ -6,8 +6,9 @@
 Gem Published: https://rubygems.org/gems/react_on_rails
 
 Live example, including server rendering + redux: http://www.reactrails.com/
+Sponsored by [ShakaCode.com](http://www.shakacode.com/)
 
-See [Action Plan for v1.0](https://github.com/shakacode/react_on_rails/issues/1). We're probably feature complete and ready for v1.0.
+See [Action Plan for v1.0](https://github.com/shakacode/react_on_rails/issues/1). We're ready v1.0.
 
 Feedback and pull-requests encouraged! Thanks in advance! We've got a private slack channel to discuss react + webpack + rails. [Email us for an invite contact@shakacode.com](mailto: contact@shakacode.com).
 
@@ -15,7 +16,7 @@ Supports:
 
 1. Rails
 2. Webpack
-3. React
+3. React, both v0.14 and v0.13.
 4. Redux
 5. Turbolinks
 6. Server side rendering with fragment caching
@@ -23,14 +24,14 @@ Supports:
 
 ## OPEN ISSUES
 1. Almost all the open issues are nice to haves like more tests.
-3. If you want to work on any of the open issues, please comment on the issue. My team is mentoring anybody that's trying to help with the issues.
-4. Longer term, we hope to put in many conveniences into this gem, in terms of Webpack + Rails integration. We're open to suggestions.
+2. If you want to work on any of the open issues, please comment on the issue. My team is mentoring anybody that's trying to help with the issues.
+3. Longer term, we hope to put in many conveniences into this gem, in terms of Webpack + Rails integration. We're open to suggestions.
 
 ## Links
 1. See https://github.com/shakacode/react-webpack-rails-tutorial/ for how to integrate it!
 2. http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/
 3. http://forum.shakacode.com
-4. Interested in consulting for a project using React and Rails, [email us! contact@shakacode.com](mailto: contact@shakacode.com)? You can first join our slack room for some free advice.
+4. If you're looking for consulting on a project using React and Rails, [email us! contact@shakacode.com](mailto: contact@shakacode.com)? You can first join our slack room for some free advice.
 5. We're looking for great developers that want to work with Rails + React with a distributed, worldwide team, for our own
 products, client work, and open source. [More info here](http://www.shakacode.com/about/index.html#work-with-us).
 
@@ -121,7 +122,8 @@ module.exports = {
       {test: /\.jsx?$/, loader: 'babel-loader', exclude: /node_modules/},
 
       // React is necessary for the client rendering:
-      {test: require.resolve('react'), loader: 'expose?React'},
+      { test: require.resolve('react'), loader: 'expose?React' },
+      { test: require.resolve('react-dom/server'), loader: 'expose?ReactDOMServer' },
     ],
   },
 };
@@ -313,81 +315,24 @@ gem "therubyracer"
 * [Charlie Marsh's article "Rendering React Components on the Server"](http://www.crmarsh.com/react-ssr/)
 * [Node globals](https://nodejs.org/api/globals.html#globals_global)
 
-
-## Development Setup for Gem Contributors
-
-### Initial Setup
-After checking out the repo, making sure you have rvm and nvm setup (setup ruby and node), 
-cd to `spec/dummy` and run `bin/setup` to install dependencies.  
-You can also run `bin/console` for an interactive prompt that will allow you to experiment. 
-
-### Starting the Dummy App
-To run the test app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. 
-If you don't do this, then `webpack` will not generate a new bundle, 
-and you will be seriously confused when you change JavaScript and the app does not change. 
-
-### Install and Release
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, 
-update the version number in `version.rb`, and then run `bundle exec rake release`, 
-which will create a git tag for the version, push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
-
-### RSpec Testing
-Run `rake` for testing the gem and `spec/dummy`. Otherwise, the `rspec` command only works for testing within `spec/dummy`.
-
-If you run `rspec` at the top level, you'll see this message: `require': cannot load such file -- rails_helper (LoadError)`
-
-### Debugging
-Start the sample app like this for some debug printing:
-```bash
-TRACE_REACT_ON_RAILS=true && foreman start
-```
-
 ### Generated JavaScript
 
 1. See spec/dummy/spec/sample_generated_js/server-generated.js to see the JavaScript for typical server rendering.
 2. See spec/dummy/spec/sample_generated_js/client-generated.js to see the JavaScript for typical client rendering.
 
-### Linting
-All linting is performed from the docker container. You will need docker and docker-compose installed
-locally to lint code changes via the lint container. 
-
-* [Install Docker Toolbox for Mac](https://www.docker.com/toolbox)
-* [Install Docker Compose for Linux](https://docs.docker.com/compose/install/)
-
-Once you have docker and docker-compose running locally, run `docker-compose build lint`. This will build
-the `reactonrails_lint` docker image and docker-compose `lint` container. The inital build is slow,
-but after the install, startup is very quick.
-
-### Linting Commands
-Run `rake -D docker` to see all docker linting commands for rake. `rake docker` will run all linters.
-For individual rake linting commands please refer to `rake -D docker` for the list.
-You can run specfic linting for directories or files by using `docker-compose run lint rubocop (file path or directory)`, etc.
-`docker-compose run lint /bin/bash` sets you up to run from the container command line. 
-
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/shakacode/react_on_rails. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](contributor-covenant.org) code of conduct.
+
+More [tips on contributing here](docs/Contributing.md)
 
 ## License
 
 The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
 
-## Updating New Versions of the Gem
-
-See https://github.com/svenfuchs/gem-release
-
-```bash
-gem bump
-cd spec/dummy
-bundle
-git commit -am "Updated Gemfile.lock"
-cd ../..
-gem tag
-gem release
-```
-
 # Authors
-The Shaka Code team!
+
+[The Shaka Code team!](http://www.shakacode.com/about/)
 
 1. [Justin Gordon](https://github.com/justin808/)
 2. [Samnang Chhun](https://github.com/samnang)

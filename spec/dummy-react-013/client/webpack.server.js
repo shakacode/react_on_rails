@@ -3,7 +3,7 @@ const path = require('path');
 module.exports = {
   context: __dirname,
   entry: [
-    'startup/serverGlobals'
+    'startup/serverGlobals',
   ],
   output: {
     path: '../app/assets/javascripts/generated',
@@ -25,7 +25,7 @@ module.exports = {
 
       // require Resolve must go first
       // 1. React must be exposed (BOILERPLATE)
-      { test: require.resolve('react'), loader: 'expose?React' }
+      { test: require.resolve('react'), loader: 'expose?React' },
 
       // 2. See client/app/startup/serverGlobals.jsx and client/apps/startup/clientGlobals.jsx
       // for configuration of how to expose your components for both server and client rendering.

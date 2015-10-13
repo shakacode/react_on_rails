@@ -48,13 +48,15 @@ namespace :lint do
 
   desc "Run jscs from shell"
   task :jscs do
-    sh "jscs -e ."
+    sh "jscs -e -v ."
   end
 
-  task lint: [:eslint, :rubocop, :ruby, :jscs, :scss] do
+  desc "Run all eslint, jscs, rubocop linters. Skip ruby-lint and scss"
+  task lint: [:eslint, :jscs, :rubocop] do
     puts "Completed all linting"
   end
 end
+
 desc "Runs all linters. Run `rake -D lint` to see all available lint options"
 task lint: ["lint:lint"]
 
@@ -91,3 +93,6 @@ end
 
 desc "Runs all linters from docker. Run `rake -D docker` to see all available lint options"
 task docker: ["docker:lint"]
+
+desc "Run all tests and linting"
+task ci: %w(docker run_rspec)
