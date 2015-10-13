@@ -3,10 +3,12 @@
 [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails)
 # React On Rails
 
-Gem Published: https://rubygems.org/gems/react_on_rails
-Current Version: 1.0.0.pre
+**Gem Published:** https://rubygems.org/gems/react_on_rails
 
-Live example, including server rendering + redux: http://www.reactrails.com/
+**Current Version:** 1.0.0.pre
+
+**Live example, including server rendering + redux:** http://www.reactrails.com/
+
 Sponsored by [ShakaCode.com](http://www.shakacode.com/)
 
 See [Action Plan for v1.0](https://github.com/shakacode/react_on_rails/issues/1). We're ready v1.0!
