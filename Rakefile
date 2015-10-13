@@ -1,4 +1,5 @@
 require "fileutils"
+require 'coveralls/rake/task'
 
 namespace :run_rspec do
   desc "Run RSpec for top level only"
@@ -8,15 +9,17 @@ namespace :run_rspec do
 
   desc "Run RSpec for spec/dummy only"
   task :dummy do
-    sh %( cd spec/dummy && rspec )
+    sh %( cd spec/dummy && DRIVER=selenium_firefox rspec )
   end
 
   desc "Run RSpec for spec/dummy only"
   task :dummy_react_013 do
-    sh %( cd spec/dummy-react-013 && rspec )
+    sh %( cd spec/dummy-react-013 && DRIVER=selenium_firefox rspec )
   end
 
-  task run_rspec: [:gem, :dummy, :dummy_react_013] do
+  Coveralls::RakeTask.new
+
+  task run_rspec: [:gem, :dummy, :dummy_react_013, "coveralls:push"] do
     puts "Completed all RSpec tests"
   end
 end
