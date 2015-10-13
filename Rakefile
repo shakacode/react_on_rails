@@ -3,7 +3,7 @@ require "fileutils"
 namespace :run_rspec do
   desc "Run RSpec for top level only"
   task :gem do
-    sh %( rspec --exclude-pattern "spec/dummy/**/*_spec.rb" spec )
+    sh %( rspec spec/react_on_rails_spec.rb )
   end
 
   desc "Run RSpec for spec/dummy only"
@@ -11,7 +11,12 @@ namespace :run_rspec do
     sh %( cd spec/dummy && rspec )
   end
 
-  task run_rspec: [:gem, :dummy] do
+  desc "Run RSpec for spec/dummy only"
+  task :dummy_react_013 do
+    sh %( cd spec/dummy-react-013 && rspec )
+  end
+
+  task run_rspec: [:gem, :dummy, :dummy_react_013] do
     puts "Completed all RSpec tests"
   end
 end

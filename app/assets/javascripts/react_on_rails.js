@@ -22,7 +22,8 @@
         }
       }
       catch (e) {
-        handleError(e, componentName, provideClientReact());
+        ReactOnRails.handleError({e: e, componentName: componentName,
+          serverSide: false});
       }
     };
 
@@ -68,28 +69,21 @@
       htmlResult = provideServerReact().renderToString(reactElement);
     }
     catch (e) {
-      htmlResult = handleError(e, componentName, provideServerReact());
+      htmlResult = ReactOnRails.handleError({e: e, componentName: componentName,
+        serverSide: true});
     }
 
     consoleReplay = ReactOnRails.buildConsoleReplay();
     return JSON.stringify([htmlResult, consoleReplay]);
   };
 
-  function createReactElement(componentName, propsVarName, props, domId, trace, generatorFunction) {
-    if (trace) {
-      console.log('RENDERED ' + componentName + ' with data_variable ' +
-        propsVarName + ' to dom node with id: ' + domId);
-    }
-
-    if (generatorFunction) {
-      return this[componentName](props);
-    } else {
-      return React.createElement(this[componentName], props);
-    }
-  }
-
   // Passing either componentName or jsCode
-  function handleError(e, componentName, jsCode, properReact) {
+  ReactOnRails.handleError = function(options) {
+    var e = options.e;
+    var componentName = options.componentName;
+    var jsCode = options.jsCode;
+    var serverSide = options.serverSide;
+
     var lineOne =
       'ERROR: You specified the option generator_function (could be in your defaults) to be\n';
     var lastLine =
@@ -127,14 +121,14 @@
     }
     console.error('message: ' + e.message);
     console.error('stack: ' + e.stack);
-    msg += 'Exception in rendering!\n' +
-      (e.fileName ? '\nlocation: ' + e.fileName + ':' + e.lineNumber : '') +
-      '\nMessage: ' + e.message + '\n\n' + e.stack;
-
-    var reactElement = React.createElement('pre', null, msg);
-
-    return properReact.renderToString(reactElement);
-  }
+    if (serverSide) {
+      msg += 'Exception in rendering!\n' +
+        (e.fileName ? '\nlocation: ' + e.fileName + ':' + e.lineNumber : '') +
+        '\nMessage: ' + e.message + '\n\n' + e.stack;
+      var reactElement = React.createElement('pre', null, msg);
+      return provideServerReact().renderToString(reactElement);
+    }
+  };
 
   ReactOnRails.buildConsoleReplay = function() {
     var consoleReplay = '';
@@ -150,6 +144,19 @@
     }
 
     return consoleReplay;
+  };
+
+  function createReactElement(componentName, propsVarName, props, domId, trace, generatorFunction) {
+    if (trace) {
+      console.log('RENDERED ' + componentName + ' with data_variable ' +
+        propsVarName + ' to dom node with id: ' + domId);
+    }
+
+    if (generatorFunction) {
+      return this[componentName](props);
+    } else {
+      return React.createElement(this[componentName], props);
+    }
   }
 
   function provideClientReact() {
@@ -165,5 +172,4 @@
     }
     return ReactDOMServer;
   }
-
 }.call(this));

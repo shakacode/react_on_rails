@@ -1,22 +1,34 @@
 language: ruby
 rvm:
 - 2.2.2
+
 gemfile:
 - spec/dummy/Gemfile
+
+env:
+ - export RAILS_ENV=test
+
 install:
+- rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install 4.2.0
+- npm install -g npm
 - bundle install
 - cd spec/dummy/client && npm install
 - $(npm bin)/webpack --config webpack.server.js
 - $(npm bin)/webpack --config webpack.client.js
-env:
- - export RAILS_ENV=test
+- cd ../../dummy-react-013/client && npm install
+- $(npm bin)/webpack --config webpack.server.js
+- $(npm bin)/webpack --config webpack.client.js
+
 before_script:
 - cd ../../
 - export DISPLAY=:99.0
 - sh -e /etc/init.d/xvfb start
+
 script:
 - rake run_rspec:gem
 - DRIVER=selenium_firefox rake run_rspec:dummy
+- DRIVER=selenium_firefox rake run_rspec:dummy_react_013
+
 notifications:
   slack:
     secure: LfcUk4AJ4vAxWwRIyw4tFh8QNbYefMwfG/oLfsN3CdRMWMOtCOHR1GGsRhAOlfVVJ/FvHqVqWj5gK7z7CaO5Uvl7rD3/zJ8QzExKx/iH9yWj55iIPuKLzwFNnBwRpFW/cqyU2lFPPRxGD50BUn3c+qybkuSqtKZ6qtTowwqlxLa5iyM3N95aZp7MEIKCP7cPcnHfLbJyP8wBpotp/rtw62eXM2HIRJJwgjcp+n+My7VFR9DnBXNFf6R91aZHM4U4cHHDbu15HFtH8honVrzK1JQdyqMNHga+j04dFuaS7z9Q369/hsELMOBp/227+Pz7ZRfWZFK4UASguOvyeX7RmGTRpTuWLm1XJeUzfsPZVROecaSVQBve+U7F12yKqilt97QlvRXn2EGyBILqvxtFNNR4S9kgAf72/6EFgiM1TKq7i9zy6lVOnagU2+7amq7UeopX1uoFsUfNKMR7YbgV1WjF0IK95UP0b0/7ZOJlPYgi5zzkQi129qAFWSMmxGk+ZpsttHh/tjJtvAh0A3mHq/zb5w4ub/MbSyZqeDUNgGj72QArOWUFSAStQT1ybsVLeDoKPgOvVq7OV1D64rpcHjBXcqOCit8tDZ+TqkFhcYJo2cITSaqE4zJXn+4F5s7So5O8CyfKYQq+kFJCooYGmfgTUckJpGl7eIvKmL4TN9Q=

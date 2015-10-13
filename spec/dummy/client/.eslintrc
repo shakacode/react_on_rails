@@ -1,3 +1,10 @@
-{
-  "extends": "eslint-config-airbnb"
-}
+---
+
+extends: eslint-config-airbnb
+
+rules:
+  # indent: [1, 2, { SwitchCase: 1, VariableDeclarator: 2 }]
+  # react/sort-comp: 0
+  # react/jsx-quotes: 1
+
+  no-console: 0

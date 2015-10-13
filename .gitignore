@@ -11,8 +11,11 @@
 
 /spec/dummy/client/node_modules
 /spec/dummy/app/assets/javascripts/generated/
+/spec/dummy-react-013/client/node_modules
+/spec/dummy-react-013/app/assets/javascripts/generated/
 
 # RVM
 .ruby-version
 .ruby-gemset
 
+node_modules

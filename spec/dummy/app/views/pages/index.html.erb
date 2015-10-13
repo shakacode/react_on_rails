@@ -31,9 +31,11 @@ This page demonstrates a few things the other pages do not show:
 </p>
 
 <% cache @app_props_server_render do %>
-  <% puts "=" * 80 %>
-  <% puts "server rendering react components" %>
-  <% puts "=" * 80 %>
+  <% if ENV["TRACE_REACT_ON_RAILS"].present? %>
+    <% puts "=" * 80 %>
+    <% puts "server rendering react components" %>
+    <% puts "=" * 80 %>
+  <% end %>
   <%= react_component("ReduxApp", @app_props_server_render, trace: true, generator_function: true) %>
   <hr/>
 
