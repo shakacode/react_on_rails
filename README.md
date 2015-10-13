@@ -320,8 +320,8 @@ gem "therubyracer"
 
 ### Generated JavaScript
 
-1. See spec/dummy/spec/sample_generated_js/server-generated.js to see the JavaScript for typical server rendering.
-2. See spec/dummy/spec/sample_generated_js/client-generated.js to see the JavaScript for typical client rendering.
+1. See [sample_generated_js/server-generated.js](docs/sample_generated_js/server-generated.js) to see the JavaScript for typical server rendering.
+2. See [sample_generated_js/client-generated.js](docs/sample_generated_js/client-generated.js) to see the JavaScript for typical client rendering.
 
 ## Contributing
 
