@@ -325,6 +325,21 @@ JavaScript engine.
 gem "therubyracer"
 ```
 
+## React 0.13 vs. React 0.14
+The main difference for using react_on_rails is that you need to add additional lines in the webpack config files:
+
+Client side config file:
+
+```
+{ test: require.resolve('react-dom'), loader: 'expose?ReactDOM' },
+```
+
+Server side config file:
+
+```
+{ test: require.resolve('react-dom/server'), loader: 'expose?ReactDOMServer' },
+```
+
 ## References
 * [Making the helper for server side rendering work with JS created by Webpack] (https://github.com/reactjs/react-rails/issues/301#issuecomment-133098974)
 * [Add Demonstration of Server Side Rendering](https://github.com/justin808/react-webpack-rails-tutorial/issues/2)
