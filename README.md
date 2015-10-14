@@ -60,8 +60,13 @@ products, client work, and open source. [More info here](http://www.shakacode.co
     module: {
       loaders: [
         // React is necessary for the client rendering:
-        {test: require.resolve('react'), loader: 'expose?React'},
+        { test: require.resolve('react'), loader: 'expose?React' },
+      
+        // For React 0.14
+        { test: require.resolve('react-dom'), loader: 'expose?ReactDOM' }, // not in the server one
     ```
+    
+    
 1. Require `react_on_rails` in your `application.js` like  [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/361f4338ebb39a5d3934b00cb6d6fcf494773000/app/assets/javascripts/application.js#L15). It possibly should come after you require `turbolinks`:
   
   ```
@@ -95,6 +100,14 @@ See the next section for a sample webpack.server.rails.config.js.
    ```
 3. Ensure the name of your ouput file (shown [here](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/webpack.server.rails.config.js#L9)) of your server bundle corresponds to the configuration of the gem. The default path is `app/assets/javascripts/generated`. See below for customization of configuration variables.
 4. Expose `React` in your webpack config, like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.config.js#L23)
+
+```javascript
+      { test: require.resolve('react'), loader: 'expose?React' },
+      
+      // For React 0.14
+      { test: require.resolve('react-dom/server'), loader: 'expose?ReactDOMServer' }, // not in client one, only server
+```
+
 
 #### Sample webpack.server.rails.config.js (ONLY for server rendering)
 Be sure to check out the latest example version of [client/webpack.server.rails.config.js](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.config.js).
