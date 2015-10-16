@@ -1,25 +1,34 @@
 require "fileutils"
-require 'coveralls/rake/task'
+require "coveralls/rake/task"
 
 namespace :run_rspec do
   desc "Run RSpec for top level only"
   task :gem do
-    sh %( rspec spec/react_on_rails_spec.rb )
+    sh %( COVERAGE=true rspec spec/react_on_rails_spec.rb )
   end
 
   desc "Run RSpec for spec/dummy only"
   task :dummy do
-    sh %( cd spec/dummy && DRIVER=selenium_firefox rspec )
+    # TEST_ENV_NUMBER is used to make SimpleCov.command_name unique in order to
+    # prevent a name collision
+    sh %( cd spec/dummy && DRIVER=selenium_firefox COVERAGE=true TEST_ENV_NUMBER=1 rspec )
   end
 
   desc "Run RSpec for spec/dummy only"
   task :dummy_react_013 do
-    sh %( cd spec/dummy-react-013 && DRIVER=selenium_firefox rspec )
+    # TEST_ENV_NUMBER is used to make SimpleCov.command_name unique in order to
+    # prevent a name collision
+    sh %( cd spec/dummy-react-013 && DRIVER=selenium_firefox COVERAGE=true TEST_ENV_NUMBER=2 rspec )
+  end
+
+  desc "Run RSpec on spec/empty_spec in order to have SimpleCov generate a coverage report from cache"
+  task :empty do
+    sh %( COVERAGE=true rspec spec/empty_spec.rb )
   end
 
   Coveralls::RakeTask.new
 
-  task run_rspec: [:gem, :dummy, :dummy_react_013, "coveralls:push"] do
+  task run_rspec: [:gem, :dummy, :dummy_react_013, :empty, "coveralls:push"] do
     puts "Completed all RSpec tests"
   end
 end
