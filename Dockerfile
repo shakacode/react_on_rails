@@ -12,3 +12,4 @@ RUN npm install -g eslint \
   eslint-plugin-react \
   babel-eslint \
   jscs
+RUN gem install coveralls
