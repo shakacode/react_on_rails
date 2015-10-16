@@ -1,31 +1,49 @@
+sudo: required
+
 language: ruby
+
 rvm:
-- 2.2.2
+  - 2.2.3
+
+services:
+  - docker
 
 gemfile:
-- spec/dummy/Gemfile
+  - spec/dummy/Gemfile
 
 env:
- - export RAILS_ENV=test
+  - export RAILS_ENV=test
+
+before_install:
+  - sudo apt-get update
+  - curl -L https://github.com/docker/compose/releases/download/1.4.0/docker-compose-`uname -s`-`uname -m` > docker-compose
+  - chmod +x docker-compose
+  - sudo mv docker-compose /usr/local/bin
+  - docker-compose build lint
+  - apt-get install -y xserver-common libgl1-mesa-glx libxfont1 libxshmfence1
+  - curl -O http://http.us.debian.org/debian/pool/main/x/xorg-server/xvfb_1.16.4-1_amd64.deb
+  - dpkg -i xvfb_1.16.4-1_amd64.deb
+  - apt-get install -y firefox firefox-locale-en
 
 install:
-- rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install 4.2.0
-- npm install -g npm
-- bundle install
-- cd spec/dummy/client && npm install
-- $(npm bin)/webpack --config webpack.server.js
-- $(npm bin)/webpack --config webpack.client.js
-- cd ../../dummy-react-013/client && npm install
-- $(npm bin)/webpack --config webpack.server.js
-- $(npm bin)/webpack --config webpack.client.js
+  - rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install 4.2.0
+  - npm install -g npm
+  - bundle install
+  - cd spec/dummy/client && npm install
+  - $(npm bin)/webpack --config webpack.server.js
+  - $(npm bin)/webpack --config webpack.client.js
+  - cd ../../dummy-react-013/client && npm install
+  - $(npm bin)/webpack --config webpack.server.js
+  - $(npm bin)/webpack --config webpack.client.js
 
 before_script:
-- cd ../../
-- export DISPLAY=:99.0
-- sh -e /etc/init.d/xvfb start
+  - cd ../../
+  - export DISPLAY=:99
+  - sh -e Xvfb :99 -screen 0 1600x1200x16
 
 script:
-- rake
+  - rake docker
+  - rake
 
 notifications:
   slack:

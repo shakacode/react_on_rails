@@ -2,7 +2,8 @@
 
 scss_files:
   - 'spec/dummy/app/assets/stylesheets/**/*.scss'
-
+exclude:
+  - 'spec/dummy/app/assets/stylesheets/application.css'
 linters:
 #  BangFormat:
 #    enabled: true
