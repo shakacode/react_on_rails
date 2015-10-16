@@ -27,6 +27,8 @@ Run `rake` for testing the gem and `spec/dummy` and `spec/dummy-react-013`. Othe
 
 If you run `rspec` at the top level, you'll see this message: `require': cannot load such file -- rails_helper (LoadError)`
 
+After running a test, you can view the coverage results SimpleCov reports by opening `coverage/index.html`.
+
 ### Debugging
 Start the sample app like this for some debug printing:
 ```bash
