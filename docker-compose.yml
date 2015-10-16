@@ -1,5 +1,5 @@
 lint:
-  build: .
+  image: dylangrafmyre/docker-lint
   working_dir: /app/
   volumes:
     - '.:/app/'

@@ -50,7 +50,7 @@ namespace :lint do
 
   desc "Run scss-lint as shell"
   task :scss do
-    sh "scss-lint ."
+    sh "scss-lint spec/dummy/app/assets/stylesheets/"
   end
 
   desc "Run eslint as shell"
@@ -64,7 +64,7 @@ namespace :lint do
   end
 
   desc "Run all eslint, jscs, rubocop linters. Skip ruby-lint and scss"
-  task lint: [:eslint, :jscs, :rubocop] do
+  task lint: [:eslint, :jscs, :rubocop, :scss] do
     puts "Completed all linting"
   end
 end
