@@ -10,6 +10,7 @@ directories:
 ignore_paths:
   - client
   - node_modules
+  - coverage
 
 analysis_classes:
   #  - argument_amount
