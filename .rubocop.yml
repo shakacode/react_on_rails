@@ -9,6 +9,7 @@ AllCops:
     - 'vendor/**/*'
     - 'spec/fixtures/**/*'
     - 'node_modules/**/*'
+    - 'coverage/**/*'
     - 'db/**/*'
     - 'db/schema.rb'
     - 'db/seeds.rb'

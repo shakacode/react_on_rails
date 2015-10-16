@@ -1,7 +1,7 @@
 {
   "preset": "airbnb",
   "fileExtensions": [".js", ".jsx"],
-  "excludeFiles": ["**/build/**", "**/node_modules/**", "**/generated/**", "**/docs/**", "**/tmp/**", "**/sample_generated/**"],
+  "excludeFiles": ["**/build/**", "**/node_modules/**", "**/generated/**", "**/docs/**", "**/tmp/**", "**/sample_generated/**", "**/coverage/**"],
   "requireTrailingComma": { "ignoreSingleValue": true, "ignoreSingleLine": true },
   "validateQuoteMarks": false
 }
