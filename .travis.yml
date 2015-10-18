@@ -20,10 +20,11 @@ before_install:
   - chmod +x docker-compose
   - sudo mv docker-compose /usr/local/bin
   - docker-compose build lint
-  - apt-get install -y xserver-common libgl1-mesa-glx libxfont1 libxshmfence1
-  - curl -O http://http.us.debian.org/debian/pool/main/x/xorg-server/xvfb_1.16.4-1_amd64.deb
-  - dpkg -i xvfb_1.16.4-1_amd64.deb
-  - apt-get install -y firefox firefox-locale-en
+  - sudo apt-get install -y xorg-server
+#  - sudo apt-get install --only-upgrade xserver-common
+#  - curl -O http://http.us.debian.org/debian/pool/main/x/xorg-server/xvfb_1.16.4-1_amd64.deb
+#  - sudo dpkg -i xvfb_1.16.4-1_amd64.deb
+  - sudo apt-get install -y firefox firefox-locale-en
 
 install:
   - rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install 4.2.0
