@@ -19,7 +19,7 @@ Gem::Specification.new do |s|
   s.executables   = s.files.grep(%r{^exe/}) { |f| File.basename(f) }
   s.require_paths = ["lib"]
 
-  s.add_dependency "rails", ">= 4.0"
+  s.add_dependency "rails", ">= 3.2"
   s.add_dependency "execjs", "~> 2.5"
   s.add_dependency "connection_pool"
 
