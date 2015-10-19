@@ -58,11 +58,11 @@ describe ReactOnRailsHelper, type: :helper do
     end
   end
 
-  describe "#render_js" do
-    subject { render_js("this.HelloString.world()") }
+  describe "#server_render_js" do
+    subject { server_render_js("this.HelloString.world()") }
 
     let(:hello_world) do
-      "Hello WORLD! Will this work?? YES! Time to visit Maui\n"
+      "    Hello WORLD! Will this work?? YES! Time to visit Maui\n    \n"
     end
 
     it { expect(self).to respond_to :react_component }
