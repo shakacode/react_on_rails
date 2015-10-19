@@ -19,7 +19,6 @@ before_install:
   - curl -L https://github.com/docker/compose/releases/download/1.4.0/docker-compose-`uname -s`-`uname -m` > docker-compose
   - chmod +x docker-compose
   - sudo mv docker-compose /usr/local/bin
-  - docker-compose build ci
 
 install:
   - rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install 4.2.0
@@ -31,9 +30,8 @@ install:
   - cd ../../dummy-react-013/client && npm install
   - $(npm bin)/webpack --config webpack.server.js
   - $(npm bin)/webpack --config webpack.client.js
-
-before_script:
-  - cd ../../
+  - cd ../../../
+  - docker-compose build ci
 
 script:
   - docker-compose run ci
