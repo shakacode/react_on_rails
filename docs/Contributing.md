@@ -62,7 +62,17 @@ the `reactonrails_lint` docker image and docker-compose `lint` container. The in
 but after the install, startup is very quick.
 
 ### Linting Commands
-Run `rake -D docker` to see all docker linting commands for rake. `rake docker` will run all linters.
+Run `rake -D docker` to see all docker linting commands for rake. `rake docker:lint` will run all linters.
 For individual rake linting commands please refer to `rake -D docker` for the list.
 You can run specfic linting for directories or files by using `docker-compose run lint rubocop (file path or directory)`, etc.
-`docker-compose run lint /bin/bash` sets you up to run from the container command line. 
+`docker-compose run lint bash` sets you up to run from the container command line. 
+
+### Docker CI - Test and Linting
+Docker CI and Tests containers have a xvfd server automatically started for headless browser testing with selenium and firefox.
+
+Run `docker-compose build ci` to build the ci container. Run `docker-compose run ci` to start all
+rspec test and linting. `docker-compose run --entrypoint=/bin/bash` will override the default ci action and place
+you inside the ci container in a bash session. This is what is run on Travis-ci.
+
+Run `docker-compose build tests` to build the tests container. Run `docker-compose run tests` to start all
+rspec tests. 

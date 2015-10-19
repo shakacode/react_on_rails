@@ -1,1 +1,0 @@
-FROM dylangrafmyre/docker-lint
