@@ -1,9 +1,9 @@
 # See http://sass-guidelin.es/#zeros
 
 scss_files:
-  - 'app/assets/stylesheets/**/*.scss'
-  - 'client/assets/stylesheets/**/*.scss'
-
+  - 'spec/dummy/app/assets/stylesheets/**/*.scss'
+exclude:
+  - 'spec/dummy/app/assets/stylesheets/application.css'
 linters:
 #  BangFormat:
 #    enabled: true

@@ -8,6 +8,7 @@
 /spec/reports/
 /tmp/
 *.gem
+/vendor/
 
 /spec/dummy/client/node_modules
 /spec/dummy/app/assets/javascripts/generated/

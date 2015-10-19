@@ -50,7 +50,7 @@ namespace :lint do
 
   desc "Run scss-lint as shell"
   task :scss do
-    sh "scss-lint ."
+    sh "scss-lint spec/dummy/app/assets/stylesheets/"
   end
 
   desc "Run eslint as shell"
@@ -107,4 +107,4 @@ desc "Runs all linters from docker. Run `rake -D docker` to see all available li
 task docker: ["docker:lint"]
 
 desc "Run all tests and linting"
-task ci: %w(docker run_rspec)
+task ci: %w(run_rspec lint)

@@ -1,5 +1,17 @@
-lint:
+ci:
   build: .
+  dockerfile: Dockerfile_ci
+  working_dir: /app/
+  volumes:
+    - '.:/app/'
+lint:
+  image: dylangrafmyre/docker-lint
+  working_dir: /app/
+  volumes:
+    - '.:/app/'
+tests:
+  build: .
+  dockerfile: Dockerfile_tests
   working_dir: /app/
   volumes:
     - '.:/app/'

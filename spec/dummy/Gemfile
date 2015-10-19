@@ -1,5 +1,7 @@
 source 'https://rubygems.org'
 
+eval_gemfile File.join(File.dirname(__FILE__), "../../react_on_rails.gemspec")
+
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
 gem 'rails', '4.2.3'
@@ -45,6 +47,9 @@ group :development, :test do
   gem "pry-rescue"
   gem "pry-byebug"
   gem "awesome_print"
+  gem "rubocop", require: false
+  gem "ruby-lint", require: false
+  gem "scss_lint", require: false
 
   # Access an IRB console on exception pages or by using <%= console %> in views
   gem 'web-console', '~> 2.0'
