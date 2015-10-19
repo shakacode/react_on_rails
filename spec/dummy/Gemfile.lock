@@ -4,7 +4,7 @@ PATH
     react_on_rails (1.0.0.pre)
       connection_pool
       execjs (~> 2.5)
-      rails (>= 4.0)
+      rails (>= 3.2)
 
 GEM
   remote: https://rubygems.org/

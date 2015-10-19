@@ -18,7 +18,8 @@ namespace :run_rspec do
   task :dummy_react_013 do
     # TEST_ENV_NUMBER is used to make SimpleCov.command_name unique in order to
     # prevent a name collision
-    sh %( cd spec/dummy-react-013 && DRIVER=selenium_firefox COVERAGE=true TEST_ENV_COMMAND_NAME="dummy-react-013-tests" rspec )
+    sh %( cd spec/dummy-react-013 && DRIVER=selenium_firefox COVERAGE=true
+          TEST_ENV_COMMAND_NAME="dummy-react-013-tests" rspec )
   end
 
   desc "Run RSpec on spec/empty_spec in order to have SimpleCov generate a coverage report from cache"
