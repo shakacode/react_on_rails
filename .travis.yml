@@ -35,8 +35,8 @@ install:
   - docker-compose up lint
 
 before_script:
-  - "export DISPLAY=:99.0"
-  - Xvfb :99 --screen 0 1600x1200x16 -ac
+  - "export DISPLAY=:99"
+  - Xvfb :99 -ac -screen scn 1600x1200x16 &
 
 script:
   - rake
