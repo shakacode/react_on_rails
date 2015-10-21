@@ -62,7 +62,7 @@ describe ReactOnRailsHelper, type: :helper do
     subject { server_render_js("this.HelloString.world()") }
 
     let(:hello_world) do
-      "    Hello WORLD! Will this work?? YES! Time to visit Maui\n    \n"
+      "Hello WORLD! Will this work?? YES! Time to visit Maui"
     end
 
     it { expect(self).to respond_to :react_component }
