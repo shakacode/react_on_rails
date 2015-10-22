@@ -123,11 +123,8 @@ module ReactOnRailsHelper
 
     result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
 
-    # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
-    <<-HTML.html_safe
-    #{result[0]}
-    #{replay_console(options) ? result[1] : ''}
-    HTML
+    # IMPORTANT: To ensure that Rails doesn't auto-escape HTML tags, use the 'raw' method.
+    raw("#{result[0]}#{replay_console(options) ? result[1] : ''}")
   end
 
   private
