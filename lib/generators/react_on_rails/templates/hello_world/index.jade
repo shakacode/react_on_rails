@@ -1,0 +1,15 @@
+//- https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/index.jade
+doctype html
+html
+
+  head
+    title Hello, React
+
+  body
+
+    #app
+
+    script(src="vendor-bundle.js")
+    script(src="app-bundle.js")
+    script.
+      React.render(HelloWorldApp, document.getElementById('app'))
