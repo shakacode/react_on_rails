@@ -139,6 +139,11 @@ module ReactOnRailsHelper
   def server_rendered_react_component_html(options, props_string, react_component_name, data_variable_name, dom_id)
     return ["", ""] unless prerender(options)
 
+    # Check if server bundle timestamp has changed.
+    # If it has, then clear the connection pool.
+    # Only for development.
+    reload_server_bundle_if_modified
+
     wrapper_js = <<-JS
 (function() {
   var props = #{props_string};
@@ -156,6 +161,16 @@ module ReactOnRailsHelper
     ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
   rescue ExecJS::ProgramError => err
     raise ReactOnRails::ServerRenderingPool::PrerenderError.new(react_component_name, props_string, err)
+  end
+
+  def reload_server_bundle_if_modified
+    return unless ReactOnRails.configuration.reload_server_js_every_request
+    file_mtime = File.mtime(ReactOnRails.configuration.server_bundle_js_file)
+    @@server_bundle_timestamp ||= file_mtime
+    if @@server_bundle_timestamp != file_mtime
+      ReactOnRails::ServerRenderingPool.reset_pool
+      @@server_bundle_timestamp = file_mtime
+    end
   end
 
   def trace(options)
