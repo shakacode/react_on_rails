@@ -36,7 +36,7 @@ end
 desc "Runs all tests. Run `rake -D run_rspec` to see all available test options"
 task run_rspec: ["run_rspec:run_rspec"]
 
-task default: :run_rspec
+task default: ["run_rspec", "docker:lint"]
 
 namespace :lint do
   desc "Run Rubocop as shell"
