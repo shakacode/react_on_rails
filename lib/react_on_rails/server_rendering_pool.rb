@@ -11,6 +11,15 @@ module ReactOnRails
       @js_context_pool = ConnectionPool.new(options) { create_js_context }
     end
 
+    def self.reset_pool_if_server_bundle_was_modified
+      return unless ReactOnRails.configuration.reload_server_js_every_request
+      file_mtime = File.mtime(ReactOnRails.configuration.server_bundle_js_file)
+      @server_bundle_timestamp ||= file_mtime
+      return if @server_bundle_timestamp == file_mtime
+      ReactOnRails::ServerRenderingPool.reset_pool
+      @server_bundle_timestamp = file_mtime
+    end
+
     class PrerenderError < RuntimeError
       def initialize(component_name, props, js_message)
         message = ["Encountered error \"#{js_message}\" when prerendering #{component_name} with #{props}",
