@@ -17,8 +17,10 @@ module ReactOnRails
   end
 
   class Configuration
-    attr_accessor :server_bundle_js_file, :prerender, :replay_console, :generator_function, :trace,
-                  :reload_server_js_every_request, :logging_on_server, :server_renderer_pool_size, :server_renderer_timeout
+    attr_accessor :server_bundle_js_file, :prerender, :replay_console,
+                  :generator_function, :trace, :reload_server_js_every_request,
+                  :logging_on_server, :server_renderer_pool_size,
+                  :server_renderer_timeout
 
     def initialize(server_bundle_js_file: nil, prerender: nil, replay_console: nil,
                    generator_function: nil, trace: nil, reload_server_js_every_request: nil,
@@ -34,7 +36,8 @@ module ReactOnRails
       self.replay_console = replay_console
       self.logging_on_server = logging_on_server
       self.generator_function = generator_function
-      self.reload_server_js_every_request = reload_server_js_every_request.nil? ? Rails.env.development? : reload_server_js_every_request
+      self.reload_server_js_every_request = reload_server_js_every_request.nil? ?
+                                            Rails.env.development? : reload_server_js_every_request
       self.trace = trace.nil? ? Rails.env.development? : trace
 
       # Server rendering:
