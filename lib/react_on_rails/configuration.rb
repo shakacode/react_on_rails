@@ -36,8 +36,11 @@ module ReactOnRails
       self.replay_console = replay_console
       self.logging_on_server = logging_on_server
       self.generator_function = generator_function
-      self.reload_server_js_every_request = reload_server_js_every_request.nil? ?
-                                            Rails.env.development? : reload_server_js_every_request
+      if reload_server_js_every_request.nil?
+        self.reload_server_js_every_request = Rails.env.development?
+      else
+        self.reload_server_js_every_request = reload_server_js_every_request
+      end
       self.trace = trace.nil? ? Rails.env.development? : trace
 
       # Server rendering:
