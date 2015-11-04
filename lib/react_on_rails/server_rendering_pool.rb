@@ -81,7 +81,11 @@ module ReactOnRails
           ExecJS.compile(base_js_code)
         else
           if server_js_file.present?
-            Rails.logger.warn("You specified server rendering JS file: #{server_js_file}, but it cannot be read.")
+            msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
+              "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\
+              "avoid this warning"
+            Rails.logger.warn msg
+            puts msg
           end
           ExecJS.compile("")
         end
