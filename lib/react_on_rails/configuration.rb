@@ -44,7 +44,7 @@ module ReactOnRails
       self.trace = trace.nil? ? Rails.env.development? : trace
 
       # Server rendering:
-      self.server_renderer_pool_size = server_renderer_pool_size # increase if you're on JRuby
+      self.server_renderer_pool_size = self.development_mode ? 1 : server_renderer_pool_size
       self.server_renderer_timeout = server_renderer_timeout # seconds
     end
   end

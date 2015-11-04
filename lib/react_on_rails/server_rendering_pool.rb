@@ -14,8 +14,8 @@ module ReactOnRails
     def self.reset_pool_if_server_bundle_was_modified
       return unless ReactOnRails.configuration.development_mode
       file_mtime = File.mtime(ReactOnRails.configuration.server_bundle_js_file)
-      @server_bundle_timestamp ||= file_mtime
-      return if @server_bundle_timestamp == file_mtime
+      first_time = @server_bundle_timestamp.nil?
+      return if first_time || @server_bundle_timestamp == file_mtime
       ReactOnRails::ServerRenderingPool.reset_pool
       @server_bundle_timestamp = file_mtime
     end
