@@ -12,7 +12,7 @@ ReactOnRails.configure do |config|
   # seconds
   config.server_renderer_timeout = 20
   # If set to true, this forces Rails to reload the server bundle if it is modified
-  config.reload_server_js_every_request = Rails.env.development?
+  config.development_mode = Rails.env.development?
   # For server rendering. This can be set to false so that server side messages are discarded.
   # Default is true. Be cautious about turning this off.
   config.replay_console = true
