@@ -9,6 +9,21 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:no_server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
+    include_examples "bootstrap"
+    include_examples "heroku_deployment"
+  end
+
+  context "--linters" do
+    before(:all) { run_generator_test_with_args(%w(-L)) }
+    include_examples "base_generator:base"
+    include_examples ":linters"
+    include_examples "bootstrap"
+    include_examples "heroku_deployment"
+  end
+
+  context "-L" do
+    before(:all) { run_generator_test_with_args(%w(-L)) }
+    include_examples "base_generator:base"
     include_examples ":linters"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
@@ -20,7 +35,6 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:server_rendering"
-    include_examples ":linters"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
   end
@@ -31,7 +45,6 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:server_rendering"
-    include_examples ":linters"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
   end
@@ -41,7 +54,6 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:base"
     include_examples "base_generator:no_server_rendering"
     include_examples "react_with_redux_generator:base"
-    include_examples ":linters"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
   end
@@ -51,7 +63,6 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:base"
     include_examples "base_generator:no_server_rendering"
     include_examples "react_with_redux_generator:base"
-    include_examples ":linters"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
   end
@@ -62,7 +73,6 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:server_rendering"
-    include_examples ":linters"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
   end
@@ -73,7 +83,6 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:server_rendering"
-    include_examples ":linters"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
   end
