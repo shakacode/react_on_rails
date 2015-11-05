@@ -139,6 +139,9 @@ module ReactOnRailsHelper
   def server_rendered_react_component_html(options, props_string, react_component_name, data_variable_name, dom_id)
     return ["", ""] unless prerender(options)
 
+    # Make sure that we use up-to-date server-bundle
+    ReactOnRails::ServerRenderingPool.reset_pool_if_server_bundle_was_modified
+
     wrapper_js = <<-JS
 (function() {
   var props = #{props_string};
