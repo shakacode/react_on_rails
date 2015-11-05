@@ -28,11 +28,11 @@ module ReactOnRails
                    default: false,
                    desc: "Configure for server-side rendering of webpack JavaScript",
                    aliases: "-S"
-      # --skip-linters
-      class_option :skip_linters,
+      # --linters
+      class_option :linters,
                    type: :boolean,
                    default: false,
-                   desc: "Don't install linter files",
+                   desc: "Install linter files",
                    aliases: "-L"
 
       def run_generators
@@ -41,7 +41,7 @@ module ReactOnRails
         invoke "react_on_rails:base"
         invoke "react_on_rails:react_no_redux" unless options.redux?
         invoke "react_on_rails:react_with_redux" if options.redux?
-        invoke "react_on_rails:linters" unless options.skip_linters?
+        invoke "react_on_rails:linters" if options.linters?
         invoke "react_on_rails:bootstrap"
         invoke "react_on_rails:heroku_deployment"
       end

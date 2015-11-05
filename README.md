@@ -54,7 +54,7 @@ In the following screenshot you can see the actual HTML rendered for a side-by-s
   rails generate react_on_rails:install
   ```
 
-3. NPM install:
+3. NPM install. Make sure you are on a recent version of node, preferably using nvm.
 
   ```bash
   npm install
