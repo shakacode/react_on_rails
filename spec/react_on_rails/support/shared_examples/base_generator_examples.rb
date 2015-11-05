@@ -65,14 +65,15 @@ shared_examples "base_generator:base" do
     %w(app/controllers/hello_world_controller.rb
        app/views/hello_world/index.html.erb
        config/initializers/react_on_rails.rb
-       client/.babelrc
-       client/index.jade
-       client/npm-shrinkwrap.json
-       client/server.js
        client/webpack.client.base.config.js
        client/webpack.client.hot.config.js
        client/webpack.client.rails.config.js
        client/app/bundles/HelloWorld/startup/clientGlobals.jsx
+       client/.babelrc
+       client/index.jade
+       client/npm-shrinkwrap.json
+       client/package.json
+       client/server.js
        lib/tasks/assets.rake
        package.json
        Procfile.dev

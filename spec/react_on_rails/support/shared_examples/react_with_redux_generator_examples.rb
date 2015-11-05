@@ -13,8 +13,7 @@ shared_examples "react_with_redux_generator:base" do
        client/app/bundles/HelloWorld/reducers/index.jsx
        client/app/bundles/HelloWorld/startup/HelloWorldAppClient.jsx
        client/app/bundles/HelloWorld/store/helloWorldStore.jsx
-       client/app/lib/middlewares/loggerMiddleware.js
-       client/package.json).each { |file| assert_file(file) }
+       client/app/lib/middlewares/loggerMiddleware.js).each { |file| assert_file(file) }
   end
 end
 

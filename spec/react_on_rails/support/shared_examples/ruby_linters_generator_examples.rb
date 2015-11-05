@@ -1,4 +1,4 @@
-shared_examples ":linters" do
+shared_examples ":ruby_linters" do
   it "adds linter gems" do
     linter_gems = <<-GEMS
 # require: false is necessary for the linters as we only want them loaded
@@ -13,12 +13,6 @@ GEMS
     assert_file("Gemfile") do |content|
       assert_match(linter_gems, content)
     end
-  end
-
-  it "copies linter config files" do
-    assert_file "client/.eslintrc"
-    assert_file "client/.eslintignore"
-    assert_file "client/.jscsrc"
   end
 
   it "copies linting and auditing tasks" do

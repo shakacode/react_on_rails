@@ -46,7 +46,6 @@ module ReactOnRails
            client/app/lib/middlewares/loggerMiddleware.js).each do |file|
              copy_file(base_path + file, file)
            end
-        template("#{base_path}client/package.json", "client/package.json")
       end
 
       def copy_server_rendering_redux_files

@@ -22,7 +22,6 @@ module ReactOnRails
            client/app/bundles/HelloWorld/startup/HelloWorldAppClient.jsx).each do |file|
              copy_file(base_path + file, file)
            end
-        template("#{base_path}client/package.json", "client/package.json")
       end
 
       def copy_server_rendering_files_if_appropriate

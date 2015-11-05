@@ -55,3 +55,8 @@ def assert_directory_with_keep_file(dir)
   assert_directory dir
   assert_file File.join(dir, ".keep")
 end
+
+# TODO
+def linter_modules_included_in_package_json
+  return "jscs"
+end

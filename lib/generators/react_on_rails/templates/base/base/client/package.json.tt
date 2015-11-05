@@ -29,7 +29,7 @@
     "build:client": "NODE_ENV=production webpack --config webpack.client.rails.config.js",
     "build:server": "NODE_ENV=production webpack --config webpack.server.rails.config.js",
     "build:dev:client": "webpack -w --config webpack.client.rails.config.js",
-    "build:dev:server": "webpack -w --config webpack.server.rails.config.js",<%- if options.linters? %>
+    "build:dev:server": "webpack -w --config webpack.server.rails.config.js"<%- if options.linters? %>,
     "lint": "npm run eslint && npm run jscs",
     "eslint": "eslint --ext .js,.jsx .",
     "jscs": "jscs --verbose ."<%- end %>
@@ -40,21 +40,21 @@
     "body-parser": "^1.14.1",
     "es5-shim": "^4.1.14",
     "es6-promise": "^3.0.2",
-    "expose-loader": "^0.7.0",
-    "immutable": "^3.7.5",
+    "expose-loader": "^0.7.0",<%- if options.redux? %>
+    "immutable": "^3.7.5",<%- end %>
     "imports-loader": "^0.6.4",
     "jquery": "^2.1.4",
-    "jquery-ujs": "^1.1.0-1",
-    "lodash": "https://registry.npmjs.org/lodash/-/lodash-3.10.1.tgz",
-    "loader-utils": "^0.2.11",
-    "mirror-creator": "0.0.1",
+    "jquery-ujs": "^1.1.0-1",<%- if options.redux? %>
+    "lodash": "https://registry.npmjs.org/lodash/-/lodash-3.10.1.tgz",<%- end %>
+    "loader-utils": "^0.2.11",<%- if options.redux? %>
+    "mirror-creator": "0.0.1",<%- end %>
     "react": "^0.14.0",
     "react-bootstrap": "^0.27.0",
-    "react-dom": "^0.14.0",
+    "react-dom": "^0.14.0",<%- if options.redux? %>
     "react-redux": "^3.1.0",
     "redux": "^3.0.2",
     "redux-promise": "^0.5.0",
-    "redux-thunk": "^1.0.0",
+    "redux-thunk": "^1.0.0",<%- end %>
     "sleep": "^3.0.0",
     "webpack": "^1.12.2"
   },

@@ -102,7 +102,8 @@ module ReactOnRails
       def template_base_files
         base_path = "base/base/"
         %w(Procfile.dev
-           app/views/hello_world/index.html.erb).each { |file| template(base_path + file + ".tt", file) }
+           app/views/hello_world/index.html.erb
+           client/package.json).each { |file| template(base_path + file + ".tt", file) }
       end
 
       def install_server_rendering_files_if_enabled
