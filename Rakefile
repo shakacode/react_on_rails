@@ -4,7 +4,7 @@ require "coveralls/rake/task"
 namespace :run_rspec do
   desc "Run RSpec for top level only"
   task :gem do
-    sh %( COVERAGE=true rspec spec/react_on_rails_spec.rb )
+    sh %( COVERAGE=true rspec spec/react_on_rails )
   end
 
   desc "Run RSpec for spec/dummy only"

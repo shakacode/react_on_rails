@@ -1,2 +1,3 @@
 node_modules
 coverage
+spec/react_on_rails/dummy-for-generators

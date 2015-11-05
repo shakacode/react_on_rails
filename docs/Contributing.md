@@ -35,6 +35,18 @@ Start the sample app like this for some debug printing:
 TRACE_REACT_ON_RAILS=true && foreman start
 ```
 
+### Install Generator
+In your Rails app add this gem with a path to your fork.
+
+```
+gem 'react_on_rails', path: '/your_fork'
+gem 'therubyracer'
+```
+
+The main installer can be run with ```rails generate react_on_rails:install```
+
+### Testing the Generator
+The generators are covered by generator tests using Rails's generator testing helpers, but it never hurts to do a sanity check and explore the API. See [generator_testing_script.md](generator_testing_script.md) for a script on how to run the generator on a fresh project.
 
 ## Updating New Versions of the Gem
 

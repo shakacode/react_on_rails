@@ -1,0 +1,19 @@
+// The Rails server imports this file via app/assets/stylesheets/application.css.scss
+// The webpack HMR dev server loads this file via client/bootstrap-sass.config.js
+
+// This file allows the same sass code with Rails and node-sass for the Webpack Dev Server.
+// It is CRTICAL that this file is loaded first.
+
+$rails: false !default; // defaults to false (e.g. webpack environment)
+
+// Sass 3 removes image-url helper
+// https://github.com/sass/libsass/issues/489
+$image-url-path: '/assets/images/' !default;
+
+@function img-url($image) {
+  @if $rails {
+    @return image-url($image);
+  } @else {
+    @return url('#{$image-url-path}#{$image}');
+  }
+}

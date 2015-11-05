@@ -27,4 +27,5 @@ Gem::Specification.new do |s|
   s.add_development_dependency "rake", "~> 10.0"
   s.add_development_dependency "rspec"
   s.add_development_dependency "coveralls"
+  s.add_development_dependency "generator_spec"
 end
