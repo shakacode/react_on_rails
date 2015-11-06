@@ -11,22 +11,41 @@ describe InstallGenerator, type: :generator do
     include_examples "no_redux_generator:no_server_rendering"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
+    include_examples "js_linters:enabled"
   end
 
-  context "--linters" do
-    before(:all) { run_generator_test_with_args(%w(-L)) }
+  context "--skip-js-linters" do
+    before(:all) { run_generator_test_with_args(%w(--skip-js-linters)) }
     include_examples "base_generator:base"
-    include_examples ":linters"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
+    include_examples "js_linters:disabled"
+  end
+
+  context "-j" do
+    before(:all) { run_generator_test_with_args(%w(-j)) }
+    include_examples "base_generator:base"
+    include_examples "bootstrap"
+    include_examples "heroku_deployment"
+    include_examples "js_linters:disabled"
+  end
+
+  context "--ruby-linters" do
+    before(:all) { run_generator_test_with_args(%w(--ruby-linters)) }
+    include_examples "base_generator:base"
+    include_examples "bootstrap"
+    include_examples "heroku_deployment"
+    include_examples "js_linters:enabled"
+    include_examples "ruby_linters"
   end
 
   context "-L" do
     before(:all) { run_generator_test_with_args(%w(-L)) }
     include_examples "base_generator:base"
-    include_examples ":linters"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
+    include_examples "js_linters:enabled"
+    include_examples "ruby_linters"
   end
 
   context "--server-rendering" do
@@ -37,6 +56,7 @@ describe InstallGenerator, type: :generator do
     include_examples "no_redux_generator:server_rendering"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
+    include_examples "js_linters:enabled"
   end
 
   context "-S" do
@@ -47,6 +67,7 @@ describe InstallGenerator, type: :generator do
     include_examples "no_redux_generator:server_rendering"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
+    include_examples "js_linters:enabled"
   end
 
   context "--redux" do
@@ -56,6 +77,7 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator:base"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
+    include_examples "js_linters:enabled"
   end
 
   context "-R" do
@@ -65,6 +87,7 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator:base"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
+    include_examples "js_linters:enabled"
   end
 
   context "--redux --server_rendering" do
@@ -75,6 +98,7 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator:server_rendering"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
+    include_examples "js_linters:enabled"
   end
 
   context "-R -S" do
@@ -85,5 +109,17 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator:server_rendering"
     include_examples "bootstrap"
     include_examples "heroku_deployment"
+    include_examples "js_linters:enabled"
+  end
+
+  context "-R -S" do
+    before(:all) { run_generator_test_with_args(%w(-R -S)) }
+    include_examples "base_generator:base"
+    include_examples "base_generator:server_rendering"
+    include_examples "react_with_redux_generator:base"
+    include_examples "react_with_redux_generator:server_rendering"
+    include_examples "bootstrap"
+    include_examples "heroku_deployment"
+    include_examples "js_linters:enabled"
   end
 end

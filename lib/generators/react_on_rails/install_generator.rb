@@ -8,8 +8,10 @@
 #     Indicates when to generate with redux
 #   [--server-rendering], [--no-server-rendering]
 #     Indicates whether ability for server-side rendering of webpack output should be enabled
-#   [--skip-linters]
-#     Indicates whether linter files and configs should be installed
+#   [--skip-js-linters]
+#     Do no install JavaScript linter files and configs
+#   [--ruby-linters]
+#     Install ruby linter files, tasks, and configs
 #
 require "rails/generators"
 
@@ -28,11 +30,17 @@ module ReactOnRails
                    default: false,
                    desc: "Configure for server-side rendering of webpack JavaScript",
                    aliases: "-S"
-      # --linters
-      class_option :linters,
+      # --skip-js-linters
+      class_option :skip_js_linters,
                    type: :boolean,
                    default: false,
-                   desc: "Install linter files",
+                   desc: "Skip installing JavaScript linting files",
+                   aliases: "-j"
+      # --ruby-linters
+      class_option :ruby_linters,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install ruby linting files, tasks, and configs",
                    aliases: "-L"
 
       def run_generators
@@ -41,7 +49,8 @@ module ReactOnRails
         invoke "react_on_rails:base"
         invoke "react_on_rails:react_no_redux" unless options.redux?
         invoke "react_on_rails:react_with_redux" if options.redux?
-        invoke "react_on_rails:linters" if options.linters?
+        invoke "react_on_rails:js_linters" unless options.skip_js_linters?
+        invoke "react_on_rails:ruby_linters" if options.ruby_linters?
         invoke "react_on_rails:bootstrap"
         invoke "react_on_rails:heroku_deployment"
       end

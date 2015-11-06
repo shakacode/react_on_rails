@@ -14,6 +14,12 @@ module ReactOnRails
                    default: false,
                    desc: "Configure for server-side rendering of webpack JavaScript",
                    aliases: "-S"
+      # --skip-js-linters
+      class_option :skip_js_linters,
+                   type: :boolean,
+                   default: false,
+                   desc: "Skip installing JavaScript linting files",
+                   aliases: "-j"
 
       def add_hello_world_route
         route "get 'hello_world', to: 'hello_world#index'"
@@ -110,7 +116,9 @@ module ReactOnRails
         return unless options.server_rendering?
         base_path = "base/server_rendering/"
         %w(client/webpack.server.rails.config.js
-           client/app/bundles/HelloWorld/startup/serverGlobals.jsx).each { |file| copy_file(base_path + file, file) }
+           client/app/bundles/HelloWorld/startup/serverGlobals.jsx).each do |file|
+          copy_file(base_path + file, file)
+        end
       end
     end
   end
