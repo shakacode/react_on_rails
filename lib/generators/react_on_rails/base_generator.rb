@@ -8,6 +8,12 @@ module ReactOnRails
       hide!
       source_root(File.expand_path("../templates", __FILE__))
 
+      # --redux
+      class_option :redux,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install Redux gems and Redux version of Hello World Example",
+                   aliases: "-R"
       # --server-rendering
       class_option :server_rendering,
                    type: :boolean,
