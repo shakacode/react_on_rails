@@ -1,0 +1,20 @@
+presenter: syntastic
+
+directories:
+  - app
+  - config
+  - spec
+
+ignore_paths:
+  - client
+  - node_modules
+
+analysis_classes:
+  #  - argument_amount
+  - pedantics
+  - shadowing_variables
+  # Too many false positives for these
+  #  - undefined_methods
+  #  - undefined_variables
+  #  - unused_variables
+  - useless_equality_checks

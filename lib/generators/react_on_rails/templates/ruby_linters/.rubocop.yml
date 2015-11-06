@@ -1,0 +1,26 @@
+# This is the configuration used to check the rubocop source code.
+# Check out: https://github.com/bbatsov/rubocop
+
+AllCops:
+  Include:
+    - '**/Rakefile'
+    - '**/config.ru'
+  Exclude:
+    - 'vendor/**/*'
+    - 'spec/fixtures/**/*'
+    - 'node_modules/**/*'
+    - 'db/**/*'
+    - 'db/schema.rb'
+    - 'db/seeds.rb'
+    - 'client/node_modules/**/*'
+    - 'bin/**/*'
+    - !ruby/regexp /old_and_unused\.rb$/
+
+Metrics/LineLength:
+  Max: 120
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/Documentation:
+  Enabled: false

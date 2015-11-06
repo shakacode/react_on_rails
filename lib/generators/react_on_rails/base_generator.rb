@@ -8,12 +8,30 @@ module ReactOnRails
       hide!
       source_root(File.expand_path("../templates", __FILE__))
 
+      # --redux
+      class_option :redux,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install Redux gems and Redux version of Hello World Example",
+                   aliases: "-R"
       # --server-rendering
       class_option :server_rendering,
                    type: :boolean,
                    default: false,
                    desc: "Configure for server-side rendering of webpack JavaScript",
                    aliases: "-S"
+      # --skip-js-linters
+      class_option :skip_js_linters,
+                   type: :boolean,
+                   default: false,
+                   desc: "Skip installing JavaScript linting files",
+                   aliases: "-j"
+      # --ruby-linters
+      class_option :ruby_linters,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install ruby linting files, tasks, and configs",
+                   aliases: "-L"
 
       def add_hello_world_route
         route "get 'hello_world', to: 'hello_world#index'"
@@ -102,14 +120,22 @@ module ReactOnRails
       def template_base_files
         base_path = "base/base/"
         %w(Procfile.dev
-           app/views/hello_world/index.html.erb).each { |file| template(base_path + file + ".tt", file) }
+           app/views/hello_world/index.html.erb
+           client/package.json).each { |file| template(base_path + file + ".tt", file) }
       end
 
       def install_server_rendering_files_if_enabled
         return unless options.server_rendering?
         base_path = "base/server_rendering/"
         %w(client/webpack.server.rails.config.js
-           client/app/bundles/HelloWorld/startup/serverGlobals.jsx).each { |file| copy_file(base_path + file, file) }
+           client/app/bundles/HelloWorld/startup/serverGlobals.jsx).each do |file|
+          copy_file(base_path + file, file)
+        end
+      end
+
+      def template_linter_files_if_appropriate
+        return if !options.ruby_linters? && options.skip_js_linters?
+        template("base/base/lib/tasks/linters.rake.tt", "lib/tasks/linters.rake")
       end
     end
   end

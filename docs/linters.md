@@ -1,7 +1,15 @@
 # Linters
-The React on Rails generator can add linters and their recommended accompanying configurations to your project (to disable this behavior, include the `--linters` option when running the generator). Those linters that are written in Ruby have been added to your Gemfile, and those that run in Node have been add to your `package.json` under `devDependencies`.
+The React on Rails generator can add linters and their recommended accompanying configurations to your project. There are two classes of linters: ruby linters and JavaScript linters.
 
-To run the linters (runs both Ruby and Node linters):
+## JavaScript Linters
+
+JavaScript linters are **enabled by default**, but can be disabled by passing the `--skip-js-linters` flag (alias `j`) , and those that run in Node have been add to `client/package.json` under `devDependencies`.
+
+## Ruby Linters
+Ruby linters are **disabled by default**, but can be enabled by passing the `--ruby-linters` flag when generating. These linters have been added to your Gemfile in addition to the the appropriate Rake tasks.
+
+## Running the Linters
+To run the linters (runs all linters you have installed, even if you installed both Ruby and Node):
 
 ```bash
 rake lint
