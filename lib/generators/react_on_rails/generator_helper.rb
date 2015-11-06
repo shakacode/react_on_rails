@@ -1,11 +1,13 @@
 module GeneratorHelper
   # Takes a relative path from the destination root, such as `.gitignore` or `app/assets/javascripts/application.js`
   def dest_file_exists?(file)
-    File.exist?(File.join(destination_root, file)) ? file : nil
+    dest_file = File.join(destination_root, file)
+    File.exist?(dest_file) ? dest_file : nil
   end
 
   def dest_dir_exists?(dir)
-    Dir.exist?(File.join(destination_root, dir)) ? dir : nil
+    dest_dir = File.join(destination_root, dir)
+    Dir.exist?(dest_dir) ? dest_dir : nil
   end
 
   # Takes the missing file and the

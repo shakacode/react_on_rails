@@ -14,8 +14,8 @@ shared_examples "bootstrap" do
     assert_file("config/initializers/assets.rb") { |contents| assert_match(expected, contents) }
   end
 
-  it "removes incompatible requires in application.css.scss" do
-    assert_file("app/assets/stylesheets/application.css.scss") do |contents|
+  it "removes incompatible requires in application.scss" do
+    assert_file("app/assets/stylesheets/application.scss") do |contents|
       refute_match("*= require_tree .", contents)
       refute_match("*= require_self", contents)
     end
@@ -23,7 +23,7 @@ shared_examples "bootstrap" do
 
   it "copies bootstrap files" do
     %w(app/assets/stylesheets/_bootstrap-custom.scss
-       app/assets/stylesheets/application.css.scss
+       app/assets/stylesheets/application.scss
        client/assets/stylesheets/_post-bootstrap.scss
        client/assets/stylesheets/_pre-bootstrap.scss
        client/assets/stylesheets/_react-on-rails-sass-helper.scss
