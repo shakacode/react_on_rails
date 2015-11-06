@@ -17,6 +17,9 @@ shared_examples "ruby_linters" do
   it "copies linting and auditing tasks" do
     %w(lib/tasks/brakeman.rake
        lib/tasks/ci.rake
-       lib/tasks/linters.rake).each { |file| assert_file(file) }
+       lib/tasks/linters.rake
+       .rubocop.yml
+       .scss-lint.yml
+       ruby-lint.yml).each { |file| assert_file(file) }
   end
 end
