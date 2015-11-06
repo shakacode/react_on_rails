@@ -70,7 +70,6 @@ shared_examples "base_generator:base" do |options|
        client/webpack.client.rails.config.js
        client/.babelrc
        client/index.jade
-       client/npm-shrinkwrap.json
        client/package.json
        client/server.js
        lib/tasks/assets.rake
