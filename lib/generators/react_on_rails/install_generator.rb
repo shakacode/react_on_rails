@@ -1,18 +1,3 @@
-# Install Generator: gem's only public generator
-#
-# Usage:
-#   rails generate react_on_rails:install [options]
-#
-# Options:
-#   [--redux], [--no-redux]
-#     Indicates when to generate with redux
-#   [--server-rendering], [--no-server-rendering]
-#     Indicates whether ability for server-side rendering of webpack output should be enabled
-#   [--skip-js-linters]
-#     Do no install JavaScript linter files and configs
-#   [--ruby-linters]
-#     Install ruby linter files, tasks, and configs
-#
 require "rails/generators"
 
 module ReactOnRails
@@ -22,13 +7,13 @@ module ReactOnRails
       class_option :redux,
                    type: :boolean,
                    default: false,
-                   desc: "Setup Redux files",
+                   desc: "Install Redux gems and Redux version of Hello World Example",
                    aliases: "-R"
       # --server-rendering
       class_option :server_rendering,
                    type: :boolean,
                    default: false,
-                   desc: "Configure for server-side rendering of webpack JavaScript",
+                   desc: "Add necessary files and configurations for server-side rendering",
                    aliases: "-S"
       # --skip-js-linters
       class_option :skip_js_linters,
