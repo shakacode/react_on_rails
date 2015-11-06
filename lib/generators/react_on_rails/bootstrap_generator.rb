@@ -32,6 +32,7 @@ module ReactOnRails
            client/bootstrap-sass.config.js).each { |file| copy_file(base_path + file, file) }
       end
 
+      # rename to application.scss from application.css or application.css.scss
       def force_application_scss_naming_if_necessary
         base_path = "app/assets/stylesheets/"
         application_css = "#{base_path}application.css"
@@ -44,12 +45,12 @@ module ReactOnRails
         File.rename(bad_name, new_name)
       end
 
-      # def change_application_css_scss_to_scss_if_necessary
-      #   stylesheets_path = File.join(destination_root, "app/assets/stylesheets")
-      #   application_css = File.join(stylesheets_path, "application.css.scss")
-      #   return unless File.exist?(application_css)
-      #   File.rename(application_css, File.join(stylesheets_path, "application.scss"))
-      # end
+      # if there still is not application.scss, just create one
+      def create_application_scss_if_necessary
+        path = File.join(destination_root, "app/assets/stylesheets/application.scss")
+        return if File.exist?(path)
+        File.open(path, "w") { |f| f.puts "// Created by React on Rails gem\n\n" }
+      end
 
       def prepend_to_application_scss
         data = <<-DATA.strip_heredoc

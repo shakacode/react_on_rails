@@ -5,7 +5,7 @@ require File.expand_path("../../../../lib/generators/react_on_rails/install_gene
 include ReactOnRails::Generators
 
 # Expects an array of strings, such as "--redux"
-def run_generator_test_with_args(args)
+def run_generator_test_with_args(args, options = {})
   prepare_destination # this completely wipes the `destination` directory
   simulate_existing_file(".gitignore")
   simulate_existing_file("Gemfile", "CoffeeScript\ncoffee-rails\n")
@@ -19,7 +19,10 @@ def run_generator_test_with_args(args)
     //= require_tree .
   DATA
   simulate_existing_file("app/assets/javascripts/application.js", app_js_data)
-  simulate_existing_file("app/assets/stylesheets/application.css", " *= require_tree .\n *= require_self\n")
+  application_css = "app/assets/stylesheets/application.css.scss"
+  if options.fetch(:application_css, true)
+    simulate_existing_file(application_css, " *= require_tree .\n *= require_self\n")
+  end
   run_generator(args)
 end
 

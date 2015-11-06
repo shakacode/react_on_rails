@@ -122,4 +122,11 @@ describe InstallGenerator, type: :generator do
     include_examples "heroku_deployment"
     include_examples "js_linters:enabled"
   end
+
+  context "without existing application.css/scss file" do
+    before(:all) { run_generator_test_with_args([], application_css: false) }
+    it "creates its own application.scss file" do
+      assert_file("app/assets/stylesheets/application.scss")
+    end
+  end
 end
