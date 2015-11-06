@@ -1,5 +1,6 @@
 if %w(development test).include? Rails.env
   namespace :lint do
+    <%- if options.ruby_linters? -%>
     # This fails: https://github.com/bbatsov/rubocop/issues/1840
     # RuboCop::RakeTask.new
     # require "rubocop/rake_task"
@@ -24,6 +25,36 @@ if %w(development test).include? Rails.env
       sh cmd
     end
 
+    desc "See docs for task 'scss_lint'"
+    task :scss do
+      begin
+        require 'scss_lint/rake_task'
+        SCSSLint::RakeTask.new do |t|
+          t.files = ["app/assets/stylesheets/", "client/assets/stylesheets/"]
+        end
+        Rake::Task[:scss_lint].invoke
+      rescue LoadError
+        puts "** add gem 'scss_lint' to your Gemfile for scss linting."
+      end
+    end
+
+    # desc "haml_lint"
+    # task :haml_lint do
+    #   require 'haml_lint/rake_task'
+
+    #   HamlLint::RakeTask.new do |t|
+    #     t.files = ["app/views"]
+    #   end
+    # end
+
+    # desc "See docs for task 'slim_lint'"
+    # task slim: :slim_lint
+    # SlimLint::RakeTask.new do |t|
+    #   t.files = ["app/views"]
+    # end
+
+    <%- end -%>
+    <%- unless options.skip_js_linters? -%>
     desc "eslint"
     task :eslint do
       cmd = "cd client && npm run eslint . -- --ext .jsx,.js"
@@ -42,36 +73,12 @@ if %w(development test).include? Rails.env
     task js: [:eslint, :jscs] do
       puts "Completed running all JavaScript Linters"
     end
+    <%- end -%>
 
-    # desc "haml_lint"
-    # task :haml_lint do
-    #   require 'haml_lint/rake_task'
-
-    #   HamlLint::RakeTask.new do |t|
-    #     t.files = ["app/views"]
-    #   end
-    # end
-
-    # desc "See docs for task 'slim_lint'"
-    # task slim: :slim_lint
-    # SlimLint::RakeTask.new do |t|
-    #   t.files = ["app/views"]
-    # end
-
-    desc "See docs for task 'scss_lint'"
-    task :scss do
-      begin
-        require 'scss_lint/rake_task'
-        SCSSLint::RakeTask.new do |t|
-          t.files = ["app/assets/stylesheets/", "client/assets/stylesheets/"]
-        end
-        Rake::Task[:scss_lint].invoke
-      rescue LoadError
-        puts "** add gem 'scss_lint' to your Gemfile for scss linting."
-      end
-    end
-
-    task lint: [:rubocop, :ruby, :js, :scss] do
+    <%- enabled_linters = [] -%>
+    <%- enabled_linters << %i(rubocop, ruby) if options.ruby_linters? -%>
+    <%- enabled_linters << %i(js scss) unless options.skip_js_linters? -%>
+    task lint: <%= enabled_linters.flatten %> do
       puts "Completed all linting"
     end
   end

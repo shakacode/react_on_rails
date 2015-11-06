@@ -24,7 +24,6 @@ module ReactOnRails
         base_path = "ruby_linters/"
         %w(lib/tasks/brakeman.rake
            lib/tasks/ci.rake
-           lib/tasks/linters.rake
            .rubocop.yml
            .scss-lint.yml
            ruby-lint.yml).each { |file| copy_file(base_path + file, file) }

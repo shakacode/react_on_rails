@@ -20,6 +20,12 @@ module ReactOnRails
                    default: false,
                    desc: "Skip installing JavaScript linting files",
                    aliases: "-j"
+      # --ruby-linters
+      class_option :ruby_linters,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install ruby linting files, tasks, and configs",
+                   aliases: "-L"
 
       def add_hello_world_route
         route "get 'hello_world', to: 'hello_world#index'"
@@ -119,6 +125,11 @@ module ReactOnRails
            client/app/bundles/HelloWorld/startup/serverGlobals.jsx).each do |file|
           copy_file(base_path + file, file)
         end
+      end
+
+      def template_linter_files_if_appropriate
+        return if !options.ruby_linters? && options.skip_js_linters?
+        template("base/base/lib/tasks/linters.rake.tt", "lib/tasks/linters.rake")
       end
     end
   end
