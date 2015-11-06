@@ -19,8 +19,6 @@ namespace :assets do
   end
 
   task :clobber do
-    rm_rf "#{Rails.application.config.root}/app/assets/javascripts/generated/vendor-bundle.js"
-    rm_rf "#{Rails.application.config.root}/app/assets/javascripts/generated/client-bundle.js"
-    rm_rf "#{Rails.application.config.root}/app/assets/javascripts/generated/server-bundle.js"
+    rm_r Dir.glob(Rails.root.join("app/assets/javascripts/generated/*"))
   end
 end
