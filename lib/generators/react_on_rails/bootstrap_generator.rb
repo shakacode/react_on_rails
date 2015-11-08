@@ -32,11 +32,24 @@ module ReactOnRails
            client/bootstrap-sass.config.js).each { |file| copy_file(base_path + file, file) }
       end
 
-      def change_application_css_to_scss_if_necessary
-        stylesheets_path = File.join(destination_root, "app/assets/stylesheets")
-        application_css = File.join(stylesheets_path, "application.css")
-        return unless File.exist?(application_css)
-        File.rename(application_css, File.join(stylesheets_path, "application.css.scss"))
+      # rename to application.scss from application.css or application.css.scss
+      def force_application_scss_naming_if_necessary
+        base_path = "app/assets/stylesheets/"
+        application_css = "#{base_path}application.css"
+        application_css_scss = "#{base_path}application.css.scss"
+
+        bad_name = dest_file_exists?(application_css) || dest_file_exists?(application_css_scss)
+        return unless bad_name
+
+        new_name = File.join(destination_root, "#{base_path}application.scss")
+        File.rename(bad_name, new_name)
+      end
+
+      # if there still is not application.scss, just create one
+      def create_application_scss_if_necessary
+        path = File.join(destination_root, "app/assets/stylesheets/application.scss")
+        return if File.exist?(path)
+        File.open(path, "w") { |f| f.puts "// Created by React on Rails gem\n\n" }
       end
 
       def prepend_to_application_scss
@@ -63,11 +76,18 @@ module ReactOnRails
           @import 'post-bootstrap';
 
         DATA
-        append_to_file("app/assets/stylesheets/application.css.scss", data)
+
+        application_scss = File.join(destination_root, "app/assets/stylesheets/application.scss")
+
+        if File.exist?(application_scss)
+          append_to_file(application_scss, data)
+        else
+          puts_setup_file_error(application_scss, data)
+        end
       end
 
       def strip_application_scss_of_incompatible_sprockets_statements
-        application_scss = File.join(destination_root, "app/assets/stylesheets/application.css.scss")
+        application_scss = File.join(destination_root, "app/assets/stylesheets/application.scss")
         gsub_file(application_scss, "*= require_tree .", "")
         gsub_file(application_scss, "*= require_self", "")
       end
