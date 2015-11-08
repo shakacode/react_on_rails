@@ -1,16 +1,3 @@
-# Install Generator: gem's only public generator
-#
-# Usage:
-#   rails generate react_on_rails:install [options]
-#
-# Options:
-#   [--redux], [--no-redux]
-#     Indicates when to generate with redux
-#   [--hello-world-example], [--no-hello-world-example]
-#     Indicates when to generate with hello world example
-#   [--server-rendering], [--no-server-rendering]
-#     Indicates whether ability for server-side rendering of webpack output should be enabled
-#
 require "rails/generators"
 
 module ReactOnRails
@@ -41,7 +28,6 @@ module ReactOnRails
            client/app/bundles/HelloWorld/constants/helloWorldConstants.jsx
            client/app/bundles/HelloWorld/reducers/helloWorldReducer.jsx
            client/app/bundles/HelloWorld/reducers/index.jsx
-           client/app/bundles/HelloWorld/startup/HelloWorldAppClient.jsx
            client/app/bundles/HelloWorld/store/helloWorldStore.jsx
            client/app/lib/middlewares/loggerMiddleware.js).each do |file|
              copy_file(base_path + file, file)
@@ -54,6 +40,12 @@ module ReactOnRails
         %w(client/app/bundles/HelloWorld/startup/HelloWorldAppServer.jsx).each do |file|
           copy_file(base_path + file, file)
         end
+      end
+
+      def template_appropriate_version_of_hello_world_app_client
+        filename = options.server_rendering? ? "HelloWorldAppClient.jsx" : "HelloWorldApp.jsx"
+        location = "client/app/bundles/HelloWorld/startup"
+        template("redux/base/#{location}/HelloWorldAppClient.jsx.tt", "#{location}/#{filename}")
       end
     end
   end

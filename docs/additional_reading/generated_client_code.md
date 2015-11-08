@@ -1,4 +1,8 @@
-# Reducers
+# React Syntax
+## Communication Between Components
+See https://facebook.github.io/react/tips/communicate-between-components.html
+
+# Redux Reducers
 Documentation of generated Redux code for reducers.
 
 ## Example

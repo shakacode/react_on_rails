@@ -18,8 +18,7 @@ module ReactOnRails
       def copy_base_files
         base_path = "no_redux/base/"
         %w(client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
-           client/app/bundles/HelloWorld/containers/HelloWorld.jsx
-           client/app/bundles/HelloWorld/startup/HelloWorldAppClient.jsx).each do |file|
+           client/app/bundles/HelloWorld/containers/HelloWorld.jsx).each do |file|
              copy_file(base_path + file, file)
            end
       end
@@ -30,6 +29,12 @@ module ReactOnRails
         %w(client/app/bundles/HelloWorld/startup/HelloWorldAppServer.jsx).each do |file|
           copy_file(base_path + file, file)
         end
+      end
+
+      def template_appropriate_version_of_hello_world_app_client
+        filename = options.server_rendering? ? "HelloWorldAppClient.jsx" : "HelloWorldApp.jsx"
+        location = "client/app/bundles/HelloWorld/startup"
+        template("no_redux/base/#{location}/HelloWorldAppClient.jsx.tt", "#{location}/#{filename}")
       end
     end
   end

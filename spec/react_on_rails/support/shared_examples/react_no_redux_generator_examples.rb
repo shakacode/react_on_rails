@@ -1,8 +1,7 @@
 shared_examples "no_redux_generator:base" do
   it "copies non-redux base files" do
     %w(client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
-       client/app/bundles/HelloWorld/containers/HelloWorld.jsx
-       client/app/bundles/HelloWorld/startup/HelloWorldAppClient.jsx).each { |file| assert_file(file) }
+       client/app/bundles/HelloWorld/containers/HelloWorld.jsx).each { |file| assert_file(file) }
   end
 
   it "does not place react folders in root" do
@@ -17,11 +16,24 @@ shared_examples "no_redux_generator:no_server_rendering" do
     assert_no_file("client/webpack.server.rails.config.js")
     assert_no_file("client/app/bundles/HelloWorld/startup/HelloWorldAppServer.jsx")
   end
+
+  it "templates the client-side-rendering version of HelloWorldApp" do
+    assert_file("client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx") do |contents|
+      assert_match("HelloWorldApp", contents)
+      refute_match("HelloWorldAppClient", contents)
+    end
+  end
 end
 
 shared_examples "no_redux_generator:server_rendering" do
   it "copies the react server-rendering-specific files" do
     assert_file("client/webpack.server.rails.config.js")
     assert_file("client/app/bundles/HelloWorld/startup/HelloWorldAppServer.jsx")
+  end
+
+  it "templates the server-side-rendering version of HelloWorldApp" do
+    assert_file("client/app/bundles/HelloWorld/startup/HelloWorldAppClient.jsx") do |contents|
+      assert_match("HelloWorldAppClient", contents)
+    end
   end
 end
