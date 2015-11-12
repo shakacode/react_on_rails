@@ -65,10 +65,8 @@ shared_examples "base_generator:base" do
     %w(app/controllers/hello_world_controller.rb
        app/views/hello_world/index.html.erb
        config/initializers/react_on_rails.rb
-       client/webpack.client.base.config.js
        client/webpack.client.hot.config.js
        client/webpack.client.rails.config.js
-       client/app/bundles/HelloWorld/startup/clientGlobals.jsx
        client/.babelrc
        client/index.jade
        client/npm-shrinkwrap.json
@@ -95,17 +93,58 @@ shared_examples "base_generator:no_server_rendering" do
     end
   end
 
+  it "copies client-side-rendering version of clientGlobals" do
+    assert_file("client/webpack.client.base.config.js") do |contents|
+      assert_match("startup/globals", contents)
+      refute_match("startup/clientGlobals", contents)
+    end
+  end
+
   it "copies client-side-rendering version of hello_world/index.html.erb" do
     assert_file("app/views/hello_world/index.html.erb") do |contents|
       assert_match("prerender: false", contents)
     end
   end
+
+  it "templates client-side-rendering version of globals" do
+    assert_file("client/app/bundles/HelloWorld/startup/globals.jsx") do |contents|
+      assert_match("HelloWorldApp", contents)
+      refute_match("HelloWorldAppClient", contents)
+    end
+  end
+
+  it "templates client-side-rendering version of webpack.client.base.js" do
+    assert_file("client/webpack.client.base.config.js") do |contents|
+      assert_match("globals", contents)
+      refute_match("clientGlobals", contents)
+    end
+  end
 end
 
 shared_examples "base_generator:server_rendering" do
+  it "templates server-side-rendering version of globals" do
+    assert_file("client/app/bundles/HelloWorld/startup/clientGlobals.jsx") do |contents|
+      assert_match("HelloWorldAppClient", contents)
+    end
+  end
+
   it "copies server-rendering-only files" do
     %w(client/webpack.server.rails.config.js
        client/app/bundles/HelloWorld/startup/serverGlobals.jsx).each { |file| assert_file(file) }
+  end
+
+  it "copies server-side-rendering version of clientGlobals" do
+    assert_file("client/webpack.client.base.config.js") do |contents|
+      assert_match("startup/clientGlobals", contents)
+      refute_match("startup/globals", contents)
+    end
+  end
+
+  it "templates client-side-rendering version of webpack.client.base.js" do
+    assert_file("client/webpack.client.base.config.js") do |contents|
+      assert_match("clientGlobals", contents)
+      refute_match("globals", contents)
+    end
   end
 
   it "copies server-side-rendering version of Procfile.dev" do

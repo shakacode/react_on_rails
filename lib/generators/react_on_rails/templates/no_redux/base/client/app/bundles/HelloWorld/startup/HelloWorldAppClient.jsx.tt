@@ -1,0 +1,12 @@
+<%- component_name = options.server_rendering? ? "HelloWorldAppClient" : "HelloWorldApp" -%>
+import React from 'react';
+import HelloWorld from '../containers/HelloWorld';
+
+const <%= component_name %> = props => {
+  const reactComponent = (
+    <HelloWorld {...props} />
+  );
+  return reactComponent;
+};
+
+export default <%= component_name %>;

@@ -107,10 +107,8 @@ module ReactOnRails
            client/index.jade
            client/npm-shrinkwrap.json
            client/server.js
-           client/webpack.client.base.config.js
            client/webpack.client.hot.config.js
            client/webpack.client.rails.config.js
-           client/app/bundles/HelloWorld/startup/clientGlobals.jsx
            lib/tasks/assets.rake
            REACT_ON_RAILS.md
            client/REACT_ON_RAILS_CLIENT_README.md
@@ -121,7 +119,14 @@ module ReactOnRails
         base_path = "base/base/"
         %w(Procfile.dev
            app/views/hello_world/index.html.erb
+           client/webpack.client.base.config.js
            client/package.json).each { |file| template(base_path + file + ".tt", file) }
+      end
+
+      def template_client_globals_file
+        filename = options.server_rendering? ? "clientGlobals.jsx" : "globals.jsx"
+        location = "client/app/bundles/HelloWorld/startup"
+        template("base/base/#{location}/globals.jsx.tt", "#{location}/#{filename}")
       end
 
       def install_server_rendering_files_if_enabled

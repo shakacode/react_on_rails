@@ -1,3 +1,4 @@
+<%- generator_function_name = options.server_rendering? ? "HelloWorldAppClient" : "HelloWorldApp" -%>
 import React from 'react';
 import { Provider } from 'react-redux';
 
@@ -7,7 +8,7 @@ import HelloWorld from '../containers/HelloWorld';
 // See documentation for https://github.com/rackt/react-redux.
 // This is how you get props from the Rails view into the redux store.
 // This code here binds your smart component to the redux store.
-const HelloWorldAppClient = props => {
+const <%= generator_function_name %> = props => {
   const store = createStore(props);
   const reactComponent = (
     <Provider store={store}>
@@ -17,4 +18,4 @@ const HelloWorldAppClient = props => {
   return reactComponent;
 };
 
-export default HelloWorldAppClient;
+export default <%= generator_function_name %>;
