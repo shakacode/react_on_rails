@@ -3,7 +3,9 @@ The generator has created the necessary files and gems for deployment to Heroku.
 
 + `Procfile`: used by Heroku and Foreman to start the server
 + `.buildpacks`: used to install Ruby and Node environments
++ `config/unicorn.rb`: Unicorn config file
 + `12factor` gem: required by Heroku
++ `unicorn` gem: app server used by Heroku
 + `lib/tasks/assets.rake`: rake task that generates your JavaScript bundles for production.
 
 ## How to Deploy
