@@ -165,7 +165,7 @@
     if (generatorFunction) {
       return this[componentName](props);
     } else {
-      return React.createElement(this[componentName], props);
+      return provideClientReact().createElement(this[componentName], props);
     }
   }
 
