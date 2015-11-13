@@ -76,7 +76,7 @@ if %w(development test).include? Rails.env
     <%- end -%>
 
     <%- enabled_linters = [] -%>
-    <%- enabled_linters << %i(rubocop, ruby) if options.ruby_linters? -%>
+    <%- enabled_linters << %i(rubocop ruby) if options.ruby_linters? -%>
     <%- enabled_linters << %i(js scss) unless options.skip_js_linters? -%>
     task lint: <%= enabled_linters.flatten %> do
       puts "Completed all linting"
