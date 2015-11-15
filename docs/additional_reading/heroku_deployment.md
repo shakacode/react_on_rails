@@ -1,10 +1,12 @@
 # Heroku Deployment
 The generator has created the necessary files and gems for deployment to Heroku. If you have installed manually, you will need to provide these files yourself:
 
-+ `Procfile`: used by Heroku and Foreman to start the server
++ `Procfile`: used by Heroku and Foreman to start the Puma server
 + `.buildpacks`: used to install Ruby and Node environments
 + `12factor` gem: required by Heroku
-+ `lib/tasks/assets.rake`: rake task that generates your JavaScript bundles for production.
++ `'puma'` gem: recommended Heroku webserver
++ `config/puma.rb`: Puma webserver config file
++ `lib/tasks/assets.rake`: This rake task file is provided by the generator regardless of whether the user chose Heroku Deployment as an option. It is highlighted here because it is helpful to understand that this task is what generates your JavaScript bundles in production.
 
 ## How to Deploy
 

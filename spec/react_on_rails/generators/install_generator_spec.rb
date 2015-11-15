@@ -10,7 +10,6 @@ describe InstallGenerator, type: :generator do
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
     include_examples "bootstrap"
-    include_examples "heroku_deployment"
     include_examples "js_linters:enabled"
   end
 
@@ -21,7 +20,6 @@ describe InstallGenerator, type: :generator do
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
     include_examples "bootstrap"
-    include_examples "heroku_deployment"
     include_examples "js_linters:disabled"
   end
 
@@ -32,7 +30,6 @@ describe InstallGenerator, type: :generator do
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
     include_examples "bootstrap"
-    include_examples "heroku_deployment"
     include_examples "js_linters:disabled"
   end
 
@@ -43,7 +40,6 @@ describe InstallGenerator, type: :generator do
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
     include_examples "bootstrap"
-    include_examples "heroku_deployment"
     include_examples "js_linters:enabled"
     include_examples "ruby_linters"
   end
@@ -55,7 +51,6 @@ describe InstallGenerator, type: :generator do
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
     include_examples "bootstrap"
-    include_examples "heroku_deployment"
     include_examples "js_linters:enabled"
     include_examples "ruby_linters"
   end
@@ -67,7 +62,6 @@ describe InstallGenerator, type: :generator do
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:server_rendering"
     include_examples "bootstrap"
-    include_examples "heroku_deployment"
     include_examples "js_linters:enabled"
   end
 
@@ -78,7 +72,6 @@ describe InstallGenerator, type: :generator do
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:server_rendering"
     include_examples "bootstrap"
-    include_examples "heroku_deployment"
     include_examples "js_linters:enabled"
   end
 
@@ -89,7 +82,6 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:no_server_rendering"
     include_examples "bootstrap"
-    include_examples "heroku_deployment"
     include_examples "js_linters:enabled"
   end
 
@@ -100,7 +92,6 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:no_server_rendering"
     include_examples "bootstrap"
-    include_examples "heroku_deployment"
     include_examples "js_linters:enabled"
   end
 
@@ -111,7 +102,6 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:server_rendering"
     include_examples "bootstrap"
-    include_examples "heroku_deployment"
     include_examples "js_linters:enabled"
   end
 
@@ -122,7 +112,6 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:server_rendering"
     include_examples "bootstrap"
-    include_examples "heroku_deployment"
     include_examples "js_linters:enabled"
   end
 
@@ -133,7 +122,6 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:server_rendering"
     include_examples "bootstrap"
-    include_examples "heroku_deployment"
     include_examples "js_linters:enabled"
   end
 
@@ -142,5 +130,15 @@ describe InstallGenerator, type: :generator do
     it "creates its own application.scss file" do
       assert_file("app/assets/stylesheets/application.scss")
     end
+  end
+
+  context "--heroku-deployment" do
+    before(:all) { run_generator_test_with_args(%w(--heroku-deployment)) }
+    include_examples "heroku_deployment"
+  end
+
+  context "-H" do
+    before(:all) { run_generator_test_with_args(%w(-H)) }
+    include_examples "heroku_deployment"
   end
 end
