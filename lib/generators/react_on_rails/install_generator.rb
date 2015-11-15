@@ -27,8 +27,14 @@ module ReactOnRails
                    default: false,
                    desc: "Install ruby linting files, tasks, and configs",
                    aliases: "-L"
+      # --ruby-linters
+      class_option :heroku_deployment,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install files necessary for deploying to Heroku",
+                   aliases: "-H"
 
-      def run_generators
+      def run_generators # rubocop:disable Metrics/CyclomaticComplexity
         return unless installation_prerequisites_met?
         warn_if_nvm_is_not_installed
         invoke "react_on_rails:base"
@@ -37,7 +43,7 @@ module ReactOnRails
         invoke "react_on_rails:js_linters" unless options.skip_js_linters?
         invoke "react_on_rails:ruby_linters" if options.ruby_linters?
         invoke "react_on_rails:bootstrap"
-        invoke "react_on_rails:heroku_deployment"
+        invoke "react_on_rails:heroku_deployment" if options.heroku_deployment?
       end
 
       private

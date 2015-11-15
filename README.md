@@ -203,10 +203,11 @@ Usage:
   rails generate react_on_rails:install [options]
 
 Options:
-  -R, [--redux], [--no-redux]                        # Install Redux gems and Redux version of Hello World Example
-  -S, [--server-rendering], [--no-server-rendering]  # Add necessary files and configurations for server-side rendering
-  -j, [--skip-js-linters], [--no-skip-js-linters]    # Skip installing JavaScript linting files
-  -L, [--ruby-linters], [--no-ruby-linters]          # Install ruby linting files, tasks, and configs
+  -R, [--redux], [--no-redux]                          # Install Redux gems and Redux version of Hello World Example
+  -S, [--server-rendering], [--no-server-rendering]    # Add necessary files and configurations for server-side rendering
+  -j, [--skip-js-linters], [--no-skip-js-linters]      # Skip installing JavaScript linting files
+  -L, [--ruby-linters], [--no-ruby-linters]            # Install ruby linting files, tasks, and configs
+  -H, [--heroku-deployment], [--no-heroku-deployment]  # Install files necessary for deploying to Heroku
 
 Runtime options:
   -f, [--force]                    # Overwrite files that already exist
