@@ -93,7 +93,7 @@ module ReactOnRails
       end
 
       def add_bootstrap_sprockets_to_gemfile
-        gem("bootstrap-sass")
+        append_to_file("Gemfile", "gem 'bootstrap-sass'\n")
       end
 
       def add_bootstrap_sprockets_to_application_js
