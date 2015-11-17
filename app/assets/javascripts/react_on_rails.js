@@ -4,19 +4,16 @@
   ReactOnRails.clientRenderReactComponent = function(options) {
     var componentName = options.componentName;
     var domId = options.domId;
-    var propsVarName = options.propsVarName;
     var props = options.props;
     var trace = options.trace;
     var generatorFunction = options.generatorFunction;
     var expectTurboLinks = options.expectTurboLinks;
 
-    this[propsVarName] = props;
-
     var renderIfDomNodePresent = function() {
       try {
         var domNode = document.getElementById(domId);
         if (domNode) {
-          var reactElement = createReactElement(componentName, propsVarName, props,
+          var reactElement = createReactElement(componentName, props,
             domId, trace, generatorFunction);
           provideClientReact().render(reactElement, domNode);
         }
@@ -60,7 +57,6 @@
   ReactOnRails.serverRenderReactComponent = function(options) {
     var componentName = options.componentName;
     var domId = options.domId;
-    var propsVarName = options.propsVarName;
     var props = options.props;
     var trace = options.trace;
     var generatorFunction = options.generatorFunction;
@@ -69,8 +65,7 @@
     var consoleReplay = '';
 
     try {
-      var reactElement = createReactElement(componentName, propsVarName, props,
-        domId, trace, generatorFunction);
+      var reactElement = createReactElement(componentName, props, domId, trace, generatorFunction);
       htmlResult = provideServerReact().renderToString(reactElement);
     }
     catch (e) {
@@ -156,10 +151,9 @@
     return consoleReplay;
   };
 
-  function createReactElement(componentName, propsVarName, props, domId, trace, generatorFunction) {
+  function createReactElement(componentName, props, domId, trace, generatorFunction) {
     if (trace) {
-      console.log('RENDERED ' + componentName + ' with data_variable ' +
-        propsVarName + ' to dom node with id: ' + domId);
+      console.log('RENDERED ' + componentName + ' to dom node with id: ' + domId);
     }
 
     if (generatorFunction) {
