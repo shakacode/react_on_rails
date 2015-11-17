@@ -1,3 +1,10 @@
+GIT
+  remote: git://github.com/rails/turbolinks.git
+  revision: 75115a3c217f54b447b780061ae0279abae1f146
+  specs:
+    turbolinks (3.0.0)
+      coffee-rails
+
 PATH
   remote: ../..
   specs:
@@ -78,7 +85,7 @@ GEM
     coffee-script (2.4.1)
       coffee-script-source
       execjs
-    coffee-script-source (1.9.1.1)
+    coffee-script-source (1.10.0)
     columnize (0.9.0)
     connection_pool (2.2.0)
     coveralls (0.8.2)
@@ -253,8 +260,6 @@ GEM
     thread_safe (0.3.5)
     tilt (1.4.1)
     tins (1.6.0)
-    turbolinks (2.5.3)
-      coffee-rails
     tzinfo (1.2.2)
       thread_safe (~> 0.1)
     uglifier (2.7.2)
@@ -305,7 +310,7 @@ DEPENDENCIES
   spring
   sqlite3
   therubyracer
-  turbolinks
+  turbolinks!
   uglifier (>= 2.7.2)
   web-console (~> 2.0)
 
