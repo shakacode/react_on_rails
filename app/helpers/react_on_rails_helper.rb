@@ -19,7 +19,7 @@ module ReactOnRailsHelper
   #      global.MyReactComponentApp = MyReactComponentApp;
   #    See spec/dummy/client/app/startup/serverGlobals.jsx and
   #      spec/dummy/client/app/startup/ClientApp.jsx for examples of this
-  # props: Ruby Hash which contains the properties to pass to the react object
+  # props: Ruby Hash or JSON string which contains the properties to pass to the react object
   #
   #  options:
   #    generator_function: <true/false> default is false, set to true if you want to use a
@@ -135,12 +135,16 @@ module ReactOnRailsHelper
     # Make sure that we use up-to-date server-bundle
     ReactOnRails::ServerRenderingPool.reset_pool_if_server_bundle_was_modified
 
+    # Since this code is not inserted on a web page, we don't need to escape.
+    props_string = props.is_a?(String) ? props : props.to_json
+
     wrapper_js = <<-JS
 (function() {
+  var props = #{props_string};
   return ReactOnRails.serverRenderReactComponent({
     componentName: '#{react_component_name}',
     domId: '#{dom_id}',
-    props: #{sanitized_props_string(props)},
+    props: props,
     trace: #{trace(options)},
     generatorFunction: #{generator_function(options)}
   });
@@ -151,7 +155,7 @@ module ReactOnRailsHelper
   rescue ExecJS::ProgramError => err
     raise ReactOnRails::ServerRenderingPool::PrerenderError.new(
       react_component_name,
-      sanitized_props_string(props),
+      sanitized_props_string(props), # Sanitize as this might be browser logged
       err
     )
   end
