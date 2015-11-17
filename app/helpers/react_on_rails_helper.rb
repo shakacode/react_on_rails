@@ -52,6 +52,8 @@ module ReactOnRailsHelper
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
     data_variable_name = "__#{component_name.camelize(:lower)}Data#{react_component_index}__"
     turbolinks_loaded = Object.const_defined?(:Turbolinks)
+    script_options = {}
+    script_options['data-turbolinks-eval'] = "always" if turbolinks_loaded
     # NOTE: props might include closing script tag that might cause XSS
     props_string = sanitized_props_string(props)
     page_loaded_js = <<-JS
@@ -69,7 +71,7 @@ module ReactOnRailsHelper
 })();
     JS
 
-    data_from_server_script_tag = javascript_tag(page_loaded_js)
+    data_from_server_script_tag = javascript_tag(page_loaded_js, script_options)
 
     # Create the HTML rendering part
     server_rendered_html, console_script =
