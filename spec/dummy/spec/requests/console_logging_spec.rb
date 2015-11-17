@@ -6,8 +6,8 @@ describe "Server Error Logging" do
     html_nodes = Nokogiri::HTML(response.body)
 
     expected = <<-JS
-console.log.apply(console, ["[SERVER] RENDERED HelloWorldWithLogAndThrow to dom node with id: \
-HelloWorldWithLogAndThrow-react-component-0"]);
+console.log.apply(console, ["[SERVER] RENDERED HelloWorldWithLogAndThrow to dom node \
+with id: HelloWorldWithLogAndThrow-react-component-0"]);
 console.log.apply(console, ["[SERVER] console.log in HelloWorld"]);
 console.warn.apply(console, ["[SERVER] console.warn in HelloWorld"]);
 console.error.apply(console, ["[SERVER] console.error in HelloWorld"]);
@@ -18,7 +18,8 @@ console.error.apply(console, ["[SERVER] stack: Error: throw in HelloWorldContain
 
     expected_lines = expected.split("\n")
 
-    script_node = html_nodes.css("script")[2]
+    script_node = html_nodes.css("script")[1]
+
     expected_lines.each do |line|
       expect(script_node.inner_text).to include(line)
     end
