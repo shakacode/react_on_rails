@@ -71,14 +71,15 @@ module ReactOnRails
 
           // bootstrap-sprockets depends on generated/vendor-bundle for jQuery.
           //= require bootstrap-sprockets
+
         DATA
 
-        application_js_path = "app/assets/javascripts/application.js"
-        application_js = dest_file_exists?(application_js_path) || dest_file_exists?(application_js_path + ".coffee")
-        if application_js
-          prepend_to_file(application_js, data)
+        app_js_path = "app/assets/javascripts/application.js"
+        found_app_js = dest_file_exists?(app_js_path) || dest_file_exists?(app_js_path + ".coffee")
+        if found_app_js
+          prepend_to_file(found_app_js, data)
         else
-          puts_setup_file_error("#{application_js} or #{application_js}.coffee", data)
+          create_file(app_js_path, data)
         end
       end
 
