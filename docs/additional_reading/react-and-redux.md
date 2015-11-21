@@ -1,4 +1,5 @@
-# React Syntax
+# Communication between React Components and Redux Reduceres
+
 ## Communication Between Components
 See https://facebook.github.io/react/tips/communicate-between-components.html
 
