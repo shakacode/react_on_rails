@@ -10,7 +10,7 @@ This document describes the coding style of [ShakaCode](http://www.shakacode.com
 * Use [Lodash](https://lodash.com/) rather than Underscore.
 * Place all JavaScript for the client app in `/client`
 * Organize your app into high level domains which map to JavaScript bundles. These are like mini-apps that live within your entire app. Create directories named like `/client/app/<bundle>` and configure Webpack to generate different corresponding bundles.
-* Carefully organize your React components into either:
+* Carefully organize your React components into [Smart and Dumb Components](https://medium.com/@dan_abramov/smart-and-dumb-components-7ca2f9a7c7d0#.ygdkh1l7b):
    1. "dumb" components that live in the `/client/app/<bundle>/components/` directories. These components should take props, including values and callbacks, and should not talk directly to Redux or any AJAX endpoints.
    2. "smart" components that live in the `/client/app/<bundle>/containers/` directory. These components will talk to the Redux store and AJAX endpoints.
 * Place common code shared across bundles in `/client/app/libs` and configure Webpack to generate a common bundle for this one.
