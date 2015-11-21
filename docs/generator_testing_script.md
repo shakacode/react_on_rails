@@ -15,7 +15,6 @@ Edit the Gemfile, adding these 2 lines:
 
 ```ruby
 gem 'react_on_rails', path: '../react_on_rails'
-gem 'therubyracer'
 ```
 
 Note the relative path to the react_on_rails gem.

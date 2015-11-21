@@ -94,7 +94,6 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
   
   ```ruby
   gem "react_on_rails"
-  gem "therubyracer"
   ```
 
 2. Run the generator with a simple "Hello World" example:
@@ -123,7 +122,9 @@ The generator installs your webpack files in the `client` folder. Foreman uses w
 Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails.
 
 ### Client-Side Rendering vs. Server-Side Rendering
-In most cases, you should use the `prerender: false` (default behavior) with the provided helper method to render the React component from your Rails views. In some cases, such as when SEO is vital or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`. Your JavaScript can then be first rendered on the server and passed to the client as HTML.
+In most cases, you should use the `prerender: false` (default behavior) with the provided helper method to render the React component from your Rails views. In some cases, such as when SEO is vital or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
+
+Now the server will interpret your JavaScript using [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. We recommend using [therubyracer](https://github.com/cowboyd/therubyracer) as ExecJS's runtime. The generator will automatically add it to your Gemfile for you.
 
 Note that **server-rendering requires globally exposing your components by setting them to `global`, not `window`** (as is the case with client-rendering). If using the generator, you can pass the `--server-rendering` option to configure your application for server-side rendering. 
 
