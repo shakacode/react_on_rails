@@ -22,9 +22,11 @@ Follow these style guidelines per the linter configuration. Basically, lint your
 
 ### Ruby Coding Standards
 * [RailsOnMaui Ruby Coding Standards](https://github.com/justin808/ruby)
+* [Ruby Documentation](http://guides.rubyonrails.org/api_documentation_guidelines.html)
 
 ### JavaScript Coding Standards
 * [AirBnb Javascript](https://github.com/airbnb/javascript)
+* [JSDoc](http://usejsdoc.org/)
 
 ### Git coding Standards
 * [Git Coding Standards](http://chlg.co/1GV2m9p)
