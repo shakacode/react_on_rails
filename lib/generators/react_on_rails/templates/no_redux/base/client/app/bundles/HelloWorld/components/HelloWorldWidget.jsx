@@ -31,7 +31,7 @@ export default class HelloWorldWidget extends React.Component {
         </h3>
         <p>
           Say hello to:
-          <input type="text" ref="name" value={this.props.name} onChange={this._handleChange} />
+          <input type="text" value={this.props.name} onChange={this._handleChange} />
         </p>
       </div>
     );
