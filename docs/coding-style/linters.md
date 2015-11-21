@@ -16,7 +16,7 @@ If you haven't tried the autofix options for `jscs` and `rubocop`, you're seriou
   jscs -x .
   ```
 
-Autofixing is a **HUGE** timesaver!
+Autofixing is a **HUGE** time saver!
 
 ## ESLint
 
