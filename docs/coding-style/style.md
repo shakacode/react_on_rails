@@ -15,7 +15,8 @@ This document describes the coding style of [ShakaCode](http://www.shakacode.com
    2. "smart" components that live in the `/client/app/<bundle>/containers/` directory. These components will talk to the Redux store and AJAX endpoints.
 * Place common code shared across bundles in `/client/app/libs` and configure Webpack to generate a common bundle for this one.
 * Prefix Immutable.js variable names and properties with `$$`. By doing this, you will clearly know that you are dealing with an Immutable.js object and not a standard JavaScript Object or Array.
-* Bind callbacks passed to react components with `_.bind`
+* Use ES6 classes rather than `React.createClass`.
+* Bind callbacks passed to react components with `_.bindAll` in the constructor unless you need to bind additional parameters. In that case, you can call `_.bind` within the rendering.
 
 ## Style Guides to Follow
 Follow these style guidelines per the linter configuration. Basically, lint your code and if you have questions about the suggested fixes, look here:
