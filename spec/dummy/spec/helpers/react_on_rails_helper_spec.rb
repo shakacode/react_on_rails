@@ -48,7 +48,8 @@ describe ReactOnRailsHelper, type: :helper do
     let(:id) { "App-react-component-0" }
 
     let(:react_definition_div) do
-      "<div class=\"react-component\"
+      "<div class=\"js-react-on-rails-component\"
+            style=\"display:none\"
             data-component-name=\"App\"
             data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
             data-trace=\"false\"

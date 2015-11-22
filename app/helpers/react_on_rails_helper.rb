@@ -55,7 +55,8 @@ module ReactOnRailsHelper
     component_specification_tag =
       content_tag(:div,
                   "",
-                  class: "react-component",
+                  class: "js-react-on-rails-component",
+                  style: "display:none",
                   data: {
                     component_name: react_component_name,
                     props: props,

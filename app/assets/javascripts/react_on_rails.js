@@ -101,7 +101,7 @@
   };
 
   function forEachComponent(fn) {
-    var els = document.getElementsByClassName('react-component');
+    var els = document.getElementsByClassName('js-react-on-rails-component');
     for (var i = 0; i < els.length; i++) {
       fn(els[i]);
     };
