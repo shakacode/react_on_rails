@@ -50,18 +50,16 @@ module ReactOnRailsHelper
 
     # Setup the page_loaded_js, which is the same regardless of prerendering or not!
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
-    data_variable_name = "__#{component_name.camelize(:lower)}Data#{react_component_index}__"
     turbolinks_loaded = Object.const_defined?(:Turbolinks)
     # NOTE: props might include closing script tag that might cause XSS
     props_string = sanitized_props_string(props)
     page_loaded_js = <<-JS
 (function() {
-  window.#{data_variable_name} = #{props_string};
+  var props = #{props_string};
   ReactOnRails.clientRenderReactComponent({
     componentName: '#{react_component_name}',
     domId: '#{dom_id}',
-    propsVarName: '#{data_variable_name}',
-    props: window.#{data_variable_name},
+    props: props,
     trace: #{trace(options)},
     generatorFunction: #{generator_function(options)},
     expectTurboLinks: #{turbolinks_loaded}
@@ -73,8 +71,7 @@ module ReactOnRailsHelper
 
     # Create the HTML rendering part
     server_rendered_html, console_script =
-      server_rendered_react_component_html(options, props_string, react_component_name,
-                                           data_variable_name, dom_id)
+      server_rendered_react_component_html(options, props_string, react_component_name, dom_id)
 
     content_tag_options = options.except(:generator_function, :prerender, :trace,
                                          :replay_console, :id, :react_component_name,
@@ -136,7 +133,7 @@ module ReactOnRailsHelper
 
   # Returns Array [0]: html, [1]: script to console log
   # NOTE, these are NOT html_safe!
-  def server_rendered_react_component_html(options, props_string, react_component_name, data_variable_name, dom_id)
+  def server_rendered_react_component_html(options, props_string, react_component_name, dom_id)
     return ["", ""] unless prerender(options)
 
     # Make sure that we use up-to-date server-bundle
@@ -148,7 +145,6 @@ module ReactOnRailsHelper
   return ReactOnRails.serverRenderReactComponent({
     componentName: '#{react_component_name}',
     domId: '#{dom_id}',
-    propsVarName: '#{data_variable_name}',
     props: props,
     trace: #{trace(options)},
     generatorFunction: #{generator_function(options)}
