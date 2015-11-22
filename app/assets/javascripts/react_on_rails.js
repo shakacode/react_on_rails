@@ -1,58 +1,6 @@
 (function() {
   this.ReactOnRails = {};
-
-  ReactOnRails.clientRenderReactComponent = function(options) {
-    var componentName = options.componentName;
-    var domId = options.domId;
-    var props = options.props;
-    var trace = options.trace;
-    var generatorFunction = options.generatorFunction;
-    var expectTurboLinks = options.expectTurboLinks;
-
-    var renderIfDomNodePresent = function() {
-      try {
-        var domNode = document.getElementById(domId);
-        if (domNode) {
-          var reactElement = createReactElement(componentName, props,
-            domId, trace, generatorFunction);
-          provideClientReact().render(reactElement, domNode);
-        }
-      }
-      catch (e) {
-        ReactOnRails.handleError({
-          e: e,
-          componentName: componentName,
-          serverSide: false,
-        });
-      }
-    };
-
-    var turbolinksInstalled = (typeof Turbolinks !== 'undefined');
-    if (!expectTurboLinks || (!turbolinksInstalled && expectTurboLinks)) {
-      if (expectTurboLinks) {
-        console.warn('WARNING: NO TurboLinks detected in JS, but it is in your Gemfile');
-      }
-
-      document.addEventListener('DOMContentLoaded', function(event) {
-        renderIfDomNodePresent();
-      });
-    } else {
-      function onPageChange(event) {
-        var removePageChangeListener = function() {
-          document.removeEventListener('page:change', onPageChange);
-          document.removeEventListener('page:before-unload', removePageChangeListener);
-          var domNode = document.getElementById(domId);
-          provideClientReact().unmountComponentAtNode(domNode);
-        };
-
-        document.addEventListener('page:before-unload', removePageChangeListener);
-
-        renderIfDomNodePresent();
-      }
-
-      document.addEventListener('page:change', onPageChange);
-    }
-  };
+  var turbolinksInstalled = (typeof Turbolinks !== 'undefined');
 
   ReactOnRails.serverRenderReactComponent = function(options) {
     var componentName = options.componentName;
@@ -65,7 +13,8 @@
     var consoleReplay = '';
 
     try {
-      var reactElement = createReactElement(componentName, props, domId, trace, generatorFunction);
+      var reactElement = createReactElement(componentName, props,
+        domId, trace, generatorFunction);
       htmlResult = provideServerReact().renderToString(reactElement);
     }
     catch (e) {
@@ -151,6 +100,56 @@
     return consoleReplay;
   };
 
+  function forEachComponent(fn) {
+    var els = document.getElementsByClassName('js-react-on-rails-component');
+    for (var i = 0; i < els.length; i++) {
+      fn(els[i]);
+    };
+  }
+
+  function pageLoaded() {
+    forEachComponent(render);
+  }
+
+  function pageUnloaded() {
+    forEachComponent(unmount);
+  }
+
+  function unmount(el) {
+    var domId = el.getAttribute('data-dom-id');
+    var domNode = document.getElementById(domId);
+    provideClientReact().unmountComponentAtNode(domNode);
+  }
+
+  function render(el) {
+    var componentName = el.getAttribute('data-component-name');
+    var domId = el.getAttribute('data-dom-id');
+    var props = JSON.parse(el.getAttribute('data-props'));
+    var trace = JSON.parse(el.getAttribute('data-trace'));
+    var generatorFunction = JSON.parse(el.getAttribute('data-generator-function'));
+    var expectTurboLinks = JSON.parse(el.getAttribute('data-expect-turbo-links'));
+
+    if (!turbolinksInstalled && expectTurboLinks) {
+      console.warn('WARNING: NO TurboLinks detected in JS, but it is in your Gemfile');
+    }
+
+    try {
+      var domNode = document.getElementById(domId);
+      if (domNode) {
+        var reactElement = createReactElement(componentName, props,
+          domId, trace, generatorFunction);
+        provideClientReact().render(reactElement, domNode);
+      }
+    }
+    catch (e) {
+      ReactOnRails.handleError({
+        e: e,
+        componentName: componentName,
+        serverSide: false,
+      });
+    }
+  };
+
   function createReactElement(componentName, props, domId, trace, generatorFunction) {
     if (trace) {
       console.log('RENDERED ' + componentName + ' to dom node with id: ' + domId);
@@ -177,5 +176,15 @@
     }
 
     return ReactDOMServer;
+  }
+
+  // Install listeners when running on the client.
+  if (typeof document !== 'undefined') {
+    if (!turbolinksInstalled) {
+      document.addEventListener('DOMContentLoaded', pageLoaded);
+    } else {
+      document.addEventListener('page:before-unload', pageUnloaded);
+      document.addEventListener('page:change', pageLoaded);
+    }
   }
 }.call(this));

@@ -35,26 +35,45 @@ describe ReactOnRailsHelper, type: :helper do
     end
   end
   describe "#react_component" do
-    subject { react_component("App") }
+    subject { react_component("App", props) }
+
+    let(:props) do
+      { name: "My Test Name" }
+    end
 
     let(:react_component_div) do
       "<div id=\"App-react-component-0\"></div>"
     end
 
+    let(:id) { "App-react-component-0" }
+
+    let(:react_definition_div) do
+      "<div class=\"js-react-on-rails-component\"
+            style=\"display:none\"
+            data-component-name=\"App\"
+            data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
+            data-trace=\"false\"
+            data-generator-function=\"false\"
+            data-expect-turbolinks=\"true\"
+            data-dom-id=\"#{id}\"></div>".squish
+    end
+
     it { expect(self).to respond_to :react_component }
 
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
-    it { is_expected.to start_with "<script>" }
+    it { is_expected.to start_with "<div" }
     it { is_expected.to end_with "</div>\n\n" }
     it { is_expected.to include react_component_div }
+    it { is_expected.to include react_definition_div }
 
     context "with 'id' option" do
-      subject { react_component("App", {}, id: id) }
+      subject { react_component("App", props, id: id) }
 
       let(:id) { "shaka_div" }
 
       it { is_expected.to include id }
       it { is_expected.not_to include react_component_div }
+      it { is_expected.to include react_definition_div }
     end
   end
 

@@ -19,7 +19,7 @@ module ReactOnRailsHelper
   #      global.MyReactComponentApp = MyReactComponentApp;
   #    See spec/dummy/client/app/startup/serverGlobals.jsx and
   #      spec/dummy/client/app/startup/ClientApp.jsx for examples of this
-  # props: Ruby Hash which contains the properties to pass to the react object
+  # props: Ruby Hash or JSON string which contains the properties to pass to the react object
   #
   #  options:
   #    generator_function: <true/false> default is false, set to true if you want to use a
@@ -51,27 +51,24 @@ module ReactOnRailsHelper
     # Setup the page_loaded_js, which is the same regardless of prerendering or not!
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
     turbolinks_loaded = Object.const_defined?(:Turbolinks)
-    # NOTE: props might include closing script tag that might cause XSS
-    props_string = sanitized_props_string(props)
-    page_loaded_js = <<-JS
-(function() {
-  var props = #{props_string};
-  ReactOnRails.clientRenderReactComponent({
-    componentName: '#{react_component_name}',
-    domId: '#{dom_id}',
-    props: props,
-    trace: #{trace(options)},
-    generatorFunction: #{generator_function(options)},
-    expectTurboLinks: #{turbolinks_loaded}
-  });
-})();
-    JS
 
-    data_from_server_script_tag = javascript_tag(page_loaded_js)
+    component_specification_tag =
+      content_tag(:div,
+                  "",
+                  class: "js-react-on-rails-component",
+                  style: "display:none",
+                  data: {
+                    component_name: react_component_name,
+                    props: props,
+                    trace: trace(options),
+                    generator_function: generator_function(options),
+                    expect_turbolinks: turbolinks_loaded,
+                    dom_id: dom_id
+                  })
 
     # Create the HTML rendering part
     server_rendered_html, console_script =
-      server_rendered_react_component_html(options, props_string, react_component_name, dom_id)
+      server_rendered_react_component_html(options, props, react_component_name, dom_id)
 
     content_tag_options = options.except(:generator_function, :prerender, :trace,
                                          :replay_console, :id, :react_component_name,
@@ -84,7 +81,7 @@ module ReactOnRailsHelper
 
     # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
     <<-HTML.html_safe
-#{data_from_server_script_tag}
+#{component_specification_tag}
 #{rendered_output}
 #{replay_console(options) ? console_script : ''}
     HTML
@@ -133,11 +130,14 @@ module ReactOnRailsHelper
 
   # Returns Array [0]: html, [1]: script to console log
   # NOTE, these are NOT html_safe!
-  def server_rendered_react_component_html(options, props_string, react_component_name, dom_id)
+  def server_rendered_react_component_html(options, props, react_component_name, dom_id)
     return ["", ""] unless prerender(options)
 
     # Make sure that we use up-to-date server-bundle
     ReactOnRails::ServerRenderingPool.reset_pool_if_server_bundle_was_modified
+
+    # Since this code is not inserted on a web page, we don't need to escape.
+    props_string = props.is_a?(String) ? props : props.to_json
 
     wrapper_js = <<-JS
 (function() {
@@ -154,7 +154,11 @@ module ReactOnRailsHelper
 
     ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
   rescue ExecJS::ProgramError => err
-    raise ReactOnRails::ServerRenderingPool::PrerenderError.new(react_component_name, props_string, err)
+    raise ReactOnRails::ServerRenderingPool::PrerenderError.new(
+      react_component_name,
+      sanitized_props_string(props), # Sanitize as this might be browser logged
+      err
+    )
   end
 
   def trace(options)
