@@ -42,10 +42,10 @@ shared_examples "base_generator:base" do
       // bootstrap-sprockets depends on generated/vendor-bundle for jQuery.
       //= require bootstrap-sprockets
 
-      //= require turbolinks
-
     MATCH
-    assert_file("app/assets/javascripts/application.js", match)
+    assert_file("app/assets/javascripts/application.js") do |contents|
+      assert_match(match, contents)
+    end
   end
 
   it "removes incompatible sprockets require statements" do

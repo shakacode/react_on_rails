@@ -141,4 +141,9 @@ describe InstallGenerator, type: :generator do
     before(:all) { run_generator_test_with_args(%w(-H)) }
     include_examples "heroku_deployment"
   end
+
+  context "without existing application.js or application.js.coffee file" do
+    before(:all) { run_generator_test_with_args([], application_js: false) }
+    include_examples "base_generator:base"
+  end
 end

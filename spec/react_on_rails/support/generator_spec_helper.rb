@@ -12,16 +12,20 @@ def run_generator_test_with_args(args, options = {})
   simulate_existing_file("config/routes.rb", "Rails.application.routes.draw do\nend\n")
   simulate_existing_file("config/application.rb", "module Gentest\nclass Application < Rails::Application\nend\nend)")
   simulate_existing_file("config/initializers/assets.rb")
-  app_js_data = <<-DATA.strip_heredoc
-    //= require jquery
-    //= require jquery_ujs
-    //= require turbolinks
-    //= require_tree .
-  DATA
-  simulate_existing_file("app/assets/javascripts/application.js", app_js_data)
-  application_css = "app/assets/stylesheets/application.css.scss"
+  if options.fetch(:application_js, true)
+    app_js = "app/assets/javascripts/application.js"
+    app_js_data = <<-DATA.strip_heredoc
+      //= require jquery
+      //= require jquery_ujs
+      //= require turbolinks
+      //= require_tree .
+    DATA
+    simulate_existing_file(app_js, app_js_data)
+  end
   if options.fetch(:application_css, true)
-    simulate_existing_file(application_css, " *= require_tree .\n *= require_self\n")
+    app_css = "app/assets/stylesheets/application.css.scss"
+    app_css_data = " *= require_tree .\n *= require_self\n"
+    simulate_existing_file(app_css, app_css_data)
   end
   run_generator(args)
 end
