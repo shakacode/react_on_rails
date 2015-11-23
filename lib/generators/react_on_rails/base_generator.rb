@@ -4,7 +4,7 @@ include GeneratorHelper
 
 module ReactOnRails
   module Generators
-    class BaseGenerator < Rails::Generators::Base
+    class BaseGenerator < Rails::Generators::Base # rubocop:disable Metrics/ClassLength
       hide!
       source_root(File.expand_path("../templates", __FILE__))
 
@@ -121,6 +121,10 @@ module ReactOnRails
            app/views/hello_world/index.html.erb
            client/webpack.client.base.config.js
            client/package.json).each { |file| template(base_path + file + ".tt", file) }
+      end
+
+      def add_base_gems_to_gemfile
+        append_to_file("Gemfile", "\ngem 'therubyracer', platforms: :ruby\n")
       end
 
       def template_client_globals_file

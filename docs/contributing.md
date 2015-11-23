@@ -40,7 +40,6 @@ In your Rails app add this gem with a path to your fork.
 
 ```
 gem 'react_on_rails', path: '/your_fork'
-gem 'therubyracer'
 ```
 
 The main installer can be run with ```rails generate react_on_rails:install```
