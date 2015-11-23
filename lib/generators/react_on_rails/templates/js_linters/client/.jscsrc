@@ -1,7 +1,18 @@
 {
   "preset": "airbnb",
-  "fileExtensions": [".js", ".jsx"],
-  "excludeFiles": ["build/**", "node_modules/**"],
-
-  "validateQuoteMarks": null                        // Issue with JSX quotemarks: https://github.com/jscs-dev/babel-jscs/issues/12
+  "fileExtensions": [
+    ".js",
+    ".jsx"
+  ],
+  "excludeFiles": [
+    "assets/**",
+    "build/**",
+    "node_modules/**"
+  ],
+  "esprima": "babel-jscs",
+  "validateQuoteMarks": {
+    "mark": "'",
+    "escape": true,
+    "ignoreJSX": true
+  }
 }

@@ -1,7 +1,26 @@
 {
   "preset": "airbnb",
-  "fileExtensions": [".js", ".jsx"],
-  "excludeFiles": ["**/build/**", "**/node_modules/**", "**/generated/**", "**/docs/**", "**/tmp/**", "**/sample_generated/**", "**/coverage/**", "**/vendor/**", "**/dummy-for-generators/**"],
-  "requireTrailingComma": { "ignoreSingleValue": true, "ignoreSingleLine": true },
-  "validateQuoteMarks": false
+  "fileExtensions": [
+    ".js",
+    ".jsx"
+  ],
+  "excludeFiles": [
+    "**/build/**",
+    "**/node_modules/**",
+    "**/generated/**",
+    "**/docs/**",
+    "**/tmp/**",
+    "**/sample_generated/**",
+    "**/coverage/**",
+    "**/vendor/**",
+    "**/dummy-for-generators/**",
+    "**/dummy/**",
+    "**/dummy-react-013/**"
+  ],
+  "esprima": "babel-jscs",
+  "validateQuoteMarks": {
+    "mark": "'",
+    "escape": true,
+    "ignoreJSX": true
+  }
 }
