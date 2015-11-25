@@ -53,8 +53,10 @@
     "lodash": "^3.10.1",
     "mirror-creator": "0.0.1",
     <%- end -%>
-    "react": "^0.14.3",
+    "react": "^0.14.0",
+    <%- unless options.skip_bootstrap? -%>
     "react-bootstrap": "^0.28.1",
+    <%- end -%>
     "react-dom": "^0.14.3",
     <%- if options.redux? -%>
     "react-redux": "^4.0.0",
@@ -69,8 +71,10 @@
     "babel-eslint": "^4.1.5",
     <%- end -%>
     "babel-plugin-react-transform": "^1.1.1",
+    <%- unless options.skip_bootstrap? -%>
     "bootstrap-sass": "^3.3.5",
     "bootstrap-sass-loader": "^1.0.9",
+    <%- end -%>
     "css-loader": "^0.23.0",
     <%- unless options.skip_js_linters? -%>
     "eslint": "^1.10.1",
