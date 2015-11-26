@@ -86,7 +86,7 @@ module ReactOnRails
       def strip_application_js_of_incompatible_sprockets_statements
         application_js = File.join(destination_root, "app/assets/javascripts/application.js")
         gsub_file(application_js, "//= require jquery_ujs", "")
-        gsub_file(application_js, "//= require jquery", "")
+        gsub_file(application_js, %r{\/\/= require jquery$}, "")
         gsub_file(application_js, "//= require_tree .", "")
       end
 

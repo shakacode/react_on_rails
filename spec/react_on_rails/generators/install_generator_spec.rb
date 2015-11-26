@@ -5,7 +5,7 @@ describe InstallGenerator, type: :generator do
 
   context "no args" do
     before(:all) { run_generator_test_with_args(%w()) }
-    include_examples "base_generator:base"
+    include_examples "base_generator:base", application_js: true
     include_examples "base_generator:no_server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
@@ -15,7 +15,7 @@ describe InstallGenerator, type: :generator do
 
   context "--skip-js-linters" do
     before(:all) { run_generator_test_with_args(%w(--skip-js-linters)) }
-    include_examples "base_generator:base"
+    include_examples "base_generator:base", application_js: true
     include_examples "base_generator:no_server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
@@ -25,7 +25,7 @@ describe InstallGenerator, type: :generator do
 
   context "-j" do
     before(:all) { run_generator_test_with_args(%w(-j)) }
-    include_examples "base_generator:base"
+    include_examples "base_generator:base", application_js: true
     include_examples "base_generator:no_server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
@@ -35,7 +35,7 @@ describe InstallGenerator, type: :generator do
 
   context "--ruby-linters" do
     before(:all) { run_generator_test_with_args(%w(--ruby-linters)) }
-    include_examples "base_generator:base"
+    include_examples "base_generator:base", application_js: true
     include_examples "base_generator:no_server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
@@ -46,7 +46,7 @@ describe InstallGenerator, type: :generator do
 
   context "-L" do
     before(:all) { run_generator_test_with_args(%w(-L)) }
-    include_examples "base_generator:base"
+    include_examples "base_generator:base", application_js: true
     include_examples "base_generator:no_server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
@@ -57,7 +57,7 @@ describe InstallGenerator, type: :generator do
 
   context "--server-rendering" do
     before(:all) { run_generator_test_with_args(%w(--server-rendering)) }
-    include_examples "base_generator:base"
+    include_examples "base_generator:base", application_js: true
     include_examples "base_generator:server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:server_rendering"
@@ -67,7 +67,7 @@ describe InstallGenerator, type: :generator do
 
   context "-S" do
     before(:all) { run_generator_test_with_args(%w(-S)) }
-    include_examples "base_generator:base"
+    include_examples "base_generator:base", application_js: true
     include_examples "base_generator:server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:server_rendering"
@@ -77,7 +77,7 @@ describe InstallGenerator, type: :generator do
 
   context "--redux" do
     before(:all) { run_generator_test_with_args(%w(--redux)) }
-    include_examples "base_generator:base"
+    include_examples "base_generator:base", application_js: true
     include_examples "base_generator:no_server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:no_server_rendering"
@@ -87,7 +87,7 @@ describe InstallGenerator, type: :generator do
 
   context "-R" do
     before(:all) { run_generator_test_with_args(%w(-R)) }
-    include_examples "base_generator:base"
+    include_examples "base_generator:base", application_js: true
     include_examples "base_generator:no_server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:no_server_rendering"
@@ -97,7 +97,7 @@ describe InstallGenerator, type: :generator do
 
   context "--redux --server_rendering" do
     before(:all) { run_generator_test_with_args(%w(--redux --server-rendering)) }
-    include_examples "base_generator:base"
+    include_examples "base_generator:base", application_js: true
     include_examples "base_generator:server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:server_rendering"
@@ -107,7 +107,7 @@ describe InstallGenerator, type: :generator do
 
   context "-R -S" do
     before(:all) { run_generator_test_with_args(%w(-R -S)) }
-    include_examples "base_generator:base"
+    include_examples "base_generator:base", application_js: true
     include_examples "base_generator:server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:server_rendering"
@@ -117,7 +117,7 @@ describe InstallGenerator, type: :generator do
 
   context "-R -S" do
     before(:all) { run_generator_test_with_args(%w(-R -S)) }
-    include_examples "base_generator:base"
+    include_examples "base_generator:base", application_js: true
     include_examples "base_generator:server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:server_rendering"
@@ -144,6 +144,6 @@ describe InstallGenerator, type: :generator do
 
   context "without existing application.js or application.js.coffee file" do
     before(:all) { run_generator_test_with_args([], application_js: false) }
-    include_examples "base_generator:base"
+    include_examples "base_generator:base", application_js: false
   end
 end
