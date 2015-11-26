@@ -1,4 +1,4 @@
-class PagesController < ApplicationController
+class ReactRouterController < ApplicationController
   before_action :data
 
   rescue_from ReactOnRails::PrerenderError do |err|
@@ -16,18 +16,6 @@ class PagesController < ApplicationController
     @app_props_server_render = {
       helloWorldData: {
         name: "Mr. Server Side Rendering"
-      }
-    }
-
-    @app_props_hello = {
-      helloWorldData: {
-        name: "Mrs. Client Side Rendering"
-      }
-    }
-
-    @app_props_hello_again = {
-      helloWorldData: {
-        name: "Mrs. Client Side Hello Again"
       }
     }
   end

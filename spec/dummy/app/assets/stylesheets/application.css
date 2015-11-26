@@ -17,3 +17,9 @@
 input[type='text'] {
   min-width: 400px;
 }
+
+.flash.error {
+  color: beige;
+  background: red;
+  padding: 20px;
+}

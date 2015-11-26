@@ -10,6 +10,7 @@ module ReactOnRails
       replay_console: true,
       logging_on_server: true,
       generator_function: false,
+      raise_on_prerender_error: false,
       trace: Rails.env.development?,
       development_mode: Rails.env.development?,
       server_renderer_pool_size: 1,
@@ -20,12 +21,12 @@ module ReactOnRails
     attr_accessor :server_bundle_js_file, :prerender, :replay_console,
                   :generator_function, :trace, :development_mode,
                   :logging_on_server, :server_renderer_pool_size,
-                  :server_renderer_timeout
+                  :server_renderer_timeout, :raise_on_prerender_error
 
     def initialize(server_bundle_js_file: nil, prerender: nil, replay_console: nil,
                    generator_function: nil, trace: nil, development_mode: nil,
                    logging_on_server: nil, server_renderer_pool_size: nil,
-                   server_renderer_timeout: nil)
+                   server_renderer_timeout: nil, raise_on_prerender_error: nil)
       if File.exist?(server_bundle_js_file)
         self.server_bundle_js_file = server_bundle_js_file
       else
@@ -42,6 +43,7 @@ module ReactOnRails
         self.development_mode = development_mode
       end
       self.trace = trace.nil? ? Rails.env.development? : trace
+      self.raise_on_prerender_error = raise_on_prerender_error
 
       # Server rendering:
       self.server_renderer_pool_size = self.development_mode ? 1 : server_renderer_pool_size

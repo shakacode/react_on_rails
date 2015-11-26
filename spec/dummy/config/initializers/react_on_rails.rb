@@ -14,8 +14,9 @@ ReactOnRails.configure do |config|
   # For server rendering. This can be set to false so that server side messages are discarded.
   config.replay_console = true # Default is true. Be cautious about turning this off.
   config.logging_on_server = true # Default is true. Logs server rendering messags to Rails.logger.info
+  config.raise_on_prerender_error = false # change to true to raise exception on server if the JS code throws
 
-  # Server rendering:
+  # Server rendering only (not for render_component helper)
   config.server_renderer_pool_size  = 1   # increase if you're on JRuby
   config.server_renderer_timeout    = 20  # seconds
 end

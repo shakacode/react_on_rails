@@ -14,6 +14,9 @@ import HelloWorldApp from './HelloWorldApp';
 // Example of React + Redux
 import ReduxApp from './ServerReduxApp';
 
+// Example of React Router with Server Rendering
+import ServerRouterApp from './ServerRouterApp';
+
 // We can use the node global object for exposing.
 // NodeJs: https://nodejs.org/api/globals.html#globals_global
 global.HelloString = HelloString;
@@ -22,6 +25,7 @@ global.HelloWorld = HelloWorld;
 global.HelloWorldWithLogAndThrow = HelloWorldWithLogAndThrow;
 global.HelloWorldES5 = HelloWorldES5;
 global.HelloWorldApp = HelloWorldApp;
+global.RouterApp = ServerRouterApp;
 
 // Alternative syntax for exposing Vars
 // NOTE: you must set exports.output.libraryTarget = 'this' in your webpack.server.js file.

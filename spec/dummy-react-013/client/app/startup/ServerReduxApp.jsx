@@ -24,6 +24,7 @@ const ReduxApp = props => {
 
   // Provider uses the this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
+  /* eslint-disable react/no-multi-comp */
   return (
     <Provider store={store}>
       {() => <HelloWorldContainer />}

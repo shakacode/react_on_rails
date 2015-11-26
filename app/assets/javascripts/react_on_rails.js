@@ -8,16 +8,36 @@
     var props = options.props;
     var trace = options.trace;
     var generatorFunction = options.generatorFunction;
-
+    var location = options.location;
     var htmlResult = '';
     var consoleReplay = '';
+    var hasErrors = false;
 
     try {
-      var reactElement = createReactElement(componentName, props,
-        domId, trace, generatorFunction);
-      htmlResult = provideServerReact().renderToString(reactElement);
+      var reactElementOrRouterResult = createReactElementOrRouterResult(componentName, props,
+        domId, trace, generatorFunction, location);
+      if (isRouterResult(reactElementOrRouterResult)) {
+
+        // We let the client side handle any redirect
+        // Set hasErrors in case we want to throw a Rails exception
+        hasErrors = !!reactElementOrRouterResult.routeError;
+        if (hasErrors) {
+          console.error('React Router ERROR: ' +
+            JSON.stringify(reactElementOrRouterResult.routeError));
+        } else {
+          if (trace) {
+            redirectLocation = reactElementOrRouterResult.redirectLocation;
+            redirectPath = redirectLocation.pathname + redirectLocation.search;
+            console.log('ROUTER REDIRECT: ' + componentName + ' to dom node with id: ' + domId +
+              ', redirect to ' + redirectPath);
+          }
+        }
+      } else {
+        htmlResult = provideServerReact().renderToString(reactElementOrRouterResult);
+      }
     }
     catch (e) {
+      hasErrors = true;
       htmlResult = ReactOnRails.handleError({
         e: e,
         componentName: componentName,
@@ -25,8 +45,13 @@
       });
     }
 
-    consoleReplay = ReactOnRails.buildConsoleReplay();
-    return JSON.stringify([htmlResult, consoleReplay]);
+    consoleReplayScript = ReactOnRails.buildConsoleReplay();
+
+    return JSON.stringify({
+      html: htmlResult,
+      consoleReplayScript: consoleReplayScript,
+      hasErrors: hasErrors,
+    });
   };
 
   // Passing either componentName or jsCode
@@ -83,21 +108,26 @@
     }
   };
 
+  ReactOnRails.wrapInScriptTags = function(scriptBody) {
+    if (!scriptBody) {
+      return '';
+    }
+
+    return '\n<script>' + scriptBody + '\n</script>';
+  };
+
   ReactOnRails.buildConsoleReplay = function() {
     var consoleReplay = '';
 
     var history = console.history;
     if (history && history.length > 0) {
-      consoleReplay += '\n<script>';
       history.forEach(function(msg) {
         consoleReplay += '\nconsole.' + msg.level + '.apply(console, ' +
           JSON.stringify(msg.arguments) + ');';
       });
-
-      consoleReplay += '\n</script>';
     }
 
-    return consoleReplay;
+    return ReactOnRails.wrapInScriptTags(consoleReplay);
   };
 
   function forEachComponent(fn) {
@@ -107,11 +137,11 @@
     };
   }
 
-  function pageLoaded() {
+  function reactOnRailsPageLoaded() {
     forEachComponent(render);
   }
 
-  function pageUnloaded() {
+  function reactOnRailsPageUnloaded() {
     forEachComponent(unmount);
   }
 
@@ -136,9 +166,15 @@
     try {
       var domNode = document.getElementById(domId);
       if (domNode) {
-        var reactElement = createReactElement(componentName, props,
+        var reactElementOrRouterResult = createReactElementOrRouterResult(componentName, props,
           domId, trace, generatorFunction);
-        provideClientReact().render(reactElement, domNode);
+        if (isRouterResult(reactElementOrRouterResult)) {
+          throw new Error('You returned a server side type of react-router error: ' +
+            JSON.stringify(reactElementOrRouterResult) +
+            '\nYou should return a React.Component always for the client side entry point.');
+        } else {
+          provideClientReact().render(reactElementOrRouterResult, domNode);
+        }
       }
     }
     catch (e) {
@@ -150,13 +186,13 @@
     }
   };
 
-  function createReactElement(componentName, props, domId, trace, generatorFunction) {
+  function createReactElementOrRouterResult(componentName, props, domId, trace, generatorFunction, location) {
     if (trace) {
       console.log('RENDERED ' + componentName + ' to dom node with id: ' + domId);
     }
 
     if (generatorFunction) {
-      return this[componentName](props);
+      return this[componentName](props, location);
     } else {
       return React.createElement(this[componentName], props);
     }
@@ -178,13 +214,18 @@
     return ReactDOMServer;
   }
 
+  function isRouterResult(reactElementOrRouterResult) {
+    return !!(reactElementOrRouterResult.redirectLocation ||
+    reactElementOrRouterResult.error);
+  }
+
   // Install listeners when running on the client.
   if (typeof document !== 'undefined') {
     if (!turbolinksInstalled) {
-      document.addEventListener('DOMContentLoaded', pageLoaded);
+      document.addEventListener('DOMContentLoaded', reactOnRailsPageLoaded);
     } else {
-      document.addEventListener('page:before-unload', pageUnloaded);
-      document.addEventListener('page:change', pageLoaded);
+      document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
+      document.addEventListener('page:change', reactOnRailsPageLoaded);
     }
   }
 }.call(this));

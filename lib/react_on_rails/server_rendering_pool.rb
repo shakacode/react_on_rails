@@ -20,30 +20,21 @@ module ReactOnRails
       @server_bundle_timestamp = file_mtime
     end
 
-    class PrerenderError < RuntimeError
-      def initialize(component_name, props, js_message)
-        message = ["Encountered error \"#{js_message}\" when prerendering #{component_name} with #{props}",
-                   js_message.backtrace.join("\n")].join("\n")
-        super(message)
-      end
-    end
-
     # js_code: JavaScript expression that returns a string.
-    # Returns an Array:
-    # [0]: string of HTML for direct insertion on the page by evaluating js_code
-    # [1]: console messages
-    #   Note, js_code does not have to be based on React.
-    # js_code MUST RETURN json stringify array of two elements
+    # Returns a Hash:
+    #   html: string of HTML for direct insertion on the page by evaluating js_code
+    #   consoleReplayScript: script for replaying console
+    #   hasErrors: true if server rendering errors
+    # Note, js_code does not have to be based on React.
+    # js_code MUST RETURN json stringify Object
     # Calling code will probably call 'html_safe' on return value before rendering to the view.
     def self.server_render_js_with_console_logging(js_code)
       trace_messsage(js_code)
-
       json_string = eval_js(js_code)
-      # element 0 is the html, element 1 is the script tag for the server console output
       result = JSON.parse(json_string)
 
       if ReactOnRails.configuration.logging_on_server
-        console_script = result[1]
+        console_script = result["consoleReplayScript"]
         console_script_lines = console_script.split("\n")
         console_script_lines = console_script_lines[2..-2]
         re = /console\.log\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/

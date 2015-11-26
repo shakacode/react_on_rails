@@ -11,9 +11,11 @@
     "babel-core": "^5.7.2",
     "babel-loader": "^5.3.2",
     "expose-loader": "^0.7.0",
+    "history": "^1.13.1",
     "node-libs-browser": "^0.5.2",
     "react": "^0.13.3",
     "react-redux": "^0.6.0",
+    "react-router": "^1.0.0",
     "redux": "^1.0.0-rc",
     "redux-thunk": "^0.1.0",
     "webpack": "^1.12.2"
