@@ -17,6 +17,7 @@ def run_generator_test_with_args(args, options = {})
     app_js_data = <<-DATA.strip_heredoc
       //= require jquery
       //= require jquery_ujs
+      //= require jquery-ui
       //= require turbolinks
       //= require_tree .
     DATA
