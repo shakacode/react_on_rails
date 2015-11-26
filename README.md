@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails)
 
 # React on Rails
-React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. Currently, both React v0.14 and v0.13 are supported. [Redux](https://github.com/rackt/redux) and [React-Router](https://github.com/rackt/react-redux) are supported as well. See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
+React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. Currently, both React v0.14 and v0.13 are supported, with server rendering. [Redux](https://github.com/rackt/redux) and [React-Router](https://github.com/rackt/react-redux) are supported as well. See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
 
 Be sure to see the [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial) along with the live example at [www.reactrails.com](http://www.reactrails.com).
 
