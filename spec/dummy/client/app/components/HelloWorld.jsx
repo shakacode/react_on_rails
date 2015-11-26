@@ -1,8 +1,16 @@
-import React from 'react';
+import React, { PropTypes } from 'react';
 import ReactCompat from '../utils/ReactCompat';
 
 // Super simple example of the simplest possible React component
 class HelloWorld extends React.Component {
+
+  static propTypes = {
+    helloWorldData: PropTypes.shape({
+      name: PropTypes.string,
+    }).isRequired,
+
+    error: PropTypes.any,
+  };
 
   // Not necessary if we only call super, but we'll need to initialize state, etc.
   constructor(props, context) {
