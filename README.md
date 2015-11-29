@@ -75,7 +75,7 @@ Like the [react-rails](https://github.com/reactjs/react-rails) gem, React on Rai
     + *([Gem *Pull Request*](https://github.com/shakacode/react_on_rails/pull/68))*
     + *([Tutorial Pull Request](https://github.com/shakacode/react-webpack-rails-tutorial/pull/128))*
 
-See the [react-webpack-rails-tutorial](https://github.com/justin808/react-webpack-rails-tutorial/) for an example of a live implementation and code.
+See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
 
 ## Why Webpack?
 
@@ -224,7 +224,7 @@ Description:
     Create react on rails files for install generator.
 ```
 
-For a clear example of what each generator option will do, see our generator results repo: [Generator Results](https://github.com/shakacode/react_on_rails-generator-results-1-0-0/pulls). Each pull request shows a git "diff" that highlights the changes that the generator has made.
+For a clear example of what each generator option will do, see our generator results repo: [Generator Results](https://github.com/shakacode/react_on_rails-generator-results/pulls). Each pull request shows a git "diff" that highlights the changes that the generator has made.
 
 ### Understanding the Organization of the Generated Client Code
 The generated client code follows our organization scheme. Each unique set of functionality, is given its own folder inside of `client/app/bundles`. This encourages for modularity of DOMAINS.
