@@ -79,12 +79,6 @@ shared_examples "base_generator:base" do |options|
        REACT_ON_RAILS.md
        client/REACT_ON_RAILS_CLIENT_README.md).each { |file| assert_file(file) }
   end
-
-  it "adds therubyracer to the Gemfile" do
-    assert_file("Gemfile") do |contents|
-      assert_match("gem 'therubyracer', platforms: :ruby", contents)
-    end
-  end
 end
 
 shared_examples "base_generator:no_server_rendering" do
@@ -118,6 +112,12 @@ shared_examples "base_generator:no_server_rendering" do
     assert_file("client/webpack.client.base.config.js") do |contents|
       assert_match("globals", contents)
       refute_match("clientGlobals", contents)
+    end
+  end
+
+  it "doesn't add therubyracer to the Gemfile" do
+    assert_file("Gemfile") do |contents|
+      refute_match("gem 'therubyracer', platforms: :ruby", contents)
     end
   end
 end
@@ -157,6 +157,12 @@ shared_examples "base_generator:server_rendering" do
   it "copies the server-side-rendering version of hello_world/index.html.erb" do
     assert_file("app/views/hello_world/index.html.erb") do |contents|
       assert_match("prerender: true", contents)
+    end
+  end
+
+  it "adds therubyracer to the Gemfile" do
+    assert_file("Gemfile") do |contents|
+      assert_match("gem 'therubyracer', platforms: :ruby", contents)
     end
   end
 end

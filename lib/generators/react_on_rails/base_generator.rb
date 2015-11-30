@@ -125,6 +125,7 @@ module ReactOnRails
       end
 
       def add_base_gems_to_gemfile
+        return unless options.server_rendering?
         append_to_file("Gemfile", "\ngem 'therubyracer', platforms: :ruby\n")
       end
 
