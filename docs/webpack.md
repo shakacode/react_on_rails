@@ -35,7 +35,7 @@ and you need to expose them:
  entry: ['./yourCode', 'react-dom/server', 'react'],
 ```
 
-and use this line rather than 'react-dom':
+and use this line rather than `{test: require.resolve('react-dom'), loader: 'expose?ReactDOM'},`:
 
 ```
    {test: require.resolve('react-dom/server'), loader: 'expose?ReactDOMServer'},
