@@ -20,7 +20,12 @@ module ReactOnRails
 
           Rails.application.config.assets.precompile += %w( generated/server-bundle.js )
         DATA
-        append_to_file("config/initializers/assets.rb", data)
+        assets_intializer = File.join(destination_root, "config/initializers/assets.rb")
+        if File.exist?(assets_intializer)
+          append_to_file(assets_intializer, data)
+        else
+          puts_setup_file_error(assets_intializer, data)
+        end
       end
 
       def copy_bootstrap_files
