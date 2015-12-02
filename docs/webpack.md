@@ -1,15 +1,46 @@
 # Entry Points and Globally Exposing Objects
 
-In `webpack.server.rails.config.js`, you should ensure you config the entry points correctly.
+You should ensure you configure the entry points correctly for webpack.
 
-When `React.version >= '0.14'`, the entry points might include below:
+### When using React 0.14 and greater
 
-```
-['./app/bundles/HelloWorld/startup/serverGlobals', 'react-dom/server', 'react']
-```
-
-Otherwise, when `React.version < '0.14'`, then entry points will be:
+You need both include `react-dom/server` and `react` as values for `entry`, like this:
 
 ```
-['/app/bundles/HelloWorld/startup/serverGlobals']
+  entry: {
+
+    // See use of 'vendor' in the CommonsChunkPlugin inclusion below.
+    vendor: [
+      'babel-core/polyfill',
+      'jquery',
+      'jquery-ujs',
+      'react',
+      'react-dom',
+    ],
 ```
+
+and you need to expose them:
+
+```
+      // React is necessary for the client rendering:
+      {test: require.resolve('react'), loader: 'expose?React'},
+      {test: require.resolve('react-dom'), loader: 'expose?ReactDOM'},
+      {test: require.resolve('jquery'), loader: 'expose?jQuery'},
+      {test: require.resolve('jquery'), loader: 'expose?$'},
+```
+
+`webpack.server.config.js` is similar, but substitute:
+
+```
+ entry: ['./yourCode', 'react-dom/server', 'react'],
+```
+
+and use this line rather than 'react-dom':
+
+```
+   {test: require.resolve('react-dom/server'), loader: 'expose?ReactDOMServer'},
+```
+
+### When you use React 0.13
+
+You don't need to put in react-dom.
