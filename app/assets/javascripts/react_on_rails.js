@@ -204,6 +204,7 @@
         console.warn('WARNING: ReactDOM is not configured in webpack.server.rails.config.js file as an entry.\n' +
                      'See: https://github.com/shakacode/react_on_rails/blob/master/docs/webpack.md for more detailed hints.');
       }
+
       return React;
     }
 
@@ -216,6 +217,7 @@
         console.warn('WARNING: `react-dom/server` is not configured in webpack.server.rails.config.js file as an entry.\n' +
                      'See: https://github.com/shakacode/react_on_rails/blob/master/docs/webpack.md for more detailed hints.');
       }
+
       return React;
     }
 
