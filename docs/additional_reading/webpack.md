@@ -2,7 +2,7 @@
 
 You should ensure you configure the entry points correctly for webpack.
 
-### When using React 0.14 and greater
+## When using React 0.14 and greater
 
 You need both include `react-dom/server` and `react` as values for `entry`, like this:
 
@@ -41,6 +41,6 @@ and use this line rather than `{test: require.resolve('react-dom'), loader: 'exp
    {test: require.resolve('react-dom/server'), loader: 'expose?ReactDOMServer'},
 ```
 
-### When you use React 0.13
+## When you use React 0.13
 
 You don't need to put in react-dom.

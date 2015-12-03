@@ -84,7 +84,7 @@ Webpack is used for 2 purposes:
 1. Generate several JavaScript "bundles" for inclusion in `application.js`.
 2. Providing the Webpack Dev Server for quick prototyping of components without needing to refresh your browser to see updates.
 
-This usage of webpack fits neatly and simply into the existing Rails sprockets system and you can include React components on a Rails view with a simple helper. 
+This usage of webpack fits neatly and simply into the existing Rails sprockets system and you can include React components on a Rails view with a simple helper.
 
 Compare this to some alternative approaches for SPAs (Single Page Apps) that utilize Webpack and Rails. They will use a separate node server to distribute web pages, JavaScript assets, CSS, etc., and will still use Rails as an API server. A good example of this is our ShakaCode team member Alex's article [
 Universal React with Rails: Part I](https://medium.com/@alexfedoseev/isomorphic-react-with-rails-part-i-440754e82a59).
@@ -93,7 +93,7 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
 
 ## Getting Started
 1. Add the following to your Gemfile and bundle install:
-  
+
   ```ruby
   gem "react_on_rails"
   ```
@@ -128,7 +128,7 @@ In most cases, you should use the `prerender: false` (default behavior) with the
 
 Now the server will interpret your JavaScript using [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. We recommend using [therubyracer](https://github.com/cowboyd/therubyracer) as ExecJS's runtime. The generator will automatically add it to your Gemfile for you.
 
-Note that **server-rendering requires globally exposing your components by setting them to `global`, not `window`** (as is the case with client-rendering). If using the generator, you can pass the `--server-rendering` option to configure your application for server-side rendering. 
+Note that **server-rendering requires globally exposing your components by setting them to `global`, not `window`** (as is the case with client-rendering). If using the generator, you can pass the `--server-rendering` option to configure your application for server-side rendering.
 
 In the following screenshot you can see the 3 parts of react_on_rails rendering:
 
@@ -149,28 +149,28 @@ On Heroku deploys, the `lib/assets.rake` file takes care of running webpack duri
 Place your JavaScript code inside of the provided `client/app` folder. Use modules just as you would when using webpack alone. The difference here is that instead of mounting React components directly to an element using `React.render`, you **expose your components globally and then mount them with helpers inside of your Rails views**.
 
 + *Normal Mode (JavaScript is Rendered on client):*
-  
+
   If you are not server rendering, `clientGlobals.jsx` will have
- 
+
   ```javascript
   window.HelloWorldApp = HelloWorldApp;
   ```
 + *Server-Side Rendering:*
 
   If you are server rendering, `globals.jsx` will have:
-  
+
   ```javascript
   window.HelloWorldApp = HelloWorldAppClient;
   ```
-  
+
   `serverGlobals.jsx` will have:
-  
+
   ```javascript
   global.HelloWorldApp = HelloWorldAppServer;
   ```
-  
+
   In general, you want different initialization for your server rendered components.
-   
+
 ### Rails View Helpers In-Depth
 Once the bundled files have been generated in your `app/assets/javascripts/generated` folder and you have exposed your components globally, you will want to run your code in your Rails views using the included helper method.
 
@@ -238,7 +238,7 @@ Inside of the generated "HelloWorld" domain you will find the following folders:
 You may also notice the `app/lib` folder. This is for any code that is common between bundles and therefore needs to be shared (for example, middleware).
 
 ### Redux
-If you have used the `--redux` generator option, you will notice the familiar additional redux folders in addition to the aforementioned folders. The Hello World example has also been modified to use Redux. 
+If you have used the `--redux` generator option, you will notice the familiar additional redux folders in addition to the aforementioned folders. The Hello World example has also been modified to use Redux.
 
 Note the organizational paradigm of "bundles". These are like application domains and are used for grouping your code into webpack bundles, in case you decide to create different bundles for deployment. This is also useful for separating out logical parts of your application. The concept is that each bundle will have it's own Redux store. If you have code that you want to reuse across bundles, including components and reducers, place them under `/client/app/lib`.
 
@@ -319,10 +319,11 @@ As you add more routes to your front-end application, you will need to make the 
 + [Heroku Deployment](docs/additional_reading/heroku_deployment.md)
 + [Manual Installation](docs/additional_reading/manual_installation.md)
 + [Node Dependencies and NPM](docs/additional_reading/node_dependencies_and_npm.md)
-+ [Optional  Configuration](docs/additional_reading/optional_configuration.md)
++ [Optional Configuration](docs/additional_reading/optional_configuration.md)
 + [React Router](docs/additional_reading/react_router.md)
 + [Server Rendering Tips](docs/additional_reading/server_rendering_tips.md)
 + [Tips](docs/additional_reading/tips.md)
++ [Webpack Configuration](docs/additional_reading/webpack.md)
 
 ## Contributing
 Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant](contributor-covenant.org) code of conduct (see [CODE OF CONDUCT](docs/code_of_conduct.md)).
@@ -347,7 +348,7 @@ And based on the work of the [react-rails gem](https://github.com/reactjs/react-
 
 ## About [ShakaCode](http://www.shakacode.com/)
 
-Visit [our forums!](http://forum.shakacode.com). We've got a [category dedicated to react_on_rails](http://forum.shakacode.com/c/rails/reactonrails). 
+Visit [our forums!](http://forum.shakacode.com). We've got a [category dedicated to react_on_rails](http://forum.shakacode.com/c/rails/reactonrails).
 
 If you're looking for consulting on a project using React and Rails, email us ([contact@shakacode.com](mailto: contact@shakacode.com))! You can also join our slack room for some free advice.
 
