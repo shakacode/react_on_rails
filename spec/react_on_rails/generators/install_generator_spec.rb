@@ -143,7 +143,12 @@ describe InstallGenerator, type: :generator do
   end
 
   context "without existing application.js or application.js.coffee file" do
-    before(:all) { run_generator_test_with_args([], application_js: true) }
+    before(:all) { run_generator_test_with_args([], application_js: false) }
     include_examples "base_generator:base", application_js: false
+  end
+
+  context "with existing application.js or application.js.coffee file" do
+    before(:all) { run_generator_test_with_args([], application_js: true) }
+    include_examples "base_generator:base", application_js: true
   end
 end
