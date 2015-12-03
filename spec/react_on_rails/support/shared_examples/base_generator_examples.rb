@@ -48,12 +48,15 @@ shared_examples "base_generator:base" do |options|
     end
   end
 
-  it "removes incompatible sprockets require statements" do
+  it "comments out incompatible sprockets require statements" do
     assert_file("app/assets/javascripts/application.js") do |contents|
-      refute_match("//= require_tree .", contents)
+      refute_match(%r{//= require_tree .$}, contents)
+      assert_match(%r{// require_tree .$}, contents)
       refute_match(%r{//= require jquery$}, contents)
+      assert_match(%r{// require jquery$}, contents)
       assert_match("//= require jquery-ui", contents) if options[:application_js]
       refute_match("//= require jquery_ujs", contents)
+      assert_match("// require jquery_ujs", contents)
     end
   end
 
