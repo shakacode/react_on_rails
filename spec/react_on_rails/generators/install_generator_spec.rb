@@ -151,4 +151,14 @@ describe InstallGenerator, type: :generator do
     before(:all) { run_generator_test_with_args([], application_js: true) }
     include_examples "base_generator:base", application_js: true
   end
+
+  context "without existing assets.rb file" do
+    before(:all) { run_generator_test_with_args([], assets_rb: false) }
+    include_examples "bootstrap", assets_rb: false
+  end
+
+  context "with existing assets.rb file" do
+    before(:all) { run_generator_test_with_args([], assets_rb: true) }
+    include_examples "bootstrap", assets_rb: true
+  end
 end

@@ -24,7 +24,7 @@ module ReactOnRails
         if File.exist?(assets_intializer)
           append_to_file(assets_intializer, data)
         else
-          puts_setup_file_error(assets_intializer, data)
+          create_file(assets_intializer, data)
         end
       end
 
