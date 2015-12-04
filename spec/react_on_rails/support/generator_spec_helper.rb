@@ -12,7 +12,9 @@ def run_generator_test_with_args(args, options = {})
   simulate_existing_file("Gemfile", "")
   simulate_existing_file("config/routes.rb", "Rails.application.routes.draw do\nend\n")
   simulate_existing_file("config/application.rb", "module Gentest\nclass Application < Rails::Application\nend\nend)")
-  simulate_existing_file("config/initializers/assets.rb")
+  if options.fetch(:assets_rb, true)
+    simulate_existing_file("config/initializers/assets.rb")
+  end
   if options.fetch(:application_js, true)
     app_js = "app/assets/javascripts/application.js"
     app_js_data = <<-DATA.strip_heredoc
