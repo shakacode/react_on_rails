@@ -11,6 +11,7 @@ ignore_paths:
   - client
   - node_modules
   - coverage
+  - examples
 
 analysis_classes:
   #  - argument_amount

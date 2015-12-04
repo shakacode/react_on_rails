@@ -1,5 +1,6 @@
 require "rails/generators"
 require File.expand_path("../generator_helper", __FILE__)
+
 include GeneratorHelper
 
 module ReactOnRails
@@ -106,7 +107,6 @@ module ReactOnRails
            config/initializers/react_on_rails.rb
            client/.babelrc
            client/index.jade
-           client/npm-shrinkwrap.json
            client/server.js
            client/webpack.client.hot.config.js
            client/webpack.client.rails.config.js

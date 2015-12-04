@@ -1,7 +1,8 @@
-require "react_on_rails/simplecov_helper"
+require_relative "../simplecov_helper"
 require "generator_spec" # let's us use Rails's generator testing helpers but with RSpec syntax
 Dir[File.expand_path("../../support/shared_examples", __FILE__) + "/*.rb"].each { |file| require file }
-require File.expand_path("../../../../lib/generators/react_on_rails/install_generator", __FILE__)
+generators_glob = File.expand_path("../../../../lib/generators/react_on_rails/*_generator.rb", __FILE__)
+Dir[generators_glob.to_s].each { |file| require file }
 include ReactOnRails::Generators
 
 # Expects an array of strings, such as "--redux"

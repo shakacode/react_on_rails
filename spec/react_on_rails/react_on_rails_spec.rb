@@ -1,5 +1,5 @@
-require "react_on_rails/simplecov_helper"
-require "react_on_rails/spec_helper"
+require_relative "simplecov_helper"
+require_relative "spec_helper"
 
 describe ReactOnRails do
   it "has a version number" do

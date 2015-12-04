@@ -1,7 +1,6 @@
 source 'https://rubygems.org'
 
-eval_gemfile File.join(File.dirname(__FILE__), "../../react_on_rails.gemspec")
-
+eval_gemfile File.expand_path("../../../react_on_rails.gemspec", __FILE__)
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
 gem 'rails', '4.2.3'
@@ -57,6 +56,8 @@ group :development, :test do
   # Spring speeds up development by keeping your application running in the background. Read more: https://github.com/rails/spring
   gem 'spring'
 end
+
+gem 'bootstrap-sass'
 
 group :test do
   gem "rspec-rails"
