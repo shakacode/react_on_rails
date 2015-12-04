@@ -200,6 +200,11 @@
 
   function provideClientReact() {
     if (typeof ReactDOM === 'undefined') {
+      if (React.version >= '0.14') {
+        console.warn('WARNING: ReactDOM is not configured in webpack.server.rails.config.js file as an entry.\n' +
+                     'See: https://github.com/shakacode/react_on_rails/blob/master/docs/webpack.md for more detailed hints.');
+      }
+
       return React;
     }
 
@@ -208,6 +213,11 @@
 
   function provideServerReact() {
     if (typeof ReactDOMServer === 'undefined') {
+      if (React.version >= '0.14') {
+        console.warn('WARNING: `react-dom/server` is not configured in webpack.server.rails.config.js file as an entry.\n' +
+                     'See: https://github.com/shakacode/react_on_rails/blob/master/docs/webpack.md for more detailed hints.');
+      }
+
       return React;
     }
 
