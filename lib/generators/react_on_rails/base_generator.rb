@@ -110,7 +110,6 @@ module ReactOnRails
            client/server.js
            client/webpack.client.hot.config.js
            client/webpack.client.rails.config.js
-           lib/tasks/assets.rake
            REACT_ON_RAILS.md
            client/REACT_ON_RAILS_CLIENT_README.md
            package.json).each { |file| copy_file(base_path + file, file) }
@@ -147,6 +146,10 @@ module ReactOnRails
       def template_linter_files_if_appropriate
         return if !options.ruby_linters? && options.skip_js_linters?
         template("base/base/lib/tasks/linters.rake.tt", "lib/tasks/linters.rake")
+      end
+
+      def template_assets_rake_file
+        template("base/base/lib/tasks/assets.rake.tt", "lib/tasks/assets.rake")
       end
     end
   end

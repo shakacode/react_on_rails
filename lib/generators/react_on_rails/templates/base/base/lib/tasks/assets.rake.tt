@@ -15,7 +15,9 @@ namespace :assets do
   desc "Compile assets with webpack"
   task :webpack do
     sh "cd client && npm run build:client"
+    <%- if options[:server_rendering] -%>
     sh "cd client && npm run build:server"
+    <%- end -%>
   end
 
   task :clobber do

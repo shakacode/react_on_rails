@@ -97,6 +97,12 @@ shared_examples "base_generator:no_server_rendering" do
     end
   end
 
+  it "copies client-side-rendering version of assets.rake" do
+    assert_file("lib/tasks/assets.rake") do |contents|
+      refute_match(/sh "cd client && npm run build:server"/, contents)
+    end
+  end
+
   it "copies client-side-rendering version of clientGlobals" do
     assert_file("client/webpack.client.base.config.js") do |contents|
       assert_match("startup/globals", contents)
@@ -135,6 +141,12 @@ shared_examples "base_generator:server_rendering" do
   it "templates server-side-rendering version of globals" do
     assert_file("client/app/bundles/HelloWorld/startup/clientGlobals.jsx") do |contents|
       assert_match("HelloWorldAppClient", contents)
+    end
+  end
+
+  it "copies server-side-rendering version of assets.rake" do
+    assert_file("lib/tasks/assets.rake") do |contents|
+      assert_match(/sh "cd client && npm run build:server"/, contents)
     end
   end
 
