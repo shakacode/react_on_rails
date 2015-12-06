@@ -51,6 +51,7 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
         + [Bootstrap via Rails Server](#bootstrap-via-rails-server)
         + [Bootstrap via Webpack HMR Dev Server](#bootstrap-via-webpack-hmr-dev-server)
         + [Keeping Custom Bootstrap Configurations Synced](#keeping-custom-bootstrap-configurations-synced)
+        + [Skip Bootstrap Integration](#skip-bootstrap-integration)
     - [Linters](#linters)
         + [JavaScript Linters](#javascript-linters)
         + [Ruby Linters](#ruby-linters)
@@ -213,6 +214,7 @@ Options:
   -j, [--skip-js-linters], [--no-skip-js-linters]      # Skip installing JavaScript linting files
   -L, [--ruby-linters], [--no-ruby-linters]            # Install ruby linting files, tasks, and configs
   -H, [--heroku-deployment], [--no-heroku-deployment]  # Install files necessary for deploying to Heroku
+  -b, [--skip-bootstrap], [--no-skip-bootstrap]        # Skip installing files for bootstrap support
 
 Runtime options:
   -f, [--force]                    # Overwrite files that already exist
@@ -262,6 +264,9 @@ When using the webpack dev server, which does not go through Rails, bootstrap is
 
 #### Keeping Custom Bootstrap Configurations Synced
 Because the webpack dev server and Rails each load Bootstrap via a different file (explained in the two sections immediately above), any changes to the way components are loaded in one file must also be made to the other file in order to keep styling consistent between the two. For example, if an import is excluded in `_bootstrap-custom.scss`, the same import should be excluded in `bootstrap-sass-config.js` so that styling in the Rails server and the webpack dev server will be the same.
+
+#### Skip Bootstrap Integration
+Bootstrap integration is enabled by default, but can be disabled by passing the `--skip-bootstrap` flag (alias `-b`). When you don't need Bootstrap in your existing project, just skip it as needed.
 
 ### Linters
 The React on Rails generator can add linters and their recommended accompanying configurations to your project. There are two classes of linters: ruby linters and JavaScript linters.

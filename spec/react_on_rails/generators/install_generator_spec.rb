@@ -9,7 +9,7 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:no_server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
-    include_examples "bootstrap"
+    include_examples "bootstrap:enabled"
     include_examples "js_linters:enabled"
   end
 
@@ -19,7 +19,7 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:no_server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
-    include_examples "bootstrap"
+    include_examples "bootstrap:enabled"
     include_examples "js_linters:disabled"
   end
 
@@ -29,7 +29,7 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:no_server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
-    include_examples "bootstrap"
+    include_examples "bootstrap:enabled"
     include_examples "js_linters:disabled"
   end
 
@@ -39,7 +39,7 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:no_server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
-    include_examples "bootstrap"
+    include_examples "bootstrap:enabled"
     include_examples "js_linters:enabled"
     include_examples "ruby_linters"
   end
@@ -50,7 +50,7 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:no_server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
-    include_examples "bootstrap"
+    include_examples "bootstrap:enabled"
     include_examples "js_linters:enabled"
     include_examples "ruby_linters"
   end
@@ -61,7 +61,7 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:server_rendering"
-    include_examples "bootstrap"
+    include_examples "bootstrap:enabled"
     include_examples "js_linters:enabled"
   end
 
@@ -71,7 +71,7 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:server_rendering"
-    include_examples "bootstrap"
+    include_examples "bootstrap:enabled"
     include_examples "js_linters:enabled"
   end
 
@@ -81,7 +81,7 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:no_server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:no_server_rendering"
-    include_examples "bootstrap"
+    include_examples "bootstrap:enabled"
     include_examples "js_linters:enabled"
   end
 
@@ -91,7 +91,7 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:no_server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:no_server_rendering"
-    include_examples "bootstrap"
+    include_examples "bootstrap:enabled"
     include_examples "js_linters:enabled"
   end
 
@@ -101,7 +101,7 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:server_rendering"
-    include_examples "bootstrap"
+    include_examples "bootstrap:enabled"
     include_examples "js_linters:enabled"
   end
 
@@ -111,7 +111,7 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:server_rendering"
-    include_examples "bootstrap"
+    include_examples "bootstrap:enabled"
     include_examples "js_linters:enabled"
   end
 
@@ -121,7 +121,7 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:server_rendering"
-    include_examples "bootstrap"
+    include_examples "bootstrap:enabled"
     include_examples "js_linters:enabled"
   end
 
@@ -142,6 +142,35 @@ describe InstallGenerator, type: :generator do
     include_examples "heroku_deployment"
   end
 
+  context "--no-skip-bootstrap" do
+    before(:all) { run_generator_test_with_args(%w(--no-skip-bootstrap)) }
+    include_examples "base_generator:base", application_js: true
+    include_examples "bootstrap:enabled"
+  end
+
+  context "--no-skip-bootstrap" do
+    before(:all) { run_generator_test_with_args(%w(--no-skip-bootstrap), application_js: false) }
+    include_examples "base_generator:base", application_js: false
+    include_examples "bootstrap:enabled"
+  end
+
+  context "-b" do
+    before(:all) { run_generator_test_with_args(%w(-b)) }
+    include_examples "bootstrap:disabled"
+  end
+
+  context "--skip-bootstrap" do
+    before(:all) { run_generator_test_with_args(%w(--skip-bootstrap)) }
+    include_examples "base_generator:base", application_js: true
+    include_examples "bootstrap:disabled"
+  end
+
+  context "--skip-bootstrap" do
+    before(:all) { run_generator_test_with_args(%w(--skip-bootstrap), application_js: false) }
+    include_examples "base_generator:base", application_js: false
+    include_examples "bootstrap:disabled"
+  end
+
   context "without existing application.js or application.js.coffee file" do
     before(:all) { run_generator_test_with_args([], application_js: false) }
     include_examples "base_generator:base", application_js: false
@@ -154,11 +183,11 @@ describe InstallGenerator, type: :generator do
 
   context "without existing assets.rb file" do
     before(:all) { run_generator_test_with_args([], assets_rb: false) }
-    include_examples "bootstrap", assets_rb: false
+    include_examples "base_generator:base", assets_rb: false
   end
 
   context "with existing assets.rb file" do
     before(:all) { run_generator_test_with_args([], assets_rb: true) }
-    include_examples "bootstrap", assets_rb: true
+    include_examples "base_generator:base", assets_rb: true
   end
 end

@@ -34,19 +34,30 @@ module ReactOnRails
                    desc: "Install files necessary for deploying to Heroku",
                    aliases: "-H"
 
+      # --skip-bootstrap
+      class_option :skip_bootstrap,
+                   type: :boolean,
+                   default: false,
+                   desc: "Skip integrating Bootstrap and don't initialize files and regarding configs",
+                   aliases: "-b"
+
       def run_generators # rubocop:disable Metrics/CyclomaticComplexity
         return unless installation_prerequisites_met?
         warn_if_nvm_is_not_installed
+        invoke_generators
+      end
+
+      private
+
+      def invoke_generators # rubocop:disable Metrics/CyclomaticComplexity
         invoke "react_on_rails:base"
         invoke "react_on_rails:react_no_redux" unless options.redux?
         invoke "react_on_rails:react_with_redux" if options.redux?
         invoke "react_on_rails:js_linters" unless options.skip_js_linters?
         invoke "react_on_rails:ruby_linters" if options.ruby_linters?
-        invoke "react_on_rails:bootstrap"
         invoke "react_on_rails:heroku_deployment" if options.heroku_deployment?
+        invoke "react_on_rails:bootstrap" unless options.skip_bootstrap?
       end
-
-      private
 
       # NOTE: other requirements for existing files such as .gitignore or application.
       # js(.coffee) are not checked by this method, but instead produce warning messages

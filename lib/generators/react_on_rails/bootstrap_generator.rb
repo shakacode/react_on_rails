@@ -8,26 +8,6 @@ module ReactOnRails
       hide!
       source_root(File.expand_path("../templates", __FILE__))
 
-      def append_to_assets_initializer
-        data = <<-DATA.strip_heredoc
-          # Add client/assets/ folders to asset pipeline's search path.
-          # If you do not want to move existing images and fonts from your Rails app
-          # you could also consider creating symlinks there that point to the original
-          # rails directories. In that case, you would not add these paths here.
-          Rails.application.config.assets.paths << Rails.root.join("client", "assets", "stylesheets")
-          Rails.application.config.assets.paths << Rails.root.join("client", "assets", "images")
-          Rails.application.config.assets.paths << Rails.root.join("client", "assets", "fonts")
-
-          Rails.application.config.assets.precompile += %w( generated/server-bundle.js )
-        DATA
-        assets_intializer = File.join(destination_root, "config/initializers/assets.rb")
-        if File.exist?(assets_intializer)
-          append_to_file(assets_intializer, data)
-        else
-          create_file(assets_intializer, data)
-        end
-      end
-
       def copy_bootstrap_files
         base_path = "bootstrap/"
         %w(app/assets/stylesheets/_bootstrap-custom.scss
@@ -35,19 +15,6 @@ module ReactOnRails
            client/assets/stylesheets/_pre-bootstrap.scss
            client/assets/stylesheets/_react-on-rails-sass-helper.scss
            client/bootstrap-sass.config.js).each { |file| copy_file(base_path + file, file) }
-      end
-
-      # rename to application.scss from application.css or application.css.scss
-      def force_application_scss_naming_if_necessary
-        base_path = "app/assets/stylesheets/"
-        application_css = "#{base_path}application.css"
-        application_css_scss = "#{base_path}application.css.scss"
-
-        bad_name = dest_file_exists?(application_css) || dest_file_exists?(application_css_scss)
-        return unless bad_name
-
-        new_name = File.join(destination_root, "#{base_path}application.scss")
-        File.rename(bad_name, new_name)
       end
 
       # if there still is not application.scss, just create one
@@ -102,7 +69,20 @@ module ReactOnRails
       end
 
       def add_bootstrap_sprockets_to_application_js
-        # see base_generator.rb this is done there
+        data = <<-DATA.strip_heredoc
+
+          // bootstrap-sprockets depends on generated/vendor-bundle for jQuery.
+          //= require bootstrap-sprockets
+
+        DATA
+
+        app_js_path = "app/assets/javascripts/application.js"
+        found_app_js = dest_file_exists?(app_js_path) || dest_file_exists?(app_js_path + ".coffee")
+        if found_app_js
+          append_to_file(found_app_js, data)
+        else
+          create_file(app_js_path, data)
+        end
       end
     end
   end
