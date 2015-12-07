@@ -32,7 +32,9 @@
     "prerelease": "npm run check && npm run clean && npm run build",
     "release:patch": "node_package/scripts/release patch",
     "release:minor": "node_package/scripts/release minor",
-    "release:major": "node_package/scripts/release major"
+    "release:major": "node_package/scripts/release major",
+    "dummy:install": "cd spec/dummy && npm i",
+    "local": "echo 'Be sure to run npm run dummy:install' && npm run build && cd spec/dummy && foreman start"
   },
   "repository": {
     "type": "git",
