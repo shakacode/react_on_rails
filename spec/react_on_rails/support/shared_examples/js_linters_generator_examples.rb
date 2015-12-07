@@ -32,5 +32,5 @@ end
 
 # An array of strings representing the names of all javascript linter npm modules
 def linter_modules_names
-  %w(babel-eslint eslint eslint-config-airbnb eslint-plugin-react jscs)
+  %w(babel-eslint eslint eslint-config-airbnb eslint-config-shakacode eslint-plugin-react jscs)
 end

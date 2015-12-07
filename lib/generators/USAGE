@@ -94,6 +94,23 @@ are such that the default is for the flag to be off. For example, the default fo
 
     We really love using all the linters! Give them a try.
 
+*******************************************************************************
+
+After running the generator, you will want to:
+
+    bundle && npm i
+
+Then you may run
+
+    npm run
+
+And you will see several useful commands:
+
+  node-server-hot
+    echo 'visit http://localhost:4000' && cd client && npm start
+  rails-server
+    echo 'visit http://localhost:3000/hello_world' && foreman start -f Procfile.dev
+
 More Details:
 
     `https://github.com/shakacode/react_on_rails#generator`

@@ -65,6 +65,13 @@ feature "Pages/client_side_log_throw", js: true do
   scenario { is_expected.to have_text "This example demonstrates client side logging and error handling." }
 end
 
+feature "Pages/Pure Component", js: true do
+  subject { page }
+  background { visit "/pure_component" }
+
+  scenario { is_expected.to have_text "This is a Pure Component!" }
+end
+
 feature "Pages/server_side_log_throw", js: true do
   subject { page }
   background { visit "/server_side_log_throw" }

@@ -5,7 +5,7 @@
   <% puts "=" * 80 %>
   <% puts "server rendering react components" %>
   <% puts "=" * 80 %>
-  <%= react_component("ReduxApp", @app_props_server_render, prerender: true, trace: true, generator_function: true) %>
+  <%= react_component("ReduxApp", @app_props_server_render, prerender: true, trace: true) %>
 <% end %>
 <hr/>
 
@@ -40,16 +40,17 @@
   </li>
   <li>
     Expose the Redux Component on the client side:
-    spec/dummy/client/app/startup/clientGlobals.jsx
+    spec/dummy/client/app/startup/clientRegistration.jsx
     <br/>
     <pre>
     import ReduxApp from './ClientReduxApp';
-    window.ReduxApp = ReduxApp;
+    import ReactOnRails from 'react-on-rails';
+    ReactOnRails.register({ ReduxApp });
     </pre>
   </li>
   <li>
     Expose the Redux Component on the server side:
-    spec/dummy/client/app/startup/serverGlobals.jsx
+    spec/dummy/client/app/startup/serverRegistration.jsx
     <br/>
     <pre>
     import ReduxApp from './ServerReduxApp';
@@ -62,7 +63,7 @@
     <br/>
     <pre>
     <%% cache @app_props_server_render do %>
-      <%%= react_component("ReduxApp", @app_props_server_render, prerender: true, trace: true, generator_function: true) %>
+      <%%= react_component("ReduxApp", @app_props_server_render, prerender: true, trace: true) %>
     <%% end %>
     </pre>
   </li>

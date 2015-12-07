@@ -1,7 +1,7 @@
 ---
 parser: babel-eslint
 
-extends: eslint-config-airbnb
+extends: eslint-config-shakacode
 
 plugins:
   - react

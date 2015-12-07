@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Run this from top directory
+
+# $(npm bin)/webpack --config node_package/webpack.config.js
+
+node_package/scripts/clean
+
+$(npm bin)/babel \
+  --out-dir node_package/lib \
+  node_package/src

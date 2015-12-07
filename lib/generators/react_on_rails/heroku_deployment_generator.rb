@@ -1,10 +1,10 @@
 require "rails/generators"
-require File.expand_path("../generator_helper", __FILE__)
-include GeneratorHelper
+require_relative "generator_helper"
 
 module ReactOnRails
   module Generators
     class HerokuDeploymentGenerator < Rails::Generators::Base
+      include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates", __FILE__))
 

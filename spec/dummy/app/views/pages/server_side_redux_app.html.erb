@@ -1,6 +1,6 @@
 <%= render "header" %>
 
-<%= react_component("ReduxApp", @app_props_server_render, prerender: true, trace: true, generator_function: true) %>
+<%= react_component("ReduxApp", @app_props_server_render, prerender: true, trace: true) %>
 <hr/>
 
 <h1>Server Rendered/Cached React/Redux Component</h1>
@@ -34,16 +34,17 @@
   </li>
   <li>
     Expose the Redux Component on the client side:
-    spec/dummy/client/app/startup/clientGlobals.jsx
+    spec/dummy/client/app/startup/clientRegistration.jsx
     <br/>
     <pre>
     import ReduxApp from './ClientReduxApp';
-    window.ReduxApp = ReduxApp;
+    import ReactOnRails from 'react-on-rails';
+    ReactOnRails.register({ ReduxApp });
     </pre>
   </li>
   <li>
     Expose the Redux Component on the server side:
-    spec/dummy/client/app/startup/serverGlobals.jsx
+    spec/dummy/client/app/startup/serverRegistration.jsx
     <br/>
     <pre>
     import ReduxApp from './ServerReduxApp';
@@ -54,7 +55,7 @@
     Place the component on the view: spec/dummy/app/views/pages/server_side_redux_app.html.erb
     <br/>
     <pre>
-    <%%= react_component("ReduxApp", @app_props_server_render, prerender: true, trace: true, generator_function: true) %>
+    <%%= react_component("ReduxApp", @app_props_server_render, prerender: true, trace: true) %>
     </pre>
   </li>
 </ol>

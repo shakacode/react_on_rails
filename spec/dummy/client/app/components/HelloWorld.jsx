@@ -20,7 +20,7 @@ class HelloWorld extends React.Component {
 
   _handleChange() {
     const name = ReactCompat.reactFindDOMNode()(this.refs.name).value;
-    this.setState({name});
+    this.setState({ name });
   }
 
   render() {

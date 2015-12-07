@@ -2,7 +2,7 @@
 <h1>Non-React Component</h1>
 <p>For example, Suppose you have some JavaScript that generates a string of HTML:</p>
 <pre>
-  <%%= server_render_js("(function() { var x = this.HelloString.world(); console.warn('ran console.warn on the server()'); return x;})()") %>
+  <%%= server_render_js("(function() { var x = ReactOnRails.getComponent('HelloString').component.world(); console.warn('ran console.warn on the server()'); return x;})()") %>
 </pre>
 <p>
   That will generate this:
@@ -10,7 +10,7 @@
 
 <hr/>
 <pre>
-<%= server_render_js("(function() { var x = this.HelloString.world(); console.warn('ran console.warn on the server()'); return x;})()") %>
+<%= server_render_js("(function() { var x = ReactOnRails.getComponent('HelloString').component.world(); console.warn('ran console.warn on the server()'); return x;})()") %>
 </pre>
 
 <hr/>

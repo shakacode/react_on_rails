@@ -1,23 +1,35 @@
-import React from 'react';
+import React, { PropTypes } from 'react';
 import { connect } from 'react-redux';
+import { bindActionCreators } from 'redux';
 
 import HelloWorldRedux from './HelloWorldRedux';
 
 import * as helloWorldActions from '../actions/HelloWorldActions';
 
-@connect(state => ({
-  // This is the slice of the data, named the same as the component
-  helloWorldData: state.helloWorldData,
-}), helloWorldActions)
+function select(state) {
+  // Which part of the Redux global state does our component want to receive as props?
+  return { data: state.helloWorldData };
+}
 
-export default class HelloWorldContainer extends React.Component {
+class HelloWorldContainer extends React.Component {
+  static propTypes = {
+    dispatch: PropTypes.func.isRequired,
+    data: PropTypes.object.isRequired,
+  };
+
   constructor(props, context) {
     super(props, context);
   }
 
   render() {
+    const { dispatch, data } = this.props;
+    const actions = bindActionCreators(helloWorldActions, dispatch);
+
     return (
-      <HelloWorldRedux {...this.props} />
+      <HelloWorldRedux {...{ actions, data }} />
     );
   }
 }
+
+// Don't forget to actually use connect!
+export default connect(select)(HelloWorldContainer);

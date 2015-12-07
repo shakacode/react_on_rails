@@ -13,26 +13,31 @@ function select(state) {
 
 // Simple example of a React "smart" component
 class HelloWorld extends React.Component {
-  constructor(props, context) {
-    super(props, context);
-  }
-
   static propTypes = {
     dispatch: PropTypes.func.isRequired,
 
     // This corresponds to the value used in function select above.
+    // We prefix all property and variable names pointing to Immutable.js objects with '$$'.
+    // This allows us to immediately know we don't call $$helloWorldStore['someProperty'], but
+    // instead use the Immutable.js `get` API for Immutable.Map
     $$helloWorldStore: PropTypes.instanceOf(Immutable.Map).isRequired,
+  };
+
+  constructor(props, context) {
+    super(props, context);
   }
 
   render() {
     const { dispatch, $$helloWorldStore } = this.props;
     const actions = bindActionCreators(helloWorldActionCreators, dispatch);
+    const { updateName } = actions;
+    const name = $$helloWorldStore.get('name');
 
     // This uses the ES2015 spread operator to pass properties as it is more DRY
     // This is equivalent to:
     // <HelloWorldWidget $$helloWorldStore={$$helloWorldStore} actions={actions} />
     return (
-      <HelloWorldWidget {...{$$helloWorldStore, actions}} />
+      <HelloWorldWidget {...{ updateName, name }} />
     );
   }
 }

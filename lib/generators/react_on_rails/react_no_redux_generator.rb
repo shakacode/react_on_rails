@@ -1,10 +1,10 @@
 require "rails/generators"
-require File.expand_path("../generator_helper", __FILE__)
-include GeneratorHelper
+require_relative "generator_helper"
 
 module ReactOnRails
   module Generators
     class ReactNoReduxGenerator < Rails::Generators::Base
+      include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates", __FILE__))
 
@@ -17,22 +17,19 @@ module ReactOnRails
 
       def copy_base_files
         base_path = "no_redux/base/"
-        %w(client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
-           client/app/bundles/HelloWorld/containers/HelloWorld.jsx).each do |file|
-             copy_file(base_path + file, file)
-           end
+        file = "client/app/bundles/HelloWorld/containers/HelloWorld.jsx"
+        copy_file(base_path + file, file)
       end
 
       def copy_server_rendering_files_if_appropriate
         return unless options.server_rendering?
         base_path = "no_redux/server_rendering/"
-        %w(client/app/bundles/HelloWorld/startup/HelloWorldAppServer.jsx).each do |file|
-          copy_file(base_path + file, file)
-        end
+        file = "client/app/bundles/HelloWorld/startup/HelloWorldAppServer.jsx"
+        copy_file(base_path + file, file)
       end
 
       def template_appropriate_version_of_hello_world_app_client
-        filename = options.server_rendering? ? "HelloWorldAppClient.jsx" : "HelloWorldApp.jsx"
+        filename = "HelloWorldAppClient.jsx"
         location = "client/app/bundles/HelloWorld/startup"
         template("no_redux/base/#{location}/HelloWorldAppClient.jsx.tt", "#{location}/#{filename}")
       end

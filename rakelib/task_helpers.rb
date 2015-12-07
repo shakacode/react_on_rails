@@ -11,7 +11,7 @@ module ReactOnRails
     end
 
     def dummy_app_dirs
-      %w(spec/dummy spec/dummy-react-013).map { |rel_dir| File.join(gem_root, rel_dir) }
+      File.join(gem_root, "spec/dummy")
     end
 
     # Executes a string or an array of strings in a shell in the given directory

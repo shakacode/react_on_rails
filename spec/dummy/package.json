@@ -1,6 +1,6 @@
 {
   "name": "react_on_rails",
-  "version": "0.9.0",
+  "version": "2.0.0-rc.2",
   "description": "example of server rendering",
   "main": "server.js",
   "engines": {
@@ -9,7 +9,9 @@
   "scripts": {
     "postinstall": "cd ./client && npm install",
     "gulp": "cd ./client && npm run gulp",
-    "test": "rspec && client/bin/lint && (cd client && npm run jscs .)"
+    "test": "npm run build:test && npm run lint && rspec",
+    "lint": "cd client && npm run lint",
+    "build:test": "cd client && npm run build:test"
   },
   "repository": {
     "type": "git",
@@ -25,5 +27,11 @@
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
+  },
+  "devDependencies": {
+    "babel-eslint": "^5.0.0-beta6",
+    "eslint": "^1.10.3",
+    "eslint-config-airbnb": "^3.1.0",
+    "eslint-config-shakacode": "0.0.1"
   }
 }

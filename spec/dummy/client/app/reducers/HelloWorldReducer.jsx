@@ -11,12 +11,12 @@ const initialState = {
 export default function helloWorldReducer(state = initialState, action) {
   const { type, name } = action;
   switch (type) {
-  case actionTypes.HELLO_WORLD_NAME_UPDATE:
-    return {
-      lastActionType: type,
-      name,
-    };
-  default:
-    return state;
+    case actionTypes.HELLO_WORLD_NAME_UPDATE:
+      return {
+        lastActionType: type,
+        name,
+      };
+    default:
+      return state;
   }
 }

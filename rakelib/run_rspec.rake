@@ -12,14 +12,8 @@ namespace :run_rspec do
     run_tests_in("", rspec_args: "spec/react_on_rails")
   end
 
-  desc "Run RSpec for spec/dummy only"
   task dummy: ["dummy_apps:dummy_app"] do
     run_tests_in("spec/dummy", env_vars: "DRIVER=selenium_firefox")
-  end
-
-  desc "Run RSpec for spec/dummy_react_013 only"
-  task dummy_react_013: ["dummy_apps:dummy_react_013_app"] do
-    run_tests_in("spec/dummy-react-013", env_vars: "DRIVER=selenium_firefox")
   end
 
   # Dynamically define Rake tasks for each example app found in the examples directory
@@ -42,9 +36,15 @@ namespace :run_rspec do
 
   Coveralls::RakeTask.new
 
-  task run_rspec: [:gem, :dummy, :dummy_react_013, :examples, :empty, "coveralls:push"] do
+  desc "run all tests"
+  task run_rspec: [:gem, :dummy, :examples, :empty, :js_tests] do
     puts "Completed all RSpec tests"
   end
+end
+
+desc "js tests (same as 'npm run test')"
+task :js_tests do
+  sh "npm run test"
 end
 
 desc "Runs all tests. Run `rake -D run_rspec` to see all available test options"

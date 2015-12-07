@@ -9,7 +9,9 @@
   },
   "scripts": {
     "postinstall": "cd client && npm install",
-    "test": "rspec && (cd client && npm run lint)"
+    "test": "rspec && (cd client && npm run lint)",
+    "node-server-hot": "echo 'visit http://localhost:4000' && cd client && npm start",
+    "rails-server": "echo 'visit http://localhost:3000/hello_world' && foreman start -f Procfile.dev"
   },
   "repository": {
     "type": "git",
