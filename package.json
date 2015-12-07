@@ -1,0 +1,55 @@
+{
+  "name": "react_on_rails",
+  "version": "0.0.0",
+  "description": "react_on_rails JavaScript for react_on_rails Ruby gem",
+  "main": "node_package/lib/react_on_rails.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "babel": "^5.8.29",
+    "babel-eslint": "^5.0.0-beta4",
+    "eslint": "^1.10.3",
+    "eslint-config-airbnb": "^2.0.0",
+    "eslint-plugin-babel": "^3.0.0",
+    "eslint-plugin-react": "^3.11.3",
+    "react": "^0.14.3",
+    "tape": "^4.2.2"
+  },
+  "peerDependencies": {
+    "react": ">= 0.13"
+  },
+  "files": [
+    "node_package/lib"
+  ],
+  "scripts": {
+    "test": "node_package/scripts/test",
+    "clean": "node_package/scripts/clean",
+    "build": "node_package/scripts/build",
+    "lint": "node_package/scripts/lint",
+    "check": "npm run lint && npm run test",
+    "prerelease": "npm run check && npm run clean && npm run build",
+    "release:patch": "node_package/scripts/release patch",
+    "release:minor": "node_package/scripts/release minor",
+    "release:major": "node_package/scripts/release major"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shakacode/react_on_rails.git"
+  },
+  "keywords": [
+    "react",
+    "webpack",
+    "JavaScript",
+    "Ruby",
+    "on",
+    "Rails"
+  ],
+  "author": "justin.gordon@gmail.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shakacode/react_on_rails/issues"
+  },
+  "homepage": "https://github.com/shakacode/react_on_rails#readme"
+}

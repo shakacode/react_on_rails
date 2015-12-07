@@ -17,6 +17,7 @@
     "react-dom": "^0.14.0",
     "react-redux": "^3.1.0",
     "react-router": "^1.0.0",
+    "react_on_rails": "^0.0.0",
     "redux": "^3.0.2",
     "redux-thunk": "^1.0.0",
     "webpack": "^1.12.2"

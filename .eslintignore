@@ -3,3 +3,5 @@ coverage
 spec/react_on_rails/dummy-for-generators
 spec/dummy
 spec/dummy-react-013
+node_package/lib/
+
