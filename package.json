@@ -14,6 +14,7 @@
     "eslint-config-airbnb": "^2.0.0",
     "eslint-plugin-babel": "^3.0.0",
     "eslint-plugin-react": "^3.11.3",
+    "jscs": "^2.6.0",
     "react": "^0.14.3",
     "tape": "^4.2.2"
   },

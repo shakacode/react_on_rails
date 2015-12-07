@@ -2,7 +2,8 @@
 
 import React from 'react';
 
-const context = window || global || this;
+const context = ((typeof window !== 'undefined') && window) ||
+  ((typeof global !== 'undefined') && global) || this;
 
 let ReactOnRails;
 
@@ -11,7 +12,8 @@ const turbolinksInstalled = (typeof Turbolinks !== 'undefined');
 function provideClientReact() {
   if (typeof context.ReactDOM === 'undefined') {
     if (React.version >= '0.14') {
-      console.warn('WARNING: ReactDOM is not configured in webpack.server.rails.config.js file as an entry.\n' +
+      console.warn(
+        'WARNING: ReactDOM is not configured in webpack.server.rails.config.js file as an entry.\n' +
         'See: https://github.com/shakacode/react_on_rails/blob/master/docs/webpack.md for more detailed hints.');
     }
 
@@ -24,7 +26,8 @@ function provideClientReact() {
 function provideServerReact() {
   if (typeof context.ReactDOMServer === 'undefined') {
     if (React.version >= '0.14') {
-      console.warn('WARNING: `react-dom/server` is not configured in webpack.server.rails.config.js file as an entry.\n' +
+      console.warn(
+        'WARNING: `react-dom/server` is not configured in webpack.server.rails.config.js file as an entry.\n' +
         'See: https://github.com/shakacode/react_on_rails/blob/master/docs/webpack.md for more detailed hints.');
     }
 
@@ -65,11 +68,12 @@ function createReactElementOrRouterResult(componentName, props, domId, trace, ge
     console.log('RENDERED ' + componentName + ' to dom node with id: ' + domId);
   }
 
+  const component = ReactOnRails.componentForName(componentName);
   if (generatorFunction) {
-    return this[componentName](props, location);
+    return component(props, location);
   }
 
-  return React.createElement(this[componentName], props);
+  return React.createElement(component, props);
 }
 
 function render(el) {
@@ -114,7 +118,31 @@ function reactOnRailsPageUnloaded() {
   forEachComponent(unmount);
 }
 
+const components = {};
+
 ReactOnRails = {
+
+  // TODO: Change to get components off the global
+  componentForName(name) {
+    if (components[name]) {
+      return components[name];
+    }
+
+    if (!context[name]) {
+      throw new Error(`Could not find component registered with name ${name}`);
+    }
+
+    console.warn(
+      'WARNING: Please use ReactOnRails.registerComponent rather than adding components' +
+      ' to the global namespace');
+    return context[name];
+  },
+
+  // TODO
+  registerCommponent(componentName, component, options) {
+    components[componentName] = component;
+  },
+
   serverRenderReactComponent(options) {
     const componentName = options.componentName;
     const domId = options.domId;
@@ -233,9 +261,9 @@ ReactOnRails = {
   },
 };
 
-(function iife(win) {
-  win.ReactOnRails = ReactOnRails;
-  const document = win.document;
+(function iife() {
+  context.ReactOnRails = ReactOnRails;
+  const document = context.document;
 
   // Install listeners when running on the client.
   if (typeof document !== 'undefined') {
@@ -246,4 +274,4 @@ ReactOnRails = {
       document.addEventListener('page:change', reactOnRailsPageLoaded);
     }
   }
-}).call(context); // 'this' should be the window
+}).call(); // 'this' should be the window

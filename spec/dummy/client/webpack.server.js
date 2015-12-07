@@ -3,6 +3,7 @@ const path = require('path');
 module.exports = {
   context: __dirname,
   entry: [
+    'react_on_rails',
     'startup/serverGlobals',
     'react-dom/server',
   ],
