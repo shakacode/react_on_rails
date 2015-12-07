@@ -1,12 +1,12 @@
 require "rails/generators"
-require File.expand_path("../generator_helper", __FILE__)
-require File.expand_path("../generator_errors", __FILE__)
-include GeneratorHelper
-include GeneratorErrors
+require_relative "generator_helper"
+require_relative "generator_messages"
 
 module ReactOnRails
   module Generators
     class InstallGenerator < Rails::Generators::Base
+      include GeneratorHelper
+
       # fetch USAGE file for details generator description
       source_root(File.expand_path("../", __FILE__))
 
@@ -47,20 +47,30 @@ module ReactOnRails
                    desc: "Skip integrating Bootstrap and don't initialize files and regarding configs. Default: false",
                    aliases: "-b"
 
-      def run_generators # rubocop:disable Metrics/CyclomaticComplexity
-        unless installation_prerequisites_met?
-          print_errors
-          return
+      # --ignore-warnings
+      class_option :ignore_warnings,
+                   type: :boolean,
+                   default: false,
+                   desc: "Skip warnings. Default: false"
+
+      def run_generators
+        if installation_prerequisites_met? || options.ignore_warnings?
+          invoke_generators
+        else
+          error = "react_on_rails generator prerequisites not met!"
+          GeneratorMessages.add_error(error)
+          # fail("react_on_rails generator prerequisites not met!")
         end
-        warn_if_nvm_is_not_installed
-        invoke_generators
+      ensure
         print_errors
       end
+
+      # Everything here is not run automatically b/c it's private
 
       private
 
       def print_errors
-        GeneratorErrors.errors.each { |errors| puts errors }
+        GeneratorMessages.errors.each { |errors| puts errors }
       end
 
       def invoke_generators # rubocop:disable Metrics/CyclomaticComplexity
@@ -82,29 +92,27 @@ module ReactOnRails
 
       def missing_npm?
         return false unless `which npm`.blank?
-        error = "** npm is required. Please install it before continuing."
+        error = "npm is required. Please install it before continuing. "
         error << "https://www.npmjs.com/"
-        GeneratorErrors.add_error(error)
+        GeneratorMessages.add_error(error)
+        true
       end
 
       def missing_node?
         return false unless `which node`.blank?
-        error = "** nodejs is required. Please install it before continuing."
+        error = "** nodejs is required. Please install it before continuing. "
         error << "https://nodejs.org/en/"
-        GeneratorErrors.add_error(error)
+        GeneratorMessages.add_error(error)
+        true
       end
 
       def uncommitted_changes?
         return false if ENV["COVERAGE"]
         status = `git status`
         return false if status.include?("nothing to commit, working directory clean")
-        error = "** You have uncommitted code. Please commit or stash your changes before continuing"
-        GeneratorErrors.add_error(error)
-      end
-
-      def warn_if_nvm_is_not_installed
-        return true unless `which nvm`.blank?
-        GeneratorErrors.add_error("** nvm is advised. Please consider installing it. https://github.com/creationix/nvm")
+        error = "You have uncommitted code. Please commit or stash your changes before continuing"
+        GeneratorMessages.add_error(error)
+        true
       end
     end
   end

@@ -1,3 +1,5 @@
+require "rainbow"
+
 module GeneratorHelper
   # Takes a relative path from the destination root, such as `.gitignore` or `app/assets/javascripts/application.js`
   def dest_file_exists?(file)
@@ -10,19 +12,12 @@ module GeneratorHelper
     Dir.exist?(dest_dir) ? dest_dir : nil
   end
 
-  # Takes the missing file and the
-  def puts_setup_file_error(file, data)
-    puts "** #{file} was not found."
-    puts "Please add the following content to your #{file} file:"
-    puts "\n#{data}\n"
-  end
-
-  def return_setup_file_error(file, data)
-    error = ""
-    error << "** #{file} was not found.\n"
-    error << "Please add the following content to your #{file} file:\n"
-    error << "\n#{data}\n"
-    error
+  def setup_file_error(file, data)
+    <<-MSG
+#{file} was not found.
+Please add the following content to your #{file} file:
+#{data}
+    MSG
   end
 
   def empty_directory_with_keep_file(destination, config = {})

@@ -15,12 +15,13 @@
     "**/vendor/**",
     "**/dummy-for-generators/**",
     "**/dummy/**",
-    "**/dummy-react-013/**"
+    "**/node_package/lib/**"
   ],
   "esprima": "babel-jscs",
   "validateQuoteMarks": {
     "mark": "'",
     "escape": true,
     "ignoreJSX": true
-  }
+  },
+  "requireTrailingComma": false
 }

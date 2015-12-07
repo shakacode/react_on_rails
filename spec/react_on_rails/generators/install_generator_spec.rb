@@ -191,8 +191,40 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:base", assets_rb: true
   end
 
+  context "without existing spec dir" do
+    before(:all) { run_generator_test_with_args(%w(--ruby-linters), spec: false) }
+    it "does not add the spec directory to the ruby-lint.yml" do
+      assert_file("ruby-lint.yml") do |contents|
+        refute_match(/- spec/, contents)
+      end
+    end
+  end
+
+  context "without existing spec dir" do
+    before(:all) { run_generator_test_with_args(%w(--ruby-linters), spec: true) }
+    it "adds the spec directory to the ruby-lint.yml" do
+      assert_file("ruby-lint.yml") do |contents|
+        assert_match(/- spec/, contents)
+      end
+    end
+  end
+
   context "with missing files to trigger errors" do
-    before(:all) { run_generator_test_with_args([], gitignore: false) }
-    include_examples "generator_errors"
+    it "GeneratorMessages has the missing file error" do
+      run_generator_test_with_args([], gitignore: false)
+      expected = <<-MSG.strip_heredoc
+        .gitignore was not found.
+        Please add the following content to your .gitignore file:
+        # React on Rails
+        npm-debug.log
+        node_modules
+
+        # Generated js bundles
+        /app/assets/javascripts/generated/*
+
+        MSG
+      expect(GeneratorMessages.output)
+        .to include(GeneratorMessages.format_error(expected))
+    end
   end
 end

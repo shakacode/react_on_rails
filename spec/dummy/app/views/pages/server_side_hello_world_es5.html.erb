@@ -1,5 +1,5 @@
 <%= render "header" %>
-<%= react_component("HelloWorldES5", @app_props_server_render, prerender: true, trace: true, generator_function: false) %>
+<%= react_component("HelloWorldES5", @app_props_server_render, prerender: true, trace: true) %>
 <hr/>
 <h1>React Rails Server Rendering ES5 Style React.createClass</h1>
 <p>
@@ -31,18 +31,10 @@
     Create component source: spec/dummy/client/app/components/HelloWorld.jsx
   </li>
   <li>
-    Expose the HelloWorld Component: spec/dummy/client/app/startup/clientGlobals.jsx
-    <br/>
-    <pre>
-      import HelloWorldES5 from '../components/HelloWorldES5';
-      window.HelloWorldES5 = HelloWorldES5;
-    </pre>
-  </li>
-  <li>
     Place the component on the view: spec/dummy/app/views/pages/client_side_hello_world.html.erb
     <br/>
     <pre>
-      <%%= react_component("HelloWorldES5", @app_props_server_render, prerender: true, trace: true, generator_function: false) %>
+      <%%= react_component("HelloWorldES5", @app_props_server_render, prerender: true, trace: true) %>
     </pre>
   </li>
 </ol>

@@ -7,7 +7,6 @@ gemspec
 # They must be defined here because of the way Travis CI works, in that it will only
 # bundle install from a single Gemfile. Therefore, all gems that we will need for any dummy/example
 # app have to be manually added to this file.
-gem "awesome_print"
 gem "bootstrap-sass"
 gem "capybara"
 gem "capybara-screenshot"
@@ -16,13 +15,10 @@ gem "coffee-rails", "~> 4.1.0"
 gem "jbuilder", "~> 2.0"
 gem "jquery-rails"
 gem "launchy"
-gem "pry"
-gem "pry-byebug"
-gem "pry-doc"
-gem "pry-rails"
-gem "pry-rescue"
-gem "pry-stack_explorer"
+gem "poltergeist"
+gem "puma"
 gem "rails", "4.2.5"
+gem "rails_12factor"
 gem "rspec-rails"
 gem "rubocop", require: false
 gem "ruby-lint", require: false

@@ -27,13 +27,23 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
   <%= react_component("HelloWorldApp", @some_props, prerender: true) %>
   ```
 
-+ The `component_name` parameter is a string matching the name you used to globally expose your React component. So, in the above examples, if you had a React component named "HelloWorldApp," you would set `window.HelloWorldApp = HelloWorldApp` in your JavaScript. Exposing your component in this way is how React on Rails is able to reference your component from a Rails view. You can expose as many components as you like, as long as their names do not collide. See below for the details of how you expose your components via the react_on_rails webpack configuration.
++ The `component_name` parameter is a string matching the name you used to globally expose your React component. So, in the above examples, if you had a React component named "HelloWorldApp," you would register it with the following lines:
+ 
+  ```js
+  import ReactOnRails from 'react-on-rails';
+  import HelloWorldApp from './HelloWorldApp';
+  ReactOnRails.register({ HelloWorldApp });
+  ```
+ 
+  Exposing your component in this way is how React on Rails is able to reference your component from a Rails view. You can expose as many components as you like, as long as their names do not collide. See below for the details of how you expose your components via the react_on_rails webpack configuration.
+  
 + `@some_props` can be either a hash or JSON string. This is an optional argument assuming you do not need to pass any options (if you want to pass options, such as `prerender: true`, but you do not want to pass any properties, simply pass an empty hash `{}`). This will make the data available in your component:
 
   ```ruby
     # Rails View
     <%= react_component("HelloWorldApp", { name: "Stranger" })
   ```
+  
   ```javascript
     // inside your React component
     this.props.name // "Stranger"
@@ -104,10 +114,16 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
 1. Add the following to your Gemfile and bundle install:
 
   ```ruby
-  gem "react_on_rails"
+  gem "react_on_rails", "~> 2.0.0"
   ```
 
-2. Run the generator with a simple "Hello World" example:
+2. See help for the generator:
+
+  ```bash
+  rails generate react_on_rails:install --help
+  ```
+
+2. Run the generator with a simple "Hello World" example (more options below):
 
   ```bash
   rails generate react_on_rails:install
@@ -159,31 +175,29 @@ Place your JavaScript code inside of the provided `client/app` folder. Use modul
 
 + *Normal Mode (JavaScript is Rendered on client):*
 
-  If you are not server rendering, `clientGlobals.jsx` will have
+  If you are not server rendering, `clientRegistration.jsx` will have
 
   ```javascript
-  window.HelloWorldApp = HelloWorldApp;
+  import HelloWorld from '../components/HelloWorld';
+  import ReactOnRails from 'react-on-rails';
+  ReactOnRails.register({ HelloWorld });
   ```
 + *Server-Side Rendering:*
 
-  If you are server rendering, `globals.jsx` will have:
+  If you are server rendering, `serverRegistration.jsx` will have this. Note, you might be initializing HelloWorld with version specialized for server rendering.
 
   ```javascript
-  window.HelloWorldApp = HelloWorldAppClient;
+  import HelloWorld from '../components/HelloWorld';
+  import ReactOnRails from 'react-on-rails';
+  ReactOnRails.register({ HelloWorld });
   ```
 
-  `serverGlobals.jsx` will have:
-
-  ```javascript
-  global.HelloWorldApp = HelloWorldAppServer;
-  ```
-
-  In general, you want different initialization for your server rendered components.
+  In general, you may want different initialization for your server rendered components.
 
 ### Rails View Helpers In-Depth
 Once the bundled files have been generated in your `app/assets/javascripts/generated` folder and you have exposed your components globally, you will want to run your code in your Rails views using the included helper method.
 
-This is how you actually render the React components you exposed to `window` inside of `clientGlobals` (and `global` inside of `serverGlobals` if you are server rendering).
+This is how you actually render the React components you exposed to `window` inside of `clientRegistration` (and `global` inside of `serverRegistration` if you are server rendering).
 
 #### react_component
 `react_component(component_name, props = {}, options = {})`
@@ -191,13 +205,15 @@ This is how you actually render the React components you exposed to `window` ins
 + **react_component_name:** Can be a React component, created using a ES6 class, or `React.createClass`, or a generator function that returns a React component.
 + **props:** Ruby Hash which contains the properties to pass to the react object, or a JSON string. If you pass a string, we'll escape it for you.
 + **options:**
-  + **generator_function:** default is false, set to true if you want to use a generator function rather than a React Component. Why would you do this? For example, you may want the ability to use the passed-in props to initialize a redux store or setup react-router. Or you may want to return different components depending on what's in the props.
   + **prerender:** enable server-side rendering of component. Set to false when debugging!
   + **router_redirect_callback:** Use this option if you want to provide a custom handler for redirects on server rendering. If you don't specify this, we'll simply change the rendered output to a script that sets window.location to the new route. Set this up exactly like a generator_function. Your function will will take one parameter, containing all the values that react-router gives on a redirect request, such as pathname, search, etc.
   + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise.
   + **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the default configuration of logging_on_server set to true, you'll still see the errors on the server.
   + **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
 + Any other options are passed to the content tag, including the id
+
+#### Generator Functions
+Why would you create a function that returns a React compnent? For example, you may want the ability to use the passed-in props to initialize a redux store or setup react-router. Or you may want to return different components depending on what's in the props. ReactOnRails will automatically detect a registered generator function.
 
 #### server_render_js
 `server_render_js(js_expression, options = {})`
@@ -241,7 +257,7 @@ The generated client code follows our organization scheme. Each unique set of fu
 
 Inside of the generated "HelloWorld" domain you will find the following folders:
 
-+  `startup`: two types of files, one that return a container component and implement any code that differs between client and server code (if using server-rendering), and a `clientGlobals` file that exposes the aforementioned files (as well as a `serverGlobals` file if using server rendering). These globals files are what webpack is using as an entry point.
++  `startup`: two types of files, one that return a container component and implement any code that differs between client and server code (if using server-rendering), and a `clientRegistration` file that exposes the aforementioned files (as well as a `serverRegistration` file if using server rendering). These registration files are what webpack is using as an entry point.
 + `containers`: "smart components" (components that have functionality and logic that is passed to child "dumb components").
 + `components`: includes "dumb components", or components that simply render their properties and call functions given to them as properties by a parent component. Ultimately, at least one of these dumb components will have a parent container component.
 

@@ -1,12 +1,11 @@
 require "rails/generators"
-require File.expand_path("../generator_helper", __FILE__)
-require File.expand_path("../generator_errors", __FILE__)
-include GeneratorHelper
-include GeneratorErrors
+require_relative "generator_helper"
+require_relative "generator_messages"
 
 module ReactOnRails
   module Generators
     class BootstrapGenerator < Rails::Generators::Base
+      include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates", __FILE__))
 
@@ -56,7 +55,7 @@ module ReactOnRails
         if File.exist?(application_scss)
           append_to_file(application_scss, data)
         else
-          GeneratorErrors.add_error(return_setup_file_error(application_scss, data))
+          GeneratorMessages.add_error(setup_file_error(application_scss, data))
         end
       end
 

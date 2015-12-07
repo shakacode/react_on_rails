@@ -1,13 +1,11 @@
 require "rails/generators"
-require File.expand_path("../generator_helper", __FILE__)
-require File.expand_path("../generator_errors", __FILE__)
-
-include GeneratorHelper
-include GeneratorErrors
+require_relative "generator_messages"
+require_relative "generator_helper"
 
 module ReactOnRails
   module Generators
     class BaseGenerator < Rails::Generators::Base # rubocop:disable Metrics/ClassLength
+      include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates", __FILE__))
 
@@ -67,7 +65,7 @@ module ReactOnRails
         if dest_file_exists?(".gitignore")
           append_to_file(".gitignore", data)
         else
-          GeneratorErrors.add_error(return_setup_file_error(".gitignore", data))
+          GeneratorMessages.add_error(setup_file_error(".gitignore", data))
         end
       end
 
@@ -78,7 +76,6 @@ module ReactOnRails
 
           // CRITICAL that generated/vendor-bundle must be BEFORE bootstrap-sprockets and turbolinks
           // since it is exposing jQuery and jQuery-ujs
-          //= require react_on_rails
 
           //= require generated/vendor-bundle
           //= require generated/app-bundle
@@ -118,6 +115,7 @@ module ReactOnRails
            client/.babelrc
            client/index.jade
            client/server.js
+           client/webpack.client.base.config.js
            client/webpack.client.rails.config.js
            REACT_ON_RAILS.md
            client/REACT_ON_RAILS_CLIENT_README.md
@@ -127,8 +125,9 @@ module ReactOnRails
       def template_base_files
         base_path = "base/base/"
         %w(Procfile.dev
+           Procfile.dev-hot
            app/views/hello_world/index.html.erb
-           client/webpack.client.base.config.js
+           client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
            client/webpack.client.hot.config.js
            client/package.json).each { |file| template(base_path + file + ".tt", file) }
       end
@@ -138,17 +137,17 @@ module ReactOnRails
         append_to_file("Gemfile", "\ngem 'therubyracer', platforms: :ruby\n")
       end
 
-      def template_client_globals_file
-        filename = options.server_rendering? ? "clientGlobals.jsx" : "globals.jsx"
+      def template_client_registration_file
+        filename = "clientRegistration.jsx"
         location = "client/app/bundles/HelloWorld/startup"
-        template("base/base/#{location}/globals.jsx.tt", "#{location}/#{filename}")
+        template("base/base/#{location}/clientRegistration.jsx.tt", "#{location}/#{filename}")
       end
 
       def install_server_rendering_files_if_enabled
         return unless options.server_rendering?
         base_path = "base/server_rendering/"
         %w(client/webpack.server.rails.config.js
-           client/app/bundles/HelloWorld/startup/serverGlobals.jsx).each do |file|
+           client/app/bundles/HelloWorld/startup/serverRegistration.jsx).each do |file|
           copy_file(base_path + file, file)
         end
       end

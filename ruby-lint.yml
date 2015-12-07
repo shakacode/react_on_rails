@@ -2,6 +2,7 @@
 ---
 presenter: syntastic
 
+# Be sure to edit this per your project!
 directories:
   - app
   - lib

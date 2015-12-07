@@ -76,7 +76,6 @@ module ReactOnRails
           base_js_code = <<-JS
 #{console_polyfill}
           #{bundle_js_code};
-#{::Rails.application.assets['react_on_rails.js']};
           JS
           ExecJS.compile(base_js_code)
         else
