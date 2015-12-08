@@ -1,3 +1,4 @@
+import ReactOnRails from 'react_on_rails';
 import HelloWorldAppServer from './HelloWorldAppServer';
 
-global.HelloWorldApp = HelloWorldAppServer;
+ReactOnRails.registerComponent('HelloWorldAppServer', HelloWorldAppServer);
