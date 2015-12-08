@@ -1,5 +1,7 @@
 // Shows the mapping from the exported object to the name used by the server rendering.
 
+import ReactOnRails from 'react_on_rails';
+
 // Example of server rendering with no React
 import HelloString from '../non_react/HelloString';
 
@@ -26,6 +28,14 @@ global.HelloWorldWithLogAndThrow = HelloWorldWithLogAndThrow;
 global.HelloWorldES5 = HelloWorldES5;
 global.HelloWorldApp = HelloWorldApp;
 global.RouterApp = ServerRouterApp;
+
+// ReactOnRails.registerComponent('HelloString', HelloString);
+// ReactOnRails.registerComponent('ReduxApp', ReduxApp);
+// ReactOnRails.registerComponent('HelloWorld', HelloWorld);
+// ReactOnRails.registerComponent('HelloWorldWithLogAndThrow', HelloWorldWithLogAndThrow);
+// ReactOnRails.registerComponent('HelloWorldES5', HelloWorldES5);
+// ReactOnRails.registerComponent('HelloWorldApp', HelloWorldApp);
+// ReactOnRails.registerComponent('RouterApp', RouterApp);
 
 // Alternative syntax for exposing Vars
 // NOTE: you must set exports.output.libraryTarget = 'this' in your webpack.server.js file.
