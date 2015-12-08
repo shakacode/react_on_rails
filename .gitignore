@@ -26,3 +26,7 @@ node_modules
 examples
 
 /node_package/lib
+
+npm-debug.*
+spec/dummy/client/npm-debug.log.*
+spec/dummy/client/npm-debug.log.*
