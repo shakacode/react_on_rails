@@ -1,3 +1,3 @@
 #!/bin/sh
 
-$(npm bin)/tape node_package/tests/*.js
+$(npm bin)/babel-tape-runner node_package/tests/*.js

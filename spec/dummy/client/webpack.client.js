@@ -3,7 +3,7 @@ const path = require('path');
 module.exports = {
   entry: [
     'react-dom',
-    'react_on_rails',
+    'react-on-rails',
     'startup/clientGlobals',
   ],
   output: {

@@ -1,4 +1,4 @@
-import ReactOnRails from 'react_on_rails';
+import ReactOnRails from 'react-on-rails';
 
 import HelloWorld from '../components/HelloWorld';
 import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';

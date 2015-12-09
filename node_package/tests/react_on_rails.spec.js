@@ -1,12 +1,13 @@
-var test = require('tape');
+import test from 'blue-tape';
 
-test('test something start from here:', function (t) {
-    t.plan(2);
+test('test something start from here:', (t) => {
+  t.plan(2);
 
-    t.equal(typeof Date.now, 'function');
-    var start = Date.now();
-
-    setTimeout(function () {
-        t.equal(Date.now() - start, 100);
-    }, 100);
+  t.equal(typeof Date.now, 'function');
+  const start = Date.now();
+  return (
+    setTimeout((t) => {
+      t.equal(Date.now() - start, 100);
+    }, 100)
+  );
 });
