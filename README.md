@@ -6,7 +6,7 @@ React on Rails integrates Facebook's [React](https://github.com/facebook/react) 
 Be sure to see the [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial) along with the live example at [www.reactrails.com](http://www.reactrails.com).
 
 ## Including your React Component in your Rails Views
-Please see [Getting Started](#getting-started) for how to set up your Rails project for React on Rails if you have not already done so.
+Please see [Getting Started](#getting-started) for how to set up your Rails project for React on Rails to understand how `react_on_rails` can see your ReactComponents.
 
 + *Normal Mode (React component will be rendered on client):*
 
@@ -329,6 +329,7 @@ As you add more routes to your front-end application, you will need to make the 
 + [Server Rendering Tips](docs/additional_reading/server_rendering_tips.md)
 + [Tips](docs/additional_reading/tips.md)
 + [Webpack Configuration](docs/additional_reading/webpack.md)
++ [Webpack Cookbook](https://christianalfoni.github.io/react-webpack-cookbook/index.html)
 
 ## Contributing
 Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant](contributor-covenant.org) code of conduct (see [CODE OF CONDUCT](docs/code_of_conduct.md)).
@@ -341,15 +342,9 @@ The gem is available as open source under the terms of the [MIT License](docs/LI
 ## Authors
 [The Shaka Code team!](http://www.shakacode.com/about/)
 
-1. [Justin Gordon](https://github.com/justin808/)
-2. [Samnang Chhun](https://github.com/samnang)
-3. [Alex Fedoseev](https://github.com/alexfedoseev)
-4. [Rob Wise](https://github.com/robwise)
-5. [Blaine Hatab](https://github.com/jbhatab)
-6. [Roger Studner](https://github.com/rstudner)
-7. [Aaron Van Bokhoven](https://github.com/aaronvb)
+The project started with [Justin Gordon](https://github.com/justin808/) pairing with [Samnang Chhun](https://github.com/samnang) to figure out how to do server rendering with Webpack plus Rails. [Alex Fedoseev](https://github.com/alexfedoseev) then joined in. [Rob Wise](https://github.com/robwise), [Aaron Van Bokhoven](https://github.com/aaronvb), and [Andy Wang](https://github.com/yorzi) did the bulk of the generators.
 
-And based on the work of the [react-rails gem](https://github.com/reactjs/react-rails)
+We owe much gratitude to the work of the [react-rails gem](https://github.com/reactjs/react-rails). We've also been inspired by the [react_webpack_rails gem](https://github.com/netguru/react_webpack_rails).
 
 ## About [ShakaCode](http://www.shakacode.com/)
 
