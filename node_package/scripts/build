@@ -1,3 +1,3 @@
 #!/bin/sh
 
-$(npm bin)/babel node_package/src --out-dir node_package/lib
+webpack -w --config node_package/webpack.config.js
