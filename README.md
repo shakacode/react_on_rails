@@ -200,8 +200,8 @@ This is how you actually render the React components you exposed to `window` ins
 This is a helper method that takes any JavaScript expression and returns the output from evaluating it. If you have more than one line that needs to be executed, wrap it in an IIFE. JS exceptions will be caught and console messages handled properly.
 
 ## Generator
-The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating Webpack with Rails.
-
+The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating Webpack with Rails. Defaults for options are such that the default is for the flag to be off. For example, the default for `-R` is that `redux` is off, and the default of `-b` means that `skip-bootstrap` is off.
+ 
 Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
 ```
@@ -226,7 +226,7 @@ Description:
     Create react on rails files for install generator.
 ```
 
-For a clear example of what each generator option will do, see our generator results repo: [Generator Results](https://github.com/shakacode/react_on_rails-generator-results/pulls). Each pull request shows a git "diff" that highlights the changes that the generator has made.
+For a clear example of what each generator option will do, see our generator results repo: [Generator Results](https://github.com/shakacode/react_on_rails-generator-results/blob/master/README.md). Each pull request shows a git "diff" that highlights the changes that the generator has made.
 
 ### Understanding the Organization of the Generated Client Code
 The generated client code follows our organization scheme. Each unique set of functionality, is given its own folder inside of `client/app/bundles`. This encourages for modularity of DOMAINS.
