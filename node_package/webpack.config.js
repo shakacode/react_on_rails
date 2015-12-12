@@ -26,7 +26,9 @@ module.exports = {
       { raw: true, entryOnly: false }
     ),
   ],
-
+  resolveLoader: {
+    fallback: [path.join(__dirname, 'node_modules')]
+  },
   module: {
     loaders: [
       {
@@ -42,4 +44,5 @@ module.exports = {
       },
     ],
   },
+  debug: true
 };

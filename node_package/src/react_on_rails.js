@@ -275,3 +275,5 @@ ReactOnRails = {
     }
   }
 }).call(); // 'this' should be the window
+
+export default ReactOnRails;

@@ -25,5 +25,8 @@
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
+  },
+  "dependencies": {
+    "history": "^1.16.0"
   }
 }
