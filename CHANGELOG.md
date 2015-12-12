@@ -1,7 +1,7 @@
 # Change Log
 All notable changes to this project will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version.
 
-## [Unreleased]
+## v1.2.0
 ### Added
 - Support `--skip-bootstrap` or `-b` option for generator.
 - Create examples tasks to test generated example apps.
