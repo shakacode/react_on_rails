@@ -3,6 +3,9 @@ require "rails/generators"
 module ReactOnRails
   module Generators
     class InstallGenerator < Rails::Generators::Base
+      # fetch USAGE file for details generator description
+      source_root(File.expand_path("../", __FILE__))
+
       # --redux
       class_option :redux,
                    type: :boolean,
@@ -33,7 +36,6 @@ module ReactOnRails
                    default: false,
                    desc: "Install files necessary for deploying to Heroku",
                    aliases: "-H"
-
       # --skip-bootstrap
       class_option :skip_bootstrap,
                    type: :boolean,
