@@ -10,37 +10,37 @@ module ReactOnRails
       class_option :redux,
                    type: :boolean,
                    default: false,
-                   desc: "Install Redux gems and Redux version of Hello World Example",
+                   desc: "Install Redux gems and Redux version of Hello World Example. Default: false",
                    aliases: "-R"
       # --server-rendering
       class_option :server_rendering,
                    type: :boolean,
                    default: false,
-                   desc: "Add necessary files and configurations for server-side rendering",
+                   desc: "Add necessary files and configurations for server-side rendering. Default: false",
                    aliases: "-S"
       # --skip-js-linters
       class_option :skip_js_linters,
                    type: :boolean,
                    default: false,
-                   desc: "Skip installing JavaScript linting files",
+                   desc: "Skip installing JavaScript linting files. Default: false",
                    aliases: "-j"
       # --ruby-linters
       class_option :ruby_linters,
                    type: :boolean,
                    default: false,
-                   desc: "Install ruby linting files, tasks, and configs",
+                   desc: "Install ruby linting files, tasks, and configs. Default: false",
                    aliases: "-L"
       # --ruby-linters
       class_option :heroku_deployment,
                    type: :boolean,
                    default: false,
-                   desc: "Install files necessary for deploying to Heroku",
+                   desc: "Install files necessary for deploying to Heroku. Default: false",
                    aliases: "-H"
       # --skip-bootstrap
       class_option :skip_bootstrap,
                    type: :boolean,
                    default: false,
-                   desc: "Skip integrating Bootstrap and don't initialize files and regarding configs",
+                   desc: "Skip integrating Bootstrap and don't initialize files and regarding configs. Default: false",
                    aliases: "-b"
 
       def run_generators # rubocop:disable Metrics/CyclomaticComplexity
