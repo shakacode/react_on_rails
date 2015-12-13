@@ -1,91 +1,107 @@
 Description:
 
-The react_on_rails:install generator combined with the example pull requests of generator runs
-will get you up and running efficiently. There's a fair bit of setup with integrating Webpack
-with Rails. Defaults for options are such that the default is for the flag to be off. For example,
-the default for -R is that redux is off, and the default of -b means that skip-bootstrap is off.
+The react_on_rails:install generator combined with the example pull requests of
+generator runs will get you up and running efficiently. There's a fair bit of
+setup with integrating Webpack with Rails. Defaults for options are such that
+the default is for the flag to be off. For example, the default for -R is that
+redux is off, and the default of -b means that skip-bootstrap is off.
 
 * Redux
 
-    If you have used the --redux generator option, you will notice the familiar additional redux
-    folders in addition to the aforementioned folders. The Hello World example has also been modified
-    to use Redux.
+    If you have used the --redux generator option, you will notice the familiar
+    additional redux folders. The Hello World example has also been modified to
+    use Redux.
 
-    Note the organizational paradigm of "bundles". These are like application domains and are used
-    for grouping your code into webpack bundles, in case you decide to create different bundles for
-    deployment. This is also useful for separating out logical parts of your application. The concept
-    is that each bundle will have it's own Redux store. If you have code that you want to reuse across
-    bundles, including components and reducers, place them under /client/app/lib.
+    Note the organizational paradigm of "bundles". These are like application
+    domains and are used for grouping your code into webpack bundles, in case
+    you decide to create different bundles for deployment. This is also useful
+    for separating out logical parts of your application. The concept is that
+    each bundle will have it's own Redux store. If you have code that you want
+    to reuse across bundles, including components and reducers, place them
+    under /client/app/lib.
 
 * Using Images and Fonts
 
-    The generator has amended the folders created in client/assets/ to Rails's asset path. We recommend
-    that if you have any existing assets that you want to use with your client code, you should move
-    them to these folders and use webpack as normal. This allows webpack's development server to have
-    access to your assets, as it will not be able to see any assets in the default Rails directories
-    which are above the /client directory.
+    The generator has amended the folders created in `client/assets/` to Rails's
+    asset path. We recommend that if you have any existing assets that you want
+    to use with your client code, you should move them to these folders and use
+    webpack as normal. This allows webpack's development server to have access
+    to your assets, as it will not be able to see any assets in the default Rails
+    directories which are above the `/client` directory.
 
-    Alternatively, if you have many existing assets and don't wish to move them, you could consider
-    creating symlinks from client/assets that point to your Rails assets folders inside of app/assets/.
-    The assets there will then be visible to both Rails and webpack.
+    Alternatively, if you have many existing assets and don't wish to move them,
+    you could consider creating symlinks from `client/assets` that point to your
+    Rails assets folders inside of `app/assets/`. The assets there will then be
+    visible to both Rails and webpack.
 
 * Bootstrap Integration
 
-    React on Rails ships with Twitter Bootstrap already integrated into the build. Note that the
-    generator removes require_tree in both the application.js and application.css.scss files. This
-    is to ensure the correct load order for the bootstrap integration, and is usually a good idea
-    in general. You will therefore need to explicitly require your files.
+    React on Rails ships with Twitter Bootstrap already integrated into the build.
+    Note that the generator removes require_tree in both the application.js and
+    application.css.scss files. This is to ensure the correct load order for the
+    bootstrap integration, and is usually a good idea in general. You will therefore
+    need to explicitly require your files.
 
-    How the Bootstrap library is loaded depends upon whether one is using the Rails server or the
-    HMR development server.
+    How the Bootstrap library is loaded depends upon whether one is using the Rails
+    server or the HMR development server.
 
     1. Bootstrap via Rails Server
 
-        In the former case, the Rails server loads bootstrap-sprockets, provided by the bootstrap-sass
-        ruby gem (added automatically to your Gemfile by the generator) via the
-        `app/assets/stylesheets/_bootstrap-custom.scss` partial.
+        In the former case, the Rails server loads bootstrap-sprockets, provided
+        by the bootstrap-sass ruby gem (added automatically to your Gemfile by
+        the generator) via the `app/assets/stylesheets/_bootstrap-custom.scss`
+        partial.
 
-        This allows for using Bootstrap in your regular Rails stylesheets. If you wish to customize any
-        of the Bootstrap variables, you can do so via the client/assets/stylesheets/_pre-bootstrap.scss partial.
+        This allows for using Bootstrap in your regular Rails stylesheets. If you
+        wish to customize any of the Bootstrap variables, you can do so via the
+        `client/assets/stylesheets/_pre-bootstrap.scss` partial.
 
     2. Bootstrap via Webpack Dev Server
 
-        When using the webpack dev server, which does not go through Rails, bootstrap is loaded via the
-        `bootstrap-sass-loader` which uses the `client/bootstrap-sass-config.js` file.
+        When using the webpack dev server, which does not go through Rails,
+        bootstrap is loaded via the `bootstrap-sass-loader` which uses the
+        `client/bootstrap-sass-config.js` file.
 
     3. Keeping Custom Bootstrap Configurations Synced
 
-        Because the webpack dev server and Rails each load Bootstrap via a different file (explained in the
-        two sections immediately above), any changes to the way components are loaded in one file must also
-        be made to the other file in order to keep styling consistent between the two. For example, if an
-        import is excluded in _bootstrap-custom.scss, the same import should be excluded in `bootstrap-sass-config.js`
-        so that styling in the Rails server and the webpack dev server will be the same.
+        Because the webpack dev server and Rails each load Bootstrap via a different
+        file (explained in the two sections immediately above), any changes to
+        the way components are loaded in one file must also be made to the other
+        file in order to keep styling consistent between the two. For example,
+        if an import is excluded in _bootstrap-custom.scss, the same import should
+        be excluded in `bootstrap-sass-config.js` so that styling in the Rails
+        server and the webpack dev server will be the same.
 
     4. Skip Bootstrap Integration
 
-        Bootstrap integration is enabled by default, but can be disabled by passing the --skip-bootstrap flag
-        (alias -b). When you don't need Bootstrap in your existing project, just skip it as needed.
+        Bootstrap integration is enabled by default, but can be disabled by passing
+        the --skip-bootstrap flag (alias -b). When you don't need Bootstrap in your
+        existing project, just skip it as needed.
 
 * Linters
 
-    The React on Rails generator can add linters and their recommended accompanying configurations to your project.
-    There are two classes of linters: ruby linters and JavaScript linters.
+    The React on Rails generator can add linters and their recommended accompanying
+    configurations to your project. There are two classes of linters: ruby linters
+    and JavaScript linters.
 
 * JavaScript Linters
 
-    JavaScript linters are enabled by default, but can be disabled by passing the --skip-js-linters flag (alias j),
-    and those that run in Node have been add to client/package.json under devDependencies.
+    JavaScript linters are enabled by default, but can be disabled by passing the
+    --skip-js-linters flag (alias j), and those that run in Node have been add to
+    `client/package.json` under devDependencies.
 
 * Ruby Linters
 
-    Ruby linters are disabled by default, but can be enabled by passing the --ruby-linters flag when generating.
-    These linters have been added to your Gemfile in addition to the the appropriate Rake tasks.
+    Ruby linters are disabled by default, but can be enabled by passing the
+    `--ruby-linters` flag when generating. These linters have been added to your
+    Gemfile in addition to the the appropriate Rake tasks.
 
     We really love using all the linters! Give them a try.
 
 * Running the Linters
 
-    To run the linters (runs all linters you have installed, even if you installed both Ruby and Node):
+    To run the linters (runs all linters you have installed, even if you installed
+    both Ruby and Node):
 
     `rake lint`
 
