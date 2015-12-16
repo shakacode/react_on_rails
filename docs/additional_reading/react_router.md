@@ -5,15 +5,6 @@ However, when attempting to use server-rendering, it is necessary to take steps 
 
 If you are working with the HelloWorldApp created by the react_on_rails generator, then the code below corresponds to the module in `client/app/bundles/HelloWorld/startup/HelloWorldAppServer.jsx`.
 
-For a fleshed out integration of react_on_rails with react-router, check out [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial), specifically the files:
-
-[routes](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/app/bundles/comments/routes/routes.jsx)
-
-[ClientRouterApp](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/app/bundles/comments/startup/ClientRouterApp.jsx)
-
-[ServerRouterApp](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/app/bundles/comments/startup/ServerRouterApp.jsx)
-
-
 ```js
 const RouterApp = (props, location) => {
   const store = createStore(props);
@@ -44,3 +35,11 @@ const RouterApp = (props, location) => {
   );
 };
 ```
+
+For a fleshed out integration of react_on_rails with react-router, check out [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial), specifically the files:
+
+[routes](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/app/bundles/comments/routes/routes.jsx)
+
+[ClientRouterApp](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/app/bundles/comments/startup/ClientRouterApp.jsx)
+
+[ServerRouterApp](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/app/bundles/comments/startup/ServerRouterApp.jsx)
