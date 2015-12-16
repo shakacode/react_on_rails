@@ -1,7 +1,9 @@
 # Using React Router
-React on Rails supports the use of React Router. Client-side code doesn't need any special configuration for the React on Rails gem. Implement React Router how you normally would. 
+React on Rails supports the use of React Router. Client-side code doesn't need any special configuration for the React on Rails gem. Implement React Router how you normally would.
 
 However, when attempting to use server-rendering, it is necessary to take steps that prevent rendering when there is a router error or redirect. In these cases, the client code should return an object containing the `error` and a `redirectLocation` instead of the React component. The `react_component` helper method in your Rails view will automatically detect that there was an error/redirect and handle it accordingly.
+
+If you are working with the HelloWorldApp created by the react_on_rails generator, then the code below corresponds to the module in `client/app/bundles/HelloWorld/startup/HelloWorldAppServer.jsx`.
 
 ```js
 const RouterApp = (props, location) => {
@@ -33,3 +35,11 @@ const RouterApp = (props, location) => {
   );
 };
 ```
+
+For a fleshed out integration of react_on_rails with react-router, check out [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial), specifically the files:
+
+* [react-webpack-rails-tutorial/client/app/bundles/comments/routes/routes.jsx](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/app/bundles/comments/routes/routes.jsx)
+
+* [react-webpack-rails-tutorial/client/app/bundles/comments/startup/ClientRouterApp.jsx](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/app/bundles/comments/startup/ClientRouterApp.jsx)
+
+* [react-webpack-rails-tutorial/client/app/bundles/comments/startup/ServerRouterApp.jsx](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/app/bundles/comments/startup/ServerRouterApp.jsx)
