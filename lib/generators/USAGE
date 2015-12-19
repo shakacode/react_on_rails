@@ -2,23 +2,25 @@ Description:
 
 The react_on_rails:install generator combined with the example pull requests of
 generator runs will get you up and running efficiently. There's a fair bit of
-setup with integrating Webpack with Rails. Defaults for options are such that
-the default is for the flag to be off. For example, the default for -R is that
-redux is off, and the default of -b means that skip-bootstrap is off.
+setup involved when ~with~ integrating Webpack with Rails. Defaults for options
+are such that the default is for the flag to be off. For example, the default for
+`-R` is that redux is off, and the default of -b means that skip-bootstrap is off.
 
 * Redux
 
-    If you have used the --redux generator option, you will notice the familiar
-    additional redux folders. The Hello World example has also been modified to
-    use Redux.
+    Passing the --redux generator option causes the generated Hello World example
+    to integrate the Redux state container framework. The necessary node modules
+    will be automatically included for you.
 
-    Note the organizational paradigm of "bundles". These are like application
-    domains and are used for grouping your code into webpack bundles, in case
-    you decide to create different bundles for deployment. This is also useful
-    for separating out logical parts of your application. The concept is that
-    each bundle will have it's own Redux store. If you have code that you want
-    to reuse across bundles, including components and reducers, place them
-    under /client/app/lib.
+    The generator uses the organizational `paradigm of "bundles"`. These are like
+    application domains and are used for grouping your code into webpack bundles
+    in case you decide to create different bundles for deployment. This is also
+    useful for separating out logical parts of your application. We recommend that
+    that each bundle will have it's own Redux store. If you have code that you
+    want to reuse across bundles, such as middleware or common utilities, place them
+    under `/client/app/lib`. You can then import them in your client code:
+    `import MyModule from 'lib/MyModule'`; since we have configured webpack to
+    automatically resolve the word lib to point to this folder.
 
 * Using Images and Fonts
 
@@ -47,9 +49,9 @@ redux is off, and the default of -b means that skip-bootstrap is off.
 
     1. Bootstrap via Rails Server
 
-        In the former case, the Rails server loads bootstrap-sprockets, provided
+        The Rails server loads bootstrap-sprockets, provided
         by the bootstrap-sass ruby gem (added automatically to your Gemfile by
-        the generator) via the `app/assets/stylesheets/_bootstrap-custom.scss`
+        the generator), via the `app/assets/stylesheets/_bootstrap-custom.scss`
         partial.
 
         This allows for using Bootstrap in your regular Rails stylesheets. If you
@@ -58,9 +60,9 @@ redux is off, and the default of -b means that skip-bootstrap is off.
 
     2. Bootstrap via Webpack Dev Server
 
-        When using the webpack dev server, which does not go through Rails,
-        bootstrap is loaded via the `bootstrap-sass-loader` which uses the
-        `client/bootstrap-sass-config.js` file.
+        The webpack dev server does not go through Rails but instead loads bootstrap
+        via the `bootstrap-sass-loader` webpack loader. You can configure the loader
+        via the `client/bootstrap-sass-config.js` file.
 
     3. Keeping Custom Bootstrap Configurations Synced
 
@@ -78,12 +80,6 @@ redux is off, and the default of -b means that skip-bootstrap is off.
         the --skip-bootstrap flag (alias -b). When you don't need Bootstrap in your
         existing project, just skip it as needed.
 
-* Linters
-
-    The React on Rails generator can add linters and their recommended accompanying
-    configurations to your project. There are two classes of linters: ruby linters
-    and JavaScript linters.
-
 * JavaScript Linters
 
     JavaScript linters are enabled by default, but can be disabled by passing the
@@ -97,28 +93,6 @@ redux is off, and the default of -b means that skip-bootstrap is off.
     Gemfile in addition to the the appropriate Rake tasks.
 
     We really love using all the linters! Give them a try.
-
-* Running the Linters
-
-    To run the linters (runs all linters you have installed, even if you installed
-    both Ruby and Node):
-
-    `rake lint`
-
-    Run this command to see all the linters available
-
-    `rake -T lint`
-
-    Here's the list:
-    ==========================================================
-    rake lint               # Runs all linters
-    rake lint:eslint        # eslint
-    rake lint:js            # JS Linting
-    rake lint:jscs          # jscs
-    rake lint:rubocop[fix]  # Run Rubocop lint in shell
-    rake lint:ruby          # Run ruby-lint as shell
-    rake lint:scss          # See docs for task 'scss_lint'
-    ==========================================================
 
 More Details:
 
