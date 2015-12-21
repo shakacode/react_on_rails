@@ -17,6 +17,14 @@ module GeneratorHelper
     puts "\n#{data}\n"
   end
 
+  def return_setup_file_error(file, data)
+    error = ""
+    error << "** #{file} was not found.\n"
+    error << "Please add the following content to your #{file} file:\n"
+    error << "\n#{data}\n"
+    error
+  end
+
   def empty_directory_with_keep_file(destination, config = {})
     empty_directory(destination, config)
     keep_file(destination)

@@ -1,7 +1,9 @@
 require "rails/generators"
 require File.expand_path("../generator_helper", __FILE__)
+require File.expand_path("../generator_errors", __FILE__)
 
 include GeneratorHelper
+include GeneratorErrors
 
 module ReactOnRails
   module Generators
@@ -62,7 +64,11 @@ module ReactOnRails
           /app/assets/javascripts/generated/*
         DATA
 
-        dest_file_exists?(".gitignore") ? append_to_file(".gitignore", data) : puts_setup_file_error(".gitignore", data)
+        if dest_file_exists?(".gitignore")
+          append_to_file(".gitignore", data)
+        else
+          GeneratorErrors.add_error(return_setup_file_error(".gitignore", data))
+        end
       end
 
       def update_application_js
