@@ -1,11 +1,8 @@
 const path = require('path');
 
 module.exports = {
-  context: __dirname,
   entry: [
-    'react-on-rails',
-    'startup/serverGlobals',
-    'react-dom/server',
+    'startup/serverGlobals'
   ],
   output: {
     path: '../app/assets/javascripts/generated',
@@ -20,17 +17,13 @@ module.exports = {
   resolve: {
     root: [path.join(__dirname, 'app')],
     extensions: ['', '.js', '.jsx'],
+    fallback: [path.join(__dirname, 'node_modules')]
   },
   module: {
     loaders: [
-      {test: /\.jsx?$/, loader: 'babel-loader', exclude: /node_modules/},
+      {test: /\.jsx?$/, loader: 'babel-loader', exclude: /node_modules/}
 
-      // require Resolve must go first
-      // 1. React must be exposed (BOILERPLATE)
-      { test: require.resolve('react'), loader: 'expose?React' },
-      { test: require.resolve('react-dom/server'), loader: 'expose?ReactDOMServer' },
-
-      // 2. See client/app/startup/serverGlobals.jsx and client/apps/startup/clientGlobals.jsx
+      // See client/app/startup/serverGlobals.jsx and client/apps/startup/clientGlobals.jsx
       // for configuration of how to expose your components for both server and client rendering.
     ],
   },

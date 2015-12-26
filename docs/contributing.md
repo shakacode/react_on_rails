@@ -14,7 +14,7 @@ After checking out the repo, making sure you have rvm and nvm setup (setup ruby 
 To run the test app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change.
 
 ### RSpec Testing
-Run `rake` for testing the gem and `spec/dummy` and `spec/dummy-react-013`. Otherwise, the `rspec` command only works for testing within the sample apps, like `spec/dummy`.
+Run `rake` for testing the gem and `spec/dummy`. Otherwise, the `rspec` command only works for testing within the sample apps, like `spec/dummy`.
 
 If you run `rspec` at the top level, you'll see this message: `require': cannot load such file -- rails_helper (LoadError)`
 

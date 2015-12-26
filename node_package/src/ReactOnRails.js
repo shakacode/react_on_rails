@@ -1,40 +1,20 @@
 /* eslint-disable no-console */
-
 import React from 'react';
+import ReactDOM from 'react-dom';
+import ReactDOMServer from 'react-dom/server';
+let ReactOnRails;
 
 const context = ((typeof window !== 'undefined') && window) ||
   ((typeof global !== 'undefined') && global) || this;
 
-let ReactOnRails;
-
 const turbolinksInstalled = (typeof Turbolinks !== 'undefined');
 
 function provideClientReact() {
-  if (typeof context.ReactDOM === 'undefined') {
-    if (React.version >= '0.14') {
-      console.warn(
-        'WARNING: ReactDOM is not configured in webpack.server.rails.config.js file as an entry.\n' +
-        'See: https://github.com/shakacode/react_on_rails/blob/master/docs/webpack.md for more detailed hints.');
-    }
-
-    return React;
-  }
-
-  return context.ReactDOM;
+  return ReactDOM;
 }
 
 function provideServerReact() {
-  if (typeof context.ReactDOMServer === 'undefined') {
-    if (React.version >= '0.14') {
-      console.warn(
-        'WARNING: `react-dom/server` is not configured in webpack.server.rails.config.js file as an entry.\n' +
-        'See: https://github.com/shakacode/react_on_rails/blob/master/docs/webpack.md for more detailed hints.');
-    }
-
-    return context.React;
-  }
-
-  return context.ReactDOMServer;
+  return ReactDOMServer;
 }
 
 function wrapInScriptTags(scriptBody) {
@@ -103,8 +83,8 @@ function render(el) {
     }
   } catch (e) {
     ReactOnRails.handleError({
-      e: e,
-      componentName: componentName,
+      e,
+      componentName,
       serverSide: false,
     });
   }
@@ -122,7 +102,6 @@ const components = {};
 
 ReactOnRails = {
 
-  // TODO: Change to get components off the global
   componentForName(name) {
     if (components[name]) {
       return components[name];
@@ -138,8 +117,7 @@ ReactOnRails = {
     return context[name];
   },
 
-  // TODO
-  registerCommponent(componentName, component, options) {
+  registerComponent(componentName, component, options) {
     components[componentName] = component;
   },
 
@@ -177,8 +155,8 @@ ReactOnRails = {
     } catch (e) {
       hasErrors = true;
       htmlResult = this.handleError({
-        e: e,
-        componentName: componentName,
+        e,
+        componentName,
         serverSide: true,
       });
     }
@@ -187,8 +165,8 @@ ReactOnRails = {
 
     return JSON.stringify({
       html: htmlResult,
-      consoleReplayScript: consoleReplayScript,
-      hasErrors: hasErrors,
+      consoleReplayScript,
+      hasErrors,
     });
   },
 
@@ -252,8 +230,15 @@ ReactOnRails = {
     const history = console.history;
     if (history && history.length > 0) {
       history.forEach(msg => {
+        const stringifiedList = msg.arguments.map(arg => {
+          try {
+            return (typeof arg === 'string' || arg instanceof String) ? arg : JSON.stringify(arg);
+          } catch (e) {
+            return `${e.message}: ${arg}`;
+          }
+        });
         consoleReplay += '\nconsole.' + msg.level + '.apply(console, ' +
-          JSON.stringify(msg.arguments) + ');';
+          JSON.stringify(stringifiedList) + ');';
       });
     }
 

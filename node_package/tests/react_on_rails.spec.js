@@ -1,13 +1,13 @@
 import test from 'blue-tape';
 
-test('test something start from here:', (t) => {
-  t.plan(2);
+test('test something start from here:', (outerTest) => {
+  outerTest.plan(2);
 
-  t.equal(typeof Date.now, 'function');
+  outerTest.equal(typeof Date.now, 'function');
   const start = Date.now();
   return (
-    setTimeout((t) => {
-      t.equal(Date.now() - start, 100);
+    setTimeout((innerTest) => {
+      innerTest.equal(Date.now() - start, 100);
     }, 100)
   );
 });

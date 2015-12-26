@@ -17,11 +17,6 @@ namespace :run_rspec do
     run_tests_in("spec/dummy", env_vars: "DRIVER=selenium_firefox")
   end
 
-  desc "Run RSpec for spec/dummy_react_013 only"
-  task dummy_react_013: ["dummy_apps:dummy_react_013_app"] do
-    run_tests_in("spec/dummy-react-013", env_vars: "DRIVER=selenium_firefox")
-  end
-
   # Dynamically define Rake tasks for each example app found in the examples directory
   ExampleType.all.each do |example_type|
     desc "Runs RSpec for #{example_type.name_pretty} only"
@@ -42,7 +37,7 @@ namespace :run_rspec do
 
   Coveralls::RakeTask.new
 
-  task run_rspec: [:gem, :dummy, :dummy_react_013, :examples, :empty, "coveralls:push"] do
+  task run_rspec: [:gem, :dummy, :examples, :empty, "coveralls:push"] do
     puts "Completed all RSpec tests"
   end
 end

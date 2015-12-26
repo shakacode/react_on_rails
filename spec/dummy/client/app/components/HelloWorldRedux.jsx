@@ -5,10 +5,8 @@ import ReactCompat from '../utils/ReactCompat';
 export default class HelloWorldRedux extends React.Component {
 
   static propTypes = {
-    helloWorldData: PropTypes.shape({
-      name: PropTypes.string,
-    }).isRequired,
-    updateName: PropTypes.func.isRequired,
+    actions: PropTypes.object.isRequired,
+    data: PropTypes.object.isRequired,
   }
 
   // Not necessary if we only call super, but we'll need to initialize state, etc.
@@ -18,14 +16,12 @@ export default class HelloWorldRedux extends React.Component {
 
   _handleChange() {
     const name = ReactCompat.reactFindDOMNode()(this.refs.name).value;
-    this.props.updateName(name);
+    this.props.actions.updateName(name);
   }
 
   render() {
-    const { name } = this.props.helloWorldData;
-
-    // Same:
-    // const name = this.props.helloWorldData.name;
+    const { data, actions } = this.props;
+    const { name } = data;
 
     return (
       <div>

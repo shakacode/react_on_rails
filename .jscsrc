@@ -15,7 +15,6 @@
     "**/vendor/**",
     "**/dummy-for-generators/**",
     "**/dummy/**",
-    "**/dummy-react-013/**",
     "**/node_package/lib/**"
   ],
   "esprima": "babel-jscs",

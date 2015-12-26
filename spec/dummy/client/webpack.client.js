@@ -2,8 +2,6 @@ const path = require('path');
 
 module.exports = {
   entry: [
-    'react-dom',
-    'react-on-rails',
     'startup/clientGlobals',
   ],
   output: {
@@ -21,11 +19,7 @@ module.exports = {
   },
   module: {
     loaders: [
-      { loader: 'babel-loader' },
-
-      // React is necessary for the client rendering:
-      { test: require.resolve('react'), loader: 'expose?React' },
-      { test: require.resolve('react-dom'), loader: 'expose?ReactDOM' },
+      { test: /\.jsx?$/, loader: 'babel-loader', exclude: /node_modules/ },
     ],
   },
 };
