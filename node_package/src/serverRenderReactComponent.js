@@ -6,18 +6,14 @@ import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 
 export default function serverRenderReactComponent(options) {
-  const componentName = options.componentName;
-  const domId = options.domId;
-  const props = options.props;
-  const trace = options.trace;
-  const generatorFunction = options.generatorFunction;
-  const location = options.location;
+  const { componentName, domId, trace } = options;
+
   let htmlResult = '';
   let hasErrors = false;
 
   try {
-    const reactElementOrRouterResult = createReactElement({
-      componentName, props, domId, trace, generatorFunction, location });
+    const reactElementOrRouterResult = createReactElement(options);
+
     if (isRouterResult(reactElementOrRouterResult)) {
       // We let the client side handle any redirect
       // Set hasErrors in case we want to throw a Rails exception

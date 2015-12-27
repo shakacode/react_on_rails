@@ -1,6 +1,7 @@
 import ReactDOM from 'react-dom';
-import handleError from './handleError';
+
 import createReactElement from './createReactElement';
+import handleError from './handleError';
 import isRouterResult from './isRouterResult';
 
 const REACT_ON_RAILS_COMPONENT_CLASS_NAME = 'js-react-on-rails-component';
@@ -13,6 +14,10 @@ function forEachComponent(fn) {
   }
 }
 
+/**
+ * Used for client rendering by ReactOnRails
+ * @param el
+ */
 function render(el) {
   const componentName = el.getAttribute('data-component-name');
   const domId = el.getAttribute('data-dom-id');
@@ -35,8 +40,14 @@ function render(el) {
   try {
     const domNode = document.getElementById(domId);
     if (domNode) {
-      const reactElementOrRouterResult = createReactElement({ componentName, props,
-        domId, trace, generatorFunction });
+      const reactElementOrRouterResult = createReactElement({
+        componentName,
+        props,
+        domId,
+        trace,
+        generatorFunction,
+      });
+
       if (isRouterResult(reactElementOrRouterResult)) {
         throw new Error('You returned a server side type of react-router error: ' +
           JSON.stringify(reactElementOrRouterResult) +

@@ -4,6 +4,6 @@ export default {
       return '';
     }
 
-    return '\n<script>' + scriptBody + '\n</script>';
+    return `\n<script>${scriptBody}\n</script>`;
   },
 };

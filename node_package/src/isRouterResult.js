@@ -1,4 +1,5 @@
 export default function isRouterResult(reactElementOrRouterResult) {
-  return !!(reactElementOrRouterResult.redirectLocation ||
-  reactElementOrRouterResult.error);
+  return !!(
+    reactElementOrRouterResult.redirectLocation ||
+    reactElementOrRouterResult.error);
 }
