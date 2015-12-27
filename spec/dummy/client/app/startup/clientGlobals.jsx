@@ -7,9 +7,9 @@ import ReduxApp from './ClientReduxApp';
 import HelloWorldApp from './HelloWorldApp';
 import RouterApp from './ClientRouterApp';
 
-ReactOnRails.registerComponent('HelloWorld', HelloWorld);
-ReactOnRails.registerComponent('HelloWorldWithLogAndThrow', HelloWorldWithLogAndThrow);
-ReactOnRails.registerComponent('HelloWorldES5', HelloWorldES5);
-ReactOnRails.registerComponent('ReduxApp', ReduxApp);
-ReactOnRails.registerComponent('HelloWorldApp', HelloWorldApp);
-ReactOnRails.registerComponent('RouterApp', RouterApp);
+ReactOnRails.register('HelloWorld', HelloWorld);
+ReactOnRails.register('HelloWorldWithLogAndThrow', HelloWorldWithLogAndThrow);
+ReactOnRails.register('HelloWorldES5', HelloWorldES5);
+ReactOnRails.register('ReduxApp', ReduxApp);
+ReactOnRails.register('HelloWorldApp', HelloWorldApp);
+ReactOnRails.register('RouterApp', RouterApp);

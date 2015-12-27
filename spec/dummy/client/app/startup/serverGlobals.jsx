@@ -19,10 +19,10 @@ import ReduxApp from './ServerReduxApp';
 // Example of React Router with Server Rendering
 import RouterApp from './ServerRouterApp';
 
- ReactOnRails.registerComponent('HelloString', HelloString);
- ReactOnRails.registerComponent('ReduxApp', ReduxApp);
- ReactOnRails.registerComponent('HelloWorld', HelloWorld);
- ReactOnRails.registerComponent('HelloWorldWithLogAndThrow', HelloWorldWithLogAndThrow);
- ReactOnRails.registerComponent('HelloWorldES5', HelloWorldES5);
- ReactOnRails.registerComponent('HelloWorldApp', HelloWorldApp);
- ReactOnRails.registerComponent('RouterApp', RouterApp);
+ ReactOnRails.register('HelloString', HelloString);
+ ReactOnRails.register('ReduxApp', ReduxApp);
+ ReactOnRails.register('HelloWorld', HelloWorld);
+ ReactOnRails.register('HelloWorldWithLogAndThrow', HelloWorldWithLogAndThrow);
+ ReactOnRails.register('HelloWorldES5', HelloWorldES5);
+ ReactOnRails.register('HelloWorldApp', HelloWorldApp);
+ ReactOnRails.register('RouterApp', RouterApp);

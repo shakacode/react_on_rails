@@ -8,12 +8,12 @@ const context = ((typeof window !== 'undefined') && window) ||
   ((typeof global !== 'undefined') && global) || this;
 
 context.ReactOnRails = {
-  componentForName(name) {
-    return ComponentStore.componentForName(name);
+  getComponent(name) {
+    return ComponentStore.getComponent(name);
   },
 
-  registerComponent(componentName, component, options) {
-    ComponentStore.registerComponent(componentName, component, options);
+  register(componentName, component, options = {}) {
+    ComponentStore.register(componentName, component, options);
   },
 
   serverRenderReactComponent(options) {

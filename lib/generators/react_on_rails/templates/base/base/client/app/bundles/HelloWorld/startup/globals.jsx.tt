@@ -3,4 +3,4 @@ import ReactOnRails from 'react_on_rails';
 import <%= component_name %> from './<%= component_name %>';
 
 // This is how react_on_rails can see the HelloWorldApp in the browser.
-ReactOnRails.registerComponent('<%= component_name %>', <%= component_name %>);
+ReactOnRails.register('<%= component_name %>', <%= component_name %>);

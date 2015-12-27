@@ -1,9 +1,17 @@
-const components = {};
+
+// key = name used by react_on_rails
+// value = { name, component, generatorFunction }
+const components = new Map();
 
 export default {
-  componentForName(name) {
-    if (components[name]) {
-      return components[name];
+
+  /**
+   * @param name
+   * @returns { name, component, generatorFunction }
+   */
+  getComponent(name) {
+    if (components.has(name)) {
+      return components.get(name);
     }
 
     if (!context[name]) {
@@ -12,11 +20,16 @@ export default {
 
     console.warn(
       'WARNING: Global components are deprecated support will be removed from a future version. ' +
-      'Use ReactOnRails.registerComponent');
-    return context[name];
+      'Use ReactOnRails.register');
+    return { name, component: context[name] };
   },
 
-  registerComponent(componentName, component, options) {
-    components[componentName] = component;
+  /**
+   * @param name
+   * @param component
+   * @param options { generatorFunction: boolean }
+   */
+  register(name, component, options = {}) {
+    components.set(name, { name, component, generatorFunction: options.generatorFunction });
   },
 };

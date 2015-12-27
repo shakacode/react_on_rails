@@ -78,7 +78,7 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#server_render_js" do
-    subject { server_render_js("ReactOnRails.componentForName('HelloString').world()") }
+    subject { server_render_js("ReactOnRails.getComponent('HelloString').component.world()") }
 
     let(:hello_world) do
       "Hello WORLD! Will this work?? YES! Time to visit Maui"

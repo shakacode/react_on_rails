@@ -15,7 +15,7 @@ export default function buildConsoleReplay() {
         }
       });
       consoleReplay += '\nconsole.' + msg.level + '.apply(console, ' +
-       JSON.stringify(stringifiedList) + ');';
+        JSON.stringify(stringifiedList) + ');';
     });
   }
 
