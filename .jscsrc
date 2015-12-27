@@ -22,5 +22,6 @@
     "mark": "'",
     "escape": true,
     "ignoreJSX": true
-  }
+  },
+  "requireTrailingComma": false
 }
