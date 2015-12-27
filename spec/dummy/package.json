@@ -25,5 +25,8 @@
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
+  },
+  "dependencies": {
+    "es5-shim": "^4.4.1"
   }
 }

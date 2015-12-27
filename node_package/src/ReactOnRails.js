@@ -9,14 +9,6 @@ const context = ((typeof window !== 'undefined') && window) ||
 
 const turbolinksInstalled = (typeof Turbolinks !== 'undefined');
 
-function provideClientReact() {
-  return ReactDOM;
-}
-
-function provideServerReact() {
-  return ReactDOMServer;
-}
-
 function wrapInScriptTags(scriptBody) {
   if (!scriptBody) {
     return '';
@@ -35,7 +27,7 @@ function forEachComponent(fn) {
 function unmount(el) {
   const domId = el.getAttribute('data-dom-id');
   const domNode = document.getElementById(domId);
-  provideClientReact().unmountComponentAtNode(domNode);
+  ReactDOM.unmountComponentAtNode(domNode);
 }
 
 function isRouterResult(reactElementOrRouterResult) {
@@ -78,7 +70,7 @@ function render(el) {
           JSON.stringify(reactElementOrRouterResult) +
           '\nYou should return a React.Component always for the client side entry point.');
       } else {
-        provideClientReact().render(reactElementOrRouterResult, domNode);
+        ReactDOM.render(reactElementOrRouterResult, domNode);
       }
     }
   } catch (e) {
@@ -112,8 +104,8 @@ ReactOnRails = {
     }
 
     console.warn(
-      'WARNING: Please use ReactOnRails.registerComponent rather than adding components' +
-      ' to the global namespace');
+      'WARNING: Global components are deprecated support will be removed from a future version. ' +
+      'Use ReactOnRails.registerComponent');
     return context[name];
   },
 
@@ -150,7 +142,7 @@ ReactOnRails = {
           }
         }
       } else {
-        htmlResult = provideServerReact().renderToString(reactElementOrRouterResult);
+        htmlResult = ReactDOMServer.renderToString(reactElementOrRouterResult);
       }
     } catch (e) {
       hasErrors = true;
@@ -220,7 +212,7 @@ ReactOnRails = {
         (e.fileName ? '\nlocation: ' + e.fileName + ':' + e.lineNumber : '') +
         '\nMessage: ' + e.message + '\n\n' + e.stack;
       const reactElement = React.createElement('pre', null, msg);
-      return provideServerReact().renderToString(reactElement);
+      return ReactDOMServer.renderToString(reactElement);
     }
   },
 

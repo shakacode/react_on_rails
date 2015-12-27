@@ -10,7 +10,7 @@
 
 <hr/>
 <pre>
-<%= server_render_js("(function() { var x = this.HelloString.world(); console.warn('ran console.warn on the server()'); return x;})()") %>
+<%= server_render_js("(function() { var x = ReactOnRails.componentForName('HelloString').world(); console.warn('ran console.warn on the server()'); return x;})()") %>
 </pre>
 
 <hr/>
