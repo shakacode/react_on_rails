@@ -1067,6 +1067,11 @@
       "from": "es5-ext@>=0.10.8 <0.11.0",
       "resolved": "https://registry.npmjs.org/es5-ext/-/es5-ext-0.10.11.tgz"
     },
+    "es5-shim": {
+      "version": "4.4.1",
+      "from": "es5-shim@latest",
+      "resolved": "https://registry.npmjs.org/es5-shim/-/es5-shim-4.4.1.tgz"
+    },
     "es6-iterator": {
       "version": "2.0.0",
       "from": "es6-iterator@>=2.0.0 <3.0.0",
