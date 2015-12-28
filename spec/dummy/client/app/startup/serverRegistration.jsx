@@ -22,12 +22,12 @@ import ReduxApp from './ServerReduxApp';
 import RouterApp from './ServerRouterApp';
 
 ReactOnRails.register({
- HelloWorld,
- HelloWorldWithLogAndThrow,
- HelloWorldES5,
- ReduxApp,
- HelloWorldApp,
- RouterApp,
- HelloString,
+  HelloWorld,
+  HelloWorldWithLogAndThrow,
+  HelloWorldES5,
+  ReduxApp,
+  HelloWorldApp,
+  RouterApp,
+  HelloString,
 });
 
