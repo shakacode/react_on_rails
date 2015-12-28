@@ -108,9 +108,9 @@ var console = { history: [] };
       end
 
       def react_on_rails
-        return ::Rails.application.assets['react_on_rails.js'] unless Rails.env.production?
+        return ::Rails.application.assets["react_on_rails.js"] unless Rails.env.production?
 
-        File.read(Rails.root.join('public', 'assets', Rails.application.assets_manifest.assets['react_on_rails.js']))
+        File.read(Rails.root.join("public", "assets", Rails.application.assets_manifest.assets["react_on_rails.js"]))
       end
     end
   end
