@@ -190,7 +190,8 @@ This is how you actually render the React components you exposed to `window` ins
   + **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
 + Any other options are passed to the content tag, including the id
 
-Note, be sure to set the **generatorFunction** flag in your JS code. The default is false, set to true if you want to use a generator function rather than a React Component. Why would you do this? For example, you may want the ability to use the passed-in props to initialize a redux store or setup react-router. Or you may want to return different components depending on what's in the props.
+#### Generator Functions
+Why would you create a funct that returns a React compnent? For example, you may want the ability to use the passed-in props to initialize a redux store or setup react-router. Or you may want to return different components depending on what's in the props. ReactOnRails will automatically detect a registered generator function.
 
 #### server_render_js
 `server_render_js(js_expression, options = {})`

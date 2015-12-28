@@ -60,9 +60,6 @@ module ReactOnRailsHelper
              dom_id: dom_id
     }
 
-    # REMOVE generator_function for v3.0
-    data[:generator_function] = true if options[:generator_function]
-
     component_specification_tag =
       content_tag(:div,
                   "",
@@ -165,9 +162,6 @@ module ReactOnRailsHelper
     # Since this code is not inserted on a web page, we don't need to escape.
     props_string = props.is_a?(String) ? props : props.to_json
 
-    # v3.0, remove generatorFunction
-    generator_function = options[:generator_function]
-
     wrapper_js = <<-JS
 (function() {
   var props = #{props_string};
@@ -175,7 +169,7 @@ module ReactOnRailsHelper
     componentName: '#{react_component_name}',
     domId: '#{dom_id}',
     props: props,
-    trace: #{trace(options)},#{generator_function ? '\n    generatorFunction: true,' : ''}
+    trace: #{trace(options)},
     location: '#{request.fullpath}'
   });
 })()

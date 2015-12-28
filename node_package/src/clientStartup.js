@@ -23,14 +23,6 @@ function render(el) {
   const domId = el.getAttribute('data-dom-id');
   const props = JSON.parse(el.getAttribute('data-props'));
   const trace = JSON.parse(el.getAttribute('data-trace'));
-  const dataGeneratorFunction = el.getAttribute('data-generator-function');
-  if (dataGeneratorFunction) {
-    console.warn('Using attribute to specify generator is deprecated. Please configure ' +
-    'in JavaScript using ReactOnRails.register(name, component, {generatorFunction: true}');
-  }
-
-  const generatorFunction = JSON.parse(dataGeneratorFunction);
-
   const expectTurboLinks = JSON.parse(el.getAttribute('data-expect-turbo-links'));
 
   if (!turbolinksInstalled && expectTurboLinks) {
@@ -45,7 +37,6 @@ function render(el) {
         props,
         domId,
         trace,
-        generatorFunction,
       });
 
       if (isRouterResult(reactElementOrRouterResult)) {

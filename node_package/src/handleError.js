@@ -12,7 +12,7 @@ function handleGeneratorFunctionIssue(options) {
       'and returns a ReactElement.';
 
     let shouldBeGeneratorError =
-      `ERROR: You failed to specify the option generatorFunction to be true, but the React
+      `ERROR: ReactOnRails is incorrectly detecting generator function to be false. The React
 component \'${componentName}\' seems to be a generator function.\n${lastLine}`;
     const reMatchShouldBeGeneratorError = /Can't add property context, object is not extensible/;
     if (reMatchShouldBeGeneratorError.test(e.message)) {
@@ -21,7 +21,7 @@ component \'${componentName}\' seems to be a generator function.\n${lastLine}`;
     }
 
     shouldBeGeneratorError =
-      `ERROR: You specified the option generatorFunction to be true, but the React, but the React
+      `ERROR: ReactOnRails is incorrectly detecting generatorFunction to be true, but the React
 component \'${componentName}\' is not a generator function.\n${lastLine}`;
 
     const reMatchShouldNotBeGeneratorError = /Cannot call a class as a function/;

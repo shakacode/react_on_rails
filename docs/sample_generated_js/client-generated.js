@@ -6,7 +6,6 @@
     propsVarName: '__helloWorldData0__',
     props: window.__helloWorldData0__,
     trace: true,
-    generatorFunction: false,
     expectTurboLinks: true
   });
 })();

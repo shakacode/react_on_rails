@@ -9,7 +9,6 @@ import ReactOnRails from './ReactOnRails';
  * @param options.props
  * @param options.domId
  * @param options.trace
- * @param options.generatorFunction Deprecated, remove for v3.0
  * @param options.location
  * @returns {Element}
  */
@@ -18,7 +17,6 @@ export default function createReactElement({
   props,
   domId,
   trace,
-  generatorFunction: domGeneratorFunction,
   location,
   }) {
   if (trace) {
@@ -30,7 +28,7 @@ export default function createReactElement({
   // CONSIDER NOT RELEASING THE OPTION version
   const { component, generatorFunction } = componentObj;
 
-  if (generatorFunction || domGeneratorFunction) {
+  if (generatorFunction) {
     return component(props, location);
   }
 
