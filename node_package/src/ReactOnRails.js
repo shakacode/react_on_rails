@@ -13,14 +13,19 @@ context.ReactOnRails = {
   /**
    * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
    * find you components for rendering.
-   * @param componentName
+   * @param componentNameOrComponents componentName | components (key is component name)
    * @param component
    * @param options
    * @param options.generatorFunction True if a generator function, which is a function that
    *   returns a React.Component
    */
-  register(componentName, component, options = {}) {
-    ComponentStore.register(componentName, component, options);
+  register(componentNameOrComponents, component, options = {}) {
+    if (typeof componentNameOrComponents === 'string') {
+      ComponentStore.register(componentNameOrComponents, component, options);
+    } else {
+      const components = componentNameOrComponents;
+      Object.keys(components).forEach(name => ComponentStore.register(name, components[name]));
+    }
   },
 
   /**

@@ -3,6 +3,11 @@ import _ from 'lodash';
 
 // Simple example of a React "dumb" component
 export default class HelloWorldWidget extends React.Component {
+  static propTypes = {
+    name: PropTypes.string.isRequired,
+    _updateName: PropTypes.func.isRequired,
+  };
+
   constructor(props, context) {
     super(props, context);
 
@@ -11,11 +16,6 @@ export default class HelloWorldWidget extends React.Component {
     // instance itself.
     _.bindAll(this, '_handleChange');
   }
-
-  static propTypes = {
-    name: PropTypes.string.isRequired,
-    _updateName: PropTypes.func.isRequired,
-  };
 
   // React will automatically provide us with the event `e`
   _handleChange(e) {

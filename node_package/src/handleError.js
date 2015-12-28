@@ -6,14 +6,14 @@ function handleGeneratorFunctionIssue(options) {
 
   let msg = '';
 
-  const lineOne =
-    'ERROR: You specified the option generator_function (could be in your defaults) to be\n';
-  const lastLine =
-    'A generator function takes a single arg of props and returns a ReactElement.';
-
   if (componentName) {
+    const lastLine =
+      'A generator function takes a single arg of props (and the location for react-router) ' +
+      'and returns a ReactElement.';
+
     let shouldBeGeneratorError =
-      `${lineOne} false, but the React component \'${componentName}\' seems to be a generator function.\n${lastLine}`;
+      `ERROR: You failed to specify the option generatorFunction to be true, but the React
+component \'${componentName}\' seems to be a generator function.\n${lastLine}`;
     const reMatchShouldBeGeneratorError = /Can't add property context, object is not extensible/;
     if (reMatchShouldBeGeneratorError.test(e.message)) {
       msg += shouldBeGeneratorError + '\n\n';
@@ -21,9 +21,11 @@ function handleGeneratorFunctionIssue(options) {
     }
 
     shouldBeGeneratorError =
-      `${lineOne} true, but the React component \'${componentName}\' is not a generator function.\n${lastLine}`;
+      `ERROR: You specified the option generatorFunction to be true, but the React, but the React
+component \'${componentName}\' is not a generator function.\n${lastLine}`;
 
     const reMatchShouldNotBeGeneratorError = /Cannot call a class as a function/;
+
     if (reMatchShouldNotBeGeneratorError.test(e.message)) {
       msg += shouldBeGeneratorError + '\n\n';
       console.error(shouldBeGeneratorError);

@@ -7,6 +7,14 @@ import _ from 'lodash';
 
 // Simple example of a React "dumb" component
 export default class HelloWorldWidget extends React.Component {
+  static propTypes = {
+    // We prefix all property and variable names pointing to Immutable.js objects with '$$'.
+    // This allows us to immediately know we don't call $$helloWorldStore['someProperty'], but instead use
+    // the Immutable.js `get` API for Immutable.Map
+    actions: PropTypes.object.isRequired,
+    $$helloWorldStore: PropTypes.instanceOf(Immutable.Map).isRequired,
+  }
+
   constructor(props, context) {
     super(props, context);
 
@@ -14,14 +22,6 @@ export default class HelloWorldWidget extends React.Component {
     // the methods defined here would not refer to the component's class, not the component
     // instance itself.
     _.bindAll(this, '_handleChange');
-  }
-
-  static propTypes = {
-    // We prefix all property and variable names pointing to Immutable.js objects with '$$'.
-    // This allows us to immediately know we don't call $$helloWorldStore['someProperty'], but instead use
-    // the Immutable.js `get` API for Immutable.Map
-    actions: PropTypes.object.isRequired,
-    $$helloWorldStore: PropTypes.instanceOf(Immutable.Map).isRequired,
   }
 
   // React will automatically provide us with the event `e`

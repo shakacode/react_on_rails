@@ -3,7 +3,7 @@ import { match, RoutingContext } from 'react-router';
 
 import routes from '../routes/routes';
 
-export default (props, location) => {
+const RouterApp = (props, location) => {
   let error;
   let redirectLocation;
   let routeProps;
@@ -27,3 +27,7 @@ export default (props, location) => {
     <RoutingContext {...routeProps} />
   );
 };
+
+RouterApp.generatorFunction = true;
+
+export default RouterApp;

@@ -26,8 +26,11 @@ export default function createReactElement({
   }
 
   const componentObj = ReactOnRails.getComponent(componentName);
-  const { component, generatorFunction } = componentObj;
-  if (generatorFunction || domGeneratorFunction) {
+
+  // CONSIDER NOT RELEASING THE OPTION version
+  const { component, generatorFunction: optionGeneratorFunction } = componentObj;
+
+  if (component.generatorFunction || optionGeneratorFunction || domGeneratorFunction) {
     return component(props, location);
   }
 

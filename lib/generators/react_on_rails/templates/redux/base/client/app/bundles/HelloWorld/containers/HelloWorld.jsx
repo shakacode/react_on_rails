@@ -13,15 +13,15 @@ function select(state) {
 
 // Simple example of a React "smart" component
 class HelloWorld extends React.Component {
-  constructor(props, context) {
-    super(props, context);
-  }
-
   static propTypes = {
     dispatch: PropTypes.func.isRequired,
 
     // This corresponds to the value used in function select above.
     $$helloWorldStore: PropTypes.instanceOf(Immutable.Map).isRequired,
+  }
+
+  constructor(props, context) {
+    super(props, context);
   }
 
   render() {

@@ -40,6 +40,8 @@ const ReduxApp = props => {
   return reactComponent;
 };
 
+ReduxApp.generatorFunction = true;
+
 /*
  * If you wish to create a React component via a function, rather than simply props,
  * then you need to set the property "generator" on that function to true.

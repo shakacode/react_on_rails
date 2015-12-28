@@ -4,6 +4,10 @@ import _ from 'lodash';
 
 // Simple example of a React "smart" component
 export default class HelloWorld extends React.Component {
+  static propTypes = {
+    name: PropTypes.string.isRequired, // this is passed from the Rails view
+  }
+
   constructor(props, context) {
     super(props, context);
 
@@ -11,10 +15,6 @@ export default class HelloWorld extends React.Component {
     // the methods defined here would not refer to the component's class, not the component
     // instance itself.
     _.bindAll(this, '_updateName');
-  }
-
-  static propTypes = {
-    name: PropTypes.string.isRequired, // this is passed from the Rails view
   }
 
   state = {name: this.props.name} // how to set initial state in es2015 class syntax

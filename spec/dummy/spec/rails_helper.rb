@@ -69,7 +69,7 @@ RSpec.configure do |config|
   end
 
   if driver == :poltergeist
-    require 'capybara/poltergeist'
+    require "capybara/poltergeist"
   elsif driver == :selenium_chrome
     Capybara.register_driver :selenium_chrome do |app|
       Capybara::Selenium::Driver.new(app, browser: :chrome)

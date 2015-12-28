@@ -53,7 +53,6 @@ describe ReactOnRailsHelper, type: :helper do
             data-component-name=\"App\"
             data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
             data-trace=\"false\"
-            data-generator-function=\"false\"
             data-expect-turbolinks=\"true\"
             data-dom-id=\"#{id}\"></div>".squish
     end

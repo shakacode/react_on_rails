@@ -21,8 +21,6 @@ ReactOnRails.configure do |config|
 
   # Default is false
   config.prerender = false
-  # Default is false, meaning that you expose ReactComponents directly
-  config.generator_function = false
   # Default is true for development, off otherwise
   config.trace = Rails.env.development?
 end

@@ -23,8 +23,6 @@ module ReactOnRailsHelper
   # props: Ruby Hash or JSON string which contains the properties to pass to the react object
   #
   #  options:
-  #    generator_function: <true/false> default is false, set to true if you want to use a
-  #                        generator function rather than a React Component.
   #    prerender: <true/false> set to false when debugging!
   #    trace: <true/false> set to true to print additional debugging information in the browser
   #           default is true for development, off otherwise
@@ -55,19 +53,22 @@ module ReactOnRailsHelper
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
     turbolinks_loaded = Object.const_defined?(:Turbolinks)
 
+    data = { component_name: react_component_name,
+             props: props,
+             trace: trace(options),
+             expect_turbolinks: turbolinks_loaded,
+             dom_id: dom_id
+    }
+
+    # REMOVE generator_function for v3.0
+    data[:generator_function] = true if options[:generator_function]
+
     component_specification_tag =
       content_tag(:div,
                   "",
                   class: "js-react-on-rails-component",
                   style: "display:none",
-                  data: {
-                    component_name: react_component_name,
-                    props: props,
-                    trace: trace(options),
-                    generator_function: generator_function(options),
-                    expect_turbolinks: turbolinks_loaded,
-                    dom_id: dom_id
-                  })
+                  data: data)
 
     # Create the HTML rendering part
     result = server_rendered_react_component_html(options, props, react_component_name, dom_id)
@@ -151,6 +152,7 @@ module ReactOnRailsHelper
 
   # Returns Array [0]: html, [1]: script to console log
   # NOTE, these are NOT html_safe!
+  # rubocop:disable Metrics/CyclomaticComplexity
   def server_rendered_react_component_html(options, props, react_component_name, dom_id)
     return { "html" => "", "consoleReplayScript" => "" } unless prerender(options)
 
@@ -163,6 +165,9 @@ module ReactOnRailsHelper
     # Since this code is not inserted on a web page, we don't need to escape.
     props_string = props.is_a?(String) ? props : props.to_json
 
+    # v3.0, remove generatorFunction
+    generator_function = options[:generator_function]
+
     wrapper_js = <<-JS
 (function() {
   var props = #{props_string};
@@ -170,8 +175,7 @@ module ReactOnRailsHelper
     componentName: '#{react_component_name}',
     domId: '#{dom_id}',
     props: props,
-    trace: #{trace(options)},
-    generatorFunction: #{generator_function(options)},
+    trace: #{trace(options)},#{generator_function ? '\n    generatorFunction: true,' : ''}
     location: '#{request.fullpath}'
   });
 })()
@@ -208,10 +212,6 @@ module ReactOnRailsHelper
 
   def trace(options)
     options.fetch(:trace) { ReactOnRails.configuration.trace }
-  end
-
-  def generator_function(options)
-    options.fetch(:generator_function) { ReactOnRails.configuration.generator_function }
   end
 
   def prerender(options)

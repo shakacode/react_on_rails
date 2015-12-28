@@ -43,7 +43,7 @@ module ReactOnRails
                    desc: "Skip integrating Bootstrap and don't initialize files and regarding configs. Default: false",
                    aliases: "-b"
 
-      def run_generators # rubocop:disable Metrics/CyclomaticComplexity
+      def run_generators
         return unless installation_prerequisites_met?
         warn_if_nvm_is_not_installed
         invoke_generators

@@ -102,11 +102,9 @@ Here's what the browser will render with a call to the `react_component` helper.
 * **props**: [hash | string of json] Properties to pass to the react object. See this example if you're using Jbuilder: [react-webpack-rails-tutorial view rendering props using jBuilder](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/app/views/pages/index.html.erb#L20)
 
 ```erb
-<%= react_component('App', render(template: "/comments/index.json.jbuilder"),
-    generator_function: true, prerender: true) %>
+<%= react_component('App', render(template: "/comments/index.json.jbuilder"), prerender: true) %>
 ```
 * **options:** [hash]
-  * **generator_function**: <true/false> default is false, set to true if you want to use a generator function rather than a React Component.
   * **prerender**: <true/false> set to false when debugging!
   * **trace**: <true/false> set to true to print additional debugging information in the browser default is true for development, off otherwise
   * **replay_console**: <true/false> Default is true. False will disable echoing server rendering logs, which can make troubleshooting server rendering difficult.

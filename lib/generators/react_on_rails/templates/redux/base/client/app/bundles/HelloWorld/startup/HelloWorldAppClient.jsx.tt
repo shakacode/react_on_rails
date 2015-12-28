@@ -18,4 +18,6 @@ const <%= generator_function_name %> = props => {
   return reactComponent;
 };
 
+<%= generator_function_name %>.generatorFunction = true;
+
 export default <%= generator_function_name %>;
