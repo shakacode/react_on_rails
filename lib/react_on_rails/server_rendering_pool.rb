@@ -76,7 +76,7 @@ module ReactOnRails
           base_js_code = <<-JS
 #{console_polyfill}
           #{bundle_js_code};
-#{::Rails.application.assets['react_on_rails.js']};
+#{react_on_rails};
           JS
           ExecJS.compile(base_js_code)
         else
@@ -105,6 +105,12 @@ var console = { history: [] };
   };
 });
         JS
+      end
+
+      def react_on_rails
+        ::Rails.application.assets['react_on_rails.js'] if Rails.env.development?
+
+        File.read(Rails.root.join('public', 'assets', Rails.application.assets_manifest.assets['react_on_rails.js']))
       end
     end
   end
