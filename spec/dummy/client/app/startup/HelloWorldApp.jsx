@@ -11,8 +11,4 @@ import HelloWorld from '../components/HelloWorld';
  *  Note, this is a fictional example, as you'd only use a generator function if you wanted to run
  *  some extra code, such as setting up Redux and React-Router.
  */
-const HelloWorldApp = props => <HelloWorld {...props} />;
-
-HelloWorldApp.generatorFunction = true;
-
-export default HelloWorldApp;
+export default  props => <HelloWorld {...props} />;

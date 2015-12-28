@@ -1,15 +1,28 @@
 // key = name used by react_on_rails
 // value = { name, component, generatorFunction: boolean }
-const components = new Map();
+import generatorFunction from './generatorFunction';
+
+const _components = new Map();
 
 export default {
   /**
-   * @param name
-   * @param component
-   * @param options { generatorFunction: boolean }
+   * @param components { name: component }
    */
-  register(name, component, options = {}) {
-    components.set(name, { name, component, generatorFunction: options.generatorFunction });
+  register(components) {
+    Object.keys(components).forEach(name => {
+      if (_components.has(name)) {
+        console.warn('Called register for component that is already registered', name);
+      }
+
+      const component = components[name];
+      const isGeneratorFunction = generatorFunction(component);
+
+      _components.set(name, {
+        name,
+        component,
+        generatorFunction: isGeneratorFunction,
+      });
+    });
   },
 
   /**
@@ -17,8 +30,8 @@ export default {
    * @returns { name, component, generatorFunction }
    */
   getComponent(name) {
-    if (components.has(name)) {
-      return components.get(name);
+    if (_components.has(name)) {
+      return _components.get(name);
     }
 
     // Backwards compatability. Remove for v3.0.

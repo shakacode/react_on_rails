@@ -18,7 +18,7 @@ import HelloWorldContainer from '../components/HelloWorldContainer';
 /*
  *  Export a function that takes the props and returns a ReactComponent.
  */
-const ReduxApp = props => {
+export default  props => {
   const combinedReducer = combineReducers(reducers);
 
   // This is where we'll put in the middleware for the async function. Placeholder.
@@ -34,7 +34,3 @@ const ReduxApp = props => {
     </Provider>
   );
 };
-
-ReduxApp.generatorFunction = true;
-
-export default ReduxApp;

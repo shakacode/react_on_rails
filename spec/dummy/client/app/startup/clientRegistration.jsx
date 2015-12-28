@@ -8,6 +8,7 @@ import HelloWorldApp from './HelloWorldApp';
 import ReduxApp from './ClientReduxApp';
 import RouterApp from './ClientRouterApp';
 import HelloString from '../non_react/HelloString';
+import PureComponent from '../components/PureComponent';
 
 ReactOnRails.register({
   HelloWorld,
@@ -16,4 +17,5 @@ ReactOnRails.register({
   ReduxApp,
   HelloWorldApp,
   RouterApp,
+  PureComponent,
 });

@@ -21,6 +21,8 @@ import ReduxApp from './ServerReduxApp';
 // Example of React Router with Server Rendering
 import RouterApp from './ServerRouterApp';
 
+import PureComponent from '../components/PureComponent';
+
 ReactOnRails.register({
   HelloWorld,
   HelloWorldWithLogAndThrow,
@@ -29,5 +31,5 @@ ReactOnRails.register({
   HelloWorldApp,
   RouterApp,
   HelloString,
+  PureComponent,
 });
-

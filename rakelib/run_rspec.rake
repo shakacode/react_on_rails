@@ -37,9 +37,15 @@ namespace :run_rspec do
 
   Coveralls::RakeTask.new
 
-  task run_rspec: [:gem, :dummy, :examples, :empty, "coveralls:push"] do
+  desc "run all tests"
+  task run_rspec: [:gem, :dummy, :examples, :empty, :js_tests, "coveralls:push"] do
     puts "Completed all RSpec tests"
   end
+end
+
+desc "js tests (same as 'npm run test')"
+task :js_tests do
+  sh "npm run test"
 end
 
 desc "Runs all tests. Run `rake -D run_rspec` to see all available test options"
