@@ -23,4 +23,6 @@ ReactOnRails.configure do |config|
   config.prerender = false
   # Default is true for development, off otherwise
   config.trace = Rails.env.development?
+  # Default is false, enable if your content security policy doesn't include `style-src: 'unsafe-inline'`
+  config.skip_display_none = false
 end
