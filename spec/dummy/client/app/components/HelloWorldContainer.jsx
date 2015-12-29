@@ -12,21 +12,21 @@ function select(state) {
 }
 
 class HelloWorldContainer extends React.Component {
-  constructor(props, context) {
-    super(props, context);
-  }
-
   static propTypes = {
     dispatch: PropTypes.func.isRequired,
     data: PropTypes.object.isRequired,
   };
+
+  constructor(props, context) {
+    super(props, context);
+  }
 
   render() {
     const { dispatch, data } = this.props;
     const actions = bindActionCreators(helloWorldActions, dispatch);
 
     return (
-      <HelloWorldRedux {...{actions, data}} />
+      <HelloWorldRedux {...{ actions, data }} />
     );
   }
 }

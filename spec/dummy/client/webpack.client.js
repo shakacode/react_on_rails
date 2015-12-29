@@ -14,6 +14,10 @@ module.exports = {
     root: [path.join(__dirname, 'app')],
     extensions: ['', '.js', '.jsx'],
     fallback: [path.join(__dirname, 'node_modules')],
+    alias: {
+      react: path.resolve('./node_modules/react'),
+      'react-dom': path.resolve('./node_modules/react-dom'),
+    },
   },
 
   // same issue, for loaders like babel

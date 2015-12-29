@@ -23,7 +23,7 @@
     "node-libs-browser": "^0.5.3",
     "react": "^0.14.3",
     "react-dom": "^0.14.3",
-    "react-on-rails": "^0.0.1",
+    "react-on-rails": "../../..",
     "react-redux": "^4.0.5",
     "react-router": "^1.0.3",
     "redux": "^3.0.5",
@@ -41,7 +41,12 @@
     "fs": false
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "npm run eslint --silent && npm run jscs --silent",
+    "eslint": "eslint --ext .js,.jsx .",
+    "jscs": "jscs --verbose .",
+    "jscs:fix": "jscs --verbose -x . --silent",
+    "build:test":  "webpack --config webpack.client.js && webpack --config webpack.server.js",
+    "test": "npm run build:test && rspec",
     "build:dev:client": "webpack -w --config webpack.client.js",
     "build:dev:server": "webpack -w --config webpack.server.js"
   },

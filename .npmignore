@@ -17,3 +17,4 @@ lib
 rakelib
 ruby-lint.yml
 spec
+node_modules

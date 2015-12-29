@@ -27,6 +27,8 @@
     "eslint-plugin-babel": "^3.0.0",
     "eslint-plugin-react": "^3.11.3",
     "jscs": "^2.6.0",
+    "react": "^0.14.3",
+    "react-dom": "^0.14.3",
     "tap-spec": "^4.1.1",
     "tape": "^4.4.0",
     "webpack": "^1.12.9"
@@ -43,7 +45,7 @@
     "clean": "node_package/scripts/clean",
     "prepublish": "npm run build",
     "build": "node_package/scripts/build",
-    "lint": "node_package/scripts/lint",
+    "lint": "node_package/scripts/lint && cd spec/dummy/client && npm run lint",
     "check": "npm run lint && npm run test",
     "prerelease": "npm run check && npm run clean && npm run build",
     "release:patch": "node_package/scripts/release patch",

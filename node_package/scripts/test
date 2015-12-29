@@ -3,13 +3,7 @@
 echo "Running JS tests in node"
 $(npm bin)/babel-tape-runner node_package/tests/*.js | $(npm bin)/tap-spec
 
-# With faucet, looks nicer, but can't see console.log
-#$(npm bin)/browserify -t babelify node_package/tests/*.js | $(npm bin)/browser-run -p 2222 | $(npm bin)/faucet
-
-# Without faucet, see console.log
-#$(npm bin)/browserify -t babelify node_package/tests/*.js | $(npm bin)/browser-run -p 2222
-
-
-echo "Running JS tests in browser"
-$(npm bin)/browserify -t babelify node_package/tests/*.js | tape-run | $(npm bin)/faucet
+# If we want to run tests in the browser
+# echo "Running JS tests in browser"
+# $(npm bin)/browserify -t babelify node_package/tests/*.js | tape-run | $(npm bin)/faucet
 

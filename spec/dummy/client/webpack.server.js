@@ -13,13 +13,14 @@ module.exports = {
     root: [path.join(__dirname, 'app')],
     extensions: ['', '.js', '.jsx'],
     fallback: [path.join(__dirname, 'node_modules')],
+    alias: {
+      react: path.resolve('./node_modules/react'),
+      'react-dom': path.resolve('./node_modules/react-dom'),
+    },
   },
   module: {
     loaders: [
-      {test: /\.jsx?$/, loader: 'babel-loader', exclude: /node_modules/},
-
-      // See client/app/startup/serverGlobals.jsx and client/apps/startup/clientGlobals.jsx
-      // for configuration of how to expose your components for both server and client rendering.
+      { test: /\.jsx?$/, loader: 'babel-loader', exclude: /node_modules/ },
     ],
   },
 };

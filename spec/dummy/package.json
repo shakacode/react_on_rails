@@ -9,7 +9,9 @@
   "scripts": {
     "postinstall": "cd ./client && npm install",
     "gulp": "cd ./client && npm run gulp",
-    "test": "rspec && client/bin/lint && (cd client && npm run jscs .)"
+    "test": "npm run build:test && npm run lint && rspec",
+    "lint":  "cd client && npm run lint",
+    "build:test": "cd client && npm run build:test"
   },
   "repository": {
     "type": "git",
