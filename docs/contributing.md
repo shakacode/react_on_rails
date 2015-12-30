@@ -5,9 +5,13 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 
 * /coverage
 * /examples
+* /node_package/lib
 * /node_modules
-
-
+* /spec/dummy/app/assets/javascripts/generated
+* /spec/dummy/log
+* /spec/dummy/node_modules
+* /spec/dummy/tmp
+* /spec/react_on_rails/dummy-for-generators
 
 # Development Setup for Gem and Node Package Contributors
 
