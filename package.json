@@ -1,13 +1,12 @@
 {
   "name": "react-on-rails",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "node_package/lib/ReactOnRails.js",
   "directories": {
     "doc": "docs"
   },
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "babel": "^6.3.13",
     "babel-cli": "^6.3.17",

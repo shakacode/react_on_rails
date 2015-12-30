@@ -1,5 +1,14 @@
 # Tips for Contributors
 
+# IDE/IDE SETUP
+It's critical to configure your IDE/editor to ignore certain directories. Otherwise your IDE might slow to a crawl!
+
+* /coverage
+* /examples
+* /node_modules
+
+
+
 # Development Setup for Gem and Node Package Contributors
 
 ## Checklist before Committing
@@ -115,3 +124,5 @@ Docker CI and Tests containers have a xvfd server automatically started for head
 Run `docker-compose build ci` to build the CI container. Run `docker-compose run ci` to start all rspec tests and linting. `docker-compose run --entrypoint=/bin/bash` will override the default CI action and place you inside the CI container in a bash session. This is what is run on Travis-CI.
 
 Run `docker-compose build tests` to build the tests container. Run `docker-compose run tests` to start all rspec tests.
+
+# NPM Releasing
