@@ -19,6 +19,15 @@ module ReactOnRails
         %w(spec/features/hello_world_spec.rb).each { |file| copy_file(file) }
       end
 
+      def fix_package_json_to_use_relative
+        # TODO ROB
+
+        # Search in file for:
+        # "react-on-rails": "ReactOnRails::VERSION"
+
+        # "react-on-rails": "../../.."
+      end
+
       def add_test_related_gems_to_gemfile
         gem("rspec-rails", group: :test)
         gem("capybara", group: :test)

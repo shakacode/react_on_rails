@@ -16,11 +16,6 @@ Follow these steps if you choose to forgo the generator:
   ```
 
 
-2. Require `react_on_rails` in your `application.js` like  [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/361f4338ebb39a5d3934b00cb6d6fcf494773000/app/assets/javascripts/application.js#L15). It possibly should come after you require `turbolinks`:
-
-  ```
-  //= require react_on_rails
-  ```
 3. Expose your client globals like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/app/startup/clientRegistration.jsx#L3):
 
   ```javascript
