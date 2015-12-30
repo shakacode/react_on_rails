@@ -26,6 +26,7 @@ install:
   - rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install 4.2.0
   - npm install -g npm
   - bundle install
+  - npm install
   - rake dummy_apps
   - rake examples
   - docker-compose up lint

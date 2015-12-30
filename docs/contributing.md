@@ -16,7 +16,7 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 # Development Setup for Gem and Node Package Contributors
 
 ## Checklist before Committing
-1. `rake ci`: runs all linters and specs (you need Docker setup, see below)
+1. `rake`: runs all linters and specs (you need Docker setup, see below)
 2. Did you need any more tests for your change?
 3. Did you document your change? Update the README.md?
 
