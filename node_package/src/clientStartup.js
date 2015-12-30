@@ -20,7 +20,7 @@ function forEachComponent(fn) {
  */
 function render(el) {
   const componentName = el.getAttribute('data-component-name');
-  const domId = el.getAttribute('data-dom-id');
+  const domNodeId = el.getAttribute('data-dom-id');
   const props = JSON.parse(el.getAttribute('data-props'));
   const trace = JSON.parse(el.getAttribute('data-trace'));
   const expectTurboLinks = JSON.parse(el.getAttribute('data-expect-turbo-links'));
@@ -30,12 +30,12 @@ function render(el) {
   }
 
   try {
-    const domNode = document.getElementById(domId);
+    const domNode = document.getElementById(domNodeId);
     if (domNode) {
       const reactElementOrRouterResult = createReactElement({
         componentName,
         props,
-        domId,
+        domNodeId,
         trace,
       });
 
@@ -61,8 +61,8 @@ function reactOnRailsPageLoaded() {
 }
 
 function unmount(el) {
-  const domId = el.getAttribute('data-dom-id');
-  const domNode = document.getElementById(domId);
+  const domNodeId = el.getAttribute('data-dom-id');
+  const domNode = document.getElementById(domNodeId);
   ReactDOM.unmountComponentAtNode(domNode);
 }
 

@@ -7,7 +7,7 @@ import ReactOnRails from './ReactOnRails';
  * @param options
  * @param options.componentName
  * @param options.props
- * @param options.domId
+ * @param options.domNodeId
  * @param options.trace
  * @param options.location
  * @returns {Element}
@@ -15,12 +15,12 @@ import ReactOnRails from './ReactOnRails';
 export default function createReactElement({
   componentName,
   props,
-  domId,
+  domNodeId,
   trace,
   location,
   }) {
   if (trace) {
-    console.log('RENDERED ' + componentName + ' to dom node with id: ' + domId);
+    console.log('RENDERED ' + componentName + ' to dom node with id: ' + domNodeId);
   }
 
   const componentObj = ReactOnRails.getComponent(componentName);

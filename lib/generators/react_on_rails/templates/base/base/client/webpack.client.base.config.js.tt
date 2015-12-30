@@ -1,4 +1,3 @@
-<%- client_globals_name = options.server_rendering? ? "clientGlobals" : "globals" -%>
 // Common client-side webpack configuration used by webpack.hot.config and webpack.rails.config.
 
 const webpack = require('webpack');
@@ -24,7 +23,7 @@ module.exports = {
 
     // This will contain the app entry points defined by webpack.hot.config and webpack.rails.config
     app: [
-      './app/bundles/HelloWorld/startup/<%= client_globals_name %>',
+      './app/bundles/HelloWorld/startup/clientRegistration',
     ],
   },
   resolve: {
@@ -57,10 +56,7 @@ module.exports = {
   ],
   module: {
     loaders: [
-
-      // React is necessary for the client rendering:
-      {test: require.resolve('react'), loader: 'expose?React'},
-      {test: require.resolve('react-dom'), loader: 'expose?ReactDOM'},
+      // Not all apps require jQuery. Many Rails apps do, such as those using TurboLinks.
       {test: require.resolve('jquery'), loader: 'expose?jQuery'},
       {test: require.resolve('jquery'), loader: 'expose?$'},
     ],

@@ -132,17 +132,17 @@ module ReactOnRails
         append_to_file("Gemfile", "\ngem 'therubyracer', platforms: :ruby\n")
       end
 
-      def template_client_globals_file
-        filename = options.server_rendering? ? "clientGlobals.jsx" : "globals.jsx"
+      def template_client_registration_file
+        filename = "clientRegistration.jsx"
         location = "client/app/bundles/HelloWorld/startup"
-        template("base/base/#{location}/globals.jsx.tt", "#{location}/#{filename}")
+        template("base/base/#{location}/registration.jsx.tt", "#{location}/#{filename}")
       end
 
       def install_server_rendering_files_if_enabled
         return unless options.server_rendering?
         base_path = "base/server_rendering/"
         %w(client/webpack.server.rails.config.js
-           client/app/bundles/HelloWorld/startup/serverGlobals.jsx).each do |file|
+           client/app/bundles/HelloWorld/startup/serverRegistration.jsx).each do |file|
           copy_file(base_path + file, file)
         end
       end

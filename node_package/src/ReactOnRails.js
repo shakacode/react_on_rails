@@ -3,6 +3,8 @@ import handleError from './handleError';
 import ComponentStore from './ComponentStore';
 import serverRenderReactComponent from './serverRenderReactComponent';
 import buildConsoleReplay from './buildConsoleReplay';
+import createReactElement from './createReactElement';
+import ReactDOM from 'react-dom';
 
 const context =
   ((typeof window !== 'undefined') && window) ||
@@ -17,6 +19,21 @@ context.ReactOnRails = {
    */
   register(components) {
     ComponentStore.register(components);
+  },
+
+  /**
+   * ReactOnRails.render("HelloWorldApp", {name: "Stranger"}, 'app');
+   *
+   * Does this:
+   *   ReactDOM.render(React.createElement(HelloWorldApp, {name: "Stranger"}), document.getElementById('app'))
+   *
+   * @param name Name of your registered component
+   * @param props Props to pass to your component
+   * @param domNodeId
+   */
+  render(name, props, domNodeId) {
+    const reactElement = createReactElement({ name, props, domNodeId });
+    ReactDOM.render(reactElement, document.getElementById(domNodeId));
   },
 
   /**

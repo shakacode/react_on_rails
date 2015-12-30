@@ -1,3 +1,4 @@
+<%- require 'react_on_rails/version' -%>
 {
   "name": "react-webpack-rails-tutorial",
   "version": "1.1.0",
@@ -58,6 +59,7 @@
     "react-bootstrap": "^0.28.1",
     <%- end -%>
     "react-dom": "^0.14.3",
+    "react-on-rails:": <%= ReactOnRails::VERSION %>,
     <%- if options.redux? -%>
     "react-redux": "^4.0.0",
     "redux": "^3.0.4",

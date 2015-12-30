@@ -14,12 +14,9 @@ module ReactOnRailsHelper
   #          var MyReactComponentApp = function(props) { return <YourReactComponent {...props}/>; }
   #    Exposing the react_component_name is necessary to both a plain ReactComponent as well as
   #      a generator:
-  #    For client rendering, expose the react_component_name on window:
-  #      window.MyReactComponentApp = MyReactComponentApp;
-  #    For server rendering, export the react_component_name on global:
-  #      global.MyReactComponentApp = MyReactComponentApp;
-  #    See spec/dummy/client/app/startup/serverGlobals.jsx and
-  #      spec/dummy/client/app/startup/ClientApp.jsx for examples of this
+  #    See README.md for how to "register" your react components.
+  #    See spec/dummy/client/app/startup/serverRegistration.jsx and
+  #      spec/dummy/client/app/startup/ClientRegistration.jsx for examples of this
   # props: Ruby Hash or JSON string which contains the properties to pass to the react object
   #
   #  options:
@@ -167,7 +164,7 @@ module ReactOnRailsHelper
   var props = #{props_string};
   return ReactOnRails.serverRenderReactComponent({
     componentName: '#{react_component_name}',
-    domId: '#{dom_id}',
+    domNodeId: '#{dom_id}',
     props: props,
     trace: #{trace(options)},
     location: '#{request.fullpath}'

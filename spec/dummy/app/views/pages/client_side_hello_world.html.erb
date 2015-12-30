@@ -19,11 +19,12 @@
     Create component source: spec/dummy/client/app/components/HelloWorld.jsx
   </li>
   <li>
-    Expose the HelloWorld Component: spec/dummy/client/app/startup/clientGlobals.jsx
+    Expose the HelloWorld Component: spec/dummy/client/app/startup/clientRegistration.jsx
     <br/>
     <pre>
       import HelloWorld from '../components/HelloWorld';
-      window.HelloWorld = HelloWorld;
+      import ReactOnRails from 'react-on-rails';
+      ReactOnRails.register({ HelloWorld });
     </pre>
   </li>
   <li>

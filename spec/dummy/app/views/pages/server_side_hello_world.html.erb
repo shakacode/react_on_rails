@@ -45,16 +45,17 @@
   </li>
   <li>
     Expose the HelloWorld Component on the client side:
-    spec/dummy/client/app/startup/clientGlobals.jsx
+    spec/dummy/client/app/startup/clientRegistration.jsx
     <br/>
     <pre>
-    import HelloWorld from '../components/HelloWorld';
-    window.HelloWorld = HelloWorld;
+      import HelloWorld from '../components/HelloWorld';
+      import ReactOnRails from 'react-on-rails';
+      ReactOnRails.register({ HelloWorld });
     </pre>
   </li>
   <li>
     Expose the HelloWorld Component on the server side:
-    spec/dummy/client/app/startup/serverGlobals.jsx
+    spec/dummy/client/app/startup/serverRegistration.jsx
     <br/>
     <pre>
     import HelloWorld from '../components/HelloWorld';

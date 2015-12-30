@@ -22,7 +22,9 @@ gem "pry-doc"
 gem "pry-rails"
 gem "pry-rescue"
 gem "pry-stack_explorer"
+gem "puma"
 gem "rails", "4.2.5"
+gem "rails_12factor"
 gem "rspec-rails"
 gem "rubocop", require: false
 gem "ruby-lint", require: false

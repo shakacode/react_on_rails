@@ -12,4 +12,4 @@ html
     script(src="vendor-bundle.js")
     script(src="app-bundle.js")
     script.
-      ReactDOM.render(React.createElement(HelloWorldApp, {name: "Stranger"}), document.getElementById('app'))
+      ReactOnRails.render("HelloWorldApp", {name: "Stranger"}, 'app');

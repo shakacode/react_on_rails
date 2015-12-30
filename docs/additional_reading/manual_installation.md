@@ -1,3 +1,5 @@
+# TODO FIX THIS FILE AFTER this is updated: https://github.com/shakacode/react-webpack-rails-tutorial
+
 # Manual Installation
 Follow these steps if you choose to forgo the generator:
 
@@ -19,22 +21,23 @@ Follow these steps if you choose to forgo the generator:
   ```
   //= require react_on_rails
   ```
-3. Expose your client globals like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/app/startup/clientGlobals.jsx#L3):
+3. Expose your client globals like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/app/startup/clientRegistration.jsx#L3):
 
   ```javascript
   import App from './ClientApp';
-  window.App = App;
+  import ReactOnRails from 'react-on-rails';
+  ReactOnRails.register({ App });
   ```
 4. Put your client globals file as webpack entry points like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/webpack.client.rails.config.js#L22). Similar pattern for server rendering.
 
   ```javascript
-  config.entry.app.push('./app/startup/clientGlobals');
+  config.entry.app.push('./app/startup/clientRegistration');
   ```
 
 ## Additional Steps For Server Rendering (option `prerender` shown below)
 See the next section for a sample webpack.server.rails.config.js.
 
-1. Expose your server globals like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/app/startup/serverGlobals.jsx#L7)
+1. Expose your server globals like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/app/startup/serverRegistration.jsx#L7)
 
   ```javascript
   import App from './ServerApp';
@@ -43,7 +46,7 @@ See the next section for a sample webpack.server.rails.config.js.
 2. Make the server globals file an entry point in your webpack config, like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/webpack.server.rails.config.js#L7)
 
   ```javascript
-  entry: ['./app/startup/serverGlobals'],
+  entry: ['./app/startup/serverRegistration'],
   ```
 3. Ensure the name of your ouput file (shown [here](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/webpack.server.rails.config.js#L9)) of your server bundle corresponds to the configuration of the gem. The default path is `app/assets/javascripts/generated`. See below for customization of configuration variables.
 4. Expose `React` in your webpack config, like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.config.js#L23)
@@ -65,13 +68,13 @@ module.exports = {
 
   // the project dir
   context: __dirname,
-  entry: ['./app/startup/serverGlobals'],
+  entry: ['./app/startup/serverRegistration'],
   output: {
     filename: 'server-bundle.js',
     path: '../app/assets/javascripts/generated',
 
     // CRITICAL to set libraryTarget: 'this' for enabling Rails to find the exposed modules IF you
-    //   use the "expose" webpackfunctionality. See startup/serverGlobals.jsx.
+    //   use the "expose" webpackfunctionality. See startup/serverRegistration.jsx.
     // NOTE: This is NOT necessary if you use the syntax of global.MyComponent = MyComponent syntax.
     // See http://webpack.github.io/docs/configuration.html#externals for documentation of this option
     //libraryTarget: 'this',
@@ -96,7 +99,7 @@ module.exports = {
 Here's what the browser will render with a call to the `react_component` helper.
 ![2015-09-28_20-24-35](https://cloud.githubusercontent.com/assets/1118459/10157268/41435186-6624-11e5-9341-6fc4cf35ee90.png)
 
-  If you're curious as to what the gem generates for the server and client rendering, see [`spec/dummy/client/app/startup/serverGlobals.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/spec/sample_generated_js/server-generated.js)
+  If you're curious as to what the gem generates for the server and client rendering, see [`spec/dummy/client/app/startup/serverRegistration.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/spec/sample_generated_js/server-generated.js)
   and [`spec/dummy/client/app/startup/ClientReduxApp.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/spec/sample_generated_js/client-generated.js) for examples of this. Note, this is not the code that you are providing. You can see the client code by viewing the page source.
 
 * **props**: [hash | string of json] Properties to pass to the react object. See this example if you're using Jbuilder: [react-webpack-rails-tutorial view rendering props using jBuilder](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/app/views/pages/index.html.erb#L20)
@@ -113,29 +116,8 @@ Here's what the browser will render with a call to the `react_component` helper.
 # JavaScript
 
 1. Configure your webpack configuration to create the file used for server rendering if you plan to do server rendering.
-2. Follow the examples in `spec/dummy/client/app/startup/clientGlobals.jsx` to expose your react components for client side rendering.
-
-  ```ruby
-  import HelloWorld from '../components/HelloWorld';
-  window.HelloWorld = HelloWorld;
-  ```
-3. Follow the examples in `spec/dummy/client/app/startup/serverGlobals.jsx` to expose your react components for server side rendering.
-
-  ```ruby
-  import HelloWorld from '../components/HelloWorld';
-  global.HelloWorld = HelloWorld;
-  ```
+2. Follow the examples in `spec/dummy/client/app/startup/clientRegistration.jsx` to expose your react components for client side rendering.
+3. Follow the examples in `spec/dummy/client/app/startup/serverRegistration.jsx` to expose your react components for server side rendering. The code is the same, but you might be importing from a file specialized for server rendering.
 
 ## React 0.13 vs. React 0.14
-The main difference for using react_on_rails is that you need to add additional lines in the webpack config files:
-
-+ Normal mode (JavaScript is rendered on the client side) webpack config file:
-
-  ```javascript
-  { test: require.resolve('react-dom'), loader: 'expose?ReactDOM' },
-  ```
-+ Server-side rendering webpack config file:
-
-  ```javascript
-  { test: require.resolve('react-dom/server'), loader: 'expose?ReactDOMServer' },
-  ```
+We no longer support React 0.13.
