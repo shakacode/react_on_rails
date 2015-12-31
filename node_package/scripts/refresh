@@ -1,0 +1,10 @@
+#!/bin/bash
+# Update the example rails node packages
+
+npm run clean
+npm run build
+
+for type in $( ls examples ); do
+  d=examples/${type}/client
+  rm -rf ${d}/node_modules/react-on-rails && (cd $d && npm i react-on-rails)
+done

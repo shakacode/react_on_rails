@@ -18,10 +18,7 @@ end
 
 shared_examples "react_with_redux_generator:no_server_rendering" do
   it "templates the client-side-rendering version of HelloWorldAppClient" do
-    assert_file("client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx") do |contents|
-      assert_match("HelloWorldApp", contents)
-      refute_match("HelloWorldAppClient", contents)
-    end
+    assert_file("client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx")
   end
 end
 
@@ -34,7 +31,7 @@ shared_examples "react_with_redux_generator:server_rendering" do
 
   it "templates the server-side-rendering version of HelloWorldAppClient" do
     assert_file("client/app/bundles/HelloWorld/startup/HelloWorldAppClient.jsx") do |contents|
-      assert_match("HelloWorldAppClient", contents)
+      assert_match("HelloWorld", contents)
     end
   end
 end

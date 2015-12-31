@@ -122,7 +122,7 @@ shared_examples "base_generator:no_server_rendering" do
   it "templates client-side-rendering version of registration" do
     assert_file("client/app/bundles/HelloWorld/startup/clientRegistration.jsx") do |contents|
       assert_match("HelloWorldApp", contents)
-      refute_match("HelloWorldAppClient", contents)
+      assert_match("HelloWorldAppClient", contents)
     end
   end
 

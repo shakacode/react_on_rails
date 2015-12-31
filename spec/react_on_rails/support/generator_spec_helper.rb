@@ -33,7 +33,7 @@ def run_generator_test_with_args(args, options = {})
   end
   if options.fetch(:package_json, false)
     package_json = "client/package.json"
-    package_json_data = '"react-on-rails": "ReactOnRails::VERSION"'
+    package_json_data = '    "react-on-rails": "2.0.0-beta.1",'
     simulate_existing_file(package_json, package_json_data)
   end
   run_generator(args)

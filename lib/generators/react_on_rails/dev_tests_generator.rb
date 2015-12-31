@@ -23,9 +23,8 @@ module ReactOnRails
       def change_package_json_to_use_local_react_on_rails_module
         package_json = File.join(destination_root, "client", "package.json")
         old_contents = File.read(package_json)
-        new_contents = old_contents.gsub('"react-on-rails": "ReactOnRails::VERSION"') do |match|
-          '"react-on-rails": "../../.."'
-        end
+        new_contents = old_contents.gsub(/"react-on-rails": ".+",/,
+                                         '"react-on-rails": "../../..",')
         File.open(package_json, "w+") { |f| f.puts new_contents }
       end
 

@@ -19,7 +19,7 @@ function forEachComponent(fn) {
  * @param el
  */
 function render(el) {
-  const componentName = el.getAttribute('data-component-name');
+  const name = el.getAttribute('data-component-name');
   const domNodeId = el.getAttribute('data-dom-id');
   const props = JSON.parse(el.getAttribute('data-props'));
   const trace = JSON.parse(el.getAttribute('data-trace'));
@@ -33,7 +33,7 @@ function render(el) {
     const domNode = document.getElementById(domNodeId);
     if (domNode) {
       const reactElementOrRouterResult = createReactElement({
-        componentName,
+        name,
         props,
         domNodeId,
         trace,
@@ -50,7 +50,7 @@ function render(el) {
   } catch (e) {
     handleError({
       e,
-      componentName,
+      name,
       serverSide: false,
     });
   }

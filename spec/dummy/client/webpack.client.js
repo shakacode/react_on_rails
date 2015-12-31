@@ -4,6 +4,7 @@ module.exports = {
   entry: [
     'es5-shim/es5-shim', // for poltergeist
     'es5-shim/es5-sham', // for poltergeist
+    'babel-polyfill',
     'startup/clientRegistration',
   ],
   output: {

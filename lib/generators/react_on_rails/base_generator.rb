@@ -134,7 +134,7 @@ module ReactOnRails
       def template_client_registration_file
         filename = "clientRegistration.jsx"
         location = "client/app/bundles/HelloWorld/startup"
-        template("base/base/#{location}/registration.jsx.tt", "#{location}/#{filename}")
+        template("base/base/#{location}/clientRegistration.jsx.tt", "#{location}/#{filename}")
       end
 
       def install_server_rendering_files_if_enabled

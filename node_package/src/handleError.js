@@ -2,18 +2,18 @@ import React from 'react';
 import ReactDOMServer from 'react-dom/server';
 
 function handleGeneratorFunctionIssue(options) {
-  const { e, componentName } = options;
+  const { e, name } = options;
 
   let msg = '';
 
-  if (componentName) {
+  if (name) {
     const lastLine =
       'A generator function takes a single arg of props (and the location for react-router) ' +
       'and returns a ReactElement.';
 
     let shouldBeGeneratorError =
       `ERROR: ReactOnRails is incorrectly detecting generator function to be false. The React
-component \'${componentName}\' seems to be a generator function.\n${lastLine}`;
+component \'${name}\' seems to be a generator function.\n${lastLine}`;
     const reMatchShouldBeGeneratorError = /Can't add property context, object is not extensible/;
     if (reMatchShouldBeGeneratorError.test(e.message)) {
       msg += shouldBeGeneratorError + '\n\n';
@@ -22,7 +22,7 @@ component \'${componentName}\' seems to be a generator function.\n${lastLine}`;
 
     shouldBeGeneratorError =
       `ERROR: ReactOnRails is incorrectly detecting generatorFunction to be true, but the React
-component \'${componentName}\' is not a generator function.\n${lastLine}`;
+component \'${name}\' is not a generator function.\n${lastLine}`;
 
     const reMatchShouldNotBeGeneratorError = /Cannot call a class as a function/;
 

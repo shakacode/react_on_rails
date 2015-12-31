@@ -6,7 +6,7 @@ import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 
 export default function serverRenderReactComponent(options) {
-  const { componentName, domNodeId, trace } = options;
+  const { name, domNodeId, trace } = options;
 
   let htmlResult = '';
   let hasErrors = false;
@@ -25,7 +25,7 @@ export default function serverRenderReactComponent(options) {
         if (trace) {
           const redirectLocation = reactElementOrRouterResult.redirectLocation;
           const redirectPath = redirectLocation.pathname + redirectLocation.search;
-          console.log('ROUTER REDIRECT: ' + componentName + ' to dom node with id: ' + domNodeId +
+          console.log('ROUTER REDIRECT: ' + name + ' to dom node with id: ' + domNodeId +
             ', redirect to ' + redirectPath);
         }
       }
@@ -36,7 +36,7 @@ export default function serverRenderReactComponent(options) {
     hasErrors = true;
     htmlResult = handleError({
       e,
-      componentName,
+      name,
       serverSide: true,
     });
   }

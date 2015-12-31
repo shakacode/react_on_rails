@@ -5,13 +5,11 @@ import serverRenderReactComponent from './serverRenderReactComponent';
 import buildConsoleReplay from './buildConsoleReplay';
 import createReactElement from './createReactElement';
 import ReactDOM from 'react-dom';
+import context from './context';
 
-const context =
-  ((typeof window !== 'undefined') && window) ||
-  ((typeof global !== 'undefined') && global) ||
-  this;
+const ctx = context();
 
-context.ReactOnRails = {
+ctx.ReactOnRails = {
   /**
    * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
    * find you components for rendering.
@@ -67,8 +65,16 @@ context.ReactOnRails = {
   buildConsoleReplay() {
     return buildConsoleReplay();
   },
+
+  /**
+   * Get an Object containing all registered components. Useful for debugging.
+   * @returns {*}
+   */
+  registeredComponents() {
+    return ComponentStore.components();
+  },
 };
 
-clientStartup(context);
+clientStartup(ctx);
 
-export default context.ReactOnRails;
+export default ctx.ReactOnRails;

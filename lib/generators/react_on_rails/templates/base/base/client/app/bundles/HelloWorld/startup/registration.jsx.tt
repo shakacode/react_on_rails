@@ -1,6 +1,0 @@
-import ReactOnRails from 'react-on-rails';
-<%- component_name = options.server_rendering? ? "HelloWorldAppClient" : "HelloWorldApp" -%>
-import <%= component_name %> from './<%= component_name %>';
-
-// This is how react_on_rails can see the HelloWorldApp in the browser.
-ReactOnRails.register({ <%= component_name %> });

@@ -5,7 +5,7 @@ import ReactOnRails from './ReactOnRails';
  * Logic to either call the generatorFunction or call React.createElement to get the
  * React.Component
  * @param options
- * @param options.componentName
+ * @param options.name
  * @param options.props
  * @param options.domNodeId
  * @param options.trace
@@ -13,17 +13,17 @@ import ReactOnRails from './ReactOnRails';
  * @returns {Element}
  */
 export default function createReactElement({
-  componentName,
+  name,
   props,
   domNodeId,
   trace,
   location,
   }) {
   if (trace) {
-    console.log('RENDERED ' + componentName + ' to dom node with id: ' + domNodeId);
+    console.log('RENDERED ' + name + ' to dom node with id: ' + domNodeId);
   }
 
-  const componentObj = ReactOnRails.getComponent(componentName);
+  const componentObj = ReactOnRails.getComponent(name);
 
   // CONSIDER NOT RELEASING THE OPTION version
   const { component, generatorFunction } = componentObj;

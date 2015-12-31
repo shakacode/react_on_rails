@@ -107,7 +107,7 @@ module ReactOnRailsHelper
         return #{js_expression};
       })();
   } catch(e) {
-    htmlResult = ReactOnRails.handleError({e: e, componentName: null,
+    htmlResult = ReactOnRails.handleError({e: e, name: null,
       jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
     hasErrors = true;
   }
@@ -163,7 +163,7 @@ module ReactOnRailsHelper
 (function() {
   var props = #{props_string};
   return ReactOnRails.serverRenderReactComponent({
-    componentName: '#{react_component_name}',
+    name: '#{react_component_name}',
     domNodeId: '#{dom_id}',
     props: props,
     trace: #{trace(options)},

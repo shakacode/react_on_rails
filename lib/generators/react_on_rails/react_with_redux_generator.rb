@@ -37,13 +37,12 @@ module ReactOnRails
       def copy_server_rendering_redux_files
         return unless options.server_rendering?
         base_path = "redux/server_rendering/"
-        %w(client/app/bundles/HelloWorld/startup/HelloWorldAppServer.jsx).each do |file|
-          copy_file(base_path + file, file)
-        end
+        file = "client/app/bundles/HelloWorld/startup/HelloWorldAppServer.jsx"
+        copy_file(base_path + file, file)
       end
 
       def template_appropriate_version_of_hello_world_app_client
-        filename = options.server_rendering? ? "HelloWorldAppClient.jsx" : "HelloWorldApp.jsx"
+        filename = "HelloWorldAppClient.jsx"
         location = "client/app/bundles/HelloWorld/startup"
         template("redux/base/#{location}/HelloWorldAppClient.jsx.tt", "#{location}/#{filename}")
       end
