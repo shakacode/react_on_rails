@@ -3,7 +3,7 @@ require File.expand_path("../../support/generator_spec_helper", __FILE__)
 describe DevTestsGenerator, type: :generator do
   destination File.expand_path("../../dummy-for-generators/", __FILE__)
 
-  before(:all) { run_generator_test_with_args(%w()) }
+  before(:all) { run_generator_test_with_args(%w(), package_json: true) }
 
   it "copies rspec files" do
     %w(spec/spec_helper.rb
@@ -22,6 +22,13 @@ describe DevTestsGenerator, type: :generator do
       assert_match("gem 'capybara', group: :test", contents)
       assert_match("gem 'selenium-webdriver', group: :test", contents)
       assert_match("gem 'coveralls', require: false", contents)
+    end
+  end
+
+  it "changes package.json to use local react-on-rails version of module" do
+    assert_file("client/package.json") do |contents|
+      assert_match('"react-on-rails": "../../.."', contents)
+      refute_match('"react-on-rails": "ReactOnRails::VERSION"', contents)
     end
   end
 end
