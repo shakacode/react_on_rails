@@ -50,9 +50,9 @@
     "jquery-ujs": "^1.1.0-1",
     "loader-utils": "^0.2.11",
     <%- if options.redux? -%>
-    "lodash": "^3.10.1",
     "mirror-creator": "0.0.1",
     <%- end -%>
+    "lodash": "^3.10.1",
     "react": "^0.14.0",
     <%- unless options.skip_bootstrap? -%>
     "react-bootstrap": "^0.28.1",
