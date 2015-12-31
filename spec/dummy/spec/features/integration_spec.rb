@@ -60,9 +60,10 @@ end
 
 feature "Pages/client_side_log_throw", js: true do
   subject { page }
-  background { visit "/client_side_log_throw" }
-
-  scenario { is_expected.to have_text "This example demonstrates client side logging and error handling." }
+  scenario "page has client side throw messages", js: true do
+    expect { visit "/client_side_log_throw" }.to raise_error(Capybara::Poltergeist::JavascriptError)
+    expect(page).to have_text "This example demonstrates client side logging and error handling."
+  end
 end
 
 feature "Pages/Pure Component", js: true do
@@ -74,9 +75,8 @@ end
 
 feature "Pages/server_side_log_throw", js: true do
   subject { page }
-  background { visit "/server_side_log_throw" }
-
   scenario "page has server side throw messages" do
+    expect { visit "/server_side_log_throw" }.to raise_error(Capybara::Poltergeist::JavascriptError)
     expect(subject).to have_text "This example demonstrates server side logging and error handling."
     expect(subject).to have_text "Exception in rendering!\n\nMessage: throw in HelloWorldContainer"
   end

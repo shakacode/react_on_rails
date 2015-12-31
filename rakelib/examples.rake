@@ -71,7 +71,7 @@ namespace :examples do
 
     # PREPARE
     desc "Prepares #{example_type.name_pretty} (generates example, `npm install`s, and generates webpack bundles)"
-    multitask example_type.prepare_task_name_short => example_type.prepared_files
+    task example_type.prepare_task_name_short => example_type.prepared_files
   end
 
   desc "Cleans all example apps"
@@ -83,14 +83,14 @@ namespace :examples do
   end
 
   desc "Generates all example apps"
-  multitask gen_all: ExampleType.all.map(&:gen_task_name)
+  task gen_all: ExampleType.all.map(&:gen_task_name)
 
   desc "Prepares all example apps"
-  multitask prepare_all: ExampleType.all.map(&:prepare_task_name)
+  task prepare_all: ExampleType.all.map(&:prepare_task_name)
 end
 
 desc "Prepares all example apps. Run `rake -D examples` to see all available options"
-multitask examples: ["examples:prepare_all"]
+task examples: ["examples:prepare_all"]
 
 private
 
