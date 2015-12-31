@@ -31,6 +31,11 @@ def run_generator_test_with_args(args, options = {})
     app_css_data = " *= require_tree .\n *= require_self\n"
     simulate_existing_file(app_css, app_css_data)
   end
+  if options.fetch(:package_json, false)
+    package_json = "client/package.json"
+    package_json_data = '"react-on-rails": "ReactOnRails::VERSION"'
+    simulate_existing_file(package_json, package_json_data)
+  end
   run_generator(args)
 end
 
