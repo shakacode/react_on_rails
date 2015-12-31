@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# COMMENTING OUT UNTIL BREAKING FIX IS HANDLED
+echo "RUN MANUALLY"
+echo "$(npm bin)/jscs -x . && (cd spec/dummy/client && $(npm bin)/jscs -x .)"
+
+# $(npm bin)/jscs -x . && (cd spec/dummy/client && $(npm bin)/jscs -x .)

@@ -11,7 +11,7 @@ namespace :dummy_apps do
                                      "$(npm bin)/webpack --config webpack.client.js"])
   end
 
-  task dummy_apps: [:dummy_app] do
+  task dummy_apps: [:dummy_app, :node_package] do
     puts "Prepared all Dummy Apps"
   end
 end

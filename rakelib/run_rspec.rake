@@ -12,7 +12,6 @@ namespace :run_rspec do
     run_tests_in("", rspec_args: "spec/react_on_rails")
   end
 
-  desc "Run RSpec for spec/dummy only"
   task dummy: ["dummy_apps:dummy_app"] do
     run_tests_in("spec/dummy", env_vars: "DRIVER=selenium_firefox")
   end

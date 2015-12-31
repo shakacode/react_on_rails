@@ -45,12 +45,14 @@
     "prepublish": "npm run build",
     "build": "node_package/scripts/build",
     "lint": "node_package/scripts/lint && cd spec/dummy/client && npm run lint",
+    "lint:fix": "node_package/scripts/lint-fix",
     "check": "npm run lint && npm run test",
     "prerelease": "npm run check && npm run clean && npm run build",
     "release:patch": "node_package/scripts/release patch",
     "release:minor": "node_package/scripts/release minor",
     "release:major": "node_package/scripts/release major",
-    "dummy:install": "cd spec/dummy && npm i",
+    "dummy:install": "rake dummy_apps",
+    "dummy:spec": "rake run_rspec:dummy",
     "local": "echo 'Be sure to run npm run dummy:install' && npm run build && cd spec/dummy && foreman start"
   },
   "repository": {
