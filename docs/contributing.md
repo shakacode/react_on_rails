@@ -1,4 +1,5 @@
 # Tips for Contributors
+*See [Releasing](../releasing.md) for instructions on releasing.*
 
 # IDE/IDE SETUP
 It's critical to configure your IDE/editor to ignore certain directories. Otherwise your IDE might slow to a crawl!
@@ -12,6 +13,32 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 * /spec/dummy/node_modules
 * /spec/dummy/tmp
 * /spec/react_on_rails/dummy-for-generators
+
+# Configuring your test app to use your local fork
+
+## Ruby Gem
+If you want to test the gem with an application before you release a new version of the gem, you can specify the path to your local version via your test app's Gemfile:
+
+```ruby
+gem "react_on_rails", path: "../path-to-react-on-rails"
+```
+
+Note that you will need to bundle install after making this change, but also that **you will need to restart your Rails application if you make any changes to the gem**.
+
+## NPM for react-on-rails
+First, be **sure** to build the NPM package
+
+    npm i
+    npm run build
+
+Use either npm-link (described below), or use a relative path in your `package.json`, like this:
+
+```js
+"react-on-rails": "../path-to-react-on-rails".
+```
+
+If you use a relative path, be sure to run `npm i` whenever you rebuild the node package.
+
 
 # Development Setup for Gem and Node Package Contributors
 
@@ -128,5 +155,3 @@ Docker CI and Tests containers have a xvfd server automatically started for head
 Run `docker-compose build ci` to build the CI container. Run `docker-compose run ci` to start all rspec tests and linting. `docker-compose run --entrypoint=/bin/bash` will override the default CI action and place you inside the CI container in a bash session. This is what is run on Travis-CI.
 
 Run `docker-compose build tests` to build the tests container. Run `docker-compose run tests` to start all rspec tests.
-
-# NPM Releasing
