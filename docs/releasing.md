@@ -9,6 +9,8 @@ See [Contributing](../contributing.md)
 Install https://github.com/svenfuchs/gem-release
 
 ```bash
+# Having the examples prevents publishing
+rm -rf examples
 gem bump
 # Or manually update the version number
 cd spec/dummy
