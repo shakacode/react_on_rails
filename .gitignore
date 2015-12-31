@@ -26,4 +26,3 @@ examples
 
 npm-debug.*
 spec/dummy/client/npm-debug.log.*
-spec/dummy/client/npm-debug.log.*
