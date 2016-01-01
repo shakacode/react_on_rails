@@ -71,18 +71,19 @@ shared_examples "base_generator:base" do |options|
   it "copies react files" do
     %w(app/controllers/hello_world_controller.rb
        app/views/hello_world/index.html.erb
-       config/initializers/react_on_rails.rb
+       client/REACT_ON_RAILS_CLIENT_README.md
+       client/app/bundles/HelloWorld/startup/clientRegistration.jsx
        client/webpack.client.hot.config.js
        client/webpack.client.rails.config.js
        client/.babelrc
        client/index.jade
        client/package.json
        client/server.js
+       config/initializers/react_on_rails.rb
        lib/tasks/assets.rake
        package.json
        Procfile.dev
-       REACT_ON_RAILS.md
-       client/REACT_ON_RAILS_CLIENT_README.md).each { |file| assert_file(file) }
+       REACT_ON_RAILS.md).each { |file| assert_file(file) }
   end
 
   it "appends path configurations to assets.rb" do
@@ -119,13 +120,6 @@ shared_examples "base_generator:no_server_rendering" do
     end
   end
 
-  it "templates client-side-rendering version of registration" do
-    assert_file("client/app/bundles/HelloWorld/startup/clientRegistration.jsx") do |contents|
-      assert_match("HelloWorldApp", contents)
-      assert_match("HelloWorldAppClient", contents)
-    end
-  end
-
   it "templates client-side-rendering version of webpack.client.base.js" do
     assert_file("client/webpack.client.base.config.js") do |contents|
       assert_match("clientRegistration", contents)
@@ -137,15 +131,14 @@ shared_examples "base_generator:no_server_rendering" do
       refute_match("gem 'therubyracer', platforms: :ruby", contents)
     end
   end
+
+  it "doesn't copy server-side-rendering-only files" do
+    %w(client/webpack.server.rails.config.js
+       client/app/bundles/HelloWorld/startup/serverRegistration.jsx).each { |file| assert_no_file(file) }
+  end
 end
 
 shared_examples "base_generator:server_rendering" do
-  it "templates server-side-rendering version of registration" do
-    assert_file("client/app/bundles/HelloWorld/startup/clientRegistration.jsx") do |contents|
-      assert_match("HelloWorldAppClient", contents)
-    end
-  end
-
   it "copies server-side-rendering version of assets.rake" do
     assert_file("lib/tasks/assets.rake") do |contents|
       assert_match(/sh "cd client && npm run build:server"/, contents)
@@ -155,12 +148,6 @@ shared_examples "base_generator:server_rendering" do
   it "copies server-rendering-only files" do
     %w(client/webpack.server.rails.config.js
        client/app/bundles/HelloWorld/startup/serverRegistration.jsx).each { |file| assert_file(file) }
-  end
-
-  it "copies server-side-rendering version of clientRegistration" do
-    assert_file("client/webpack.client.base.config.js") do |contents|
-      assert_match("startup/clientRegistration", contents)
-    end
   end
 
   it "templates client-side-rendering version of webpack.client.base.js" do

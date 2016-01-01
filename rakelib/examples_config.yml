@@ -7,7 +7,7 @@ example_type_data:
     generator_options: --server-rendering
   -
     name: redux
-    generator_options: --redux --server-rendering
+    generator_options: --redux
   -
     name: redux-server-rendering
     generator_options: --redux --server-rendering

@@ -12,13 +12,14 @@ shared_examples "react_with_redux_generator:base" do
        client/app/bundles/HelloWorld/reducers/helloWorldReducer.jsx
        client/app/bundles/HelloWorld/reducers/index.jsx
        client/app/bundles/HelloWorld/store/helloWorldStore.jsx
-       client/app/lib/middlewares/loggerMiddleware.js).each { |file| assert_file(file) }
+       client/app/lib/middlewares/loggerMiddleware.js
+       client/app/bundles/HelloWorld/startup/HelloWorldAppClient.jsx).each { |file| assert_file(file) }
   end
 end
 
 shared_examples "react_with_redux_generator:no_server_rendering" do
-  it "templates the client-side-rendering version of HelloWorldAppClient" do
-    assert_file("client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx")
+  it "does not template the server-side rendering files" do
+    assert_no_file "client/app/bundles/HelloWorld/startup/HelloWorldAppServer.jsx"
   end
 end
 
@@ -26,12 +27,6 @@ shared_examples "react_with_redux_generator:server_rendering" do
   it "copies redux version of helloWorldAppServer.jsx" do
     assert_file("client/app/bundles/HelloWorld/startup/HelloWorldAppServer.jsx") do |contents|
       assert_match(/import { Provider } from 'react-redux';/, contents)
-    end
-  end
-
-  it "templates the server-side-rendering version of HelloWorldAppClient" do
-    assert_file("client/app/bundles/HelloWorld/startup/HelloWorldAppClient.jsx") do |contents|
-      assert_match("HelloWorld", contents)
     end
   end
 end
