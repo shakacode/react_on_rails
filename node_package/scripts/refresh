@@ -3,12 +3,19 @@
 
 npm run clean
 npm run build
-# root_path="../../$(dirname "${BASH_SOURCE}")"x
+
+# Ensure the paths will work no matter where we run the script from
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 root_path=${DIR}/../..
-# echo $root_path
+
+# Set up link
 (cd $root_path && npm link)
+
+# Link the example apps to use react_on_rails node_package
 for type in $( ls ${root_path}/examples ); do
   d=examples/${type}/client
   (cd $d && npm link react-on-rails)
 done
+
+# Link the spec/dummy app to use react_on_rails node_package
+(cd $root_path/spec/dummy/client && npm link react-on-rails)
