@@ -33,6 +33,7 @@ module ReactOnRails
         gem("capybara", group: :test)
         gem("selenium-webdriver", group: :test)
         gem("coveralls", require: false)
+        gem("poltergeist")
       end
     end
   end
