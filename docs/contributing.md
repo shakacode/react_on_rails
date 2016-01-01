@@ -52,18 +52,16 @@ If you use a relative path, be sure to run `npm i` whenever you rebuild the node
 ### Prereqs
 After checking out the repo, making sure you have rvm and nvm setup (setup ruby and node), cd to `spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
-### Npm link
+### NPM link
+Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the app's root directory and run:
 
-By the following steps, the node package code of react-on-rails is directly coming from `node_package/lib`
-
-```sh
-cd <top level>
-npm link
-cd spec/dummy/client
-npm link react-on-rails
+```
+npm run refresh
 ```
 
-*Side note: It's critical to use the alias section of the webpack config to avoid the double inclusion error:*
+From now on, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:prepare_all` rake task.
+
+*Side note: It's critical to use the alias section of the webpack config to avoid a double inclusion error. This has already been done for you in the example and dummy apps, but for reference:*
 
 ```js
   resolve: {
@@ -73,7 +71,7 @@ npm link react-on-rails
   },
 ```
 
-### Install npm dependencies and build the npm package for react-on-rails 
+### Install NPM dependencies and build the NPM package for react-on-rails
 
 ```sh
 cd <top level>
@@ -83,7 +81,7 @@ cd spec/dummy
 npm i
 ```
 
-### Run npm JS tests
+### Run NPM JS tests
 
 ```sh
 cd <top level>
@@ -96,7 +94,7 @@ npm test
 cd spec/dummy
 npm run test
 ```
- 
+
 ### Run most tests and linting
 
 ```
@@ -147,11 +145,11 @@ Run `rake -D docker` to see all docker linting commands for rake. `rake docker:l
 
 You can run specific linting for directories or files by using `docker-compose run lint rubocop (file path or directory)`, etc.
 
-`docker-compose run lint bash` sets you up to run from the container command line. 
+`docker-compose run lint bash` sets you up to run from the container command line.
 
 ### Docker CI - Test and Linting
 Docker CI and Tests containers have a xvfd server automatically started for headless browser testing with selenium and Firefox.
 
 Run `docker-compose build ci` to build the CI container. Run `docker-compose run ci` to start all rspec tests and linting. `docker-compose run --entrypoint=/bin/bash` will override the default CI action and place you inside the CI container in a bash session. This is what is run on Travis-CI.
 
-Run `docker-compose build tests` to build the tests container. Run `docker-compose run tests` to start all rspec tests.
+Run `docker-compose build tests` to build the tests container. Run `docker-compose run tests` to start all RSpec tests.
