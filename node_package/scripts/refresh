@@ -3,8 +3,12 @@
 
 npm run clean
 npm run build
-
-for type in $( ls examples ); do
+# root_path="../../$(dirname "${BASH_SOURCE}")"x
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+root_path=${DIR}/../..
+# echo $root_path
+(cd $root_path && npm link)
+for type in $( ls ${root_path}/examples ); do
   d=examples/${type}/client
-  rm -rf ${d}/node_modules/react-on-rails && (cd $d && npm i react-on-rails)
+  (cd $d && npm link react-on-rails)
 done

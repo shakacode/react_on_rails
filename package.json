@@ -42,6 +42,7 @@
   "scripts": {
     "test": "node_package/scripts/test",
     "clean": "node_package/scripts/clean",
+    "refresh": "node_package/scripts/refresh",
     "prepublish": "npm run build",
     "build": "node_package/scripts/build",
     "lint": "node_package/scripts/lint && cd spec/dummy/client && npm run lint",
