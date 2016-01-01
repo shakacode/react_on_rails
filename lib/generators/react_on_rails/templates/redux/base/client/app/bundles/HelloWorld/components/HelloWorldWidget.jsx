@@ -11,9 +11,11 @@ export default class HelloWorldWidget extends React.Component {
     // We prefix all property and variable names pointing to Immutable.js objects with '$$'.
     // This allows us to immediately know we don't call $$helloWorldStore['someProperty'], but instead use
     // the Immutable.js `get` API for Immutable.Map
-    actions: PropTypes.object.isRequired,
+    actions: PropTypes.shape({
+      updateName: PropTypes.func.isRequired,
+    }).isRequired,
     $$helloWorldStore: PropTypes.instanceOf(Immutable.Map).isRequired,
-  }
+  };
 
   constructor(props, context) {
     super(props, context);

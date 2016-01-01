@@ -18,7 +18,7 @@ class HelloWorld extends React.Component {
 
     // This corresponds to the value used in function select above.
     $$helloWorldStore: PropTypes.instanceOf(Immutable.Map).isRequired,
-  }
+  };
 
   constructor(props, context) {
     super(props, context);
@@ -32,7 +32,7 @@ class HelloWorld extends React.Component {
     // This is equivalent to:
     // <HelloWorldWidget $$helloWorldStore={$$helloWorldStore} actions={actions} />
     return (
-      <HelloWorldWidget {...{$$helloWorldStore, actions}} />
+      <HelloWorldWidget {...{ $$helloWorldStore, actions }} />
     );
   }
 }
