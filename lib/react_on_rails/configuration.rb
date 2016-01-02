@@ -1,17 +1,12 @@
+require_relative "version_checker"
+
 module ReactOnRails
   def self.configure
     yield(configuration)
   end
 
-  # TODO: ROB
-  # parse the client/package.json and ensure that either:
-  # 1. version number matches
-  # 2. version number is a relative path (for testing)
-  # Throw error if not.
-  # Allow skipping this check in the configuration in case somebody has a wacky configuration, such
-  # as you don't know where their package.json
-
   def self.configuration
+    VersionChecker.warn_if_gem_and_node_package_versions_differ
     @configuration ||= Configuration.new(
       server_bundle_js_file: "app/assets/javascripts/generated/server.js",
       prerender: false,
@@ -22,7 +17,6 @@ module ReactOnRails
       development_mode: Rails.env.development?,
       server_renderer_pool_size: 1,
       server_renderer_timeout: 20)
-    # TODO: ROB do the version check
   end
 
   class Configuration
