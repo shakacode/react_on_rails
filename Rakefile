@@ -5,6 +5,6 @@ desc "Run all tests and linting"
 task default: ["run_rspec", "docker:lint"]
 
 desc "Has all examples and dummy apps use local node_package folder for react-on-rails node dependency"
-task :refresh_node_package do
-  sh_in_dir(gem_root, "npm run refresh")
+task :symlink_node_package do
+  sh_in_dir(gem_root, "npm run symlink_node_package")
 end

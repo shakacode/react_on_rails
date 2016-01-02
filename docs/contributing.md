@@ -63,7 +63,7 @@ npm install -g poltergeist
 Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the app's root directory and run:
 
 ```sh
-npm run refresh
+npm run symlink_node_package
 ```
 
 From now on, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:prepare_all` rake task.
