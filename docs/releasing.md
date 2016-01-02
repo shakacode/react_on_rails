@@ -27,3 +27,18 @@ gem release
 Be sure to keep the version number the same as the ruby gem!
 
 Use the npm package `release-it`
+
+### Commands Used for Pushing Beta
+
+Note the npm beta version has a dash and the gem version has a dot.
+
+```
+gem bump -v 2.0.0.beta.3
+gem tag
+cd spec/dummy && bundle
+ga Gemfile.lock
+gc -m "Update Gemfile.lock for spec/dummy"
+...
+gem release
+release-it 2.0.0-beta.3
+```
