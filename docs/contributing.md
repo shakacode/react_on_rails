@@ -28,8 +28,10 @@ Note that you will need to bundle install after making this change, but also tha
 ## NPM for react-on-rails
 First, be **sure** to build the NPM package
 
-    npm i
-    npm run build
+```sh
+npm i
+npm run build
+```
 
 Use either npm-link (described below), or use a relative path in your `package.json`, like this:
 
@@ -38,7 +40,6 @@ Use either npm-link (described below), or use a relative path in your `package.j
 ```
 
 If you use a relative path, be sure to run `npm i` whenever you rebuild the node package.
-
 
 # Development Setup for Gem and Node Package Contributors
 
@@ -52,10 +53,16 @@ If you use a relative path, be sure to run `npm i` whenever you rebuild the node
 ### Prereqs
 After checking out the repo, making sure you have rvm and nvm setup (setup ruby and node), cd to `spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
+Additionally, our RSpec tests use the poltergeist web driver. You will need to install the poltergeist node module:
+
+```sh
+npm install -g poltergeist
+```
+
 ### NPM link
 Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the app's root directory and run:
 
-```
+```sh
 npm run refresh
 ```
 
@@ -97,11 +104,10 @@ npm run test
 
 ### Run most tests and linting
 
-```
+```sh
 cd <top level>
 node_package/scripts/ci
 ```
-
 
 ### Starting the Dummy App
 To run the test app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the webpack configs, then you need to restart foreman. If you change the JS code for react-on-rails, you need to run `node_package/scripts/build`. Since the react-on-rails package should be sym linked, you don't have to `npm i react-on-rails` after every change.
@@ -116,14 +122,14 @@ After running a test, you can view the coverage results SimpleCov reports by ope
 ### Debugging
 Start the sample app like this for some debug printing:
 
-```bash
+```sh
 TRACE_REACT_ON_RAILS=true && foreman start
 ```
 
 ### Install Generator
 In your Rails app add this gem with a path to your fork.
 
-```
+```ruby
 gem 'react_on_rails', path: '../relative/path/to/react_on_rails'
 ```
 
