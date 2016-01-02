@@ -1,6 +1,13 @@
 # Tips for Contributors
 *See [Releasing](../releasing.md) for instructions on releasing.*
 
+* After Syncing, to prepare all examples and run all tests
+
+```
+bundle && npm i && rake examples:prepare_all && rake symlink_node_package && rake
+```
+
+
 # IDE/IDE SETUP
 It's critical to configure your IDE/editor to ignore certain directories. Otherwise your IDE might slow to a crawl!
 
