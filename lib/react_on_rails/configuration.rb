@@ -3,7 +3,7 @@ module ReactOnRails
     yield(configuration)
   end
 
-  # TODO ROB
+  # TODO: ROB
   # parse the client/package.json and ensure that either:
   # 1. version number matches
   # 2. version number is a relative path (for testing)
@@ -22,7 +22,7 @@ module ReactOnRails
       development_mode: Rails.env.development?,
       server_renderer_pool_size: 1,
       server_renderer_timeout: 20)
-    # TODO ROB: do the version check
+    # TODO: ROB do the version check
   end
 
   class Configuration

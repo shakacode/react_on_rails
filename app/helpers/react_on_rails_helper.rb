@@ -146,7 +146,6 @@ module ReactOnRailsHelper
 
   # Returns Array [0]: html, [1]: script to console log
   # NOTE, these are NOT html_safe!
-  # rubocop:disable Metrics/CyclomaticComplexity
   def server_rendered_react_component_html(options, props, react_component_name, dom_id)
     return { "html" => "", "consoleReplayScript" => "" } unless prerender(options)
 
