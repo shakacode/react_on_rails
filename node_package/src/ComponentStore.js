@@ -29,7 +29,7 @@ export default {
    * @param name
    * @returns { name, component, generatorFunction }
    */
-  getComponent(name) {
+  get(name) {
     const ctx = context();
     if (_components.has(name)) {
       return _components.get(name);
@@ -47,8 +47,9 @@ export default {
   },
 
   /**
-   * Get an Object containing all registered components. Useful for debugging.
-   * @returns {*}
+   * Get an Map containing all registered components. Useful for debugging.
+   * @returns Map where key is the component name and values are the
+   * { name, component, generatorFunction}
    */
   components() {
     return _components;

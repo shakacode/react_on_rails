@@ -40,7 +40,7 @@ ctx.ReactOnRails = {
    * @returns {name, component, generatorFunction}
    */
   getComponent(name) {
-    return ComponentStore.getComponent(name);
+    return ComponentStore.get(name);
   },
 
   /**
