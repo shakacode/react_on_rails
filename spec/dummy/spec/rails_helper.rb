@@ -60,7 +60,7 @@ RSpec.configure do |config|
   # Capybara config
   #
   # selenium_firefox webdriver only works for Travis-CI builds.
-  default_driver = :poltergeist
+  default_driver = :selenium_firefox
   supported_drivers = %w( poltergeist webkit selenium_chrome selenium_firefox)
   driver = ENV["DRIVER"].try(:to_sym) || default_driver
 
