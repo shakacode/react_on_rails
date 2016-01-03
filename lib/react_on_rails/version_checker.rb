@@ -39,7 +39,7 @@ module ReactOnRails
 
     def self.client_package_json
       return unless Rails.root.present?
-      package_json = Rails.root.join("client", "package.json")
+      Rails.root.join("client", "package.json")
     end
 
     # Basically this means "not a relative path" as we don't want warn the user
