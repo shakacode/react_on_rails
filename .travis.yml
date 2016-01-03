@@ -30,12 +30,12 @@ install:
   - npm install
   - rake dummy_apps
   - rake examples
+  - rake node_package
   - docker-compose up lint
 
 before_script:
   - "export DISPLAY=:99"
   - Xvfb :99 -ac -screen scn 1600x1200x16 &
-  - npm run symlink_node_package
 
 script:
   - rake

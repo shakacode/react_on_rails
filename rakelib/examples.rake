@@ -72,7 +72,7 @@ namespace :examples do
     # PREPARE
     desc "Prepares #{example_type.name_pretty} (generates example, `npm install`s, and generates webpack bundles)"
     multitask example_type.prepare_task_name_short => example_type.prepared_files do
-      Rake::Task[:refresh_node_package].invoke
+      Rake::Task["node_package"].invoke
     end
   end
 
