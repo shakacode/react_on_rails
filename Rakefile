@@ -2,4 +2,4 @@
 # See rakelib/
 
 desc "Run all tests and linting"
-task default: ["run_rspec", "docker:lint"]
+task default: ["run_rspec", "docker:lint", "coveralls:push"]
