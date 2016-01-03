@@ -13,10 +13,8 @@ module ReactOnRails
     # For compatibility, the gem and the node package versions should always match, unless the user
     # really knows what they're doing. So we will give a warning if they do not.
     def self.warn_if_gem_and_node_package_versions_differ
-      return unless
-        File.exist?(client_package_json) &&
-        node_package_version_is_standard_version_number? &&
-        gem_version != node_package_version
+      return unless node_package_version_is_standard_version_number? &&
+                    gem_version != node_package_version
       msg = "**WARNING** ReactOnRails: ReactOnRails gem and node package versions do not match\n" \
             "                     gem: #{gem_version}\n" \
             "            node package: #{node_package_version}\n" \
@@ -33,13 +31,14 @@ module ReactOnRails
 
     # Warning: we replace all hyphens with periods for normalization purposes
     def self.node_package_version
-      package_json = client_package_json
-      contents = File.read(package_json)
+      return unless client_package_json.present? && File.exist?(client_package_json)
+      contents = File.read(client_package_json)
       raw_version = contents.match(/"react-on-rails": "(.*)",/)[1]
       raw_version.tr("-", ".")
     end
 
     def self.client_package_json
+      return unless Rails.root.present?
       package_json = Rails.root.join("client", "package.json")
     end
 
