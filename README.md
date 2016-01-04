@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails)
 
 # NEWS
-2.0 is about to ship! Please grab the latest 
+2.0 is about to ship! Please grab the latest and let us know if you see any issues!
 
 * https://rubygems.org/gems/react_on_rails
 * https://www.npmjs.com/package/react-on-rails
