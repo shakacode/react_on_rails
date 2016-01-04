@@ -1,3 +1,3 @@
 module ReactOnRails
-  VERSION = "2.0.0.beta.3"
+  VERSION = "2.0.0.rc.1"
 end
