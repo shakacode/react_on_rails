@@ -77,22 +77,14 @@ test('generatorFunction: Generator function recognized as such', (assert) => {
     'generatorFunction should be recognized as a generatorFunction');
 });
 
-// test('generatorFunction: invalid param throws', (assert) => {
-//  assert.plan(3);
-//
-//  const foobarComponent = '<div/>';
-//
-//  assert.throws(() => generatorFunction(foobarComponent), /Error/,
-//    'generatorFunction should throw an exception for an invalid param string');
-//
-//  const foobarComponentObject = { a: 1 };
-//
-//  assert.throws(() => generatorFunction(foobarComponentObject), /Error/,
-//    'generatorFunction should throw an exception for an invalid param object');
-//
-//  const foobarComponentObjectWithProto = { a: 1 };
-//  foobarComponentObjectWithProto.prototype = { x: 2 };
-//
-//  assert.throws(() => generatorFunction(foobarComponentObjectWithProto), /Error/,
-//    'generatorFunction should throw an exception for an invalid param object');
-// });
+test('generatorFunction: simple object returns false', (assert) => {
+  assert.plan(1);
+
+  const foobarComponent = {
+    hello() {
+      return 'world';
+    },
+  };
+  assert.equal(generatorFunction(foobarComponent), false,
+    'Plain object is not a generator function.');
+});
