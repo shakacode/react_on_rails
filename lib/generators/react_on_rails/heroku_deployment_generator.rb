@@ -5,7 +5,7 @@ include GeneratorHelper
 module ReactOnRails
   module Generators
     class HerokuDeploymentGenerator < Rails::Generators::Base
-      hide!
+      Rails::Generators.hide_namespace self.namespace
       source_root(File.expand_path("../templates", __FILE__))
 
       def copy_heroku_deployment_files
