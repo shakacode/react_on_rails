@@ -90,9 +90,18 @@ From now on, the example and dummy apps will use your local node_package folder 
 ```sh
 cd <top level>
 npm i
-npm run build
-cd spec/dummy
-npm i
+npm build
+```
+
+Or run this which builds the npm package, then the webpack files for spec/dummy, and runs tests in
+spec/dummy.
+
+
+```sh
+# Optionally change default selenium_firefox driver
+export DRIVER=poltergeist
+cd <top level>
+npm dummy:spec
 ```
 
 ### Run NPM JS tests

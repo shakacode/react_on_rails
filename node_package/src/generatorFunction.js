@@ -1,32 +1,13 @@
-import React from 'react';
+// See discussion: https://discuss.reactjs.org/t/how-to-determine-if-js-object-is-react-component/2825/2
 
-function allObjectKeys(obj) {
-  const result = [];
-  /* eslint-disable guard-for-in */
-  for (const prop in obj) {
-    result.push(prop);
-  }
-
-  return result;
-}
-
-function arrIncludes(arr, value) {
-  return (arr.indexOf(value) > -1);
-}
-
+/**
+ * Used to determine we'll call be calling React.createElement on the component of if this is a
+ * generator function used return a function that takes props to return a React element
+ * @param component
+ * @returns {boolean}
+ */
 export default function generatorFunction(component) {
-  const prototypeKeys = allObjectKeys(component.prototype);
-  const keys = allObjectKeys(component);
-
-  // es5 React Component
-  if (arrIncludes(prototypeKeys, 'constructor') && arrIncludes(prototypeKeys, 'render')) {
-    return false;
-  } else if (arrIncludes(prototypeKeys, 'isReactComponent')  // es6 React Component
-    || arrIncludes(keys, 'propTypes')
-    || component.prototype instanceof React.Component) {
-    return false;
-  }
-
-  // Else, we assume a generator function!
-  return true;
+  // es5 or es6 React Component
+  const es5OrEs6ReactComponent = component.prototype.isReactComponent;
+  return !es5OrEs6ReactComponent;
 }
