@@ -5,7 +5,7 @@ include GeneratorHelper
 module ReactOnRails
   module Generators
     class ReactNoReduxGenerator < Rails::Generators::Base
-      Rails::Generators.hide_namespace self.namespace
+      Rails::Generators.hide_namespace(self.namespace)
       source_root(File.expand_path("../templates", __FILE__))
 
       # --server-rendering
