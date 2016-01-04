@@ -46,7 +46,7 @@ See the next section for a sample webpack.server.rails.config.js.
   entry: ['./app/startup/serverGlobals'],
   ```
 3. Ensure the name of your ouput file (shown [here](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/webpack.server.rails.config.js#L9)) of your server bundle corresponds to the configuration of the gem. The default path is `app/assets/javascripts/generated`. See below for customization of configuration variables.
-4. Expose `React` in your webpack config, like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.config.js#L23)
+4. Expose `React` in your webpack config, like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.build.config.js#L54-L55)
 
 ```javascript
 { test: require.resolve('react'), loader: 'expose?React' },
@@ -54,9 +54,8 @@ See the next section for a sample webpack.server.rails.config.js.
 // For React 0.14
 { test: require.resolve('react-dom/server'), loader: 'expose?ReactDOMServer' }, // not in client one, only server
 ```
-
-### Sample webpack.server.rails.config.js (ONLY for server rendering)
-Be sure to check out the latest example version of [client/webpack.server.rails.config.js](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.config.js).
+### Sample webpack.server.rails.build.config.js (ONLY for server rendering)
+Be sure to check out the latest example version of [client/webpack.server.rails.build.config.js](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.build.config.js).
 
 ```javascript
 // Common webpack configuration for server bundle
