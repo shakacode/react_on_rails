@@ -1,9 +1,15 @@
+# Not currently using ruby-lint
+---
 presenter: syntastic
 
+# Be sure to edit this per your project!
 directories:
   - app
   - config
+  - lib
+  <%- if dest_dir_exists?("spec") -%>
   - spec
+  <%- end -%>
 
 ignore_paths:
   - client

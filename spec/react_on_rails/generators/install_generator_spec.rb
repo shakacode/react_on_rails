@@ -190,4 +190,22 @@ describe InstallGenerator, type: :generator do
     before(:all) { run_generator_test_with_args([], assets_rb: true) }
     include_examples "base_generator:base", assets_rb: true
   end
+
+  context "without existing spec dir" do
+    before(:all) { run_generator_test_with_args(%w(--ruby-linters), spec: false) }
+    it "does not add the spec directory to the ruby-lint.yml" do
+      assert_file("ruby-lint.yml") do |contents|
+        refute_match(/- spec/, contents)
+      end
+    end
+  end
+
+  context "without existing spec dir" do
+    before(:all) { run_generator_test_with_args(%w(--ruby-linters), spec: true) }
+    it "adds the spec directory to the ruby-lint.yml" do
+      assert_file("ruby-lint.yml") do |contents|
+        assert_match(/- spec/, contents)
+      end
+    end
+  end
 end

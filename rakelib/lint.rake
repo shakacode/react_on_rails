@@ -9,7 +9,8 @@ namespace :lint do
 
   desc "Run ruby-lint as shell"
   task :ruby do
-    sh_in_dir(gem_root, "ruby-lint app spec lib")
+    puts "See /ruby-lint.yml for what directories are included."
+    sh_in_dir(gem_root, "ruby-lint .")
   end
 
   desc "Run scss-lint as shell"

@@ -25,8 +25,8 @@ module ReactOnRails
         %w(lib/tasks/brakeman.rake
            lib/tasks/ci.rake
            .rubocop.yml
-           .scss-lint.yml
-           ruby-lint.yml).each { |file| copy_file(base_path + file, file) }
+           .scss-lint.yml).each { |file| copy_file(base_path + file, file) }
+        template("ruby_linters/ruby-lint.yml.tt", "ruby-lint.yml")
       end
     end
   end

@@ -1,4 +1,14 @@
+require "rainbow"
+
 module GeneratorHelper
+  def gen_error(msg)
+    puts Rainbow("ERROR: #{msg}").red
+  end
+
+  def gen_warning(msg)
+    puts Rainbow("WARNING: #{msg}").yellow
+  end
+
   # Takes a relative path from the destination root, such as `.gitignore` or `app/assets/javascripts/application.js`
   def dest_file_exists?(file)
     dest_file = File.join(destination_root, file)

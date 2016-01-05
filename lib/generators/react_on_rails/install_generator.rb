@@ -1,8 +1,11 @@
 require "rails/generators"
+require_relative "generator_helper"
 
 module ReactOnRails
   module Generators
     class InstallGenerator < Rails::Generators::Base
+      include GeneratorHelper
+
       # fetch USAGE file for details generator description
       source_root(File.expand_path("../", __FILE__))
 
@@ -43,12 +46,22 @@ module ReactOnRails
                    desc: "Skip integrating Bootstrap and don't initialize files and regarding configs. Default: false",
                    aliases: "-b"
 
+      # --ignore-warnings
+      class_option :ignore_warnings,
+                   type: :boolean,
+                   default: false,
+                   desc: "Skip warnings. Default: false"
+
       def run_generators
-        return unless installation_prerequisites_met?
-        warn_if_nvm_is_not_installed
-        invoke_generators
+        if installation_prerequisites_met? || options.ignore_warnings?
+          invoke_generators
+        else
+          gen_error("react_on_rails generator prerequisites not met!")
+          fail("react_on_rails generator prerequisites not met!")
+        end
       end
 
+      # Everything here is not run automatically b/c it's private
       private
 
       def invoke_generators # rubocop:disable Metrics/CyclomaticComplexity
@@ -70,29 +83,27 @@ module ReactOnRails
 
       def missing_npm?
         return false unless `which npm`.blank?
-        error = "** npm is required. Please install it before continuing."
+        error = "npm is required. Please install it before continuing. "
         error << "https://www.npmjs.com/"
-        puts error
+        gen_error(error)
+        true
       end
 
       def missing_node?
         return false unless `which node`.blank?
-        error = "** nodejs is required. Please install it before continuing."
+        error = "** nodejs is required. Please install it before continuing. "
         error << "https://nodejs.org/en/"
-        puts error
+        gen_error(error)
+        true
       end
 
       def uncommitted_changes?
         return false if ENV["COVERAGE"]
         status = `git status`
         return false if status.include?("nothing to commit, working directory clean")
-        error = "** You have uncommitted code. Please commit or stash your changes before continuing"
-        puts error
-      end
-
-      def warn_if_nvm_is_not_installed
-        return true unless `which nvm`.blank?
-        puts "** nvm is advised. Please consider installing it. https://github.com/creationix/nvm"
+        error = "You have uncommitted code. Please commit or stash your changes before continuing"
+        gen_error(error)
+        true
       end
     end
   end

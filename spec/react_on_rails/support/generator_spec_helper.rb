@@ -26,6 +26,9 @@ def run_generator_test_with_args(args, options = {})
     DATA
     simulate_existing_file(app_js, app_js_data)
   end
+  if options.fetch(:spec, true)
+    simulate_existing_dir("spec")
+  end
   if options.fetch(:application_css, true)
     app_css = "app/assets/stylesheets/application.css.scss"
     app_css_data = " *= require_tree .\n *= require_self\n"
@@ -36,7 +39,7 @@ def run_generator_test_with_args(args, options = {})
     package_json_data = '    "react-on-rails": "2.0.0-beta.1",'
     simulate_existing_file(package_json, package_json_data)
   end
-  run_generator(args)
+  run_generator(args + ["--ignore-warnings"])
 end
 
 def assert_server_render_procfile
