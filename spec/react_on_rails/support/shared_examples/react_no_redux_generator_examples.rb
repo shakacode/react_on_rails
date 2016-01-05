@@ -1,7 +1,6 @@
 shared_examples "no_redux_generator:base" do
   it "copies non-redux base files" do
-    %w(client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
-       client/app/bundles/HelloWorld/containers/HelloWorld.jsx).each { |file| assert_file(file) }
+    assert_file("client/app/bundles/HelloWorld/containers/HelloWorld.jsx")
   end
 
   it "does not place react folders in root" do

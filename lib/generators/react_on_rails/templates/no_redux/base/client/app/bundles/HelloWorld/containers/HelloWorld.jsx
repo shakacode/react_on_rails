@@ -14,19 +14,19 @@ export default class HelloWorld extends React.Component {
     // Uses lodash to bind all methods to the context of the object instance, otherwise
     // the methods defined here would not refer to the component's class, not the component
     // instance itself.
-    _.bindAll(this, '_updateName');
+    _.bindAll(this, 'updateName');
   }
 
-  state = {name: this.props.name} // how to set initial state in es2015 class syntax
+  state = { name: this.props.name } // how to set initial state in es2015 class syntax
 
-  _updateName(name) {
-    this.setState({name: name});
+  updateName(name) {
+    this.setState({ name });
   }
 
   render() {
     return (
       <div>
-        <HelloWorldWidget name={this.state.name} _updateName={this._updateName} />
+        <HelloWorldWidget name={this.state.name} updateName={this.updateName} />
       </div>
     );
   }

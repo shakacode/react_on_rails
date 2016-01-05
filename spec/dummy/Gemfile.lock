@@ -5,6 +5,7 @@ PATH
       connection_pool
       execjs (~> 2.5)
       rails (>= 3.2)
+      rainbow (~> 2.0)
 
 GEM
   remote: https://rubygems.org/

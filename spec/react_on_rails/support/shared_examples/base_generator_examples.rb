@@ -73,6 +73,7 @@ shared_examples "base_generator:base" do |options|
        app/views/hello_world/index.html.erb
        client/REACT_ON_RAILS_CLIENT_README.md
        client/app/bundles/HelloWorld/startup/clientRegistration.jsx
+       client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
        client/webpack.client.hot.config.js
        client/webpack.client.rails.config.js
        client/.babelrc
@@ -102,9 +103,11 @@ shared_examples "base_generator:base" do |options|
 end
 
 shared_examples "base_generator:no_server_rendering" do
-  it "copies client-side-rendering version of Procfile.dev" do
-    assert_file("Procfile.dev") do |contents|
-      refute_match(/server: sh -c 'cd client && npm run build:dev:server'/, contents)
+  it "copies client-side-rendering version of Procfile.dev and Procfile.dev-hot" do
+    %w(Procfile.dev Procfile.dev-hot).each do |file|
+      assert_file(file) do |contents|
+        refute_match(/server: sh -c 'cd client && npm run build:dev:server'/, contents)
+      end
     end
   end
 
@@ -156,9 +159,11 @@ shared_examples "base_generator:server_rendering" do
     end
   end
 
-  it "copies server-side-rendering version of Procfile.dev" do
-    assert_file("Procfile.dev") do |contents|
-      assert_match(/server: sh -c 'cd client && npm run build:dev:server'/, contents)
+  it "copies server-side-rendering version of Procfile.dev and Procfile.dev-hot" do
+    %w(Procfile.dev Procfile.dev-hot).each do |file|
+      assert_file(file) do |contents|
+        assert_match(/server: sh -c 'cd client && npm run build:dev:server'/, contents)
+      end
     end
   end
 

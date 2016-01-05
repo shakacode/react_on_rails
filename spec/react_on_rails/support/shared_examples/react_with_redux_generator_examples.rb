@@ -6,7 +6,6 @@ shared_examples "react_with_redux_generator:base" do
 
   it "copies base redux files" do
     %w(client/app/bundles/HelloWorld/actions/helloWorldActionCreators.jsx
-       client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
        client/app/bundles/HelloWorld/containers/HelloWorld.jsx
        client/app/bundles/HelloWorld/constants/helloWorldConstants.jsx
        client/app/bundles/HelloWorld/reducers/helloWorldReducer.jsx

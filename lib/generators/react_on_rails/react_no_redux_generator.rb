@@ -17,10 +17,8 @@ module ReactOnRails
 
       def copy_base_files
         base_path = "no_redux/base/"
-        %w(client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
-           client/app/bundles/HelloWorld/containers/HelloWorld.jsx).each do |file|
-             copy_file(base_path + file, file)
-           end
+        file = "client/app/bundles/HelloWorld/containers/HelloWorld.jsx"
+        copy_file(base_path + file, file)
       end
 
       def copy_server_rendering_files_if_appropriate
