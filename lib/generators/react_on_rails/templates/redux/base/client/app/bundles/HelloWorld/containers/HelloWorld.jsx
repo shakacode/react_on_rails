@@ -17,6 +17,9 @@ class HelloWorld extends React.Component {
     dispatch: PropTypes.func.isRequired,
 
     // This corresponds to the value used in function select above.
+    // We prefix all property and variable names pointing to Immutable.js objects with '$$'.
+    // This allows us to immediately know we don't call $$helloWorldStore['someProperty'], but
+    // instead use the Immutable.js `get` API for Immutable.Map
     $$helloWorldStore: PropTypes.instanceOf(Immutable.Map).isRequired,
   };
 

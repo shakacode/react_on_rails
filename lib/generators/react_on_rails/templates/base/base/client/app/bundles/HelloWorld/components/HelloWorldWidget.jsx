@@ -8,9 +8,8 @@ import { Input } from 'react-bootstrap';
 // Simple example of a React "dumb" component
 export default class HelloWorldWidget extends React.Component {
   static propTypes = {
-    // We prefix all property and variable names pointing to Immutable.js objects with '$$'.
-    // This allows us to immediately know we don't call $$helloWorldStore['someProperty'], but
-    // instead use the Immutable.js `get` API for Immutable.Map
+    // If you have lots of data or action properties, you should consider grouping them by
+    // passing two properties: "data" and "actions".
     updateName: PropTypes.func.isRequired,
     name: PropTypes.string.isRequired,
   };
