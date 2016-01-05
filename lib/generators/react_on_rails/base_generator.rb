@@ -6,7 +6,7 @@ include GeneratorHelper
 module ReactOnRails
   module Generators
     class BaseGenerator < Rails::Generators::Base # rubocop:disable Metrics/ClassLength
-      Rails::Generators.hide_namespace(self.namespace)
+      Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates", __FILE__))
 
       # --redux
