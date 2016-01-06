@@ -109,7 +109,6 @@ module ReactOnRails
         %w(app/controllers/hello_world_controller.rb
            config/initializers/react_on_rails.rb
            client/.babelrc
-           client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
            client/index.jade
            client/server.js
            client/webpack.client.base.config.js
@@ -124,6 +123,7 @@ module ReactOnRails
         %w(Procfile.dev
            Procfile.dev-hot
            app/views/hello_world/index.html.erb
+           client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
            client/webpack.client.hot.config.js
            client/package.json).each { |file| template(base_path + file + ".tt", file) }
       end

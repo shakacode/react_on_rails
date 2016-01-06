@@ -28,6 +28,7 @@
     "jscs": "^2.6.0",
     "react": "^0.14.3",
     "react-dom": "^0.14.3",
+    "react-transform-hmr": "^1.0.1",
     "tap-spec": "^4.1.1",
     "tape": "^4.4.0",
     "webpack": "^1.12.9"

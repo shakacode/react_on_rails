@@ -35,6 +35,13 @@ shared_examples "bootstrap:enabled" do
       assert_match(/"bootstrap-sass-loader"/, contents)
     end
   end
+
+  it "adds react-bootstrap to client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx" do
+    assert_file("client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx") do |contents|
+      assert_match(/'react-bootstrap'/, contents)
+      assert_match(/<Input/, contents)
+    end
+  end
 end
 
 shared_examples "bootstrap:disabled" do
@@ -65,6 +72,13 @@ shared_examples "bootstrap:disabled" do
       refute_match(/"react-bootstrap"/, contents)
       refute_match(/"bootstrap-sass"/, contents)
       refute_match(/"bootstrap-sass-loader"/, contents)
+    end
+  end
+
+  it "adds react-bootstrap to client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx" do
+    assert_file("client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx") do |contents|
+      refute_match(/'react-bootstrap'/, contents)
+      refute_match(/<Input/, contents)
     end
   end
 end

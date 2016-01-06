@@ -73,7 +73,6 @@ shared_examples "base_generator:base" do |options|
        app/views/hello_world/index.html.erb
        client/REACT_ON_RAILS_CLIENT_README.md
        client/app/bundles/HelloWorld/startup/clientRegistration.jsx
-       client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
        client/webpack.client.hot.config.js
        client/webpack.client.rails.config.js
        client/.babelrc

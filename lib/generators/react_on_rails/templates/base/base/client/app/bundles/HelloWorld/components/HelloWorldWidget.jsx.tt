@@ -3,7 +3,9 @@
 
 import React, { PropTypes } from 'react';
 import _ from 'lodash';
+<%- unless options.skip_bootstrap? -%>
 import { Input } from 'react-bootstrap';
+<%- end -%>
 
 // Simple example of a React "dumb" component
 export default class HelloWorldWidget extends React.Component {
@@ -32,12 +34,22 @@ export default class HelloWorldWidget extends React.Component {
   render() {
     const { name } = this.props;
     return (
-      <div>
+      <div className="container">
         <h3>
           Hello, {name}!
         </h3>
         <hr/>
         <form className="form-horizontal">
+            <%- if options.skip_bootstrap? -%>
+            <label>
+              Say hello to:
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={this.handleChange}
+            />
+            <%- else -%>
             <Input
               type="text"
               labelClassName="col-sm-2"
@@ -46,6 +58,7 @@ export default class HelloWorldWidget extends React.Component {
               value={name}
               onChange={this.handleChange}
             />
+            <%- end -%>
         </form>
       </div>
     );
