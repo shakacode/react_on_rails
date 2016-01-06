@@ -1,6 +1,6 @@
 {
   "name": "react_on_rails",
-  "version": "0.0.0",
+  "version": "2.0.0-rc.2",
   "description": "example of server rendering",
   "main": "server.js",
   "engines": {
@@ -10,7 +10,7 @@
     "postinstall": "cd ./client && npm install",
     "gulp": "cd ./client && npm run gulp",
     "test": "npm run build:test && npm run lint && rspec",
-    "lint":  "cd client && npm run lint",
+    "lint": "cd client && npm run lint",
     "build:test": "cd client && npm run build:test"
   },
   "repository": {
