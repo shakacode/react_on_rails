@@ -3,7 +3,7 @@ require "rails/generators"
 module ReactOnRails
   module Generators
     class RubyLintersGenerator < Rails::Generators::Base
-      hide!
+      Rails::Generators.hide_namespace(namespace)
       source_root File.expand_path("../templates", __FILE__)
 
       def add_ruby_linter_gems_to_gemfile
