@@ -190,4 +190,9 @@ describe InstallGenerator, type: :generator do
     before(:all) { run_generator_test_with_args([], assets_rb: true) }
     include_examples "base_generator:base", assets_rb: true
   end
+
+  context "with missing files to trigger errors" do
+    before(:all) { run_generator_test_with_args([], gitignore: false) }
+    include_examples "generator_errors"
+  end
 end

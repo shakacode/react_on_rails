@@ -1,6 +1,8 @@
 require "rails/generators"
 require File.expand_path("../generator_helper", __FILE__)
+require File.expand_path("../generator_errors", __FILE__)
 include GeneratorHelper
+include GeneratorErrors
 
 module ReactOnRails
   module Generators
@@ -54,7 +56,7 @@ module ReactOnRails
         if File.exist?(application_scss)
           append_to_file(application_scss, data)
         else
-          puts_setup_file_error(application_scss, data)
+          GeneratorErrors.add_error(return_setup_file_error(application_scss, data))
         end
       end
 

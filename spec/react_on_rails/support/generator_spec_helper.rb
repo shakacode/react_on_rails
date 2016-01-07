@@ -8,7 +8,7 @@ include ReactOnRails::Generators
 # Expects an array of strings, such as "--redux"
 def run_generator_test_with_args(args, options = {})
   prepare_destination # this completely wipes the `destination` directory
-  simulate_existing_file(".gitignore")
+  simulate_existing_file(".gitignore") if options.fetch(:gitignore, true)
   simulate_existing_file("Gemfile", "")
   simulate_existing_file("config/routes.rb", "Rails.application.routes.draw do\nend\n")
   simulate_existing_file("config/application.rb", "module Gentest\nclass Application < Rails::Application\nend\nend)")

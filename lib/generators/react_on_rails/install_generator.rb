@@ -1,4 +1,8 @@
 require "rails/generators"
+require File.expand_path("../generator_helper", __FILE__)
+require File.expand_path("../generator_errors", __FILE__)
+include GeneratorHelper
+include GeneratorErrors
 
 module ReactOnRails
   module Generators
@@ -44,12 +48,20 @@ module ReactOnRails
                    aliases: "-b"
 
       def run_generators # rubocop:disable Metrics/CyclomaticComplexity
-        return unless installation_prerequisites_met?
+        unless installation_prerequisites_met?
+          print_errors
+          return
+        end
         warn_if_nvm_is_not_installed
         invoke_generators
+        print_errors
       end
 
       private
+
+      def print_errors
+        GeneratorErrors.errors.each { |errors| puts errors }
+      end
 
       def invoke_generators # rubocop:disable Metrics/CyclomaticComplexity
         invoke "react_on_rails:base"
@@ -72,14 +84,14 @@ module ReactOnRails
         return false unless `which npm`.blank?
         error = "** npm is required. Please install it before continuing."
         error << "https://www.npmjs.com/"
-        puts error
+        GeneratorErrors.add_error(error)
       end
 
       def missing_node?
         return false unless `which node`.blank?
         error = "** nodejs is required. Please install it before continuing."
         error << "https://nodejs.org/en/"
-        puts error
+        GeneratorErrors.add_error(error)
       end
 
       def uncommitted_changes?
@@ -87,12 +99,12 @@ module ReactOnRails
         status = `git status`
         return false if status.include?("nothing to commit, working directory clean")
         error = "** You have uncommitted code. Please commit or stash your changes before continuing"
-        puts error
+        GeneratorErrors.add_error(error)
       end
 
       def warn_if_nvm_is_not_installed
         return true unless `which nvm`.blank?
-        puts "** nvm is advised. Please consider installing it. https://github.com/creationix/nvm"
+        GeneratorErrors.add_error("** nvm is advised. Please consider installing it. https://github.com/creationix/nvm")
       end
     end
   end
