@@ -64,8 +64,7 @@
     "redux-promise": "^0.5.0",
     "redux-thunk": "^1.0.0",
     <%- end -%>
-    "webpack": "^1.12.8",
-    "lodash":"^3.10.1"
+    "webpack": "^1.12.8"
   },
   "devDependencies": {
     <%- unless options.skip_js_linters? -%>
