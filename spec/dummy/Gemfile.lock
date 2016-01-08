@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (1.2.0)
+    react_on_rails (1.2.1)
       connection_pool
       execjs (~> 2.5)
       rails (>= 3.2)
@@ -319,4 +319,4 @@ DEPENDENCIES
   web-console (~> 2.0)
 
 BUNDLED WITH
-   1.10.6
+   1.11.2
