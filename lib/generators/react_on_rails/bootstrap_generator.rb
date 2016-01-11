@@ -53,11 +53,7 @@ module ReactOnRails
 
         application_scss = File.join(destination_root, "app/assets/stylesheets/application.scss")
 
-        if File.exist?(application_scss)
-          append_to_file(application_scss, data)
-        else
-          GeneratorErrors.add_error(return_setup_file_error(application_scss, data))
-        end
+        append_to_file(application_scss, data)
       end
 
       def strip_application_scss_of_incompatible_sprockets_statements
