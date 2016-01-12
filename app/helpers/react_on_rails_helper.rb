@@ -59,7 +59,7 @@ module ReactOnRailsHelper
       content_tag(:div,
                   "",
                   class: "js-react-on-rails-component",
-                  style: "display:none",
+                  style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
                   data: {
                     component_name: react_component_name,
                     props: props,
