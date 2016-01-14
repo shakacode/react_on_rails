@@ -5,13 +5,13 @@ All notable changes to this project will be documented in this file. Items under
 - Move JavaScript part of react_on_rails to npm package 'react-on-rails'.
 - Converted JavaScript code to ES6! with tests!
 - No global namespace pollution. ReactOnRails is the only global added.
-- New API. Instead of placing React components on the global namespace, you instead call ReactOnRails.register, passing an object where keys are the names of your components.
-  ```
-  import ReactOnRails from 'react-on-rails';
-  ReactOnRails.registerComponent({name: component});
-  ```
-  Best done with Object destructing
-  ```
+- New API. Instead of placing React components on the global namespace, you instead call ReactOnRails.register, passing an object where keys are the names of your components:
+```
+import ReactOnRails from 'react-on-rails';
+ReactOnRails.registerComponent({name: component});
+```
+Best done with Object destructing:
+```
   import ReactOnRails from 'react-on-rails';
   ReactOnRails.registerComponent(
     {
@@ -19,7 +19,7 @@ All notable changes to this project will be documented in this file. Items under
       Component2
     }
   );
-  ```
+```
   Previously, you used 
   ```
   window.Component1 = Component1;
@@ -27,13 +27,13 @@ All notable changes to this project will be documented in this file. Items under
   ```
   This would pollute the global namespace. See details in the README.md for more information.
 - Your jade template for the WebpackDevServer setup should use the new API:
-  ```
+```
   ReactOnRails.render(componentName, props, domNodeId);
-  ```
+```
   such as:
-  ```
+```
   ReactOnRails.render("HelloWorldApp", {name: "Stranger"}, 'app');
-  ```
+```
 - All npm dependency libraries updated. Most notable is going to Babel 6.
 - Dropped support for react 0.13.
 - JS Linter uses ShakaCode JavaScript style: https://github.com/shakacode/style-guide-javascript 
