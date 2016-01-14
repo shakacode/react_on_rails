@@ -1,6 +1,9 @@
 require_relative "version"
+require_relative "version_syntax_converter"
 
 module ReactOnRails
+  # Responsible for checking versions of rubygem versus npm node package
+  # against each otherat runtime.
   class VersionChecker
     attr_reader :node_package_version, :logger
 
@@ -13,10 +16,12 @@ module ReactOnRails
       @node_package_version = node_package_version
     end
 
-    # For compatibility, the gem and the node package versions should always match, unless the user
-    # really knows what they're doing. So we will give a warning if they do not.
+    # For compatibility, the gem and the node package versions should always match,
+    # unless the user really knows what they're doing. So we will give a
+    # warning if they do not.
     def warn_if_gem_and_node_package_versions_differ
-      return if node_package_version.major == gem_major_version || node_package_version.relative_path?
+      return if node_package_version.relative_path?
+      return if node_package_version.major == gem_major_version
       log_differing_versions_warning
     end
 
@@ -58,21 +63,13 @@ module ReactOnRails
         JSON.parse(package_json_contents)["dependencies"]["react-on-rails"]
       end
 
-      def normalized
-        match = raw
-                .tr("-", ".")
-                .strip
-                .match(/(\d.*)/)
-        match.present? ? match[0] : nil
-      end
-
       def relative_path?
-        normalized.nil? # must be a relative path if nil and we haven't failed
+        raw.match(/\.\./).present?
       end
 
       def major
-        return if normalized.nil?
-        normalized.match(/(\d+)\./)[1]
+        return if relative_path?
+        raw.match(/(\d+)\./)[1]
       end
 
       private

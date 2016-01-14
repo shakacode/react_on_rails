@@ -1,4 +1,4 @@
-<%- require 'react_on_rails/version' -%>
+<%- require_relative "../react_on_rails/version_syntax_converter" -%>
 {
   "name": "react-webpack-rails-tutorial",
   "version": "1.1.0",
@@ -64,7 +64,7 @@
     "react-bootstrap": "^0.28.1",
     <%- end -%>
     "react-dom": "^0.14.3",
-    "react-on-rails": "<%= x = ReactOnRails::VERSION.match(/(\d+\.\d+\.\d+)/); "#{x[1]}" %>",
+    "react-on-rails": "<%= VersionSyntaxConverter.new.rubygem_to_npm %>",
     <%- if options.redux? -%>
     "react-redux": "^4.0.5",
     "redux": "^3.0.5",
