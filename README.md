@@ -1,15 +1,12 @@
-[![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails)
+[![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails)
 
 # NEWS
-2.0 is about to ship! Please grab the latest and let us know if you see any issues!
 
-* https://rubygems.org/gems/react_on_rails
-* https://www.npmjs.com/package/react-on-rails
-* Branch: https://github.com/shakacode/react_on_rails/tree/npm-react-on-rails-js
-* PR: https://github.com/shakacode/react_on_rails/pull/148
+* 2.0 has shipped! Please grab the latest and let us know if you see any issues!
+* It does not yet have *generator* support for CSS modules and hot reloading via the Rails server per shown in the [shakacode/react-webpack-rails-tutorial]. We're always looking for contributors! Thus, the setup for webpack, foreman, and sass will be somewhat different until we get the generators caught up.
 
 # React on Rails
-React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. Currently, both React v0.14 and v0.13 are supported, with server rendering. [Redux](https://github.com/rackt/redux) and [React-Router](https://github.com/rackt/react-redux) are supported as well. See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
+React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x is supported, with server rendering. [Redux](https://github.com/rackt/redux) and [React-Router](https://github.com/rackt/react-redux) are supported as well. See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
 
 Be sure to see the [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial) along with the live example at [www.reactrails.com](http://www.reactrails.com).
 
@@ -142,6 +139,15 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
   ```
 
 5. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world)
+
+## NPM
+All JavaScript in React On Rails is loaded from npm: [react-on-rails](https://www.npmjs.com/package/react-on-rails). To manually install this (you did not use the generator), assuming you have a standard configuration, run this command:
+
+```
+cd client && npm i --saveDev react-on-rails
+```
+
+That will install the latest version and update your package.json.
 
 ## How it Works
 The generator installs your webpack files in the `client` folder. Foreman uses webpack to compile your code and output the bundled results to `app/assets/javascripts/generated`, which are then loaded by sprockets. These generated bundle files have been added to your `.gitignore` for your convenience.
