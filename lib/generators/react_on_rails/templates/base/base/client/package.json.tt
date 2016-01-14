@@ -64,7 +64,7 @@
     "react-bootstrap": "^0.28.1",
     <%- end -%>
     "react-dom": "^0.14.3",
-    "react-on-rails": "<%= x = ReactOnRails::VERSION.match(/(\d+\.\d+\.\d+)/); "#{x[1]}-#{x[2]}" %>",
+    "react-on-rails": "<%= x = ReactOnRails::VERSION.match(/(\d+\.\d+\.\d+)/); "#{x[1]}" %>",
     <%- if options.redux? -%>
     "react-redux": "^4.0.5",
     "redux": "^3.0.5",
