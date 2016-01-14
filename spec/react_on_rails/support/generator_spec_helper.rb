@@ -5,16 +5,22 @@ generators_glob = File.expand_path("../../../../lib/generators/react_on_rails/*_
 Dir[generators_glob.to_s].each { |file| require file }
 include ReactOnRails::Generators
 
-# Expects an array of strings, such as "--redux"
-def run_generator_test_with_args(args, options = {})
-  prepare_destination # this completely wipes the `destination` directory
+RSpec.configure do |config|
+  config.after(:each) do
+    GeneratorMessages.clear
+  end
+end
+
+def simulate_existing_rails_files(options)
   simulate_existing_file(".gitignore") if options.fetch(:gitignore, true)
   simulate_existing_file("Gemfile", "")
   simulate_existing_file("config/routes.rb", "Rails.application.routes.draw do\nend\n")
-  simulate_existing_file("config/application.rb", "module Gentest\nclass Application < Rails::Application\nend\nend)")
-  if options.fetch(:assets_rb, true)
-    simulate_existing_file("config/initializers/assets.rb")
-  end
+  simulate_existing_file("config/application.rb",
+                         "module Gentest\nclass Application < Rails::Application\nend\nend)")
+end
+
+def simulate_existing_assets_files(options)
+  simulate_existing_file("config/initializers/assets.rb") if options.fetch(:assets_rb, true)
   if options.fetch(:application_js, true)
     app_js = "app/assets/javascripts/application.js"
     app_js_data = <<-DATA.strip_heredoc
@@ -26,12 +32,43 @@ def run_generator_test_with_args(args, options = {})
     DATA
     simulate_existing_file(app_js, app_js_data)
   end
-  if options.fetch(:application_css, true)
-    app_css = "app/assets/stylesheets/application.css.scss"
-    app_css_data = " *= require_tree .\n *= require_self\n"
-    simulate_existing_file(app_css, app_css_data)
+
+  simulate_existing_dir("spec") if options.fetch(:spec, true)
+
+  return unless options.fetch(:application_css, true)
+
+  app_css = "app/assets/stylesheets/application.css.scss"
+  app_css_data = " *= require_tree .\n *= require_self\n"
+  simulate_existing_file(app_css, app_css_data)
+end
+
+def simulate_npm_files(options)
+  if options.fetch(:package_json, false)
+    package_json = "client/package.json"
+    package_json_data = '    "react-on-rails": "2.0.0-beta.1",'
+    simulate_existing_file(package_json, package_json_data)
   end
-  run_generator(args)
+
+  return unless options.fetch(:webpack_client_base_config, false)
+  config = "client/webpack.client.base.config.js"
+  text = <<-TEXT
+  resolve: {
+    ...
+  },
+  plugins: [
+    ...
+  ]
+  TEXT
+  simulate_existing_file(config, text)
+end
+
+# Expects an array of strings, such as "--redux"
+def run_generator_test_with_args(args, options = {})
+  prepare_destination # this completely wipes the `destination` directory
+  simulate_existing_rails_files(options)
+  simulate_existing_assets_files(options)
+  simulate_npm_files(options)
+  run_generator(args + ["--ignore-warnings"])
 end
 
 def assert_server_render_procfile

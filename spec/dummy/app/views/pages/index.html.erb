@@ -36,7 +36,7 @@ This page demonstrates a few things the other pages do not show:
     <% puts "server rendering react components" %>
     <% puts "=" * 80 %>
   <% end %>
-  <%= react_component("ReduxApp", @app_props_server_render, trace: true, generator_function: true) %>
+  <%= react_component("ReduxApp", @app_props_server_render, trace: true) %>
   <hr/>
 
   <h1>Server Rendered/Cached React Component Without Redux</h1>
@@ -57,16 +57,16 @@ This page demonstrates a few things the other pages do not show:
 <h1>Simple Client Rendered Component</h1>
 <!-- Passing prerender: false to not render on server -->
 <pre>
-  <%%= react_component("HelloWorldApp", @app_props_hello, prerender: false, trace: true, generator_function: true) %>
+  <%%= react_component("HelloWorldApp", @app_props_hello, prerender: false, trace: true) %>
 </pre>
-<%= react_component("HelloWorldApp", @app_props_hello, prerender: false, trace: true, generator_function: true) %>
+<%= react_component("HelloWorldApp", @app_props_hello, prerender: false, trace: true) %>
 <hr/>
 
 <h1>Showing you can put the same component twice on a page with different props</h1>
 <pre>
   <%%= react_component("HelloWorldApp", @app_props_hello_again, prerender: false, trace: true) %>
 </pre>
-<%= react_component("HelloWorldApp", @app_props_hello_again, prerender: false, trace: true, generator_function: true) %>
+<%= react_component("HelloWorldApp", @app_props_hello_again, prerender: false, trace: true) %>
 <hr/>
 
 <h1>Simple Component Without Redux</h1>
@@ -87,4 +87,4 @@ This page demonstrates a few things the other pages do not show:
   That will generate this:
 </p>
 
-<%= server_render_js("this.HelloString.world()") %>
+<%= server_render_js("ReactOnRails.getComponent('HelloString').component.world()") %>

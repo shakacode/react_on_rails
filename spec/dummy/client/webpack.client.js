@@ -2,8 +2,10 @@ const path = require('path');
 
 module.exports = {
   entry: [
-    'startup/clientGlobals',
-    'react-dom',
+    'es5-shim/es5-shim', // for poltergeist
+    'es5-shim/es5-sham', // for poltergeist
+    'babel-polyfill',
+    'startup/clientRegistration',
   ],
   output: {
     path: '../app/assets/javascripts/generated',
@@ -12,14 +14,20 @@ module.exports = {
   resolve: {
     root: [path.join(__dirname, 'app')],
     extensions: ['', '.js', '.jsx'],
+    fallback: [path.join(__dirname, 'node_modules')],
+    alias: {
+      react: path.resolve('./node_modules/react'),
+      'react-dom': path.resolve('./node_modules/react-dom'),
+    },
+  },
+
+  // same issue, for loaders like babel
+  resolveLoader: {
+    fallback: [path.join(__dirname, 'node_modules')],
   },
   module: {
     loaders: [
-      { loader: 'babel-loader' },
-
-      // React is necessary for the client rendering:
-      { test: require.resolve('react'), loader: 'expose?React' },
-      { test: require.resolve('react-dom'), loader: 'expose?ReactDOM' },
+      { test: /\.jsx?$/, loader: 'babel-loader', exclude: /node_modules/ },
     ],
   },
 };

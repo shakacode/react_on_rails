@@ -1,0 +1,13 @@
+<%= render "header" %>
+
+<%= react_component("PureComponent", { title: "This is a Pure Component!" }, prerender: true, trace: true) %>
+
+<hr/>
+
+<h1>React Rails Server Rendering of Pure Component</h1>
+<pre>
+<%%= react_component("PureComponent",
+  { title: "This is a Pure Component!" },
+  prerender: true,
+  trace: true) %>
+</pre>

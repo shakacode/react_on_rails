@@ -1,0 +1,26 @@
+# Not currently using ruby-lint
+---
+presenter: syntastic
+
+# Be sure to edit this per your project!
+directories:
+  - app
+  - config
+  - lib
+  <%- if dest_dir_exists?("spec") -%>
+  - spec
+  <%- end -%>
+
+ignore_paths:
+  - client
+  - node_modules
+
+analysis_classes:
+  #  - argument_amount
+  - pedantics
+  - shadowing_variables
+  # Too many false positives for these
+  #  - undefined_methods
+  #  - undefined_variables
+  #  - unused_variables
+  - useless_equality_checks

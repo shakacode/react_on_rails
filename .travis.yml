@@ -12,7 +12,7 @@ gemfile:
   - spec/dummy/Gemfile
 
 env:
-  - export RAILS_ENV=test
+  - export RAILS_ENV=test DRIVER=selenium_chrome
 
 before_install:
   - sudo apt-get update
@@ -24,9 +24,12 @@ before_install:
 install:
   - rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install 4.2.0
   - npm install -g npm
+  - npm install -g poltergeist
   - bundle install
+  - npm install
   - rake dummy_apps
   - rake examples
+  - rake node_package
   - docker-compose up lint
 
 before_script:

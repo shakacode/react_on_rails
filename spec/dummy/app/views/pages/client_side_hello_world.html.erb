@@ -1,5 +1,5 @@
 <%= render "header" %>
-<%= react_component("HelloWorld", @app_props_server_render, prerender: false, trace: true, generator_function: false) %>
+<%= react_component("HelloWorld", @app_props_server_render, prerender: false, trace: true) %>
 <hr/>
 
 <h1>React Rails Client Side Only Rendering</h1>
@@ -19,18 +19,19 @@
     Create component source: spec/dummy/client/app/components/HelloWorld.jsx
   </li>
   <li>
-    Expose the HelloWorld Component: spec/dummy/client/app/startup/clientGlobals.jsx
+    Expose the HelloWorld Component: spec/dummy/client/app/startup/clientRegistration.jsx
     <br/>
     <pre>
       import HelloWorld from '../components/HelloWorld';
-      window.HelloWorld = HelloWorld;
+      import ReactOnRails from 'react-on-rails';
+      ReactOnRails.register({ HelloWorld });
     </pre>
   </li>
   <li>
     Place the component on the view: spec/dummy/app/views/pages/client_side_hello_world.html.erb
     <br/>
     <pre>
-      <%%= react_component("HelloWorld", @app_props_server_render, prerender: false, trace: true, generator_function: false) %>
+      <%%= react_component("HelloWorld", @app_props_server_render, prerender: false, trace: true) %>
     </pre>
   </li>
 </ol>

@@ -14,17 +14,12 @@ module ReactOnRailsHelper
   #          var MyReactComponentApp = function(props) { return <YourReactComponent {...props}/>; }
   #    Exposing the react_component_name is necessary to both a plain ReactComponent as well as
   #      a generator:
-  #    For client rendering, expose the react_component_name on window:
-  #      window.MyReactComponentApp = MyReactComponentApp;
-  #    For server rendering, export the react_component_name on global:
-  #      global.MyReactComponentApp = MyReactComponentApp;
-  #    See spec/dummy/client/app/startup/serverGlobals.jsx and
-  #      spec/dummy/client/app/startup/ClientApp.jsx for examples of this
+  #    See README.md for how to "register" your react components.
+  #    See spec/dummy/client/app/startup/serverRegistration.jsx and
+  #      spec/dummy/client/app/startup/ClientRegistration.jsx for examples of this
   # props: Ruby Hash or JSON string which contains the properties to pass to the react object
   #
   #  options:
-  #    generator_function: <true/false> default is false, set to true if you want to use a
-  #                        generator function rather than a React Component.
   #    prerender: <true/false> set to false when debugging!
   #    trace: <true/false> set to true to print additional debugging information in the browser
   #           default is true for development, off otherwise
@@ -55,19 +50,19 @@ module ReactOnRailsHelper
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
     turbolinks_loaded = Object.const_defined?(:Turbolinks)
 
+    data = { component_name: react_component_name,
+             props: props,
+             trace: trace(options),
+             expect_turbolinks: turbolinks_loaded,
+             dom_id: dom_id
+    }
+
     component_specification_tag =
       content_tag(:div,
                   "",
                   class: "js-react-on-rails-component",
                   style: "display:none",
-                  data: {
-                    component_name: react_component_name,
-                    props: props,
-                    trace: trace(options),
-                    generator_function: generator_function(options),
-                    expect_turbolinks: turbolinks_loaded,
-                    dom_id: dom_id
-                  })
+                  data: data)
 
     # Create the HTML rendering part
     result = server_rendered_react_component_html(options, props, react_component_name, dom_id)
@@ -112,7 +107,7 @@ module ReactOnRailsHelper
         return #{js_expression};
       })();
   } catch(e) {
-    htmlResult = ReactOnRails.handleError({e: e, componentName: null,
+    htmlResult = ReactOnRails.handleError({e: e, name: null,
       jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
     hasErrors = true;
   }
@@ -167,11 +162,10 @@ module ReactOnRailsHelper
 (function() {
   var props = #{props_string};
   return ReactOnRails.serverRenderReactComponent({
-    componentName: '#{react_component_name}',
-    domId: '#{dom_id}',
+    name: '#{react_component_name}',
+    domNodeId: '#{dom_id}',
     props: props,
     trace: #{trace(options)},
-    generatorFunction: #{generator_function(options)},
     location: '#{request.fullpath}'
   });
 })()
@@ -208,10 +202,6 @@ module ReactOnRailsHelper
 
   def trace(options)
     options.fetch(:trace) { ReactOnRails.configuration.trace }
-  end
-
-  def generator_function(options)
-    options.fetch(:generator_function) { ReactOnRails.configuration.generator_function }
   end
 
   def prerender(options)

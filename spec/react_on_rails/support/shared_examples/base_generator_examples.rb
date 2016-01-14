@@ -34,7 +34,6 @@ shared_examples "base_generator:base" do |options|
 
       // CRITICAL that generated/vendor-bundle must be BEFORE bootstrap-sprockets and turbolinks
       // since it is exposing jQuery and jQuery-ujs
-      //= require react_on_rails
 
       //= require generated/vendor-bundle
       //= require generated/app-bundle
@@ -72,18 +71,19 @@ shared_examples "base_generator:base" do |options|
   it "copies react files" do
     %w(app/controllers/hello_world_controller.rb
        app/views/hello_world/index.html.erb
-       config/initializers/react_on_rails.rb
+       client/REACT_ON_RAILS_CLIENT_README.md
+       client/app/bundles/HelloWorld/startup/clientRegistration.jsx
        client/webpack.client.hot.config.js
        client/webpack.client.rails.config.js
        client/.babelrc
        client/index.jade
        client/package.json
        client/server.js
+       config/initializers/react_on_rails.rb
        lib/tasks/assets.rake
        package.json
        Procfile.dev
-       REACT_ON_RAILS.md
-       client/REACT_ON_RAILS_CLIENT_README.md).each { |file| assert_file(file) }
+       REACT_ON_RAILS.md).each { |file| assert_file(file) }
   end
 
   it "appends path configurations to assets.rb" do
@@ -102,9 +102,11 @@ shared_examples "base_generator:base" do |options|
 end
 
 shared_examples "base_generator:no_server_rendering" do
-  it "copies client-side-rendering version of Procfile.dev" do
-    assert_file("Procfile.dev") do |contents|
-      refute_match(/server: sh -c 'cd client && npm run build:dev:server'/, contents)
+  it "copies client-side-rendering version of Procfile.dev and Procfile.dev-hot" do
+    %w(Procfile.dev Procfile.dev-hot).each do |file|
+      assert_file(file) do |contents|
+        refute_match(/server: sh -c 'cd client && npm run build:dev:server'/, contents)
+      end
     end
   end
 
@@ -114,30 +116,15 @@ shared_examples "base_generator:no_server_rendering" do
     end
   end
 
-  it "copies client-side-rendering version of clientGlobals" do
-    assert_file("client/webpack.client.base.config.js") do |contents|
-      assert_match("startup/globals", contents)
-      refute_match("startup/clientGlobals", contents)
-    end
-  end
-
   it "copies client-side-rendering version of hello_world/index.html.erb" do
     assert_file("app/views/hello_world/index.html.erb") do |contents|
       assert_match("prerender: false", contents)
     end
   end
 
-  it "templates client-side-rendering version of globals" do
-    assert_file("client/app/bundles/HelloWorld/startup/globals.jsx") do |contents|
-      assert_match("HelloWorldApp", contents)
-      refute_match("HelloWorldAppClient", contents)
-    end
-  end
-
   it "templates client-side-rendering version of webpack.client.base.js" do
     assert_file("client/webpack.client.base.config.js") do |contents|
-      assert_match("globals", contents)
-      refute_match("clientGlobals", contents)
+      assert_match("clientRegistration", contents)
     end
   end
 
@@ -146,15 +133,14 @@ shared_examples "base_generator:no_server_rendering" do
       refute_match("gem 'therubyracer', platforms: :ruby", contents)
     end
   end
+
+  it "doesn't copy server-side-rendering-only files" do
+    %w(client/webpack.server.rails.config.js
+       client/app/bundles/HelloWorld/startup/serverRegistration.jsx).each { |file| assert_no_file(file) }
+  end
 end
 
 shared_examples "base_generator:server_rendering" do
-  it "templates server-side-rendering version of globals" do
-    assert_file("client/app/bundles/HelloWorld/startup/clientGlobals.jsx") do |contents|
-      assert_match("HelloWorldAppClient", contents)
-    end
-  end
-
   it "copies server-side-rendering version of assets.rake" do
     assert_file("lib/tasks/assets.rake") do |contents|
       assert_match(/sh "cd client && npm run build:server"/, contents)
@@ -163,26 +149,20 @@ shared_examples "base_generator:server_rendering" do
 
   it "copies server-rendering-only files" do
     %w(client/webpack.server.rails.config.js
-       client/app/bundles/HelloWorld/startup/serverGlobals.jsx).each { |file| assert_file(file) }
-  end
-
-  it "copies server-side-rendering version of clientGlobals" do
-    assert_file("client/webpack.client.base.config.js") do |contents|
-      assert_match("startup/clientGlobals", contents)
-      refute_match("startup/globals", contents)
-    end
+       client/app/bundles/HelloWorld/startup/serverRegistration.jsx).each { |file| assert_file(file) }
   end
 
   it "templates client-side-rendering version of webpack.client.base.js" do
     assert_file("client/webpack.client.base.config.js") do |contents|
-      assert_match("clientGlobals", contents)
-      refute_match("globals", contents)
+      assert_match("clientRegistration", contents)
     end
   end
 
-  it "copies server-side-rendering version of Procfile.dev" do
-    assert_file("Procfile.dev") do |contents|
-      assert_match(/server: sh -c 'cd client && npm run build:dev:server'/, contents)
+  it "copies server-side-rendering version of Procfile.dev and Procfile.dev-hot" do
+    %w(Procfile.dev Procfile.dev-hot).each do |file|
+      assert_file(file) do |contents|
+        assert_match(/server: sh -c 'cd client && npm run build:dev:server'/, contents)
+      end
     end
   end
 

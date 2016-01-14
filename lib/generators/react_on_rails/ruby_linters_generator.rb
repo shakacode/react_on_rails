@@ -1,8 +1,10 @@
 require "rails/generators"
+require_relative "generator_helper"
 
 module ReactOnRails
   module Generators
     class RubyLintersGenerator < Rails::Generators::Base
+      include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
       source_root File.expand_path("../templates", __FILE__)
 
@@ -25,8 +27,8 @@ module ReactOnRails
         %w(lib/tasks/brakeman.rake
            lib/tasks/ci.rake
            .rubocop.yml
-           .scss-lint.yml
-           ruby-lint.yml).each { |file| copy_file(base_path + file, file) }
+           .scss-lint.yml).each { |file| copy_file(base_path + file, file) }
+        template("ruby_linters/ruby-lint.yml.tt", "ruby-lint.yml")
       end
     end
   end

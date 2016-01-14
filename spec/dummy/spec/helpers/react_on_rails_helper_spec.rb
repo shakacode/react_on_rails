@@ -53,7 +53,6 @@ describe ReactOnRailsHelper, type: :helper do
             data-component-name=\"App\"
             data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
             data-trace=\"false\"
-            data-generator-function=\"false\"
             data-expect-turbolinks=\"true\"
             data-dom-id=\"#{id}\"></div>".squish
     end
@@ -78,7 +77,7 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#server_render_js" do
-    subject { server_render_js("this.HelloString.world()") }
+    subject { server_render_js("ReactOnRails.getComponent('HelloString').component.world()") }
 
     let(:hello_world) do
       "Hello WORLD! Will this work?? YES! Time to visit Maui"

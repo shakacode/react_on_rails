@@ -58,7 +58,7 @@ You can disable all rules for a line or block, or only specific rules, as shown 
 
 * [Configuring ESLint](http://eslint.org/docs/user-guide/configuring.html#configuring-rules)
 * [ESLint quick start](http://untilfalse.com/eslint-quick-start/)
-* [RuboCop][https://github.com/bbatsov/rubocop]
-* [ESLint][http://eslint.org/] 
-* [JSCS][https://github.com/jscs-dev/node-jscs]
+* [RuboCop](https://github.com/bbatsov/rubocop)
+* [ESLint](http://eslint.org/)
+* [JSCS](https://github.com/jscs-dev/node-jscs)
 

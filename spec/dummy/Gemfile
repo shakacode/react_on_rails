@@ -68,4 +68,6 @@ group :test do
   gem "chromedriver-helper"
   gem "launchy"
   gem "generator_spec"
+  gem "poltergeist"
+  gem "capybara-webkit"
 end

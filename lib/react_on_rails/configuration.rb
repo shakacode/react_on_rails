@@ -1,3 +1,4 @@
+
 module ReactOnRails
   def self.configure
     yield(configuration)
@@ -9,7 +10,6 @@ module ReactOnRails
       prerender: false,
       replay_console: true,
       logging_on_server: true,
-      generator_function: false,
       raise_on_prerender_error: false,
       trace: Rails.env.development?,
       development_mode: Rails.env.development?,
@@ -19,12 +19,12 @@ module ReactOnRails
 
   class Configuration
     attr_accessor :server_bundle_js_file, :prerender, :replay_console,
-                  :generator_function, :trace, :development_mode,
+                  :trace, :development_mode,
                   :logging_on_server, :server_renderer_pool_size,
                   :server_renderer_timeout, :raise_on_prerender_error
 
     def initialize(server_bundle_js_file: nil, prerender: nil, replay_console: nil,
-                   generator_function: nil, trace: nil, development_mode: nil,
+                   trace: nil, development_mode: nil,
                    logging_on_server: nil, server_renderer_pool_size: nil,
                    server_renderer_timeout: nil, raise_on_prerender_error: nil)
       if File.exist?(server_bundle_js_file)
@@ -36,7 +36,6 @@ module ReactOnRails
       self.prerender = prerender
       self.replay_console = replay_console
       self.logging_on_server = logging_on_server
-      self.generator_function = generator_function
       if development_mode.nil?
         self.development_mode = Rails.env.development?
       else

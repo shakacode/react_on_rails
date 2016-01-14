@@ -21,3 +21,49 @@ heroku buildpacks:set https://github.com/heroku/heroku-buildpack-multi
 Heroku will now be able to use the multiple buildpacks specified in `.buildpacks`. 
 
 Note, an alternative approach is to use the [Heroku Toolbelt to set buildpacks](https://devcenter.heroku.com/articles/using-multiple-buildpacks-for-an-app).
+
+## Fresh Rails Install
+
+### Swap out sqlite for postgres by doing the following:
+
+1. Delete the line with `sqlite` and replace it with:
+
+```ruby
+   gem 'pg'
+```
+
+2. Replace your `database.yml` file with this (assuming your app name is "ror")
+
+```yml
+default: &default
+  adapter: postgresql
+  username:
+  password:
+  host: localhost
+
+development:
+  <<: *default
+  database: ror_development
+
+# Warning: The database defined as "test" will be erased and
+# re-generated from your development database when you run "rake".
+# Do not set this db to the same as development or production.
+test:
+  <<: *default
+  database: ror_test
+
+production:
+  <<: *default
+  database: ror_production
+```
+
+Run:
+
+```
+bundle
+bin/rake db:migrate
+bin/rake db:setup
+```
+
+
+

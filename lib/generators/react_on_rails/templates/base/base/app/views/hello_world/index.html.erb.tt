@@ -1,5 +1,4 @@
 <h1 class="alert alert-info this-works"><%= options.server_rendering? ? "Server Rendering" : "Client Rendering" %></h1>
 <%%= react_component("HelloWorldApp",
                      @hello_world_props,
-                     generator_function: true,
                      prerender: <%= options.server_rendering? %>) %>
