@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (2.0.0.rc.3)
+    react_on_rails (2.0.0.rc.4)
       connection_pool
       execjs (~> 2.5)
       rails (>= 3.2)
