@@ -3,7 +3,7 @@
 # NEWS
 
 * 2.0 has shipped! Please grab the latest and let us know if you see any issues!
-* It does not yet have *generator* support for building new apps that use CSS modules and hot reloading via the Rails server per shown in the [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/). *We do support this, but we don't generate the code.* Thus, the setup for webpack, foreman, and sass will be somewhat different until we get the generators caught up. If you did generate a fresh app from react_on_rails and want to move to CSS Modules, then see [PR 175: Babel 6 / CSS Modules / Rails hot reloading](https://github.com/shakacode/react-webpack-rails-tutorial/pull/175). Note, while there are probably fixes after this PR was accepted, this has the majority of the changes. See [the tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/#news) for more information. Ping us if you want to help!
+* It does not yet have *generator* support for building new apps that use CSS modules and hot reloading via the Rails server as is demonstrated in the [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/). *We do support this, but we don't generate the code.* If you did generate a fresh app from react_on_rails and want to move to CSS Modules, then see [PR 175: Babel 6 / CSS Modules / Rails hot reloading](https://github.com/shakacode/react-webpack-rails-tutorial/pull/175). Note, while there are probably fixes after this PR was accepted, this has the majority of the changes. See [the tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/#news) for more information. Ping us if you want to help!
 
 # React on Rails
 
@@ -26,22 +26,22 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
   ```
 
 + The `component_name` parameter is a string matching the name you used to globally expose your React component. So, in the above examples, if you had a React component named "HelloWorldApp," you would register it with the following lines:
- 
+
   ```js
   import ReactOnRails from 'react-on-rails';
   import HelloWorldApp from './HelloWorldApp';
   ReactOnRails.register({ HelloWorldApp });
   ```
- 
+
   Exposing your component in this way is how React on Rails is able to reference your component from a Rails view. You can expose as many components as you like, as long as their names do not collide. See below for the details of how you expose your components via the react_on_rails webpack configuration.
-  
+
 + `@some_props` can be either a hash or JSON string. This is an optional argument assuming you do not need to pass any options (if you want to pass options, such as `prerender: true`, but you do not want to pass any properties, simply pass an empty hash `{}`). This will make the data available in your component:
 
   ```ruby
     # Rails View
     <%= react_component("HelloWorldApp", { name: "Stranger" })
   ```
-  
+
   ```javascript
     // inside your React component
     this.props.name // "Stranger"
@@ -88,9 +88,7 @@ Like the [react-rails](https://github.com/reactjs/react-rails) gem, React on Rai
 + [Redux](https://github.com/rackt/redux)
 + [Webpack dev server](https://webpack.github.io/docs/webpack-dev-server.html) with [hot module replacement](https://webpack.github.io/docs/hot-module-replacement-with-webpack.html)
 + [Webpack optimization functionality](https://github.com/webpack/docs/wiki/optimization)
-+ _*(Coming Soon)*_ [React Router](https://github.com/rackt/react-router)
-    + *([Gem *Pull Request*](https://github.com/shakacode/react_on_rails/pull/68))*
-    + *([Tutorial Pull Request](https://github.com/shakacode/react-webpack-rails-tutorial/pull/128))*
++ [React Router](https://github.com/rackt/react-router)
 
 See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
 
@@ -232,7 +230,7 @@ This is a helper method that takes any JavaScript expression and returns the out
 
 ## Generator
 The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating Webpack with Rails. Defaults for options are such that the default is for the flag to be off. For example, the default for `-R` is that `redux` is off, and the default of `-b` means that `skip-bootstrap` is off.
- 
+
 Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
 ```
