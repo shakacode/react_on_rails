@@ -5,7 +5,7 @@ We're now releasing this as a combined ruby gem plus npm package. We will keep t
 ## Testing the Gem before Release from a Rails App
 See [Contributing](../contributing.md)
 
-## Releaseing a new gem version
+## Releasing a new gem version
 Install https://github.com/svenfuchs/gem-release
 
 ```bash
