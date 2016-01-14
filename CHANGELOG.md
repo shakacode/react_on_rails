@@ -48,8 +48,7 @@ All notable changes to this project will be documented in this file. Items under
 4. Update your index.jade to use the new API `ReactOnRails.render("MyApp", !{props}, 'app');`
 5. Update your webpack files per the example commit. Remove globally exposing React and ReactDom, as well as their inclusion in the `entry` section. These are automatically included now.
 6. Run `cd client && npm i --save react-on-rails` to get react-on-rails into your `client/package.json`.
-
-That's it!
+7. You should also update any other dependencies if possible to match up with the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/).
 
 ## v1.2.2
 ### Fixed
