@@ -62,15 +62,15 @@ module ReactOnRails
           # fail("react_on_rails generator prerequisites not met!")
         end
       ensure
-        print_errors
+        print_generator_messages
       end
 
       # Everything here is not run automatically b/c it's private
 
       private
 
-      def print_errors
-        GeneratorMessages.errors.each { |errors| puts errors }
+      def print_generator_messages
+        GeneratorMessages.messages.each { |message| puts message }
       end
 
       def invoke_generators # rubocop:disable Metrics/CyclomaticComplexity

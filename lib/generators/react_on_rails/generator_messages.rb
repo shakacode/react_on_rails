@@ -16,7 +16,7 @@ module GeneratorMessages
       output << format_info(message)
     end
 
-    def errors
+    def messages
       output
     end
 
