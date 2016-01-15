@@ -3,9 +3,10 @@
 # NEWS
 
 * 2.0 has shipped! Please grab the latest and let us know if you see any issues!
-* It does not yet have *generator* support for CSS modules and hot reloading via the Rails server per shown in the [shakacode/react-webpack-rails-tutorial]. We're always looking for contributors! Thus, the setup for webpack, foreman, and sass will be somewhat different until we get the generators caught up.
+* It does not yet have *generator* support for building new apps that use CSS modules and hot reloading via the Rails server per shown in the [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/). *We do support this, but we don't generate the code.* Thus, the setup for webpack, foreman, and sass will be somewhat different until we get the generators caught up. If you did generate a fresh app from react_on_rails and want to move to CSS Modules, then see [PR 175: Babel 6 / CSS Modules / Rails hot reloading](https://github.com/shakacode/react-webpack-rails-tutorial/pull/175). Note, while there are probably fixes after this PR was accepted, this has the majority of the changes. See [the tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/#news) for more information. Ping us if you want to help!
 
 # React on Rails
+
 React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x is supported, with server rendering. [Redux](https://github.com/rackt/redux) and [React-Router](https://github.com/rackt/react-redux) are supported as well. See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
 
 Be sure to see the [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial) along with the live example at [www.reactrails.com](http://www.reactrails.com).
