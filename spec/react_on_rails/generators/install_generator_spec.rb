@@ -1,4 +1,5 @@
-require File.expand_path("../../support/generator_spec_helper", __FILE__)
+require_relative "../support/generator_spec_helper"
+require_relative "../support/version_test_helpers"
 
 describe InstallGenerator, type: :generator do
   destination File.expand_path("../../dummy-for-generators/", __FILE__)
@@ -210,7 +211,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with missing files to trigger errors" do
-    it "GeneratorMessages has the missing file error" do
+    specify "GeneratorMessages has the missing file error" do
       run_generator_test_with_args([], gitignore: false)
       expected = <<-MSG.strip_heredoc
         .gitignore was not found.

@@ -1,5 +1,6 @@
 require_relative "simplecov_helper"
 require_relative "spec_helper"
+require_relative "support/version_test_helpers"
 
 class FakeLogger
   attr_accessor :message
@@ -15,7 +16,7 @@ module ReactOnRails
       let(:logger) { FakeLogger.new }
 
       context "when gem and node package major versions are equal" do
-        let(:node_package_version) { double_package_version(raw: "^2.2.5", normalized: "2.2.5", major: "2") }
+        let(:node_package_version) { double_package_version(raw: "^2.2.5", major: "2") }
         before { stub_gem_version("2.0.0.beta.2") }
 
         it "does not log a warning" do
@@ -26,7 +27,7 @@ module ReactOnRails
 
       context "when gem and node package major versions differ" do
         let(:node_package_version) do
-          double_package_version(raw: "13.0.0.beta-2", normalized: "13.0.0.beta.2", major: "13")
+          double_package_version(raw: "13.0.0.beta-2", major: "13")
         end
         before { stub_gem_version("12.0.0.beta.1") }
 
@@ -38,7 +39,7 @@ module ReactOnRails
 
       context "when package json uses a relative path" do
         let(:node_package_version) do
-          double_package_version(raw: "../../..", normalized: "", major: "", relative_path: true)
+          double_package_version(raw: "../../..", major: "", relative_path: true)
         end
         before { stub_gem_version("2.0.0.beta.1") }
 
@@ -49,14 +50,9 @@ module ReactOnRails
       end
     end
 
-    def stub_gem_version(version)
-      stub_const("ReactOnRails::VERSION", version)
-    end
-
-    def double_package_version(raw:, normalized:, major:, relative_path: false)
+    def double_package_version(raw:, major:, relative_path: false)
       instance_double(VersionChecker::NodePackageVersion,
                       raw: raw,
-                      normalized: normalized,
                       major: major,
                       relative_path?: relative_path)
     end
@@ -76,10 +72,6 @@ module ReactOnRails
           specify { expect(node_package_version.raw).to eq("0.0.2") }
         end
 
-        describe "#normalized" do
-          specify { expect(node_package_version.normalized).to eq("0.0.2") }
-        end
-
         describe "#relative_path?" do
           specify { expect(node_package_version.relative_path?).to be false }
         end
@@ -96,10 +88,6 @@ module ReactOnRails
           specify { expect(node_package_version.raw).to eq("^14.0.0.beta-2") }
         end
 
-        describe "#normalized" do
-          specify { expect(node_package_version.normalized).to eq("14.0.0.beta.2") }
-        end
-
         describe "#relative_path?" do
           specify { expect(node_package_version.relative_path?).to be false }
         end
@@ -114,10 +102,6 @@ module ReactOnRails
 
         describe "#raw" do
           specify { expect(node_package_version.raw).to eq("../../..") }
-        end
-
-        describe "#normalized" do
-          specify { expect(node_package_version.normalized).to be_nil }
         end
 
         describe "#relative_path?" do
