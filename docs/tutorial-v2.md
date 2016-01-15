@@ -1,3 +1,5 @@
+# Tutorial for v2.0
+
 I just released RC3 of [React On Rails](https://github.com/shakacode/react_on_rails/tree/npm-react-on-rails-js). Here's a tiny tutorial to get you started. This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
 You can find:
