@@ -125,7 +125,7 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
   rails generate react_on_rails:install
   ```
 
-3. NPM install. Make sure you are on a recent version of node, preferably using nvm.
+3. NPM install. Make sure you are on a recent version of node, preferably using nvm. We've heard some reports that you need at least Node v5.
 
   ```bash
   npm install
