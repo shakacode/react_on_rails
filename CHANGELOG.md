@@ -42,13 +42,14 @@ Best done with Object destructing:
 ### Migration Steps
 [Example of upgrading](https://github.com/shakacode/react-webpack-rails-tutorial/commit/5b1b8698e8daf0f0b94e987740bc85ee237ef608)
 
-1. Update the `react_on_rails` gem
-2. Search you app for 'generator_function' and remove lines in layouts and rb files that contain it. Determination of a generator function is handled automatically.
-3. Find your files where you registered client and server globals, and use the new ReactOnRails.register syntax. Optionally rename the files `clientRegistration.jsx` and `serverRegistration.jsx` rather than `Globals`.
-4. Update your index.jade to use the new API `ReactOnRails.render("MyApp", !{props}, 'app');`
-5. Update your webpack files per the example commit. Remove globally exposing React and ReactDom, as well as their inclusion in the `entry` section. These are automatically included now.
-6. Run `cd client && npm i --save react-on-rails` to get react-on-rails into your `client/package.json`.
-7. You should also update any other dependencies if possible to match up with the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/).
+1. Update the `react_on_rails` gem.
+2. Remove `//= require react_on_rails` from any files such as `app/assets/javascripts/application.js`. This file comes from npm now.
+3. Search you app for 'generator_function' and remove lines in layouts and rb files that contain it. Determination of a generator function is handled automatically.
+4. Find your files where you registered client and server globals, and use the new ReactOnRails.register syntax. Optionally rename the files `clientRegistration.jsx` and `serverRegistration.jsx` rather than `Globals`.
+5. Update your index.jade to use the new API `ReactOnRails.render("MyApp", !{props}, 'app');`
+6. Update your webpack files per the example commit. Remove globally exposing React and ReactDom, as well as their inclusion in the `entry` section. These are automatically included now.
+7. Run `cd client && npm i --save react-on-rails` to get react-on-rails into your `client/package.json`.
+8. You should also update any other dependencies if possible to match up with the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/).
 
 ## v1.2.2
 ### Fixed
