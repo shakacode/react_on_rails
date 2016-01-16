@@ -207,7 +207,7 @@ This is how you actually render the React components you exposed to `window` ins
 #### react_component
 `react_component(component_name, props = {}, options = {})`
 
-+ **react_component_name:** Can be a React component, created using a ES6 class, or `React.createClass`, or a generator function that returns a React component.
++ **component_name:** Can be a React component, created using a ES6 class, or `React.createClass`, or a generator function that returns a React component.
 + **props:** Ruby Hash which contains the properties to pass to the react object, or a JSON string. If you pass a string, we'll escape it for you.
 + **options:**
   + **prerender:** enable server-side rendering of component. Set to false when debugging!
