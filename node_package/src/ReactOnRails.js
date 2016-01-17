@@ -77,4 +77,4 @@ ctx.ReactOnRails = {
 
 clientStartup(ctx);
 
-export default ctx.ReactOnRails;
+module.exports = ctx.ReactOnRails;
