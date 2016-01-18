@@ -25,7 +25,7 @@ module GeneratorMessages
     end
 
     def format_warning(msg)
-      Rainbow("WARNING: #{msg}").orange
+      Rainbow("WARNING: #{msg}").color(255, 165, 0)
     end
 
     def format_info(msg)
