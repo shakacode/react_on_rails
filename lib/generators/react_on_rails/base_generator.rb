@@ -192,6 +192,24 @@ module ReactOnRails
         new_name = File.join(destination_root, "#{base_path}application.scss")
         File.rename(bad_name, new_name)
       end
+
+      def print_helpful_message
+        message = <<-MSG.strip_heredoc
+
+          What to do next:
+
+            - Ensure your bundle and npm are up to date.
+
+                bundle && npm i
+
+            - Run the npm rails-server command to load the rails server.
+
+                npm run rails-server
+
+            - Visit http://localhost:3000/hello_world and see your React On Rails app running!
+        MSG
+        GeneratorMessages.add_info(message)
+      end
     end
   end
 end

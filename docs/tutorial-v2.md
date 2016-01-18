@@ -48,7 +48,7 @@ npm run rails-server
 Visit http://localhost:3000/hello_world and see your React On Rails app running!
 
 ```
-npm run node-server-hot
+npm run express-server
 ```
 
 <img src="http://forum.shakacode.com/uploads/default/original/1X/5bd396a7f9c0764929b693fb79eb6685ec6f62cf.png" width="470" height="499">
