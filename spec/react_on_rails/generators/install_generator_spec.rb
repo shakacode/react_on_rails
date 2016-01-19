@@ -228,4 +228,39 @@ describe InstallGenerator, type: :generator do
         .to include(GeneratorMessages.format_error(expected))
     end
   end
+
+  context "with helpful message" do
+    specify "base generator contains a helpful message" do
+      run_generator_test_with_args(%w())
+      expected = <<-MSG.strip_heredoc
+
+        What to do next:
+
+          - Ensure your bundle and npm are up to date.
+
+              bundle && npm i
+
+          - Run the npm rails-server command to load the rails server.
+
+              npm run rails-server
+
+          - Visit http://localhost:3000/hello_world and see your React On Rails app running!
+        MSG
+      expect(GeneratorMessages.output)
+        .to include(GeneratorMessages.format_info(expected))
+    end
+
+    specify "react with redux generator contains a helpful message" do
+      run_generator_test_with_args(%w(--redux))
+      expected = <<-MSG
+  - Run the npm express-server command to load the node server with hot reloading support.
+
+      npm run express-server
+
+  - Visit http://localhost:4000 and see your React On Rails app running using the Webpack Dev server.
+        MSG
+      expect(GeneratorMessages.output)
+        .to include(GeneratorMessages.format_info(expected))
+    end
+  end
 end
