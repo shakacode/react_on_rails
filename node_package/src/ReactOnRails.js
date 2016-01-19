@@ -31,7 +31,7 @@ ctx.ReactOnRails = {
    */
   render(name, props, domNodeId) {
     const reactElement = createReactElement({ name, props, domNodeId });
-    ReactDOM.render(reactElement, document.getElementById(domNodeId));
+    return ReactDOM.render(reactElement, document.getElementById(domNodeId));
   },
 
   /**
