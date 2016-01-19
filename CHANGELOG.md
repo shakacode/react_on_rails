@@ -2,7 +2,7 @@
 All notable changes to this project will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version.
 
 ## v2.0.2
-- Better messages after generator runs [#210](https://github.com/shakacode/react_on_rails/pull/210)
+- Better messages after generator runs [#210](https://github.com/shakacode/react_on_rails/pull/210).
 
 ## v2.0.1
 - Fixed bug with version matching betwen gem and npm package.
