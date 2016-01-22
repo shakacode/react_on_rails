@@ -18,4 +18,7 @@ ReactOnRails.configure do |config|
   # Server rendering only (not for render_component helper)
   config.server_renderer_pool_size  = 1   # increase if you're on JRuby
   config.server_renderer_timeout    = 20  # seconds
+
+  # Default is false, enable if your content security policy doesn't include `style-src: 'unsafe-inline'`
+  config.skip_display_none = false
 end
