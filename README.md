@@ -354,9 +354,9 @@ As you add more routes to your front-end application, you will need to make the 
 ## Migrate From react-rails
 If you are using [react-rails](https://github.com/reactjs/react-rails) in your project, it is pretty simple to migrate to [react_on_rails](https://github.com/shakacode/react_on_rails).
 
-1. Remove the 'react-rails' gem from your Gemfile.
+- Remove the 'react-rails' gem from your Gemfile.
 
-2. Remove the generated generated lines for react-rails in your application.js file. 
+- Remove the generated generated lines for react-rails in your application.js file. 
 
 ```
 //= require react
@@ -364,7 +364,7 @@ If you are using [react-rails](https://github.com/reactjs/react-rails) in your p
 //= require components
 ```
 
-3. Follow our getting started guide: https://github.com/shakacode/react_on_rails#getting-started.
+- Follow our getting started guide: https://github.com/shakacode/react_on_rails#getting-started.
 
 Note: If you have components from react-rails you want to use, then you will need to port them into react_on_rails which uses webpack instead of the asset pipeline.
 
