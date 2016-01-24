@@ -1,5 +1,4 @@
 import React, { PropTypes } from 'react';
-import ReactDOM from 'react-dom';
 
 // Super simple example of the simplest possible React component
 class HelloWorld extends React.Component {
@@ -18,9 +17,13 @@ class HelloWorld extends React.Component {
     this.state = props.helloWorldData;
   }
 
-  _handleChange() {
-    const name = ReactDOM.findDOMNode(this.refs.name).value;
+  handleChange() {
+    const name =  this.nameDomRef.name;
     this.setState({ name });
+  }
+
+  setNameDomRef(nameDomNode) {
+    this.nameDomRef = nameDomNode;
   }
 
   render() {
@@ -36,7 +39,7 @@ class HelloWorld extends React.Component {
         </h3>
         <p>
           Say hello to:
-          <input type="text" ref="name" defaultValue={name} onChange={::this._handleChange} />
+          <input type="text" ref={this.setNameDomRef} defaultValue={name} onChange={::this.handleChange} />
         </p>
       </div>
     );

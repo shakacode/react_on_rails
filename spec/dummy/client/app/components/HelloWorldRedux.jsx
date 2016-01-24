@@ -14,9 +14,13 @@ export default class HelloWorldRedux extends React.Component {
     super(props, context);
   }
 
-  _handleChange() {
-    const name = ReactDOM.findDOMNode(this.refs.name).value;
-    this.props.actions.updateName(name);
+  handleChange() {
+    const name =  this.nameDomRef.name;
+    this.setState({ name });
+  }
+
+  setNameDomRef(nameDomNode) {
+    this.nameDomRef = nameDomNode;
   }
 
   render() {
@@ -30,7 +34,7 @@ export default class HelloWorldRedux extends React.Component {
         </h3>
         <p>
           With Redux, say hello to:
-          <input type="text" ref="name" defaultValue={name} onChange={::this._handleChange} />
+          <input type="text" ref={this.setNameDomRef} defaultValue={name} onChange={::this.handleChange} />
         </p>
       </div>
     );

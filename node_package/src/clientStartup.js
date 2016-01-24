@@ -12,7 +12,7 @@ function debugTurbolinks(...msg) {
   }
 
   if (window.DEBUG_TURBOLINKS) {
-    console.log('TURBO', ...msg);
+    console.log('TURBO:', ...msg);
   }
 }
 
@@ -101,7 +101,7 @@ export default function clientStartup(context) {
 
   context.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
 
-  debugTurbolinks('Adding DOMContentLoaded event to install event listeners');
+  debugTurbolinks('Adding DOMContentLoaded event to install event listeners.');
 
   document.addEventListener('DOMContentLoaded', () => {
     // Install listeners when running on the client (browser).
@@ -109,7 +109,7 @@ export default function clientStartup(context) {
     // Webpack bundles first.
 
     if (!turbolinksInstalled()) {
-      debugTurbolinks('WITHOUT TURBOLINKS: DOMContentLoaded handler installed');
+      debugTurbolinks('WITHOUT TURBOLINKS: DOMContentLoaded handler installed.');
       document.addEventListener('DOMContentLoaded', reactOnRailsPageLoaded);
     } else {
       debugTurbolinks('WITH TURBOLINKS: document page:before-unload and page:change handlers' +
