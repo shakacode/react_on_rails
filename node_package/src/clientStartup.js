@@ -5,7 +5,20 @@ import handleError from './handleError';
 import isRouterResult from './isRouterResult';
 
 const REACT_ON_RAILS_COMPONENT_CLASS_NAME = 'js-react-on-rails-component';
-const turbolinksInstalled = (typeof Turbolinks !== 'undefined');
+
+function debugTurbolinks(...msg) {
+  if (!window) {
+    return;
+  }
+
+  if (window.DEBUG_TURBOLINKS) {
+    console.log('TURBO:', ...msg);
+  }
+}
+
+function turbolinksInstalled() {
+  return (typeof Turbolinks !== 'undefined');
+}
 
 function forEachComponent(fn) {
   const els = document.getElementsByClassName(REACT_ON_RAILS_COMPONENT_CLASS_NAME);
@@ -25,7 +38,7 @@ function render(el) {
   const trace = JSON.parse(el.getAttribute('data-trace'));
   const expectTurboLinks = JSON.parse(el.getAttribute('data-expect-turbo-links'));
 
-  if (!turbolinksInstalled && expectTurboLinks) {
+  if (!turbolinksInstalled() && expectTurboLinks) {
     console.warn('WARNING: NO TurboLinks detected in JS, but it is in your Gemfile');
   }
 
@@ -57,6 +70,8 @@ function render(el) {
 }
 
 function reactOnRailsPageLoaded() {
+  debugTurbolinks('reactOnRailsPageLoaded');
+
   forEachComponent(render);
 }
 
@@ -67,27 +82,40 @@ function unmount(el) {
 }
 
 function reactOnRailsPageUnloaded() {
+  debugTurbolinks('reactOnRailsPageUnloaded');
   forEachComponent(unmount);
 }
 
-let ranOnce = false;
-
 export default function clientStartup(context) {
-  if (ranOnce) {
+  const document = context.document;
+
+  // Check if server rendering
+  if (!document) {
     return;
   }
 
-  const document = context.document;
+  // Tried with a file local variable, but the install handler gets called twice.
+  if (context.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__) {
+    return;
+  }
 
-  // Install listeners when running on the client (browser)
-  if (typeof document !== 'undefined') {
-    if (!turbolinksInstalled) {
+  context.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
+
+  debugTurbolinks('Adding DOMContentLoaded event to install event listeners.');
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Install listeners when running on the client (browser).
+    // We must do this check for turbolinks AFTER the document is loaded because we load the
+    // Webpack bundles first.
+
+    if (!turbolinksInstalled()) {
+      debugTurbolinks('WITHOUT TURBOLINKS: DOMContentLoaded handler installed.');
       document.addEventListener('DOMContentLoaded', reactOnRailsPageLoaded);
     } else {
+      debugTurbolinks('WITH TURBOLINKS: document page:before-unload and page:change handlers' +
+        ' installed.');
       document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
       document.addEventListener('page:change', reactOnRailsPageLoaded);
     }
-  }
-
-  ranOnce = true;
+  });
 }

@@ -18,3 +18,4 @@ rakelib
 ruby-lint.yml
 spec
 node_modules
+tmp

@@ -1,4 +1,5 @@
 /* eslint-disable react/no-multi-comp */
+/* eslint-disable react/prefer-es6-class */
 
 import test from 'tape';
 import React from 'react';

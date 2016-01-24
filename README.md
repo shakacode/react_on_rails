@@ -378,6 +378,7 @@ Note: If you have components from react-rails you want to use, then you will nee
 + [React Router](docs/additional_reading/react_router.md)
 + [Server Rendering Tips](docs/additional_reading/server_rendering_tips.md)
 + [Tips](docs/additional_reading/tips.md)
++ [Turbolinks](docs/additional_reading/turbolinks.md)
 + [Webpack Configuration](docs/additional_reading/webpack.md)
 + [Webpack Cookbook](https://christianalfoni.github.io/react-webpack-cookbook/index.html)
 

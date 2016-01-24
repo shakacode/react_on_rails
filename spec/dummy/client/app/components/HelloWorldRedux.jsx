@@ -1,5 +1,5 @@
 import React, { PropTypes } from 'react';
-import ReactCompat from '../utils/ReactCompat';
+import ReactDOM from 'react-dom';
 
 // Super simple example of the simplest possible React component
 export default class HelloWorldRedux extends React.Component {
@@ -12,11 +12,17 @@ export default class HelloWorldRedux extends React.Component {
   // Not necessary if we only call super, but we'll need to initialize state, etc.
   constructor(props, context) {
     super(props, context);
+    this.setNameDomRef = this.setNameDomRef.bind(this);
+    this.handleChange = this.handleChange.bind(this);
   }
 
-  _handleChange() {
-    const name = ReactCompat.reactFindDOMNode()(this.refs.name).value;
+  handleChange() {
+    const name =  this.nameDomRef.value;
     this.props.actions.updateName(name);
+  }
+
+  setNameDomRef(nameDomNode) {
+    this.nameDomRef = nameDomNode;
   }
 
   render() {
@@ -30,7 +36,7 @@ export default class HelloWorldRedux extends React.Component {
         </h3>
         <p>
           With Redux, say hello to:
-          <input type="text" ref="name" defaultValue={name} onChange={::this._handleChange} />
+          <input type="text" ref={this.setNameDomRef} defaultValue={name} onChange={this.handleChange} />
         </p>
       </div>
     );

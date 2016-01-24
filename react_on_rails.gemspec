@@ -14,7 +14,7 @@ Gem::Specification.new do |s|
   s.homepage      = "https://github.com/shakacode/react_on_rails"
   s.license       = "MIT"
 
-  s.files         = `git ls-files -z`.split("\x0").reject { |f| f.match(%r{^(test|spec|features|examples|node_modules|node_package|coverage)/}) }
+  s.files         = `git ls-files -z`.split("\x0").reject { |f| f.match(%r{^(test|spec|features|tmp|node_modules|node_package|coverage)/}) }
   s.bindir        = "exe"
   s.executables   = s.files.grep(%r{^exe/}) { |f| File.basename(f) }
   s.require_paths = ["lib"]

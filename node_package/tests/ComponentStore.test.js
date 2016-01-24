@@ -1,4 +1,6 @@
 /* eslint-disable react/no-multi-comp */
+/* eslint-disable react/prefer-es6-class */
+
 import test from 'tape';
 import ComponentStore from '../src/ComponentStore';
 import React from 'react';
