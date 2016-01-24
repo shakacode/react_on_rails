@@ -48,7 +48,9 @@
     "build:test":  "webpack --config webpack.client.js && webpack --config webpack.server.js",
     "test": "npm run build:test && rspec",
     "build:dev:client": "webpack -w --config webpack.client.js",
-    "build:dev:server": "webpack -w --config webpack.server.js"
+    "build:dev:server": "webpack -w --config webpack.server.js",
+    "build:client": "webpack --config webpack.client.js",
+    "build:server": "webpack --config webpack.server.js"
   },
   "author": "",
   "license": "ISC"
