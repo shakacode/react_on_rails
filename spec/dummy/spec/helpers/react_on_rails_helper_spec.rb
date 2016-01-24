@@ -74,6 +74,37 @@ describe ReactOnRailsHelper, type: :helper do
       it { is_expected.not_to include react_component_div }
       it { is_expected.to include react_definition_div }
     end
+
+    context "with skip_display_none option true" do
+      before { ReactOnRails.configuration.skip_display_none = true }
+
+      let(:react_definition_div_skip_display_none_true) do
+        "<div class=\"js-react-on-rails-component\"
+              data-component-name=\"App\"
+              data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
+              data-trace=\"false\"
+              data-expect-turbolinks=\"true\"
+              data-dom-id=\"#{id}\"></div>".squish
+      end
+
+      it { is_expected.to include react_definition_div_skip_display_none_true }
+    end
+
+    context "with skip_display_none option false" do
+      before { ReactOnRails.configuration.skip_display_none = false }
+
+      let(:react_definition_div_skip_display_none_false) do
+        "<div class=\"js-react-on-rails-component\"
+              style=\"display:none\"
+              data-component-name=\"App\"
+              data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
+              data-trace=\"false\"
+              data-expect-turbolinks=\"true\"
+              data-dom-id=\"#{id}\"></div>".squish
+      end
+
+      it { is_expected.to include react_definition_div_skip_display_none_false }
+    end
   end
 
   describe "#server_render_js" do

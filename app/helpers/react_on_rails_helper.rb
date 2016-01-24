@@ -61,7 +61,7 @@ module ReactOnRailsHelper
       content_tag(:div,
                   "",
                   class: "js-react-on-rails-component",
-                  style: "display:none",
+                  style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
                   data: data)
 
     # Create the HTML rendering part
