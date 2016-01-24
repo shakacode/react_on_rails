@@ -1,5 +1,7 @@
+/* eslint-disable react/prefer-es6-class */
+
 import React from 'react';
-import ReactCompat from '../utils/ReactCompat';
+import ReactDOM from 'react-dom';
 
 // Super simple example of React component using React.createClass
 const HelloWorldES5 = React.createClass({
@@ -12,7 +14,7 @@ const HelloWorldES5 = React.createClass({
   },
 
   _handleChange() {
-    const name = ReactCompat.reactFindDOMNode()(this.refs.name).value;
+    const name = ReactDOM.findDOMNode(this.refs.name).value;
     this.setState({ name });
   },
 

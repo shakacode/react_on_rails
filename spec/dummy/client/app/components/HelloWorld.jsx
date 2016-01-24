@@ -1,5 +1,5 @@
 import React, { PropTypes } from 'react';
-import ReactCompat from '../utils/ReactCompat';
+import ReactDOM from 'react-dom';
 
 // Super simple example of the simplest possible React component
 class HelloWorld extends React.Component {
@@ -19,12 +19,13 @@ class HelloWorld extends React.Component {
   }
 
   _handleChange() {
-    const name = ReactCompat.reactFindDOMNode()(this.refs.name).value;
+    const name = ReactDOM.findDOMNode(this.refs.name).value;
     this.setState({ name });
   }
 
   render() {
-    console.log('HelloWorld demonstrating a call to console.log in spec/dummy/client/app/components/HelloWorld.jsx:18');
+    console.log('HelloWorld demonstrating a call to console.log in '
+      + 'spec/dummy/client/app/components/HelloWorld.jsx:18');
 
     const { name } = this.state;
 

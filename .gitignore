@@ -20,7 +20,7 @@
 .ruby-gemset
 
 node_modules
-/examples
+/tmp/examples
 
 /node_package/lib
 

@@ -12,7 +12,7 @@ bundle && npm i && rake examples:prepare_all && rake symlink_node_package && rak
 It's critical to configure your IDE/editor to ignore certain directories. Otherwise your IDE might slow to a crawl!
 
 * /coverage
-* /examples
+* /tmp (takes care of /tmp/examples)
 * /node_package/lib
 * /node_modules
 * /spec/dummy/app/assets/javascripts/generated

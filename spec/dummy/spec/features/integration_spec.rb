@@ -1,17 +1,21 @@
 require "rails_helper"
 
+def change_text_expect_dom_selector(dom_selector)
+  new_text = "John Doe"
+
+  within(dom_selector) do
+    find("input").set new_text
+    within("h3") do
+      is_expected.to have_content new_text
+    end
+  end
+end
+
 shared_examples "React Component" do |dom_selector|
   scenario { is_expected.to have_css dom_selector }
 
   scenario "changes name in message according to input" do
-    new_text = "John Doe"
-
-    within(dom_selector) do
-      find("input").set new_text
-      within("h3") do
-        is_expected.to have_content new_text
-      end
-    end
+    change_text_expect_dom_selector(dom_selector)
   end
 end
 
@@ -55,6 +59,17 @@ feature "Pages/Index", js: true do
     end
 
     include_examples "React Component", "div#my-hello-world-id"
+  end
+end
+
+feature "Turbolinks across pages", js: true do
+  subject { page }
+
+  scenario "changes name in message according to input" do
+    visit "/client_side_hello_world"
+    change_text_expect_dom_selector("#HelloWorld-react-component-0")
+    click_link "Hello World Component Server Rendered, with extra options"
+    change_text_expect_dom_selector("#my-hello-world-id")
   end
 end
 
