@@ -10,11 +10,13 @@ const HelloWorldES5 = React.createClass({
   },
 
   getInitialState() {
+    //this.setNameDomRef = this.setNameDomRef.bind(this);
+    //this.handleChange = this.handleChange.bind(this);
     return this.props.helloWorldData;
   },
 
   handleChange() {
-    const name =  this.nameDomRef.name;
+    const name =  this.nameDomRef.value;
     this.setState({ name });
   },
 
@@ -32,7 +34,7 @@ const HelloWorldES5 = React.createClass({
         </h3>
         <p>
           Say hello to:
-          <input type="text" ref={this.setNameDomRef} defaultValue={name} onChange={::this.handleChange} />
+          <input type="text" ref={this.setNameDomRef} defaultValue={name} onChange={this.handleChange} />
         </p>
       </div>
     );

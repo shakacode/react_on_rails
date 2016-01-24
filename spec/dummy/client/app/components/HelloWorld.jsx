@@ -15,10 +15,12 @@ class HelloWorld extends React.Component {
   constructor(props, context) {
     super(props, context);
     this.state = props.helloWorldData;
+    this.setNameDomRef = this.setNameDomRef.bind(this);
+    this.handleChange = this.handleChange.bind(this);
   }
 
   handleChange() {
-    const name =  this.nameDomRef.name;
+    const name =  this.nameDomRef.value;
     this.setState({ name });
   }
 
@@ -39,7 +41,7 @@ class HelloWorld extends React.Component {
         </h3>
         <p>
           Say hello to:
-          <input type="text" ref={this.setNameDomRef} defaultValue={name} onChange={::this.handleChange} />
+          <input type="text" ref={this.setNameDomRef} defaultValue={name} onChange={this.handleChange} />
         </p>
       </div>
     );
