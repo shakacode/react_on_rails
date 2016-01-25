@@ -34,7 +34,8 @@
     "react-transform-hmr": "^1.0.1",
     "tap-spec": "^4.1.1",
     "tape": "^4.4.0",
-    "webpack": "^1.12.12"
+    "webpack": "^1.12.12",
+    "jsdom": "^8.0.0-0"
   },
   "peerDependencies": {
     "react": ">= 0.14",
