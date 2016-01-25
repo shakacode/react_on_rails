@@ -376,6 +376,7 @@ Note: If you have components from react-rails you want to use, then you will nee
 + [Node Dependencies and NPM](docs/additional_reading/node_dependencies_and_npm.md)
 + [Optional Configuration](docs/additional_reading/optional_configuration.md)
 + [React Router](docs/additional_reading/react_router.md)
++ [RSpec Configuration](docs/additional_reading/rspec_configuration.md)
 + [Server Rendering Tips](docs/additional_reading/server_rendering_tips.md)
 + [Tips](docs/additional_reading/tips.md)
 + [Turbolinks](docs/additional_reading/turbolinks.md)
