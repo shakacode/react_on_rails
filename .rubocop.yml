@@ -20,7 +20,7 @@ AllCops:
     - !ruby/regexp /old_and_unused\.rb$/
     - 'spec/react_on_rails/dummy-for-generators/**/*'
     - 'spec/dummy/bin/**/*'
-    - 'tmp/examples/**/*'
+    - 'gen-examples/examples/**/*'
 
 Metrics/LineLength:
   Max: 120

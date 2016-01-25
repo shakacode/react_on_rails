@@ -7,7 +7,7 @@ module ReactOnRails
 
     # Returns the folder where examples are located
     def examples_dir
-      File.join(gem_root, "tmp", "examples")
+      File.join(gem_root, "gen-examples", "examples")
     end
 
     def dummy_app_dirs
