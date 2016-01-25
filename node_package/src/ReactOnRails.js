@@ -29,10 +29,11 @@ ctx.ReactOnRails = {
    * @param name Name of your registered component
    * @param props Props to pass to your component
    * @param domNodeId
+   * @returns {virtualDomElement} Reference to your component's backing instance
    */
   render(name, props, domNodeId) {
     const reactElement = createReactElement({ name, props, domNodeId });
-    ReactDOM.render(reactElement, document.getElementById(domNodeId));
+    return ReactDOM.render(reactElement, document.getElementById(domNodeId));
   },
 
   /**
