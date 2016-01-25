@@ -368,7 +368,6 @@ If you are using [react-rails](https://github.com/reactjs/react-rails) in your p
 
 Note: If you have components from react-rails you want to use, then you will need to port them into react_on_rails which uses webpack instead of the asset pipeline.
 
-
 ## Additional Reading
 + [Generated Client Code](docs/additional_reading/generated_client_code.md)
 + [Heroku Deployment](docs/additional_reading/heroku_deployment.md)
@@ -379,9 +378,15 @@ Note: If you have components from react-rails you want to use, then you will nee
 + [RSpec Configuration](docs/additional_reading/rspec_configuration.md)
 + [Server Rendering Tips](docs/additional_reading/server_rendering_tips.md)
 + [Tips](docs/additional_reading/tips.md)
++ [Tutorial for v2.0](docs/tutorial-v2.md)
 + [Turbolinks](docs/additional_reading/turbolinks.md)
 + [Webpack Configuration](docs/additional_reading/webpack.md)
 + [Webpack Cookbook](https://christianalfoni.github.io/react-webpack-cookbook/index.html)
+
+## Demos
++ [www.reactrails.com](http://www.reactrails.com)
+
+
 
 ## Contributing
 Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant](contributor-covenant.org) code of conduct (see [CODE OF CONDUCT](docs/code_of_conduct.md)).

@@ -16,8 +16,7 @@ export function consoleReplay() {
       }
     });
 
-    return 'console.' + msg.level + '.apply(console, ' +
-      JSON.stringify(stringifiedList) + ');';
+    return `console.${msg.level}.apply(console, ${JSON.stringify(stringifiedList)});`;
   });
 
   return lines.join('\n');

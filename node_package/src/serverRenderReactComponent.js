@@ -19,14 +19,16 @@ export default function serverRenderReactComponent(options) {
       // Set hasErrors in case we want to throw a Rails exception
       hasErrors = !!reactElementOrRouterResult.routeError;
       if (hasErrors) {
-        console.error('React Router ERROR: ' +
-          JSON.stringify(reactElementOrRouterResult.routeError));
+        console.error(
+          `React Router ERROR: ${JSON.stringify(reactElementOrRouterResult.routeError)}`
+        );
       } else {
         if (trace) {
           const redirectLocation = reactElementOrRouterResult.redirectLocation;
           const redirectPath = redirectLocation.pathname + redirectLocation.search;
-          console.log('ROUTER REDIRECT: ' + name + ' to dom node with id: ' + domNodeId +
-            ', redirect to ' + redirectPath);
+          console.log(`\
+ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redirectPath}`
+          );
         }
       }
     } else {

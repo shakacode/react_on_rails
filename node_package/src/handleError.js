@@ -16,7 +16,7 @@ function handleGeneratorFunctionIssue(options) {
 component \'${name}\' seems to be a generator function.\n${lastLine}`;
     const reMatchShouldBeGeneratorError = /Can't add property context, object is not extensible/;
     if (reMatchShouldBeGeneratorError.test(e.message)) {
-      msg += shouldBeGeneratorError + '\n\n';
+      msg += `${shouldBeGeneratorError}\n\n`;
       console.error(shouldBeGeneratorError);
     }
 
@@ -27,7 +27,7 @@ component \'${name}\' is not a generator function.\n${lastLine}`;
     const reMatchShouldNotBeGeneratorError = /Cannot call a class as a function/;
 
     if (reMatchShouldNotBeGeneratorError.test(e.message)) {
-      msg += shouldBeGeneratorError + '\n\n';
+      msg += `${shouldBeGeneratorError}\n\n`;
       console.error(shouldBeGeneratorError);
     }
   }
@@ -43,11 +43,11 @@ export default (options) => {
   let msg = handleGeneratorFunctionIssue(options);
 
   if (jsCode) {
-    console.error('JS code was: ' + jsCode);
+    console.error(`JS code was: ${jsCode}`);
   }
 
   if (e.fileName) {
-    console.error('location: ' + e.fileName + ':' + e.lineNumber);
+    console.error(`location: ${e.fileName}:${e.lineNumber}`);
   }
 
   console.error(`message: ${e.message}`);
@@ -55,7 +55,7 @@ export default (options) => {
 
   if (serverSide) {
     msg += `Exception in rendering!
-${e.fileName ? `\nlocation: ${e.fileName}:` + e.lineNumber : ''}
+${e.fileName ? `\nlocation: ${e.fileName}:${e.lineNumber}` : ''}
 Message: ${e.message}
 
 ${e.stack}`;

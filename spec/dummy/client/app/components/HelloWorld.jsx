@@ -20,7 +20,7 @@ class HelloWorld extends React.Component {
   }
 
   handleChange() {
-    const name =  this.nameDomRef.value;
+    const name = this.nameDomRef.value;
     this.setState({ name });
   }
 
@@ -29,8 +29,8 @@ class HelloWorld extends React.Component {
   }
 
   render() {
-    console.log('HelloWorld demonstrating a call to console.log in '
-      + 'spec/dummy/client/app/components/HelloWorld.jsx:18');
+    console.log(`\HelloWorld demonstrating a call to console.log in \
+spec/dummy/client/app/components/HelloWorld.jsx:18`);
 
     const { name } = this.state;
 
@@ -41,7 +41,12 @@ class HelloWorld extends React.Component {
         </h3>
         <p>
           Say hello to:
-          <input type="text" ref={this.setNameDomRef} defaultValue={name} onChange={this.handleChange} />
+          <input
+            type="text"
+            ref={this.setNameDomRef}
+            defaultValue={name}
+            onChange={this.handleChange}
+          />
         </p>
       </div>
     );

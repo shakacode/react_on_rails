@@ -26,3 +26,5 @@ node_modules
 
 npm-debug.*
 spec/dummy/client/npm-debug.log.*
+
+gen_examples

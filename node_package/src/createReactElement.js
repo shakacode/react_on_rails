@@ -20,7 +20,7 @@ export default function createReactElement({
   location,
   }) {
   if (trace) {
-    console.log('RENDERED ' + name + ' to dom node with id: ' + domNodeId);
+    console.log(`RENDERED ${name} to dom node with id: ${domNodeId}`);
   }
 
   const componentObj = ReactOnRails.getComponent(name);

@@ -23,7 +23,8 @@ ctx.ReactOnRails = {
    * ReactOnRails.render("HelloWorldApp", {name: "Stranger"}, 'app');
    *
    * Does this:
-   *   ReactDOM.render(React.createElement(HelloWorldApp, {name: "Stranger"}), document.getElementById('app'))
+   *   ReactDOM.render(React.createElement(HelloWorldApp, {name: "Stranger"}),
+   *     document.getElementById('app'))
    *
    * @param name Name of your registered component
    * @param props Props to pass to your component

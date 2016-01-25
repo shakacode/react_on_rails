@@ -12,7 +12,7 @@
     "test": "npm run build:test && npm run lint && rspec",
     "lint": "cd client && npm run lint",
     "build:clent": "cd client && npm run build:client",
-    "build:server": "cd client && npm run build:server",
+    "build:server": "cd client && npm run build:server"
   },
   "repository": {
     "type": "git",
