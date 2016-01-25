@@ -50,7 +50,7 @@ module ReactOnRails
       end
     end
 
-    def double_package_version(raw:, major:, relative_path: false)
+    def double_package_version(raw: nil, major: nil, relative_path: false)
       instance_double(VersionChecker::NodePackageVersion,
                       raw: raw,
                       major: major,

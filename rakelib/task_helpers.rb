@@ -25,7 +25,7 @@ module ReactOnRails
     end
 
     # Runs bundle exec using that directory's Gemfile
-    def bundle_exec(dir:, args:, env_vars: "")
+    def bundle_exec(dir: nil, args: nil, env_vars: "")
       sh_in_dir(dir, "#{env_vars} #{args}")
     end
 

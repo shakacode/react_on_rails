@@ -30,20 +30,18 @@ module ReactOnRails
                    logging_on_server: nil, server_renderer_pool_size: nil,
                    server_renderer_timeout: nil, raise_on_prerender_error: nil,
                    skip_display_none: nil)
-      if File.exist?(server_bundle_js_file)
-        self.server_bundle_js_file = server_bundle_js_file
-      else
-        self.server_bundle_js_file = nil
-      end
+      self.server_bundle_js_file = if File.exist?(server_bundle_js_file)
+                                     server_bundle_js_file
+                                   end
 
       self.prerender = prerender
       self.replay_console = replay_console
       self.logging_on_server = logging_on_server
-      if development_mode.nil?
-        self.development_mode = Rails.env.development?
-      else
-        self.development_mode = development_mode
-      end
+      self.development_mode = if development_mode.nil?
+                                Rails.env.development?
+                              else
+                                development_mode
+                              end
       self.trace = trace.nil? ? Rails.env.development? : trace
       self.raise_on_prerender_error = raise_on_prerender_error
       self.skip_display_none = skip_display_none

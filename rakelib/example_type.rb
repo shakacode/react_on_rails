@@ -18,7 +18,7 @@ module ReactOnRails
 
       attr_reader :name, :generator_options
 
-      def initialize(name:, generator_options:)
+      def initialize(name: nil, generator_options: nil)
         @name = name
         @generator_options = generator_options
         self.class.all << self

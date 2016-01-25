@@ -29,7 +29,7 @@ module GeneratorMessages
     end
 
     def format_info(msg)
-      Rainbow("#{msg}").green
+      Rainbow(msg.to_s).green
     end
 
     def clear
