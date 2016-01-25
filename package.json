@@ -25,7 +25,7 @@
     "blue-tape": "^0.1.11",
     "eslint": "^1.10.3",
     "eslint-config-airbnb": "^4.0.0",
-    "eslint-config-shakacode": "0.0.1",
+    "eslint-config-shakacode": "1.0.0",
     "eslint-plugin-babel": "^3.0.0",
     "eslint-plugin-react": "^3.16.1",
     "jscs": "^2.8.0",

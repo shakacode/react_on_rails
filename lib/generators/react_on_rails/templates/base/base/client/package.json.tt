@@ -58,7 +58,7 @@
     "loader-utils": "^0.2.12",
     "lodash": "^4.0.0",
     <%- if options.redux? -%>
-    "mirror-creator": "0.0.1",
+    "mirror-creator": "1.0.0",
     <%- end -%>
     "react": "^0.14.6",
     <%- unless options.skip_bootstrap? -%>
@@ -87,7 +87,7 @@
     <%- unless options.skip_js_linters? -%>
     "eslint": "^1.10.3",
     "eslint-config-airbnb": "^4.0.0",
-    "eslint-config-shakacode": "^0.0.1",
+    "eslint-config-shakacode": "^1.0.0",
     "eslint-plugin-react": "^3.16.1",
     <%- end -%>
     "express": "^4.13.4",
