@@ -40,11 +40,11 @@ module ReactOnRailsHelper
     # We use this react_component_index in case we have the same component multiple times on the page.
     react_component_index = next_react_component_index
     react_component_name = component_name.camelize # Not sure if we should be doing this (JG)
-    if options[:id].nil?
-      dom_id = "#{component_name}-react-component-#{react_component_index}"
-    else
-      dom_id = options[:id]
-    end
+    dom_id = if options[:id].nil?
+               "#{component_name}-react-component-#{react_component_index}"
+             else
+               options[:id]
+             end
 
     # Setup the page_loaded_js, which is the same regardless of prerendering or not!
     # The reason is that React is smart about not doing extra work if the server rendering did its job.

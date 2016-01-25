@@ -1,5 +1,4 @@
 import React, { PropTypes } from 'react';
-import ReactDOM from 'react-dom';
 
 // Super simple example of the simplest possible React component
 export default class HelloWorldRedux extends React.Component {
@@ -17,7 +16,7 @@ export default class HelloWorldRedux extends React.Component {
   }
 
   handleChange() {
-    const name =  this.nameDomRef.value;
+    const name = this.nameDomRef.value;
     this.props.actions.updateName(name);
   }
 
@@ -36,7 +35,12 @@ export default class HelloWorldRedux extends React.Component {
         </h3>
         <p>
           With Redux, say hello to:
-          <input type="text" ref={this.setNameDomRef} defaultValue={name} onChange={this.handleChange} />
+          <input
+            type="text"
+            ref={this.setNameDomRef}
+            defaultValue={name}
+            onChange={this.handleChange}
+          />
         </p>
       </div>
     );

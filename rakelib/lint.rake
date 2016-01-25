@@ -20,12 +20,12 @@ namespace :lint do
 
   desc "Run eslint as shell"
   task :eslint do
-    sh_in_dir(gem_root, "$(npm bin)/eslint . --ext .jsx and .js")
+    sh_in_dir(gem_root, "npm run eslint")
   end
 
   desc "Run jscs from shell"
   task :jscs do
-    sh_in_dir(gem_root, "$(npm bin)/jscs -e -v .")
+    sh_in_dir(gem_root, "npm run jscs")
   end
 
   desc "Run all eslint, jscs, rubocop linters. Skip ruby-lint and scss"

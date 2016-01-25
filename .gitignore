@@ -20,9 +20,10 @@
 .ruby-gemset
 
 node_modules
-/tmp/examples
 
 /node_package/lib
 
 npm-debug.*
 spec/dummy/client/npm-debug.log.*
+
+/gen-examples

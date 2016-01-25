@@ -70,9 +70,7 @@ test('generatorFunction: Generator function recognized as such', (assert) => {
     },
   });
 
-  const foobarGeneratorFunction = () => {
-    return foobarComponent;
-  };
+  const foobarGeneratorFunction = () => foobarComponent;
 
   assert.equal(generatorFunction(foobarGeneratorFunction), true,
     'generatorFunction should be recognized as a generatorFunction');

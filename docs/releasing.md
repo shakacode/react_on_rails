@@ -10,7 +10,7 @@ Install https://github.com/svenfuchs/gem-release
 
 ```bash
 # Having the examples prevents publishing
-rm -rf tmp/examples
+rm -rf gen-examples/examples
 gem bump
 # Or manually update the version number
 cd spec/dummy

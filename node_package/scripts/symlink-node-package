@@ -12,7 +12,7 @@ root_path=${DIR}/../..
 (cd $root_path && npm link)
 
 # Link the example apps to use react_on_rails node_package
-examplesDir=${root_path}/tmp/examples
+examplesDir=${root_path}/gen-examples/examples
 if [ -d $examplesDir ] ; then
   for type in $( ls $examplesDir ); do
     d=$examplesDir/${type}/client

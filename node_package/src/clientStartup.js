@@ -53,9 +53,9 @@ function render(el) {
       });
 
       if (isRouterResult(reactElementOrRouterResult)) {
-        throw new Error('You returned a server side type of react-router error: ' +
-          JSON.stringify(reactElementOrRouterResult) +
-          '\nYou should return a React.Component always for the client side entry point.');
+        throw new Error(`\
+You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
+You should return a React.Component always for the client side entry point.`);
       } else {
         ReactDOM.render(reactElementOrRouterResult, domNode);
       }
@@ -99,7 +99,8 @@ export default function clientStartup(context) {
     return;
   }
 
-  context.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
+  context.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = // eslint-disable-line no-param-reassign
+    true;
 
   debugTurbolinks('Adding DOMContentLoaded event to install event listeners.');
 

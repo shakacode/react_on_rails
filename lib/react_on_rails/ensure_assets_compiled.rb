@@ -14,9 +14,9 @@ module ReactOnRails
         build_output = `cd client && npm run build:#{type}`
         if build_output =~ /error/i
           fail "Error in building assets!\n#{build_output}"
-        else
-          puts "Webpack #{type}-rendering assets built."
         end
+
+        puts "Webpack #{type}-rendering assets built."
       end
     end
 
