@@ -10,7 +10,7 @@ if ENV["COVERAGE"]
   SimpleCov.start("rails") do
     # Consider the entire gem project as the root
     # (typically this will be the folder named "react_on_rails")
-    gem_root_path = File.expand_path("../../../../.", __FILE__)
+    gem_root_path = File.expand_path("../../../../../.", __FILE__)
     root gem_root_path
 
     # Don't report anything that has "spec" in the path
