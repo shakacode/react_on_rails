@@ -86,13 +86,12 @@ module ReactOnRails
         "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record"
       end
 
-      # Methods for retrieving the name of a task specific to the example type
       %w(gen prepare clean clobber npm_install build_webpack_bundles).each do |task_type|
-        method = "#{task_type}_task_name"      # ex: `clean_task_name`
-        task_name = "#{task_type}_#{name}"     # ex: `clean_basic`
+        method_name_normal = "#{task_type}_task_name"          # ex: `clean_task_name`
+        method_name_short = "#{method_name_normal}_short"      # ex: `clean_task_name_short`
 
-        define_method(method) { "#{self.class.namespace_name}:#{task_name}" }
-        define_method("#{method}_short") { task_name }
+        define_method(method_name_normal) { "#{self.class.namespace_name}:#{task_type}_#{name}" }
+        define_method(method_name_short) { "#{task_type}_#{name}" }
       end
 
       def rspec_task_name_short
