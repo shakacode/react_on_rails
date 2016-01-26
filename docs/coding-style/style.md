@@ -18,7 +18,6 @@ Follow these style guidelines per the linter configuration. Basically, lint your
 ### JavaScript Coding Standards
 * [ShakaCode Javascript](https://github.com/shakacode/style-guide-javascript)
 * Use the [eslint-config-shakacode](https://github.com/shakacode/style-guide-javascript/tree/master/packages/eslint-config-shakacode) npm package with eslint.
-* [AirBnb Javascript](https://github.com/airbnb/javascript)
 * [JSDoc](http://usejsdoc.org/)
 
 ### Git coding Standards
