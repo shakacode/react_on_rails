@@ -61,7 +61,7 @@ ES5 was ugly. ES6 is beautiful. React is beautiful. Client side code written wit
 Assuming that you're building the type of app that's a good fit for Rails (document/database based with lots of business rules), the tight integration of modern JavaScript with React on top of Ruby on Rails is better than building a pure client side app and separate microservices. Here's why:
 
 * Via React on Rails, we can seamlessly integrate React UI components with Rails.
-* Tight integration allows for trivial set up of server rendering of React on top of Rails, complete with support fragment caching of the server rendered HTML, and integration with [Turbolinks](https://github.com/rails/turbolinks).
+* Tight integration allows for trivial set up of server rendering of React on top of Rails, complete with support for fragment caching of the server rendered HTML, and integration with [Turbolinks](https://github.com/rails/turbolinks).
 * Tight integration allows mixing and matching Rails pages with React driven pages, even on the same page. Not every part of a UI requires the high fidelity achievable using React. Many existing apps may have hundreds of standards Rails forms. Support for mixing and matching React with Rails forms provides the best of both worlds.
 
 ## Progress over Stability
@@ -71,7 +71,7 @@ React on Rails will maintain an active pace of development, to keep up with:
 * New client side tooling, libraries, and techniques.
 * Updates to Rails.
 
-## Push up a big tent
+## Raise a Big Tent
 React on Rails is definitely a part of the big tent of Rails. Plus, React on Rails provides its own big tent. A huge benefit of the React on Rails system is simple integration with Webpack and NPM, allowing integration with almost any library available on [npm](https://www.npmjs.org/)! The integration with Webpack also allows for other Webpack supported build tools.
 
 ## Thanks!
