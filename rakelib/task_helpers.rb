@@ -10,7 +10,7 @@ module ReactOnRails
       File.join(gem_root, "gen-examples", "examples")
     end
 
-    def dummy_app_dirs
+    def dummy_app_dir
       File.join(gem_root, "spec/dummy")
     end
 
