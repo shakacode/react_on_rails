@@ -59,7 +59,6 @@ module ReactOnRails
         else
           error = "react_on_rails generator prerequisites not met!"
           GeneratorMessages.add_error(error)
-          # fail("react_on_rails generator prerequisites not met!")
         end
       ensure
         print_generator_messages
@@ -87,7 +86,7 @@ module ReactOnRails
       # js(.coffee) are not checked by this method, but instead produce warning messages
       # and allow the build to continue
       def installation_prerequisites_met?
-        !(missing_node? || missing_npm? || uncommitted_changes?)
+        !(missing_node? || missing_npm? || ReactOnRails::GitUtils.uncommitted_changes?(GeneratorMessages))
       end
 
       def missing_npm?
@@ -102,15 +101,6 @@ module ReactOnRails
         return false unless `which node`.blank?
         error = "** nodejs is required. Please install it before continuing. "
         error << "https://nodejs.org/en/"
-        GeneratorMessages.add_error(error)
-        true
-      end
-
-      def uncommitted_changes?
-        return false if ENV["COVERAGE"]
-        status = `git status`
-        return false if status.include?("nothing to commit, working directory clean")
-        error = "You have uncommitted code. Please commit or stash your changes before continuing"
         GeneratorMessages.add_error(error)
         true
       end
