@@ -1,6 +1,3 @@
-require_relative "version"
-require_relative "version_syntax_converter"
-
 module ReactOnRails
   # Responsible for checking versions of rubygem versus npm node package
   # against each otherat runtime.

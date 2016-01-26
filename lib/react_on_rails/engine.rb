@@ -1,5 +1,3 @@
-require_relative "version_checker"
-
 module ReactOnRails
   class Engine < ::Rails::Engine
     config.to_prepare do
