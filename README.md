@@ -2,7 +2,7 @@
 
 # NEWS
 
-* 2.1 has shipped on Tuesday, 2/26/2016. Please see the [Changelog](changelog.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps).
+* 2.1 has shipped on Tuesday, 2/26/2016. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps).
 * 2 highlights:
   1. Fixed a **critical** problem with TurboLinks.
   2. Provides a convenient helper to ensure that JavaScript assets are compiled before running tests.
