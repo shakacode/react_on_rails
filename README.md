@@ -2,7 +2,7 @@
 
 # NEWS
 
-* 2.1 has shipped on Tuesday, 2/26/2016. Please see the [Changelog](changelog.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps).
+* 2.1 has shipped on Tuesday, 2/26/2016. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps).
 * 2 highlights:
   1. Fixed a **critical** problem with TurboLinks.
   2. Provides a convenient helper to ensure that JavaScript assets are compiled before running tests.
@@ -377,6 +377,7 @@ If you are using [react-rails](https://github.com/reactjs/react-rails) in your p
 Note: If you have components from react-rails you want to use, then you will need to port them into react_on_rails which uses webpack instead of the asset pipeline.
 
 ## Additional Reading
++ [The React on Rails Doctrine](http://www.shakacode.com/2016/01/26/the-react-on-rails-doctrine.html)
 + [Generated Client Code](docs/additional_reading/generated_client_code.md)
 + [Heroku Deployment](docs/additional_reading/heroku_deployment.md)
 + [Manual Installation](docs/additional_reading/manual_installation.md)
@@ -390,9 +391,10 @@ Note: If you have components from react-rails you want to use, then you will nee
 + [Turbolinks](docs/additional_reading/turbolinks.md)
 + [Webpack Configuration](docs/additional_reading/webpack.md)
 + [Webpack Cookbook](https://christianalfoni.github.io/react-webpack-cookbook/index.html)
++ [Changelog](CHANGELOG.md)
 
 ## Demos
-+ [www.reactrails.com](http://www.reactrails.com)
++ [www.reactrails.com](http://www.reactrails.com) with source at [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/).
 + [spec app](spec/dummy): Great simple examples used for our tests.
   ```
   cd spec/dummy
@@ -411,7 +413,7 @@ The gem is available as open source under the terms of the [MIT License](docs/LI
 ## Authors
 [The Shaka Code team!](http://www.shakacode.com/about/)
 
-The project started with [Justin Gordon](https://github.com/justin808/) pairing with [Samnang Chhun](https://github.com/samnang) to figure out how to do server rendering with Webpack plus Rails. [Alex Fedoseev](https://github.com/alexfedoseev) then joined in. [Rob Wise](https://github.com/robwise), [Aaron Van Bokhoven](https://github.com/aaronvb), and [Andy Wang](https://github.com/yorzi) did the bulk of the generators.
+The project started with [Justin Gordon](https://github.com/justin808/) pairing with [Samnang Chhun](https://github.com/samnang) to figure out how to do server rendering with Webpack plus Rails. [Alex Fedoseev](https://github.com/alexfedoseev) then joined in. [Rob Wise](https://github.com/robwise), [Aaron Van Bokhoven](https://github.com/aaronvb), and [Andy Wang](https://github.com/yorzi) did the bulk of the generators. Many others have [contributed](https://github.com/shakacode/react_on_rails/graphs/contributors).
 
 We owe much gratitude to the work of the [react-rails gem](https://github.com/reactjs/react-rails). We've also been inspired by the [react_webpack_rails gem](https://github.com/netguru/react_webpack_rails).
 
