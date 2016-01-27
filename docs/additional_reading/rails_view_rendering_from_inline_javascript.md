@@ -2,9 +2,18 @@
 You can easily render React components in your JavaScript with `render` method that returns a [reference to the component](https://facebook.github.io/react/docs/more-about-refs.html) (virtual DOM element).
 
 ```js
-// componentName - name of your registered component;
-// props - Object which contains the properties to pass to the react object;
-// elementId - id of an element where we render our React component;
+/**
+ * ReactOnRails.render("HelloWorldApp", {name: "Stranger"}, 'app');
+ *
+ * Does this:
+ *   ReactDOM.render(React.createElement(HelloWorldApp, {name: "Stranger"}),
+ *     document.getElementById('app'))
+ *
+ * @param name Name of your registered component
+ * @param props Props to pass to your component
+ * @param domNodeId
+ * @returns {virtualDomElement} Reference to your component's backing instance
+ */
 ReactOnRails.render(componentName, props, elementId)
 ```
 
