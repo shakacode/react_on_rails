@@ -170,15 +170,15 @@ Now the server will interpret your JavaScript using [ExecJS](https://github.com/
 
 Note that **server-rendering requires globally exposing your components by setting them to `global`, not `window`** (as is the case with client-rendering). If using the generator, you can pass the `--server-rendering` option to configure your application for server-side rendering.
 
-In the following screenshot you can see the 3 parts of react_on_rails rendering:
+In the following screenshot you can see the 3 parts of React on Rails rendering:
 
-1. Inline JavaScript to "client-side" render the React component.
-2. The wrapper div `<div id="HelloWorld-react-component-0">` enclosing the server-rendered HTML for the React component
-3. Additional JavaScript to console log any messages, such as server rendering errors.
+1. A hidden HTML div that contains the properties of the React component, such as the registered name and any props. A JavaScript function runs after the page loads to convert take this data and build initialize React components.
+2. The wrapper div `<div id="HelloWorld-react-component-0">` specifies the div where to place the React rendering. It encloses the server-rendered HTML for the React component
+3. Additional JavaScript is placed to console log any messages, such as server rendering errors. Note, these server side logs can be configured to only be sent to the server logs.
 
-**Note**: If server rendering is not used (prerender: false), then the major difference is that the HTML rendered contains *only* the outer div: `<div id="HelloWorld-react-component-0"/>`
+**Note**: If server rendering is not used (prerender: false), then the major difference is that the HTML rendered for the React component only contains the outer div: `<div id="HelloWorld-react-component-0"/>`. The first specification of the React component is just the same.
 
-![Comparison of a normal React Component with its server-rendered version](https://cloud.githubusercontent.com/assets/1118459/10157268/41435186-6624-11e5-9341-6fc4cf35ee90.png)
+![Comparison of a normal React Component with its server-rendered version](https://cloud.githubusercontent.com/assets/1118459/12607542/a959d5c8-c48a-11e5-8187-2433d543ccaa.png)
 
 ### Building the Bundles
 Each time you change your client code, you will need to re-generate the bundles (the webpack-created JavaScript files included in application.js). The included Foreman `Procfile.dev` will take care of this for you by watching your JavaScript code files for changes. Simply run `foreman start -f Procfile.dev`.
