@@ -1,6 +1,6 @@
 # The React on Rails Doctrine
 
-By Justin Gordon, January 24, 2016
+By Justin Gordon, January 26, 2016
 
 This document is an extension and complement to [The Rails Doctrine](http://rubyonrails.org/doctrine/). If you haven't read that document, I suggest you do so first.
 

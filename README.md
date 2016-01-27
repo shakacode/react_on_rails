@@ -2,8 +2,12 @@
 
 # NEWS
 
-* 2.1 is almost ready and will probably ship on Monday, 1/25/2016. Please grab the latest and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps).
+* 2.1 has ship on Tuesday, 2/26/2016. Please see the [Changelog](changelog.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps). 2 highlights:
+  1. Fixed a critical problem with TurboLinks.
+  2. Providing a helper to ensure that JavaScript assets are compiled before running tests.
 * React on Rails does not yet have *generator* support for building new apps that use CSS modules and hot reloading via the Rails server as is demonstrated in the [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/). *We do support this, but we don't generate the code.* If you did generate a fresh app from react_on_rails and want to move to CSS Modules, then see [PR 175: Babel 6 / CSS Modules / Rails hot reloading](https://github.com/shakacode/react-webpack-rails-tutorial/pull/175). Note, while there are probably fixes after this PR was accepted, this has the majority of the changes. See [the tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/#news) for more information. Ping us if you want to help!
+* ShakaCode is doing Skype plus Slack/Github based coaching for "React on Rails". [Click here](http://www.shakacode.com/work/index.html) for more information.
+* Be sure to read our new article [The React on Rails Doctrine](http://www.shakacode.com/2016/01/26/the-react-on-rails-doctrine.html).
 
 # React on Rails
 
@@ -13,7 +17,7 @@ React on Rails integrates Facebook's [React](https://github.com/facebook/react) 
 
 Be sure to see:
 
-* [The React on Rails Doctrine](docs/doctrine.md)
+* [The React on Rails Doctrine](http://www.shakacode.com/2016/01/26/the-react-on-rails-doctrine.html)
 * [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial) along with the live example at [www.reactrails.com](http://www.reactrails.com).
 
 ## Including your React Component in your Rails Views
