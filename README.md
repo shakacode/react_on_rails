@@ -364,7 +364,7 @@ If you are using [react-rails](https://github.com/reactjs/react-rails) in your p
 
 - Remove the 'react-rails' gem from your Gemfile.
 
-- Remove the generated generated lines for react-rails in your application.js file. 
+- Remove the generated generated lines for react-rails in your application.js file.
 
 ```
 //= require react
@@ -386,6 +386,7 @@ Note: If you have components from react-rails you want to use, then you will nee
 + [React Router](docs/additional_reading/react_router.md)
 + [RSpec Configuration](docs/additional_reading/rspec_configuration.md)
 + [Server Rendering Tips](docs/additional_reading/server_rendering_tips.md)
++ [Rails View Rendering from Inline JavaScript](docs/additional_reading/rails_view_rendering_from_inline_javascript.md)
 + [Tips](docs/additional_reading/tips.md)
 + [Tutorial for v2.0](docs/tutorial-v2.md), deployed [here](https://shakacode-react-on-rails.herokuapp.com/).
 + [Turbolinks](docs/additional_reading/turbolinks.md)
