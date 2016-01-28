@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+##### Fixed
+- Fixed regression where apps that were not using Turbolinks would not render components on page load.
+
+##### Added
+- `debug_turbolinks` helper for debugging turbolinks issues. See [turbolinks](docs/additional_reading/turbolinks.md).
+- Enhanced regression testing for non-turbolinks apps. Runs all tests for dummy app with turbolinks both disabled and enabled.
 
 ## [2.1.0] - 2016-01-26
 ##### Added

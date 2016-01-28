@@ -16,6 +16,12 @@ namespace :run_rspec do
     run_tests_in(File.join("spec", "dummy"), env_vars: "DRIVER=selenium_firefox")
   end
 
+  task dummy_no_turbolinks: ["dummy_apps:dummy_app"] do
+    run_tests_in(File.join("spec", "dummy"),
+                 env_vars: "DRIVER=selenium_firefox DISABLE_TURBOLINKS=TRUE",
+                 command_name: "dummy_no_turbolinks")
+  end
+
   # Dynamically define Rake tasks for each example app found in the examples directory
   ExampleType.all.each do |example_type|
     desc "Runs RSpec for #{example_type.name_pretty} only"
@@ -37,7 +43,7 @@ namespace :run_rspec do
   Coveralls::RakeTask.new
 
   desc "run all tests"
-  task run_rspec: [:gem, :dummy, :examples, :empty, :js_tests] do
+  task run_rspec: [:gem, :dummy, :dummy_no_turbolinks, :examples, :empty, :js_tests] do
     puts "Completed all RSpec tests"
   end
 end
@@ -69,6 +75,6 @@ def run_tests_in(dir, options = {})
 
   command_name = options.fetch(:command_name, path.basename)
   rspec_args = options.fetch(:rspec_args, "")
-  env_vars = %(#{options.fetch(env_vars, '')} COVERAGE=true TEST_ENV_COMMAND_NAME="#{command_name}")
+  env_vars = %(#{options.fetch(:env_vars, '')} COVERAGE=true TEST_ENV_COMMAND_NAME="#{command_name}")
   sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
 end
