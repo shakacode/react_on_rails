@@ -11,6 +11,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 - Fixed regression where apps that were not using Turbolinks would not render components on page load.
 
 ##### Added
+- `ReactOnRails.render` returns a virtualDomElement Reference to your React component's backing instance. See [#234](https://github.com/shakacode/react_on_rails/pull/234).
 - `debug_turbolinks` helper for debugging turbolinks issues. See [turbolinks](docs/additional_reading/turbolinks.md).
 - Enhanced regression testing for non-turbolinks apps. Runs all tests for dummy app with turbolinks both disabled and enabled.
 
