@@ -111,7 +111,7 @@ export default function clientStartup(context) {
 
     if (!turbolinksInstalled()) {
       debugTurbolinks('WITHOUT TURBOLINKS: DOMContentLoaded handler installed.');
-      document.addEventListener('DOMContentLoaded', reactOnRailsPageLoaded);
+      reactOnRailsPageLoaded();
     } else {
       debugTurbolinks('WITH TURBOLINKS: document page:before-unload and page:change handlers' +
         ' installed.');

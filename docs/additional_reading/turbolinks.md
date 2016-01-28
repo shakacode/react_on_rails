@@ -4,8 +4,8 @@
 * Currently support 2.5.x of Turbolinks. We plan to update to Turbolinks 5 soon.
 
 ## Why Turbolinks?
-As you switch between Rails HTML controller requests, you will only load the HTML and you will 
-not reload JavaScript and stylesheets. This definitely can make an app perform better, even if 
+As you switch between Rails HTML controller requests, you will only load the HTML and you will
+not reload JavaScript and stylesheets. This definitely can make an app perform better, even if
 the JavaScript and stylesheets are cached by the browser, as they will still require parsing.
 
 ### Install Checklist
@@ -19,21 +19,8 @@ the JavaScript and stylesheets are cached by the browser, as they will still req
    ```javascript
    //= require turbolinks
    ```
-   
+
 ## Troubleshooting
+To turn on tracing of Turbolinks events, require `debug_turbolinks` (provided by ReactOnRails) inside of `app/assets/javascripts/application.js` **at the beginning of the file**. This will print out events related to the initialization of the components created with the view helper `react_component`.
 
-You cans set a global debug flag in your `application.js` to turn on tracing of Turbolinks events
-as they pertain to React on Rails.
-
-1. Add this line to your `application.js`:
-   ```javascript
-   //= require testGlobals
-   ```
-2. Initialie the global debug value of `DEBUG_TURBOLINKS` like this:
-   ```javascript
-   window.DEBUG_TURBOLINKS = true;
-   console.log('window.DEBUG_TURBOLINKS = true;');
-   ```
-   
-This will print out events related to the initialization of the components created with the view 
-helper `react_component`.
+We've noticed that Turbolinks doesn't work if you use the ruby gem version of jQuery and jQuery ujs. Therefore we recommend using the node packages instead. See the [tutorial app](https://github.com/shakacode/react-webpack-rails-tutorial) for how to accomplish this.
