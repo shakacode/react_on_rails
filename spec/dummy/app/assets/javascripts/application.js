@@ -10,7 +10,4 @@
 // Read Sprockets README (https://github.com/rails/sprockets#sprockets-directives) for details
 // about supported directives.
 //
-//= require testGlobals
 //= require generated/client
-
-//= require turbolinks

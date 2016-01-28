@@ -48,13 +48,13 @@ describe ReactOnRailsHelper, type: :helper do
     let(:id) { "App-react-component-0" }
 
     let(:react_definition_div) do
-      "<div class=\"js-react-on-rails-component\"
+      %(<div class=\"js-react-on-rails-component\"
             style=\"display:none\"
             data-component-name=\"App\"
             data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
             data-trace=\"false\"
-            data-expect-turbolinks=\"true\"
-            data-dom-id=\"#{id}\"></div>".squish
+            #{turbolinks_line}
+            data-dom-id=\"#{id}\"></div>).squish
     end
 
     it { expect(self).to respond_to :react_component }
@@ -83,7 +83,7 @@ describe ReactOnRailsHelper, type: :helper do
               data-component-name=\"App\"
               data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
               data-trace=\"false\"
-              data-expect-turbolinks=\"true\"
+              #{turbolinks_line}
               data-dom-id=\"#{id}\"></div>".squish
       end
 
@@ -99,7 +99,7 @@ describe ReactOnRailsHelper, type: :helper do
               data-component-name=\"App\"
               data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
               data-trace=\"false\"
-              data-expect-turbolinks=\"true\"
+              #{turbolinks_line}
               data-dom-id=\"#{id}\"></div>".squish
       end
 
@@ -118,5 +118,9 @@ describe ReactOnRailsHelper, type: :helper do
 
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
     it { is_expected.to eq hello_world }
+  end
+
+  def turbolinks_line
+    %(data-expect-turbolinks="#{ENV['DISABLE_TURBOLINKS'] ? 'false' : 'true'}")
   end
 end
