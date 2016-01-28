@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+
+## [2.1.1] - 2016-01-28
+
 ##### Fixed
 - Fixed regression where apps that were not using Turbolinks would not render components on page load.
 
@@ -119,7 +122,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/shakacode/react_on_rails/compare/v2.1.0...2.1.1
 [2.1.0]: https://github.com/shakacode/react_on_rails/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/shakacode/react_on_rails/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/shakacode/react_on_rails/compare/v2.0.0...v2.0.1
