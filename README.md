@@ -2,9 +2,9 @@
 
 # NEWS
 
-* 2.1 has shipped on Tuesday, 2/26/2016. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps).
+* 2.2 has shipped on Tuesday, 1/29/2016. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v1-to-v2).
 * Highlights:
-  1. Fixed a **critical** problem with TurboLinks.
+  1. Fixed a **critical** problem with TurboLinks. Be sure to see [turbolinks docs](docs/additional_reading/turbolinks.md) for more information on how to debug TurboLinks issues.
   2. Provides a convenient helper to ensure that JavaScript assets are compiled before running tests.
 * React on Rails does not yet have *generator* support for building new apps that use CSS modules and hot reloading via the Rails server as is demonstrated in the [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/). *We do support this, but we don't generate the code.* If you did generate a fresh app from react_on_rails and want to move to CSS Modules, then see [PR 175: Babel 6 / CSS Modules / Rails hot reloading](https://github.com/shakacode/react-webpack-rails-tutorial/pull/175). Note, while there are probably fixes after this PR was accepted, this has the majority of the changes. See [the tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/#news) for more information. Ping us if you want to help!
 * [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for "React on Rails". [Click here](http://www.shakacode.com/work/index.html) for more information.
@@ -378,6 +378,7 @@ Note: If you have components from react-rails you want to use, then you will nee
 
 ## Additional Reading
 + [The React on Rails Doctrine](http://www.shakacode.com/2016/01/26/the-react-on-rails-doctrine.html)
++ [Babel](docs/additional_reading/babel.md)
 + [Generated Client Code](docs/additional_reading/generated_client_code.md)
 + [Heroku Deployment](docs/additional_reading/heroku_deployment.md)
 + [Manual Installation](docs/additional_reading/manual_installation.md)

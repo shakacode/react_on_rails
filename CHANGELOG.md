@@ -5,6 +5,10 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 
+## [2.2.0] - 2016-01-29
+##### Added
+- New JavaScript API for debugging TurboLinks issues. Be sure to see [turbolinks docs](docs/additional_reading/turbolinks.md). `ReactOnRails.setOptions({ traceTurbolinks: true });`. Removed the file `debug_turbolinks` added in 2.1.1. See [#243](https://github.com/shakacode/react_on_rails/pull/243).
+
 ## [2.1.1] - 2016-01-28
 
 ##### Fixed
@@ -76,7 +80,7 @@ Best done with Object destructing:
 - JS Linter uses ShakaCode JavaScript style: https://github.com/shakacode/style-guide-javascript
 - Generators account these differences.
 
-##### Migration Steps
+##### Migration Steps v1 to v2
 [Example of upgrading](https://github.com/shakacode/react-webpack-rails-tutorial/commit/5b1b8698e8daf0f0b94e987740bc85ee237ef608)
 
 1. Update the `react_on_rails` gem.
@@ -86,7 +90,8 @@ Best done with Object destructing:
 5. Update your index.jade to use the new API `ReactOnRails.render("MyApp", !{props}, 'app');`
 6. Update your webpack files per the example commit. Remove globally exposing React and ReactDom, as well as their inclusion in the `entry` section. These are automatically included now.
 7. Run `cd client && npm i --save react-on-rails` to get react-on-rails into your `client/package.json`.
-8. You should also update any other dependencies if possible to match up with the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/).
+8. You should also update any other dependencies if possible to match up with the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/). This includes updating to Babel 6.
+9. If you want to stick with Babel 5 for a bit, see [Issue #238](https://github.com/shakacode/react_on_rails/issues/238).
 
 ---
 
@@ -123,7 +128,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/v2.1.1...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/2.2.0...HEAD
+[2.2.0]: https://github.com/shakacode/react_on_rails/compare/2.1.1...2.2.0
 [2.1.1]: https://github.com/shakacode/react_on_rails/compare/v2.1.0...2.1.1
 [2.1.0]: https://github.com/shakacode/react_on_rails/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/shakacode/react_on_rails/compare/v2.0.1...v2.0.2
