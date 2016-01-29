@@ -2,6 +2,7 @@
 
 # NEWS
 
+* CI broke for the case of tests on React on Rails when not using TurboLinks. We'll have this fixed by tonight.
 * 2.2 has shipped on Tuesday, 1/29/2016. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v1-to-v2).
 * Highlights:
   1. Fixed a **critical** problem with TurboLinks. Be sure to see [turbolinks docs](docs/additional_reading/turbolinks.md) for more information on how to debug TurboLinks issues.
