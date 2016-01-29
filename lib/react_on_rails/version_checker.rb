@@ -61,7 +61,7 @@ module ReactOnRails
       end
 
       def relative_path?
-        raw.match(/\.\./).present?
+        raw.match(%r{(\.\.|\Afile:///)}).present?
       end
 
       def major

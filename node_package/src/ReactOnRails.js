@@ -9,7 +9,31 @@ import context from './context';
 
 const ctx = context();
 
+const DEFAULT_OPTIONS = {
+  traceTurbolinks: false,
+};
+
 ctx.ReactOnRails = {
+  /**
+   * Set options for ReactOnRails, typically before you call ReactOnRails.register
+   * Available Options:
+   * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
+   */
+  setOptions(options) {
+    if (options.hasOwnProperty('traceTurbolinks')) {
+      this._options.traceTurbolinks = options.traceTurbolinks;
+      delete options.traceTurbolinks;
+    }
+
+    if (Object.keys(options).length > 0) {
+      throw new Error('Invalid options passed to ReactOnRails.options: ', JSON.stringify(options));
+    }
+  },
+
+  option(key) {
+    return this._options[key];
+  },
+
   /**
    * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
    * find you components for rendering.
@@ -75,7 +99,13 @@ ctx.ReactOnRails = {
   registeredComponents() {
     return ComponentStore.components();
   },
+
+  resetOptions() {
+    this._options = Object.assign({}, DEFAULT_OPTIONS);
+  },
 };
+
+ReactOnRails.resetOptions();
 
 clientStartup(ctx);
 

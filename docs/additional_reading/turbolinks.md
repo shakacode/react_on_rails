@@ -19,8 +19,39 @@ the JavaScript and stylesheets are cached by the browser, as they will still req
    ```javascript
    //= require turbolinks
    ```
+Note, in the future, we might change to installing this via npm.
 
 ## Troubleshooting
-To turn on tracing of Turbolinks events, require `debug_turbolinks` (provided by ReactOnRails) inside of `app/assets/javascripts/application.js` **at the beginning of the file**. This will print out events related to the initialization of the components created with the view helper `react_component`.
+To turn on tracing of Turbolinks events, put this in your registration file, where you register your components. 
+
+```js
+   ReactOnRails.setOptions({
+     traceTurbolinks: true,
+   });
+```
+
+Rather than setting the value to true, you could set it to TRACE_TURBOLINKS, and then you could place this in your `webpack.client.base.config.js`:
+
+Define this const at the top of the file:
+```js
+  const devBuild = process.env.NODE_ENV !== 'production';
+```
+
+Add this DefinePlugin option:
+```js
+  plugins: [
+   new webpack.DefinePlugin({
+     TRACE_TURBOLINKS: devBuild,
+   }),
+```
+
+At Webpack compile time, the value of devBuild is inserted into your file.
+
+Once you do that, you'll see messages prefixed with **TURBO:** like this in the browser console:
+
+```
+TURBO: WITH TURBOLINKS: document page:before-unload and page:change handlers installed. (program)
+TURBO: reactOnRailsPageLoaded
+```
 
 We've noticed that Turbolinks doesn't work if you use the ruby gem version of jQuery and jQuery ujs. Therefore we recommend using the node packages instead. See the [tutorial app](https://github.com/shakacode/react-webpack-rails-tutorial) for how to accomplish this.

@@ -11,7 +11,7 @@ function debugTurbolinks(...msg) {
     return;
   }
 
-  if (window.DEBUG_TURBOLINKS) {
+  if (ReactOnRails.option('traceTurbolinks')) {
     console.log('TURBO:', ...msg);
   }
 }

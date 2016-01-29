@@ -37,7 +37,7 @@ module ReactOnRails
         end
       end
 
-      context "when package json uses a relative path" do
+      context "when package json uses a relative path with dots" do
         let(:node_package_version) do
           double_package_version(raw: "../../..", major: "", relative_path: true)
         end
@@ -98,10 +98,26 @@ module ReactOnRails
       end
 
       context "with node version of '../../..'" do
-        let(:package_json) { File.expand_path("../fixtures/relative_package.json", __FILE__) }
+        let(:package_json) { File.expand_path("../fixtures/relative_path_package.json", __FILE__) }
 
         describe "#raw" do
           specify { expect(node_package_version.raw).to eq("../../..") }
+        end
+
+        describe "#relative_path?" do
+          specify { expect(node_package_version.relative_path?).to be true }
+        end
+
+        describe "#major" do
+          specify { expect(node_package_version.major).to be_nil }
+        end
+      end
+
+      context "with node version of 'file:///Users/justin/shakacode/react_on_rails'" do
+        let(:package_json) { File.expand_path("../fixtures/absolute_path_package.json", __FILE__) }
+
+        describe "#raw" do
+          specify { expect(node_package_version.raw).to eq("file:///Users/justin/shakacode/react_on_rails") }
         end
 
         describe "#relative_path?" do
