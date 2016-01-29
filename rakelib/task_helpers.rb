@@ -24,6 +24,10 @@ module ReactOnRails
       sh_in_dir(dir, "bundle install")
     end
 
+    def bundle_install_in_no_turbolinks(dir)
+      sh_in_dir(dir, "DISABLE_TURBOLINKS=TRUE bundle install")
+    end
+
     # Runs bundle exec using that directory's Gemfile
     def bundle_exec(dir: nil, args: nil, env_vars: "")
       sh_in_dir(dir, "#{env_vars} #{args}")

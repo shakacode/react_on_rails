@@ -51,7 +51,8 @@
     "build:dev:client": "webpack -w --config webpack.client.js",
     "build:dev:server": "webpack -w --config webpack.server.js",
     "build:client": "webpack --config webpack.client.js",
-    "build:server": "webpack --config webpack.server.js"
+    "build:server": "webpack --config webpack.server.js",
+    "install-react-on-rails": "npm install 'react-on-rails@../../..'"
   },
   "author": "",
   "license": "ISC"

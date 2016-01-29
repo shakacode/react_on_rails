@@ -9,6 +9,10 @@ import ReduxApp from './ClientReduxApp';
 import RouterApp from './ClientRouterApp';
 import PureComponent from '../components/PureComponent';
 
+ReactOnRails.setOptions({
+  traceTurbolinks: true
+});
+
 ReactOnRails.register({
   HelloWorld,
   HelloWorldWithLogAndThrow,
