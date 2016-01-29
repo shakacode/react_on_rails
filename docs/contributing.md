@@ -41,13 +41,33 @@ npm i
 npm run build
 ```
 
-Use either npm-link (described below), or use a relative path in your `package.json`, like this:
-
-```js
-"react-on-rails": "../path-to-react-on-rails".
+Use a relative path in your `package.json`, like this:
+```sh
+cd client
+npm install --save "react-on-rails@../../react_on_rails"
 ```
 
-If you use a relative path, be sure to run `npm i` whenever you rebuild the node package.
+When you use a relative path, be sure to run the above `npm install` command whenever you change the node package for react-on-rails.
+
+Wihle we'd prefer to us `npm link`, we get errors. If you can figure out how to get `npm link react-on-rails` to work with this project, please file an issue or PR! This used to work with babel 5.
+
+This is the error:
+
+```
+16:34:11 rails-client-assets.1 | ERROR in /react_on_rails/node_package/lib/ReactOnRails.js
+16:34:11 rails-client-assets.1 | Module build failed: ReferenceError: Unknown plugin "react-transform" specified in "base" at 0, attempted to resolve relative to "/react_on_rails/node_package/lib"
+16:34:11 rails-client-assets.1 |     at /react-webpack-rails-tutorial/client/node_modules/babel-core/lib/transformation/file/options/option-manager.js:193:17
+16:34:11 rails-client-assets.1 |     at Array.map (native)
+16:34:11 rails-client-assets.1 |     at Function.normalisePlugins (/react-webpack-rails-tutorial/client/node_modules/babel-core/lib/transformation/file/options/option-manager.js:173:20)
+16:34:11 rails-client-assets.1 |     at OptionManager.mergeOptions (/react-webpack-rails-tutorial/client/node_modules/babel-core/lib/transformation/file/options/option-manager.js:271:36)
+16:34:11 rails-client-assets.1 |     at OptionManager.init (/react-webpack-rails-tutorial/client/node_modules/babel-core/lib/transformation/file/options/option-manager.js:416:10)
+16:34:11 rails-client-assets.1 |     at File.initOptions (/react-webpack-rails-tutorial/client/node_modules/babel-core/lib/transformation/file/index.js:191:75)
+16:34:11 rails-client-assets.1 |     at new File (/react-webpack-rails-tutorial/client/node_modules/babel-core/lib/transformation/file/index.js:122:22)
+16:34:11 rails-client-assets.1 |     at Pipeline.transform (/react-webpack-rails-tutorial/client/node_modules/babel-core/lib/transformation/pipeline.js:42:16)
+16:34:11 rails-client-assets.1 |     at transpile (/react-webpack-rails-tutorial/client/node_modules/babel-loader/index.js:14:22)
+16:34:11 rails-client-assets.1 |     at Object.module.exports (/react-webpack-rails-tutorial/client/node_modules/babel-loader/index.js:88:12)
+16:34:11 rails-client-assets.1 |  @ ./app/bundles/comments/startup/clientRegistration.jsx 15:20-45
+```
 
 # Development Setup for Gem and Node Package Contributors
 
@@ -164,6 +184,10 @@ All linting is performed from the docker container for CI. You will need docker 
 Once you have docker and docker-compose running locally, run `docker-compose build lint`. This will build the `reactonrails_lint` docker image and docker-compose `lint` container. The initial build is slow, but after the install, startup is very quick.
 
 ### Linting Commands
+Run `rake lint`. 
+
+Alternately with Docker:
+
 Run `rake -D docker` to see all docker linting commands for rake. `rake docker:lint` will run all linters. For individual rake linting commands please refer to `rake -D docker` for the list.
 
 You can run specific linting for directories or files by using `docker-compose run lint rubocop (file path or directory)`, etc.

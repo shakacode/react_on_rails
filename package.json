@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "node_package/lib/ReactOnRails.js",
   "directories": {
@@ -50,6 +50,7 @@
     "symlink-node-package": "node_package/scripts/symlink-node-package",
     "prepublish": "npm run build",
     "build": "node_package/scripts/build",
+    "build-watch": "$(npm bin)/babel --watch --out-dir node_package/lib node_package/src",
     "eslint": "eslint . --ext .jsx and .js",
     "jscs": "jscs . -e -v",
     "lint": "npm run eslint && npm run jscs",
