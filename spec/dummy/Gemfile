@@ -37,6 +37,9 @@ gem "react_on_rails", path: "../.."
 
 gem "therubyracer"
 
+# Access an IRB console on exception pages or by using <%= console %> in views
+gem 'web-console', group: :development, require: false
+
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console
   gem "pry"
@@ -49,9 +52,6 @@ group :development, :test do
   gem "rubocop", require: false
   gem "ruby-lint", require: false
   gem "scss_lint", require: false
-
-  # Access an IRB console on exception pages or by using <%= console %> in views
-  gem 'web-console', '~> 2.0'
 
   # Spring speeds up development by keeping your application running in the background. Read more: https://github.com/rails/spring
   gem 'spring'
