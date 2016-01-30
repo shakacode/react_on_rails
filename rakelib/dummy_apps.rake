@@ -7,11 +7,6 @@ namespace :dummy_apps do
     bundle_install_in(dummy_app_dir)
   end
 
-  task :dummy_app_no_turbolinks do
-    dummy_app_dir = File.join(gem_root, "spec/dummy")
-    bundle_install_in_no_turbolinks(dummy_app_dir)
-  end
-
   task dummy_apps: [:dummy_app, :node_package] do
     puts "Prepared all Dummy Apps"
   end

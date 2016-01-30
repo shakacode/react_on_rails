@@ -2,10 +2,10 @@
 <html>
 <head>
   <title>Dummy</title>
-  <%= ENV["DISABLE_TURBOLINKS"] ?
+  <%= ENV["DISABLE_TURBOLINKS"].present? ?
       stylesheet_link_tag('application', media: 'all') :
       stylesheet_link_tag('application', media: 'all', 'data-turbolinks-track' => true) %>
-  <%= ENV["DISABLE_TURBOLINKS"] ?
+  <%= ENV["DISABLE_TURBOLINKS"].present? ?
       javascript_include_tag('application') :
       javascript_include_tag('application_with_turbolinks', 'data-turbolinks-track' => true) %>
   <%= csrf_meta_tags %>

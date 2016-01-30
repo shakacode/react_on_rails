@@ -21,6 +21,8 @@
     "es5-shim": "^4.5.0",
     "expose-loader": "^0.7.1",
     "history": "^2.0.0-rc2",
+    "jquery": "^2.2.0",
+    "jquery-ujs": "^1.2.0",
     "node-libs-browser": "^1.0.0",
     "react": "^0.14.6",
     "react-dom": "^0.14.6",

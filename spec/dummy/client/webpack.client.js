@@ -5,6 +5,8 @@ module.exports = {
     'es5-shim/es5-shim', // for poltergeist
     'es5-shim/es5-sham', // for poltergeist
     'babel-polyfill',
+    'jquery',
+    'jquery-ujs',
     'startup/clientRegistration',
   ],
   output: {
@@ -28,6 +30,8 @@ module.exports = {
   module: {
     loaders: [
       { test: /\.jsx?$/, loader: 'babel-loader', exclude: /node_modules/ },
+      { test: require.resolve('jquery'), loader: 'expose?jQuery' },
+      { test: require.resolve('jquery'), loader: 'expose?$' },
     ],
   },
 };

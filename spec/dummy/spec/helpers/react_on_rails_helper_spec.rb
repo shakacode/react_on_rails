@@ -121,6 +121,6 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   def turbolinks_line
-    %(data-expect-turbolinks="#{ENV['DISABLE_TURBOLINKS'] ? 'false' : 'true'}")
+    %(data-expect-turbolinks="#{ENV['DISABLE_TURBOLINKS'].present? ? 'false' : 'true'}")
   end
 end
