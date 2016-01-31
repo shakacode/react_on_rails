@@ -2,7 +2,7 @@
 
 # NEWS
 
-* CI broke for the case of tests on React on Rails when not using TurboLinks. We'll have this fixed by tonight.
+* There's a fatal error when using the lastest version of Redux for server rendering. See [Redux #1335](https://github.com/rackt/redux/issues/1335). See [diff 3.1.6...3.1.4](https://github.com/rackt/redux/commit/e2e14d26f09ca729ae0555442f50fcfc45bfb423#diff-1fdf421c05c1140f6d71444ea2b27638). Workaround for server rendering: Use Redux 3.1.4. Fix is done and should be pushed shortly, in [this commit](https://github.com/shakacode/react_on_rails/commit/59f1e68d3d233775e6abc63bff180ea59ac2d79e) on [PR #244](https://github.com/shakacode/react_on_rails/pull/244/).
 * 2.2 has shipped on Tuesday, 1/29/2016. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v1-to-v2).
 * Highlights:
   1. Fixed a **critical** problem with TurboLinks. Be sure to see [turbolinks docs](docs/additional_reading/turbolinks.md) for more information on how to debug TurboLinks issues.
