@@ -12,7 +12,7 @@ gemfile:
   - spec/dummy/Gemfile
 
 env:
-  - export RAILS_ENV=test DRIVER=selenium_chrome
+  - export RAILS_ENV=test
 
 before_install:
   - sudo apt-get update
