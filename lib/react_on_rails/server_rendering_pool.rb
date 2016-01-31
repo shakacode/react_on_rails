@@ -75,6 +75,7 @@ module ReactOnRails
           bundle_js_code = File.read(server_js_file)
           base_js_code = <<-JS
 #{console_polyfill}
+#{execjs_timer_polyfills}
           #{bundle_js_code};
           JS
           begin
@@ -100,6 +101,18 @@ module ReactOnRails
           end
           ExecJS.compile("")
         end
+      end
+
+      def execjs_timer_polyfills
+        <<-JS
+function setInterval() {
+ conosle.error('setInterval is not defined for execJS. See https://github.com/sstephenson/execjs#faq');
+}
+
+function setTimeout() {
+ conosle.error('setTimeout is not defined for execJS. See https://github.com/sstephenson/execjs#faq');
+}
+        JS
       end
 
       # Reimplement console methods for replaying on the client
