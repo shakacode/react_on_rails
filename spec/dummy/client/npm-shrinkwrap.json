@@ -202,7 +202,8 @@
         },
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.4.5 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         },
         "babylon": {
           "version": "6.4.5",
@@ -240,7 +241,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -263,7 +265,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -274,7 +277,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -285,7 +289,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -296,7 +301,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -307,7 +313,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -329,7 +336,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -340,7 +348,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -351,7 +360,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -362,7 +372,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -565,7 +576,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -591,7 +603,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -602,7 +615,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -644,7 +658,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -660,7 +675,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.21 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -671,7 +687,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -687,7 +704,8 @@
       "dependencies": {
         "babel-types": {
           "version": "6.4.5",
-          "from": "babel-types@>=6.3.13 <7.0.0"
+          "from": "babel-types@6.4.5",
+          "resolved": "https://registry.npmjs.org/babel-types/-/babel-types-6.4.5.tgz"
         }
       }
     },
@@ -1221,7 +1239,8 @@
         },
         "esprima-fb": {
           "version": "15001.1001.0-dev-harmony-fb",
-          "from": "esprima-fb@>=15001.1001.0-dev-harmony-fb <15001.1002.0"
+          "from": "esprima-fb@15001.1001.0-dev-harmony-fb",
+          "resolved": "https://registry.npmjs.org/esprima-fb/-/esprima-fb-15001.1001.0-dev-harmony-fb.tgz"
         },
         "window-size": {
           "version": "0.1.4",
@@ -3388,9 +3407,9 @@
       "resolved": "https://registry.npmjs.org/redent/-/redent-1.0.0.tgz"
     },
     "redux": {
-      "version": "3.1.6",
-      "from": "redux@>=3.1.6 <4.0.0",
-      "resolved": "https://registry.npmjs.org/redux/-/redux-3.1.6.tgz"
+      "version": "3.1.7",
+      "from": "redux@3.1.7",
+      "resolved": "https://registry.npmjs.org/redux/-/redux-3.1.7.tgz"
     },
     "redux-thunk": {
       "version": "1.0.3",
