@@ -106,11 +106,11 @@ module ReactOnRails
       def execjs_timer_polyfills
         <<-JS
 function setInterval() {
- conosle.error('setInterval is not defined for execJS. See https://github.com/sstephenson/execjs#faq');
+ console.error('setInterval is not defined for execJS. See https://github.com/sstephenson/execjs#faq');
 }
 
 function setTimeout() {
- conosle.error('setTimeout is not defined for execJS. See https://github.com/sstephenson/execjs#faq');
+ console.error('setTimeout is not defined for execJS. See https://github.com/sstephenson/execjs#faq');
 }
         JS
       end
