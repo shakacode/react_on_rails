@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+##### Added
+- Added forman to gemspec in case new dev does not have it globally installed. [#248](https://github.com/shakacode/react_on_rails/pull/248)
 
 ## [2.3.0] - 2016-02-01
 ##### Added
