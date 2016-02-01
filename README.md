@@ -50,7 +50,7 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
 
   ```ruby
     # Rails View
-    <%= react_component("HelloWorldApp", { name: "Stranger" })
+    <%= react_component("HelloWorldApp", { name: "Stranger" }) %>
   ```
 
   ```javascript
