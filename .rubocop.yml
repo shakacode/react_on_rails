@@ -8,18 +8,19 @@ AllCops:
   Exclude:
     - 'vendor/**/*'
     - 'spec/fixtures/**/*'
-    - 'node_modules/**/*.*'
+    - 'node_modules/**/.*'
     - 'node_modules/**/*'
     - 'coverage/**/*'
     - 'db/**/*'
     - 'db/schema.rb'
     - 'db/seeds.rb'
     - 'client/node_modules/**/*.*'
-    - 'client/node_modules/**/*'
+    - 'client/node_modules/**/.*'
     - 'bin/**/*'
     - !ruby/regexp /old_and_unused\.rb$/
     - 'spec/react_on_rails/dummy-for-generators/**/*'
     - 'spec/dummy/bin/**/*'
+    - 'gen-examples/examples/**/.*'
     - 'gen-examples/examples/**/*'
 
 Metrics/LineLength:
