@@ -1,31 +1,47 @@
 module ReactOnRails
-  module EnsureAssetsCompiled
-    def self.check_built_assets
-      return if @checks_complete
-      puts "Checking for existing webpack bundles before running tests."
-      build_assets_for_type("client")
-      build_assets_for_type("server") if ReactOnRails.configuration.server_bundle_js_file.present?
-      @checks_complete = true
+  class EnsureAssetsCompiled
+    COMPILED_DIR_NAMES = %w(javascripts stylesheets fonts images).freeze
+
+    def self.build
+      client_dir = Rails.root.join("client")
+      compiled_dirs = COMPILED_DIR_NAMES.map { |dir| Rails.root.join("app", "assets", dir, "generated") }
+      checker = WebpackAssetsStatusChecker.new(client_dir: client_dir, compiled_dirs: compiled_dirs)
+      compiler = WebpackAssetsCompiler.new
+      new(checker, compiler)
     end
 
-    def self.build_assets_for_type(type)
-      unless running_webpack_watch?(type)
-        puts "Building Webpack #{type}-rendering assets..."
-        build_output = `cd client && npm run build:#{type}`
-        if build_output =~ /error/i
-          fail "Error in building assets!\n#{build_output}"
-        end
+    attr_reader :webpack_assets_checker, :webpack_assets_compiler, :assets_have_been_compiled
 
-        puts "Webpack #{type}-rendering assets built."
-      end
+    def initialize(webpack_assets_checker, webpack_assets_compiler)
+      @webpack_assets_compiler = webpack_assets_compiler
+      @webpack_assets_checker = webpack_assets_checker
+      @assets_have_been_compiled = false
     end
 
-    def self.running_webpack_watch?(type)
-      running = `pgrep -fl '\\-w \\-\\-config webpack\\.#{type}\\.rails\\.build\\.config\\.js'`
-      if running.present?
-        puts "Webpack is running for #{type}-rendering assets, skipping rebuild => #{running.ai}"
-        return true
+    def call
+      should_skip_compiling = assets_have_been_compiled || @webpack_assets_checker.up_to_date?
+      webpack_assets_compiler.compile unless should_skip_compiling
+      @assets_have_been_compiled = true
+    end
+  end
+
+  class WebpackAssetsCompiler
+    def compile
+      compile_type(:client)
+      compile_type(:server) if ReactOnRails.configuration.server_bundle_js_file.present?
+    end
+
+    private
+
+    def compile_type(type)
+      puts "\n\nBuilding Webpack #{type}-rendering assets..."
+      build_output = `cd client && npm run build:#{type}`
+
+      if build_output =~ /error/i
+        fail "Error in building assets!\n#{build_output}"
       end
+
+      puts "Webpack #{type}-rendering assets built.\n\n"
     end
   end
 end
