@@ -110,10 +110,10 @@ export default function clientStartup(context) {
     // Webpack bundles first.
 
     if (!turbolinksInstalled()) {
-      debugTurbolinks('WITHOUT TURBOLINKS: DOMContentLoaded handler installed.');
+      debugTurbolinks('NOT USING TURBOLINKS: DOMContentLoaded event, calling reactOnRailsPageLoaded');
       reactOnRailsPageLoaded();
     } else {
-      debugTurbolinks('WITH TURBOLINKS: document page:before-unload and page:change handlers' +
+      debugTurbolinks('USING TURBOLINKS: document page:before-unload and page:change handlers' +
         ' installed.');
       document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
       document.addEventListener('page:change', reactOnRailsPageLoaded);

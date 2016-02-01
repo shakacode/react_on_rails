@@ -51,13 +51,13 @@ module ReactOnRails
     class << self
       private
 
-      def trace_messsage(js_code)
+      def trace_messsage(js_code, file_name = "tmp/server-generated.js")
         return unless ENV["TRACE_REACT_ON_RAILS"].present?
         # Set to anything to print generated code.
         puts "Z" * 80
         puts "react_renderer.rb: 92"
-        puts "wrote file tmp/server-generated.js"
-        File.write("tmp/server-generated.js", js_code)
+        puts "wrote file #{file_name}"
+        File.write(file_name, js_code)
         puts "Z" * 80
       end
 
@@ -75,9 +75,22 @@ module ReactOnRails
           bundle_js_code = File.read(server_js_file)
           base_js_code = <<-JS
 #{console_polyfill}
+#{execjs_timer_polyfills}
           #{bundle_js_code};
           JS
-          ExecJS.compile(base_js_code)
+          begin
+            ExecJS.compile(base_js_code)
+          rescue => e
+            file_name = "tmp/base_js_code.js"
+            msg = "ERROR when compiling base_js_code! See #{file_name} to "\
+              "ERROR when compiling base_js_code! See #{file_name} to "\
+              "correlate line numbers of error. Error is\n\n#{e.message}"\
+              "\n\n#{e.backtrace.join("\n")}"
+            puts msg
+            Rails.logger.error(msg)
+            trace_messsage(base_js_code, file_name)
+            raise e
+          end
         else
           if server_js_file.present?
             msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
@@ -88,6 +101,18 @@ module ReactOnRails
           end
           ExecJS.compile("")
         end
+      end
+
+      def execjs_timer_polyfills
+        <<-JS
+function setInterval() {
+ console.error('setInterval is not defined for execJS. See https://github.com/sstephenson/execjs#faq');
+}
+
+function setTimeout() {
+ console.error('setTimeout is not defined for execJS. See https://github.com/sstephenson/execjs#faq');
+}
+        JS
       end
 
       # Reimplement console methods for replaying on the client

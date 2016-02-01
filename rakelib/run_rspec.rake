@@ -12,14 +12,17 @@ namespace :run_rspec do
     run_tests_in("", rspec_args: File.join("spec", "react_on_rails"))
   end
 
+  desc "Runs dummy rspec with turbolinks"
   task dummy: ["dummy_apps:dummy_app"] do
-    run_tests_in(File.join("spec", "dummy"), env_vars: "DRIVER=selenium_firefox")
+    run_tests_in(File.join("spec", "dummy"))
   end
 
+  desc "Runs dummy rspec without turbolinks"
   task dummy_no_turbolinks: ["dummy_apps:dummy_app"] do
     run_tests_in(File.join("spec", "dummy"),
-                 env_vars: "DRIVER=selenium_firefox DISABLE_TURBOLINKS=TRUE",
+                 env_vars: "DISABLE_TURBOLINKS=TRUE",
                  command_name: "dummy_no_turbolinks")
+    bundle_install_in(dummy_app_dir)
   end
 
   # Dynamically define Rake tasks for each example app found in the examples directory

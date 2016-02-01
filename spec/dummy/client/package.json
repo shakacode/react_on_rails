@@ -18,25 +18,27 @@
     "babel-preset-react": "^6.3.13",
     "babel-preset-stage-0": "^6.3.13",
     "babel-types": "^6.4.5",
-    "es5-shim": "^4.5.0",
+    "es5-shim": "^4.5.2",
     "expose-loader": "^0.7.1",
     "history": "^2.0.0-rc2",
+    "jquery": "^2.2.0",
+    "jquery-ujs": "^1.2.0",
     "node-libs-browser": "^1.0.0",
-    "react": "^0.14.6",
-    "react-dom": "^0.14.6",
+    "react": "^0.14.7",
+    "react-dom": "^0.14.7",
     "react-on-rails": "../../..",
-    "react-redux": "^4.0.6",
+    "react-redux": "^4.1.2",
     "react-router": "^2.0.0-rc5",
-    "redux": "^3.0.6",
+    "redux": "^3.1.7",
     "redux-thunk": "^1.0.3",
     "webpack": "^1.12.12"
   },
   "devDependencies": {
-    "babel-eslint": "^5.0.0-beta6",
+    "babel-eslint": "^5.0.0-beta8",
     "eslint": "^1.10.3",
     "eslint-config-airbnb": "4.0.0",
     "eslint-plugin-react": "^3.16.1",
-    "jscs": "^2.8.0"
+    "jscs": "^2.9.0"
   },
   "browser": {
     "fs": false
@@ -51,7 +53,8 @@
     "build:dev:client": "webpack -w --config webpack.client.js",
     "build:dev:server": "webpack -w --config webpack.server.js",
     "build:client": "webpack --config webpack.client.js",
-    "build:server": "webpack --config webpack.server.js"
+    "build:server": "webpack --config webpack.server.js",
+    "install-react-on-rails": "npm install 'react-on-rails@../../..'"
   },
   "author": "",
   "license": "ISC"
