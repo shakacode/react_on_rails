@@ -5,6 +5,12 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 
+## [2.3.0] - 2016-02-01
+##### Added
+- Added polyfills for `setInterval` and `setTimeout` in case other libraries expect these to exist. 
+- Added much improved debugging for errors in the server JavaScript webpack file.
+- See [#244](https://github.com/shakacode/react_on_rails/pull/244/) for these improvements.
+
 ## [2.2.0] - 2016-01-29
 ##### Added
 - New JavaScript API for debugging TurboLinks issues. Be sure to see [turbolinks docs](docs/additional_reading/turbolinks.md). `ReactOnRails.setOptions({ traceTurbolinks: true });`. Removed the file `debug_turbolinks` added in 2.1.1. See [#243](https://github.com/shakacode/react_on_rails/pull/243).
@@ -128,7 +134,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/2.2.0...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/2.3.0...HEAD
+[2.3.0]: https://github.com/shakacode/react_on_rails/compare/2.2.0...2.3.0
 [2.2.0]: https://github.com/shakacode/react_on_rails/compare/2.1.1...2.2.0
 [2.1.1]: https://github.com/shakacode/react_on_rails/compare/v2.1.0...2.1.1
 [2.1.0]: https://github.com/shakacode/react_on_rails/compare/v2.0.2...v2.1.0
