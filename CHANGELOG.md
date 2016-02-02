@@ -6,10 +6,16 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 ##### Added
 - Added forman to gemspec in case new dev does not have it globally installed. [#248](https://github.com/shakacode/react_on_rails/pull/248)
+##### Changed
+- Changed the EnsureAssetsCompiled feature that ensures RSpec tests are run with the latest webpack bundles. Previously, webpack bundles would be rebuilt every test run, whether or not they actually needed to be. While one could around this by running webpack in the background to rebuild the static assets, doing so required users to name their webpack build script exactly correct as the technique relied on a `pgrep`.
+
+  Instead, the new functionality checks the mdate on each generated webpack bundle/asset against the mdate of every file inside of the `client` directory, which is all encapsulated by the standard library method `FileUtils.uptodate?` and is very performant. This eliminates the need to check for an existing webpack process because the webpack bundles will be up to date anyway if the latter is running.
+
+  Users need not make any changes to their code to benefit from the enhancement, assuming all of their generated files are output to `javascripts/generated`, `stylesheets/generated`, `fonts/generated`, or `images/generated`. [#251](https://github.com/shakacode/react_on_rails/pull/251)
 
 ## [2.3.0] - 2016-02-01
 ##### Added
-- Added polyfills for `setInterval` and `setTimeout` in case other libraries expect these to exist. 
+- Added polyfills for `setInterval` and `setTimeout` in case other libraries expect these to exist.
 - Added much improved debugging for errors in the server JavaScript webpack file.
 - See [#244](https://github.com/shakacode/react_on_rails/pull/244/) for these improvements.
 
