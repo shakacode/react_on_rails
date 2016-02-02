@@ -2,6 +2,7 @@
 
 * See [Turbolinks on Github](https://github.com/rails/turbolinks)
 * Currently support 2.5.x of Turbolinks. We plan to update to Turbolinks 5 soon.
+* Turbolinks is currently included only via the Rails gem and the Rails manifest file rather than NPM. [Turbolinks Issue #658 ](https://github.com/rails/turbolinks/issues/658) discusses this.
 
 ## Why Turbolinks?
 As you switch between Rails HTML controller requests, you will only load the HTML and you will
