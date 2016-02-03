@@ -1,4 +1,5 @@
 require "rake"
+require "fileutils"
 
 module ReactOnRails
   class WebpackAssetsStatusChecker
@@ -10,18 +11,23 @@ module ReactOnRails
     end
 
     def up_to_date?
+      create_compiled_dirs_if_missing
       return false unless assets_exist?
       all_compiled_assets.all? { |asset| FileUtils.uptodate?(asset, client_files) }
     end
 
     private
 
+    def create_compiled_dirs_if_missing
+      compiled_dirs.each { |dir| FileUtils.mkdir_p(dir) }
+    end
+
     def all_compiled_assets
-      @all_compiled_assets ||= make_file_list(make_globs(compiled_dirs)).to_ary
+      @all_compiled_assets = make_file_list(make_globs(compiled_dirs)).to_ary
     end
 
     def client_files
-      @client_files ||= make_file_list(make_globs(client_dir)).to_ary
+      @client_files = make_file_list(make_globs(client_dir)).to_ary
     end
 
     def make_globs(dirs)
