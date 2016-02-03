@@ -6,6 +6,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 ##### Added
 - Added forman to gemspec in case new dev does not have it globally installed. [#248](https://github.com/shakacode/react_on_rails/pull/248)
+
 ##### Changed
 - Changed the EnsureAssetsCompiled feature that ensures RSpec tests are run with the latest webpack bundles. Previously, webpack bundles would be rebuilt every test run, whether or not they actually needed to be. While one could around this by running webpack in the background to rebuild the static assets, doing so required users to name their webpack build script exactly correct as the technique relied on a `pgrep`.
 
