@@ -1,7 +1,7 @@
 require_relative "simplecov_helper"
 require_relative "spec_helper"
 
-class WebpackAssetsCompilerDouble
+class CompilerDouble
   attr_reader :times_ran
 
   def initialize
@@ -13,29 +13,70 @@ class WebpackAssetsCompilerDouble
   end
 end
 
+class ProcessCheckerDouble
+  attr_accessor :is_running
+
+  def initialize(p_is_running)
+    @is_running = p_is_running
+  end
+
+  def running?
+    is_running
+  end
+end
+
+class StatusCheckerDouble
+  attr_accessor :up_to_date
+
+  def initialize(initial)
+    @up_to_date = initial
+  end
+
+  def up_to_date?
+    up_to_date
+  end
+end
+
 module ReactOnRails
   describe EnsureAssetsCompiled do
-    let(:compiler) { WebpackAssetsCompilerDouble.new }
-    let(:ensurer) { EnsureAssetsCompiled.new(checker, compiler) }
+    let(:compiler) { CompilerDouble.new }
+    let(:ensurer) { EnsureAssetsCompiled.new(assets_checker, compiler, process_checker) }
 
     context "when assets are not up to date" do
-      let(:checker) { double_webpack_assets_checker(up_to_date: false) }
+      let(:assets_checker) { StatusCheckerDouble.new(false) }
 
-      it "compiles the webpack bundles" do
-        expect { ensurer.call }.to change { compiler.times_ran }.from(0).to(1)
+      context "and webpack process is running" do
+        let(:process_checker) { ProcessCheckerDouble.new(true) }
+
+        it "sleeps until assets are up to date" do
+          thread = Thread.new { ensurer.call }
+
+          sleep 1
+          assets_checker.up_to_date = true
+
+          thread.join
+
+          expect(compiler.times_ran).to eq(0)
+          expect(ensurer.assets_have_been_compiled).to eq(true)
+        end
+      end
+
+      context "and webpack process is NOT running" do
+        let(:process_checker) { ProcessCheckerDouble.new(false) }
+
+        it "compiles the webpack assets" do
+          expect { ensurer.call }.to change { compiler.times_ran }.from(0).to(1)
+        end
       end
     end
 
     context "when assets are up to date" do
-      let(:checker) { double_webpack_assets_checker(up_to_date: true) }
+      let(:assets_checker) { StatusCheckerDouble.new(true) }
+      let(:process_checker) { ProcessCheckerDouble.new(false) }
 
-      it "does not compile the webpack bundles if they exist and are up to date" do
+      it "does nothing" do
         expect { ensurer.call }.not_to change { compiler.times_ran }
       end
-    end
-
-    def double_webpack_assets_checker(args = {})
-      instance_double(WebpackAssetsStatusChecker, up_to_date?: args.fetch(:up_to_date))
     end
   end
 end
