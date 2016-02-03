@@ -17,11 +17,11 @@ module ReactOnRails
     private
 
     def all_compiled_assets
-      @all_compiled_assets ||= make_file_list(make_globs(compiled_dirs)).to_ary
+      @all_compiled_assets = make_file_list(make_globs(compiled_dirs)).to_ary
     end
 
     def client_files
-      @client_files ||= make_file_list(make_globs(client_dir)).to_ary
+      @client_files = make_file_list(make_globs(client_dir)).to_ary
     end
 
     def make_globs(dirs)
