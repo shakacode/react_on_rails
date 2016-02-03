@@ -9,9 +9,9 @@ RSpec.configure do |config|
   ReactOnRails.configure_rspec_to_compile_assets(config)
 ```
 
-You can pass an RSpec metatag as an optional second parameter to this helper method if you want this helper to run on examples other than where `js: true` (default). The helper will compile webpack files at most once per test run.
+You can pass an RSpec metatag as an optional second parameter to this helper method if you want this helper to run on examples other than where `js: true` (default). The helper will compile webpack files at most once per test run. The helper will not compile the webpack files unless they are out of date (stale).
 
-If you do not want to be slowed down by re-compiling webpack assets from scratch every test run, you can call `npm run build:client` (and `npm run build:server` if doing server rendering) to have webpack recompile these files in the background, which will be much faster. The helper looks for these processes and will abort recompiling if it finds them to be running.
+If you want to speed up the re-compiling process, you can call `npm run build:dev:client` (and `npm run build:dev:server` if doing server rendering) to have webpack run in "watch" mode and recompile these files in the background, which will be much faster when making incremental changes than compiling from scratch.
 
 If you want to use a testing framework other than RSpec, we suggest you implement similar logic.
 
