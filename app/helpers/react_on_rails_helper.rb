@@ -30,7 +30,11 @@ module ReactOnRailsHelper
   #    raise_on_prerender_error: <true/false> Default to false. True will raise exception on server
   #       if the JS code throws
   #  Any other options are passed to the content tag, including the id.
-  def react_component(component_name, props = {}, options = {})
+  def react_component(component_name, props = {}, options = {}, &block)
+
+    if block
+      props[:innerHTML] = capture(&block)
+    end
     # Create the JavaScript and HTML to allow either client or server rendering of the
     # react_component.
     #
@@ -40,11 +44,16 @@ module ReactOnRailsHelper
     # We use this react_component_index in case we have the same component multiple times on the page.
     react_component_index = next_react_component_index
     react_component_name = component_name.camelize # Not sure if we should be doing this (JG)
-    dom_id = if options[:id].nil?
-               "#{component_name}-react-component-#{react_component_index}"
-             else
-               options[:id]
-             end
+    if options[:id].nil?
+      dom_id = "#{component_name}-react-component-#{react_component_index}"
+    else
+      dom_id = options[:id]
+    end
+    if options[:tag].nil?
+      html_tag = :div
+    else
+      html_tag = options[:tag]
+    end
 
     # Setup the page_loaded_js, which is the same regardless of prerendering or not!
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
@@ -58,7 +67,7 @@ module ReactOnRailsHelper
     }
 
     component_specification_tag =
-      content_tag(:div,
+      content_tag(html_tag,
                   "",
                   class: "js-react-on-rails-component",
                   style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
@@ -75,8 +84,9 @@ module ReactOnRailsHelper
                                          :server_side, :raise_on_prerender_error)
     content_tag_options[:id] = dom_id
 
-    rendered_output = content_tag(:div,
-                                  server_rendered_html.html_safe,
+    inner_content = server_rendered_html.empty? ? props[:innerHTML] : server_rendered_html.html_safe
+    rendered_output = content_tag(html_tag,
+                                  inner_content,
                                   content_tag_options)
 
     # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
