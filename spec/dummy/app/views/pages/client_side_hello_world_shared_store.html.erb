@@ -1,0 +1,37 @@
+<%= render "header" %>
+<%= react_store("SharedReduxStore", @app_props_server_render) %>
+
+<%= react_component("ReduxSharedStoreApp", prerender: false, trace: true) %>
+<hr/>
+<p>Second Hello World</p>
+<%= react_component("ReduxSharedStoreApp", prerender: false, trace: true) %>
+<hr/>
+
+<h1>React Rails Client Side Only Rendering</h1>
+<p>
+  This example demonstrates using 2 components attached to the same store.<br/><br/>
+</p>
+
+<hr/>
+<h2>Setup</h2>
+<ol>
+  <li>
+    Create component source: spec/dummy/client/app/components/HelloWorld.jsx
+  </li>
+  <li>
+    Expose the HelloWorld Component: spec/dummy/client/app/startup/clientRegistration.jsx
+    <br/>
+    <pre>
+      import HelloWorld from '../components/HelloWorld';
+      import ReactOnRails from 'react-on-rails';
+      ReactOnRails.register({ HelloWorld });
+    </pre>
+  </li>
+  <li>
+    Place the component on the view: spec/dummy/app/views/pages/client_side_hello_world.html.erb
+    <br/>
+    <pre>
+      <%%= react_component("HelloWorld", @app_props_server_render, prerender: false, trace: true) %>
+    </pre>
+  </li>
+</ol>
