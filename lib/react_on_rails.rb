@@ -6,13 +6,11 @@ require "react_on_rails/configuration"
 require "react_on_rails/server_rendering_pool"
 require "react_on_rails/engine"
 require "react_on_rails/version_syntax_converter"
-require "react_on_rails/ensure_assets_compiled"
-require "react_on_rails/webpack_assets_status_checker"
+require "react_on_rails/test_helper"
 require "react_on_rails/git_utils"
 require "react_on_rails/utils"
-
-module ReactOnRails
-  def self.configure_rspec_to_compile_assets(config, metatag = :js)
-    config.before(:example, metatag) { EnsureAssetsCompiled.build.call }
-  end
-end
+require "react_on_rails/test_helper"
+require "react_on_rails/test_helper/webpack_assets_compiler"
+require "react_on_rails/test_helper/webpack_assets_status_checker"
+require "react_on_rails/test_helper/webpack_process_checker"
+require "react_on_rails/test_helper/ensure_assets_compiled"
