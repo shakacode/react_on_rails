@@ -22,7 +22,6 @@ module ReactOnRails
         end
       end
 
-
       def whats_not_up_to_date
         return [] unless assets_exist?
         result = []
@@ -40,9 +39,7 @@ module ReactOnRails
         new_time = File.mtime(new)
         old_list.each do |old|
           if File.exist?(old)
-            unless new_time > File.mtime(old)
-              not_up_to_date << old
-            end
+            not_up_to_date << old unless new_time > File.mtime(old)
           end
         end
         not_up_to_date
@@ -66,7 +63,7 @@ module ReactOnRails
 
       def make_file_list(glob)
         FileList.new(glob) do |fl|
-          fl.exclude(/\/node_modules\//)
+          fl.exclude(%r{/node_modules/})
           fl.exclude(".DS_Store")
           fl.exclude(".keep")
           fl.exclude("thumbs.db")

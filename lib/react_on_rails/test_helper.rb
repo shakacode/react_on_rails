@@ -32,7 +32,7 @@ module ReactOnRails
     # an example of usage.
     #
     # Typical usage passes all params as nil defaults.
-    # webpack_assets_status_checker: provide one method: `def up_to_date?`
+    # webpack_assets_status_checker: provide: `up_to_date?`, `whats_not_up_to_date`, `client_dir`
     #                         defaults to ReactOnRails::TestHelper::WebpackAssetsStatusChecker
     # webpack_process_checker: provide one method: `def running?`
     #                         defaults to ReactOnRails::TestHelper::WebpackProcessChecker
@@ -41,12 +41,10 @@ module ReactOnRails
     # client_dir and compiled_dirs are passed into the default webpack_assets_status_checker if you
     #                         don't provide one.
     def self.ensure_assets_compiled(webpack_assets_status_checker: nil,
-      webpack_assets_compiler: nil,
-      webpack_process_checker: nil,
-      client_dir: nil,
-      compiled_dirs: nil)
-
-      return if @has_been_run
+                                    webpack_assets_compiler: nil,
+                                    webpack_process_checker: nil,
+                                    client_dir: nil,
+                                    compiled_dirs: nil)
 
       if webpack_assets_status_checker.nil?
         client_dir ||= Rails.root.join("client")
@@ -59,47 +57,11 @@ module ReactOnRails
       webpack_assets_compiler ||= WebpackAssetsCompiler.new
       webpack_process_checker ||= WebpackProcessChecker.new
 
-      max_iterations = 5
-      loop_count = 0
-      loop do
-        break if webpack_assets_status_checker.up_to_date?
-
-        if loop_count == 0
-          puts "\n\nReact on Rails is ensuring your JavaScript generated files are up to date!"
-        end
-
-        if webpack_process_checker.running? && loop_count < max_iterations
-          loop_count += 1
-          sleep 1
-        else
-          if loop_count == max_iterations
-            stale_files = webpack_assets_status_checker.whats_not_up_to_date.join("\n")
-            puts <<-MSG
-
-Even though we detected the webpack watch processes are running, we found files modified that are
-not causing a rebuild of your generated files:
-
-#{stale_files}
-
-One possibility is that you modified a file in your directory that is not a dependency of
-your webpack files: #{client_dir}
-
-To be sure, we will now rebuild your generated files.
-            MSG
-          end
-
-          webpack_assets_compiler.compile
-          puts
-          break
-        end
-      end
-
-      @has_been_run = true
-    end
-
-    class << self
-      attr_accessor :has_been_run
-      @has_been_run = false
+      ReactOnRails::TestHelper::EnsureAssetsCompiled.new(
+        webpack_assets_status_checker: webpack_assets_status_checker,
+        webpack_assets_compiler: webpack_assets_compiler,
+        webpack_process_checker: webpack_process_checker
+      ).call
     end
   end
 end

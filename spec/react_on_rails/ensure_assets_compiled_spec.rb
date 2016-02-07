@@ -4,7 +4,7 @@ require_relative "spec_helper"
 describe ReactOnRails::TestHelper do
   describe "#ensureAssetsCompiled"
   let(:compiler) { double_assets_compiler }
-  after { ReactOnRails::TestHelper.has_been_run = false }
+  after { ReactOnRails::TestHelper::EnsureAssetsCompiled.has_been_run = false }
 
   context "when assets are not up to date" do
     let(:assets_checker) { double_assets_checker(up_to_date: false) }
@@ -22,7 +22,7 @@ describe ReactOnRails::TestHelper do
 
         thread.join
 
-        expect(ReactOnRails::TestHelper.has_been_run).to eq(true)
+        expect(ReactOnRails::TestHelper::EnsureAssetsCompiled.has_been_run).to eq(true)
       end
     end
 
