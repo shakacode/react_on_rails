@@ -13,6 +13,6 @@ require "react_on_rails/utils"
 
 module ReactOnRails
   def self.configure_rspec_to_compile_assets(config, metatag = :js)
-    config.before(:example, metatag) { EnsureAssetsCompiled.build.call }
+    config.before(:example, metatag) { EnsureAssetsCompiled.invoke }
   end
 end
