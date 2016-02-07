@@ -13,3 +13,5 @@ require "pry-doc"
 
 require "binding_of_caller"
 require "awesome_print"
+
+require_relative "./simplecov_helper"

@@ -1,5 +1,4 @@
-require_relative "simplecov_helper"
-require_relative "spec_helper"
+require_relative "../spec_helper"
 
 describe ReactOnRails::TestHelper do
   describe "#ensureAssetsCompiled"

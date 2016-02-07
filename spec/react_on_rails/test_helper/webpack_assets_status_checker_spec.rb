@@ -1,6 +1,5 @@
-require_relative "simplecov_helper"
-require_relative File.join("support", "fixtures_helper")
-require_relative "spec_helper"
+require_relative File.join("..", "support", "fixtures_helper")
+require_relative "../spec_helper"
 
 describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
   describe "#up_to_date?" do
