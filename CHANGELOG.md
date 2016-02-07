@@ -10,12 +10,21 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ##### Changed
 - Changed the EnsureAssetsCompiled feature that ensures RSpec tests are run with the latest webpack bundles. Previously, webpack bundles would be rebuilt every test run, whether or not they actually needed to be. While one could around this by running webpack in the background to rebuild the static assets, doing so required users to name their webpack build script exactly correct as the technique relied on a `pgrep`.
 
-  Instead, the new functionality checks the mdate on each generated webpack bundle/asset against the mdate of every file inside of the `client` directory, which is all encapsulated by the standard library method `FileUtils.uptodate?` and is very performant. This eliminates the need to check for an existing webpack process because the webpack bundles will be up to date anyway if the latter is running.
+  Instead, the new functionality checks the mdate on each generated webpack bundle/asset against the mdate of every file inside of the `client` directory, which is all encapsulated by the standard library method `FileUtils.uptodate?` and is very performant. This eliminates the need to check for an existing webpack process because the webpack bundles will be up to date anyway if the latter is running. [#253](https://github.com/shakacode/react_on_rails/pull/253).
 
   Users need not make any changes to their code to benefit from the enhancement, assuming all of their generated files are output to `javascripts/generated`, `stylesheets/generated`, `fonts/generated`, or `images/generated`. [#251](https://github.com/shakacode/react_on_rails/pull/251)
   
 ##### Breaking Change  
-  Renamed `ReactOnRails.configure_rspec_to_compile_assets` to `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`
+- Renamed `ReactOnRails.configure_rspec_to_compile_assets` to `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`.  [#253](https://github.com/shakacode/react_on_rails/pull/253).
+  
+##### Migration
+- [spec/dummy/spec/rails_helper.rb](https://github.com/shakacode/react_on_rails/blob/master/spec%2Fdummy%2Fspec%2Frails_helper.rb#L36..38) for an example. Add this line to your `rails_helper.rb`:
+```ruby
+RSpec.configure do |config|
+  # Ensure that if we are running js tests, we are using latest webpack assets
+  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+```
+  
 
 ## [2.3.0] - 2016-02-01
 ##### Added
