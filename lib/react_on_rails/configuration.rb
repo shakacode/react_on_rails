@@ -1,12 +1,17 @@
-
 module ReactOnRails
   def self.configure
     yield(configuration)
   end
 
+  DEFAULT_GENERATED_ASSETS_DIRS = [
+    %w(app assets javascripts generated),
+    %w(app assets javascripts stylesheets generated)
+  ].map { |dirs| File.join(*dirs) }.freeze
+
   def self.configuration
     @configuration ||= Configuration.new(
-      server_bundle_js_file: "app/assets/javascripts/generated/server.js",
+      generated_assets_dirs: DEFAULT_GENERATED_ASSETS_DIRS,
+      server_bundle_js_file: File.join(*%w(app assets javascripts generated server.js)),
       prerender: false,
       replay_console: true,
       logging_on_server: true,
@@ -23,17 +28,18 @@ module ReactOnRails
                   :trace, :development_mode,
                   :logging_on_server, :server_renderer_pool_size,
                   :server_renderer_timeout, :raise_on_prerender_error,
-                  :skip_display_none
+                  :skip_display_none, :generated_assets_dirs
 
     def initialize(server_bundle_js_file: nil, prerender: nil, replay_console: nil,
                    trace: nil, development_mode: nil,
                    logging_on_server: nil, server_renderer_pool_size: nil,
                    server_renderer_timeout: nil, raise_on_prerender_error: nil,
-                   skip_display_none: nil)
+                   skip_display_none: nil, generated_assets_dirs: DEFAULT_GENERATED_ASSETS_DIRS)
       self.server_bundle_js_file = if File.exist?(server_bundle_js_file)
                                      server_bundle_js_file
                                    end
 
+      self.generated_assets_dirs = generated_assets_dirs
       self.prerender = prerender
       self.replay_console = replay_console
       self.logging_on_server = logging_on_server
