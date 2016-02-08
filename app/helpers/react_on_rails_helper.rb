@@ -227,6 +227,7 @@ module ReactOnRailsHelper
   end
 
   def initialize_redux_stores
+    return "" unless @registered_stores.present?
     declarations = "var reduxProps, store, storeGenerator;\n"
     result = @registered_stores.each_with_object(declarations) do |redux_store_data, memo|
       store_name = redux_store_data[:store_name]
