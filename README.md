@@ -3,7 +3,7 @@
 # NEWS
 
 * 2.3 has shipped on Monday, 2/1/2016. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v1-to-v2).
-* There was a fatal error when using the lastest version of Redux for server rendering. See [Redux #1335](https://github.com/rackt/redux/issues/1335). See [diff 3.1.6...3.1.4](https://github.com/rackt/redux/commit/e2e14d26f09ca729ae0555442f50fcfc45bfb423#diff-1fdf421c05c1140f6d71444ea2b27638). Workaround for server rendering: Use Redux 3.1.7 or upgrade to React On Rails v2.3.0.  [this commit](https://github.com/shakacode/react_on_rails/commit/59f1e68d3d233775e6abc63bff180ea59ac2d79e) on [PR #244](https://github.com/shakacode/react_on_rails/pull/244/).
+* There was a fatal error when using the latest version of Redux for server rendering. See [Redux #1335](https://github.com/rackt/redux/issues/1335). See [diff 3.1.6...3.1.4](https://github.com/rackt/redux/commit/e2e14d26f09ca729ae0555442f50fcfc45bfb423#diff-1fdf421c05c1140f6d71444ea2b27638). Workaround for server rendering: Use Redux 3.1.7 or upgrade to React On Rails v2.3.0.  [this commit](https://github.com/shakacode/react_on_rails/commit/59f1e68d3d233775e6abc63bff180ea59ac2d79e) on [PR #244](https://github.com/shakacode/react_on_rails/pull/244/).
 * 2.x Highlights:
   1. Fixed a **critical** problem with TurboLinks. Be sure to see [turbolinks docs](docs/additional_reading/turbolinks.md) for more information on how to debug TurboLinks issues.
   2. Provides a convenient helper to ensure that JavaScript assets are compiled before running tests.
@@ -223,7 +223,7 @@ This is how you actually render the React components you exposed to `window` ins
 + **props:** Ruby Hash which contains the properties to pass to the react object, or a JSON string. If you pass a string, we'll escape it for you.
 + **options:**
   + **prerender:** enable server-side rendering of component. Set to false when debugging!
-  + **router_redirect_callback:** Use this option if you want to provide a custom handler for redirects on server rendering. If you don't specify this, we'll simply change the rendered output to a script that sets window.location to the new route. Set this up exactly like a generator_function. Your function will will take one parameter, containing all the values that react-router gives on a redirect request, such as pathname, search, etc.
+  + **router_redirect_callback:** Use this option if you want to provide a custom handler for redirects on server rendering. If you don't specify this, we'll simply change the rendered output to a script that sets window.location to the new route. Set this up exactly like a generator_function. Your function will take one parameter, containing all the values that react-router gives on a redirect request, such as pathname, search, etc.
   + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise.
   + **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the default configuration of logging_on_server set to true, you'll still see the errors on the server.
   + **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
@@ -316,7 +316,7 @@ The React on Rails generator can add linters and their recommended accompanying 
 JavaScript linters are **enabled by default**, but can be disabled by passing the `--skip-js-linters` flag (alias `j`) , and those that run in Node have been add to `client/package.json` under `devDependencies`.
 
 ##### Ruby Linters
-Ruby linters are **disabled by default**, but can be enabled by passing the `--ruby-linters` flag when generating. These linters have been added to your Gemfile in addition to the the appropriate Rake tasks.
+Ruby linters are **disabled by default**, but can be enabled by passing the `--ruby-linters` flag when generating. These linters have been added to your Gemfile in addition to the appropriate Rake tasks.
 
 We really love using all the linters! Give them a try.
 
@@ -365,7 +365,7 @@ If you are using [react-rails](https://github.com/reactjs/react-rails) in your p
 
 - Remove the 'react-rails' gem from your Gemfile.
 
-- Remove the generated generated lines for react-rails in your application.js file.
+- Remove the generated lines for react-rails in your application.js file.
 
 ```
 //= require react
@@ -397,7 +397,7 @@ Note: If you have components from react-rails you want to use, then you will nee
 + [Changelog](CHANGELOG.md)
 
 ## Demos
-+ [www.reactrails.com](http://www.reactrails.com) with source at [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/).
++ [www.reactrails.com](http://www.reactrails.com) with the source at [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/).
 + [spec app](spec/dummy): Great simple examples used for our tests.
   ```
   cd spec/dummy
