@@ -1,6 +1,6 @@
 import test from 'tape';
 import serverRenderReactComponent from '../src/serverRenderReactComponent';
-import ComponentStore from '../src/ComponentStore';
+import ComponentStore from '../src/ComponentRegistry';
 import React from 'react';
 
 test('serverRenderReactComponent renders a registered component', (assert) => {

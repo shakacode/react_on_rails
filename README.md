@@ -28,12 +28,12 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
 + *Normal Mode (React component will be rendered on client):*
 
   ```erb
-  <%= react_component("HelloWorldApp", @some_props) %>
+  <%= react_component("HelloWorldApp", props: @some_props) %>
   ```
 + *Server-Side Rendering (React component is first rendered into HTML on the server):*
 
   ```erb
-  <%= react_component("HelloWorldApp", @some_props, prerender: true) %>
+  <%= react_component("HelloWorldApp", props: @some_props, prerender: true) %>
   ```
 
 + The `component_name` parameter is a string matching the name you used to globally expose your React component. So, in the above examples, if you had a React component named "HelloWorldApp," you would register it with the following lines:
@@ -50,7 +50,7 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
 
   ```ruby
     # Rails View
-    <%= react_component("HelloWorldApp", { name: "Stranger" }) %>
+    <%= react_component("HelloWorldApp", props: { name: "Stranger" }) %>
   ```
 
   ```javascript
@@ -73,6 +73,7 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
 + [Generator](#generator)
     - [Understanding the Organization of the Generated Client Code](#understanding-the-organization-of-the-generated-client-code)
     - [Redux](#redux)
+      - [Multiple React Components on a Page with One Store](#multiple-react-components-on-a-page-with-one-store)
     - [Using Images and Fonts](#using-images-and-fonts)
     - [Bootstrap Integration](#bootstrap-integration)
         + [Bootstrap via Rails Server](#bootstrap-via-rails-server)
@@ -163,7 +164,7 @@ That will install the latest version and update your package.json.
 ## How it Works
 The generator installs your webpack files in the `client` folder. Foreman uses webpack to compile your code and output the bundled results to `app/assets/javascripts/generated`, which are then loaded by sprockets. These generated bundle files have been added to your `.gitignore` for your convenience.
 
-Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails.
+Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the react component helper. You can also initialize a Redux store with view helper `redux_store` so that the store can be shared amongst multiple React components. Your best best is to scan the code inside of the [/spec/dummy](spec/dummy) sample app.
 
 ### Client-Side Rendering vs. Server-Side Rendering
 In most cases, you should use the `prerender: false` (default behavior) with the provided helper method to render the React component from your Rails views. In some cases, such as when SEO is vital or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
@@ -284,6 +285,56 @@ You may also notice the `app/lib` folder. This is for any code that is common be
 If you have used the `--redux` generator option, you will notice the familiar additional redux folders in addition to the aforementioned folders. The Hello World example has also been modified to use Redux.
 
 Note the organizational paradigm of "bundles". These are like application domains and are used for grouping your code into webpack bundles, in case you decide to create different bundles for deployment. This is also useful for separating out logical parts of your application. The concept is that each bundle will have it's own Redux store. If you have code that you want to reuse across bundles, including components and reducers, place them under `/client/app/lib`.
+
+#### Multiple React Components on a Page with One Store
+You may wish to have 2 React components share the same the Redux store. For example, if your navbar is a React component, you may want it to use the same store as your component in the main area of the page. You may even want multiple React components in the main area, which allows for greater modularity. In addition, you may want this to work with Turbolinks to minimize reloading the JavaScript. A good example of this would be something like an a notifications counter in a header. As each notifications is read in the body of the page, you would like to update the header. If both the header and body share the same Redux store, then this is trivial. Otherwise, we have to rely on other solutions, such as the header polling the server to see how many unread notifications exist.
+
+Suppose the Redux store is called `appStore`, and you have 3 React components that each need to connect to a store: `NavbarApp`, `CommentsApp`, and `BlogsApp`. I named them with `App` to indicate that they are the registered components.
+
+You will need to make function that can create the store you will be using for all components and register it via the `registerStore` method. Note, this is a **storeCreator**, meaning that it is a function that takes props and returns a store:
+
+```
+ReactOnRails.registerStore({
+  appStore
+});
+```
+
+When registering your component with React on Rails, you can get the store via `ReactOnRails.getStore`:
+
+```js
+// getStore will initialize the store if not already initialized, so creates or retrieves store
+const appStore = ReactOnRails.getStore("appStore");
+return (
+  <Provider store={appStore}>
+    <CommentsApp />
+  </Provider>
+);
+```
+
+From your Rails view, you can use the provided helper `redux_store(store_name, props)` to create a fresh version of the store (because it may already exist if you came from visiting a previous page). Note, for this example, since we're initializing this from the main layout, we're using a generic name of `@react_props`. This means in this case that Rails controllers would set `@react_props` to the properties to hydrate the Redux store.
+
+**app/views/layouts/application.html.erb**
+```erb
+...
+<% redux_store("appStore", @react_props) %>;
+<%= render_component("NavbarApp") %>
+yield
+...
+```
+
+Components are created as [stateless function(al) components](https://facebook.github.io/react/docs/reusable-components.html#stateless-functions). Since you can pass in initial props via the helper `redux_store`, you do not need to pass any props directly to the component. Instead, the component hydrates by connecting to the store.
+
+**_comments.html.erb**
+```erb
+<%= render_component("CommentsApp") %>
+```
+
+**_blogs.html.erb**
+```erb
+<%= render_component("BlogsApp") %>
+```
+
+*Note:* You will not be doing any partial updates to the Redux store when loading a new page. When the page content loads, React on Rails will rehydrate a new version of the store with whatever props are placed on the page.
 
 ### Using Images and Fonts
 The generator has amended the folders created in `client/assets/` to Rails's asset path. We recommend that if you have any existing assets that you want to use with your client code, you should move them to these folders and use webpack as normal. This allows webpack's development server to have access to your assets, as it will not be able to see any assets in the default Rails directories which are above the `/client` directory.

@@ -1,6 +1,6 @@
 <%= render "header" %>
 
-<%= react_component("HelloWorld", @app_props_server_render, prerender: true, trace: true) %>
+<%= react_component("HelloWorld", props: @app_props_server_render, prerender: true, trace: true) %>
 <hr/>
 
 <h1>React Rails Server Rendering</h1>
@@ -66,7 +66,7 @@
     Place the component on the view: spec/dummy/app/views/pages/client_side_hello_world.html.erb
     <br/>
     <pre>
-    <%%= react_component("HelloWorld", @app_props_server_render, prerender: true, trace: true) %>
+    <%%= react_component("HelloWorld", props: @app_props_server_render, prerender: true, trace: true) %>
     </pre>
   </li>
 </ol>
