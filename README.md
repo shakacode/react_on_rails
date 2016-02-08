@@ -2,6 +2,7 @@
 
 # NEWS
 
+* 2/8/2016: 3.0 is in beta! See [ChangeLog](https://github.com/shakacode/react_on_rails/blob/initialize-redux-store-view-helper/CHANGELOG.md), [#215](https://github.com/shakacode/react_on_rails/pull/215), branch [initialize-redux-store-view-helper](https://github.com/shakacode/react_on_rails/tree/initialize-redux-store-view-helper).
 * 2.3 has shipped on Monday, 2/1/2016. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v1-to-v2).
 * There was a fatal error when using the lastest version of Redux for server rendering. See [Redux #1335](https://github.com/rackt/redux/issues/1335). See [diff 3.1.6...3.1.4](https://github.com/rackt/redux/commit/e2e14d26f09ca729ae0555442f50fcfc45bfb423#diff-1fdf421c05c1140f6d71444ea2b27638). Workaround for server rendering: Use Redux 3.1.7 or upgrade to React On Rails v2.3.0.  [this commit](https://github.com/shakacode/react_on_rails/commit/59f1e68d3d233775e6abc63bff180ea59ac2d79e) on [PR #244](https://github.com/shakacode/react_on_rails/pull/244/).
 * 2.x Highlights:
