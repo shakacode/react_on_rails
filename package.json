@@ -1,13 +1,10 @@
 {
   "name": "react-on-rails",
-  "version": "2.3.0",
+  "version": "3.0.0-beta.1",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "node_package/lib/ReactOnRails.js",
   "directories": {
     "doc": "docs"
-  },
-  "dependencies": {
-    "babel-types": "^6.4.5"
   },
   "devDependencies": {
     "babel": "^6.3.26",
@@ -21,6 +18,7 @@
     "babel-preset-stage-0": "^6.3.13",
     "babel-runtime": "^6.3.19",
     "babel-tape-runner": "^2.0.0",
+    "babel-types": "^6.4.5",
     "babelify": "^7.2.0",
     "blue-tape": "^0.1.11",
     "eslint": "^1.10.3",
@@ -33,6 +31,7 @@
     "react": "^0.14.7",
     "react-dom": "^0.14.7",
     "react-transform-hmr": "^1.0.1",
+    "redux": "^3.3.1",
     "tap-spec": "^4.1.1",
     "tape": "^4.4.0",
     "webpack": "^1.12.12"

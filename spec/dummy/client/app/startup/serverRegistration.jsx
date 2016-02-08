@@ -15,18 +15,29 @@ import HelloWorldApp from './HelloWorldApp';
 // Example of React + Redux
 import ReduxApp from './ServerReduxApp';
 
+// Example of 2 React components sharing the same store
+import ReduxSharedStoreApp from './ServerReduxSharedStoreApp';
+
 // Example of React Router with Server Rendering
 import RouterApp from './ServerRouterApp';
 
 import PureComponent from '../components/PureComponent';
+
+import SharedReduxStore from '../stores/SharedReduxStore'
 
 ReactOnRails.register({
   HelloWorld,
   HelloWorldWithLogAndThrow,
   HelloWorldES5,
   ReduxApp,
+  ReduxSharedStoreApp,
   HelloWorldApp,
   RouterApp,
   HelloString,
   PureComponent,
 });
+
+ReactOnRails.registerStore({
+  SharedReduxStore
+});
+

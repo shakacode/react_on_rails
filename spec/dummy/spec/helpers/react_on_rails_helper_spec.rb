@@ -34,8 +34,9 @@ describe ReactOnRailsHelper, type: :helper do
       expect(sanitized).to eq(hash_sanitized)
     end
   end
+
   describe "#react_component" do
-    subject { react_component("App", props) }
+    subject { react_component("App", props: props) }
 
     let(:props) do
       { name: "My Test Name" }
@@ -48,13 +49,20 @@ describe ReactOnRailsHelper, type: :helper do
     let(:id) { "App-react-component-0" }
 
     let(:react_definition_div) do
-      %(<div class=\"js-react-on-rails-component\"
-            style=\"display:none\"
-            data-component-name=\"App\"
-            data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
-            data-trace=\"false\"
+      %(<div class="js-react-on-rails-component"
+            style="display:none"
+            data-component-name="App"
+            data-props="{&quot;name&quot;:&quot;My Test Name&quot;}"
+            data-trace="false"
             #{turbolinks_line}
-            data-dom-id=\"#{id}\"></div>).squish
+            data-dom-id="#{id}"></div>).squish
+    end
+
+    describe "deprecated API" do
+      subject { react_component("App", props) }
+      it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
+      it { is_expected.to include react_component_div }
+      it { is_expected.to include react_definition_div }
     end
 
     it { expect(self).to respond_to :react_component }
@@ -104,6 +112,45 @@ describe ReactOnRailsHelper, type: :helper do
       end
 
       it { is_expected.to include react_definition_div_skip_display_none_false }
+    end
+  end
+
+  describe "#redux_store" do
+    subject { redux_store("reduxStore", props) }
+
+    let(:props) do
+      { name: "My Test Name" }
+    end
+
+    let(:react_store_div) do
+      %(<div class="js-react-on-rails-store"
+            style="display:none"
+            data-store-name="reduxStore"
+            data-props="{&quot;name&quot;:&quot;My Test Name&quot;}"></div>).squish
+    end
+
+    it { expect(self).to respond_to :redux_store }
+
+    it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
+    it { is_expected.to start_with "<div" }
+    it { is_expected.to end_with "</div>" }
+    it { is_expected.to include react_store_div }
+
+    context "with skip_display_none option true" do
+      before { ReactOnRails.configuration.skip_display_none = true }
+
+      let(:react_store_definition_div_skip_display_none_true) do
+        %(<div class="js-react-on-rails-store"
+            data-store-name="reduxStore"
+            data-props="{&quot;name&quot;:&quot;My Test Name&quot;}"></div>).squish
+      end
+
+      it { is_expected.to include react_store_definition_div_skip_display_none_true }
+    end
+
+    context "with skip_display_none option false" do
+      before { ReactOnRails.configuration.skip_display_none = false }
+      it { is_expected.to include react_store_div }
     end
   end
 

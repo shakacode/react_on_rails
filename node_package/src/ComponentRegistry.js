@@ -37,7 +37,9 @@ export default {
 
     // Backwards compatability. Remove for v3.0.
     if (!ctx[name]) {
-      throw new Error(`Could not find component registered with name ${name}`);
+      const keys = Array.from(_components.keys()).join(', ');
+      throw new Error(`Could not find component registered with name ${name}. \
+Registered component names include [ ${keys} ]. Maybe you forgot to register the component?`);
     }
 
     console.warn(
@@ -47,7 +49,7 @@ export default {
   },
 
   /**
-   * Get an Map containing all registered components. Useful for debugging.
+   * Get a Map containing all registered components. Useful for debugging.
    * @returns Map where key is the component name and values are the
    * { name, component, generatorFunction}
    */
