@@ -1,5 +1,6 @@
 /* eslint-disable react/no-multi-comp */
 import test from 'tape';
+import { createStore } from 'redux';
 import React from 'react';
 import ReactOnRails from '../src/ReactOnRails';
 import { canUseDOM } from 'fbjs/lib/ExecutionEnvironment';
@@ -57,4 +58,46 @@ test('serverRenderReactComponent throws error for invalid options', (assert) => 
     /Invalid option/,
     'setOptions should throw an error for invalid options'
   );
+});
+
+test('register store and getStoreGenerator allow registration', (assert) => {
+  assert.plan(2);
+  function reducer(state = {}, action) {
+    return {};
+  }
+
+  function storeGenerator(props) {
+    return createStore(reducer, props);
+  };
+
+  ReactOnRails.registerStore({ storeGenerator });
+
+  const actual = ReactOnRails.getStoreGenerator('storeGenerator');
+  assert.equal(actual, storeGenerator,
+    `Could not find 'storeGenerator' amongst store generators ${JSON.stringify(ReactOnRails.storeGenerators())}.`);
+
+  assert.deepEqual(ReactOnRails.storeGenerators(), new Map([['storeGenerator', storeGenerator]]));
+});
+
+test('setStore and getStore', (assert) => {
+  assert.plan(2);
+  function reducer(state = {}, action) {
+    return {};
+  }
+
+  function storeGenerator(props) {
+    return createStore(reducer, props);
+  };
+
+  const store = storeGenerator({});
+
+  ReactOnRails.setStore('storeGenerator', store);
+
+  const actual = ReactOnRails.getStore('storeGenerator');
+  assert.equal(actual, store,
+    `Could not find 'store' amongst store generators ${JSON.stringify(ReactOnRails.stores())}.`);
+  const expected = new Map();
+  expected.set('storeGenerator', store);
+
+  assert.deepEqual(ReactOnRails.stores(), expected);
 });

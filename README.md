@@ -2,9 +2,11 @@
 
 # NEWS
 
-* 2/8/2016: 3.0 is in beta! See [ChangeLog](https://github.com/shakacode/react_on_rails/blob/initialize-redux-store-view-helper/CHANGELOG.md), [#215](https://github.com/shakacode/react_on_rails/pull/215), branch [initialize-redux-store-view-helper](https://github.com/shakacode/react_on_rails/tree/initialize-redux-store-view-helper).
-* 2.3 has shipped on Monday, 2/1/2016. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v1-to-v2).
-* There was a fatal error when using the latest version of Redux for server rendering. See [Redux #1335](https://github.com/rackt/redux/issues/1335). See [diff 3.1.6...3.1.4](https://github.com/rackt/redux/commit/e2e14d26f09ca729ae0555442f50fcfc45bfb423#diff-1fdf421c05c1140f6d71444ea2b27638). Workaround for server rendering: Use Redux 3.1.7 or upgrade to React On Rails v2.3.0.  [this commit](https://github.com/shakacode/react_on_rails/commit/59f1e68d3d233775e6abc63bff180ea59ac2d79e) on [PR #244](https://github.com/shakacode/react_on_rails/pull/244/).
+* 3.0.0.beta.1 has shipped on Monday, 2/8/2016. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v1-to-v2). [Migration steps from 2.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v2-to-v3).
+* 3.0.0 Highlights:
+  1. Support for ensuring JavaScript is current when running tests.
+  2. Support for multiple React components with one Redux store. So you can have a header React component and different body React components talking to the same Redux store!
+* There was a fatal error when using the lastest version of Redux for server rendering. See [Redux #1335](https://github.com/rackt/redux/issues/1335). See [diff 3.1.6...3.1.4](https://github.com/rackt/redux/commit/e2e14d26f09ca729ae0555442f50fcfc45bfb423#diff-1fdf421c05c1140f6d71444ea2b27638). Workaround for server rendering: Use Redux 3.1.7 or upgrade to React On Rails v2.3.0. [this commit](https://github.com/shakacode/react_on_rails/commit/59f1e68d3d233775e6abc63bff180ea59ac2d79e) on [PR #244](https://github.com/shakacode/react_on_rails/pull/244/).
 * 2.x Highlights:
   1. Fixed a **critical** problem with TurboLinks. Be sure to see [turbolinks docs](docs/additional_reading/turbolinks.md) for more information on how to debug TurboLinks issues.
   2. Provides a convenient helper to ensure that JavaScript assets are compiled before running tests.
@@ -29,12 +31,12 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
 + *Normal Mode (React component will be rendered on client):*
 
   ```erb
-  <%= react_component("HelloWorldApp", @some_props) %>
+  <%= react_component("HelloWorldApp", props: @some_props) %>
   ```
 + *Server-Side Rendering (React component is first rendered into HTML on the server):*
 
   ```erb
-  <%= react_component("HelloWorldApp", @some_props, prerender: true) %>
+  <%= react_component("HelloWorldApp", props: @some_props, prerender: true) %>
   ```
 
 + The `component_name` parameter is a string matching the name you used to globally expose your React component. So, in the above examples, if you had a React component named "HelloWorldApp," you would register it with the following lines:
@@ -51,7 +53,7 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
 
   ```ruby
     # Rails View
-    <%= react_component("HelloWorldApp", { name: "Stranger" }) %>
+    <%= react_component("HelloWorldApp", props: { name: "Stranger" }) %>
   ```
 
   ```javascript
@@ -74,6 +76,7 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
 + [Generator](#generator)
     - [Understanding the Organization of the Generated Client Code](#understanding-the-organization-of-the-generated-client-code)
     - [Redux](#redux)
+      - [Multiple React Components on a Page with One Store](#multiple-react-components-on-a-page-with-one-store)
     - [Using Images and Fonts](#using-images-and-fonts)
     - [Bootstrap Integration](#bootstrap-integration)
         + [Bootstrap via Rails Server](#bootstrap-via-rails-server)
@@ -164,7 +167,7 @@ That will install the latest version and update your package.json.
 ## How it Works
 The generator installs your webpack files in the `client` folder. Foreman uses webpack to compile your code and output the bundled results to `app/assets/javascripts/generated`, which are then loaded by sprockets. These generated bundle files have been added to your `.gitignore` for your convenience.
 
-Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails.
+Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the react component helper. You can also initialize a Redux store with view helper `redux_store` so that the store can be shared amongst multiple React components. Your best best is to scan the code inside of the [/spec/dummy](spec/dummy) sample app.
 
 ### Client-Side Rendering vs. Server-Side Rendering
 In most cases, you should use the `prerender: false` (default behavior) with the provided helper method to render the React component from your Rails views. In some cases, such as when SEO is vital or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
@@ -218,17 +221,25 @@ Once the bundled files have been generated in your `app/assets/javascripts/gener
 This is how you actually render the React components you exposed to `window` inside of `clientRegistration` (and `global` inside of `serverRegistration` if you are server rendering).
 
 #### react_component
-`react_component(component_name, props = {}, options = {})`
+`react_component(component_name, options = {})`
 
 + **component_name:** Can be a React component, created using a ES6 class, or `React.createClass`, or a generator function that returns a React component.
-+ **props:** Ruby Hash which contains the properties to pass to the react object, or a JSON string. If you pass a string, we'll escape it for you.
 + **options:**
+  + **props:** Ruby Hash which contains the properties to pass to the react object, or a JSON string. If you pass a string, we'll escape it for you.
   + **prerender:** enable server-side rendering of component. Set to false when debugging!
   + **router_redirect_callback:** Use this option if you want to provide a custom handler for redirects on server rendering. If you don't specify this, we'll simply change the rendered output to a script that sets window.location to the new route. Set this up exactly like a generator_function. Your function will take one parameter, containing all the values that react-router gives on a redirect request, such as pathname, search, etc.
   + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise.
   + **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the default configuration of logging_on_server set to true, you'll still see the errors on the server.
   + **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
 + Any other options are passed to the content tag, including the id
+
+#### redux_store
+`redux_store(store_name, props = {})`
+
++ **store_name:** A name for the store. You'll refer to this name in 2 places in your JavaScript:
+  1. You'll call `ReactOnRails.registerStore({storeName})` in the same place that you register your components.
+  2. In your component definition, you'll call `ReactOnRails.getStore('storeName')` to get the hydrated Redux store to attach to your components.
++ **props:**  ReactOnRails takes care of setting up the hydration of your store with props from the view.
 
 #### Generator Functions
 Why would you create a function that returns a React compnent? For example, you may want the ability to use the passed-in props to initialize a redux store or setup react-router. Or you may want to return different components depending on what's in the props. ReactOnRails will automatically detect a registered generator function.
@@ -285,6 +296,56 @@ You may also notice the `app/lib` folder. This is for any code that is common be
 If you have used the `--redux` generator option, you will notice the familiar additional redux folders in addition to the aforementioned folders. The Hello World example has also been modified to use Redux.
 
 Note the organizational paradigm of "bundles". These are like application domains and are used for grouping your code into webpack bundles, in case you decide to create different bundles for deployment. This is also useful for separating out logical parts of your application. The concept is that each bundle will have it's own Redux store. If you have code that you want to reuse across bundles, including components and reducers, place them under `/client/app/lib`.
+
+#### Multiple React Components on a Page with One Store
+You may wish to have 2 React components share the same the Redux store. For example, if your navbar is a React component, you may want it to use the same store as your component in the main area of the page. You may even want multiple React components in the main area, which allows for greater modularity. In addition, you may want this to work with Turbolinks to minimize reloading the JavaScript. A good example of this would be something like an a notifications counter in a header. As each notifications is read in the body of the page, you would like to update the header. If both the header and body share the same Redux store, then this is trivial. Otherwise, we have to rely on other solutions, such as the header polling the server to see how many unread notifications exist.
+
+Suppose the Redux store is called `appStore`, and you have 3 React components that each need to connect to a store: `NavbarApp`, `CommentsApp`, and `BlogsApp`. I named them with `App` to indicate that they are the registered components.
+
+You will need to make a function that can create the store you will be using for all components and register it via the `registerStore` method. Note, this is a **storeCreator**, meaning that it is a function that takes props and returns a store:
+
+```
+ReactOnRails.registerStore({
+  appStore
+});
+```
+
+When registering your component with React on Rails, you can get the store via `ReactOnRails.getStore`:
+
+```js
+// getStore will initialize the store if not already initialized, so creates or retrieves store
+const appStore = ReactOnRails.getStore("appStore");
+return (
+  <Provider store={appStore}>
+    <CommentsApp />
+  </Provider>
+);
+```
+
+From your Rails view, you can use the provided helper `redux_store(store_name, props)` to create a fresh version of the store (because it may already exist if you came from visiting a previous page). Note, for this example, since we're initializing this from the main layout, we're using a generic name of `@react_props`. This means in this case that Rails controllers would set `@react_props` to the properties to hydrate the Redux store.
+
+**app/views/layouts/application.html.erb**
+```erb
+...
+<% redux_store("appStore", @react_props) %>;
+<%= render_component("NavbarApp") %>
+yield
+...
+```
+
+Components are created as [stateless function(al) components](https://facebook.github.io/react/docs/reusable-components.html#stateless-functions). Since you can pass in initial props via the helper `redux_store`, you do not need to pass any props directly to the component. Instead, the component hydrates by connecting to the store.
+
+**_comments.html.erb**
+```erb
+<%= render_component("CommentsApp") %>
+```
+
+**_blogs.html.erb**
+```erb
+<%= render_component("BlogsApp") %>
+```
+
+*Note:* You will not be doing any partial updates to the Redux store when loading a new page. When the page content loads, React on Rails will rehydrate a new version of the store with whatever props are placed on the page.
 
 ### Using Images and Fonts
 The generator has amended the folders created in `client/assets/` to Rails's asset path. We recommend that if you have any existing assets that you want to use with your client code, you should move them to these folders and use webpack as normal. This allows webpack's development server to have access to your assets, as it will not be able to see any assets in the default Rails directories which are above the `/client` directory.

@@ -72,7 +72,7 @@ module ReactOnRails
         GeneratorMessages.messages.each { |message| puts message }
       end
 
-      def invoke_generators # rubocop:disable Metrics/CyclomaticComplexity
+      def invoke_generators
         invoke "react_on_rails:base"
         invoke "react_on_rails:react_no_redux" unless options.redux?
         invoke "react_on_rails:react_with_redux" if options.redux?

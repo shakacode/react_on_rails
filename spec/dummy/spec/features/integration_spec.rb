@@ -19,7 +19,7 @@ shared_examples "React Component" do |dom_selector|
   end
 end
 
-feature "Pages/Index", js: true do
+feature "Pages/Index", :js do
   subject { page }
 
   context "All in one page" do
@@ -62,7 +62,7 @@ feature "Pages/Index", js: true do
   end
 end
 
-feature "Turbolinks across pages", js: true do
+feature "Turbolinks across pages", :js do
   subject { page }
 
   scenario "changes name in message according to input" do
@@ -73,21 +73,21 @@ feature "Turbolinks across pages", js: true do
   end
 end
 
-feature "Pages/client_side_log_throw", js: true do
+feature "Pages/client_side_log_throw", :js do
   subject { page }
   background { visit "/client_side_log_throw" }
 
   scenario { is_expected.to have_text "This example demonstrates client side logging and error handling." }
 end
 
-feature "Pages/Pure Component", js: true do
+feature "Pages/Pure Component", :js do
   subject { page }
   background { visit "/pure_component" }
 
   scenario { is_expected.to have_text "This is a Pure Component!" }
 end
 
-feature "Pages/server_side_log_throw", js: true do
+feature "Pages/server_side_log_throw", :js do
   subject { page }
   background { visit "/server_side_log_throw" }
 
@@ -108,7 +108,7 @@ feature "Pages/server_side_log_throw_raise" do
   end
 end
 
-feature "Pages/index after using browser's back button", js: true do
+feature "Pages/index after using browser's back button", :js do
   subject { page }
   background do
     visit root_path
@@ -119,7 +119,7 @@ feature "Pages/index after using browser's back button", js: true do
   include_examples "React Component", "div#ReduxApp-react-component-0"
 end
 
-feature "React Router" do
+feature "React Router", :js do
   subject { page }
   background { visit "/react_router" }
   context "/react_router" do
@@ -136,4 +136,41 @@ feature "React Router" do
       expect(second_page_header_text).to eq("React Router Second Page")
     end
   end
+end
+
+shared_examples "React Component Shared Store" do |url|
+  subject { page }
+  background { visit url }
+  context url do
+    scenario "Type in one component changes the other compnent" do
+      expect(current_path).to eq(url)
+      new_text = "John Doe"
+      new_text_2 = "Jane Smith"
+      within("#ReduxSharedStoreApp-react-component-0") do
+        find("input").set new_text
+        within("h3") do
+          is_expected.to have_content new_text
+        end
+      end
+      within("#ReduxSharedStoreApp-react-component-1") do
+        within("h3") do
+          is_expected.to have_content new_text
+        end
+        find("input").set new_text_2
+      end
+      within("#ReduxSharedStoreApp-react-component-0") do
+        within("h3") do
+          is_expected.to have_content new_text_2
+        end
+      end
+    end
+  end
+end
+
+feature "2 react components, 1 store, client only", :js do
+  include_examples "React Component Shared Store", "/client_side_hello_world_shared_store"
+end
+
+feature "2 react components, 1 store, server side", :js do
+  include_examples "React Component Shared Store", "/server_side_hello_world_shared_store"
 end

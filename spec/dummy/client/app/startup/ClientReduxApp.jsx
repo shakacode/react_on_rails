@@ -17,7 +17,7 @@ import HelloWorldContainer from '../components/HelloWorldContainer';
  *  React will see that the state is the same and not do anything.
  *
  */
-export default props => {
+export default (props) => {
   const combinedReducer = combineReducers(reducers);
   const store = applyMiddleware(middleware)(createStore)(combinedReducer, props);
 

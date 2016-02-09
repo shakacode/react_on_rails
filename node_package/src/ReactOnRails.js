@@ -1,6 +1,7 @@
 import clientStartup from './clientStartup';
 import handleError from './handleError';
-import ComponentStore from './ComponentStore';
+import ComponentRegistry from './ComponentRegistry';
+import StoreRegistry from './StoreRegistry';
 import serverRenderReactComponent from './serverRenderReactComponent';
 import buildConsoleReplay from './buildConsoleReplay';
 import createReactElement from './createReactElement';
@@ -30,17 +31,65 @@ ctx.ReactOnRails = {
     }
   },
 
-  option(key) {
-    return this._options[key];
-  },
-
   /**
    * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
    * find you components for rendering.
    * @param components (key is component name, value is component)
    */
   register(components) {
-    ComponentStore.register(components);
+    ComponentRegistry.register(components);
+  },
+
+  /**
+   * Allows registration of store generators to be used by multiple react components on one Rails view.
+   * store generators are functions that take one arg, props, and return a store. Note that the
+   * setStore API is different in tha it's the actual store hydrated with props.
+   * @param stores (key is store name, value is the store generator)
+   */
+  registerStore(stores) {
+    StoreRegistry.register(stores);
+  },
+
+  /**
+   * Allows retrieval of the store by name. This store will be hydrated by any
+   * Rails form props.
+   * @param name
+   * @returns Redux Store, possibly hydrated
+   */
+  getStore(name) {
+    return StoreRegistry.getStore(name);
+  },
+
+  ////////////////////////////////////////////////////////////////////////////////
+  // INTERNALLY USED APIs
+  ////////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Retrieve an option by key.
+   * @param key
+   * @returns option value
+   */
+  option(key) {
+    return this._options[key];
+  },
+
+  /**
+   * Allows retrieval of the store generator by name. This is used internally by ReactOnRails after
+   * a rails form loads to prepare stores.
+   * @param name
+   * @returns Redux Store generator function
+   */
+  getStoreGenerator(name) {
+    return StoreRegistry.getStoreGenerator(name);
+  },
+
+  /**
+   * Allows saving the store populated by Rails form props. Used internally by ReactOnRails.
+   * @param name
+   * @returns Redux Store, possibly hydrated
+   */
+  setStore(name, store) {
+    return StoreRegistry.setStore(name, store);
   },
 
   /**
@@ -66,7 +115,7 @@ ctx.ReactOnRails = {
    * @returns {name, component, generatorFunction}
    */
   getComponent(name) {
-    return ComponentStore.get(name);
+    return ComponentRegistry.get(name);
   },
 
   /**
@@ -97,7 +146,23 @@ ctx.ReactOnRails = {
    * @returns {*}
    */
   registeredComponents() {
-    return ComponentStore.components();
+    return ComponentRegistry.components();
+  },
+
+  /**
+   * Get an Object containing all registered store generators. Useful for debugging.
+   * @returns {*}
+   */
+  storeGenerators() {
+    return StoreRegistry.storeGenerators();
+  },
+
+  /**
+   * Get an Object containing all hydrated stores. Useful for debugging.
+   * @returns {*}
+   */
+  stores() {
+    return StoreRegistry.stores();
   },
 
   resetOptions() {

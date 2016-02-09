@@ -5,6 +5,7 @@ import handleError from './handleError';
 import isRouterResult from './isRouterResult';
 
 const REACT_ON_RAILS_COMPONENT_CLASS_NAME = 'js-react-on-rails-component';
+const REACT_ON_RAILS_STORE_CLASS_NAME = 'js-react-on-rails-store';
 
 function debugTurbolinks(...msg) {
   if (!window) {
@@ -21,10 +22,26 @@ function turbolinksInstalled() {
 }
 
 function forEachComponent(fn) {
-  const els = document.getElementsByClassName(REACT_ON_RAILS_COMPONENT_CLASS_NAME);
+  forEach(fn, REACT_ON_RAILS_COMPONENT_CLASS_NAME);
+}
+
+function forEachStore(fn) {
+  forEach(fn, REACT_ON_RAILS_STORE_CLASS_NAME);
+}
+
+function forEach(fn, className) {
+  const els = document.getElementsByClassName(className);
   for (let i = 0; i < els.length; i++) {
     fn(els[i]);
   }
+}
+
+function initializeStore(el) {
+  const name = el.getAttribute('data-store-name');
+  const props = JSON.parse(el.getAttribute('data-props'));
+  const storeGenerator = ReactOnRails.getStoreGenerator(name);
+  const store = storeGenerator(props);
+  ReactOnRails.setStore(name, store);
 }
 
 /**
@@ -72,6 +89,7 @@ You should return a React.Component always for the client side entry point.`);
 function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded');
 
+  forEachStore(initializeStore);
   forEachComponent(render);
 }
 

@@ -11,6 +11,17 @@ describe "Server Rendering" do
       .to eq("Mr. Server Side Rendering")
   end
 
+  it "generates server rendered HTML if server renderering enabled for shared redux" do
+    get server_side_hello_world_shared_store_path
+    html_nodes = Nokogiri::HTML(response.body)
+    top_id = "#ReduxSharedStoreApp-react-component-0"
+    expect(html_nodes.css(top_id).children.size).to eq(1)
+    expect(html_nodes.css("#{top_id} h3").text)
+      .to eq("Redux Hello, Mr. Server Side Rendering!")
+    expect(html_nodes.css("#{top_id} p input")[0]["value"])
+      .to eq("Mr. Server Side Rendering")
+  end
+
   it "generates no server rendered HTML if server renderering not enabled" do
     get client_side_hello_world_path
     html_nodes = Nokogiri::HTML(response.body)
