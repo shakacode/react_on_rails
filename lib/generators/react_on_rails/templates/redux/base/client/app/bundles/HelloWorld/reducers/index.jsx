@@ -9,6 +9,6 @@ export default {
   $$helloWorldStore: helloWorldReducer,
 };
 
-export const initalStates = {
+export const initialStates = {
   $$helloWorldState,
 };
