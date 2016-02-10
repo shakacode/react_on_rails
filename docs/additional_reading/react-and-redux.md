@@ -27,7 +27,7 @@ export default {
   // ...
 };
 
-export const initalStates = {
+export const initialStates = {
   $$usersState,
   $$blogPostsState,
   $$commentsState,
