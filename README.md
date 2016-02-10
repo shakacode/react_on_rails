@@ -327,8 +327,8 @@ From your Rails view, you can use the provided helper `redux_store(store_name, p
 **app/views/layouts/application.html.erb**
 ```erb
 ...
-<% redux_store("appStore", @react_props) %>;
-<%= render_component("NavbarApp") %>
+<%= redux_store("appStore", @react_props) %>;
+<%= react_component("NavbarApp") %>
 yield
 ...
 ```
@@ -337,12 +337,12 @@ Components are created as [stateless function(al) components](https://facebook.g
 
 **_comments.html.erb**
 ```erb
-<%= render_component("CommentsApp") %>
+<%= react_component("CommentsApp") %>
 ```
 
 **_blogs.html.erb**
 ```erb
-<%= render_component("BlogsApp") %>
+<%= react_component("BlogsApp") %>
 ```
 
 *Note:* You will not be doing any partial updates to the Redux store when loading a new page. When the page content loads, React on Rails will rehydrate a new version of the store with whatever props are placed on the page.
