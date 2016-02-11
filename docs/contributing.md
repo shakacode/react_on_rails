@@ -156,6 +156,8 @@ If you run `rspec` at the top level, you'll see this message: `require': cannot 
 
 After running a test, you can view the coverage results SimpleCov reports by opening `coverage/index.html`.
 
+To test `spec/dummy` against Turbolinks 5, install the gem by running `ENABLE_TURBOLINKS_5=TRUE bundle install` in the `spec/dummy` directory before running `rake`.
+
 ### Debugging
 Start the sample app like this for some debug printing:
 
@@ -184,7 +186,7 @@ All linting is performed from the docker container for CI. You will need docker 
 Once you have docker and docker-compose running locally, run `docker-compose build lint`. This will build the `reactonrails_lint` docker image and docker-compose `lint` container. The initial build is slow, but after the install, startup is very quick.
 
 ### Linting Commands
-Run `rake lint`. 
+Run `rake lint`.
 
 Alternately with Docker:
 

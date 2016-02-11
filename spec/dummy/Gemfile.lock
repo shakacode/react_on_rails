@@ -330,7 +330,7 @@ DEPENDENCIES
   spring
   sqlite3
   therubyracer
-  turbolinks
+  turbolinks (= 2.5.3)
   uglifier (>= 2.7.2)
   web-console
 
