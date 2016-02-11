@@ -26,6 +26,7 @@ install:
   - npm install -g npm
   - npm install -g poltergeist
   - bundle install
+  - ENABLE_TURBOLINKS_5=TRUE bundle install
   - npm install
   - rake dummy_apps
   - rake examples
