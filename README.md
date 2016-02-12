@@ -442,7 +442,7 @@ If you are using [react-rails](https://github.com/reactjs/react-rails) in your p
 Note: If you have components from react-rails you want to use, then you will need to port them into react_on_rails which uses webpack instead of the asset pipeline.
 
 ## Additional Reading
-+ [The React on Rails Doctrine](http://rubyonrails.org/doctrine/)
++ [The React on Rails Doctrine](http://www.shakacode.com/2016/01/27/the-react-on-rails-doctrine.html)
 + [Babel](docs/additional_reading/babel.md)
 + [Generated Client Code](docs/additional_reading/generated_client_code.md)
 + [Heroku Deployment](docs/additional_reading/heroku_deployment.md)
