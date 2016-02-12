@@ -169,7 +169,7 @@ That will install the latest version and update your package.json.
 ## How it Works
 The generator installs your webpack files in the `client` folder. Foreman uses webpack to compile your code and output the bundled results to `app/assets/javascripts/generated`, which are then loaded by sprockets. These generated bundle files have been added to your `.gitignore` for your convenience.
 
-Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the react component helper. You can also initialize a Redux store with view helper `redux_store` so that the store can be shared amongst multiple React components. Your best best is to scan the code inside of the [/spec/dummy](spec/dummy) sample app.
+Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the react component helper. You can also initialize a Redux store with view helper `redux_store` so that the store can be shared amongst multiple React components. Your best bet is to scan the code inside of the [/spec/dummy](spec/dummy) sample app.
 
 ### Client-Side Rendering vs. Server-Side Rendering
 In most cases, you should use the `prerender: false` (default behavior) with the provided helper method to render the React component from your Rails views. In some cases, such as when SEO is vital or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
@@ -364,7 +364,7 @@ In the former case, the Rails server loads `bootstrap-sprockets`, provided by th
 
 This allows for using Bootstrap in your regular Rails stylesheets. If you wish to customize any of the Bootstrap variables, you can do so via the `client/assets/stylesheets/_pre-bootstrap.scss` partial.
 
-#### Bootstrap via Webpack Dev Server
+#### Bootstrap via Webpack HMR Dev Server
 When using the webpack dev server, which does not go through Rails, bootstrap is loaded via the [bootstrap-sass-loader](https://github.com/shakacode/bootstrap-sass-loader) which uses the `client/bootstrap-sass-config.js` file.
 
 #### Keeping Custom Bootstrap Configurations Synced
@@ -442,7 +442,7 @@ If you are using [react-rails](https://github.com/reactjs/react-rails) in your p
 Note: If you have components from react-rails you want to use, then you will need to port them into react_on_rails which uses webpack instead of the asset pipeline.
 
 ## Additional Reading
-+ [The React on Rails Doctrine](http://www.shakacode.com/2016/01/26/the-react-on-rails-doctrine.html)
++ [The React on Rails Doctrine](http://www.shakacode.com/2016/01/27/the-react-on-rails-doctrine.html)
 + [Babel](docs/additional_reading/babel.md)
 + [Generated Client Code](docs/additional_reading/generated_client_code.md)
 + [Heroku Deployment](docs/additional_reading/heroku_deployment.md)
