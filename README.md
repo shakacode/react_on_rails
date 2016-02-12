@@ -364,7 +364,7 @@ In the former case, the Rails server loads `bootstrap-sprockets`, provided by th
 
 This allows for using Bootstrap in your regular Rails stylesheets. If you wish to customize any of the Bootstrap variables, you can do so via the `client/assets/stylesheets/_pre-bootstrap.scss` partial.
 
-#### Bootstrap via Webpack Dev Server
+#### Bootstrap via Webpack HMR Dev Server
 When using the webpack dev server, which does not go through Rails, bootstrap is loaded via the [bootstrap-sass-loader](https://github.com/shakacode/bootstrap-sass-loader) which uses the `client/bootstrap-sass-config.js` file.
 
 #### Keeping Custom Bootstrap Configurations Synced
