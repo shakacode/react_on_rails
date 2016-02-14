@@ -15,7 +15,7 @@ While React On Rails does not *enforce* a specific project structure, we do *rec
   * `/containers`: "smart" components. These components are bound to Redux.
   * `/reducers`: Reducers for redux.
   * `/routes`: Routes for React Router.
-  * `/store`: Store, which might be [configured differently for dev vs. production](https://github.com/rackt/redux/tree/master/examples/real-world/store).
+  * `/store`: Store, which might be [configured differently for dev vs. production](https://github.com/reactjs/redux/tree/master/examples/real-world/store).
   * `/startup`: Component bindings to stores, with registration of components and stores.
   * `/schemas`: Schemas for AJAX JSON requests and responses, as used by the [Normalizr](https://github.com/gaearon/normalizr) package.
 1. `/client/app/assets`: Assets for CSS for client app.

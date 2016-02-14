@@ -8,7 +8,7 @@ export default (props, location) => {
   let redirectLocation;
   let routeProps;
 
-  // See https://github.com/rackt/react-router/blob/master/docs/guides/advanced/ServerRendering.md
+  // See https://github.com/reactjs/react-router/blob/master/docs/guides/advanced/ServerRendering.md
   match({ routes, location }, (_error, _redirectLocation, _routeProps) => {
     error = _error;
     redirectLocation = _redirectLocation;

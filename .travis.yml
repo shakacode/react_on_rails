@@ -3,7 +3,7 @@ sudo: required
 language: ruby
 
 rvm:
-  - 2.2.3
+  - 2.2.4
 
 services:
   - docker
@@ -22,7 +22,7 @@ before_install:
   - sudo apt-get install -y xvfb
 
 install:
-  - rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install 4.2.0
+  - rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install 5.5.0
   - npm install -g npm
   - npm install -g poltergeist
   - bundle install

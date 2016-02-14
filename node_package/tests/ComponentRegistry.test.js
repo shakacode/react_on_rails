@@ -73,3 +73,12 @@ test('ComponentRegistry throws error for retrieving unregistered component', (as
   );
 });
 
+test('ComponentRegistry throws error for setting null component', (assert) => {
+  assert.plan(1);
+  const C6 = null;
+  assert.throws(() => ComponentRegistry.register({ C6 }),
+    /Called register with null component named C6/,
+    'Expected an exception for calling ComponentRegistry.set with a null component.'
+  );
+});
+
