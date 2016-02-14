@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (3.0.0.rc.1)
+    react_on_rails (3.0.0.rc.2)
       connection_pool
       execjs (~> 2.5)
       foreman
