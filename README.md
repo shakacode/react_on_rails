@@ -2,12 +2,14 @@
 
 # NEWS
 
-* 3.0.0.rc.1 has shipped on Monday, 2/8/2016. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v1-to-v2). [Migration steps from 2.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v2-to-v3).
-  * [RubyGems](https://rubygems.org/gems/react_on_rails/versions/3.0.0.rc.1), `gem "react_on_rails", "~> 3.0.0-rc.1"`
-  * [NPM](https://www.npmjs.com/package/react-on-rails), `npm i --save react-on-rails@3.0.0-rc.1`
+* 3.0.0.rc.2 shipped on Sunday, 2/14/2016. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v1-to-v2). [Migration steps from 2.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v2-to-v3).
+  * [RubyGems](https://rubygems.org/gems/react_on_rails/versions/3.0.0.rc.2), `gem "react_on_rails", "~> 3.0.0-rc.2"`
+  * [NPM](https://www.npmjs.com/package/react-on-rails), `npm i --save react-on-rails@3.0.0-rc.2`
+* 3.0.0.rc.1 shipped on Monday, 2/8/2016.
 * 3.0.0 Highlights:
   1. Support for ensuring JavaScript is current when running tests.
   2. Support for multiple React components with one Redux store. So you can have a header React component and different body React components talking to the same Redux store!
+  3. Support for Turbolinks 5!
 * There was a fatal error when using the lastest version of Redux for server rendering. See [Redux #1335](https://github.com/reactjs/redux/issues/1335). See [diff 3.1.6...3.1.4](https://github.com/reactjs/redux/commit/e2e14d26f09ca729ae0555442f50fcfc45bfb423#diff-1fdf421c05c1140f6d71444ea2b27638). Workaround for server rendering: Use Redux 3.1.7 or upgrade to React On Rails v2.3.0. [this commit](https://github.com/shakacode/react_on_rails/commit/59f1e68d3d233775e6abc63bff180ea59ac2d79e) on [PR #244](https://github.com/shakacode/react_on_rails/pull/244/).
 * 2.x Highlights:
   1. Fixed a **critical** problem with TurboLinks. Be sure to see [turbolinks docs](docs/additional_reading/turbolinks.md) for more information on how to debug TurboLinks issues.
