@@ -10,6 +10,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ##### Added
 - Added helper `redux_store` and associated JavaScript APIs that allow multiple React components to use the same store. Thus, you initialize the store, with props, separately from the components.
 - Added forman to gemspec in case new dev does not have it globally installed. [#248](https://github.com/shakacode/react_on_rails/pull/248).
+- Support for Turbolinks 5! [#270](https://github.com/shakacode/react_on_rails/pull/270).
 - Added better error messages for `ReactOnRails.register()`. [#273](https://github.com/shakacode/react_on_rails/pull/273).
 
 ##### Breaking Change  
