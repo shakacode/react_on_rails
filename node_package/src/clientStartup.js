@@ -36,6 +36,10 @@ function forEach(fn, className) {
   }
 }
 
+function turbolinksVersion5() {
+  return (typeof Turbolinks.controller !== 'undefined');
+}
+
 function initializeStore(el) {
   const name = el.getAttribute('data-store-name');
   const props = JSON.parse(el.getAttribute('data-props'));
@@ -131,10 +135,17 @@ export default function clientStartup(context) {
       debugTurbolinks('NOT USING TURBOLINKS: DOMContentLoaded event, calling reactOnRailsPageLoaded');
       reactOnRailsPageLoaded();
     } else {
-      debugTurbolinks('USING TURBOLINKS: document page:before-unload and page:change handlers' +
-        ' installed.');
-      document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
-      document.addEventListener('page:change', reactOnRailsPageLoaded);
+      if (turbolinksVersion5()) {
+        debugTurbolinks('USING TURBOLINKS 5: document turbolinks:before-cache and turbolinks:load handlers' +
+          ' installed.');
+        document.addEventListener('turbolinks:before-cache', reactOnRailsPageUnloaded);
+        document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
+      } else {
+        debugTurbolinks('USING TURBOLINKS: document page:before-unload and page:change handlers' +
+          ' installed.');
+        document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
+        document.addEventListener('page:change', reactOnRailsPageLoaded);
+      }
     }
   });
 }
