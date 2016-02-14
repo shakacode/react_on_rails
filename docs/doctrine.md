@@ -39,8 +39,8 @@ Here's the chef's selection from the React on Rails community:
 * [Bootstrap](http://getbootstrap.com/), loaded from [bootstrap-loader](https://github.com/shakacode/bootstrap-loader/). Common UI styles.
 * [Lodash](https://lodash.com/): Swiss army knife of utilities.
 * [React](https://facebook.github.io/react/): UI components.
-* [React-Router](https://github.com/rackt/react-router): Provider of deep links for client-side application.
-* [Redux](https://github.com/rackt/redux): Flux implementation (aka "state container").
+* [React-Router](https://github.com/reactjs/react-router): Provider of deep links for client-side application.
+* [Redux](https://github.com/reactjs/redux): Flux implementation (aka "state container").
 
 ### JavaScript Tooling
 * [Babel](https://babeljs.io/): Transpiler for ES6 into ES5 and much more.

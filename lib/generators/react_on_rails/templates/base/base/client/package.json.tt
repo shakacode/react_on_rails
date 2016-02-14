@@ -37,46 +37,47 @@
     <%- end -%>
   },
   "dependencies": {
-    "babel": "^6.3.26",
-    "babel-cli": "^6.4.5",
-    "babel-core": "^6.4.5",
-    "babel-loader": "^6.2.1",
-    "babel-plugin-syntax-decorators": "^6.3.13",
-    "babel-polyfill": "^6.3.14",
-    "babel-preset-es2015": "^6.3.13",
-    "babel-preset-react": "^6.3.13",
-    "babel-preset-stage-0": "^6.3.13",
-    "babel-types": "^6.4.5",
-    "es5-shim": "^4.5.0",
+    "autoprefixer": "^6.3.2",
+    "axios": "^0.9.1",
+    "babel": "^6.5.1",
+    "babel-cli": "^6.5.1",
+    "babel-core": "^6.5.1",
+    "babel-loader": "^6.2.2",
+    "babel-polyfill": "^6.5.0",
+    "babel-preset-es2015": "^6.5.0",
+    "babel-preset-react": "^6.5.0",
+    "babel-preset-stage-0": "^6.5.0",
+    "css-loader": "^0.23.1",
+    "es5-shim": "^4.5.2",
     "expose-loader": "^0.7.1",
     <%- if options.redux? -%>
     "immutable": "^3.7.6",
     <%- end -%>
     "imports-loader": "^0.6.5",
     "jquery": "^2.2.0",
-    "jquery-ujs": "^1.1.0-1",
+    "jquery-ujs": "^1.2.0",
     "loader-utils": "^0.2.12",
-    "lodash": "^4.0.0",
+    "lodash": "^4.3.0",
     <%- if options.redux? -%>
     "mirror-creator": "1.0.0",
     <%- end -%>
-    "react": "^0.14.6",
+    "react": "^0.14.7",
     <%- unless options.skip_bootstrap? -%>
-    "react-bootstrap": "^0.28.2",
+    "react-bootstrap": "^0.28.3",
     <%- end -%>
-    "react-dom": "^0.14.6",
+    "react-dom": "^0.14.7",
     "react-on-rails": "<%= VersionSyntaxConverter.new.rubygem_to_npm %>",
     <%- if options.redux? -%>
-    "react-redux": "^4.0.6",
-    "redux": "^3.0.6",
+    "react-redux": "^4.4.0",
+    "redux": "^3.3.1",
     "redux-promise": "^0.5.1",
     "redux-thunk": "^1.0.3",
     <%- end -%>
-    "webpack": "^1.12.12"
+    "webpack": "^1.12.13"
   },
   "devDependencies": {
     <%- unless options.skip_js_linters? -%>
-    "babel-eslint": "^5.0.0-beta6",
+    "babel-eslint": "^5.0.0-beta8",
     <%- end -%>
     "babel-plugin-react-transform": "^2.0.0",
     <%- unless options.skip_bootstrap? -%>
@@ -86,7 +87,7 @@
     "css-loader": "^0.23.1",
     <%- unless options.skip_js_linters? -%>
     "eslint": "^1.10.3",
-    "eslint-config-airbnb": "^4.0.0",
+    "eslint-config-airbnb": "^5.0.0",
     "eslint-config-shakacode": "^1.0.0",
     "eslint-plugin-react": "^3.16.1",
     <%- end -%>
@@ -94,10 +95,10 @@
     "file-loader": "^0.8.5",
     "jade": "^1.11.0",
     <%- unless options.skip_js_linters? -%>
-    "jscs": "^2.8.0",
+    "jscs": "^2.9.0",
     <%- end -%>
     "node-sass": "^3.4.2",
-    "react-transform-hmr": "^1.0.1",
+    "react-transform-hmr": "^1.0.2",
     "sass-loader": "^3.1.2",
     "style-loader": "^0.13.0",
     "url-loader": "^0.5.7",
