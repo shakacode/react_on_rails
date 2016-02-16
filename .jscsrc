@@ -15,7 +15,8 @@
     "**/vendor/**",
     "**/dummy-for-generators/**",
     "**/dummy/**",
-    "**/node_package/lib/**"
+    "**/node_package/lib/**",
+    "**/app/assets/javascripts/application.js"
   ],
   "esprima": "babel-jscs",
   "validateQuoteMarks": {

@@ -1,4 +1,5 @@
-// See discussion: https://discuss.reactjs.org/t/how-to-determine-if-js-object-is-react-component/2825/2
+// See discussion:
+// https://discuss.reactjs.org/t/how-to-determine-if-js-object-is-react-component/2825/2
 
 /**
  * Used to determine we'll call be calling React.createElement on the component of if this is a

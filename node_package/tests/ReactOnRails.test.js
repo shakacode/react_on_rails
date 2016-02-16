@@ -74,7 +74,8 @@ test('register store and getStoreGenerator allow registration', (assert) => {
 
   const actual = ReactOnRails.getStoreGenerator('storeGenerator');
   assert.equal(actual, storeGenerator,
-    `Could not find 'storeGenerator' amongst store generators ${JSON.stringify(ReactOnRails.storeGenerators())}.`);
+    `Could not find 'storeGenerator' amongst store generators \
+${JSON.stringify(ReactOnRails.storeGenerators())}.`);
 
   assert.deepEqual(ReactOnRails.storeGenerators(), new Map([['storeGenerator', storeGenerator]]));
 });

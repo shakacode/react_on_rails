@@ -132,17 +132,22 @@ export default function clientStartup(context) {
     // Webpack bundles first.
 
     if (!turbolinksInstalled()) {
-      debugTurbolinks('NOT USING TURBOLINKS: DOMContentLoaded event, calling reactOnRailsPageLoaded');
+      debugTurbolinks(
+        'NOT USING TURBOLINKS: DOMContentLoaded event, calling reactOnRailsPageLoaded'
+      );
       reactOnRailsPageLoaded();
     } else {
       if (turbolinksVersion5()) {
-        debugTurbolinks('USING TURBOLINKS 5: document turbolinks:before-cache and turbolinks:load handlers' +
-          ' installed.');
+        debugTurbolinks(
+          'USING TURBOLINKS 5: document added event listeners turbolinks:before-cache and ' +
+          'turbolinks:load.'
+        );
         document.addEventListener('turbolinks:before-cache', reactOnRailsPageUnloaded);
         document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
       } else {
-        debugTurbolinks('USING TURBOLINKS: document page:before-unload and page:change handlers' +
-          ' installed.');
+        debugTurbolinks(
+          'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +
+          'page:change.');
         document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
         document.addEventListener('page:change', reactOnRailsPageLoaded);
       }
