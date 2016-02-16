@@ -45,17 +45,6 @@ module ReactOnRails
         location = "client/app/bundles/HelloWorld/startup"
         template("redux/base/#{location}/HelloWorldAppClient.jsx.tt", "#{location}/#{filename}")
       end
-
-      def print_helpful_message
-        message = <<-MSG
-  - Run the npm express-server command to load the node server with hot reloading support.
-
-      npm run express-server
-
-  - Visit http://localhost:4000 and see your React On Rails app running using the Webpack Dev server.
-        MSG
-        GeneratorMessages.add_info(message)
-      end
     end
   end
 end

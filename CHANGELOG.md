@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
 
+## [3.0.2] - 2016-02-15
+##### Fixed
+- Fixed missing information in the helpful message after running the base install generator regarding how to run the node server with hot reloading support.
+
 ## [3.0.1] - 2016-02-15
 ##### Fixed
 - Fixed several jscs linter issues.
@@ -169,7 +173,8 @@ Best done with Object destructing:
 
 ##### Fixed
 - Fix several generator related issues.
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/3.0.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/3.0.2...master
+[3.0.2]: https://github.com/shakacode/react_on_rails/compare/3.0.1...3.0.2
 [3.0.1]: https://github.com/shakacode/react_on_rails/compare/3.0.0...3.0.1
 [3.0.0]: https://github.com/shakacode/react_on_rails/compare/2.3.0...3.0.0
 [2.3.0]: https://github.com/shakacode/react_on_rails/compare/2.2.0...2.3.0
