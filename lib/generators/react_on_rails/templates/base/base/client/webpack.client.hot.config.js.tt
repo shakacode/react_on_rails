@@ -1,4 +1,5 @@
-// This config file setups up the Webpack Dev Server: https://webpack.github.io/docs/webpack-dev-server.html
+// This config file setups up the Webpack Dev Server:
+//   https://webpack.github.io/docs/webpack-dev-server.html
 // Run like this:
 // cd client && node server.js
 
