@@ -423,7 +423,7 @@ Open your browser to [localhost:4000](http://localhost:4000). Whenever you make 
 Note that **React-related error messages are typically significantly more helpful when encountered in the dev server** than the Rails server as they do not include noise added by the React on Rails gem.
 
 ### Adding Additional Routes for the Dev Server
-As you add more routes to your front-end application, you will need to make the corresponding API for the dev server in `client/server.js`. See our example `server.js` from our [tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/server.js).
+As you add more routes to your front-end application, you will need to make the corresponding API for the dev server in `client/server.js`. See our example `server.js` from our [tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client%2Fserver-express.js).
 
 ## Migrate From react-rails
 If you are using [react-rails](https://github.com/reactjs/react-rails) in your project, it is pretty simple to migrate to [react_on_rails](https://github.com/shakacode/react_on_rails).
@@ -445,7 +445,6 @@ Note: If you have components from react-rails you want to use, then you will nee
 ## Additional Reading
 + [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 + [Babel](docs/additional_reading/babel.md)
-+ [Generated Client Code](docs/additional_reading/generated_client_code.md)
 + [Heroku Deployment](docs/additional_reading/heroku_deployment.md)
 + [Manual Installation](docs/additional_reading/manual_installation.md)
 + [Node Dependencies and NPM](docs/additional_reading/node_dependencies_and_npm.md)
@@ -471,7 +470,7 @@ Note: If you have components from react-rails you want to use, then you will nee
   ```
 
 ## Contributing
-Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant](contributor-covenant.org) code of conduct (see [CODE OF CONDUCT](docs/code_of_conduct.md)).
+Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant Code of Conduct](docs/code_of_conduct.md)).
 
 See [Contributing](docs/contributing.md) to get started.
 
