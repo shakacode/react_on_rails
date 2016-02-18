@@ -30,7 +30,7 @@ const RouterApp = (props, location) => {
   // Important that you don't do this if you are redirecting or have an error.
   return (
     <Provider store={store}>
-      <RoutingContext {...routeProps} />
+      <RouterContext {...routeProps} />
     </Provider>
   );
 };
