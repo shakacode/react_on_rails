@@ -1,5 +1,5 @@
 import React from 'react';
-import { match, RoutingContext } from 'react-router';
+import { match, RouterContext } from 'react-router';
 
 import routes from '../routes/routes';
 
@@ -24,6 +24,6 @@ export default (props, location) => {
 
   // Important that you don't do this if you are redirecting or have an error.
   return (
-    <RoutingContext {...routeProps} />
+    <RouterContext {...routeProps} />
   );
 };

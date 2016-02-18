@@ -12,7 +12,6 @@ import { Provider } from 'react-redux';
  *  React will see that the state is the same and not do anything.
  */
 export default () => {
-
   // This is where we get the existing store.
   const store = ReactOnRails.getStore('SharedReduxStore');
 

@@ -35,4 +35,4 @@ else
   gem "turbolinks", "~> 5.0.0.beta"
 end
 gem "uglifier", ">= 2.7.2"
-gem "web-console", "~> 2.0"
+gem "web-console", "~> 2.0", group: :development

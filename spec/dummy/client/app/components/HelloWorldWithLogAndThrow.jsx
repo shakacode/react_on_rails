@@ -1,6 +1,7 @@
 import React from 'react';
 
 // Example of logging and throw error handling
+
 class HelloWorldWithLogAndThrow extends React.Component {
   constructor(props, context) {
     super(props, context);

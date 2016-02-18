@@ -23,7 +23,7 @@ import RouterApp from './ServerRouterApp';
 
 import PureComponent from '../components/PureComponent';
 
-import SharedReduxStore from '../stores/SharedReduxStore'
+import SharedReduxStore from '../stores/SharedReduxStore';
 
 ReactOnRails.register({
   HelloWorld,
@@ -38,6 +38,5 @@ ReactOnRails.register({
 });
 
 ReactOnRails.registerStore({
-  SharedReduxStore
+  SharedReduxStore,
 });
-
