@@ -1,6 +1,4 @@
-import { combineReducers } from 'redux';
-import { applyMiddleware } from 'redux';
-import { createStore } from 'redux';
+import { combineReducers, applyMiddleware, createStore } from 'redux';
 import middleware from 'redux-thunk';
 
 import reducers from '../reducers/reducersIndex';
