@@ -64,6 +64,11 @@ module ReactOnRailsHelper
       dom_id: dom_id
     }
 
+    if options[:route].present?
+      route = { route: options[:route] }
+      data.merge!(route)
+    end
+
     component_specification_tag =
       content_tag(:div,
                   "",
@@ -126,7 +131,6 @@ module ReactOnRailsHelper
   var htmlResult = '';
   var consoleReplayScript = '';
   var hasErrors = false;
-
   try {
     htmlResult =
       (function() {
@@ -137,15 +141,12 @@ module ReactOnRailsHelper
       jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
     hasErrors = true;
   }
-
   consoleReplayScript = ReactOnRails.buildConsoleReplay();
-
   return JSON.stringify({
       html: htmlResult,
       consoleReplayScript: consoleReplayScript,
       hasErrors: hasErrors
   });
-
 })()
     JS
 
@@ -191,13 +192,23 @@ module ReactOnRailsHelper
 (function() {
 #{initialize_redux_stores}
   var props = #{props_string(props)};
-  return ReactOnRails.serverRenderReactComponent({
-    name: '#{react_component_name}',
-    domNodeId: '#{dom_id}',
-    props: props,
-    trace: #{trace(options)},
-    location: '#{request.fullpath}'
-  });
+  if (#{options[:route].present?}) {
+    return ReactOnRails.serverRenderRelayComponents({
+      name: '#{react_component_name}',
+      domNodeId: '#{dom_id}',
+      route: #{options[:route]},
+      trace: #{trace(options)},
+      location: '#{request.fullpath}'
+    })
+  } else {
+    return ReactOnRails.serverRenderReactComponent({
+      name: '#{react_component_name}',
+      domNodeId: '#{dom_id}',
+      props: props,
+      trace: #{trace(options)},
+      location: '#{request.fullpath}'
+    });
+  }
 })()
     JS
 
@@ -262,7 +273,11 @@ ReactOnRails.setStore('#{store_name}', store);
     other_options ||= {}
     if options.is_a?(Hash) && options.key?(:props)
       props = options[:props]
-      final_options = options.except(:props)
+      if options.key?(:route)
+        final_options = options.except([:props, :route])
+      else
+        final_options = options.except(:props)
+      end
       final_options.merge!(other_options) if other_options.present?
     else
       # either no props specified or deprecated

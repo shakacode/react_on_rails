@@ -2,7 +2,9 @@ import clientStartup from './clientStartup';
 import handleError from './handleError';
 import ComponentRegistry from './ComponentRegistry';
 import StoreRegistry from './StoreRegistry';
+import RouteRegistry from './RouteRegistry';
 import serverRenderReactComponent from './serverRenderReactComponent';
+import serverRenderRelayComponent from './serverRenderRelayComponent';
 import buildConsoleReplay from './buildConsoleReplay';
 import createReactElement from './createReactElement';
 import ReactDOM from 'react-dom';
@@ -41,6 +43,15 @@ ctx.ReactOnRails = {
   },
 
   /**
+   * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
+   * find you components for rendering.
+   * @param components (key is component name, value is component)
+   */
+  registerRoute(routes) {
+    RouteRegistry.register(routes);
+  },
+
+  /**
    * Allows registration of store generators to be used by multiple react components on one Rails
    * view. store generators are functions that take one arg, props, and return a store. Note that
    * the setStore API is different in tha it's the actual store hydrated with props.
@@ -60,9 +71,9 @@ ctx.ReactOnRails = {
     return StoreRegistry.getStore(name);
   },
 
-  ////////////////////////////////////////////////////////////////////////////////
-  // INTERNALLY USED APIs
-  ////////////////////////////////////////////////////////////////////////////////
+  //  //////////////////////////////////////////////////////////////////////////////
+  //  INTERNALLY USED APIs
+  //  //////////////////////////////////////////////////////////////////////////////
 
   /**
    * Retrieve an option by key.
@@ -104,6 +115,7 @@ ctx.ReactOnRails = {
    * @param domNodeId
    * @returns {virtualDomElement} Reference to your component's backing instance
    */
+
   render(name, props, domNodeId) {
     const reactElement = createReactElement({ name, props, domNodeId });
     return ReactDOM.render(reactElement, document.getElementById(domNodeId));
@@ -119,10 +131,28 @@ ctx.ReactOnRails = {
   },
 
   /**
+   * Get the route that you registered
+   * @param name
+   * @returns {name, route, generatorFunction}
+   */
+
+  getRoute(name) {
+    return RouteRegistry.get(name);
+  },
+
+  /**
    * Used by server rendering by Rails
    * @param options
    */
   serverRenderReactComponent(options) {
+    return serverRenderRelayComponent(options);
+  },
+
+  /**
+   * Used by server rendering by Rails
+   * @param options
+   */
+  serverRenderRelayComponents(options) {
     return serverRenderReactComponent(options);
   },
 
