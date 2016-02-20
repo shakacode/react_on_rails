@@ -1,6 +1,5 @@
 import ReactDOMServer from 'react-dom/server';
 import buildConsoleReplay from './buildConsoleReplay';
-import ReactOnRails from './ReactOnRails';
 import Relay from 'react-relay';
 import React from 'react';
 

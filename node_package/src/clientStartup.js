@@ -4,7 +4,6 @@ import Relay from 'react-relay';
 
 import createReactElement from './createReactElement';
 import handleError from './handleError';
-import ReactOnRails from './ReactOnRails';
 import isRouterResult from './isRouterResult';
 
 const REACT_ON_RAILS_COMPONENT_CLASS_NAME = 'js-react-on-rails-component';
