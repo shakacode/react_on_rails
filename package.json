@@ -64,7 +64,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shakacode/react_on_rails.git"
+    "url": "git+https://github.com/gauravtiwari/react_on_rails.git"
   },
   "keywords": [
     "react",
@@ -74,12 +74,12 @@
     "on",
     "Rails"
   ],
-  "author": "justin.gordon@gmail.com",
+  "author": "gaurav@gauravtiwari.co.uk",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/shakacode/react_on_rails/issues"
+    "url": "https://github.com/gauravtiwari/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails#readme",
+  "homepage": "https://github.com/gauravtiwari/react_on_rails#readme",
   "dependencies": {
     "babel-relay-plugin": "^0.7.1",
     "react-relay": "^0.7.1"
