@@ -1,0 +1,1 @@
+--protected --private --plugin redcarpet-ext --main README.md lib/**/*.rb - NEWS.md LICENSE

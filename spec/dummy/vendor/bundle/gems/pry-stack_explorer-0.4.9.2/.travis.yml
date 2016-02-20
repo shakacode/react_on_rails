@@ -1,0 +1,15 @@
+script:
+  rake test --trace
+
+rvm:
+  - 1.9.2
+  - 1.9.3
+
+notifications:
+  irc: "irc.freenode.org#pry"
+  recipients:
+    - jrmair@gmail.com
+
+branches:
+  only:
+    - master

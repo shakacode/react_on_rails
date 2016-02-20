@@ -1,0 +1,1 @@
+raise "simple-exception"

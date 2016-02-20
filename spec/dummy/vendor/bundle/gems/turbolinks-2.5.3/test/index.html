@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Home</title>
+  <script type="text/javascript" src="/js/turbolinks.js"></script>
+  <script type="text/javascript">
+    Turbolinks.enableProgressBar();
+
+    document.addEventListener("page:change", function() {
+      console.log("page changed");
+    });
+
+    document.addEventListener("page:update", function() {
+      console.log("page updated");
+    });
+
+    document.addEventListener("page:restore", function() {
+      console.log("page restored");
+    });
+  </script>
+</head>
+<body class="page-index">
+  <ul style="margin-top:20px;">
+    <li><a href="/other.html">Other page</a></li>
+    <li><a href="/slow-response">Slow loading page for progress bar</a></li>
+    <li><a href="/other.html"><span>Wrapped link</span></a></li>
+    <li><a href="/withoutextension">Without extension</a></li>
+    <li><a href="/withoutextension?sort=user.name">Without extension with query params</a></li>
+    <li><a href="http://www.google.com/">Cross origin</a></li>
+    <li><a href="/other.html" onclick="if(!confirm('follow link?')) { return false}">Confirm Fire Order</a></li>
+    <li><a href="/reload.html"><span>New assets track </span></a></li>
+    <li><a href="/dummy.gif?12345">Query Param Image Link</a></li>
+    <li><a href="/bounce">Redirect</a></li>
+    <li><a href="#">Hash link</a></li>
+    <li><a href="/reload.html#foo">New assets track with hash link</a></li>
+    <li><h5>If you stop the server or go into airplane/offline mode</h5></li>
+    <li><a href="/doesnotexist.html">A page with client error (4xx, rfc2616 sec. 10.4) should error out</a></li>
+    <li><a href="/500">Also server errors (5xx, rfc2616 sec. 10.5) should error out</a></li>
+    <li><a href="/fallback.html">A page that has a fallback in appcache should fallback</a></li>
+  </ul>
+
+  <div style="background:#ccc;height:5000px;width:200px;">
+  </div>
+  <iframe height='1' scrolling='no' src='/offline.html' style='display: none;' width='1'></iframe>
+
+  <script type="text/javascript" data-turbolinks-eval=false>
+    console.log("turbolinks-eval-false script fired. This should only happen on the initial page load.");
+  </script>
+</body>
+</html>

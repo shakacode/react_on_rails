@@ -1,0 +1,9 @@
+*.gem
+.bundle
+pkg
+doc
+/test.rb
+Gemfile.lock
+/.rake_tasks~
+/*.gem
+rails/

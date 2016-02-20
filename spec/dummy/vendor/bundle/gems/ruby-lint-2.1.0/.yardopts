@@ -1,0 +1,15 @@
+./lib/ruby-lint/**/*.rb ./lib/ruby-lint.rb
+-m markdown
+-M kramdown
+-o yardoc
+-r ./README.md
+--private
+--protected
+--asset ./doc/css/common.css:css/common.css
+--asset ./doc/images:images
+--exclude lib/ruby-lint/definitions
+--verbose
+-
+./doc/*.md
+LICENSE
+CONTRIBUTING.md

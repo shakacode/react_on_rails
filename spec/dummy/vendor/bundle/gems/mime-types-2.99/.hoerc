@@ -1,0 +1,20 @@
+---
+exclude: !ruby/regexp '/
+  \.(tmp|swp)$
+  |
+  CVS/
+  |
+  (?i:TAGS)
+  |
+  \.(svn|git|hg|DS_Store|idea|vagrant)\/
+  |
+  Gemfile(?:\.lock)?
+  |
+  type-lists\/
+  |
+  \.(coveralls|pullreview|travis).yml$
+  |
+  \.gemspec
+  |
+  Vagrantfile
+  /x'

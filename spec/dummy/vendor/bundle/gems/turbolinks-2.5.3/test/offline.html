@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en" manifest="/manifest.appcache">
+<head>
+  <meta charset="utf-8">
+  <title>Home</title>
+  <script type="text/javascript" src="/js/turbolinks.js"></script>
+  <script type="text/javascript">
+    document.addEventListener("page:change", function() {
+      console.log("page changed");
+    });
+  </script>
+</head>
+<body class="page-offline">
+  <h1>Offline Mode Fallback</h1>
+  <ul>
+    <li><a href="/index.html">Home</a></li>
+  </ul>
+</body>
+</html>

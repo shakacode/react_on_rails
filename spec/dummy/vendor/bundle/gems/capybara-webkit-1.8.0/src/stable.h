@@ -1,0 +1,39 @@
+#include <QApplication>
+#include <QByteArray>
+#include <QDebug>
+#include <QEvent>
+#include <QFile>
+#include <QIODevice>
+#include <QList>
+#include <QNetworkCookie>
+#include <QNetworkProxy>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QObject>
+#include <QResource>
+#include <QSet>
+#include <QString>
+#include <QStringList>
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QTimer>
+#include <QUuid>
+#include <QVariant>
+#include <QVariantList>
+#include <QWebElement>
+#include <QWebSettings>
+#include <QtNetwork/QNetworkAccessManager>
+#include <QtNetwork/QNetworkCookie>
+#include <QtNetwork/QNetworkCookieJar>
+#include <QtNetwork/QNetworkReply>
+#include <QtNetwork/QNetworkRequest>
+#include <QtNetwork>
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+#include <QtWebKitWidgets>
+#else
+#include <QtWebKit>
+#endif
+#include <cmath>
+#include <fstream>
+#include <iostream>
+#include <sstream>

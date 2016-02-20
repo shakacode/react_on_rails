@@ -1,0 +1,7 @@
+.rvmrc
+.yardoc
+doc
+*.swp
+*.gem
+*.rbc
+Gemfile.lock

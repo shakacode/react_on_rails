@@ -1,0 +1,11 @@
+bundler_args: --without guard development
+rvm:
+  - 1.9.2
+  - 1.9.3
+  - 2.0.0
+  - 2.1.0
+  - rbx
+  - jruby
+
+script: "bundle exec rake"
+sudo: false

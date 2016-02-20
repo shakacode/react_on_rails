@@ -1,0 +1,63 @@
+2015-06-23 - 1.3.2 * Fix release 1.3.1
+2014-06-17 - 1.3.1 * This release was a bit premature, yanked it.
+2014-02-06 - 1.3.0 * Support bright and faint color names.
+2013-05-30 - 1.2.2 * No more fun and smileys, now you have to call term_display
+                     yourself.
+                   * term_display can now display image URLs directly.
+2013-05-25 - 1.2.1 * Merge patch from Gavin Kistner <gavin@phrogz.net> to
+                     prevent warnings when running in -w mode.
+2013-05-16 - 1.2.0 * Add term_mandel and term_display executables.
+                   * Implement configurable color metrics.
+                   * Add gradient functionality for color attributes.
+2013-04-18 - 1.1.5 * Add colortab executable to rubygem binary config
+2013-03-26 - 1.1.4 * Easier access to color attributes via color(123) or
+                     approximate html colors like color('#336caf').
+2013-03-26 - 1.1.3 * Fix a bug where respond_to could overflow the stack.
+2013-03-25 - 1.1.2 * Change the API: color0 - color255 to color(:color0) -
+                     color(:color255), and on_color0 to on_color(:color0) -
+                     on_color(:color255); the previous way caused some
+                     failures, sorry. On the plus side you can now do
+                     color('#4a6ab4') and get the nearest terminal color to
+                     this html color.
+                   * Add colortab executable to display the 255 colors and
+                     related HTML colors.
+2013-03-08 - 1.1.1 * Avoid possible conflicts with other people's attributes
+                     methods.
+                   * Cache attributes globally, also fix caching for frozen
+                     strings.
+2013-03-07 - 1.1.0 * Cleanup documentation.
+                   * Implement color0 - color255 and on_color0 - on_color255
+                     methods for xterm256 colors.
+2011-10-13 - 1.0.7 * Merged patch by Mike Bethany <mikbe.tk@gmail.com> that
+                     adds high intensity colors and backgrounds.
+                   * Fix problem caused by Ruby 1.9 implementing String#clear
+                   * now, reported by Joe Fiorini <joe@joefiorini.com>.
+2011-07-21 - 1.0.6 * Use gem_hadar for building.
+2010-03-10 - 1.0.5 * Added cdiff example as an executable.
+                   * Disabled building of gemspec file.
+                   * Made an decolor executable, that removes colors from an io
+                     stream.
+                   * Match an additional way to clear the color in the
+                     COLORED_REGEXP for the uncolored method.
+2009-07-23 - 1.0.4 * Some cleanup.
+                   * Build a gemspec file.
+2007-10-05 - 1.0.3 * Better documentation + some code clean up.
+                   * Deleted autorequire from Rakefile.
+2005-11-12 - 1.0.2 * Added DESTDIR in front of install path to make repackaging
+                     easier. Thanks to Tilman Sauerbeck <tilman@code-monkey.de>
+                     for giving the hint.
+2005-09-05 - 1.0.1 * Fixed install bug in Rakefile, reported by
+                     Martin DeMello <martindemello@gmail.com>
+2004-12-23 - 1.0.0 * Added Term::ANSIColor.coloring[?=]? methods.
+                     Thanks, Thomas Husterer for the contribution.
+                   * Minor cleanup of code.
+                   * Documented visible methods in the module.
+2004-09-28 - 0.0.4 * First release on Rubyforge
+                   * Supports Rubygems now
+2003-10-09 - 0.0.3 * Added uncolored method as suggested by
+                     Thomas Husterer <Thomas.Husterer@heidelberg.com>
+                   * Added attribute methods with string arguments
+                   * Deleted now unused files
+2002-07-27 - 0.0.2 * Minor Code Cleanup
+                   * Added cdiff.rb
+2002-06-12 - 0.0.1 * Initial Release

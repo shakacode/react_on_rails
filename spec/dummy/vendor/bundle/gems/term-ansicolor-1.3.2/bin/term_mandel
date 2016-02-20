@@ -1,0 +1,52 @@
+#!/usr/bin/env ruby
+
+require 'term/ansicolor'
+require 'tins/xt'
+require "complex"
+include Tins::GO
+
+@width, @height = Tins::Terminal.cols, Tins::Terminal.lines
+
+def color_random
+  (1..3).map { rand(255) }
+end
+
+def draw_set(rx, ry)
+  sx = (rx.end - rx.begin).abs / @width
+  sy = (ry.end - ry.begin).abs / @height
+
+  ac = Term::ANSIColor
+  color =
+    ac::Attribute[ color_random ].gradient_to(ac::Attribute[ color_random ], :steps => 16) +
+    ac::Attribute[ color_random ].gradient_to(ac::Attribute[ color_random ], :steps => 16) +
+    ac::Attribute[ color_random ].gradient_to(ac::Attribute[ color_random ], :steps => 16) +
+    ac::Attribute[ color_random ].gradient_to(ac::Attribute[ color_random ], :steps => 16) +
+    ac::Attribute[ color_random ].gradient_to(ac::Attribute[ color_random ], :steps => 16) +
+    ac::Attribute[ color_random ].gradient_to(ac::Attribute[ color_random ], :steps => 16) +
+    ac::Attribute[ color_random ].gradient_to(ac::Attribute[ color_random ], :steps => 16) +
+    ac::Attribute[ color_random ].gradient_to(ac::Attribute['#000'], :steps => 16)
+  iters = color.size - 2
+
+  text = ''
+  for j in 0...@height
+    for i in 0...@width
+      n, z_n = 0, Complex(0, 0)
+      c = Complex(sx * i + rx.begin, sy * j + ry.begin)
+      while n <= iters
+        break if z_n.abs > 2
+        z_n = z_n ** 2 + c
+        n += 1
+      end
+      text << ac.on_color(color[n]) << ' '
+    end
+    text << ac.reset << "\n"
+  end
+  puts text
+end
+
+opts = go 'x:y:'
+
+rx = opts['x'].full? { |r| Range.new(*(r.split('..', 2).map(&:to_f))) } || (-2.0..1.0)
+ry = opts['y'].full? { |r| Range.new(*(r.split('..', 2).map(&:to_f))) } || (-1.0..1.0)
+
+draw_set rx, ry

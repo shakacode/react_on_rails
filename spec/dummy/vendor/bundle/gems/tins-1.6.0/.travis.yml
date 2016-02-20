@@ -1,0 +1,14 @@
+rvm:
+  - 2.0
+  - 2.1
+  - 2.2
+  - ruby-head
+  - rbx-head
+  - jruby-head
+matrix:
+  allow_failures:
+    - rvm: ruby-head
+    - rvm: rbx-head
+    - rvm: jruby-head
+env:
+  - CODECLIMATE_REPO_TOKEN=62d082406430ccf662c2e401976b613c0091e26fcfb546f92b1f2b391951cf50

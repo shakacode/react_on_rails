@@ -1,0 +1,13 @@
+diff --git a/build/standalone.gypi b/build/standalone.gypi
+index 125c5bf..a283a28 100644
+--- a/build/standalone.gypi
++++ b/build/standalone.gypi
+@@ -211,6 +212,8 @@
+             '-W',
+             '-Wno-unused-parameter',
+             '-Wno-unused-variable',
++            '-Wno-unused-local-typedefs',
++            '-Wno-tautological-undefined-compare',
+             '-Wnon-virtual-dtor',
+           ],
+         },

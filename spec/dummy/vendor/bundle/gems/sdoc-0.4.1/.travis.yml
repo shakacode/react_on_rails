@@ -1,0 +1,12 @@
+---
+rvm:
+  - 1.8.7
+  - 1.9.3
+  - 2.0.0
+  - 2.1.0
+  - ruby-head
+  - jruby-19mode
+  - jruby-head
+notifications:
+  recipients:
+    - zachary@zacharyscott.net

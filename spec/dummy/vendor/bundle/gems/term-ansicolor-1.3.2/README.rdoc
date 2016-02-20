@@ -1,0 +1,55 @@
+= Term::ANSIColor - ANSI escape sequences in Ruby
+
+== Description
+
+This library can be used to color/decolor strings using ANSI escape sequences.
+
+== Installation
+
+Just type into the command line as root:
+
+# ruby install.rb
+
+Or if you prefer using Rake, try:
+
+# rake install
+
+Or if you want to use rubygems just type this and rubygems fetches the gem and
+installs it for you:
+
+# gem install term-ansicolor
+
+== Download
+
+The latest version of this library can be downloaded at
+
+* http://www.ping.de/~flori
+
+The homepage of this library is located at
+
+* http://flori.github.com/term-ansicolor
+
+== Examples
+
+The following executables are provided with Term::ANSIColor:
+
+* cdiff: colors a diff patch
+* decolor: decolors any text file that was colored with ANSI escape sequences
+* colortab: Displays a table of the 256 terminal colors with their indices and
+  nearest html equivalents.
+* term_display: displays a ppm3 or ppm6 image file in the terminal. If the netpbm
+  programs are installed it can handle a lot of other image file formats.
+* term_mandel: displays the mandelbrot set in the terminal
+
+Additionally the file examples/example.rb in the source/gem-distribution shows
+how this library can be used.
+
+== Author
+
+Florian Frank mailto:flori@ping.de
+
+== License
+
+This is free software; you can redistribute it and/or modify it under the
+terms of the GNU General Public License Version 2 as published by the Free
+Software Foundation: www.gnu.org/copyleft/gpl.html

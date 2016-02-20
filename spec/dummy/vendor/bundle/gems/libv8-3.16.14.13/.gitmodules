@@ -1,0 +1,6 @@
+[submodule "vendor/v8"]
+	path = vendor/v8
+	url = https://chromium.googlesource.com/v8/v8.git
+[submodule "vendor/gyp"]
+	path = vendor/gyp
+	url = https://chromium.googlesource.com/external/gyp.git

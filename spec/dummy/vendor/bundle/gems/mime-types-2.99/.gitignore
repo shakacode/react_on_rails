@@ -1,0 +1,17 @@
+*.md
+*.swp
+*~
+.rake_tasks~
+.source_index
+.vagrant
+Gemfile.lock
+Vagrantfile
+coverage
+doc
+html
+pkg
+publish
+test/cache.tst
+tmp/
+.byebug_history
+.rubocop.yml

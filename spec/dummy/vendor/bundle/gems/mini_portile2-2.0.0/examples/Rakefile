@@ -1,0 +1,127 @@
+require 'rbconfig'
+
+$: << File.expand_path(File.join(File.dirname(__FILE__), "../lib"))
+require "mini_portile2"
+
+recipes = []
+
+def windows?
+  RbConfig::CONFIG['target_os'] =~ /mswin|mingw32/
+end
+
+# libiconv
+libiconv = MiniPortile.new "libiconv", "1.14"
+libiconv.files << "ftp://ftp.gnu.org/pub/gnu/#{libiconv.name}/#{libiconv.name}-#{libiconv.version}.tar.gz"
+unless windows?
+  libiconv.patch_files = Dir["libiconv-patches/*.patch"].map { |dir| File.expand_path dir }
+end
+
+recipes.push libiconv
+
+# sqlite3
+sqlite3 = MiniPortile.new "sqlite3", "3.8.4.1"
+sqlite3.files << "http://sqlite.org/2014/sqlite-autoconf-3080401.tar.gz"
+
+recipes.push sqlite3
+
+# c-ares
+c_ares = MiniPortile.new "c-ares", "1.7.5"
+c_ares.files << "http://distfiles.openknapsack.org/#{c_ares.name}/#{c_ares.name}-#{c_ares.version}.tar.gz"
+
+recipes.push c_ares
+
+# zlib
+class ZlibRecipe < MiniPortile
+  def windows?
+    !(host =~ /mswin|mingw/).nil?
+  end
+
+  def configure
+    return super unless windows?
+
+    Dir.chdir work_path do
+      mk = File.read 'win32/Makefile.gcc'
+      File.open 'win32/Makefile.gcc', 'wb' do |f|
+        f.puts "BINARY_PATH = #{path}/bin"
+        f.puts "LIBRARY_PATH = #{path}/lib"
+        f.puts "INCLUDE_PATH = #{path}/include"
+
+        cross_build? and
+          mk.sub!(/^PREFIX\s*=\s*$/, "PREFIX = #{host}-")
+
+        f.puts mk
+      end
+    end
+  end
+
+  def configure_defaults
+    ["--static"]
+  end
+
+  def configured?
+    return super unless windows?
+
+    !!(File.read(File.join(work_path, 'win32/Makefile.gcc')) =~ /^BINARY_PATH/)
+  end
+
+  def compile
+    return super unless windows?
+
+    execute "compile", "make -f win32/Makefile.gcc"
+  end
+
+  def install
+    return if installed?
+    return super unless windows?
+
+    execute "install", %Q(#{make_cmd} -f win32/Makefile.gcc install)
+  end
+
+  def cross_build?
+    host != original_host
+  end
+end
+
+zlib = ZlibRecipe.new "zlib", "1.2.8"
+zlib.files << {
+  url: "http://zlib.net/#{zlib.name}-#{zlib.version}.tar.gz",
+  md5: "44d667c142d7cda120332623eab69f40",
+}
+
+
+recipes.push zlib
+
+namespace :ports do
+  directory "ports"
+
+  recipes.each do |recipe|
+    desc "Install port #{recipe.name} #{recipe.version}"
+    task recipe.name => ["ports"] do |t|
+      checkpoint = "ports/.#{recipe.name}-#{recipe.version}-#{recipe.host}.installed"
+
+      unless File.exist?(checkpoint)
+        recipe.cook
+        touch checkpoint
+      end
+
+      recipe.activate
+    end
+
+    task :all => recipe.name
+  end
+
+  desc "Install all ports and display installation location"
+  task :all do
+    recipes.each do |recipe|
+      puts "Artifacts of '#{recipe.name}' in '#{recipe.path}'"
+    end
+    puts "LDFLAGS: " << ENV['LDFLAGS'].inspect
+  end
+end
+
+desc "Adjust all recipes host for cross-compilation"
+task :cross do
+  recipes.each do |recipe|
+    recipe.host = "i686-w64-mingw32"
+  end
+end

@@ -1,0 +1,6 @@
+*.gem
+Gemfile.lock
+.rbx
+.yardoc
+doc
+tags

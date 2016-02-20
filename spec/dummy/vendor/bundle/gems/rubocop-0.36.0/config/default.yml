@@ -1,0 +1,1087 @@
+# This is the default configuration file. Enabling and disabling is configured
+# in separate files. This file adds all other parameters apart from Enabled.
+
+inherit_from:
+  - enabled.yml
+  - disabled.yml
+
+# Common configuration.
+AllCops:
+  # Include common Ruby source files.
+  Include:
+    - '**/*.gemspec'
+    - '**/*.podspec'
+    - '**/*.jbuilder'
+    - '**/*.rake'
+    - '**/*.opal'
+    - '**/config.ru'
+    - '**/Gemfile'
+    - '**/Rakefile'
+    - '**/Capfile'
+    - '**/Guardfile'
+    - '**/Podfile'
+    - '**/Thorfile'
+    - '**/Vagrantfile'
+    - '**/Berksfile'
+    - '**/Cheffile'
+    - '**/Vagabondfile'
+  Exclude:
+    - 'vendor/**/*'
+  # Default formatter will be used if no -f/--format option is given.
+  DefaultFormatter: progress
+  # Cop names are not displayed in offense messages by default. Change behavior
+  # by overriding DisplayCopNames, or by giving the -D/--display-cop-names
+  # option.
+  DisplayCopNames: false
+  # Style guide URLs are not displayed in offense messages by default. Change
+  # behavior by overriding DisplayStyleGuide, or by giving the
+  # -S/--display-style-guide option.
+  DisplayStyleGuide: false
+  # Extra details are not displayed in offense messages by default. Change
+  # behavior by overriding ExtraDetails, or by giving the
+  # -E/--extra-details option.
+  ExtraDetails: false
+  # Additional cops that do not reference a style guide rule may be enabled by
+  # default. Change behavior by overriding StyleGuideCopsOnly, or by giving
+  # the --only-guide-cops option.
+  StyleGuideCopsOnly: false
+  # All cops except the ones in disabled.yml are enabled by default. Change
+  # this behavior by overriding DisabledByDefault. When DisabledByDefault is
+  # true, all cops in the default configuration are disabled, and and only cops
+  # in user configuration are enabled. This makes cops opt-in instead of
+  # opt-out. Note that when DisabledByDefault is true, cops in user
+  # configuration will be enabled even if they don't set the Enabled parameter.
+  DisabledByDefault: false
+  # Enables the result cache if true. Can be overridden by the --cache command
+  # line option.
+  UseCache: true
+  # Threshold for how many files can be stored in the result cache before some
+  # of the files are automatically removed.
+  MaxFilesInCache: 20000
+  # The cache will be stored in "rubocop_cache" under this directory. The name
+  # "/tmp" is special and will be converted to the system temporary directory,
+  # which is "/tmp" on Unix-like systems, but could be something else on other
+  # systems.
+  CacheRootDirectory: /tmp
+  # What version of the Ruby interpreter is the inspected code intended to
+  # run on? (If there is more than one, set this to the lowest version.)
+  TargetRubyVersion: 2.0
+
+# Indent private/protected/public as deep as method definitions
+Style/AccessModifierIndentation:
+  EnforcedStyle: indent
+  SupportedStyles:
+    - outdent
+    - indent
+  # By default, the indentation width from Style/IndentationWidth is used
+  # But it can be overridden by setting this parameter
+  IndentationWidth: ~
+
+Style/Alias:
+  EnforcedStyle: prefer_alias
+  SupportedStyles:
+    - prefer_alias
+    - prefer_alias_method
+
+# Align the elements of a hash literal if they span more than one line.
+Style/AlignHash:
+  # Alignment of entries using hash rocket as separator. Valid values are:
+  #
+  # key - left alignment of keys
+  #   'a' => 2
+  #   'bb' => 3
+  # separator - alignment of hash rockets, keys are right aligned
+  #    'a' => 2
+  #   'bb' => 3
+  # table - left alignment of keys, hash rockets, and values
+  #   'a'  => 2
+  #   'bb' => 3
+  EnforcedHashRocketStyle: key
+  # Alignment of entries using colon as separator. Valid values are:
+  #
+  # key - left alignment of keys
+  #   a: 0
+  #   bb: 1
+  # separator - alignment of colons, keys are right aligned
+  #    a: 0
+  #   bb: 1
+  # table - left alignment of keys and values
+  #   a:  0
+  #   bb: 1
+  EnforcedColonStyle: key
+  # Select whether hashes that are the last argument in a method call should be
+  # inspected? Valid values are:
+  #
+  # always_inspect - Inspect both implicit and explicit hashes.
+  #   Registers an offense for:
+  #     function(a: 1,
+  #       b: 2)
+  #   Registers an offense for:
+  #     function({a: 1,
+  #       b: 2})
+  # always_ignore - Ignore both implicit and explicit hashes.
+  #   Accepts:
+  #     function(a: 1,
+  #       b: 2)
+  #   Accepts:
+  #     function({a: 1,
+  #       b: 2})
+  # ignore_implicit - Ignore only implicit hashes.
+  #   Accepts:
+  #     function(a: 1,
+  #       b: 2)
+  #   Registers an offense for:
+  #     function({a: 1,
+  #       b: 2})
+  # ignore_explicit - Ignore only explicit hashes.
+  #   Accepts:
+  #     function({a: 1,
+  #       b: 2})
+  #   Registers an offense for:
+  #     function(a: 1,
+  #       b: 2)
+  EnforcedLastArgumentHashStyle: always_inspect
+  SupportedLastArgumentHashStyles:
+    - always_inspect
+    - always_ignore
+    - ignore_implicit
+    - ignore_explicit
+
+Style/AlignParameters:
+  # Alignment of parameters in multi-line method calls.
+  #
+  # The `with_first_parameter` style aligns the following lines along the same
+  # column as the first parameter.
+  #
+  #     method_call(a,
+  #                 b)
+  #
+  # The `with_fixed_indentation` style aligns the following lines with one
+  # level of indentation relative to the start of the line with the method call.
+  #
+  #     method_call(a,
+  #       b)
+  EnforcedStyle: with_first_parameter
+  SupportedStyles:
+    - with_first_parameter
+    - with_fixed_indentation
+
+Style/AndOr:
+  # Whether `and` and `or` are banned only in conditionals (conditionals)
+  # or completely (always).
+  EnforcedStyle: always
+  SupportedStyles:
+    - always
+    - conditionals
+
+
+# Checks if usage of %() or %Q() matches configuration.
+Style/BarePercentLiterals:
+  EnforcedStyle: bare_percent
+  SupportedStyles:
+    - percent_q
+    - bare_percent
+
+Style/BlockDelimiters:
+  EnforcedStyle: line_count_based
+  SupportedStyles:
+    # The `line_count_based` style enforces braces around single line blocks and
+    # do..end around multi-line blocks.
+    - line_count_based
+    # The `semantic` style enforces braces around functional blocks, where the
+    # primary purpose of the block is to return a value and do..end for
+    # procedural blocks, where the primary purpose of the block is its
+    # side-effects.
+    #
+    # This looks at the usage of a block's method to determine its type (e.g. is
+    # the result of a `map` assigned to a variable or passed to another
+    # method) but exceptions are permitted in the `ProceduralMethods`,
+    # `FunctionalMethods` and `IgnoredMethods` sections below.
+    - semantic
+    # The `braces_for_chaining` style enforces braces around single line blocks
+    # and do..end around multi-line blocks, except for multi-line blocks whose
+    # return value is being chained with another method (in which case braces
+    # are enforced).
+    - braces_for_chaining
+  ProceduralMethods:
+    # Methods that are known to be procedural in nature but look functional from
+    # their usage, e.g.
+    #
+    #   time = Benchmark.realtime do
+    #     foo.bar
+    #   end
+    #
+    # Here, the return value of the block is discarded but the return value of
+    # `Benchmark.realtime` is used.
+    - benchmark
+    - bm
+    - bmbm
+    - create
+    - each_with_object
+    - measure
+    - new
+    - realtime
+    - tap
+    - with_object
+  FunctionalMethods:
+    # Methods that are known to be functional in nature but look procedural from
+    # their usage, e.g.
+    #
+    #   let(:foo) { Foo.new }
+    #
+    # Here, the return value of `Foo.new` is used to define a `foo` helper but
+    # doesn't appear to be used from the return value of `let`.
+    - let
+    - let!
+    - subject
+    - watch
+  IgnoredMethods:
+    # Methods that can be either procedural or functional and cannot be
+    # categorised from their usage alone, e.g.
+    #
+    #   foo = lambda do |x|
+    #     puts "Hello, #{x}"
+    #   end
+    #
+    #   foo = lambda do |x|
+    #     x * 100
+    #   end
+    #
+    # Here, it is impossible to tell from the return value of `lambda` whether
+    # the inner block's return value is significant.
+    - lambda
+    - proc
+    - it
+
+Style/BracesAroundHashParameters:
+  EnforcedStyle: no_braces
+  SupportedStyles:
+    # The `braces` style enforces braces around all method parameters that are
+    # hashes.
+    - braces
+    # The `no_braces` style checks that the last parameter doesn't have braces
+    # around it.
+    - no_braces
+    # The `context_dependent` style checks that the last parameter doesn't have
+    # braces around it, but requires braces if the second to last parameter is
+    # also a hash literal.
+    - context_dependent
+
+# Indentation of `when`.
+Style/CaseIndentation:
+  IndentWhenRelativeTo: case
+  SupportedStyles:
+    - case
+    - end
+  IndentOneStep: false
+  # By default, the indentation width from Style/IndentationWidth is used
+  # But it can be overridden by setting this parameter
+  # This only matters if IndentOneStep is true
+  IndentationWidth: ~
+
+Style/ClassAndModuleChildren:
+  # Checks the style of children definitions at classes and modules.
+  #
+  # Basically there are two different styles:
+  #
+  # `nested` - have each child on a separate line
+  #   class Foo
+  #     class Bar
+  #     end
+  #   end
+  #
+  # `compact` - combine definitions as much as possible
+  #   class Foo::Bar
+  #   end
+  #
+  # The compact style is only forced, for classes / modules with one child.
+  EnforcedStyle: nested
+  SupportedStyles:
+    - nested
+    - compact
+
+Style/ClassCheck:
+  EnforcedStyle: is_a?
+  SupportedStyles:
+    - is_a?
+    - kind_of?
+
+# Align with the style guide.
+Style/CollectionMethods:
+  # Mapping from undesired method to desired_method
+  # e.g. to use `detect` over `find`:
+  #
+  # CollectionMethods:
+  #   PreferredMethods:
+  #     find: detect
+  PreferredMethods:
+    collect: 'map'
+    collect!: 'map!'
+    inject: 'reduce'
+    detect: 'find'
+    find_all: 'select'
+
+# Use ` or %x around command literals.
+Style/CommandLiteral:
+  EnforcedStyle: backticks
+  # backticks: Always use backticks.
+  # percent_x: Always use %x.
+  # mixed: Use backticks on single-line commands, and %x on multi-line commands.
+  SupportedStyles:
+    - backticks
+    - percent_x
+    - mixed
+  # If false, the cop will always recommend using %x if one or more backticks
+  # are found in the command string.
+  AllowInnerBackticks: false
+
+# Checks formatting of special comments
+Style/CommentAnnotation:
+  Keywords:
+    - TODO
+    - FIXME
+    - OPTIMIZE
+    - HACK
+    - REVIEW
+
+# Checks that you have put a copyright in a comment before any code.
+#
+# You can override the default Notice in your .rubocop.yml file.
+#
+# In order to use autocorrect, you must supply a value for the
+# AutocorrectNotice key that matches the regexp Notice.  A blank
+# AutocorrectNotice will cause an error during autocorrect.
+#
+# Autocorrect will add a copyright notice in a comment at the top
+# of the file immediately after any shebang or encoding comments.
+#
+# Example rubocop.yml:
+#
+# Style/Copyright:
+#   Enabled: true
+#   Notice: 'Copyright (\(c\) )?2015 Yahoo! Inc'
+#   AutocorrectNotice: '# Copyright (c) 2015 Yahoo! Inc.'
+#
+Style/Copyright:
+  Notice: '^Copyright (\(c\) )?2[0-9]{3} .+'
+  AutocorrectNotice: ''
+
+# Multi-line method chaining should be done with leading dots.
+Style/DotPosition:
+  EnforcedStyle: leading
+  SupportedStyles:
+    - leading
+    - trailing
+
+# Warn on empty else statements
+# empty - warn only on empty else
+# nil - warn on else with nil in it
+# both - warn on empty else and else with nil in it
+Style/EmptyElse:
+  EnforcedStyle: both
+  SupportedStyles:
+    - empty
+    - nil
+    - both
+
+# Use empty lines between defs.
+Style/EmptyLineBetweenDefs:
+  # If true, this parameter means that single line method definitions don't
+  # need an empty line between them.
+  AllowAdjacentOneLineDefs: false
+
+Style/EmptyLinesAroundBlockBody:
+  EnforcedStyle: no_empty_lines
+  SupportedStyles:
+    - empty_lines
+    - no_empty_lines
+
+Style/EmptyLinesAroundClassBody:
+  EnforcedStyle: no_empty_lines
+  SupportedStyles:
+    - empty_lines
+    - no_empty_lines
+
+Style/EmptyLinesAroundModuleBody:
+  EnforcedStyle: no_empty_lines
+  SupportedStyles:
+    - empty_lines
+    - no_empty_lines
+
+# Checks whether the source file has a utf-8 encoding comment or not
+# AutoCorrectEncodingComment must match the regex
+# /#.*coding\s?[:=]\s?(?:UTF|utf)-8/
+Style/Encoding:
+  EnforcedStyle: always
+  SupportedStyles:
+    - when_needed
+    - always
+  AutoCorrectEncodingComment: '# encoding: utf-8'
+
+Style/ExtraSpacing:
+  # When true, allows most uses of extra spacing if the intent is to align
+  # things with the previous or next line, not counting empty lines or comment
+  # lines.
+  AllowForAlignment: true
+  # When true, forces the alignment of = in assignments on consecutive lines.
+  ForceEqualSignAlignment: false
+
+Style/FileName:
+  # File names listed in AllCops:Include are excluded by default. Add extra
+  # excludes here.
+  Exclude: []
+  # When true, requires that each source file should define a class or module
+  # with a name which matches the file name (converted to ... case).
+  # It further expects it to be nested inside modules which match the names
+  # of subdirectories in its path.
+  ExpectMatchingDefinition: false
+  # If non-nil, expect all source file names to match the following regex.
+  # Only the file name itself is matched, not the entire file path.
+  # Use anchors as necessary if you want to match the entire name rather than
+  # just a part of it.
+  Regex: ~
+  # With `IgnoreExecutableScripts` set to `true`, this cop does not
+  # report offending filenames for executable scripts (i.e. source
+  # files with a shebang in the first line).
+  IgnoreExecutableScripts: true
+
+Style/FirstParameterIndentation:
+  EnforcedStyle: special_for_inner_method_call_in_parentheses
+  SupportedStyles:
+    # The first parameter should always be indented one step more than the
+    # preceding line.
+    - consistent
+    # The first parameter should normally be indented one step more than the
+    # preceding line, but if it's a parameter for a method call that is itself
+    # a parameter in a method call, then the inner parameter should be indented
+    # relative to the inner method.
+    - special_for_inner_method_call
+    # Same as special_for_inner_method_call except that the special rule only
+    # applies if the outer method call encloses its arguments in parentheses.
+    - special_for_inner_method_call_in_parentheses
+  # By default, the indentation width from Style/IndentationWidth is used
+  # But it can be overridden by setting this parameter
+  IndentationWidth: ~
+
+# Checks use of for or each in multiline loops.
+Style/For:
+  EnforcedStyle: each
+  SupportedStyles:
+    - for
+    - each
+
+# Enforce the method used for string formatting.
+Style/FormatString:
+  EnforcedStyle: format
+  SupportedStyles:
+    - format
+    - sprintf
+    - percent
+
+Style/FrozenStringLiteralComment:
+  EnforcedStyle: when_needed
+  SupportedStyles:
+    # `when_needed` will add the frozen string literal comment to files that call
+    # `freeze` or `<<` on a string literal. It will only add the comment to files
+    # when running Ruby 2.3.0+.
+    - when_needed
+    # `always` will always add the frozen string literal comment to a file
+    # regardless of the Ruby version or if `freeze` or `<<` are called on a
+    # string literal. If you run code against multiple versions of Ruby, it is
+    # possible that this will create errors in Ruby 2.3.0+.
+    - always
+
+# Built-in global variables are allowed by default.
+Style/GlobalVars:
+  AllowedVariables: []
+
+# `MinBodyLength` defines the number of lines of the a body of an if / unless
+# needs to have to trigger this cop
+Style/GuardClause:
+  MinBodyLength: 1
+
+Style/HashSyntax:
+  EnforcedStyle: ruby19
+  SupportedStyles:
+    - ruby19
+    - ruby19_no_mixed_keys
+    - hash_rockets
+# Force hashes that have a symbol value to use hash rockets
+  UseHashRocketsWithSymbolValues: false
+
+Style/IfUnlessModifier:
+  MaxLineLength: 80
+
+Style/IndentationConsistency:
+  # The difference between `rails` and `normal` is that the `rails` style
+  # prescribes that in classes and modules the `protected` and `private`
+  # modifier keywords shall be indented the same as public methods and that
+  # protected and private members shall be indented one step more than the
+  # modifiers. Other than that, both styles mean that entities on the same
+  # logical depth shall have the same indentation.
+  EnforcedStyle: normal
+  SupportedStyles:
+    - normal
+    - rails
+
+Style/IndentationWidth:
+  # Number of spaces for each indentation level.
+  Width: 2
+
+# Checks the indentation of the first element in an array literal.
+Style/IndentArray:
+  # The value `special_inside_parentheses` means that array literals with
+  # brackets that have their opening bracket on the same line as a surrounding
+  # opening round parenthesis, shall have their first element indented relative
+  # to the first position inside the parenthesis.
+  #
+  # The value `consistent` means that the indentation of the first element shall
+  # always be relative to the first position of the line where the opening
+  # bracket is.
+  #
+  # The value `align_brackets` means that the indentation of the first element
+  # shall always be relative to the position of the opening bracket.
+  EnforcedStyle: special_inside_parentheses
+  SupportedStyles:
+    - special_inside_parentheses
+    - consistent
+    - align_brackets
+  # By default, the indentation width from Style/IndentationWidth is used
+  # But it can be overridden by setting this parameter
+  IndentationWidth: ~
+
+# Checks the indentation of assignment RHS, when on a different line from LHS
+Style/IndentAssignment:
+  # By default, the indentation width from Style/IndentationWidth is used
+  # But it can be overridden by setting this parameter
+  IndentationWidth: ~
+
+# Checks the indentation of the first key in a hash literal.
+Style/IndentHash:
+  # The value `special_inside_parentheses` means that hash literals with braces
+  # that have their opening brace on the same line as a surrounding opening
+  # round parenthesis, shall have their first key indented relative to the
+  # first position inside the parenthesis.
+  #
+  # The value `consistent` means that the indentation of the first key shall
+  # always be relative to the first position of the line where the opening
+  # brace is.
+  #
+  # The value `align_braces` means that the indentation of the first key shall
+  # always be relative to the position of the opening brace.
+  EnforcedStyle: special_inside_parentheses
+  SupportedStyles:
+    - special_inside_parentheses
+    - consistent
+    - align_braces
+  # By default, the indentation width from Style/IndentationWidth is used
+  # But it can be overridden by setting this parameter
+  IndentationWidth: ~
+
+Style/LambdaCall:
+  EnforcedStyle: call
+  SupportedStyles:
+    - call
+    - braces
+
+Style/Next:
+  # With `always` all conditions at the end of an iteration needs to be
+  # replaced by next - with `skip_modifier_ifs` the modifier if like this one
+  # are ignored: [1, 2].each { |a| return 'yes' if a == 1 }
+  EnforcedStyle: skip_modifier_ifs
+  # `MinBodyLength` defines the number of lines of the a body of an if / unless
+  # needs to have to trigger this cop
+  MinBodyLength: 3
+  SupportedStyles:
+    - skip_modifier_ifs
+    - always
+
+Style/NonNilCheck:
+  # With `IncludeSemanticChanges` set to `true`, this cop reports offenses for
+  # `!x.nil?` and autocorrects that and `x != nil` to solely `x`, which is
+  # **usually** OK, but might change behavior.
+  #
+  # With `IncludeSemanticChanges` set to `false`, this cop does not report
+  # offenses for `!x.nil?` and does no changes that might change behavior.
+  IncludeSemanticChanges: false
+
+Style/MethodDefParentheses:
+  EnforcedStyle: require_parentheses
+  SupportedStyles:
+    - require_parentheses
+    - require_no_parentheses
+    - require_no_parentheses_except_multiline
+
+Style/MethodName:
+  EnforcedStyle: snake_case
+  SupportedStyles:
+    - snake_case
+    - camelCase
+
+Style/MultilineAssignmentLayout:
+  # The types of assignments which are subject to this rule.
+  SupportedTypes:
+    - block
+    - case
+    - class
+    - if
+    - kwbegin
+    - module
+  EnforcedStyle: new_line
+  SupportedStyles:
+    # Ensures that the assignment operator and the rhs are on the same line for
+    # the set of supported types.
+    - same_line
+    # Ensures that the assignment operator and the rhs are on separate lines
+    # for the set of supported types.
+    - new_line
+
+Style/MultilineMethodCallIndentation:
+  EnforcedStyle: aligned
+  SupportedStyles:
+    - aligned
+    - indented
+  # By default, the indentation width from Style/IndentationWidth is used
+  # But it can be overridden by setting this parameter
+  IndentationWidth: ~
+
+Style/MultilineOperationIndentation:
+  EnforcedStyle: aligned
+  SupportedStyles:
+    - aligned
+    - indented
+  # By default, the indentation width from Style/IndentationWidth is used
+  # But it can be overridden by setting this parameter
+  IndentationWidth: ~
+
+Style/NumericLiterals:
+  MinDigits: 5
+
+Style/OptionHash:
+  # A list of parameter names that will be flagged by this cop.
+  SuspiciousParamNames:
+    - options
+    - opts
+    - args
+    - params
+    - parameters
+
+# Allow safe assignment in conditions.
+Style/ParenthesesAroundCondition:
+  AllowSafeAssignment: true
+
+Style/PercentLiteralDelimiters:
+  PreferredDelimiters:
+    '%':  ()
+    '%i': ()
+    '%q': ()
+    '%Q': ()
+    '%r': '{}'
+    '%s': ()
+    '%w': ()
+    '%W': ()
+    '%x': ()
+
+Style/PercentQLiterals:
+  EnforcedStyle: lower_case_q
+  SupportedStyles:
+    - lower_case_q # Use %q when possible, %Q when necessary
+    - upper_case_q # Always use %Q
+
+Style/PredicateName:
+  # Predicate name prefixes.
+  NamePrefix:
+    - is_
+    - has_
+    - have_
+  # Predicate name prefixes that should be removed.
+  NamePrefixBlacklist:
+    - is_
+    - has_
+    - have_
+  # Predicate names which, despite having a blacklisted prefix, or no ?,
+  # should still be accepted
+  NameWhitelist:
+    - is_a?
+
+Style/RaiseArgs:
+  EnforcedStyle: exploded
+  SupportedStyles:
+    - compact # raise Exception.new(msg)
+    - exploded # raise Exception, msg
+
+Style/RedundantReturn:
+  # When true allows code like `return x, y`.
+  AllowMultipleReturnValues: false
+
+# Use / or %r around regular expressions.
+Style/RegexpLiteral:
+  EnforcedStyle: slashes
+  # slashes: Always use slashes.
+  # percent_r: Always use %r.
+  # mixed: Use slashes on single-line regexes, and %r on multi-line regexes.
+  SupportedStyles:
+    - slashes
+    - percent_r
+    - mixed
+  # If false, the cop will always recommend using %r if one or more slashes
+  # are found in the regexp string.
+  AllowInnerSlashes: false
+
+Style/Semicolon:
+  # Allow ; to separate several expressions on the same line.
+  AllowAsExpressionSeparator: false
+
+Style/SignalException:
+  EnforcedStyle: semantic
+  SupportedStyles:
+    - only_raise
+    - only_fail
+    - semantic
+
+Style/SingleLineBlockParams:
+  Methods:
+    - reduce:
+        - a
+        - e
+    - inject:
+        - a
+        - e
+
+Style/SingleLineMethods:
+  AllowIfMethodIsEmpty: true
+
+Style/SpaceBeforeFirstArg:
+  # When true, allows most uses of extra spacing if the intent is to align
+  # things with the previous or next line, not counting empty lines or comment
+  # lines.
+  AllowForAlignment: true
+
+Style/SpecialGlobalVars:
+  EnforcedStyle: use_english_names
+  SupportedStyles:
+    - use_perl_names
+    - use_english_names
+
+Style/StabbyLambdaParentheses:
+  EnforcedStyle: require_parentheses
+  SupportedStyles:
+    - require_parentheses
+    - require_no_parentheses
+
+Style/StringLiterals:
+  EnforcedStyle: single_quotes
+  SupportedStyles:
+    - single_quotes
+    - double_quotes
+  # If true, strings which span multiple lines using \ for continuation must
+  # use the same type of quotes on each line.
+  ConsistentQuotesInMultiline: false
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: single_quotes
+  SupportedStyles:
+    - single_quotes
+    - double_quotes
+
+Style/StringMethods:
+  # Mapping from undesired method to desired_method
+  # e.g. to use `to_sym` over `intern`:
+  #
+  # StringMethods:
+  #   PreferredMethods:
+  #     intern: to_sym
+  PreferredMethods:
+    intern: to_sym
+
+Style/SpaceAroundBlockParameters:
+  EnforcedStyleInsidePipes: no_space
+  SupportedStyles:
+    - space
+    - no_space
+
+Style/SpaceAroundEqualsInParameterDefault:
+  EnforcedStyle: space
+  SupportedStyles:
+    - space
+    - no_space
+
+Style/SpaceAroundOperators:
+  # When true, allows most uses of extra spacing if the intent is to align
+  # with an operator on the previous or next line, not counting empty lines
+  # or comment lines.
+  AllowForAlignment: true
+
+Style/SpaceBeforeBlockBraces:
+  EnforcedStyle: space
+  SupportedStyles:
+    - space
+    - no_space
+
+Style/SpaceInsideBlockBraces:
+  EnforcedStyle: space
+  SupportedStyles:
+    - space
+    - no_space
+  # Valid values are: space, no_space
+  EnforcedStyleForEmptyBraces: no_space
+  # Space between { and |. Overrides EnforcedStyle if there is a conflict.
+  SpaceBeforeBlockParameters: true
+
+Style/SpaceInsideHashLiteralBraces:
+  EnforcedStyle: space
+  EnforcedStyleForEmptyBraces: no_space
+  SupportedStyles:
+    - space
+    - no_space
+
+Style/SpaceInsideStringInterpolation:
+  EnforcedStyle: no_space
+  SupportedStyles:
+    - space
+    - no_space
+
+Style/SymbolArray:
+  EnforcedStyle: percent
+  SupportedStyles:
+    - percent
+    - brackets
+
+Style/SymbolProc:
+  # A list of method names to be ignored by the check.
+  # The names should be fairly unique, otherwise you'll end up ignoring lots of code.
+  IgnoredMethods:
+    - respond_to
+
+Style/TrailingBlankLines:
+  EnforcedStyle: final_newline
+  SupportedStyles:
+    - final_newline
+    - final_blank_line
+
+Style/TrailingCommaInArguments:
+  # If `comma`, the cop requires a comma after the last argument, but only for
+  # parenthesized method calls where each argument is on its own line.
+  # If `consistent_comma`, the cop requires a comma after the last argument,
+  # for all parenthesized method calls with arguments.
+  EnforcedStyleForMultiline: no_comma
+  SupportedStyles:
+    - comma
+    - consistent_comma
+    - no_comma
+
+Style/TrailingCommaInLiteral:
+  # If `comma`, the cop requires a comma after the last item in an array or
+  # hash, but only when each item is on its own line.
+  # If `consistent_comma`, the cop requires a comma after the last item of all
+  # non-empty array and hash literals.
+  EnforcedStyleForMultiline: no_comma
+  SupportedStyles:
+    - comma
+    - consistent_comma
+    - no_comma
+
+# TrivialAccessors requires exact name matches and doesn't allow
+# predicated methods by default.
+Style/TrivialAccessors:
+  # When set to false the cop will suggest the use of accessor methods
+  # in situations like:
+  #
+  # def name
+  #   @other_name
+  # end
+  #
+  # This way you can uncover "hidden" attributes in your code.
+  ExactNameMatch: true
+  AllowPredicates: false
+  # Allows trivial writers that don't end in an equal sign. e.g.
+  #
+  # def on_exception(action)
+  #   @on_exception=action
+  # end
+  # on_exception :restart
+  #
+  # Commonly used in DSLs
+  AllowDSLWriters: false
+  IgnoreClassMethods: false
+  Whitelist:
+    - to_ary
+    - to_a
+    - to_c
+    - to_enum
+    - to_h
+    - to_hash
+    - to_i
+    - to_int
+    - to_io
+    - to_open
+    - to_path
+    - to_proc
+    - to_r
+    - to_regexp
+    - to_str
+    - to_s
+    - to_sym
+
+Style/VariableName:
+  EnforcedStyle: snake_case
+  SupportedStyles:
+    - snake_case
+    - camelCase
+
+Style/WhileUntilModifier:
+  MaxLineLength: 80
+
+Style/WordArray:
+  EnforcedStyle: percent
+  SupportedStyles:
+    - percent
+    - brackets
+  MinSize: 0
+  # The regular expression WordRegex decides what is considered a word.
+  WordRegex: !ruby/regexp '/\A[\p{Word}\n\t]+\z/'
+
+##################### Metrics ##################################
+
+Metrics/AbcSize:
+  # The ABC size is a calculated magnitude, so this number can be a Fixnum or
+  # a Float.
+  Max: 15
+
+Metrics/BlockNesting:
+  Max: 3
+
+Metrics/ClassLength:
+  CountComments: false  # count full line comments?
+  Max: 100
+
+Metrics/ModuleLength:
+  CountComments: false  # count full line comments?
+  Max: 100
+
+# Avoid complex methods.
+Metrics/CyclomaticComplexity:
+  Max: 6
+
+Metrics/LineLength:
+  Max: 80
+  # To make it possible to copy or click on URIs in the code, we allow lines
+  # contaning a URI to be longer than Max.
+  AllowHeredoc: true
+  AllowURI: true
+  URISchemes:
+    - http
+    - https
+
+Metrics/MethodLength:
+  CountComments: false  # count full line comments?
+  Max: 10
+
+Metrics/ParameterLists:
+  Max: 5
+  CountKeywordArgs: true
+
+Metrics/PerceivedComplexity:
+  Max: 7
+
+##################### Lint ##################################
+
+# Allow safe assignment in conditions.
+Lint/AssignmentInCondition:
+  AllowSafeAssignment: true
+
+# Align ends correctly.
+Lint/EndAlignment:
+  # The value `keyword` means that `end` should be aligned with the matching
+  # keyword (if, while, etc.).
+  # The value `variable` means that in assignments, `end` should be aligned
+  # with the start of the variable on the left hand side of `=`. In all other
+  # situations, `end` should still be aligned with the keyword.
+  # The value `start_of_line` means that `end` should be aligned with the start
+  # of the line which the matching keyword appears on.
+  AlignWith: keyword
+  SupportedStyles:
+    - keyword
+    - variable
+    - start_of_line
+  AutoCorrect: false
+
+Lint/DefEndAlignment:
+  # The value `def` means that `end` should be aligned with the def keyword.
+  # The value `start_of_line` means that `end` should be aligned with method
+  # calls like `private`, `public`, etc, if present in front of the `def`
+  # keyword on the same line.
+  AlignWith: start_of_line
+  SupportedStyles:
+    - start_of_line
+    - def
+  AutoCorrect: false
+
+# Checks for unused block arguments
+Lint/UnusedBlockArgument:
+  IgnoreEmptyBlocks: true
+
+# Checks for unused method arguments.
+Lint/UnusedMethodArgument:
+  AllowUnusedKeywordArguments: false
+  IgnoreEmptyMethods: true
+
+##################### Rails ##################################
+
+Rails/ActionFilter:
+  EnforcedStyle: action
+  SupportedStyles:
+    - action
+    - filter
+  Include:
+    - app/controllers/**/*.rb
+
+Rails/Date:
+  # The value `strict` disallows usage of `Date.today`, `Date.current`,
+  # `Date#to_time` etc.
+  # The value `flexible` allows usage of `Date.current`, `Date.yesterday`, etc
+  # (but not `Date.today`) which are overriden by ActiveSupport to handle current
+  # time zone.
+  EnforcedStyle: flexible
+  SupportedStyles:
+    - strict
+    - flexible
+
+Rails/FindBy:
+  Include:
+    - app/models/**/*.rb
+
+Rails/FindEach:
+  Include:
+    - app/models/**/*.rb
+
+Rails/HasAndBelongsToMany:
+  Include:
+    - app/models/**/*.rb
+
+Rails/Output:
+  Include:
+    - app/**/*.rb
+    - config/**/*.rb
+    - db/**/*.rb
+    - lib/**/*.rb
+
+Rails/ReadWriteAttribute:
+  Include:
+    - app/models/**/*.rb
+
+Rails/ScopeArgs:
+  Include:
+    - app/models/**/*.rb
+
+Rails/TimeZone:
+  # The value `strict` means that `Time` should be used with `zone`.
+  # The value `flexible` allows usage of `in_time_zone` instead of `zone`.
+  EnforcedStyle: flexible
+  SupportedStyles:
+    - strict
+    - flexible
+
+Rails/Validation:
+  Include:
+    - app/models/**/*.rb

@@ -1,0 +1,13 @@
+diff --git a/build/standalone.gypi b/build/standalone.gypi
+index 125c5bf..71641a3 100644
+--- a/build/standalone.gypi
++++ b/build/standalone.gypi
+@@ -107,7 +107,7 @@
+           [ 'visibility=="hidden" and v8_enable_backtrace==0', {
+             'cflags': [ '-fvisibility=hidden' ],
+           }],
+-          [ 'component=="shared_library"', {
++          [ 'component=="shared_library" or component=="static_library" and v8_target_arch=="x64" or v8_target_arch=="arm"', {
+             'cflags': [ '-fPIC', ],
+           }],
+         ],

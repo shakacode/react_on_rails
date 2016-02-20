@@ -1,0 +1,42 @@
+current directory: /Users/gaurav/contributions/react_on_rails/spec/dummy/vendor/bundle/gems/unf_ext-0.0.7.1/ext/unf_ext
+/Users/gaurav/.rbenv/versions/2.3.0/bin/ruby -r ./siteconf20160227-52636-bkm1uc.rb extconf.rb
+checking for main() in -lstdc++... yes
+creating Makefile
+
+To see why this extension failed to compile, please check the mkmf.log which can be found here:
+
+  /Users/gaurav/contributions/react_on_rails/spec/dummy/vendor/bundle/extensions/x86_64-darwin-15/2.3.0-static/unf_ext-0.0.7.1/mkmf.log
+
+current directory: /Users/gaurav/contributions/react_on_rails/spec/dummy/vendor/bundle/gems/unf_ext-0.0.7.1/ext/unf_ext
+make "DESTDIR=" clean
+
+current directory: /Users/gaurav/contributions/react_on_rails/spec/dummy/vendor/bundle/gems/unf_ext-0.0.7.1/ext/unf_ext
+make "DESTDIR="
+compiling unf.cc
+In file included from unf.cc:1:
+In file included from ./unf/normalizer.hh:8:
+In file included from ./unf/trie/searcher.hh:4:
+./unf/trie/char_stream.hh:52:56: warning: implicit conversion loses integer precision: 'long' to 'unsigned int' [-Wshorten-64-to-32]
+      unsigned offset() const { return cur1-beg1 + cur2-beg2; }
+                                ~~~~~~ ~~~~~~~~~~~~~~~~^~~~~
+./unf/trie/char_stream.hh:89:17: warning: implicit conversion loses integer precision: 'size_type' (aka 'unsigned long') to 'unsigned int' [-Wshorten-64-to-32]
+        skipped_tail = skipped.size();
+                     ~ ^~~~~~~~~~~~~~
+In file included from unf.cc:1:
+In file included from ./unf/normalizer.hh:8:
+./unf/trie/searcher.hh:49:25: warning: implicit conversion loses integer precision: 'long' to 'unsigned int' [-Wshorten-64-to-32]
+        unsigned beg = in.cur()-str;
+                 ~~~   ~~~~~~~~^~~~
+./unf/trie/searcher.hh:59:27: warning: implicit conversion loses integer precision: 'long' to 'unsigned int' [-Wshorten-64-to-32]
+              sort_end = in.cur()-str;
+                       ~ ~~~~~~~~^~~~
+In file included from unf.cc:1:
+./unf/normalizer.hh:60:23: warning: implicit conversion loses integer precision: 'size_type' (aka 'unsigned long') to 'unsigned int' [-Wshorten-64-to-32]
+      unsigned last = buf.size();
+               ~~~~   ^~~~~~~~~~
+5 warnings generated.
+linking shared-object unf_ext.bundle
+
+current directory: /Users/gaurav/contributions/react_on_rails/spec/dummy/vendor/bundle/gems/unf_ext-0.0.7.1/ext/unf_ext
+make "DESTDIR=" install
+/usr/bin/install -c -m 0755 unf_ext.bundle ./.gem.20160227-52636-gsp9jc

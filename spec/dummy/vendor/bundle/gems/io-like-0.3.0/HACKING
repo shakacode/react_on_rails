@@ -1,0 +1,123 @@
+= Guide to Hacking IO::Like
+
+== Licensing
+
+Contributed code must be licensed under the same license as this project.  See
+the included LICENSE file for details.  Special consideration MAY be made in
+some cases, but such cases will be rare.
+
+
+== Dependencies
+
+=== Runtime
+
+* Ruby 1.8.6 or greater
+
+
+=== Build
+
+* rubygems 0.9.0 or greater
+* rake 0.8.3 or greater
+* mspec 1.5.9 (optional - used for testing)
+* allison 2.0.3 (optional - used for documentation only, if available)
+* rsync (optional - used for publishing documentation)
+
+
+=== Install
+
+* rubygems 0.9.0 or greater
+
+
+== Versioning Policy
+
+Version numbers will be in <em>x.y.z</em> format, where <em>x</em>, <em>y</em>,
+and <em>z</em> are integers starting from 0.  The version increment rules are
+as follows:
+
+<b>x</b>:: Planned releases which implement significant changes and/or break API
+           compatibility.  An exception is to be made for the transition from
+           the <em>0.y.z</em> series to the <em>1.y.z</em> series since the
+           <em>0.y.z</em> series is expected to be unstable throughout
+           development.  When incremented, <em>y</em> and <em>z</em> are reset
+           to 0.
+<b>y</b>:: Planned releases which incorporate numerous bug fixes and/or new
+           features which do not break backward compatibility.  When
+           incremented, <em>z</em> is reset to 0.
+<b>z</b>:: Generally, unplanned releases which incorporate a single fix for a
+           critical defect.
+
+This is the {Rational Versioning Policy}[http://www.rubygems.org/read/chapter/7]
+as outlined in the {RubyGems User Guide}[http://www.rubygems.org/read/book/1].
+
+
+== Support Policy
+
+Due to limitations in resources (time/money/manpower), this project will focus
+primarily upon the development line of the current release at any given time.
+Fixes and new features should be applied first to that development line and then
+backported to earlier releases if necessary and feasible.  Long term maintenance
+of previous releases is not planned.  Users are generally expected to upgrade to
+the latest release in order to receive updates unless an explicit declaration of
+support for a previous release is made.
+
+
+== Coding Style
+
+The following points are not necessarily set in stone but should rather be used
+as a good guideline.  Consistency is the goal of coding style, and changes will
+be more easily accepted if they are consistent with the rest of the code.
+
+<b>File Encoding</b>::     UTF-8
+<b>Indentation</b>::       Two spaces; no tabs
+<b>Comments</b>::          Document classes, attributes, methods, and code
+<b>Boolean Operators</b>:: Use <tt>&&</tt> and <tt>||</tt> for boolean tests;
+                           avoid <tt>and</tt> and <tt>or</tt>
+<b>Method Calls</b>::      Use <tt>a_method(arg, arg, etc)</tt>; <b>not</b>
+                           <tt>a_method( arg, arg, etc )</tt>,
+                           <tt>a_method arg, arg, etc</tt>, or any other
+                           variation
+<b>Blocks</b>::            <tt>do end</tt> for multi-line blocks and
+                           <tt>{ }</tt> for single-line blocks
+<b>Line length</b>::       Limit lines to a maximum of 80 characters
+<b>General</b>::           Try to follow the flow and style of the rest of the
+                           code
+
+
+== Generating Patches
+
+Patches should usually be generated against the <em>HEAD</em> revision of the
+<em>master</em> branch.  When generating patches, please try to implement only
+a single feature or bug fix per patch.  Documentation describing a patch should
+be included along with the patch so that the maintainer can more easily
+determine whether or not a patch is acceptable.  Patches lacking the necessary
+documentation will be ignored.
+
+Patches will be much more readily accepted if test cases are provided which
+verify correct operation.  Such test cases should be provided within the patch
+rather than as a separate patch.  Proper documentation, especially for
+user-visible APIs, is highly prized; providing accurate and detailed
+documentation, often in the form of rubydocs, throughout new code contributions
+will also increase the desirability of a patch.
+
+If a series of patches is generated which cannot be applied individually, make
+sure to mention the dependency relationships in whatever medium is being used
+to distribute the patches.  For instance, if a bug is discovered while
+implementing a new feature, create a patch which fixes the bug followed by a
+separate patch adding the feature.  If the feature patch requires the bug fix
+patch in order to work, note that dependency in the comments for the feature
+patch by somehow referencing the bug fix patch.
+
+The patch generation process in general:
+  $ git clone git://rubyforge.org/io-like.git  # Clone the repo and check out
+                                               # the master branch.
+  $ cd io-like                                 # Enter the workspace.
+  (make and test changes)
+  $ git add file1 file2 ..                     # Add new/modified files.
+  $ git commit                                 # Commit changes.
+  $ git format-patch -C HEAD^                  # Create a patch for the last
+                                               # commit.
+
+Repeat as necessary until all patches are generated.  Then either attach them to
+1 or more email messages addressed to the maintainer or attach them to tickets
+in the issue tracker for the project.  Remember to include a brief description
+of the patch and its dependencies, if any.

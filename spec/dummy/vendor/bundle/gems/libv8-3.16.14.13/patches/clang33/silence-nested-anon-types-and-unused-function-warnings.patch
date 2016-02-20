@@ -1,0 +1,28 @@
+diff --git a/build/common.gypi b/build/common.gypi
+index 14bf0f9..301109a 100644
+--- a/build/common.gypi
++++ b/build/common.gypi
+@@ -377,7 +377,8 @@
+           ['OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="netbsd"', {
+             'cflags': [ '-Wall', '<(werror)', '-W', '-Wno-unused-parameter',
+                         '-Wnon-virtual-dtor', '-Woverloaded-virtual',
+-                        '-Wno-unused-private-field' ],
++                        '-Wno-unused-private-field', '-Wno-nested-anon-types',
++                        '-Wno-unused-function' ],
+           }],
+           ['OS=="linux" and v8_enable_backtrace==1', {
+             # Support for backtrace_symbols.
+diff --git a/build/standalone.gypi b/build/standalone.gypi
+index c8d9b4f..ddd1693 100644
+--- a/build/standalone.gypi
++++ b/build/standalone.gypi
+@@ -99,7 +99,8 @@
+         'cflags': [ '-Wall', '<(werror)', '-W', '-Wno-unused-parameter',
+                     '-Wnon-virtual-dtor', '-pthread', '-fno-rtti',
+                     '-fno-exceptions', '-pedantic',
+-                    '-Wno-unused-private-field' ],
++                    '-Wno-unused-private-field', '-Wno-nested-anon-types',
++                    '-Wno-unused-function' ],
+         'ldflags': [ '-pthread', ],
+         'conditions': [
+           [ 'OS=="linux"', {

@@ -1,0 +1,108 @@
+# These are all the cops that are disabled in the default configuration.
+
+# By default, the rails cops are not run. Override in project or home
+# directory .rubocop.yml files, or by giving the -R/--rails option.
+Rails:
+  Enabled: false
+
+Style/AutoResourceCleanup:
+  Description: 'Suggests the usage of an auto resource cleanup version of a method (if available).'
+  Enabled: false
+
+Style/CollectionMethods:
+  Description: 'Preferred collection methods.'
+  StyleGuide: 'https://github.com/bbatsov/ruby-style-guide#map-find-select-reduce-size'
+  Enabled: false
+
+Style/Copyright:
+  Description: 'Include a copyright notice in each file before any code.'
+  Enabled: false
+
+Style/Encoding:
+  Description: 'Use UTF-8 as the source file encoding.'
+  StyleGuide: 'https://github.com/bbatsov/ruby-style-guide#utf-8'
+  Enabled: false
+
+Style/FirstArrayElementLineBreak:
+  Description: >-
+                 Checks for a line break before the first element in a
+                 multi-line array.
+  Enabled: false
+
+Style/FirstHashElementLineBreak:
+  Description: >-
+                 Checks for a line break before the first element in a
+                 multi-line hash.
+  Enabled: false
+
+Style/FirstMethodArgumentLineBreak:
+  Description: >-
+                 Checks for a line break before the first argument in a
+                 multi-line method call.
+  Enabled: false
+
+Style/FirstMethodParameterLineBreak:
+  Description: >-
+                 Checks for a line break before the first parameter in a
+                 multi-line method parameter definition.
+  Enabled: false
+
+Style/InlineComment:
+  Description: 'Avoid inline comments.'
+  Enabled: false
+
+Style/MethodCalledOnDoEndBlock:
+  Description: 'Avoid chaining a method call on a do...end block.'
+  StyleGuide: 'https://github.com/bbatsov/ruby-style-guide#single-line-blocks'
+  Enabled: false
+
+Style/MissingElse:
+  Description: >-
+                Require if/case expressions to have an else branches.
+                If enabled, it is recommended that
+                Style/UnlessElse and Style/EmptyElse be enabled.
+                This will conflict with Style/EmptyElse if
+                Style/EmptyElse is configured to style "both"
+  Enabled: false
+  EnforcedStyle: both
+  SupportedStyles:
+    # if - warn when an if expression is missing an else branch
+    # case - warn when a case expression is missing an else branch
+    # both - warn when an if or case expression is missing an else branch
+    - if
+    - case
+    - both
+
+Style/MultilineArrayBraceLayout:
+  Description: >-
+                 Checks that the closing brace in an array literal is
+                 symmetrical with respect to the opening brace and the
+                 array elements.
+  Enabled: false
+
+Style/MultilineAssignmentLayout:
+  Description: 'Check for a newline after the assignment operator in multi-line assignments.'
+  StyleGuide: 'https://github.com/bbatsov/ruby-style-guide#indent-conditional-assignment'
+  Enabled: false
+
+Style/OptionHash:
+  Description: "Don't use option hashes when you can use keyword arguments."
+  Enabled: false
+
+Style/Send:
+  Description: 'Prefer `Object#__send__` or `Object#public_send` to `send`, as `send` may overlap with existing methods.'
+  StyleGuide: 'https://github.com/bbatsov/ruby-style-guide#prefer-public-send'
+  Enabled: false
+
+Style/StringMethods:
+  Description: 'Checks if configured preferred methods are used over non-preferred.'
+  Enabled: false
+
+Style/SymbolArray:
+  Description: 'Use %i or %I for arrays of symbols.'
+  StyleGuide: 'https://github.com/bbatsov/ruby-style-guide#percent-i'
+  Enabled: false
+
+Lint/LiteralInInterpolation:
+  Description: 'Avoid interpolating literals in strings'
+  AutoCorrect: false

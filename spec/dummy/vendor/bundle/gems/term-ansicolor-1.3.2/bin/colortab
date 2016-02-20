@@ -1,0 +1,48 @@
+#!/usr/bin/env ruby
+
+require 'term/ansicolor'
+
+class String
+  include Term::ANSIColor
+end
+
+def print_color(c)
+  color = Term::ANSIColor::Attribute[c]
+  text = [
+    Term::ANSIColor::Attribute.nearest_rgb_color('#000'),
+    Term::ANSIColor::Attribute.nearest_rgb_color('#fff'),
+  ].max_by { |t| t.distance_to(color) }
+  print ("%3u #{color.rgb.html} " % c).on_color(color.name).color(text.name)
+end
+
+for c in 0..3
+  print_color c
+end
+puts
+
+for c in 4..7
+  print_color c
+end
+puts
+
+for c in 8..11
+  print_color c
+end
+puts
+
+for c in 12..15
+  print_color c
+end
+puts
+
+for c in 16..231
+  (c - 16) % 6 == 0 and puts
+  print_color c
+end
+puts
+
+for c in 232..255
+  (c - 16) % 6 == 0 and puts
+  print_color c
+end
+puts

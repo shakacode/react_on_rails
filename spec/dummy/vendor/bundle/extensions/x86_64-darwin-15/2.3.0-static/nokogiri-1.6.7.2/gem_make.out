@@ -1,0 +1,99 @@
+current directory: /Users/gaurav/contributions/react_on_rails/spec/dummy/vendor/bundle/gems/nokogiri-1.6.7.2/ext/nokogiri
+/Users/gaurav/.rbenv/versions/2.3.0/bin/ruby -r ./siteconf20160227-52636-ncvbln.rb extconf.rb --use-system-libraries
+checking if the C compiler accepts ... yes
+checking if the C compiler accepts -Wno-error=unused-command-line-argument-hard-error-in-future... no
+Building nokogiri using system libraries.
+checking for xmlParseDoc() in libxml/parser.h... yes
+checking for xsltParseStylesheetDoc() in libxslt/xslt.h... yes
+checking for exsltFuncRegister() in libexslt/exslt.h... yes
+checking for xmlHasFeature()... yes
+checking for xmlFirstElementChild()... yes
+checking for xmlRelaxNGSetParserStructuredErrors()... yes
+checking for xmlRelaxNGSetParserStructuredErrors()... yes
+checking for xmlRelaxNGSetValidStructuredErrors()... yes
+checking for xmlSchemaSetValidStructuredErrors()... yes
+checking for xmlSchemaSetParserStructuredErrors()... yes
+creating Makefile
+
+To see why this extension failed to compile, please check the mkmf.log which can be found here:
+
+  /Users/gaurav/contributions/react_on_rails/spec/dummy/vendor/bundle/extensions/x86_64-darwin-15/2.3.0-static/nokogiri-1.6.7.2/mkmf.log
+
+current directory: /Users/gaurav/contributions/react_on_rails/spec/dummy/vendor/bundle/gems/nokogiri-1.6.7.2/ext/nokogiri
+make "DESTDIR=" clean
+
+current directory: /Users/gaurav/contributions/react_on_rails/spec/dummy/vendor/bundle/gems/nokogiri-1.6.7.2/ext/nokogiri
+make "DESTDIR="
+compiling html_document.c
+compiling html_element_description.c
+compiling html_entity_lookup.c
+compiling html_sax_parser_context.c
+compiling html_sax_push_parser.c
+compiling nokogiri.c
+compiling xml_attr.c
+compiling xml_attribute_decl.c
+compiling xml_cdata.c
+compiling xml_comment.c
+compiling xml_document.c
+compiling xml_document_fragment.c
+compiling xml_dtd.c
+compiling xml_element_content.c
+compiling xml_element_decl.c
+compiling xml_encoding_handler.c
+compiling xml_entity_decl.c
+compiling xml_entity_reference.c
+compiling xml_io.c
+compiling xml_libxml2_hacks.c
+compiling xml_namespace.c
+compiling xml_node.c
+xml_node.c:168:15: warning: 14 enumeration values not handled in switch: 'XML_ATTRIBUTE_NODE', 'XML_ENTITY_NODE', 'XML_DOCUMENT_NODE'... [-Wswitch]
+      switch (reparentee->type) {
+              ^
+xml_node.c:186:15: warning: 15 enumeration values not handled in switch: 'XML_ATTRIBUTE_NODE', 'XML_ENTITY_NODE', 'XML_DOCUMENT_NODE'... [-Wswitch]
+      switch (reparentee->type) {
+              ^
+xml_node.c:197:15: warning: 19 enumeration values not handled in switch: 'XML_ELEMENT_NODE', 'XML_ATTRIBUTE_NODE', 'XML_CDATA_SECTION_NODE'... [-Wswitch]
+      switch (reparentee->type) {
+              ^
+xml_node.c:165:13: warning: 14 enumeration values not handled in switch: 'XML_CDATA_SECTION_NODE', 'XML_ENTITY_NODE', 'XML_PI_NODE'... [-Wswitch]
+    switch (parent->type) {
+            ^
+4 warnings generated.
+compiling xml_node_set.c
+compiling xml_processing_instruction.c
+compiling xml_reader.c
+compiling xml_relax_ng.c
+compiling xml_sax_parser.c
+compiling xml_sax_parser_context.c
+compiling xml_sax_push_parser.c
+compiling xml_schema.c
+compiling xml_syntax_error.c
+compiling xml_text.c
+compiling xml_xpath_context.c
+compiling xslt_stylesheet.c
+xslt_stylesheet.c:217:21: warning: incompatible pointer to integer conversion passing 'void *' to parameter of type 'VALUE' (aka 'unsigned long') [-Wint-conversion]
+    Data_Get_Struct(ctxt->style->_private, nokogiriXsltStylesheetTuple,
+                    ^~~~~~~~~~~~~~~~~~~~~
+/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/ruby.h:1198:41: note: expanded from macro 'Data_Get_Struct'
+    ((sval) = (type*)rb_data_object_get(obj))
+                                        ^
+/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/ruby.h:1390:26: note: passing argument to parameter 'obj' here
+rb_data_object_get(VALUE obj)
+                         ^
+xslt_stylesheet.c:230:21: warning: incompatible pointer to integer conversion passing 'void *' to parameter of type 'VALUE' (aka 'unsigned long') [-Wint-conversion]
+    Data_Get_Struct(ctxt->style->_private, nokogiriXsltStylesheetTuple,
+                    ^~~~~~~~~~~~~~~~~~~~~
+/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/ruby.h:1198:41: note: expanded from macro 'Data_Get_Struct'
+    ((sval) = (type*)rb_data_object_get(obj))
+                                        ^
+/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/ruby.h:1390:26: note: passing argument to parameter 'obj' here
+rb_data_object_get(VALUE obj)
+                         ^
+2 warnings generated.
+linking shared-object nokogiri/nokogiri.bundle
+Cleaning files only used during build.
+rm -rf /Users/gaurav/contributions/react_on_rails/spec/dummy/vendor/bundle/gems/nokogiri-1.6.7.2/ports/archives
+
+current directory: /Users/gaurav/contributions/react_on_rails/spec/dummy/vendor/bundle/gems/nokogiri-1.6.7.2/ext/nokogiri
+make "DESTDIR=" install
+/usr/bin/install -c -m 0755 nokogiri.bundle ./.gem.20160227-52636-402ofc/nokogiri

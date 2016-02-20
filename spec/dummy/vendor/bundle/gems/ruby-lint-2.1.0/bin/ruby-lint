@@ -1,0 +1,95 @@
+#!/usr/bin/env ruby
+
+require_relative '../lib/ruby-lint'
+
+require 'slop'
+
+slop = Slop.new(:strict => true) do
+  banner      'Usage: ruby-lint [FILES] [OPTIONS]'
+  description 'Analyze the source code of Ruby files'
+
+  separator <<-EOF.chomp
+
+About:
+
+  Analyses the source code of a Ruby file and presents a report containing
+  information such as errors about invalid code, warnings and informational
+  messages.
+
+Configuration:
+
+  When this command is executed it will try to load a configuration file in
+  one of the following two locations (in this order):
+
+  * $PWD/ruby-lint.yml
+  * ~/.ruby-lint.yml
+
+  Only the first existing configuration file is loaded.
+
+  These configuration files can be used for specifying the presenter, reporting
+  levels and various other options.
+
+  You can also configure various parts using the supplied commandline options.
+  For example, to use the JSON presenter you'd run the following:
+
+    $ ruby-lint ./test_file.rb --presenter=json
+
+Analysis Classes:
+
+  #{RubyLint::Command.format_names(:available_analysis_classes)}
+
+Presenters:
+
+  #{RubyLint::Command.format_names(:available_presenters)}
+
+Reporting Levels:
+
+  #{RubyLint::Command.format_names(:available_report_levels)}
+
+Examples:
+
+  To analyze a single file you can run the following command:
+
+      $ ruby-lint ./test_file.rb
+
+  You can also specify multiple files:
+
+      $ ruby-lint first_file.rb second_file.rb
+
+  Run analysis on an entire directory:
+
+      $ ruby-lint lib/
+  EOF
+
+  separator "\nOptions:\n"
+
+  on :h, :help, 'Shows this help message' do
+    puts self
+    exit
+  end
+
+  on :v, :version, 'Shows the current version' do
+    puts "ruby-lint v#{RubyLint::VERSION} on #{RUBY_DESCRIPTION}"
+    exit
+  end
+
+  on :l=, :levels=, 'The reporting levels to enable', :as => Array
+  on :p=, :presenter=, 'The presenter to use', :as => String
+  on :a=, :analysis=, 'The analysis classes to use', :as => Array
+  on :b, :benchmark, 'Enables benchmarking mode'
+  on :c=, :config=, 'Path to a custom configuration file', :as => String
+
+  run do |opts, args|
+    abort 'You must specify at least one file to analyze' if args.empty?
+
+    command = RubyLint::Command.new(opts)
+
+    begin
+      command.run(args)
+    rescue Errno::ENOENT => error
+      abort error.message
+    end
+  end
+end
+
+slop.parse

@@ -1,0 +1,474 @@
+find_header: checking for sqlite3.h... -------------------- yes
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib     -lruby-static -framework CoreFoundation  -lpthread -ldl -lobjc "
+checked program was:
+/* begin */
+1: #include "ruby.h"
+2: 
+3: int main(int argc, char **argv)
+4: {
+5:   return 0;
+6: }
+/* end */
+
+"clang -E -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe  conftest.c -o conftest.i"
+checked program was:
+/* begin */
+1: #include "ruby.h"
+2: 
+3: #include <sqlite3.h>
+/* end */
+
+--------------------
+
+find_library: checking for sqlite3_libversion_number() in -lsqlite3... -------------------- yes
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib     -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+conftest.c:13:57: error: use of undeclared identifier 'sqlite3_libversion_number'
+int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_libversion_number; return !p; }
+                                                        ^
+1 error generated.
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_libversion_number; return !p; }
+/* end */
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib     -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: extern void sqlite3_libversion_number();
+14: int t(void) { sqlite3_libversion_number(); return 0; }
+/* end */
+
+--------------------
+
+have_func: checking for rb_proc_arity()... -------------------- yes
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: int t(void) { void ((*volatile p)()); p = (void ((*)()))rb_proc_arity; return !p; }
+/* end */
+
+--------------------
+
+have_func: checking for rb_integer_pack()... -------------------- yes
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: int t(void) { void ((*volatile p)()); p = (void ((*)()))rb_integer_pack; return !p; }
+/* end */
+
+--------------------
+
+have_func: checking for sqlite3_initialize()... -------------------- yes
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+conftest.c:13:57: error: use of undeclared identifier 'sqlite3_initialize'
+int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_initialize; return !p; }
+                                                        ^
+1 error generated.
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_initialize; return !p; }
+/* end */
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: extern void sqlite3_initialize();
+14: int t(void) { sqlite3_initialize(); return 0; }
+/* end */
+
+--------------------
+
+have_func: checking for sqlite3_backup_init()... -------------------- yes
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+conftest.c:13:57: error: use of undeclared identifier 'sqlite3_backup_init'
+int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_backup_init; return !p; }
+                                                        ^
+1 error generated.
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_backup_init; return !p; }
+/* end */
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: extern void sqlite3_backup_init();
+14: int t(void) { sqlite3_backup_init(); return 0; }
+/* end */
+
+--------------------
+
+have_func: checking for sqlite3_column_database_name()... -------------------- no
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+conftest.c:13:57: error: use of undeclared identifier 'sqlite3_column_database_name'
+int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_column_database_name; return !p; }
+                                                        ^
+1 error generated.
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_column_database_name; return !p; }
+/* end */
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+Undefined symbols for architecture x86_64:
+  "_sqlite3_column_database_name", referenced from:
+      _t in conftest-dc06c1.o
+ld: symbol(s) not found for architecture x86_64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: extern void sqlite3_column_database_name();
+14: int t(void) { sqlite3_column_database_name(); return 0; }
+/* end */
+
+--------------------
+
+have_func: checking for sqlite3_enable_load_extension()... -------------------- no
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+conftest.c:13:57: error: use of undeclared identifier 'sqlite3_enable_load_extension'
+int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_enable_load_extension; return !p; }
+                                                        ^
+1 error generated.
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_enable_load_extension; return !p; }
+/* end */
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+Undefined symbols for architecture x86_64:
+  "_sqlite3_enable_load_extension", referenced from:
+      _t in conftest-1daf91.o
+ld: symbol(s) not found for architecture x86_64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: extern void sqlite3_enable_load_extension();
+14: int t(void) { sqlite3_enable_load_extension(); return 0; }
+/* end */
+
+--------------------
+
+have_func: checking for sqlite3_load_extension()... -------------------- no
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+conftest.c:13:57: error: use of undeclared identifier 'sqlite3_load_extension'
+int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_load_extension; return !p; }
+                                                        ^
+1 error generated.
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_load_extension; return !p; }
+/* end */
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+Undefined symbols for architecture x86_64:
+  "_sqlite3_load_extension", referenced from:
+      _t in conftest-5a7828.o
+ld: symbol(s) not found for architecture x86_64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: extern void sqlite3_load_extension();
+14: int t(void) { sqlite3_load_extension(); return 0; }
+/* end */
+
+--------------------
+
+have_func: checking for sqlite3_open_v2()... -------------------- yes
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+conftest.c:13:57: error: use of undeclared identifier 'sqlite3_open_v2'
+int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_open_v2; return !p; }
+                                                        ^
+1 error generated.
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_open_v2; return !p; }
+/* end */
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: extern void sqlite3_open_v2();
+14: int t(void) { sqlite3_open_v2(); return 0; }
+/* end */
+
+--------------------
+
+have_func: checking for sqlite3_prepare_v2()... -------------------- yes
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+conftest.c:13:57: error: use of undeclared identifier 'sqlite3_prepare_v2'
+int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_prepare_v2; return !p; }
+                                                        ^
+1 error generated.
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: int t(void) { void ((*volatile p)()); p = (void ((*)()))sqlite3_prepare_v2; return !p; }
+/* end */
+
+"clang -o conftest -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe conftest.c  -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib -L. -L/Users/gaurav/.rbenv/versions/2.3.0/lib  -fstack-protector -L/usr/local/lib    -lsqlite3  -lruby-static -framework CoreFoundation -lsqlite3  -lpthread -ldl -lobjc "
+checked program was:
+/* begin */
+ 1: #include "ruby.h"
+ 2: 
+ 3: /*top*/
+ 4: extern int t(void);
+ 5: int main(int argc, char **argv)
+ 6: {
+ 7:   if (argc > 1000000) {
+ 8:     printf("%p", &t);
+ 9:   }
+10: 
+11:   return 0;
+12: }
+13: extern void sqlite3_prepare_v2();
+14: int t(void) { sqlite3_prepare_v2(); return 0; }
+/* end */
+
+--------------------
+
+have_type: checking for sqlite3_int64 in sqlite3.h... -------------------- yes
+
+"clang -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe   -c conftest.c"
+checked program was:
+/* begin */
+1: #include "ruby.h"
+2: 
+3: #include <sqlite3.h>
+4: 
+5: /*top*/
+6: typedef sqlite3_int64 conftest_type;
+7: int conftestval[sizeof(conftest_type)?1:-1];
+/* end */
+
+--------------------
+
+have_type: checking for sqlite3_uint64 in sqlite3.h... -------------------- yes
+
+"clang -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/x86_64-darwin15 -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0/ruby/backward -I/Users/gaurav/.rbenv/versions/2.3.0/include/ruby-2.3.0 -I. -I/Users/gaurav/.rbenv/versions/2.3.0/include  -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE -D_DARWIN_UNLIMITED_SELECT -D_REENTRANT    -O3 -Wno-error=shorten-64-to-32  -pipe   -c conftest.c"
+checked program was:
+/* begin */
+1: #include "ruby.h"
+2: 
+3: #include <sqlite3.h>
+4: 
+5: /*top*/
+6: typedef sqlite3_uint64 conftest_type;
+7: int conftestval[sizeof(conftest_type)?1:-1];
+/* end */
+
+--------------------
+

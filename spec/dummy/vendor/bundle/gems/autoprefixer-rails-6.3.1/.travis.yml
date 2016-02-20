@@ -1,0 +1,12 @@
+sudo: false
+language: ruby
+rvm:
+  - "2.0"
+  - "2.1"
+  - "2.2"
+  - "2.3.0"
+  - jruby-21mode
+
+env:
+  - EXECJS_RUNTIME=Node
+  - EXECJS_RUNTIME=      # Rubyracer or rubyrhino depending on platform

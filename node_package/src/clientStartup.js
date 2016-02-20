@@ -1,7 +1,10 @@
 import ReactDOM from 'react-dom';
+import React from 'react';
+import Relay from 'react-relay';
 
 import createReactElement from './createReactElement';
 import handleError from './handleError';
+import ReactOnRails from './ReactOnRails';
 import isRouterResult from './isRouterResult';
 
 const REACT_ON_RAILS_COMPONENT_CLASS_NAME = 'js-react-on-rails-component';
@@ -49,6 +52,36 @@ function initializeStore(el) {
 }
 
 /**
+ * Used for client relay rendering by ReactOnRails
+ * @param el
+ */
+
+function renderRelayComponents(el) {
+  const componentName = el.getAttribute('data-component-name');
+  const domNodeId = el.getAttribute('data-dom-id');
+  const routeName = el.getAttribute('data-route');
+  const componentObj = ReactOnRails.getComponent(componentName);
+  const routeObj = ReactOnRails.getRoute(routeName);
+
+  // CONSIDER NOT RELEASING THE OPTION version
+  const { component } = componentObj;
+  const { route } = routeObj;
+
+  ReactDOM.render(
+  <Relay.RootContainer
+    Component={component}
+    route={route}
+    renderLoading={function() {
+    return  <div className="loader">
+              <span className="fa fa-spin fa-spinner"></span>
+            </div>;
+    }}
+  />,
+    document.getElementById(domNodeId)
+  );
+}
+
+/**
  * Used for client rendering by ReactOnRails
  * @param el
  */
@@ -57,6 +90,16 @@ function render(el) {
   const domNodeId = el.getAttribute('data-dom-id');
   const props = JSON.parse(el.getAttribute('data-props'));
   const trace = JSON.parse(el.getAttribute('data-trace'));
+  const expectTurboLinks = JSON.parse(el.getAttribute('data-expect-turbo-links'));
+
+  if (el.getAttribute('data-route')) {
+    forEachComponent(renderRelayComponents);
+    return;
+  }
+
+  if (!turbolinksInstalled() && expectTurboLinks) {
+    console.warn('WARNING: NO TurboLinks detected in JS, but it is in your Gemfile');
+  }
 
   try {
     const domNode = document.getElementById(domNodeId);
