@@ -272,7 +272,7 @@ module ReactOnRailsHelper
     return ReactOnRails.serverRenderRelayComponents({
       name: '#{react_component_name}',
       domNodeId: '#{dom_id}',
-      route: #{options[:route]},
+      route: '#{options[:route]}',
       trace: #{trace(options)},
       location: '#{request.fullpath}'
     })
