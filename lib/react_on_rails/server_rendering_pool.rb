@@ -48,6 +48,9 @@ module ReactOnRails
       result
     end
 
+    def self.before_render(component_name, props, prerender_options, request); ""; end
+    def self.after_render(component_name, props, prerender_options, request); ""; end
+
     class << self
       private
 

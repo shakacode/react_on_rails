@@ -189,15 +189,17 @@ module ReactOnRailsHelper
 
     wrapper_js = <<-JS
 (function() {
+#{ReactOnRails::ServerRenderingPool.before_render(react_component_name, props, options, request)}
 #{initialize_redux_stores}
   var props = #{props_string(props)};
   return ReactOnRails.serverRenderReactComponent({
-    name: '#{react_component_name}',
-    domNodeId: '#{dom_id}',
+    name: "#{react_component_name}",
+    domNodeId: "#{dom_id}",
     props: props,
     trace: #{trace(options)},
-    location: '#{request.fullpath}'
+    location: "#{request.fullpath}"
   });
+#{ReactOnRails::ServerRenderingPool.after_render(react_component_name, props, options, request)}
 })()
     JS
 
