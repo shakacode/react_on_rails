@@ -2,6 +2,7 @@
 
 # NEWS
 
+* Just added a [Projects page](PROJECTS.md). Please submit a PR with your project!
 * 3.0.3 shipped on Sunday, 2/21/2016. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v1-to-v2). [Migration steps from 2.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v2-to-v3).
   * [RubyGems](https://rubygems.org/gems/react_on_rails/versions/3.0.0.rc.2), `gem "react_on_rails", "~> 3.0.0-rc.2"`
   * [NPM](https://www.npmjs.com/package/react-on-rails), `npm i --save react-on-rails@3.0.0-rc.2`
@@ -27,6 +28,7 @@ Be sure to see:
 
 * [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 * [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial) along with the live example at [www.reactrails.com](http://www.reactrails.com).
+* [Projects](PROJECTS.md) using React on Rails. Please submit yours!
 
 ## Including your React Component in your Rails Views
 Please see [Getting Started](#getting-started) for how to set up your Rails project for React on Rails to understand how `react_on_rails` can see your ReactComponents.
@@ -459,6 +461,7 @@ Note: If you have components from react-rails you want to use, then you will nee
 + [Webpack Configuration](docs/additional_reading/webpack.md)
 + [Webpack Cookbook](https://christianalfoni.github.io/react-webpack-cookbook/index.html)
 + [Changelog](CHANGELOG.md)
++ [Projects](PROJECTS.md)
 
 ## Demos
 + [www.reactrails.com](http://www.reactrails.com) with the source at [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/).
