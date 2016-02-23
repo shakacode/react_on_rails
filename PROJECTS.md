@@ -3,6 +3,7 @@
 *Please add your project to this list.*
 
 ## Commercial Products
+* **[Blink Inc](https://www.blinkinc.com)**: Website and more built by [ShakaCode](http://www.shakacode.com).
 * **Friends and Guests**, the signature product of [ShakaCode](http://www.shakacode.com), which is a "Social Network Connecting Hosts and Guests".
 
 --------
