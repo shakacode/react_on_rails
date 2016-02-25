@@ -138,6 +138,12 @@ shared_examples "base_generator:no_server_rendering" do
     %w(client/webpack.server.rails.config.js
        client/app/bundles/HelloWorld/startup/serverRegistration.jsx).each { |file| assert_no_file(file) }
   end
+
+  it "sets server bundle js file to '' in react_on_rails initializer" do
+    assert_file("config/initializers/react_on_rails.rb") do |contents|
+      assert_match(/config.server_bundle_js_file = ""/, contents)
+    end
+  end
 end
 
 shared_examples "base_generator:server_rendering" do
@@ -175,6 +181,13 @@ shared_examples "base_generator:server_rendering" do
   it "adds therubyracer to the Gemfile" do
     assert_file("Gemfile") do |contents|
       assert_match("gem 'therubyracer', platforms: :ruby", contents)
+    end
+  end
+
+  it "sets server bundle js file to server-bundle in react_on_rails initializer" do
+    regexp = %r{config.server_bundle_js_file = "app/assets/javascripts/generated/server-bundle.js"}
+    assert_file("config/initializers/react_on_rails.rb") do |contents|
+      assert_match(regexp, contents)
     end
   end
 end
