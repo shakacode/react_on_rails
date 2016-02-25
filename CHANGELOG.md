@@ -6,7 +6,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [3.0.4] - 2016-02-25
 - Updated CHANGELOG.md to include contributors for each PR.
--	Fix config.server_bundle_js file value in generator to match generator setting of server rendering. See [#295](https://github.com/shakacode/react_on_rails/pull/282) by [aaronvb](https://github.com/aaronvb).
+-	Fix config.server_bundle_js file value in generator to match generator setting of server rendering. See [#295](https://github.com/shakacode/react_on_rails/pull/295) by [aaronvb](https://github.com/aaronvb).
 
 ## [3.0.3] - 2016-02-21
 ##### Fixed
