@@ -1,9 +1,11 @@
-import ReactOnRails from 'react-on-rails';
+import ReactOnRails from 'react-relay-on-rails';
 
 import HelloWorld from '../components/HelloWorld';
 import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 import HelloWorldES5 from '../components/HelloWorldES5';
 import HelloWorldApp from './HelloWorldApp';
+import Sample from '../components/Sample';
+import SampleRoute from '../routes/SampleRoute';
 
 import ReduxApp from './ClientReduxApp';
 import ReduxSharedStoreApp from './ClientReduxSharedStoreApp';
@@ -16,8 +18,12 @@ ReactOnRails.setOptions({
   traceTurbolinks: true
 });
 
+ReactOnRails.registerRoute({
+  SampleRoute,
+});
 ReactOnRails.register({
   HelloWorld,
+  Sample,
   HelloWorldWithLogAndThrow,
   HelloWorldES5,
   ReduxApp,
