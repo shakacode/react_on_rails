@@ -6,6 +6,8 @@ import createReactElement from './createReactElement';
 import handleError from './handleError';
 import isRouterResult from './isRouterResult';
 
+/* global ReactOnRails, Turbolinks */
+
 const REACT_ON_RAILS_COMPONENT_CLASS_NAME = 'js-react-on-rails-component';
 const REACT_ON_RAILS_STORE_CLASS_NAME = 'js-react-on-rails-store';
 
@@ -55,29 +57,50 @@ function initializeStore(el) {
  * @param el
  */
 
-function renderRelayComponents(el) {
+function renderRelayComponent(el) {
   const componentName = el.getAttribute('data-component-name');
   const domNodeId = el.getAttribute('data-dom-id');
   const routeName = el.getAttribute('data-route');
-  const componentObj = ReactOnRails.getComponent(componentName);
-  const routeObj = ReactOnRails.getRoute(routeName);
+  const props = JSON.parse(el.getAttribute('data-props'));
+  const expectTurboLinks = JSON.parse(el.getAttribute('data-expect-turbo-links'));
+  // Get the Component and Route Object
+  const { component } = ReactOnRails.getComponent(componentName);
+  const { route } = ReactOnRails.getRoute(routeName);
 
-  // CONSIDER NOT RELEASING THE OPTION version
-  const { component } = componentObj;
-  const { route } = routeObj;
+  // Add ID to route if params[:id]
+  if (props.id) {
+    route.params = {};
+    route.params.id = props.id;
+  }
 
-  ReactDOM.render(
-  <Relay.RootContainer
-    Component={component}
-    route={route}
-    renderLoading={function() {
-    return  <div className="loader">
-              <span className="fa fa-spin fa-spinner"></span>
-            </div>;
-    }}
-  />,
-    document.getElementById(domNodeId)
-  );
+  if (!turbolinksInstalled() && expectTurboLinks) {
+    console.warn('WARNING: NO TurboLinks detected in JS, but it is in your Gemfile');
+  }
+
+  try {
+    const domNode = document.getElementById(domNodeId);
+
+    if (domNode) {
+      ReactDOM.render(
+      <Relay.RootContainer
+        Component={component}
+        route={route}
+        renderLoading={ function loading() {
+          return (<div className="loader">
+                  <span className="fa fa-spin fa-spinner"></span>
+                </div>);
+        }}
+      />,
+        domNode
+      );
+    }
+  } catch (e) {
+    handleError({
+      e,
+      name,
+      serverSide: false,
+    });
+  }
 }
 
 /**
@@ -85,16 +108,17 @@ function renderRelayComponents(el) {
  * @param el
  */
 function render(el) {
+  // If route is defined render as a Relay component
+  if (el.getAttribute('data-route')) {
+    forEachComponent(renderRelayComponent);
+    return;
+  }
+
   const name = el.getAttribute('data-component-name');
   const domNodeId = el.getAttribute('data-dom-id');
   const props = JSON.parse(el.getAttribute('data-props'));
   const trace = JSON.parse(el.getAttribute('data-trace'));
   const expectTurboLinks = JSON.parse(el.getAttribute('data-expect-turbo-links'));
-
-  if (el.getAttribute('data-route')) {
-    forEachComponent(renderRelayComponents);
-    return;
-  }
 
   if (!turbolinksInstalled() && expectTurboLinks) {
     console.warn('WARNING: NO TurboLinks detected in JS, but it is in your Gemfile');
