@@ -1,3 +1,17 @@
+GIT
+  remote: git://github.com/rmosolgo/graphql-relay-ruby.git
+  revision: 7a07abf4cebd5c5ffe05cfe414d30a56db2e8570
+  specs:
+    graphql-relay (0.7.0)
+      graphql (~> 0.8)
+
+GIT
+  remote: git://github.com/rmosolgo/graphql-ruby.git
+  revision: 803097d4016454a9b817d449506c40995594833f
+  specs:
+    graphql (0.10.9)
+      parslet (~> 1.6)
+
 PATH
   remote: ../..
   specs:
@@ -56,6 +70,7 @@ GEM
     awesome_print (1.6.1)
     binding_of_caller (0.7.2)
       debug_inspector (>= 0.0.1)
+    blankslate (3.1.3)
     bootstrap-sass (3.3.6)
       autoprefixer-rails (>= 5.2.1)
       sass (>= 3.3.4)
@@ -109,6 +124,12 @@ GEM
       railties (>= 3.0.0)
     globalid (0.3.6)
       activesupport (>= 4.1.0)
+<<<<<<< 3e72b2b2e2a072256091498c21c667aaddbc91e5
+=======
+    hashie (3.4.3)
+    http-cookie (1.0.2)
+      domain_name (~> 0.5)
+>>>>>>> Use modified version of gem and update tests
     i18n (0.7.0)
     interception (0.5)
     io-like (0.3.0)
@@ -136,7 +157,13 @@ GEM
       mini_portile2 (~> 2.0.0.rc2)
     parser (2.3.0.6)
       ast (~> 2.2)
+<<<<<<< 3e72b2b2e2a072256091498c21c667aaddbc91e5
     poltergeist (1.9.0)
+=======
+    parslet (1.7.1)
+      blankslate (>= 2.0, <= 4.0)
+    poltergeist (1.8.1)
+>>>>>>> Use modified version of gem and update tests
       capybara (~> 2.1)
       cliver (~> 0.3.1)
       multi_json (~> 1.0)
@@ -295,6 +322,9 @@ DEPENDENCIES
   coffee-rails (~> 4.1.0)
   coveralls
   generator_spec
+  graphql!
+  graphql-relay!
+  hashie
   jbuilder (~> 2.0)
   jquery-rails
   launchy

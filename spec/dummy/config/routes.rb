@@ -4,6 +4,9 @@ Rails.application.routes.draw do
 
   # You can have the root of your site routed with "root"
   root "pages#index"
+  scope '/graphql' do
+    post "/", to: "graphql#create"
+  end
 
   get "client_side_hello_world" => "pages#client_side_hello_world"
   get "client_side_hello_world_shared_store" => "pages#client_side_hello_world_shared_store"
@@ -21,6 +24,7 @@ Rails.application.routes.draw do
   get "server_side_hello_world_with_options" => "pages#server_side_hello_world_with_options"
   get "server_side_redux_app_cached" => "pages#server_side_redux_app_cached"
   get "render_js" => "pages#render_js"
+  get "relay" => "pages#relay"
   get "react_router(/*all)" => "react_router#index", as: :react_router
   get "pure_component" => "pages#pure_component"
 end

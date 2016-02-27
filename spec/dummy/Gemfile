@@ -41,8 +41,10 @@ gem 'sdoc', '~> 0.4.0', group: :doc
 # Use Capistrano for deployment
 # gem 'capistrano-rails', group: :development
 
+gem 'graphql', github: 'rmosolgo/graphql-ruby'
+gem 'graphql-relay', github: 'rmosolgo/graphql-relay-ruby'
 gem "react_on_rails", path: "../.."
-
+gem 'hashie'
 gem "therubyracer"
 
 # Access an IRB console on exception pages or by using <%= console %> in views
