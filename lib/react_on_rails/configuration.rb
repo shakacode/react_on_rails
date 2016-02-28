@@ -21,6 +21,7 @@ module ReactOnRails
       server_renderer_pool_size: 1,
       server_renderer_timeout: 20,
       skip_display_none: false,
+      renderer: 'ReactOnRails::Renderer'
     )
   end
 

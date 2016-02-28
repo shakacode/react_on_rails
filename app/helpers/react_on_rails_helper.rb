@@ -232,7 +232,9 @@ module ReactOnRailsHelper
   end
 
   def create_render(react_component_name, props, options, request)
-    ReactOnRails.configuration.renderer.constantize.new(react_component_name, props, options, request)
+    require "#{ReactOnRails.configuration.renderer.split('::').map { |o| o.underscore }.join('/')}"
+    clazz = ReactOnRails.configuration.renderer.split('::').inject(Object) {|o,c| o.const_get c}
+    clazz.new(react_component_name, props, options, request)
   end
 
   def initialize_redux_stores
