@@ -20,7 +20,8 @@ module ReactOnRails
       development_mode: Rails.env.development?,
       server_renderer_pool_size: 1,
       server_renderer_timeout: 20,
-      skip_display_none: false)
+      skip_display_none: false,
+    )
   end
 
   class Configuration
@@ -28,13 +29,13 @@ module ReactOnRails
                   :trace, :development_mode,
                   :logging_on_server, :server_renderer_pool_size,
                   :server_renderer_timeout, :raise_on_prerender_error,
-                  :skip_display_none, :generated_assets_dirs
+                  :skip_display_none, :generated_assets_dirs, :renderer
 
     def initialize(server_bundle_js_file: nil, prerender: nil, replay_console: nil,
                    trace: nil, development_mode: nil,
                    logging_on_server: nil, server_renderer_pool_size: nil,
                    server_renderer_timeout: nil, raise_on_prerender_error: nil,
-                   skip_display_none: nil, generated_assets_dirs: DEFAULT_GENERATED_ASSETS_DIRS)
+                   skip_display_none: nil, generated_assets_dirs: DEFAULT_GENERATED_ASSETS_DIRS, renderer: nil)
       self.server_bundle_js_file = if File.exist?(server_bundle_js_file)
                                      server_bundle_js_file
                                    end
@@ -55,6 +56,7 @@ module ReactOnRails
       # Server rendering:
       self.server_renderer_pool_size = self.development_mode ? 1 : server_renderer_pool_size
       self.server_renderer_timeout = server_renderer_timeout # seconds
+      self.renderer = renderer if renderer
     end
   end
 end

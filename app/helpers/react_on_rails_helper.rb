@@ -185,11 +185,14 @@ module ReactOnRailsHelper
     # Make sure that we use up-to-date server-bundle
     ReactOnRails::ServerRenderingPool.reset_pool_if_server_bundle_was_modified
 
+    # Create renderer for before/after JS insertion.
+    renderer = create_render(react_component_name, props, options, request)
+
     # Since this code is not inserted on a web page, we don't need to escape props
 
     wrapper_js = <<-JS
 (function() {
-#{ReactOnRails::ServerRenderingPool.before_render(react_component_name, props, options, request)}
+#{renderer.before_render}
 #{initialize_redux_stores}
   var props = #{props_string(props)};
   return ReactOnRails.serverRenderReactComponent({
@@ -199,7 +202,7 @@ module ReactOnRailsHelper
     trace: #{trace(options)},
     location: '#{request.fullpath}'
   });
-#{ReactOnRails::ServerRenderingPool.after_render(react_component_name, props, options, request)}
+#{renderer.after_render}
 })()
     JS
 
@@ -226,6 +229,10 @@ module ReactOnRailsHelper
                                            err: err,
                                            js_code: wrapper_js)
     # rubocop:enable Style/RaiseArgs
+  end
+
+  def create_render(react_component_name, props, options, request)
+    ReactOnRails.configuration.renderer.constantize.new(react_component_name, props, options, request)
   end
 
   def initialize_redux_stores
