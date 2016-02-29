@@ -111,7 +111,6 @@ module ReactOnRails
       def copy_base_files
         base_path = "base/base/"
         %w(app/controllers/hello_world_controller.rb
-           config/initializers/react_on_rails.rb
            client/.babelrc
            client/index.jade
            client/server.js
@@ -124,7 +123,8 @@ module ReactOnRails
 
       def template_base_files
         base_path = "base/base/"
-        %w(Procfile.dev
+        %w(config/initializers/react_on_rails.rb
+           Procfile.dev
            Procfile.dev-hot
            app/views/hello_world/index.html.erb
            client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
