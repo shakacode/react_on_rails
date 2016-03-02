@@ -3,9 +3,9 @@
 # NEWS
 
 * 2016-02-28: We added a [Projects page](PROJECTS.md). Please edit the page your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors. [jbhatab](https://github.com/jbhatab) is leading an effort to ease the onboarding process for newbies with simpler project generators. See [#245](https://github.com/shakacode/react_on_rails/issues/245).
-* 3.0.5 shipped on Friday, 2/26/2016. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v1-to-v2). [Migration steps from 2.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v2-to-v3).
-  * [RubyGems](https://rubygems.org/gems/react_on_rails/versions/3.0.0.rc.2), `gem "react_on_rails", "~> 3.0.0-rc.2"`
-  * [NPM](https://www.npmjs.com/package/react-on-rails), `npm i --save react-on-rails@3.0.0-rc.2`
+* 3.0.6 shipped on Tuesday, 2016-03-01. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v1-to-v2). [Migration steps from 2.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v2-to-v3).
+  * [RubyGems](https://rubygems.org/gems/react_on_rails/)
+  * [NPM](https://www.npmjs.com/package/react-on-rails)
 * 3.0.0 Highlights:
   1. Support for ensuring JavaScript is current when running tests.
   2. Support for multiple React components with one Redux store. So you can have a header React component and different body React components talking to the same Redux store!
