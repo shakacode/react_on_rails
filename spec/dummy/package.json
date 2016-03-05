@@ -11,9 +11,15 @@
     "gulp": "cd ./client && npm run gulp",
     "test": "npm run build:test && npm run lint && rspec",
     "lint": "cd client && npm run lint",
-    "build:client": "cd client && npm run build:client",
-    "build:server": "cd client && npm run build:server",
-    "install-react-on-rails": "cd client && npm run install-react-on-rails"
+    "install-react-on-rails": "cd client && npm run install-react-on-rails",
+    "build:clean": "rm app/assets/webpack/* || true",
+    "build:production:client": "(cd client && npm run build:production:client --silent)",
+    "build:production:server": "(cd client && npm run build:production:server --silent)",
+    "build:client": "(cd client && npm run build:client --silent",
+    "build:server": "(cd client && npm run build:server --silent)",
+    "build:dev:client": "(cd client && npm run build:dev:client --silent)",
+    "build:dev:server": "(cd client && npm run build:dev:server --silent)",
+    "hot-assets": "(cd client && npm run hot-assets)"
   },
   "repository": {
     "type": "git",

@@ -1,3 +1,4 @@
+# rubocop:disable Metrics/ModuleLength
 # NOTE:
 # For any heredoc JS:
 # 1. The white spacing in this file matters!
@@ -5,6 +6,59 @@
 require "react_on_rails/prerender_error"
 
 module ReactOnRailsHelper
+  # The env_javascript_include_tag and env_stylesheet_link_tag support the usage of a webpack
+  # dev server for providing the JS and CSS assets during development mode. See
+  # https://github.com/shakacode/react-webpack-rails-tutorial/ for a working example.
+  #
+  # The key options are `static` and `hot` which specify what you want for static vs. hot. Both of
+  # these params are optional, and support either a single value, or an array.
+  #
+  # static vs. hot is picked based on whether
+  # ENV["REACT_ON_RAILS_ENV"] == "HOT"
+  #
+  #   <%= env_stylesheet_link_tag(static: 'application_static',
+  #                               hot: 'application_non_webpack',
+  #                               media: 'all',
+  #                               'data-turbolinks-track' => "reload")  %>
+  #
+  #   <!-- These do not use turbolinks, so no data-turbolinks-track -->
+  #   <!-- This is to load the hot assets. -->
+  #   <%= env_javascript_include_tag(hot: ['http://localhost:3500/vendor-bundle.js',
+  #                                        'http://localhost:3500/app-bundle.js']) %>
+  #
+  #   <!-- These do use turbolinks -->
+  #   <%= env_javascript_include_tag(static: 'application_static',
+  #                                  hot: 'application_non_webpack',
+  #                                  'data-turbolinks-track' => "reload") %>
+  #
+  # NOTE: for Turbolinks 2.x, use 'data-turbolinks-track' => true
+  # See application.html.erb for usage example
+  # https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/app%2Fviews%2Flayouts%2Fapplication.html.erb
+  def env_javascript_include_tag(args = {})
+    send_tag_method(:javascript_include_tag, args)
+  end
+
+  # Helper to set CSS assets depending on if we want static or "hot", which means from the
+  # Webpack dev server.
+  #
+  # In this example, application_non_webpack is simply a CSS asset pipeline file which includes
+  # styles not placed in the webpack build.
+  #
+  # We don't need styles from the webpack build, as those will come via the JavaScript include
+  # tags.
+  #
+  # The key options are `static` and `hot` which specify what you want for static vs. hot. Both of
+  # these params are optional, and support either a single value, or an array.
+  #
+  #   <%= env_stylesheet_link_tag(static: 'application_static',
+  #                               hot: 'application_non_webpack',
+  #                               media: 'all',
+  #                               'data-turbolinks-track' => true)  %>
+  #
+  def env_stylesheet_link_tag(args = {})
+    send_tag_method(:stylesheet_link_tag, args)
+  end
+
   # react_component_name: can be a React component, created using a ES6 class, or
   #   React.createClass, or a
   #    `generator function` that returns a React component
@@ -52,7 +106,6 @@ module ReactOnRailsHelper
 
     # Setup the page_loaded_js, which is the same regardless of prerendering or not!
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
-    turbolinks_loaded = Object.const_defined?(:Turbolinks)
 
     props = {} if props.nil?
 
@@ -60,7 +113,6 @@ module ReactOnRailsHelper
       component_name: react_component_name,
       props: props,
       trace: trace(options),
-      expect_turbolinks: turbolinks_loaded,
       dom_id: dom_id
     }
 
@@ -89,8 +141,8 @@ module ReactOnRailsHelper
     # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
     <<-HTML.html_safe
 #{component_specification_tag}
-#{rendered_output}
-#{replay_console(options) ? console_script : ''}
+    #{rendered_output}
+    #{replay_console(options) ? console_script : ''}
     HTML
   end
 
@@ -99,18 +151,34 @@ module ReactOnRailsHelper
   #
   # store_name: name of the store, corresponding to your call to ReactOnRails.registerStores in your
   #             JavaScript code.
-  # props: Ruby Hash or JSON string which contains the properties to pass to the redux storea.
-  def redux_store(store_name, props = {})
+  # props: Ruby Hash or JSON string which contains the properties to pass to the redux store.
+  # Options
+  #    defer: false -- pass as true if you wish to render this below your component.
+  def redux_store(store_name, props: {}, defer: false)
     redux_store_data = { store_name: store_name,
                          props: props }
-    @registered_stores ||= []
-    @registered_stores << redux_store_data
+    if defer
+      @registered_stores_defer_render ||= []
+      @registered_stores_defer_render << redux_store_data
+      "YOU SHOULD NOT SEE THIS ON YOUR VIEW -- Uses as a code block, like <% redux_store %> "\
+        "and not <%= redux store %>"
+    else
+      @registered_stores ||= []
+      @registered_stores << redux_store_data
+      render_redux_store_data(redux_store_data)
+    end
+  end
 
-    content_tag(:div,
-                "",
-                class: "js-react-on-rails-store",
-                style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
-                data: redux_store_data)
+  # Place this view helper (no parameters) at the end of your shared layout. This tell
+  # ReactOnRails where to client render the redux store hydration data. Since we're going
+  # to be setting up the stores in the controllers, we need to know where on the view to put the
+  # client side rendering of this hydration data, which is a hidden div with a matching class
+  # that contains a data props.
+  def redux_store_hydration_data
+    return if @registered_stores_defer_render.blank?
+    @registered_stores_defer_render.reduce("") do |accum, redux_store_data|
+      accum << render_redux_store_data(redux_store_data)
+    end.html_safe
   end
 
   def sanitized_props_string(props)
@@ -165,6 +233,14 @@ module ReactOnRailsHelper
 
   private
 
+  def render_redux_store_data(redux_store_data)
+    content_tag(:div,
+                "",
+                class: "js-react-on-rails-store",
+                style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
+                data: redux_store_data)
+  end
+
   def next_react_component_index
     @react_component_index ||= -1
     @react_component_index += 1
@@ -206,12 +282,12 @@ module ReactOnRailsHelper
     if result["hasErrors"] && raise_on_prerender_error(options)
       # We caught this exception on our backtrace handler
       # rubocop:disable Style/RaiseArgs
-      fail ReactOnRails::PrerenderError.new(component_name: react_component_name,
-                                            # Sanitize as this might be browser logged
-                                            props: sanitized_props_string(props),
-                                            err: nil,
-                                            js_code: wrapper_js,
-                                            console_messages: result["consoleReplayScript"])
+      raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
+                                             # Sanitize as this might be browser logged
+                                             props: sanitized_props_string(props),
+                                             err: nil,
+                                             js_code: wrapper_js,
+                                             console_messages: result["consoleReplayScript"])
       # rubocop:enable Style/RaiseArgs
     end
     result
@@ -227,9 +303,12 @@ module ReactOnRailsHelper
   end
 
   def initialize_redux_stores
-    return "" unless @registered_stores.present?
+    return "" unless @registered_stores.present? || @registered_stores_defer_render.present?
     declarations = "var reduxProps, store, storeGenerator;\n"
-    result = @registered_stores.each_with_object(declarations) do |redux_store_data, memo|
+
+    all_stores = (@registered_stores || []) + (@registered_stores_defer_render || [])
+
+    result = all_stores.each_with_object(declarations) do |redux_store_data, memo|
       store_name = redux_store_data[:store_name]
       props = props_string(redux_store_data[:props])
       memo << <<-JS
@@ -289,5 +368,16 @@ ReactOnRails.setStore('#{store_name}', store);
       end
     end
     [final_options, props]
+  end
+
+  def use_hot_reloading?
+    ENV["REACT_ON_RAILS_ENV"] == "HOT"
+  end
+
+  def send_tag_method(tag_method_name, args)
+    asset_type = use_hot_reloading? ? :hot : :static
+    assets = Array(args[asset_type])
+    options = args.delete_if { |key, _value| %i(hot static).include?(key) }
+    send(tag_method_name, *assets, options) unless assets.empty?
   end
 end

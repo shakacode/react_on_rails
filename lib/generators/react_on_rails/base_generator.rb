@@ -59,7 +59,7 @@ module ReactOnRails
           node_modules
 
           # Generated js bundles
-          /app/assets/javascripts/generated/*
+          /app/assets/webpack/*
         DATA
 
         if dest_file_exists?(".gitignore")
@@ -74,11 +74,11 @@ module ReactOnRails
           // DO NOT REQUIRE jQuery or jQuery-ujs in this file!
           // DO NOT REQUIRE TREE!
 
-          // CRITICAL that generated/vendor-bundle must be BEFORE bootstrap-sprockets and turbolinks
+          // CRITICAL that vendor-bundle must be BEFORE bootstrap-sprockets and turbolinks
           // since it is exposing jQuery and jQuery-ujs
 
-          //= require generated/vendor-bundle
-          //= require generated/app-bundle
+          //= require vendor-bundle
+          //= require app-bundle
 
         DATA
 
@@ -161,22 +161,26 @@ module ReactOnRails
         template("base/base/lib/tasks/assets.rake.tt", "lib/tasks/assets.rake")
       end
 
+      ASSETS_RB_APPEND = <<-DATA.strip_heredoc
+# Add client/assets/ folders to asset pipeline's search path.
+# If you do not want to move existing images and fonts from your Rails app
+# you could also consider creating symlinks there that point to the original
+# rails directories. In that case, you would not add these paths here.
+Rails.application.config.assets.paths << Rails.root.join("client", "assets", "stylesheets")
+Rails.application.config.assets.paths << Rails.root.join("client", "assets", "images")
+Rails.application.config.assets.paths << Rails.root.join("client", "assets", "fonts")
+Rails.application.config.assets.precompile += %w( server-bundle.js )
+
+# Add folder with webpack generated assets to assets.paths
+Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpack")
+      DATA
+
       def append_to_assets_initializer
-        data = <<-DATA.strip_heredoc
-          # Add client/assets/ folders to asset pipeline's search path.
-          # If you do not want to move existing images and fonts from your Rails app
-          # you could also consider creating symlinks there that point to the original
-          # rails directories. In that case, you would not add these paths here.
-          Rails.application.config.assets.paths << Rails.root.join("client", "assets", "stylesheets")
-          Rails.application.config.assets.paths << Rails.root.join("client", "assets", "images")
-          Rails.application.config.assets.paths << Rails.root.join("client", "assets", "fonts")
-          Rails.application.config.assets.precompile += %w( generated/server-bundle.js )
-        DATA
         assets_intializer = File.join(destination_root, "config/initializers/assets.rb")
         if File.exist?(assets_intializer)
-          append_to_file(assets_intializer, data)
+          append_to_file(assets_intializer, ASSETS_RB_APPEND)
         else
-          create_file(assets_intializer, data)
+          create_file(assets_intializer, ASSETS_RB_APPEND)
         end
       end
 

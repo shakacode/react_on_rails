@@ -1,3 +1,3 @@
-client: sh -c 'rm app/assets/javascripts/generated/* || true && cd client && npm run build:dev:client'
+client: sh -c 'rm app/assets/webpack/* || true && cd client && npm run build:dev:client'
 server: sh -c 'cd client && npm run build:dev:server'
-web: DISABLE_TURBOLINKS=TRUE bin/rails s
+web: DISABLE_TURBOLINKS=TRUE bin/rails s -b 0.0.0.0

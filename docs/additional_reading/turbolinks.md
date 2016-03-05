@@ -13,14 +13,15 @@ the JavaScript and stylesheets are cached by the browser, as they will still req
 1. Include the gem "turbolinks".
 1. Included the proper "track" tags when you include the javascript and stylesheet:
   ```erb
-    <%= stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track' => true %>
-    <%= javascript_include_tag 'application', 'data-turbolinks-track' => true %>
+    <%= stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track' => 'reload' %>
+    <%= javascript_include_tag 'application', 'data-turbolinks-track' => 'reload' %>
   ```
+  NOTE: for Turbolinks 2.x, use 'data-turbolinks-track' => true
 1. Add turbolinks to your `application.js` file:
    ```javascript
    //= require turbolinks
    ```
-Note, in the future, we might change to installing this via npm.
+Note, in the future, we will change to installing this via npm.
 
 ## Turbolinks 5
 Turbolinks 5 is now being supported. React on Rails will automatically detect which version of Turbolinks you are using and use the correct event handlers.

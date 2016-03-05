@@ -24,16 +24,22 @@ export default {
   /**
    * Used by components to get the hydrated store which contains props.
    * @param name
-   * @returns store with given name
+   * @param throwIfMissing Defaults to true. Set to false to have this call return undefined if
+   *        there is no store with the given name.
+   * @returns Redux Store, possibly hydrated
    */
-  getStore(name) {
+  getStore(name, throwIfMissing = true) {
     if (_stores.has(name)) {
       return _stores.get(name);
     } else {
-      const storeKeys = Array.from(_stores.keys()).join(', ');
-      console.log('storeKeys', storeKeys);
-      throw new Error(`Could not find hydrated store with name '${name}'. \
-Hydrated store names include [${storeKeys}].`);
+      if (throwIfMissing)  {
+        const storeKeys = Array.from(_stores.keys()).join(', ');
+        console.log('storeKeys', storeKeys);
+        throw new Error(`Could not find hydrated store with name '${name}'. ` +
+          `Hydrated store names include [${storeKeys}].`);
+      } else {
+        return;
+      }
     }
   },
 
@@ -47,8 +53,8 @@ Hydrated store names include [${storeKeys}].`);
       return _storeGenerators.get(name);
     } else {
       const storeKeys = Array.from(_storeGenerators.keys()).join(', ');
-      throw new Error(`Could not find store registered with name '${name}'. \
-Registered store names include [ ${storeKeys} ]. Maybe you forgot to register the store?`);
+      throw new Error(`Could not find store registered with name '${name}'. Registered store ` +
+        `names include [ ${storeKeys} ]. Maybe you forgot to register the store?`);
     }
   },
 

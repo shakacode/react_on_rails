@@ -6,6 +6,7 @@ node_package/lib/
 node_package/tests/node_modules
 node_package/webpack.config.js
 **/node_modules/**
+**/assets/webpack/**
 **/generated/**
 **/app/assets/javascripts/application.js
 **/coverage/**

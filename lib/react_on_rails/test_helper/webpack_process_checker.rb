@@ -5,27 +5,31 @@ module ReactOnRails
     class WebpackProcessChecker
       def initialize
         @printed_once = {}
+        @needs_client_compile = true
+        @needs_server_compile = Utils.server_rendering_is_enabled?
+        @wait_longer = false
       end
 
-      def running?
+      # Return true if we should keep waiting
+      # type is either client or server
+      def client_running?
         client_running = check_running_for_type("client")
-        return client_running unless Utils.server_rendering_is_enabled?
+        return false unless client_running
+      end
 
-        server_running = check_running_for_type("server")
-        fail_if_only_running_for_one_type(client_running, server_running)
+      def server_running?
+        if Utils.server_rendering_is_enabled?
+          return true if check_running_for_type("server")
+        end
+        false
+      end
 
-        client_running && server_running
+      def hot_running?
+        _response = `pgrep -fl 'babel-node +server-rails-hot.js'`
+        Utils.last_process_completed_successfully?
       end
 
       private
-
-      # We only want to do this if server rendering is enabled.
-      def fail_if_only_running_for_one_type(client_running, server_running)
-        return unless client_running ^ server_running
-        fail "\n\nError: detected webpack is not running for both types of assets:\n"\
-         "***Webpack Client Process Running?: #{client_running}\n"\
-         "***Webpack Server Process Running?: #{server_running}"
-      end
 
       def check_running_for_type(type)
         type = type.to_sym
