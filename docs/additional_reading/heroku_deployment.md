@@ -18,9 +18,9 @@ Assuming you have downloaded and installed the Heroku command-line utility and h
 heroku buildpacks:set https://github.com/heroku/heroku-buildpack-multi
 ```
 
-Heroku will now be able to use the multiple buildpacks specified in `.buildpacks`. 
+Heroku will now be able to use the multiple buildpacks specified in `.buildpacks`.
 
-Note, an alternative approach is to use the [Heroku Toolbelt to set buildpacks](https://devcenter.heroku.com/articles/using-multiple-buildpacks-for-an-app).
+For more information, see [Using Multiple Buildpacks for an App](https://devcenter.heroku.com/articles/using-multiple-buildpacks-for-an-app)
 
 ## Fresh Rails Install
 
