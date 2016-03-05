@@ -76,7 +76,8 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
     - [Client-Side Rendering vs. Server-Side Rendering](#client-side-rendering-vs-server-side-rendering)
     - [Building the Bundles](#building-the-bundles)
     - [Globally Exposing Your React Components](#globally-exposing-your-react-components)
-    - [Rails View Helpers In-Depth](#rails-view-helpers-in-depth)
+    - [ReactOnRails View Helpers API](#reactonrails-view-helpers-api)
+    - [ReactOnRails JavaScript API](#reactonrails-javascript-api)
     - [Redux](#redux)
     - [React-Router](#react-router)
 + [Generator](#generator)
@@ -221,12 +222,12 @@ Place your JavaScript code inside of the provided `client/app` folder. Use modul
 
   In general, you may want different initialization for your server rendered components.
 
-### Rails View Helpers In-Depth
+## ReactOnRails View Helpers API
 Once the bundled files have been generated in your `app/assets/javascripts/generated` folder and you have exposed your components globally, you will want to run your code in your Rails views using the included helper method.
 
 This is how you actually render the React components you exposed to `window` inside of `clientRegistration` (and `global` inside of `serverRegistration` if you are server rendering).
 
-#### react_component
+### react_component
 `react_component(component_name, options = {})`
 
 + **component_name:** Can be a React component, created using a ES6 class, or `React.createClass`, or a generator function that returns a React component.
@@ -239,7 +240,10 @@ This is how you actually render the React components you exposed to `window` ins
   + **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
 + Any other options are passed to the content tag, including the id
 
-#### redux_store
+### redux_store
+#### Controller Extension
+Include the module ReactOnRails::Controller in your controller, probably in ApplicationController. This will provide the following controller method, which you can call in your controller actions:
+
 `redux_store(store_name, props = {})`
 
 + **store_name:** A name for the store. You'll refer to this name in 2 places in your JavaScript:
@@ -247,16 +251,65 @@ This is how you actually render the React components you exposed to `window` ins
   2. In your component definition, you'll call `ReactOnRails.getStore('storeName')` to get the hydrated Redux store to attach to your components.
 + **props:**  ReactOnRails takes care of setting up the hydration of your store with props from the view.
 
-#### Generator Functions
+#### View Helper
+`redux_store_hydration_data`
+
+Place this view helper (no parameters) at the end of your shared layout. This tell ReactOnRails where to client render the redux store hydration data. Since we're going to be setting up the stores in the controllers, we need to know where on the view to put the client side rendering of this hydration data, which is a hidden div with a matching class that contains a data props.
+
+#### Redux Store Notes
+Note, you don't need to separately initialize your redux store. However, it's recommended for the two following use cases:
+
+1. You want to have multiple components that access the same store.
+2. You want to place the props to hydrate the client side stores at the very end of your HTML, so the browser can render all earlier HTML first. This is particularly useful if your props will be large.
+
+### Generator Functions
 Why would you create a function that returns a React compnent? For example, you may want the ability to use the passed-in props to initialize a redux store or setup react-router. Or you may want to return different components depending on what's in the props. ReactOnRails will automatically detect a registered generator function.
 
-#### server_render_js
+### server_render_js
 `server_render_js(js_expression, options = {})`
 
 + js_expression, like 2 + 3, and not a block of js code. If you have more than one line that needs to be executed, wrap it in an [IIFE](https://en.wikipedia.org/wiki/Immediately-invoked_function_expression). JS exceptions will be caught and console messages handled properly
 + Currently the only option you may pass is `replay_console` (boolean)
 
 This is a helper method that takes any JavaScript expression and returns the output from evaluating it. If you have more than one line that needs to be executed, wrap it in an IIFE. JS exceptions will be caught and console messages handled properly.
+
+## ReactOnRails JavaScript API
+The best source of docs is the main [ReactOnRails.js](node_package/src/ReactOnRails.js) file. Here's a quick summary. No guarantees that this won't be outdated!
+
+```js
+  /**
+   * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
+   * find you components for rendering.
+   * @param components (key is component name, value is component)
+   */
+  register(components)
+
+  /**
+   * Allows registration of store generators to be used by multiple react components on one Rails
+   * view. store generators are functions that take one arg, props, and return a store. Note that
+   * the setStore API is different in tha it's the actual store hydrated with props.
+   * @param stores (key is store name, value is the store generator)
+   */
+  registerStore(stores)
+
+  /**
+   * Allows retrieval of the store by name. This store will be hydrated by any Rails form props. 
+   * Pass optional param throwIfMissing = false if you want to use this call to get back null if the
+   * store with name is not registered.
+   * @param name
+   * @param throwIfMissing Defaults to true. Set to false to have this call return undefined if 
+   *        there is no store with the given name.
+   * @returns Redux Store, possibly hydrated
+   */
+  getStore(name, throwIfMissing = true )
+
+  /**
+   * Set options for ReactOnRails, typically before you call ReactOnRails.register
+   * Available Options:
+   * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
+   */
+  setOptions(options)
+```
 
 ## Generator
 The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating Webpack with Rails. Defaults for options are such that the default is for the flag to be off. For example, the default for `-R` is that `redux` is off, and the default of `-b` is that `skip-bootstrap` is off.
