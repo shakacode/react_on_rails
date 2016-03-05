@@ -1,8 +1,7 @@
-
 import test from 'tape';
 import StoreRegistry from '../src/StoreRegistry';
 import React from 'react';
-import { createStore } from 'redux';
+import {createStore} from 'redux';
 
 function reducer(state = {}, action) {
   return {};
@@ -18,7 +17,7 @@ function storeGenerator2(props) {
 
 test('StoreRegistry registers and retrieves generator function stores', (assert) => {
   assert.plan(2);
-  StoreRegistry.register({ storeGenerator, storeGenerator2 });
+  StoreRegistry.register({storeGenerator, storeGenerator2});
   const actual = StoreRegistry.getStoreGenerator('storeGenerator');
   const expected = storeGenerator;
   assert.deepEqual(actual, expected,
@@ -36,6 +35,18 @@ test('StoreRegistry throws error for retrieving unregistered store', (assert) =>
     'Expected an exception for calling StoreRegistry.getStoreGenerator with an invalid name.'
   );
 });
+
+test('StoreRegistry returns undefined for retrieving unregistered store, ' +
+  'passing throwIfMissing = false',
+  (assert) => {
+    assert.plan(1);
+    const actual = StoreRegistry.getStore('foobar', false);
+    const expected = undefined;
+    assert.equals(actual, expected, 'StoreRegistry.get should return undefined for missing ' +
+      'store if throwIfMissing is passed as false'
+    );
+  }
+);
 
 test('StoreRegistry getStore, setStore', (assert) => {
   assert.plan(1);
