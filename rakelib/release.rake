@@ -32,7 +32,6 @@ task :release, [:gem_version, :dry_run, :tools_install] do |_t, args|
   args_hash = args.to_hash
 
   is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
-  should_install_tools = ReactOnRails::Utils.object_to_boolean(args_hash.fetch(:tools_install, true))
 
   gem_version = args_hash.fetch(:gem_version, "")
 
