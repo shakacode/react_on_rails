@@ -2,9 +2,9 @@ Description:
 
 The react_on_rails:install generator combined with the example pull requests of
 generator runs will get you up and running efficiently. There's a fair bit of
-setup involved when ~with~ integrating Webpack with Rails. Defaults for options
+setup involved when integrating Webpack with Rails. Defaults for options
 are such that the default is for the flag to be off. For example, the default for
-`-R` is that redux is off, and the default of -b means that skip-bootstrap is off.
+`-R` is that redux is off, and the default of -b is that skip-bootstrap is off.
 
 * Redux
 
@@ -83,7 +83,7 @@ are such that the default is for the flag to be off. For example, the default fo
 * JavaScript Linters
 
     JavaScript linters are enabled by default, but can be disabled by passing the
-    --skip-js-linters flag (alias j), and those that run in Node have been add to
+    --skip-js-linters flag (alias j), and those that run in Node have been added to
     `client/package.json` under devDependencies.
 
 * Ruby Linters
