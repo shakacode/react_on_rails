@@ -19,3 +19,5 @@
 /node_modules
 
 /app/assets/webpack
+
+/spec/examples.txt
