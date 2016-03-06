@@ -121,9 +121,12 @@ feature "Pages/index after using browser's back button", :js do
   include_examples "React Component", "div#ReduxApp-react-component-0"
 end
 
-feature "React Router", :js do
+feature "React Router", js: true, driver: js_errors_driver do
   subject { page }
-  background { visit "/react_router" }
+  background do
+    visit "/"
+    click_link "React Router"
+  end
   context "/react_router" do
     it { is_expected.to have_text("Woohoo, we can use react-router here!") }
     scenario "clicking links correctly renders other pages" do

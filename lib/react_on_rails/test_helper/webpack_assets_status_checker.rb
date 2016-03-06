@@ -15,7 +15,6 @@ module ReactOnRails
       end
 
       def up_to_date?
-        # binding.pry
         return false unless assets_exist?
         all_compiled_assets.all? do |asset|
           FileUtils.uptodate?(asset, client_files)
@@ -63,7 +62,7 @@ module ReactOnRails
 
       def make_file_list(glob)
         FileList.new(glob) do |fl|
-          fl.exclude(%r{/node_modules/})
+          fl.exclude(%r{/node_modules})
           fl.exclude(".DS_Store")
           fl.exclude(".keep")
           fl.exclude("thumbs.db")

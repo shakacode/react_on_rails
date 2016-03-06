@@ -19,8 +19,22 @@ cd react_on_rails
 npm run dummy:install 
 ```
 
-## Starting the spec/dummy
+# Starting the Sample App
+
+
+## Hot Reloading of Rails Assets
 
 ```sh
-npm run local
+foreman start -f Procfile.hot
 ```
+
+## Static Loading of Rails Assets
+```sh
+foreman start -f Procfile.static
+```
+
+## Creating Assets for Tests
+```sh
+foreman start -f Procfile.spec
+```
+

@@ -4,8 +4,7 @@ module ReactOnRails
   end
 
   DEFAULT_GENERATED_ASSETS_DIRS = [
-    %w(app assets javascripts generated),
-    %w(app assets javascripts stylesheets generated)
+    %w(app assets webpack)
   ].map { |dirs| File.join(*dirs) }.freeze
 
   def self.configuration

@@ -53,8 +53,11 @@ module ReactOnRails
       def puts_max_iterations_message(loop_count)
         if loop_count == MAX_TIME_TO_WAIT
           stale_files = webpack_assets_status_checker.whats_not_up_to_date.join("\n")
-
-          puts <<-MSG
+          if stale_files.empty?
+            puts "Please check your config value for `config.generated_assets_dirs`."
+            puts "We're not finding your generated files for test runs."
+          else
+            puts <<-MSG
 
 Even though we detected the webpack watch processes are running, we found files modified that are
 not causing a rebuild of your generated files:
@@ -66,6 +69,7 @@ your webpack files: #{webpack_assets_status_checker.client_dir}
 
 To be sure, we will now rebuild your generated files.
           MSG
+          end
         end
       end
     end

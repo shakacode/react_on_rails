@@ -29,7 +29,7 @@ describe "Server Rendering" do
   end
 
   describe "reloading the server bundle" do
-    let(:server_bundle) { File.expand_path("../../../app/assets/javascripts/generated/server.js", __FILE__) }
+    let(:server_bundle) { File.expand_path("../../../app/assets/webpack/server-bundle.js", __FILE__) }
     let!(:original_bundle_text) { File.read(server_bundle) }
     before do
       ReactOnRails.configure { |config| config.development_mode = true }
