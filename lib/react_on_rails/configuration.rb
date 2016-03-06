@@ -10,7 +10,7 @@ module ReactOnRails
   def self.configuration
     @configuration ||= Configuration.new(
       generated_assets_dirs: DEFAULT_GENERATED_ASSETS_DIRS,
-      server_bundle_js_file: File.join(*%w(app assets javascripts generated server.js)),
+      server_bundle_js_file: "",
       prerender: false,
       replay_console: true,
       logging_on_server: true,

@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
 
+## [4.0.0.rc.1] - 2016-03-06
+##### Added
+- Added controller `module ReactOnRails::Controller`. Adds method `redux_store` to setup redux stores in the view.
+- Added view helper `redux_store_hydration_data` to render the props on the application's layout, near the bottom. This allows for the client hydration data to be parsed after the server rendering, which may result in a faster load time.
+- Added helpers `env_stylesheet_link_tag` and `env_javascript_include_tag` to support hot reloading Rails. See the [README.md](./README.md) for more details and see the example application in `spec/dummy`.
+
+##### Fixed
+- Lots of doc updates!
+- Improved the **spec/dummy** sample app so that it supports CSS modules, hot reloading, etc, and it can server as a template for a new ReactOnRails installation.
+
+##### Breaking Changes
+- Deprecated `redux_store` called from views. Call this method from your controller actions and place `redux_store_hydration_data` on your layout, near the bottom. 
+- Removed the config default of the `config.server_bundle_js_file`. The default is blank, meaning no server rendering.
+
+
 ## [3.0.6] - 2016-03-01
 ##### Fixed
 -	Improved errors when registered store is not found. See [#301](https://github.com/shakacode/react_on_rails/pull/301) by [justin808](https://github.com/justin808).
