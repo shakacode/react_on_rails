@@ -57,7 +57,7 @@ module ReactOnRails
       end
 
       def assets_exist?
-        all_compiled_assets.to_ary.size > 0
+        !all_compiled_assets.empty?
       end
 
       def make_file_list(glob)

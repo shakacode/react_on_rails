@@ -22,7 +22,7 @@ module ReactOnRails
       # We only want to do this if server rendering is enabled.
       def fail_if_only_running_for_one_type(client_running, server_running)
         return unless client_running ^ server_running
-        fail "\n\nError: detected webpack is not running for both types of assets:\n"\
+        raise "\n\nError: detected webpack is not running for both types of assets:\n"\
          "***Webpack Client Process Running?: #{client_running}\n"\
          "***Webpack Server Process Running?: #{server_running}"
       end
