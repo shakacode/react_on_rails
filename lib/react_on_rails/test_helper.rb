@@ -38,20 +38,39 @@ module ReactOnRails
     #                         defaults to ReactOnRails::TestHelper::WebpackProcessChecker
     # webpack_assets_compiler: provide one method: `def compile`
     #                         defaults to ReactOnRails::TestHelper::WebpackAssetsCompiler
+    # server_bundle_js_file: The server rendering file, defaulting to server_bundle_js_file in
+    #                        your config
     # client_dir and compiled_dirs are passed into the default webpack_assets_status_checker if you
     #                         don't provide one.
     def self.ensure_assets_compiled(webpack_assets_status_checker: nil,
-                                    webpack_assets_compiler: nil,
-                                    webpack_process_checker: nil,
-                                    client_dir: nil,
-                                    compiled_dirs: nil)
+      webpack_assets_compiler: nil,
+      webpack_process_checker: nil,
+      client_dir: nil,
+      compiled_dirs: nil,
+      server_bundle_js_file: nil)
 
       if webpack_assets_status_checker.nil?
         client_dir ||= Rails.root.join("client")
         compiled_dirs ||= ReactOnRails.configuration.generated_assets_dirs
+        server_bundle_js_file ||= ReactOnRails.configuration.server_bundle_js_file
+
+        if server_bundle_js_file.present?
+          dir = File.dirname(server_bundle_js_file)
+          compiled_dirs ||= []
+          compiled_dirs << dir unless compiled_dirs.include?(dir)
+        end
         webpack_assets_status_checker ||=
           WebpackAssetsStatusChecker.new(client_dir: client_dir,
-                                         compiled_dirs: compiled_dirs)
+                                         compiled_dirs: compiled_dirs,
+                                         server_bundle_js_file: server_bundle_js_file)
+
+        unless @printed_once
+          puts
+          puts "====> React On Rails: Checking dirs for outdated/missing bundles: "\
+            "#{webpack_assets_status_checker.compiled_dirs}"
+          puts
+          @printed_once = true
+        end
       end
 
       webpack_assets_compiler ||= WebpackAssetsCompiler.new
