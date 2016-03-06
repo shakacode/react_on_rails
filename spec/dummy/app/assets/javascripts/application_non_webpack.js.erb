@@ -3,5 +3,5 @@
 // b/c it exposes jQuery for turbolinks and another non-webpack JS (if any)
 
 <% if ENV["DISABLE_TURBOLINKS"].blank? %>
-//= require turbolinks
+  <% require_asset "turbolinks" %>
 <% end %>
