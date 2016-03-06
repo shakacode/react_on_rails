@@ -94,23 +94,36 @@ module ReactOnRailsHelper
     HTML
   end
 
+  # Deprecated: Use `redux_store` via including ReactOnRails::Controller in your controller and calling
+  # redux_store.
+  #
   # Separate initialization of store from react_component allows multiple react_component calls to
   # use the same Redux store.
   #
   # store_name: name of the store, corresponding to your call to ReactOnRails.registerStores in your
   #             JavaScript code.
-  # props: Ruby Hash or JSON string which contains the properties to pass to the redux storea.
+  # props: Ruby Hash or JSON string which contains the properties to pass to the redux store.
   def redux_store(store_name, props = {})
+    warn "[DEPRECATION] `redux_store` within a view is deprecated. Please move to call "\
+      "to redux store to your controller action."
     redux_store_data = { store_name: store_name,
                          props: props }
     @registered_stores ||= []
     @registered_stores << redux_store_data
 
-    content_tag(:div,
-                "",
-                class: "js-react-on-rails-store",
-                style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
-                data: redux_store_data)
+    render_redux_store_data(redux_store_data)
+  end
+
+  # Place this view helper (no parameters) at the end of your shared layout. This tell
+  # ReactOnRails where to client render the redux store hydration data. Since we're going
+  # to be setting up the stores in the controllers, we need to know where on the view to put the
+  # client side rendering of this hydration data, which is a hidden div with a matching class
+  # that contains a data props.
+  def redux_store_hydration_data
+    return if @registered_stores_via_controller.blank?
+    @registered_stores_via_controller.reduce("") do |accum, redux_store_data|
+      accum << render_redux_store_data(redux_store_data)
+    end.html_safe
   end
 
   def sanitized_props_string(props)
@@ -164,6 +177,14 @@ module ReactOnRailsHelper
   end
 
   private
+
+  def render_redux_store_data(redux_store_data)
+    content_tag(:div,
+                "",
+                class: "js-react-on-rails-store",
+                style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
+                data: redux_store_data)
+  end
 
   def next_react_component_index
     @react_component_index ||= -1
@@ -227,9 +248,12 @@ module ReactOnRailsHelper
   end
 
   def initialize_redux_stores
-    return "" unless @registered_stores.present?
+    return "" unless @registered_stores.present? || @registered_stores_via_controller.present?
     declarations = "var reduxProps, store, storeGenerator;\n"
-    result = @registered_stores.each_with_object(declarations) do |redux_store_data, memo|
+
+    all_stores = (@registered_stores || []) + (@registered_stores_via_controller || [])
+
+    result = all_stores.each_with_object(declarations) do |redux_store_data, memo|
       store_name = redux_store_data[:store_name]
       props = props_string(redux_store_data[:props])
       memo << <<-JS

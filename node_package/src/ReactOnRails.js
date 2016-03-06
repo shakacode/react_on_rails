@@ -35,15 +35,15 @@ ctx.ReactOnRails = {
   },
 
   /**
-   * Allows retrieval of the store by name. This store will be hydrated by any Rails form props. 
+   * Allows retrieval of the store by name. This store will be hydrated by any Rails form props.
    * Pass optional param throwIfMissing = false if you want to use this call to get back null if the
    * store with name is not registered.
    * @param name
-   * @param throwIfMissing Defaults to true. Set to false to have this call return undefined if 
+   * @param throwIfMissing Defaults to true. Set to false to have this call return undefined if
    *        there is no store with the given name.
    * @returns Redux Store, possibly hydrated
    */
-  getStore(name, throwIfMissing = true ) {
+  getStore(name, throwIfMissing = true) {
     return StoreRegistry.getStore(name, throwIfMissing);
   },
 

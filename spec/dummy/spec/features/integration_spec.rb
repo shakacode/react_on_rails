@@ -77,7 +77,9 @@ feature "Pages/client_side_log_throw", :js do
   subject { page }
   background { visit "/client_side_log_throw" }
 
-  scenario { is_expected.to have_text "This example demonstrates client side logging and error handling." }
+  scenario "client side logging and error handling", driver: js_errors_driver do
+    is_expected.to have_text "This example demonstrates client side logging and error handling."
+  end
 end
 
 feature "Pages/Pure Component", :js do
@@ -91,7 +93,7 @@ feature "Pages/server_side_log_throw", :js do
   subject { page }
   background { visit "/server_side_log_throw" }
 
-  scenario "page has server side throw messages" do
+  scenario "page has server side throw messages", driver: js_errors_driver do
     expect(subject).to have_text "This example demonstrates server side logging and error handling."
     expect(subject).to have_text "Exception in rendering!\n\nMessage: throw in HelloWorldContainer"
   end
@@ -173,4 +175,12 @@ end
 
 feature "2 react components, 1 store, server side", :js do
   include_examples "React Component Shared Store", "/server_side_hello_world_shared_store"
+end
+
+feature "2 react components, 1 store, client only", :js do
+  include_examples "React Component Shared Store", "/client_side_hello_world_shared_store_controller"
+end
+
+feature "2 react components, 1 store, server side", :js do
+  include_examples "React Component Shared Store", "/server_side_hello_world_shared_store_controller"
 end

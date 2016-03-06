@@ -73,6 +73,9 @@ RSpec.configure do |config|
 
   if driver == :poltergeist
     require "capybara/poltergeist"
+    Capybara.register_driver :poltergeist_errors_ok do |app|
+      Capybara::Poltergeist::Driver.new(app, js_errors: false)
+    end
   elsif driver == :selenium_chrome
     Capybara.register_driver :selenium_chrome do |app|
       Capybara::Selenium::Driver.new(app, browser: :chrome)
@@ -94,4 +97,8 @@ RSpec.configure do |config|
 
   Capybara::Screenshot.prune_strategy = { keep: 10 }
   # [END] Capybara config
+
+  def js_errors_driver
+    Capybara.javascript_driver == :poltergeist ? :poltergeist_errors_ok : Capybara.javascript_driver
+  end
 end

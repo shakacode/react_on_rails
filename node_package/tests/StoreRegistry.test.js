@@ -17,7 +17,7 @@ function storeGenerator2(props) {
 
 test('StoreRegistry registers and retrieves generator function stores', (assert) => {
   assert.plan(2);
-  StoreRegistry.register({storeGenerator, storeGenerator2});
+  StoreRegistry.register({ storeGenerator, storeGenerator2 });
   const actual = StoreRegistry.getStoreGenerator('storeGenerator');
   const expected = storeGenerator;
   assert.deepEqual(actual, expected,
