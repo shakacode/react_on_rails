@@ -68,7 +68,7 @@ RSpec.configure do |config|
   driver = ENV["DRIVER"].try(:to_sym) || default_driver
 
   unless supported_drivers.include?(driver.to_s)
-    fail "Unsupported driver: #{driver} (supported = #{supported_drivers})"
+    raise "Unsupported driver: #{driver} (supported = #{supported_drivers})"
   end
 
   if driver == :poltergeist

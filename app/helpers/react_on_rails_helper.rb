@@ -1,3 +1,4 @@
+# rubocop:disable Metrics/ModuleLength
 # NOTE:
 # For any heredoc JS:
 # 1. The white spacing in this file matters!
@@ -5,7 +6,6 @@
 require "react_on_rails/prerender_error"
 
 module ReactOnRailsHelper
-
   # The env_javascript_include_tag and env_stylesheet_link_tag support the usage of a webpack
   # dev server for providing the JS and CSS assets during development mode. See
   # https://github.com/shakacode/react-webpack-rails-tutorial/ for a working example.
@@ -279,12 +279,12 @@ module ReactOnRailsHelper
     if result["hasErrors"] && raise_on_prerender_error(options)
       # We caught this exception on our backtrace handler
       # rubocop:disable Style/RaiseArgs
-      fail ReactOnRails::PrerenderError.new(component_name: react_component_name,
-                                            # Sanitize as this might be browser logged
-                                            props: sanitized_props_string(props),
-                                            err: nil,
-                                            js_code: wrapper_js,
-                                            console_messages: result["consoleReplayScript"])
+      raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
+                                             # Sanitize as this might be browser logged
+                                             props: sanitized_props_string(props),
+                                             err: nil,
+                                             js_code: wrapper_js,
+                                             console_messages: result["consoleReplayScript"])
       # rubocop:enable Style/RaiseArgs
     end
     result

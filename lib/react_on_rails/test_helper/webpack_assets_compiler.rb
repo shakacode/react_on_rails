@@ -24,7 +24,7 @@ https://github.com/shakacode/react_on_rails/blob/master/docs/additional_reading/
 
         build_output = `cd client && npm run build:#{type}`
 
-        fail "Error in building assets!\n#{build_output}" unless Utils.last_process_completed_successfully?
+        raise "Error in building assets!\n#{build_output}" unless Utils.last_process_completed_successfully?
 
         puts "Completed building Webpack #{type}-rendering assets."
       end
