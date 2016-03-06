@@ -22,5 +22,6 @@ ReactOnRails.configure do |config|
   # Default is false, enable if your content security policy doesn't include `style-src: 'unsafe-inline'`
   config.skip_display_none = false
 
+  # Defaulting to the same directory as the server_bundle_js_file
   config.generated_assets_dirs = File.join(%w(app assets webpack))
 end

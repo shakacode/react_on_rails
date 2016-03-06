@@ -6,11 +6,12 @@ require "fileutils"
 module ReactOnRails
   module TestHelper
     class WebpackAssetsStatusChecker
-      attr_reader :client_dir, :compiled_dirs
+      attr_reader :client_dir, :compiled_dirs, :server_bundle_js_file
 
       def initialize(args = {})
         @compiled_dirs = args.fetch(:compiled_dirs)
         @client_dir = args.fetch(:client_dir)
+        @server_bundle_js_file = args.fetch(:server_bundle_js_file)
         @last_stale_files = ""
       end
 
@@ -45,7 +46,11 @@ module ReactOnRails
       end
 
       def all_compiled_assets
-        make_file_list(make_globs(compiled_dirs)).to_ary
+        file_list = make_file_list(make_globs(compiled_dirs)).to_ary
+        if file_list && !file_list.empty?
+          file_list.delete(server_bundle_js_file)
+        end
+        file_list
       end
 
       def client_files

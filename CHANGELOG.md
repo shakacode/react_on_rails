@@ -9,8 +9,10 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 - Added controller `module ReactOnRails::Controller`. Adds method `redux_store` to setup redux stores in the view.
 - Added view helper `redux_store_hydration_data` to render the props on the application's layout, near the bottom. This allows for the client hydration data to be parsed after the server rendering, which may result in a faster load time.
 - Added helpers `env_stylesheet_link_tag` and `env_javascript_include_tag` to support hot reloading Rails. See the [README.md](./README.md) for more details and see the example application in `spec/dummy`.
+- The checker for outdated bundles before running tests will default to including the directory with `server_bundle_js_file`.
 
 ##### Fixed
+- The test runner assets up to date checker might see only the server rendering file, and assume that all assets are up to date.
 - Lots of doc updates!
 - Improved the **spec/dummy** sample app so that it supports CSS modules, hot reloading, etc, and it can server as a template for a new ReactOnRails installation.
 
