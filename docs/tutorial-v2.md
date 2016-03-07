@@ -146,9 +146,10 @@ Run this command that looks like this from your new heroku app
 
     heroku git:remote -a my-name-react-on-rails
 
-Set the correct buildpack for using react-on-rails:
+Set heroku to use multiple buildpacks:
 
-    heroku buildpacks:set https://github.com/heroku/heroku-buildpack-multi
+    heroku buildpacks:set heroku/ruby
+    heroku buildpacks:add --index 1 heroku/nodejs
 
 
 ### Swap out sqlite for postgres by doing the following:
