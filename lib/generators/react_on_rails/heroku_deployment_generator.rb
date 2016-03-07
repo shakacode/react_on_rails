@@ -10,8 +10,7 @@ module ReactOnRails
 
       def copy_heroku_deployment_files
         base_path = "heroku_deployment"
-        %w(.buildpacks
-           Procfile
+        %w(Procfile
            config/puma.rb).each { |file| copy_file("#{base_path}/#{file}", file) }
       end
 
