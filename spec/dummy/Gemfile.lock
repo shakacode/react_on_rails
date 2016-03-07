@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (3.0.5)
+    react_on_rails (3.0.6)
       connection_pool
       execjs (~> 2.5)
       foreman
@@ -72,9 +72,6 @@ GEM
     capybara-screenshot (1.0.11)
       capybara (>= 1.0, < 3)
       launchy
-    capybara-webkit (1.8.0)
-      capybara (>= 2.3.0, < 2.7.0)
-      json
     childprocess (0.5.9)
       ffi (~> 1.0, >= 1.0.11)
     chromedriver-helper (1.0.0)
@@ -303,7 +300,6 @@ DEPENDENCIES
   bootstrap-sass
   capybara
   capybara-screenshot
-  capybara-webkit
   chromedriver-helper
   coffee-rails (~> 4.1.0)
   coveralls

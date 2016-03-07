@@ -1,4 +1,4 @@
-import clientStartup from './clientStartup';
+import { reactOnRailsPageLoaded, clientStartup } from './clientStartup';
 import handleError from './handleError';
 import ComponentRegistry from './ComponentRegistry';
 import StoreRegistry from './StoreRegistry';
@@ -58,6 +58,10 @@ ctx.ReactOnRails = {
    */
   getStore(name) {
     return StoreRegistry.getStore(name);
+  },
+
+  reactOnRailsPageLoaded() {
+    reactOnRailsPageLoaded();
   },
 
   ////////////////////////////////////////////////////////////////////////////////
