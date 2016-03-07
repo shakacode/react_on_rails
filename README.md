@@ -420,7 +420,7 @@ The webpack dev server with HMR will apply changes from the code (or styles!) to
   foreman start -f Procfile.dev
   ```
 
-Open your browser to [localhost:4000](http://localhost:4000). Whenever you make changes to your JavaScript code in the `client` folder, they will automatically show up in the browser. Hot module replacement is already enabled by default.
+Open your browser to [localhost:3000](http://localhost:3000). Whenever you make changes to your JavaScript code in the `client` folder, they will automatically show up in the browser. Hot module replacement is already enabled by default.
 
 Note that **React-related error messages are typically significantly more helpful when encountered in the dev server** than the Rails server as they do not include noise added by the React on Rails gem.
 
