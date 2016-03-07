@@ -85,7 +85,7 @@ You should return a React.Component always for the client side entry point.`);
   }
 }
 
-function reactOnRailsPageLoaded() {
+export function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded');
 
   forEachStore(initializeStore);
@@ -103,7 +103,7 @@ function reactOnRailsPageUnloaded() {
   forEachComponent(unmount);
 }
 
-export default function clientStartup(context) {
+export function clientStartup(context) {
   const document = context.document;
 
   // Check if server rendering
