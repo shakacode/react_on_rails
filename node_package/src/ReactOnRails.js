@@ -1,4 +1,4 @@
-import { reactOnRailsPageLoaded, clientStartup } from './clientStartup';
+import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
 import ComponentRegistry from './ComponentRegistry';
 import StoreRegistry from './StoreRegistry';
@@ -61,7 +61,7 @@ ctx.ReactOnRails = {
   },
 
   reactOnRailsPageLoaded() {
-    reactOnRailsPageLoaded();
+    ClientStartup.reactOnRailsPageLoaded();
   },
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -176,6 +176,6 @@ ctx.ReactOnRails = {
 
 ReactOnRails.resetOptions();
 
-clientStartup(ctx);
+ClientStartup.clientStartup(ctx);
 
 export default ctx.ReactOnRails;
