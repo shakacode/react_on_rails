@@ -5,7 +5,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
   describe "#up_to_date?" do
     let(:client_dir) { client_dir_for(fixture_dirname) }
     let(:compiled_js_dir) { compiled_js_dir_for(fixture_dirname) }
-    let(:server_bundle_js_file ) { File.join([compiled_js_dir, "server-bundle.js"]) }
+    let(:server_bundle_js_file) { File.join([compiled_js_dir, "server-bundle.js"]) }
     let(:compiled_sass_dir) { compiled_js_dir_for(fixture_dirname) }
     let(:compiled_dirs) { [compiled_js_dir, compiled_sass_dir] }
     let(:checker) do

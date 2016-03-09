@@ -10,6 +10,8 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 - Added view helper `redux_store_hydration_data` to render the props on the application's layout, near the bottom. This allows for the client hydration data to be parsed after the server rendering, which may result in a faster load time.
 - Added helpers `env_stylesheet_link_tag` and `env_javascript_include_tag` to support hot reloading Rails. See the [README.md](./README.md) for more details and see the example application in `spec/dummy`.
 - The checker for outdated bundles before running tests will default to including the directory with `server_bundle_js_file`.
+- Better support for Turbolinks 5!
+-	Fixed generator check of uncommitted code for foreign languages. See [#303](https://github.com/shakacode/react_on_rails/pull/303) by [nmatyukov](https://github.com/nmatyukov).
 
 ##### Fixed
 - The test runner assets up to date checker might see only the server rendering file, and assume that all assets are up to date.

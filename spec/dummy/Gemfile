@@ -68,7 +68,6 @@ end
 gem 'bootstrap-sass'
 
 group :test do
-  gem "rspec-rails"
   gem "coveralls", require: false
   gem "capybara"
   gem "capybara-screenshot"
@@ -77,5 +76,6 @@ group :test do
   gem "generator_spec"
   gem "launchy"
   gem "poltergeist"
+  gem "rspec-rails"
   gem "selenium-webdriver", require: !["poltergeist", "poltergeist_errors_ok", "webkit"].include?(ENV["DRIVER"])
 end

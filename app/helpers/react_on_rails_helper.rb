@@ -19,7 +19,7 @@ module ReactOnRailsHelper
   #   <%= env_stylesheet_link_tag(static: 'application_static',
   #                               hot: 'application_non_webpack',
   #                               media: 'all',
-  #                               'data-turbolinks-track' => true)  %>
+  #                               'data-turbolinks-track' => "reload")  %>
   #
   #   <!-- These do not use turbolinks, so no data-turbolinks-track -->
   #   <!-- This is to load the hot assets. -->
@@ -29,7 +29,9 @@ module ReactOnRailsHelper
   #   <!-- These do use turbolinks -->
   #   <%= env_javascript_include_tag(static: 'application_static',
   #                                  hot: 'application_non_webpack',
-  #                                  'data-turbolinks-track' => true) %>
+  #                                  'data-turbolinks-track' => "reload") %>
+  #
+  # NOTE: for Turbolinks 2.x, use 'data-turbolinks-track' => true
   # See application.html.erb for usage example
   # https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/app%2Fviews%2Flayouts%2Fapplication.html.erb
   def env_javascript_include_tag(args = {})
@@ -104,7 +106,6 @@ module ReactOnRailsHelper
 
     # Setup the page_loaded_js, which is the same regardless of prerendering or not!
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
-    turbolinks_loaded = Object.const_defined?(:Turbolinks)
 
     props = {} if props.nil?
 
@@ -112,7 +113,6 @@ module ReactOnRailsHelper
       component_name: react_component_name,
       props: props,
       trace: trace(options),
-      expect_turbolinks: turbolinks_loaded,
       dom_id: dom_id
     }
 

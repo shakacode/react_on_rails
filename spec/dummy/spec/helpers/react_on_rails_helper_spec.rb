@@ -54,7 +54,6 @@ describe ReactOnRailsHelper, type: :helper do
             data-component-name="App"
             data-props="{&quot;name&quot;:&quot;My Test Name&quot;}"
             data-trace="false"
-            #{turbolinks_line}
             data-dom-id="#{id}"></div>).squish
     end
 
@@ -91,7 +90,6 @@ describe ReactOnRailsHelper, type: :helper do
               data-component-name=\"App\"
               data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
               data-trace=\"false\"
-              #{turbolinks_line}
               data-dom-id=\"#{id}\"></div>".squish
       end
 
@@ -107,7 +105,6 @@ describe ReactOnRailsHelper, type: :helper do
               data-component-name=\"App\"
               data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
               data-trace=\"false\"
-              #{turbolinks_line}
               data-dom-id=\"#{id}\"></div>".squish
       end
 
@@ -165,9 +162,5 @@ describe ReactOnRailsHelper, type: :helper do
 
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
     it { is_expected.to eq hello_world }
-  end
-
-  def turbolinks_line
-    %(data-expect-turbolinks="#{ENV['DISABLE_TURBOLINKS'].present? ? 'false' : 'true'}")
   end
 end

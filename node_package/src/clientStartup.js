@@ -57,11 +57,6 @@ function render(el) {
   const domNodeId = el.getAttribute('data-dom-id');
   const props = JSON.parse(el.getAttribute('data-props'));
   const trace = JSON.parse(el.getAttribute('data-trace'));
-  const expectTurboLinks = JSON.parse(el.getAttribute('data-expect-turbo-links'));
-
-  if (!turbolinksInstalled() && expectTurboLinks) {
-    console.warn('WARNING: NO TurboLinks detected in JS, but it is in your Gemfile');
-  }
 
   try {
     const domNode = document.getElementById(domNodeId);

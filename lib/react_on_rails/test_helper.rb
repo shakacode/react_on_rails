@@ -43,11 +43,11 @@ module ReactOnRails
     # client_dir and compiled_dirs are passed into the default webpack_assets_status_checker if you
     #                         don't provide one.
     def self.ensure_assets_compiled(webpack_assets_status_checker: nil,
-      webpack_assets_compiler: nil,
-      webpack_process_checker: nil,
-      client_dir: nil,
-      compiled_dirs: nil,
-      server_bundle_js_file: nil)
+                                    webpack_assets_compiler: nil,
+                                    webpack_process_checker: nil,
+                                    client_dir: nil,
+                                    compiled_dirs: nil,
+                                    server_bundle_js_file: nil)
 
       if webpack_assets_status_checker.nil?
         client_dir ||= Rails.root.join("client")
