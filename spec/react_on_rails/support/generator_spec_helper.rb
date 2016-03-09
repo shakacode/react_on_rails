@@ -71,18 +71,6 @@ def run_generator_test_with_args(args, options = {})
   run_generator(args + ["--ignore-warnings"])
 end
 
-def assert_server_render_procfile
-  assert_file "Procfile.dev" do |contents|
-    assert_match(/\n\s*server:/, contents)
-  end
-end
-
-def assert_client_render_procfile
-  assert_file "Procfile.dev" do |contents|
-    refute_match(/\n\s*server:/, contents)
-  end
-end
-
 # Simulate having an existing file for cases where the generator needs to modify, not create, a file
 def simulate_existing_file(file, data = "some existing text\n")
   path = Pathname.new(File.join(destination_root, file))

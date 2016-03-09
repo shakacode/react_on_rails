@@ -21,18 +21,6 @@ module ReactOnRails
                    default: false,
                    desc: "Configure for server-side rendering of webpack JavaScript",
                    aliases: "-S"
-      # --skip-js-linters
-      class_option :skip_js_linters,
-                   type: :boolean,
-                   default: false,
-                   desc: "Skip installing JavaScript linting files",
-                   aliases: "-j"
-      # --ruby-linters
-      class_option :ruby_linters,
-                   type: :boolean,
-                   default: false,
-                   desc: "Install ruby linting files, tasks, and configs",
-                   aliases: "-L"
 
       def add_hello_world_route
         route "get 'hello_world', to: 'hello_world#index'"
@@ -105,23 +93,15 @@ module ReactOnRails
         base_path = "base/base/"
         %w(app/controllers/hello_world_controller.rb
            client/.babelrc
-           client/index.jade
-           client/server.js
            client/webpack.client.base.config.js
-           client/webpack.client.rails.config.js
-           REACT_ON_RAILS.md
-           client/REACT_ON_RAILS_CLIENT_README.md
-           package.json).each { |file| copy_file(base_path + file, file) }
+           client/webpack.client.rails.config.js).each { |file| copy_file(base_path + file, file) }
       end
 
       def template_base_files
         base_path = "base/base/"
         %w(config/initializers/react_on_rails.rb
-           Procfile.dev
-           Procfile.dev-hot
            app/views/hello_world/index.html.erb
            client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
-           client/webpack.client.hot.config.js
            client/package.json).each { |file| template(base_path + file + ".tt", file) }
       end
 
@@ -143,15 +123,6 @@ module ReactOnRails
            client/app/bundles/HelloWorld/startup/serverRegistration.jsx).each do |file|
           copy_file(base_path + file, file)
         end
-      end
-
-      def template_linter_files_if_appropriate
-        return if !options.ruby_linters? && options.skip_js_linters?
-        template("base/base/lib/tasks/linters.rake.tt", "lib/tasks/linters.rake")
-      end
-
-      def template_assets_rake_file
-        template("base/base/lib/tasks/assets.rake.tt", "lib/tasks/assets.rake")
       end
 
       def append_to_assets_initializer
@@ -200,12 +171,6 @@ module ReactOnRails
                 npm run rails-server
 
             - Visit http://localhost:3000/hello_world and see your React On Rails app running!
-
-            - Run the npm express-server command to load the node server with hot reloading support.
-
-                npm run express-server
-
-            - Visit http://localhost:4000 and see your React On Rails app running using the Webpack Dev server.
         MSG
         GeneratorMessages.add_info(message)
       end

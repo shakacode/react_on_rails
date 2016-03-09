@@ -3,7 +3,6 @@
   "name": "react-webpack-rails-tutorial",
   "version": "1.1.0",
   "description": "Built using the react_on_rails generator.",
-  "main": "server.js",
   "engines": {
     "node": "5.0.0",
     "npm": "3.5.0"
@@ -25,16 +24,10 @@
   },
   "homepage": "https://github.com/shakacode/react-webpack-rails-tutorial",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js",
     "build:client": "NODE_ENV=production webpack --config webpack.client.rails.config.js",
     "build:server": "NODE_ENV=production webpack --config webpack.server.rails.config.js",
     "build:dev:client": "webpack -w --config webpack.client.rails.config.js",
-    "build:dev:server": "webpack -w --config webpack.server.rails.config.js"<% unless options.skip_js_linters? -%>,
-    "lint": "npm run eslint && npm run jscs",
-    "eslint": "eslint --ext .js,.jsx .",
-    "jscs": "jscs --verbose ."
-    <%- end -%>
+    "build:dev:server": "webpack -w --config webpack.server.rails.config.js"
   },
   "dependencies": {
     "autoprefixer": "^6.3.2",
@@ -73,25 +66,10 @@
     "webpack": "^1.12.13"
   },
   "devDependencies": {
-    <%- unless options.skip_js_linters? -%>
-    "babel-eslint": "^5.0.0-beta8",
-    <%- end -%>
     "babel-plugin-react-transform": "^2.0.0",
     "css-loader": "^0.23.1",
-    <%- unless options.skip_js_linters? -%>
-    "eslint": "^1.10.3",
-    "eslint-config-airbnb": "^5.0.0",
-    "eslint-config-shakacode": "^1.0.0",
-    "eslint-plugin-react": "^3.16.1",
-    <%- end -%>
-    "express": "^4.13.4",
     "file-loader": "^0.8.5",
-    "jade": "^1.11.0",
-    <%- unless options.skip_js_linters? -%>
-    "jscs": "^2.9.0",
-    <%- end -%>
     "node-sass": "^3.4.2",
-    "react-transform-hmr": "^1.0.2",
     "sass-loader": "^3.1.2",
     "style-loader": "^0.13.0",
     "url-loader": "^0.5.7",
