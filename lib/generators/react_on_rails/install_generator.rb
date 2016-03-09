@@ -40,12 +40,6 @@ module ReactOnRails
                    default: false,
                    desc: "Install files necessary for deploying to Heroku. Default: false",
                    aliases: "-H"
-      # --skip-bootstrap
-      class_option :skip_bootstrap,
-                   type: :boolean,
-                   default: false,
-                   desc: "Skip integrating Bootstrap and don't initialize files and regarding configs. Default: false",
-                   aliases: "-b"
 
       # --ignore-warnings
       class_option :ignore_warnings,
@@ -79,7 +73,6 @@ module ReactOnRails
         invoke "react_on_rails:js_linters" unless options.skip_js_linters?
         invoke "react_on_rails:ruby_linters" if options.ruby_linters?
         invoke "react_on_rails:heroku_deployment" if options.heroku_deployment?
-        invoke "react_on_rails:bootstrap" unless options.skip_bootstrap?
       end
 
       # NOTE: other requirements for existing files such as .gitignore or application.

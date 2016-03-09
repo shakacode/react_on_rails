@@ -32,7 +32,7 @@ shared_examples "base_generator:base" do |options|
       // DO NOT REQUIRE jQuery or jQuery-ujs in this file!
       // DO NOT REQUIRE TREE!
 
-      // CRITICAL that generated/vendor-bundle must be BEFORE bootstrap-sprockets and turbolinks
+      // CRITICAL that generated/vendor-bundle must be BEFORE turbolinks
       // since it is exposing jQuery and jQuery-ujs
 
       //= require generated/vendor-bundle

@@ -14,6 +14,3 @@ example_type_data:
   -
     name: heroku-deployment
     generator_options: --heroku-deployment
-  -
-    name: skip-bootstrap
-    generator_options: --skip-bootstrap

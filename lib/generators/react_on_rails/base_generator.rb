@@ -34,13 +34,6 @@ module ReactOnRails
                    desc: "Install ruby linting files, tasks, and configs",
                    aliases: "-L"
 
-      # --skip-bootstrap
-      class_option :skip_bootstrap,
-                   type: :boolean,
-                   default: false,
-                   desc: "Skip integrating Bootstrap and don't initialize files and regarding configs",
-                   aliases: "-b"
-
       def add_hello_world_route
         route "get 'hello_world', to: 'hello_world#index'"
       end
@@ -74,7 +67,7 @@ module ReactOnRails
           // DO NOT REQUIRE jQuery or jQuery-ujs in this file!
           // DO NOT REQUIRE TREE!
 
-          // CRITICAL that generated/vendor-bundle must be BEFORE bootstrap-sprockets and turbolinks
+          // CRITICAL that generated/vendor-bundle must be BEFORE turbolinks
           // since it is exposing jQuery and jQuery-ujs
 
           //= require generated/vendor-bundle
