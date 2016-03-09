@@ -123,7 +123,6 @@ describe InstallGenerator, type: :generator do
               npm run rails-server
 
           - Visit http://localhost:3000/hello_world and see your React On Rails app running!
-
         MSG
       expect(GeneratorMessages.output)
         .to include(GeneratorMessages.format_info(expected))
