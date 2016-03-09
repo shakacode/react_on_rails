@@ -6,7 +6,7 @@
   "plugins": ["prism", "-highlight", "github"],
   "pluginsConfig": {
     "github": {
-      "url": "https://github.com/shakacode/react_on_rails/"
+      "url": "https://github.com/shakacode/react_on_rails/tree/feature/generator-rewrite"
     }
   }
 }
