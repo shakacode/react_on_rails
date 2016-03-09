@@ -8,12 +8,9 @@ gemspec
 # bundle install from a single Gemfile. Therefore, all gems that we will need for any dummy/example
 # app have to be manually added to this file.
 gem "bootstrap-sass"
-gem "chromedriver-helper"
 gem "coffee-rails", "~> 4.1.0"
 gem "jbuilder", "~> 2.0"
 gem "jquery-rails"
-gem "launchy"
-gem "poltergeist"
 gem "puma"
 gem "rails", "4.2.5"
 gem "rails_12factor"
@@ -35,12 +32,10 @@ gem "web-console", "~> 2.0", group: :development
 
 # below are copied from spec/dummy/Gemfile
 gem "rspec-rails"
-gem "coveralls", require: false
 gem "capybara"
 gem "capybara-screenshot"
 gem "capybara-webkit"
 gem "chromedriver-helper"
-gem "generator_spec"
 gem "launchy"
 gem "poltergeist"
 gem "selenium-webdriver"
