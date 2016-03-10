@@ -291,23 +291,6 @@ The generator has amended the folders created in `client/assets/` to Rails's ass
 
 Alternatively, if you have many existing assets and don't wish to move them, you could consider creating symlinks from client/assets that point to your Rails assets folders inside of `app/assets/`. The assets there will then be visible to both Rails and webpack.
 
-## Migrate From react-rails
-If you are using [react-rails](https://github.com/reactjs/react-rails) in your project, it is pretty simple to migrate to [react_on_rails](https://github.com/shakacode/react_on_rails).
-
-- Remove the 'react-rails' gem from your Gemfile.
-
-- Remove the generated lines for react-rails in your application.js file.
-
-```
-//= require react
-//= require react_ujs
-//= require components
-```
-
-- Follow our getting started guide: https://github.com/shakacode/react_on_rails#getting-started.
-
-Note: If you have components from react-rails you want to use, then you will need to port them into react_on_rails which uses webpack instead of the asset pipeline.
-
 ## Additional Reading
 + [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 + [Babel](docs/additional_reading/babel.md)
