@@ -48,8 +48,8 @@ module ReactOnRails
 
       def invoke_generators
         invoke "react_on_rails:base"
-        invoke "react_on_rails:react_no_redux" unless options.redux?
-        invoke "react_on_rails:react_with_redux" if options.redux?
+        invoke "react_on_rails:react_no_redux_bundle" unless options.redux?
+        invoke "react_on_rails:react_with_redux_bundle" if options.redux?
       end
 
       # NOTE: other requirements for existing files such as .gitignore or application.
