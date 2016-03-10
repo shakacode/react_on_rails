@@ -29,5 +29,6 @@
     "url": "https://github.com/shakacode/react-webpack-rails-tutorial/issues"
   },
   "homepage": "https://github.com/shakacode/react-webpack-rails-tutorial",
-  "dependencies": {}
+  "dependencies": {},
+  "cacheDirectories": ["node_modules", "client/node_modules"]
 }
