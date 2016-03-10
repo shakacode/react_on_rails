@@ -11,6 +11,6 @@
    * [Bootstrap](docs/how-tos/bootstrap.md)
    * [Linters](docs/how-tos/linters.md)
    * [Webpack Dev Server](docs/how-tos/webpack_dev_server.md)
-   * Migrate From react-rails
+   * [Migrate From react-rails](docs/how-tos/migrate_from_react-rails.md)
 * [Change Log](docs/changelog.md)
 
