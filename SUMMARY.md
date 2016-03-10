@@ -10,6 +10,6 @@
 * ["How-to" Articles](docs/how-tos/README.md)
    * [Bootstrap](docs/how-tos/bootstrap.md)
    * [Linters](docs/how-tos/linters.md)
-   * Webpack Dev Server
+   * [Webpack Dev Server](docs/how-tos/webpack_dev_server.md)
 * [Change Log](docs/changelog.md)
 
