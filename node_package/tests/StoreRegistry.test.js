@@ -1,7 +1,7 @@
 import test from 'tape';
 import StoreRegistry from '../src/StoreRegistry';
 import React from 'react';
-import {createStore} from 'redux';
+import { createStore } from 'redux';
 
 function reducer(state = {}, action) {
   return {};
