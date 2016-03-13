@@ -57,7 +57,7 @@ Visit http://localhost:4000 and see your React On Rails app running using the We
 
 With this setup, you can make changes to your JS or CSS and the browser will hot reload the changes (no page refresh required).
 
-I'm going to add this line to:
+I'm going to add this line to client/app/bundles/HelloWorld/HelloWorldWidget.jsx:
 
 ```html
 <h1>Welcome to React On Rails!</h1>
