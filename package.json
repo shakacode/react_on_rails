@@ -46,7 +46,6 @@
   "scripts": {
     "test": "node_package/scripts/test",
     "clean": "node_package/scripts/clean",
-    "symlink-node-package": "node_package/scripts/symlink-node-package",
     "prepublish": "npm run build",
     "build": "node_package/scripts/build",
     "build-watch": "$(npm bin)/babel --watch --out-dir node_package/lib node_package/src",
