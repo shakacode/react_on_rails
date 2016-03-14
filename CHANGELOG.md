@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
 
-## [4.0.0.rc.1] - 2016-03-06
+## [4.0.0.beta.3] - 2016-03-14
 ##### Added
 - Added controller `module ReactOnRails::Controller`. Adds method `redux_store` to setup redux stores in the view.
 - Added option `defer: true` for view helper `redux_store`. This allows the view helper to specify the props for store hydration, yet still render the props at the bottom of the view.
@@ -16,10 +16,12 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 - Added several parameters used for ensuring webpack assets are built for running tests:
   - `config.generated_assets_dir`: Directory where your generated webpack assets go. You can have only **one** directory for this.
   - `config.webpack_generated_files`: List of files that will get created in the `generated_assets_dir`. The test runner helper will ensure these generated files are newer than any of the files in the client directory.
+
 ##### Changed
  - Generator default for webpack generated assets is now `app/assets/webpack` as we use this for both JavaScript and CSS generated assets.
+ - 
 ##### Fixed
-- The test runner assets up to date checker is greatly improved.
+- The test runner "assets up to date checker" is greatly improved.
 - Lots of doc updates!
 - Improved the **spec/dummy** sample app so that it supports CSS modules, hot reloading, etc, and it can server as a template for a new ReactOnRails installation.
 
@@ -217,7 +219,8 @@ Best done with Object destructing:
 
 ##### Fixed
 - Fix several generator related issues.
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/3.0.6...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/4.0.0.beta.3...master
+[4.0.0.beta.3]: https://github.com/shakacode/react_on_rails/compare/3.0.6...4.0.0.beta.3
 [3.0.6]: https://github.com/shakacode/react_on_rails/compare/3.0.5...3.0.6
 [3.0.5]: https://github.com/shakacode/react_on_rails/compare/3.0.4...3.0.5
 [3.0.4]: https://github.com/shakacode/react_on_rails/compare/3.0.3...3.0.4
