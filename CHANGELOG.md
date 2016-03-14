@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
 
+## [3.0.6] - 2016-03-01
+##### Fixed
+-	Improved errors when registered store is not found. See [#301](https://github.com/shakacode/react_on_rails/pull/301) by [justin808](https://github.com/justin808).
+
 ## [3.0.5] - 2016-02-26
 ##### Fixed
 -	Fixed error in linters rake file for generator. See [#299](https://github.com/shakacode/react_on_rails/pull/299) by [mpugach](https://github.com/mpugach).
@@ -188,7 +192,8 @@ Best done with Object destructing:
 
 ##### Fixed
 - Fix several generator related issues.
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/3.0.5...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/3.0.6...master
+[3.0.6]: https://github.com/shakacode/react_on_rails/compare/3.0.5...3.0.6
 [3.0.5]: https://github.com/shakacode/react_on_rails/compare/3.0.4...3.0.5
 [3.0.4]: https://github.com/shakacode/react_on_rails/compare/3.0.3...3.0.4
 [3.0.3]: https://github.com/shakacode/react_on_rails/compare/3.0.2...3.0.3

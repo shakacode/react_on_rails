@@ -11,15 +11,14 @@ It will be automatically converted to a valid npm semver by the rake task
 for the node package version. This only makes a difference for pre-release
 versions such as `3.0.0.beta.1` (npm version would be `3.0.0-beta.1`).
 
-This task will also globally install gem-release (ruby gem) and
-release-it (node package) unless you specify skip installing tools.
+This task depends on the gem-release (ruby gem) and release-it (node package)
+which are installed via `bundle install` and `npm install`
 
 1st argument: The new version in rubygem format (no dashes). Pass no argument to
               automatically perform a patch version bump.
 2nd argument: Perform a dry run by passing 'true' as a second argument.
-3rd argument: Skip installing tools by passing 'false' as a third argument (default is true).
 
-Example: `rake release[2.1.0,false,false]`")
+Example: `rake release[2.1.0,false]`")
 
 task :release, [:gem_version, :dry_run, :tools_install] do |_t, args|
   class MessageHandler
@@ -33,7 +32,6 @@ task :release, [:gem_version, :dry_run, :tools_install] do |_t, args|
   args_hash = args.to_hash
 
   is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
-  should_install_tools = ReactOnRails::Utils.object_to_boolean(args_hash.fetch(:tools_install, true))
 
   gem_version = args_hash.fetch(:gem_version, "")
 
@@ -47,7 +45,7 @@ task :release, [:gem_version, :dry_run, :tools_install] do |_t, args|
   Rake::Task["examples:clobber"].invoke
 
   # See https://github.com/svenfuchs/gem-release
-  sh_in_dir(gem_root, "gem install gem-release") if should_install_tools
+  sh_in_dir(gem_root, "git pull --rebase")
   sh_in_dir(gem_root, "gem bump --no-commit #{gem_version.strip.empty? ? '' : %(--version #{gem_version})}")
 
   # Update dummy app's Gemfile.lock
@@ -56,11 +54,8 @@ task :release, [:gem_version, :dry_run, :tools_install] do |_t, args|
   # Stage changes so far
   sh_in_dir(gem_root, "git add .")
 
-  # See https://www.npmjs.com/package/release-it
-  sh %(npm install release-it -g) if should_install_tools
-
   # Will bump the npm version, commit, tag the commit, push to repo, and release on npm
-  release_it_command = "release-it --non-interactive --npm.publish"
+  release_it_command = "$(npm bin)/release-it --non-interactive --npm.publish"
   release_it_command << " --dry-run --verbose" if is_dry_run
   release_it_command << " #{npm_version}" unless npm_version.strip.empty?
   sh_in_dir(gem_root, release_it_command)

@@ -22,7 +22,7 @@ export default {
   },
 
   /**
-   * Used by components to get the store which contains props (hydrated store).
+   * Used by components to get the hydrated store which contains props.
    * @param name
    * @returns store with given name
    */
@@ -32,7 +32,7 @@ export default {
     } else {
       const storeKeys = Array.from(_stores.keys()).join(', ');
       console.log('storeKeys', storeKeys);
-      throw new Error(`Could not find store with name ${name}.\
+      throw new Error(`Could not find hydrated store with name '${name}'. \
 Hydrated store names include [${storeKeys}].`);
     }
   },
@@ -47,7 +47,7 @@ Hydrated store names include [${storeKeys}].`);
       return _storeGenerators.get(name);
     } else {
       const storeKeys = Array.from(_storeGenerators.keys()).join(', ');
-      throw new Error(`Could not find store registered with name ${name}. \
+      throw new Error(`Could not find store registered with name '${name}'. \
 Registered store names include [ ${storeKeys} ]. Maybe you forgot to register the store?`);
     }
   },
