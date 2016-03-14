@@ -127,7 +127,7 @@ Completed all linting
 
 It's super important to exclude certain directories from RubyMine or else it will slow to a crawl as it tries to parse all the npm files.
 
-* `app/assets/javascripts/generated`
+* `app/assets/webpack`
 * `client/node_modules`
 
 <img src="http://forum.shakacode.com/uploads/default/original/1X/a1b3e1146d86915f7d5d1c89548e81ec208458cc.png" width="338" height="500">

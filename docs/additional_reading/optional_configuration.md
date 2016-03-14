@@ -10,7 +10,7 @@ ReactOnRails.configure do |config|
   # Client bundles are configured in application.js
   # Server bundle is a single file for all server rendering of components.
   # Set the server_bundle_js_file to "" if you know that you will not be server rendering.
-  config.server_bundle_js_file = "app/assets/javascripts/generated/server.js" # This is the default
+  config.server_bundle_js_file = "server-bundle.js" # This is the default
 
   # Below options can be overriden by passing to the helper method.
   config.prerender = false # default is false

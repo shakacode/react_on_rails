@@ -13,9 +13,11 @@ You can pass an RSpec metatag as an optional second parameter to this helper met
 
 Please take note of the following:
 - This utility assumes your build tasks for the static generated files are `npm run build:client` and `npm run build:server` and do not have the `--watch` option enabled.
-- By default, the webpack processes look for the `app/assets/javascripts/generated` and `app/assets/stylesheets/generated` folders. If these folders are missing, are empty, or contain files with `mtime`s older than any of the files in your `client` folder, the helper will recompile your assets. You can override this inside of `config/initializers/react_on_rails.rb` by passing an array of filepaths (relative to the root of the app) to the `generated_assets_dirs` configuration option.
+- By default, the webpack processes look for the `app/assets/webpack` folders. If this folder is missing, is empty, or contains files with `mtime`s older than any of the files in your `client` folder, the helper will recompile your assets. You can override this inside of `config/initializers/react_on_rails.rb` by passing a filepath (relative to the root of the app) to the `generated_assets_dir` configuration option.
 
 If you want to speed up the re-compiling process, you can call `npm run build:dev:client` (and `npm run build:dev:server` if doing server rendering) to have webpack run in "watch" mode and recompile these files in the background, which will be much faster when making incremental changes than compiling from scratch.
+
+[spec/dummy](../../spec/dummy) contains examples of how to set the proc files for this purpose.
 
 If you want to use a testing framework other than RSpec, please submit let us know on the changes you need to do and we'll update the docs.
 

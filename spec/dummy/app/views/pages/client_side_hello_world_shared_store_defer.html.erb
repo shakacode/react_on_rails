@@ -1,5 +1,7 @@
 <%= render "header" %>
-<%= redux_store("SharedReduxStore", props: @app_props_server_render) %>
+<!-- defer will make this not render the HTML at the top but at the bottom, per application.html.erb -->
+YO
+<% redux_store("SharedReduxStore", props: @app_props_server_render, defer: true) %>
 
 <%= react_component("ReduxSharedStoreApp", prerender: false, trace: true) %>
 <hr/>

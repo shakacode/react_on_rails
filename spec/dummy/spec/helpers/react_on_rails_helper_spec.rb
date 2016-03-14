@@ -113,7 +113,7 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#redux_store" do
-    subject { redux_store("reduxStore", props) }
+    subject { redux_store("reduxStore", props: props) }
 
     let(:props) do
       { name: "My Test Name" }

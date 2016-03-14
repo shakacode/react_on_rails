@@ -43,7 +43,7 @@ See the next section for a sample webpack.server.rails.config.js.
   ```javascript
   entry: ['./app/startup/serverRegistration'],
   ```
-3. Ensure the name of your ouput file (shown [here](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/webpack.server.rails.config.js#L9)) of your server bundle corresponds to the configuration of the gem. The default path is `app/assets/javascripts/generated`. See below for customization of configuration variables.
+3. Ensure the name of your ouput file (shown [here](https://github.com/shakacode/react-webpack-rails-tutorial/blob/537c985dc82faee333d80509343ca32a3965f9dd/client/webpack.server.rails.config.js#L9)) of your server bundle corresponds to the configuration of the gem. The default path is `app/assets/webpack`. See below for customization of configuration variables.
 4. Expose `React` in your webpack config, like [this](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.server.rails.build.config.js#L54-L55)
 
 ```javascript
@@ -65,7 +65,7 @@ module.exports = {
   entry: ['./app/startup/serverRegistration'],
   output: {
     filename: 'server-bundle.js',
-    path: '../app/assets/javascripts/generated',
+    path: '../app/assets/webpack',
 
     // CRITICAL to set libraryTarget: 'this' for enabling Rails to find the exposed modules IF you
     //   use the "expose" webpackfunctionality. See startup/serverRegistration.jsx.

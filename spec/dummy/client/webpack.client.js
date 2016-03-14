@@ -10,7 +10,7 @@ module.exports = {
     'startup/clientRegistration',
   ],
   output: {
-    path: '../app/assets/javascripts/generated',
+    path: '../app/assets/webpack',
     filename: 'client.js',
   },
   resolve: {

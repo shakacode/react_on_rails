@@ -174,7 +174,7 @@ cd client && npm i --saveDev react-on-rails
 That will install the latest version and update your package.json.
 
 ## How it Works
-The generator installs your webpack files in the `client` folder. Foreman uses webpack to compile your code and output the bundled results to `app/assets/javascripts/generated`, which are then loaded by sprockets. These generated bundle files have been added to your `.gitignore` for your convenience.
+The generator installs your webpack files in the `client` folder. Foreman uses webpack to compile your code and output the bundled results to `app/assets/webpack`, which are then loaded by sprockets. These generated bundle files have been added to your `.gitignore` for your convenience.
 
 Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the react component helper. You can also initialize a Redux store with view helper `redux_store` so that the store can be shared amongst multiple React components. Your best bet is to scan the code inside of the [/spec/dummy](spec/dummy) sample app.
 
@@ -225,7 +225,7 @@ Place your JavaScript code inside of the provided `client/app` folder. Use modul
   In general, you may want different initialization for your server rendered components.
 
 ## ReactOnRails View Helpers API
-Once the bundled files have been generated in your `app/assets/javascripts/generated` folder and you have exposed your components globally, you will want to run your code in your Rails views using the included helper method.
+Once the bundled files have been generated in your `app/assets/webpack` folder and you have exposed your components globally, you will want to run your code in your Rails views using the included helper method.
 
 This is how you actually render the React components you exposed to `window` inside of `clientRegistration` (and `global` inside of `serverRegistration` if you are server rendering).
 
@@ -576,6 +576,11 @@ Note: If you have components from react-rails you want to use, then you will nee
   bundle && npm i
   foreman start
   ```
+
+## Dependencies
++ Ruby 2.1 or greater
++ Rails 3.2 or greater
++ Node 5.5 or great
 
 ## Contributing
 Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant Code of Conduct](docs/code_of_conduct.md)).

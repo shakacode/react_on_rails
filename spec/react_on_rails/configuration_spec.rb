@@ -8,7 +8,7 @@ module ReactOnRails
         config.prerender = false
       end
 
-      expect(ReactOnRails.configuration.server_bundle_js_file).to eq("client/dist/server.js")
+      expect(ReactOnRails.configuration.server_bundle_js_file).to eq("server.js")
       expect(ReactOnRails.configuration.prerender).to eq(false)
     end
 
@@ -18,7 +18,7 @@ module ReactOnRails
         config.prerender = true
       end
 
-      expect(ReactOnRails.configuration.server_bundle_js_file).to eq("client/dist/something.js")
+      expect(ReactOnRails.configuration.server_bundle_js_file).to eq("something.js")
       expect(ReactOnRails.configuration.prerender).to eq(true)
     end
 
