@@ -146,24 +146,27 @@ module ReactOnRailsHelper
     HTML
   end
 
-  # Deprecated: Use `redux_store` via including ReactOnRails::Controller in your controller and calling
-  # redux_store.
-  #
   # Separate initialization of store from react_component allows multiple react_component calls to
   # use the same Redux store.
   #
   # store_name: name of the store, corresponding to your call to ReactOnRails.registerStores in your
   #             JavaScript code.
   # props: Ruby Hash or JSON string which contains the properties to pass to the redux store.
-  def redux_store(store_name, props = {})
-    warn "[DEPRECATION] `redux_store` within a view is deprecated. Please move to call "\
-      "to redux store to your controller action."
+  # Options
+  #    defer: false -- pass as true if you wish to render this below your component.
+  def redux_store(store_name, props: {}, defer: false)
     redux_store_data = { store_name: store_name,
                          props: props }
-    @registered_stores ||= []
-    @registered_stores << redux_store_data
-
-    render_redux_store_data(redux_store_data)
+    if defer
+      @registered_stores_defer_render ||= []
+      @registered_stores_defer_render << redux_store_data
+      "YOU SHOULD NOT SEE THIS ON YOUR VIEW -- Uses as a code block, like <% redux_store %> "\
+        "and not <%= redux store %>"
+    else
+      @registered_stores ||= []
+      @registered_stores << redux_store_data
+      render_redux_store_data(redux_store_data)
+    end
   end
 
   # Place this view helper (no parameters) at the end of your shared layout. This tell
@@ -172,8 +175,8 @@ module ReactOnRailsHelper
   # client side rendering of this hydration data, which is a hidden div with a matching class
   # that contains a data props.
   def redux_store_hydration_data
-    return if @registered_stores_via_controller.blank?
-    @registered_stores_via_controller.reduce("") do |accum, redux_store_data|
+    return if @registered_stores_defer_render.blank?
+    @registered_stores_defer_render.reduce("") do |accum, redux_store_data|
       accum << render_redux_store_data(redux_store_data)
     end.html_safe
   end
@@ -300,10 +303,10 @@ module ReactOnRailsHelper
   end
 
   def initialize_redux_stores
-    return "" unless @registered_stores.present? || @registered_stores_via_controller.present?
+    return "" unless @registered_stores.present? || @registered_stores_defer_render.present?
     declarations = "var reduxProps, store, storeGenerator;\n"
 
-    all_stores = (@registered_stores || []) + (@registered_stores_via_controller || [])
+    all_stores = (@registered_stores || []) + (@registered_stores_defer_render || [])
 
     result = all_stores.each_with_object(declarations) do |redux_store_data, memo|
       store_name = redux_store_data[:store_name]

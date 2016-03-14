@@ -22,7 +22,7 @@ shared_examples "base_generator:base" do |options|
       node_modules
 
       # Generated js bundles
-      /app/assets/javascripts/generated/*
+      /app/assets/webpack/*
     MATCH
     assert_file ".gitignore", match
   end
@@ -32,11 +32,11 @@ shared_examples "base_generator:base" do |options|
       // DO NOT REQUIRE jQuery or jQuery-ujs in this file!
       // DO NOT REQUIRE TREE!
 
-      // CRITICAL that generated/vendor-bundle must be BEFORE bootstrap-sprockets and turbolinks
+      // CRITICAL that vendor-bundle must be BEFORE bootstrap-sprockets and turbolinks
       // since it is exposing jQuery and jQuery-ujs
 
-      //= require generated/vendor-bundle
-      //= require generated/app-bundle
+      //= require vendor-bundle
+      //= require app-bundle
 
     MATCH
     assert_file("app/assets/javascripts/application.js") do |contents|
@@ -185,7 +185,7 @@ shared_examples "base_generator:server_rendering" do
   end
 
   it "sets server bundle js file to server-bundle in react_on_rails initializer" do
-    regexp = %r{config.server_bundle_js_file = "app/assets/javascripts/generated/server-bundle.js"}
+    regexp = %r{config.server_bundle_js_file = "app/assets/webpack/server-bundle.js"}
     assert_file("config/initializers/react_on_rails.rb") do |contents|
       assert_match(regexp, contents)
     end

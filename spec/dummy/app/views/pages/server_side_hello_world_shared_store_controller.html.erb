@@ -1,5 +1,4 @@
 <%= render "header" %>
-<%= redux_store("SharedReduxStore", @app_props_server_render) %>
 
 <%= react_component("ReduxSharedStoreApp", prerender: true, trace: true) %>
 <hr/>

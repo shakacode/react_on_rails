@@ -12,8 +12,8 @@ module ReactOnRails
     def redux_store(store_name, props)
       redux_store_data = { store_name: store_name,
                            props: props }
-      @registered_stores_via_controller ||= []
-      @registered_stores_via_controller << redux_store_data
+      @registered_stores_defer_render ||= []
+      @registered_stores_defer_render << redux_store_data
     end
   end
 end

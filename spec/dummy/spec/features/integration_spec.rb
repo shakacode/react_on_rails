@@ -180,10 +180,18 @@ feature "2 react components, 1 store, server side", :js do
   include_examples "React Component Shared Store", "/server_side_hello_world_shared_store"
 end
 
-feature "2 react components, 1 store, client only", :js do
+feature "2 react components, 1 store, client only, controller setup", :js do
   include_examples "React Component Shared Store", "/client_side_hello_world_shared_store_controller"
 end
 
-feature "2 react components, 1 store, server side", :js do
+feature "2 react components, 1 store, server side, controller setup", :js do
   include_examples "React Component Shared Store", "/server_side_hello_world_shared_store_controller"
+end
+
+feature "2 react components, 1 store, client only, defer", :js do
+  include_examples "React Component Shared Store", "/client_side_hello_world_shared_store_defer"
+end
+
+feature "2 react components, 1 store, server side, defer", :js do
+  include_examples "React Component Shared Store", "/server_side_hello_world_shared_store_defer"
 end

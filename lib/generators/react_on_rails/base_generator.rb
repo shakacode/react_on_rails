@@ -59,7 +59,7 @@ module ReactOnRails
           node_modules
 
           # Generated js bundles
-          /app/assets/javascripts/generated/*
+          /app/assets/webpack/*
         DATA
 
         if dest_file_exists?(".gitignore")
@@ -74,11 +74,11 @@ module ReactOnRails
           // DO NOT REQUIRE jQuery or jQuery-ujs in this file!
           // DO NOT REQUIRE TREE!
 
-          // CRITICAL that generated/vendor-bundle must be BEFORE bootstrap-sprockets and turbolinks
+          // CRITICAL that vendor-bundle must be BEFORE bootstrap-sprockets and turbolinks
           // since it is exposing jQuery and jQuery-ujs
 
-          //= require generated/vendor-bundle
-          //= require generated/app-bundle
+          //= require vendor-bundle
+          //= require app-bundle
 
         DATA
 
@@ -171,6 +171,9 @@ module ReactOnRails
           Rails.application.config.assets.paths << Rails.root.join("client", "assets", "images")
           Rails.application.config.assets.paths << Rails.root.join("client", "assets", "fonts")
           Rails.application.config.assets.precompile += %w( generated/server-bundle.js )
+
+          # Add folder with webpack generated assets to assets.paths
+          Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpack")
         DATA
         assets_intializer = File.join(destination_root, "config/initializers/assets.rb")
         if File.exist?(assets_intializer)
