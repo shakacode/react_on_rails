@@ -185,7 +185,7 @@ shared_examples "base_generator:server_rendering" do
   end
 
   it "sets server bundle js file to server-bundle in react_on_rails initializer" do
-    regexp = %r{config.server_bundle_js_file = "app/assets/webpack/server-bundle.js"}
+    regexp = %r{config.server_bundle_js_file = "server-bundle.js"}
     assert_file("config/initializers/react_on_rails.rb") do |contents|
       assert_match(regexp, contents)
     end
