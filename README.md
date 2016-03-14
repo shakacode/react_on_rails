@@ -79,6 +79,7 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
     - [Rails View Helpers In-Depth](#rails-view-helpers-in-depth)
     - [Redux](#redux)
     - [React-Router](#react-router)
+    - [Boostrap Integration](#boostrap-integration)
 + [Generator](#generator)
     - [Understanding the Organization of the Generated Client Code](#understanding-the-organization-of-the-generated-client-code)
     - [Redux](#redux)
@@ -357,6 +358,9 @@ Components are created as [stateless function(al) components](https://facebook.g
 The generator has amended the folders created in `client/assets/` to Rails's asset path. We recommend that if you have any existing assets that you want to use with your client code, you should move them to these folders and use webpack as normal. This allows webpack's development server to have access to your assets, as it will not be able to see any assets in the default Rails directories which are above the `/client` directory.
 
 Alternatively, if you have many existing assets and don't wish to move them, you could consider creating symlinks from client/assets that point to your Rails assets folders inside of `app/assets/`. The assets there will then be visible to both Rails and webpack.
+
+### React Router
+[React Router]() is supported, including server side rendering! See the examples in [spec/dummy/apps/views/react_router](spec/dummy/apps/views/react_router) and follow to the JavaScript code in the [client/app/startup/ServerRouterApp.jsx](client/app/startup/ServerRouterApp.jsx). Additionally, see the `react_component` helper option `router_redirect_callback`.
 
 ### Bootstrap Integration
 React on Rails ships with Twitter Bootstrap already integrated into the build. Note that the generator removes `require_tree` in both the application.js and application.css.scss files. This is to ensure the correct load order for the bootstrap integration, and is usually a good idea in general. You will therefore need to explicitly require your files.
