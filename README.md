@@ -79,7 +79,7 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
     - [Rails View Helpers In-Depth](#rails-view-helpers-in-depth)
     - [Redux](#redux)
     - [React-Router](#react-router)
-    - [Boostrap Integration](#boostrap-integration)
+    - [Bootstrap Integration](#bootstrap-integration)
 + [Generator](#generator)
     - [Understanding the Organization of the Generated Client Code](#understanding-the-organization-of-the-generated-client-code)
     - [Redux](#redux)
