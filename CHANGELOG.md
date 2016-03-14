@@ -19,7 +19,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ##### Changed
  - Generator default for webpack generated assets is now `app/assets/webpack` as we use this for both JavaScript and CSS generated assets.
- - 
+
 ##### Fixed
 - The test runner "assets up to date checker" is greatly improved.
 - Lots of doc updates!
