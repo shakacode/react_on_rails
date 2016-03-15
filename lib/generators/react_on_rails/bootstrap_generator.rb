@@ -68,7 +68,7 @@ module ReactOnRails
       def add_bootstrap_sprockets_to_application_js
         data = <<-DATA.strip_heredoc
 
-          // bootstrap-sprockets depends on generated/vendor-bundle for jQuery.
+          // bootstrap-sprockets depends on vendor-bundle for jQuery.
           //= require bootstrap-sprockets
 
         DATA

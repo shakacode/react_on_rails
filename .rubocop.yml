@@ -2,9 +2,13 @@
 # Check out: https://github.com/bbatsov/rubocop
 
 AllCops:
+  DisplayCopNames: true
+  TargetRubyVersion: 2.1
+
   Include:
     - '**/Rakefile'
     - '**/config.ru'
+
   Exclude:
     - 'vendor/**/*'
     - 'spec/fixtures/**/*'

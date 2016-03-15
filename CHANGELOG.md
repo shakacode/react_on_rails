@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
 
+## [4.0.0.beta.3] - 2016-03-14
+##### Added
+- Added optional parameter for ReactOnRails.getStore(name, throwIfMissing = true) so that you can check if a store is defined easily.
+- Added controller `module ReactOnRails::Controller`. Adds method `redux_store` to setup redux stores in the view.
+- Added option `defer: true` for view helper `redux_store`. This allows the view helper to specify the props for store hydration, yet still render the props at the bottom of the view.
+- Added view helper `redux_store_hydration_data` to render the props on the application's layout, near the bottom. This allows for the client hydration data to be parsed after the server rendering, which may result in a faster load time.
+- Added helpers `env_stylesheet_link_tag` and `env_javascript_include_tag` to support hot reloading Rails. See the [README.md](./README.md) for more details and see the example application in `spec/dummy`.
+- The checker for outdated bundles before running tests will default to including the directory with `server_bundle_js_file`.
+- Better support for Turbolinks 5!
+-	Fixed generator check of uncommitted code for foreign languages. See [#303](https://github.com/shakacode/react_on_rails/pull/303) by [nmatyukov](https://github.com/nmatyukov).
+- Added several parameters used for ensuring webpack assets are built for running tests:
+  - `config.generated_assets_dir`: Directory where your generated webpack assets go. You can have only **one** directory for this.
+  - `config.webpack_generated_files`: List of files that will get created in the `generated_assets_dir`. The test runner helper will ensure these generated files are newer than any of the files in the client directory.
+
+##### Changed
+ - Generator default for webpack generated assets is now `app/assets/webpack` as we use this for both JavaScript and CSS generated assets.
+
+##### Fixed
+- The test runner "assets up to date checker" is greatly improved.
+- Lots of doc updates!
+- Improved the **spec/dummy** sample app so that it supports CSS modules, hot reloading, etc, and it can server as a template for a new ReactOnRails installation.
+
+##### Breaking Changes
+- Deprecated calling `redux_store(store_name, props)`. The API has changed. Use `redux_store(store_name, props: props, defer: false)` A new option called `defer` allows the rendering of store hydration at the bottom of the your layout.  Place `redux_store_hydration_data` on your layout. 
+- `config.server_bundle_js_file` has changed. The default value is now blank, meaning no server rendering. Addtionally, if you specify the file name, you should not include the path, as that should be specified in the `config.generated_assets_dir`.
+- `config.generated_assets_dirs` has been renamed to `config.generated_assets_dir` (singular) and it only takes one directory.
+
+
 ## [3.0.6] - 2016-03-01
 ##### Fixed
 -	Improved errors when registered store is not found. See [#301](https://github.com/shakacode/react_on_rails/pull/301) by [justin808](https://github.com/justin808).
@@ -192,7 +220,8 @@ Best done with Object destructing:
 
 ##### Fixed
 - Fix several generator related issues.
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/3.0.6...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/4.0.0.beta.3...master
+[4.0.0.beta.3]: https://github.com/shakacode/react_on_rails/compare/3.0.6...4.0.0-beta.3
 [3.0.6]: https://github.com/shakacode/react_on_rails/compare/3.0.5...3.0.6
 [3.0.5]: https://github.com/shakacode/react_on_rails/compare/3.0.4...3.0.5
 [3.0.4]: https://github.com/shakacode/react_on_rails/compare/3.0.3...3.0.4

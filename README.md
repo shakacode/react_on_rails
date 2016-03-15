@@ -1,7 +1,11 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails)  [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
 # NEWS
-* 2016-03-14: 4.0.0.beta.3 is released! Please try it out. There are a number of **BREAKING** changes and I'd like to get feedback before releasing. See [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/new-api-shared-redux-stores/CHANGELOG.md) and [PR 311](https://github.com/shakacode/react_on_rails/pull/311/files).
+* 4.0.0 Highlights
+  * Better support for Turbolinks 5.
+  * Controller rendering of shared redux stores and ability to render store data at bottom of HTML page.
+  * See [#311](https://github.com/shakacode/react_on_rails/pull/311/files).
+  * See [CHANGELOG.md](CHANGELOG.md) for full details.
 * 2016-02-28: We added a [Projects page](PROJECTS.md). Please edit the page your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors. [jbhatab](https://github.com/jbhatab) is leading an effort to ease the onboarding process for newbies with simpler project generators. See [#245](https://github.com/shakacode/react_on_rails/issues/245).
 * 3.0.6 shipped on Tuesday, 2016-03-01. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v1-to-v2). [Migration steps from 2.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v2-to-v3).
   * [RubyGems](https://rubygems.org/gems/react_on_rails/)
@@ -76,7 +80,8 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
     - [Client-Side Rendering vs. Server-Side Rendering](#client-side-rendering-vs-server-side-rendering)
     - [Building the Bundles](#building-the-bundles)
     - [Globally Exposing Your React Components](#globally-exposing-your-react-components)
-    - [Rails View Helpers In-Depth](#rails-view-helpers-in-depth)
+    - [ReactOnRails View Helpers API](#reactonrails-view-helpers-api)
+    - [ReactOnRails JavaScript API](#reactonrails-javascript-api)
     - [Redux](#redux)
     - [React-Router](#react-router)
     - [Bootstrap Integration](#bootstrap-integration)
@@ -172,7 +177,7 @@ cd client && npm i --saveDev react-on-rails
 That will install the latest version and update your package.json.
 
 ## How it Works
-The generator installs your webpack files in the `client` folder. Foreman uses webpack to compile your code and output the bundled results to `app/assets/javascripts/generated`, which are then loaded by sprockets. These generated bundle files have been added to your `.gitignore` for your convenience.
+The generator installs your webpack files in the `client` folder. Foreman uses webpack to compile your code and output the bundled results to `app/assets/webpack`, which are then loaded by sprockets. These generated bundle files have been added to your `.gitignore` for your convenience.
 
 Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the react component helper. You can also initialize a Redux store with view helper `redux_store` so that the store can be shared amongst multiple React components. Your best bet is to scan the code inside of the [/spec/dummy](spec/dummy) sample app.
 
@@ -222,12 +227,12 @@ Place your JavaScript code inside of the provided `client/app` folder. Use modul
 
   In general, you may want different initialization for your server rendered components.
 
-### Rails View Helpers In-Depth
-Once the bundled files have been generated in your `app/assets/javascripts/generated` folder and you have exposed your components globally, you will want to run your code in your Rails views using the included helper method.
+## ReactOnRails View Helpers API
+Once the bundled files have been generated in your `app/assets/webpack` folder and you have exposed your components globally, you will want to run your code in your Rails views using the included helper method.
 
 This is how you actually render the React components you exposed to `window` inside of `clientRegistration` (and `global` inside of `serverRegistration` if you are server rendering).
 
-#### react_component
+### react_component
 `react_component(component_name, options = {})`
 
 + **component_name:** Can be a React component, created using a ES6 class, or `React.createClass`, or a generator function that returns a React component.
@@ -240,7 +245,10 @@ This is how you actually render the React components you exposed to `window` ins
   + **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
 + Any other options are passed to the content tag, including the id
 
-#### redux_store
+### redux_store
+#### Controller Extension
+Include the module ReactOnRails::Controller in your controller, probably in ApplicationController. This will provide the following controller method, which you can call in your controller actions:
+
 `redux_store(store_name, props = {})`
 
 + **store_name:** A name for the store. You'll refer to this name in 2 places in your JavaScript:
@@ -248,16 +256,114 @@ This is how you actually render the React components you exposed to `window` ins
   2. In your component definition, you'll call `ReactOnRails.getStore('storeName')` to get the hydrated Redux store to attach to your components.
 + **props:**  ReactOnRails takes care of setting up the hydration of your store with props from the view.
 
-#### Generator Functions
+For an example, see [spec/dummy/app/controllers/pages_controller.rb](spec/dummy/app/controllers/pages_controller.rb).
+
+#### View Helper
+`redux_store_hydration_data`
+
+Place this view helper (no parameters) at the end of your shared layout. This tell ReactOnRails where to client render the redux store hydration data. Since we're going to be setting up the stores in the controllers, we need to know where on the view to put the client side rendering of this hydration data, which is a hidden div with a matching class that contains a data props. For an example, see [spec/dummy/app/views/layouts/application.html.erb](spec/dummy/app/views/layouts/application.html.erb).
+
+#### Redux Store Notes
+Note, you don't need to separately initialize your redux store. However, it's recommended for the two following use cases:
+
+1. You want to have multiple components that access the same store.
+2. You want to place the props to hydrate the client side stores at the very end of your HTML, so the browser can render all earlier HTML first. This is particularly useful if your props will be large.
+
+### Generator Functions
 Why would you create a function that returns a React compnent? For example, you may want the ability to use the passed-in props to initialize a redux store or setup react-router. Or you may want to return different components depending on what's in the props. ReactOnRails will automatically detect a registered generator function.
 
-#### server_render_js
+### server_render_js
 `server_render_js(js_expression, options = {})`
 
 + js_expression, like 2 + 3, and not a block of js code. If you have more than one line that needs to be executed, wrap it in an [IIFE](https://en.wikipedia.org/wiki/Immediately-invoked_function_expression). JS exceptions will be caught and console messages handled properly
 + Currently the only option you may pass is `replay_console` (boolean)
 
 This is a helper method that takes any JavaScript expression and returns the output from evaluating it. If you have more than one line that needs to be executed, wrap it in an IIFE. JS exceptions will be caught and console messages handled properly.
+
+## ReactOnRails JavaScript API
+The best source of docs is the main [ReactOnRails.js](node_package/src/ReactOnRails.js) file. Here's a quick summary. No guarantees that this won't be outdated!
+
+```js
+  /**
+   * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
+   * find you components for rendering.
+   * @param components (key is component name, value is component)
+   */
+  register(components)
+
+  /**
+   * Allows registration of store generators to be used by multiple react components on one Rails
+   * view. store generators are functions that take one arg, props, and return a store. Note that
+   * the setStore API is different in tha it's the actual store hydrated with props.
+   * @param stores (key is store name, value is the store generator)
+   */
+  registerStore(stores)
+
+  /**
+   * Allows retrieval of the store by name. This store will be hydrated by any Rails form props. 
+   * Pass optional param throwIfMissing = false if you want to use this call to get back null if the
+   * store with name is not registered.
+   * @param name
+   * @param throwIfMissing Defaults to true. Set to false to have this call return undefined if 
+   *        there is no store with the given name.
+   * @returns Redux Store, possibly hydrated
+   */
+  getStore(name, throwIfMissing = true )
+
+  /**
+   * Set options for ReactOnRails, typically before you call ReactOnRails.register
+   * Available Options:
+   * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
+   */
+  setOptions(options)
+```
+
+## Hot Reloading View Helpers
+The `env_javascript_include_tag` and `env_stylesheet_link_tag` support the usage of a webpack dev server for providing the JS and CSS assets during development mode. See the [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/) for a working example.
+
+The key options are `static` and `hot` which specify what you want for static vs. hot. Both of these params are optional, and support either a single value, or an array.
+
+static vs. hot is picked based on whether ENV["REACT_ON_RAILS_ENV"] == "HOT"
+
+```erb
+ <%= env_stylesheet_link_tag(static: 'application_static',
+                             hot: 'application_non_webpack',
+                             media: 'all',
+                             'data-turbolinks-track' => true)  %>
+
+ <!-- These do not use turbolinks, so no data-turbolinks-track -->
+ <!-- This is to load the hot assets. -->
+ <%= env_javascript_include_tag(hot: ['http://localhost:3500/vendor-bundle.js',
+                                      'http://localhost:3500/app-bundle.js']) %>
+
+ <!-- These do use turbolinks -->
+ <%= env_javascript_include_tag(static: 'application_static',
+                                hot: 'application_non_webpack',
+                                'data-turbolinks-track' => true) %>
+```
+                                
+See application.html.erb for usage example and [application.html.erb](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/app%2Fviews%2Flayouts%2Fapplication.html.erb)
+
+**env_javascript_include_tag(args = {})**
+
+Helper to set CSS assets depending on if we want static or "hot", which means from the Webpack dev server.
+
+In this example, application_non_webpack is simply a CSS asset pipeline file which includes styles not placed in the webpack build.
+
+We don't need styles from the webpack build, as those will come via the JavaScript include tags.
+
+The key options are `static` and `hot` which specify what you want for static vs. hot. Both of
+these params are optional, and support either a single value, or an array.
+
+```erb
+ <%= env_stylesheet_link_tag(static: 'application_static',
+                             hot: 'application_non_webpack',
+                             media: 'all',
+                             'data-turbolinks-track' => true)  %>
+```
+
+**env_stylesheet_link_tag(args = {})**
+
 
 ## Generator
 The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating Webpack with Rails. Defaults for options are such that the default is for the flag to be off. For example, the default for `-R` is that `redux` is off, and the default of `-b` is that `skip-bootstrap` is off.
@@ -476,6 +582,11 @@ Note: If you have components from react-rails you want to use, then you will nee
   bundle && npm i
   foreman start
   ```
+
+## Dependencies
++ Ruby 2.1 or greater
++ Rails 3.2 or greater
++ Node 5.5 or great
 
 ## Contributing
 Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant Code of Conduct](docs/code_of_conduct.md)).

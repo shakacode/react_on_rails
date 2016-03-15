@@ -1,4 +1,4 @@
 web: rails s
 # TODO: MIGRATE from tutorial
-client: sh -c 'rm app/assets/javascripts/generated/* || true && cd client && npm run build:dev:client'
+client: sh -c 'rm app/assets/webpack/* || true && cd client && npm run build:dev:client'
 <%- if options.server_rendering? %>server: sh -c 'cd client && npm run build:dev:server'<%- end %>

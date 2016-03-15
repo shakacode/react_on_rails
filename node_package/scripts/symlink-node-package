@@ -19,6 +19,3 @@ if [ -d $examplesDir ] ; then
     (cd $d && npm link react-on-rails)
   done
 fi
-
-# Link the spec/dummy app to use react_on_rails node_package
-(cd $root_path/spec/dummy/client && npm link react-on-rails)

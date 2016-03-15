@@ -10,8 +10,9 @@
 *.gem
 /vendor/
 
+/spec/examples.txt
 /spec/dummy/client/node_modules
-/spec/dummy/app/assets/javascripts/generated/
+/spec/dummy/app/assets/webpack/
 /spec/dummy/coverage/
 /spec/react_on_rails/dummy-for-generators/
 
