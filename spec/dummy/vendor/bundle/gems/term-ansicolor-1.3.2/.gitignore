@@ -1,7 +1,0 @@
-.*.sw[pon]
-.bundle
-.rvmrc
-Gemfile.lock
-coverage
-pkg
-tags

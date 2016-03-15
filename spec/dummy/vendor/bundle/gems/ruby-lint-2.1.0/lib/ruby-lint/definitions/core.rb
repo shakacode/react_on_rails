@@ -1,5 +1,0 @@
-require_relative 'core/module'
-require_relative 'core/class'
-require_relative 'core/kernel'
-require_relative 'core/basic_object'
-require_relative 'core/object'

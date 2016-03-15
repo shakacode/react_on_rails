@@ -1,3 +1,0 @@
-[Unit]
-StopWhenUnneeded=true
-Wants=app-alpha-1.service

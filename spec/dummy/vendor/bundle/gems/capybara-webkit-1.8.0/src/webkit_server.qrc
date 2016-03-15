@@ -1,6 +1,0 @@
-<RCC>
-  <qresource prefix="/">
-    <file>capybara.js</file>
-    <file>pointer.png</file>
-  </qresource>
-</RCC>

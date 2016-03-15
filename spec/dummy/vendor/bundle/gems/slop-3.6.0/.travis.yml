@@ -1,9 +1,0 @@
-rvm:
-  - 1.9.3
-  - 2.1
-  - ruby-head
-  - jruby-19mode
-notifications:
-  email:
-    on_success: change
-    on_failure: always

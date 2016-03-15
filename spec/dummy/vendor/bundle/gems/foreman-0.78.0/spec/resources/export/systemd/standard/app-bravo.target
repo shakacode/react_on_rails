@@ -1,3 +1,0 @@
-[Unit]
-StopWhenUnneeded=true
-Wants=app-bravo-1.service
