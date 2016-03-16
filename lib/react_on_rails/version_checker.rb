@@ -57,7 +57,7 @@ module ReactOnRails
       end
 
       def raw
-        JSON.parse(package_json_contents)["dependencies"]["react-on-rails"]
+        JSON.parse(package_json_contents)["dependencies"]["react-relay-on-rails"]
       end
 
       def relative_path?

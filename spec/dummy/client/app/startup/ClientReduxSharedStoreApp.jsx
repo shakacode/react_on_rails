@@ -2,7 +2,7 @@
 // Compare this to the ./ServerApp.jsx file which is used for server side rendering.
 
 import React from 'react';
-import ReactOnRails from 'react-on-rails';
+import ReactOnRails from 'react-relay-on-rails';
 import HelloWorldContainer from '../components/HelloWorldContainer';
 import { Provider } from 'react-redux';
 

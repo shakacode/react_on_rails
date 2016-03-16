@@ -15,6 +15,7 @@
 /spec/dummy/app/assets/webpack/
 /spec/dummy/coverage/
 /spec/react_on_rails/dummy-for-generators/
+/spec/dummy/vendor/bundle/
 
 # RVM
 .ruby-version
