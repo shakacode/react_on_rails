@@ -3,8 +3,7 @@
 *We'll keep a history of the news. A few bullets at the top will also show on the [README.md](./README.md).*
 
 * Always see the [CHANGELOG.md](./CHANGELOG.md) for the latest project changes.
-* 2016-03-16: **4.0.1** Shipped! Includes using the new Heroku buildpack steps.
-* 2016-03-14: **4.0.0** Highlights
+* 2016-03-17: **4.0.2** Shipped! Includes using the new Heroku buildpack steps.
   * Better support for hot reloading of assets from Rails with new helpers and updates to the sample testing app, [spec/dummy](spec/dummy).
   * Better support for Turbolinks 5.
   * Controller rendering of shared redux stores and ability to render store data at bottom of HTML page.
