@@ -57,11 +57,34 @@ describe ReactOnRailsHelper, type: :helper do
             data-dom-id="#{id}"></div>).squish
     end
 
+    let(:react_definition_div_no_params) do
+      %(<div class="js-react-on-rails-component"
+            style="display:none"
+            data-component-name="App"
+            data-props="{}"
+            data-trace="false"
+            data-dom-id="#{id}"></div>).squish
+    end
+
     describe "deprecated API" do
       subject { react_component("App", props) }
       it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
       it { is_expected.to include react_component_div }
       it { is_expected.to include react_definition_div }
+    end
+
+    describe "API with component name only" do
+      subject { react_component("App") }
+      it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
+      it { is_expected.to include react_component_div }
+      it { is_expected.to include react_definition_div_no_params }
+    end
+
+    describe "Deprecated API with component name and empty props" do
+      subject { react_component("App", "") }
+      it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
+      it { is_expected.to include react_component_div }
+      it { is_expected.to include react_definition_div_no_params }
     end
 
     it { expect(self).to respond_to :react_component }
@@ -73,7 +96,7 @@ describe ReactOnRailsHelper, type: :helper do
     it { is_expected.to include react_definition_div }
 
     context "with 'id' option" do
-      subject { react_component("App", props, id: id) }
+      subject { react_component("App", props: props, id: id) }
 
       let(:id) { "shaka_div" }
 
