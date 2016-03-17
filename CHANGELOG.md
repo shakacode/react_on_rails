@@ -3,18 +3,24 @@ All notable changes to this project will be documented in this file. Items under
 
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
+
 ## [4.0.3] - 2016-03-17
+
 ##### Fixed
 - `ReactOnRailsHelper#react_compnent`: Invalid deprecation message when called with only one paramter, the component name.
+
 ## [4.0.2] - 2016-03-17
+
 ##### Fixed
 - `ReactOnRails::Controller#redux_store`: 2nd parameter changed to a named parameter `props` for consistency.
 
 ## [4.0.1] - 2016-03-16
+
 ##### Fixed
 - Switched to `heroku buildpacks:set` syntax rather than using a `.buildpacks` file, which is deprecated. See [#319](https://github.com/shakacode/react_on_rails/pull/319) by [esauter5](https://github.com/esauter5). Includes both generator and doc updates.
 
 ## [4.0.0] - 2016-03-14
+
 ##### Added
 - [spec/dummy](spec/dummy) is a full sample app of React on Rails techniques **including** the hot reloading of assets from Rails!
 - Added helpers `env_stylesheet_link_tag` and `env_javascript_include_tag` to support hot reloading Rails. See the [README.md](./README.md) for more details and see the example application in `spec/dummy`. Also see how this is used in the [tutorial: application.html.erb](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/app%2Fviews%2Flayouts%2Fapplication.html.erb#L6)
