@@ -3,6 +3,9 @@ All notable changes to this project will be documented in this file. Items under
 
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
+## [4.0.3] - 2016-03-17
+##### Fixed
+- `ReactOnRailsHelper#react_compnent`: Invalid deprecation message when called with only one paramter, the component name.
 ## [4.0.2] - 2016-03-17
 ##### Fixed
 - `ReactOnRails::Controller#redux_store`: 2nd parameter changed to a named parameter `props` for consistency.
@@ -227,7 +230,9 @@ Best done with Object destructing:
 
 ##### Fixed
 - Fix several generator related issues.
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/4.0.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/4.0.3...master
+[4.0.3]: https://github.com/shakacode/react_on_rails/compare/4.0.2...4.0.3
+[4.0.2]: https://github.com/shakacode/react_on_rails/compare/4.0.1...4.0.2
 [4.0.1]: https://github.com/shakacode/react_on_rails/compare/4.0.0...4.0.1
 [4.0.0]: https://github.com/shakacode/react_on_rails/compare/3.0.6...4.0.0
 [3.0.6]: https://github.com/shakacode/react_on_rails/compare/3.0.5...3.0.6

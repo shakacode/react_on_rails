@@ -337,6 +337,8 @@ ReactOnRails.setStore('#{store_name}', store);
     options.fetch(:replay_console) { ReactOnRails.configuration.replay_console }
   end
 
+  # rubocop:disable Metrics/CyclomaticComplexity
+  # rubocop:disable Metrics/PerceivedComplexity
   def parse_options_props(component_name, options, other_options)
     other_options ||= {}
     if options.is_a?(Hash) && options.key?(:props)
@@ -352,7 +354,7 @@ ReactOnRails.setStore('#{store_name}', store);
           %i(prerender trace replay_console raise_on_prerender_error).none? do |key|
             options.key?(key)
           end
-        deprecated_syntax = options_has_no_reserved_keys
+        deprecated_syntax = options_has_no_reserved_keys && options.present?
       end
 
       if deprecated_syntax
@@ -360,6 +362,7 @@ ReactOnRails.setStore('#{store_name}', store);
           " Props as the second arg will be removed in a future release. Called for "\
           "component_name: #{component_name}, controller: #{controller_name}, "\
           "action: #{action_name}."
+        options = {} if options.is_a?(String) && options.blank?
         props = options
         final_options = other_options
       else
@@ -369,6 +372,8 @@ ReactOnRails.setStore('#{store_name}', store);
     end
     [final_options, props]
   end
+  # rubocop:enable Metrics/CyclomaticComplexity
+  # rubocop:enable Metrics/PerceivedComplexity
 
   def use_hot_reloading?
     ENV["REACT_ON_RAILS_ENV"] == "HOT"
