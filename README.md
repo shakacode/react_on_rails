@@ -244,12 +244,12 @@ This is how you actually render the React components you exposed to `window` ins
 #### Controller Extension
 Include the module ReactOnRails::Controller in your controller, probably in ApplicationController. This will provide the following controller method, which you can call in your controller actions:
 
-`redux_store(store_name, props = {})`
+`redux_store(store_name, props: {})`
 
 + **store_name:** A name for the store. You'll refer to this name in 2 places in your JavaScript:
   1. You'll call `ReactOnRails.registerStore({storeName})` in the same place that you register your components.
   2. In your component definition, you'll call `ReactOnRails.getStore('storeName')` to get the hydrated Redux store to attach to your components.
-+ **props:**  ReactOnRails takes care of setting up the hydration of your store with props from the view.
++ **props:**  Named parameter `props`. ReactOnRails takes care of setting up the hydration of your store with props from the view.
 
 For an example, see [spec/dummy/app/controllers/pages_controller.rb](spec/dummy/app/controllers/pages_controller.rb).
 
@@ -435,7 +435,7 @@ From your Rails view, you can use the provided helper `redux_store(store_name, p
 **app/views/layouts/application.html.erb**
 ```erb
 ...
-<%= redux_store("appStore", @react_props) %>;
+<%= redux_store("appStore", props: @react_props) %>;
 <%= react_component("NavbarApp") %>
 yield
 ...

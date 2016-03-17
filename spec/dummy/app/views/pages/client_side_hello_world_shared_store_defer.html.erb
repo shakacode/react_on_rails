@@ -30,7 +30,7 @@ YO
     Place the components and store on the view: spec/dummy/app/views/pages/client_side_hello_world_shared_store.html.erb
     <br/>
     <pre>
-<%%= redux_store("SharedReduxStore", @app_props_server_render) %>
+<%%= redux_store("SharedReduxStore", props: @app_props_server_render) %>
 
 <%%= react_component("ReduxSharedStoreApp", prerender: false, trace: true) %>
 

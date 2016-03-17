@@ -18,7 +18,7 @@ class PagesController < ApplicationController
   private
 
   def initialize_shared_store
-    redux_store("SharedReduxStore", @app_props_server_render)
+    redux_store("SharedReduxStore", props: @app_props_server_render)
   end
 
   def data
