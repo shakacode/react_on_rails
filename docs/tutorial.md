@@ -1,10 +1,10 @@
-# Tutorial for v2.0
+# Tutorial for React on Rails
 
-I just released RC3 of [React On Rails](https://github.com/shakacode/react_on_rails/tree/npm-react-on-rails-js). Here's a tiny tutorial to get you started. This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
+This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
 You can find:
 
-* [Source code for this sample app](https://github.com/justin808/test-react-on-rails-3)
+* [Source code for this sample app](https://github.com/justin808/test-react-on-rails-3) (for an older version)
 * [Live on Heroku](https://shakacode-react-on-rails.herokuapp.com/hello_world)
 
 By the time you read this, the latest may have changed. Be sure to check the versions here:
@@ -12,7 +12,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 * https://rubygems.org/gems/react_on_rails
 * https://www.npmjs.com/package/react-on-rails
 
-Trying out v2 is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 4.x and node version 4+. I recommend `rvm` and `nvm` to install Ruby and Node.
+Trying out v4 is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 4.x and node version 5+. I recommend `rvm` and `nvm` to install Ruby and Node.
 
 ```
 cd <directory where you want to create your new Rails app>
