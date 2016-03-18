@@ -1,13 +1,9 @@
-# Basic procfile for dev work.
-# Runs all processes. Development is faster if you pick one of the other Procfiles if you don't need
-# some of the processes
+# Procfile for development with hot reloading of JavaScript and CSS
 
-# Development rails requires both rails and rails-assets
-# (and rails-server-assets if server rendering)
 rails: REACT_ON_RAILS_ENV=HOT rails s -b 0.0.0.0
 
 # Run the hot reload server for client development
-hot-assets: sh -c 'rm app/assets/webpack/* || true && HOT_RAILS_PORT=3500 npm run hot-assets'
+hot-assets: HOT_RAILS_PORT=3500 npm run hot-assets
 
 # Keep the JS fresh for server rendering. Remove if not server rendering
-rails-server-assets: sh -c 'npm run build:dev:server'
+rails-server-assets: npm run build:dev:server
