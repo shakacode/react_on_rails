@@ -234,7 +234,6 @@ This is how you actually render the React components you exposed to `window` ins
 + **options:**
   + **props:** Ruby Hash which contains the properties to pass to the react object, or a JSON string. If you pass a string, we'll escape it for you.
   + **prerender:** enable server-side rendering of component. Set to false when debugging!
-  + **router_redirect_callback:** Use this option if you want to provide a custom handler for redirects on server rendering. If you don't specify this, we'll simply change the rendered output to a script that sets window.location to the new route. Set this up exactly like a generator_function. Your function will take one parameter, containing all the values that react-router gives on a redirect request, such as pathname, search, etc.
   + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise.
   + **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the default configuration of logging_on_server set to true, you'll still see the errors on the server.
   + **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
@@ -461,7 +460,10 @@ The generator has amended the folders created in `client/assets/` to Rails's ass
 Alternatively, if you have many existing assets and don't wish to move them, you could consider creating symlinks from client/assets that point to your Rails assets folders inside of `app/assets/`. The assets there will then be visible to both Rails and webpack.
 
 ### React Router
-[React Router](https://github.com/reactjs/react-router) is supported, including server side rendering! See the examples in [spec/dummy/apps/views/react_router](spec/dummy/apps/views/react_router) and follow to the JavaScript code in the [client/app/startup/ServerRouterApp.jsx](client/app/startup/ServerRouterApp.jsx). Additionally, see the `react_component` helper option `router_redirect_callback`.
+[React Router](https://github.com/reactjs/react-router) is supported, including server side rendering! See:
+  
+1. [React on Rails docs for react-router](docs/additional_reading/react_router.md)
+1. Examples in [spec/dummy/apps/views/react_router](spec/dummy/apps/views/react_router) and follow to the JavaScript code in the [client/app/startup/ServerRouterApp.jsx](client/app/startup/ServerRouterApp.jsx). 
 
 ### Bootstrap Integration
 React on Rails ships with Twitter Bootstrap already integrated into the build. Note that the generator removes `require_tree` in both the application.js and application.css.scss files. This is to ensure the correct load order for the bootstrap integration, and is usually a good idea in general. You will therefore need to explicitly require your files.

@@ -1,4 +1,4 @@
-// This file is used in production to server generated JS assets.
+// This file is used in production and tests to serve generated JS assets.
 //
 // In development mode, we use either:
 // Procfile.static: Load static assets

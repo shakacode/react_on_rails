@@ -1,6 +1,7 @@
 # Hot Reloading of Assets For Rails Development
 
 This document outlines the steps to setup your React On Rails Environment so that you can experience the pleasure of hot reloading of JavaScript and Sass during your Rails development work. There are 2 examples of this setup:
+
 1. [spec/dummy](../spec/dummy): Simpler setup used for integration testing this gem.
 1. [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/). Full featured setup using Twitter bootstrap.
 
@@ -23,10 +24,87 @@ The secret sauce is in the [app/views/layouts/application.html.erb](spec/dummy/a
    1. Start the webpack processes, depending on the mode or HOT or not.
    2. Start the rails server, setting an ENV value of REACT_ON_RAILS_ENV to HOT if we're hot loading or else setting this to blank.
 1. Configure the file Rails asset pipeline files:
-   1. [app/assets/javascripts/application_static.js.erb](spec/dummy/app/assets/javascripts/application_static.js.erb): We have to only specify the `vendor-bundle` and `app-bundle` if we're not HOT loading, as Sprockets will throw an error if that is the case. Note the use of `require_asset`.
-   1. [app/assets/stylesheets/application_static.js.erb](spec/dummy/app/assets/stylesheets/application_static.scss.erb): We have to only specify the `vendor-bundle` and `app-bundle` if we're not HOT loading, as Sprockets will throw an error if that is the case. Note the conditional around the @import.
+   1. [app/assets/javascripts/application_static.js](spec/dummy/app/assets/javascripts/application_static.js) 
+   1. [app/assets/stylesheets/application_static.js](spec/dummy/app/assets/stylesheets/application_static.scss) 
 1. Be sure your [config/initializers/assets.rb](spec/dummy/config/initializers/assets.rb) is configured to include the webpack generated files.
 1. Copy the [client/server-rails-hot.js](spec/dummy/client/server-rails-hot.js) to the [client](client) directory.
 1. Copy the scripts in the top level and client level `package.json` files:
    1. Top Level: [package.json](spec/dummy/package.json)
    1. Client Level: [package.json](spec/dummy/client/package.json)
+
+
+## Code Snippets
+Please refer to the examples linked above in `spec/dummy` as these code samples might be out of date.
+
+
+### config/initializers/assets.rb
+
+```ruby
+# Add folder with webpack generated assets to assets.paths
+Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpack")
+
+# Precompile additional assets.
+# application.js, application.css, and all non-JS/CSS in app/assets folder are already added.
+Rails.application.config.assets.precompile << "server-bundle.js"
+
+type = ENV["REACT_ON_RAILS_ENV"] == "HOT" ? "non_webpack" : "static"
+Rails.application.config.assets.precompile +=
+  [
+    "application_#{type}.js",
+    "application_#{type}.css"
+  ]
+```
+
+### app/views/layouts/application.html.erb
+
+```erb
+<head>
+  <title>Dummy</title>
+
+  <%= env_stylesheet_link_tag(static: 'application_static',
+                              hot: 'application_non_webpack',
+                              media: 'all',
+                              'data-turbolinks-track' => true) %>
+
+  <!-- These do not use turbolinks, so no data-turbolinks-track -->
+  <!-- This is to load the hot assets. -->
+  <%= env_javascript_include_tag(hot: ['http://localhost:3500/vendor-bundle.js',
+                                       'http://localhost:3500/app-bundle.js']) %>
+
+  <!-- These do use turbolinks -->
+  <%= env_javascript_include_tag(static: 'application_static',
+                                 hot: 'application_non_webpack',
+                                 'data-turbolinks-track' => true) %>
+
+  <%= csrf_meta_tags %>
+</head>
+```
+
+### Procfile.static
+```
+  # Run Rails without hot reloading (static assets).
+  rails: REACT_ON_RAILS_ENV= rails s -b 0.0.0.0
+  
+  # Build client assets, watching for changes.
+  rails-client-assets: sh -c 'npm run build:dev:client'
+  
+  # Build server assets, watching for changes. Remove if not server rendering.
+  rails-server-assets: sh -c 'npm run build:dev:server'
+```
+
+### Procfile.hot
+
+```
+# Procfile for development with hot reloading of JavaScript and CSS 
+
+# Development rails requires both rails and rails-assets
+# (and rails-server-assets if server rendering)
+rails: REACT_ON_RAILS_ENV=HOT rails s -b 0.0.0.0
+
+# Run the hot reload server for client development
+hot-assets: sh -c 'rm app/assets/webpack/* || true && HOT_RAILS_PORT=3500 npm run hot-assets'
+
+# Keep the JS fresh for server rendering. Remove if not server rendering
+rails-server-assets: sh -c 'npm run build:dev:server'
+```
+
