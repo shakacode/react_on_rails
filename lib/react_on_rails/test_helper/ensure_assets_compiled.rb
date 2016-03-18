@@ -99,7 +99,7 @@ watch processes, such by running a clean on your generated bundles before starti
 
 If you are frequently running tests, you can run webpack in watch mode for static assets to
 speed up this process. See the official documentation:
-https://github.com/shakacode/react_on_rails/blob/master/docs/additional_reading/rspec_configuration.md
+https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/rspec-configuration.md
         MSG
 
         if already_compiled_client_file

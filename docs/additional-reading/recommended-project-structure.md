@@ -2,6 +2,8 @@
 
 While React On Rails does not *enforce* a specific project structure, we do *recommend* a standard organization. The more we follow standards as a community, the easier it will be for all of us to move between various Rails projects that include React On Rails.
 
+The best way to understand these standards is to follow this example: [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)
+
 1. `/client`: All client side JavaScript goes under the `/client` directory. Place all the major domains of the client side app under client.
 1. `/client/app`: All application JavaScript. Note the adherence to the [Airbnb JavaScript Style Guide](https://github.com/airbnb/javascript#naming-conventions) where we name the files to correspond to exported Objects (PascalCase) or exported functions (camelCase). We don't use dashes or snake_case for JavaScript files, except for possibly some config files.
 1. `/client/app/bundles`: Top level of different app domains. Use a name within this directory for you app domains. For example, if you had a domain called `widget-editing`, then you would have: `/client/app/bundles/widget-editing`
