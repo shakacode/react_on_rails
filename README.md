@@ -1,6 +1,7 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails)  [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
 # NEWS
+* [New slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
 * Always see the [CHANGELOG.md](./CHANGELOG.md) for the latest project changes.
 * 2016-03-17: **4.0.3** Shipped! Includes using the new Heroku buildpack steps, several smaller changes detailed in the [CHANGELOG.md](./CHANGELOG.md). 
 * 2016-03-14: **4.0.0** Highlights
@@ -24,7 +25,7 @@
 React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering. See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
 
 Be sure to see:
-
+* [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v4032)
 * [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 * [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial) along with the live example at [www.reactrails.com](http://www.reactrails.com).
 * [Projects](PROJECTS.md) using React on Rails. Please submit yours!
@@ -553,6 +554,7 @@ If you are using [react-rails](https://github.com/reactjs/react-rails) in your p
 Note: If you have components from react-rails you want to use, then you will need to port them into react_on_rails which uses webpack instead of the asset pipeline.
 
 ## Additional Reading
++ [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v4032)
 + [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 + [Babel](docs/additional_reading/babel.md)
 + [Heroku Deployment](docs/additional_reading/heroku_deployment.md)
