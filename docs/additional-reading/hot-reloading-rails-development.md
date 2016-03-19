@@ -27,7 +27,7 @@ The secret sauce is in the [app/views/layouts/application.html.erb](../../spec/d
    1. [app/assets/javascripts/application_static.js](../../spec/dummy/app/assets/javascripts/application_static.js) 
    1. [app/assets/stylesheets/application_static.css.scss](../../spec/dummy/app/assets/stylesheets/application_static.css.scss)
 1. Be sure your [config/initializers/assets.rb](../../spec/dummy/config/initializers/assets.rb) is configured to include the webpack generated files.
-1. Copy the [client/server-rails-hot.js](../../spec/dummy/client/server-rails-hot.js) to the [client](client) directory.
+1. Copy the [client/server-rails-hot.js](../../spec/dummy/client/server-rails-hot.js) to the your client directory.
 1. Copy the scripts in the top level and client level `package.json` files:
    1. Top Level: [package.json](../../spec/dummy/package.json)
    1. Client Level: [package.json](../../spec/dummy/client/package.json)
