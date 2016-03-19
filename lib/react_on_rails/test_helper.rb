@@ -24,7 +24,7 @@ module ReactOnRails
     # faster. The helper looks for these processes and will abort recompiling if it finds them
     # to be running.
     #
-    # See docs/additional_reading/rspec_configuration.md for more info
+    # See docs/additional-reading/rspec-configuration.md for more info
     #
     # Params:
     # config - config for rspec

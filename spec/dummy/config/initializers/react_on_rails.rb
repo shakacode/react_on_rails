@@ -29,6 +29,11 @@ ReactOnRails.configure do |config|
   config.raise_on_prerender_error = false # change to true to raise exception on server if the JS code throws
 
   # Server rendering only (not for render_component helper)
+  # You can configure your pool of JS virtual machines and specify where it should load code:
+  # On MRI, use `therubyracer` for the best performance
+  # (see [discussion](https://github.com/reactjs/react-rails/pull/290))
+  # On MRI, you'll get a deadlock with `pool_size` > 1
+  # If you're using JRuby, you can increase `pool_size` to have real multi-threaded rendering.
   config.server_renderer_pool_size  = 1   # increase if you're on JRuby
   config.server_renderer_timeout    = 20  # seconds
 
