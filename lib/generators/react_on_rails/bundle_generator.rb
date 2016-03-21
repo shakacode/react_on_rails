@@ -52,6 +52,7 @@ module ReactOnRails
         invoke "react_on_rails:react_with_redux_bundle" if options.redux?
       end
 
+
       # NOTE: other requirements for existing files such as .gitignore or application.
       # js(.coffee) are not checked by this method, but instead produce warning messages
       # and allow the build to continue
