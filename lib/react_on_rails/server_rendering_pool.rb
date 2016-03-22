@@ -17,15 +17,19 @@ module ReactOnRails
       end
     end
 
-    # TODO: should we allow reset for all files?
-    def self.reset_pool_if_server_bundle_was_modified(server_bundle_js_file)
+    def self.reset_pool_if_server_bundle_was_modified
       return unless ReactOnRails.configuration.development_mode
+
       @server_bundle_timestamps ||= {}
-      file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path(server_bundle_js_file))
-      @server_bundle_timestamps[server_bundle_js_file] ||= file_mtime
-      return if @server_bundle_timestamps[server_bundle_js_file] == file_mtime
-      ReactOnRails::ServerRenderingPool.reset_pool
-      @server_bundle_timestamps[server_bundle_js_file] = file_mtime
+      do_reset_pool = false
+      ReactOnRails.configuration.server_bundle_js_files.each do |server_bundle_js_file|
+        file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path(server_bundle_js_file))
+        next if @server_bundle_timestamps[server_bundle_js_file] == file_mtime
+        @server_bundle_timestamps[server_bundle_js_file] = file_mtime
+        do_reset_pool = true
+      end
+
+      ReactOnRails::ServerRenderingPool.reset_pool if do_reset_pool
     end
 
     # js_code: JavaScript expression that returns a string.
@@ -70,6 +74,8 @@ module ReactOnRails
       end
 
       def eval_js(server_bundle_js_file, js_code)
+        fail "Bundle [#{server_bundle_js_file}] does not exist in the js context pools" if @js_context_pools[server_bundle_js_file].nil?
+
         @js_context_pools[server_bundle_js_file].with do |js_context|
           result = js_context.eval(js_code)
           js_context.eval("console.history = []")

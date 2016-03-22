@@ -40,5 +40,7 @@ class PagesController < ApplicationController
         name: "Mrs. Client Side Hello Again"
       }
     }
+
+    @custom_server_bundle_js_file = 'alternative-server-bundle.js'
   end
 end

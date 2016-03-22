@@ -218,8 +218,8 @@ module ReactOnRailsHelper
 })()
     JS
 
-    sbjf = server_bundle_js_file(options)
-    result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(sbjf, wrapper_js)
+    server_js_file = server_bundle_js_file(options)
+    result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(server_js_file, wrapper_js)
 
     # IMPORTANT: To ensure that Rails doesn't auto-escape HTML tags, use the 'raw' method.
     html = result["html"]
@@ -260,9 +260,8 @@ module ReactOnRailsHelper
     # On server `location` option is added (`location = request.fullpath`)
     # React Router needs this to match the current route
 
-    # Make sure that we use up-to-date server-bundle
-    sbjf = server_bundle_js_file(options)
-    ReactOnRails::ServerRenderingPool.reset_pool_if_server_bundle_was_modified(sbjf)
+    # Make sure that we use up-to-date server bundles js files
+    ReactOnRails::ServerRenderingPool.reset_pool_if_server_bundle_was_modified
 
     # Since this code is not inserted on a web page, we don't need to escape props
 
@@ -280,7 +279,8 @@ module ReactOnRailsHelper
 })()
     JS
 
-    result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(sbjf, wrapper_js)
+    server_js_file = server_bundle_js_file(options)
+    result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(server_js_file, wrapper_js)
 
     if result["hasErrors"] && raise_on_prerender_error(options)
       # We caught this exception on our backtrace handler
