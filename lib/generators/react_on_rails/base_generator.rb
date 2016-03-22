@@ -147,7 +147,7 @@ module ReactOnRails
         return unless options.server_rendering?
         base_path = "base/server_rendering/"
         %w(client/webpack.server.rails.config.js
-           client/app/bundles/HelloWorld/startup/serverRegistration.jsx).each do |file|
+           client/app/bundles/HelloWorld/startup/server.jsx).each do |file|
           copy_file(base_path + file, file)
         end
       end

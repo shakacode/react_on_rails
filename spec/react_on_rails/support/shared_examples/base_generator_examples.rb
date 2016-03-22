@@ -127,7 +127,7 @@ shared_examples "base_generator:no_server_rendering" do
 
   it "doesn't copy server-side-rendering-only files" do
     %w(client/webpack.server.rails.config.js
-       client/app/bundles/HelloWorld/startup/serverRegistration.jsx).each { |file| assert_no_file(file) }
+       client/app/bundles/HelloWorld/startup/server.jsx).each { |file| assert_no_file(file) }
   end
 
   it "sets server bundle js file to '' in react_on_rails initializer" do
@@ -146,7 +146,7 @@ shared_examples "base_generator:server_rendering" do
 
   it "copies server-rendering-only files" do
     %w(client/webpack.server.rails.config.js
-       client/app/bundles/HelloWorld/startup/serverRegistration.jsx).each { |file| assert_file(file) }
+       client/app/bundles/HelloWorld/startup/server.jsx).each { |file| assert_file(file) }
   end
 
   it "templates client-side-rendering version of webpack.client.base.js" do

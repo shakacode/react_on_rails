@@ -222,7 +222,7 @@ Place your JavaScript code inside of the provided `client/app` folder. Use modul
   ```
 + *Server-Side Rendering:*
 
-  If you are server rendering, `serverRegistration.jsx` will have this. Note, you might be initializing HelloWorld with version specialized for server rendering.
+  If you are server rendering, `server.jsx` will have this. Note, you might be initializing HelloWorld with version specialized for server rendering.
 
   ```javascript
   import HelloWorld from '../components/HelloWorld';
@@ -237,7 +237,7 @@ See below section on how to setup redux stores that allow multiple components to
 ## ReactOnRails View Helpers API
 Once the bundled files have been generated in your `app/assets/webpack` folder and you have exposed your components globally, you will want to run your code in your Rails views using the included helper method.
 
-This is how you actually render the React components you exposed to `window` inside of `clientRegistration` (and `global` inside of `serverRegistration` if you are server rendering).
+This is how you actually render the React components you exposed to `window` inside of `clientRegistration` (and `global` inside of `server` if you are server rendering).
 
 ### react_component
 `react_component(component_name, options = {})`
@@ -404,7 +404,7 @@ The generated client code follows our organization scheme. Each unique set of fu
 
 Inside of the generated "HelloWorld" domain you will find the following folders:
 
-+  `startup`: two types of files, one that return a container component and implement any code that differs between client and server code (if using server-rendering), and a `clientRegistration` file that exposes the aforementioned files (as well as a `serverRegistration` file if using server rendering). These registration files are what webpack is using as an entry point.
++  `startup`: two types of files, one that return a container component and implement any code that differs between client and server code (if using server-rendering), and a `clientRegistration` file that exposes the aforementioned files (as well as a `server` file if using server rendering). These registration files are what webpack is using as an entry point.
 + `containers`: "smart components" (components that have functionality and logic that is passed to child "dumb components").
 + `components`: includes "dumb components", or components that simply render their properties and call functions given to them as properties by a parent component. Ultimately, at least one of these dumb components will have a parent container component.
 

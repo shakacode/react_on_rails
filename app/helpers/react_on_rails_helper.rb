@@ -69,7 +69,7 @@ module ReactOnRailsHelper
   #   Exposing the react_component_name is necessary to both a plain ReactComponent as well as
   #     a generator:
   #   See README.md for how to "register" your react components.
-  #   See spec/dummy/client/app/startup/serverRegistration.jsx and
+  #   See spec/dummy/client/app/startup/server.jsx and
   #     spec/dummy/client/app/startup/ClientRegistration.jsx for examples of this
   #
   # options:

@@ -8,7 +8,6 @@ module ReactOnRails
     def self.reset_pool
       options = { size: ReactOnRails.configuration.server_renderer_pool_size,
                   timeout: ReactOnRails.configuration.server_renderer_pool_size }
-
       @js_context_pools ||= {}
       ReactOnRails.configuration.server_bundle_js_files.each do |server_bundle_js_file|
         @js_context_pools[server_bundle_js_file] = ConnectionPool.new(options) do
@@ -19,7 +18,6 @@ module ReactOnRails
 
     def self.reset_pool_if_server_bundle_was_modified
       return unless ReactOnRails.configuration.development_mode
-
       @server_bundle_timestamps ||= {}
       do_reset_pool = false
       ReactOnRails.configuration.server_bundle_js_files.each do |server_bundle_js_file|
@@ -28,7 +26,6 @@ module ReactOnRails
         @server_bundle_timestamps[server_bundle_js_file] = file_mtime
         do_reset_pool = true
       end
-
       ReactOnRails::ServerRenderingPool.reset_pool if do_reset_pool
     end
 
@@ -44,7 +41,6 @@ module ReactOnRails
       trace_message(js_code)
       json_string = eval_js(server_bundle_js_file, js_code)
       result = JSON.parse(json_string)
-
       if ReactOnRails.configuration.logging_on_server
         console_script = result["consoleReplayScript"]
         console_script_lines = console_script.split("\n")
@@ -73,10 +69,9 @@ module ReactOnRails
         puts "Z" * 80
       end
 
-      def eval_js(server_bundle_js_file, js_code)
-        fail "Bundle [#{server_bundle_js_file}] does not exist in the js context pools" if @js_context_pools[server_bundle_js_file].nil?
-
-        @js_context_pools[server_bundle_js_file].with do |js_context|
+      def eval_js(server_js_file, js_code)
+        raise "Bundle [#{server_js_file}] not set in js context pools" if @js_context_pools[server_js_file].nil?
+        @js_context_pools[server_js_file].with do |js_context|
           result = js_context.eval(js_code)
           js_context.eval("console.history = []")
           result

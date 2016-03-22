@@ -33,8 +33,7 @@ describe "Server Rendering", :server_rendering do
       get server_side_hello_world_with_server_bundle_via_options_path
       html_nodes = Nokogiri::HTML(response.body)
       expect(html_nodes.css("div#my-hello-world-id").children.size).to eq(1)
-      expect(html_nodes.css("div#my-hello-world-id h3").text)
-          .to eq("Hi, Mr. Server Side Rendering!")
+      expect(html_nodes.css("div#my-hello-world-id h3").text).to eq("Hi, Mr. Server Side Rendering!")
     end
   end
 

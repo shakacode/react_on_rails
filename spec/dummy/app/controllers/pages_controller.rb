@@ -41,6 +41,6 @@ class PagesController < ApplicationController
       }
     }
 
-    @custom_server_bundle_js_file = 'alternative-server-bundle.js'
+    @custom_server_bundle_js_file = "alternative-server-bundle.js"
   end
 end
