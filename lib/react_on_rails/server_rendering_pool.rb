@@ -20,10 +20,12 @@ module ReactOnRails
     # TODO: should we allow reset for all files?
     def self.reset_pool_if_server_bundle_was_modified(server_bundle_js_file)
       return unless ReactOnRails.configuration.development_mode
+
       @server_bundle_timestamps ||= {}
       file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path(server_bundle_js_file))
       @server_bundle_timestamps[server_bundle_js_file] ||= file_mtime
       return if @server_bundle_timestamps[server_bundle_js_file] == file_mtime
+
       ReactOnRails::ServerRenderingPool.reset_pool
       @server_bundle_timestamps[server_bundle_js_file] = file_mtime
     end
