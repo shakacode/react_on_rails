@@ -16,9 +16,9 @@ ReactOnRails.configure do |config|
   # Server bundle is a single file for all server rendering of components.
   # Set the server_bundle_js_file to "" if you know that you will not be server rendering.
   <%- if options.server_rendering? %>
-  config.server_bundle_js_file = "server-bundle.js"
+  config.server_bundle_js_files = ["server-bundle.js"]
   <% else %>
-  config.server_bundle_js_file = ""
+  config.server_bundle_js_files = []
   <%- end %>
   # increase if you're on JRuby
   config.server_renderer_pool_size = 1

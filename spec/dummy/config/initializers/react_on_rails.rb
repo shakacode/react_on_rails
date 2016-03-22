@@ -8,7 +8,7 @@ ReactOnRails.configure do |config|
 
   # The server bundle is a single file for all server rendering of components.
   # If you are not using server rendering `(prerender: true)`, set this to "".
-  config.server_bundle_js_file = "server-bundle.js"
+  config.server_bundle_js_files = ["server-bundle.js"]
 
   ################################################################################
   # CLIENT RENDERING OPTIONS

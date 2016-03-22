@@ -132,7 +132,7 @@ shared_examples "base_generator:no_server_rendering" do
 
   it "sets server bundle js file to '' in react_on_rails initializer" do
     assert_file("config/initializers/react_on_rails.rb") do |contents|
-      assert_match(/config.server_bundle_js_file = ""/, contents)
+      assert_match(/config.server_bundle_js_files = \[\]/, contents)
     end
   end
 end
@@ -176,7 +176,7 @@ shared_examples "base_generator:server_rendering" do
   end
 
   it "sets server bundle js file to server-bundle in react_on_rails initializer" do
-    regexp = /config.server_bundle_js_file = "server-bundle.js"/
+    regexp = /config.server_bundle_js_files = \["server-bundle.js"\]/
     assert_file("config/initializers/react_on_rails.rb") do |contents|
       assert_match(regexp, contents)
     end
