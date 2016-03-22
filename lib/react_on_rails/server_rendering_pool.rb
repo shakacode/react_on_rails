@@ -79,36 +79,36 @@ module ReactOnRails
       end
 
       def create_js_context(server_js_file)
-        if server_js_file.present?
-          server_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path(server_js_file)
-          if File.exist?(server_js_file_path)
-            bundle_js_code = File.read(server_js_file_path)
-            base_js_code = <<-JS
+        return unless server_js_file.present?
+
+        server_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path(server_js_file)
+        if File.exist?(server_js_file_path)
+          bundle_js_code = File.read(server_js_file_path)
+          base_js_code = <<-JS
 #{console_polyfill}
 #{execjs_timer_polyfills}
-            #{bundle_js_code};
-            JS
-            begin
-              ExecJS.compile(base_js_code)
-            rescue => e
-              file_name = "tmp/base_js_code.js"
-              msg = "ERROR when compiling base_js_code! See #{file_name} to "\
-                "ERROR when compiling base_js_code! See #{file_name} to "\
-                "correlate line numbers of error. Error is\n\n#{e.message}"\
-                "\n\n#{e.backtrace.join("\n")}"
-              puts msg
-              Rails.logger.error(msg)
-              trace_message(base_js_code, file_name)
-              raise e
-            end
-          else
-            msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
-              "read. You may set the server_bundle_js_files in your configuration to be \"[]\" to "\
-              "avoid this warning"
-            Rails.logger.warn msg
+          #{bundle_js_code};
+          JS
+          begin
+            ExecJS.compile(base_js_code)
+          rescue => e
+            file_name = "tmp/base_js_code.js"
+            msg = "ERROR when compiling base_js_code! See #{file_name} to "\
+              "ERROR when compiling base_js_code! See #{file_name} to "\
+              "correlate line numbers of error. Error is\n\n#{e.message}"\
+              "\n\n#{e.backtrace.join("\n")}"
             puts msg
-            ExecJS.compile("")
+            Rails.logger.error(msg)
+            trace_message(base_js_code, file_name)
+            raise e
           end
+        else
+          msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
+            "read. You may set the server_bundle_js_files in your configuration to be \"[]\" to "\
+            "avoid this warning"
+          Rails.logger.warn msg
+          puts msg
+          ExecJS.compile("")
         end
       end
 
