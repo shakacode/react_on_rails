@@ -8,12 +8,10 @@ module ReactOnRails
     def self.reset_pool
       options = { size: ReactOnRails.configuration.server_renderer_pool_size,
                   timeout: ReactOnRails.configuration.server_renderer_pool_size }
-      @js_context_pools ||= {}
-      ReactOnRails.configuration.server_bundle_js_files.each do |server_bundle_js_file|
-        @js_context_pools[server_bundle_js_file] = ConnectionPool.new(options) do
-          create_js_context(server_bundle_js_file)
+      @js_context_pools =
+        ReactOnRails.configuration.server_bundle_js_files.each_with_object({}) do |server_bundle_js_file, hash|
+          hash[server_bundle_js_file] = ConnectionPool.new(options) { create_js_context(server_bundle_js_file) }
         end
-      end
     end
 
     def self.reset_pool_if_server_bundle_was_modified
@@ -70,12 +68,17 @@ module ReactOnRails
       end
 
       def eval_js(server_js_file, js_code)
-        raise "Bundle [#{server_js_file}] not set in js context pools" if @js_context_pools[server_js_file].nil?
-        @js_context_pools[server_js_file].with do |js_context|
+        server_js_file_context_pool = js_context_pool_for_file(server_js_file)
+        raise "Bundle [#{server_js_file}] not set in js context pools" if server_js_file_context_pool.nil?
+        server_js_file_context_pool.with do |js_context|
           result = js_context.eval(js_code)
           js_context.eval("console.history = []")
           result
         end
+      end
+
+      def js_context_pool_for_file(server_js_file)
+        @js_context_pools[server_js_file]
       end
 
       def create_js_context(server_js_file)

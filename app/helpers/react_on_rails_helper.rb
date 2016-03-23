@@ -84,7 +84,8 @@ module ReactOnRailsHelper
   #                   true, you'll still see the errors on the server.
   #   raise_on_prerender_error: <true/false> Default to false. True will raise exception on server
   #      if the JS code throws
-  #   server_bundle_js_file: the name of the server bundle js file you want to use for rendering the component
+  #   server_bundle_js_file: the name of the server bundle js file you want to use for rendering the component.
+  #      If this is not specified, the default file specified in your config/initializers/react_on_rails.rb is used.
   # Any other options are passed to the content tag, including the id.
   def react_component(component_name, options = {}, other_options = nil)
     # Create the JavaScript and HTML to allow either client or server rendering of the

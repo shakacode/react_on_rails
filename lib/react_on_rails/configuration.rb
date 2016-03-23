@@ -10,7 +10,7 @@ module ReactOnRails
     if @configuration.webpack_generated_files.empty?
       files = ["client-bundle.js"]
       if @configuration.server_bundle_js_files.present?
-        files.concat @configuration.server_bundle_js_files
+        files += @configuration.server_bundle_js_files
       end
       @configuration.webpack_generated_files = files
     end
@@ -31,16 +31,7 @@ module ReactOnRails
       puts "ReactOnRails: Set generated_assets_dir to default: #{DEFAULT_GENERATED_ASSETS_DIR}"
     end
 
-    stripped_server_bundle_js_files = []
-    @configuration.server_bundle_js_files.each do |server_bundle_js_file|
-      if server_bundle_js_file.include?(File::SEPARATOR)
-        puts "[DEPRECATION] ReactOnRails: remove path from server_bundle_js_files in configuration. "\
-          "All generated files must go in #{@configuration.generated_assets_dir}"
-        server_bundle_js_file = File.basename(server_bundle_js_file)
-      end
-      stripped_server_bundle_js_files << server_bundle_js_file
-    end
-    @configuration.server_bundle_js_files = stripped_server_bundle_js_files
+    @configuration.normalize_server_bundle_js_files!
   end
 
   def self.configuration
@@ -99,6 +90,18 @@ module ReactOnRails
       self.server_renderer_timeout = server_renderer_timeout # seconds
 
       self.webpack_generated_files = webpack_generated_files
+    end
+
+    def normalize_server_bundle_js_files!
+      @server_bundle_js_files.map! do |server_bundle_js_file|
+        if server_bundle_js_file.include?(File::SEPARATOR)
+          puts "[DEPRECATION] ReactOnRails: remove path from server_bundle_js_files in configuration. "\
+          "All generated files must go in #{@generated_assets_dir}"
+          File.basename(server_bundle_js_file)
+        else
+          server_bundle_js_file
+        end
+      end
     end
   end
 end
