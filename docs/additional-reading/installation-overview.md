@@ -11,7 +11,7 @@ Note, the best to understand how to use ReactOnRails is to study the examples:
 
 This directory has no references to Rails outside of the destination directory for the files created by the various Webpack config files. 
 
-The only requirements within this diectory for basic React on Rails integration are:
+The only requirements within this directory for basic React on Rails integration are:
 
 1. Your webpack configuration files:
    1. Create outputs in a directory like `/app/assets/webpack`, which is customizable in your `config/initializers/react_on_rails.rb`.
