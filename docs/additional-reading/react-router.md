@@ -6,12 +6,14 @@ However, when attempting to use server-rendering, it is necessary to take steps 
 If you are working with the HelloWorldApp created by the react_on_rails generator, then the code below corresponds to the module in `client/app/bundles/HelloWorld/startup/HelloWorldAppServer.jsx`.
 
 ```js
-const RouterApp = (props, location) => {
-  const store = createStore(props);
-
+const RouterApp = (props, railsContext) => {
   let error;
   let redirectLocation;
   let routeProps;
+  const { location } = railsContext;
+  
+  // create your hydrated store
+  const store = createStore(props);
 
   // See https://github.com/reactjs/react-router/blob/master/docs/guides/advanced/ServerRendering.md
   match({ routes, location }, (_error, _redirectLocation, _routeProps) => {

@@ -15,21 +15,22 @@ import ReactOnRails from './ReactOnRails';
 export default function createReactElement({
   name,
   props,
+  railsContext,
   domNodeId,
   trace,
   location,
   }) {
   if (trace) {
-    console.log(`RENDERED ${name} to dom node with id: ${domNodeId}`);
+    console.log(`RENDERED ${name} to dom node with id: ${domNodeId} with props, railsContext:`,
+      props, railsContext);
   }
 
   const componentObj = ReactOnRails.getComponent(name);
 
-  // CONSIDER NOT RELEASING THE OPTION version
   const { component, generatorFunction } = componentObj;
 
   if (generatorFunction) {
-    return component(props, location);
+    return component(props, railsContext);
   }
 
   return React.createElement(component, props);
