@@ -77,6 +77,7 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
 + [How it Works](#how-it-works)
     - [Client-Side Rendering vs. Server-Side Rendering](#client-side-rendering-vs-server-side-rendering)
     - [Building the Bundles](#building-the-bundles)
+    - [Rails Context)(#rails-context)
     - [Globally Exposing Your React Components](#globally-exposing-your-react-components)
     - [ReactOnRails View Helpers API](#reactonrails-view-helpers-api)
     - [ReactOnRails JavaScript API](#reactonrails-javascript-api)
@@ -207,6 +208,84 @@ In the following screenshot you can see the 3 parts of React on Rails rendering:
 Each time you change your client code, you will need to re-generate the bundles (the webpack-created JavaScript files included in application.js). The included Foreman `Procfile.dev` will take care of this for you by watching your JavaScript code files for changes. Simply run `foreman start -f Procfile.dev`.
 
 On Heroku deploys, the `lib/assets.rake` file takes care of running webpack during deployment. If you have used the provided generator, these bundles will automatically be added to your `.gitignore` in order to prevent extraneous noise from re-generated code in your pull requests. You will want to do this manually if you do not use the provided generator.
+
+### Rails Context
+When you use a "generator function" to create react components or you used shared redux stores, you get 2 params passed to your function:
+
+1. Props that you pass in the view helper of either `react_component` or `redux_store`
+2. Rails contextual information, such as the current pathname. You can customize this in your config file.
+
+This information should be the same regardless of either client or server side rendering.
+
+While you could manually pass this information in as "props", the rails_context is a convenience because it's pass consistently to all invocations of generator functions.
+
+So if you register your generator function `MyAppComponent`, it will get called like:
+
+```js
+reactComponent = MyAppComponent(props, railsContext);
+```
+and for a store:
+
+```js
+reduxStore = MyReduxStore(props, railsContext);
+```
+
+The `railsContext` has: (see implementation in file react_on_rails_helper.rb for method rails_context for the definitive list).
+
+```ruby
+  {
+    # URL settings
+    href: request.original_url,
+    location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}": ""}",
+    scheme: uri.scheme, # http
+    host: uri.host, # foo.com
+    pathname: uri.path, # /posts
+    search: uri.query, # id=30&limit=5
+
+    # Locale settings
+    i18nLocale: I18n.locale,
+    i18nDefaultLocale: I18n.default_locale,
+    httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"]
+  }
+```
+
+#### Use Cases
+##### Needing the current url path for server rendering
+Suppose you want to display a nav bar with the current navigation link highlighted by the URL. When you server render the code, you will need to know the current URL/path if that is what you want your logic to be based on. This could be added to props, or ReactOnRails can add this automatically as another param to the generator function (or maybe an additional object, where we'll consider other additional bits of system info from Rails, like maybe the locale, later).
+
+##### Needing the I18n.locale
+Suppose you want to server render your react components with a the current Rails locale. We need to pass the I18n.locale to the view rendering.
+
+
+#### Customization of the rails_context
+You can customize the values passed in the rails_context in your `config/initializers/react_on_rails.rb`
+
+
+Set the class for the `rendering_extension`:
+
+```ruby
+  config.rendering_extension = RenderingExtension
+```
+
+Implement it like this above in the same file. Create a class method on the module called `custom_context` that takes the `view_context` for a param.
+
+```ruby
+module RenderingExtension
+
+  # Return a Hash that contains custom values from the view context that will get merged with
+  # the standard rails_context values and passed to all calls to generator functions used by the
+  # react_component and redux_store view helpers
+  def self.custom_context(view_context)
+    {
+     somethingUseful: view_context.session[:something_useful]
+    }
+  end
+end
+```
+
+In this case, a prop and value for `somethingUseful` will go into the railsContext passed to all react_component and redux_store calls.
+
+Since you can't access the rails session from JavaScript (or other values available in the view rendering context), this might useful.
 
 ### Globally Exposing Your React Components
 Place your JavaScript code inside of the provided `client/app` folder. Use modules just as you would when using webpack alone. The difference here is that instead of mounting React components directly to an element using `React.render`, you **expose your components globally and then mount them with helpers inside of your Rails views**.
@@ -479,9 +558,15 @@ You may wish to have 2 React components share the same the Redux store. For exam
 
 Suppose the Redux store is called `appStore`, and you have 3 React components that each need to connect to a store: `NavbarApp`, `CommentsApp`, and `BlogsApp`. I named them with `App` to indicate that they are the registered components.
 
-You will need to make a function that can create the store you will be using for all components and register it via the `registerStore` method. Note, this is a **storeCreator**, meaning that it is a function that takes props and returns a store:
+You will need to make a function that can create the store you will be using for all components and register it via the `registerStore` method. Note, this is a **storeCreator**, meaning that it is a function that takes (props, location) and returns a store:
 
 ```
+function appStore(props, railsContext) {
+  // Create a hydrated redux store, using props and the railsContext (object with 
+  // Rails contextual information).
+  return myAppStore;
+}
+
 ReactOnRails.registerStore({
   appStore
 });
