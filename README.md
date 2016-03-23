@@ -527,7 +527,7 @@ Components are created as [stateless function(al) components](https://facebook.g
 ## React Router
 [React Router](https://github.com/reactjs/react-router) is supported, including server side rendering! See:
   
-1. [React on Rails docs for react-router](docs/additional-reading/react_router.md)
+1. [React on Rails docs for react-router](docs/additional-reading/react-router.md)
 1. Examples in [spec/dummy/app/views/react_router](spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](spec/dummy/client/app/startup/ServerRouterApp.jsx). 
 
 ## Developing with the Webpack Dev Server
