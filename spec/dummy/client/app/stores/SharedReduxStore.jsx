@@ -7,7 +7,8 @@ import reducers from '../reducers/reducersIndex';
  *  Export a function that takes the props and returns a Redux store
  *  This is used so that 2 components can have the same store.
  */
-export default props => {
+export default (props, railsContext) => {
   const combinedReducer = combineReducers(reducers);
+  props.railsContext = railsContext;
   return applyMiddleware(middleware)(createStore)(combinedReducer, props);
 };

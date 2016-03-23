@@ -7,7 +7,7 @@ describe "Server Error Logging" do
 
     expected = <<-JS
 console.log.apply(console, ["[SERVER] RENDERED HelloWorldWithLogAndThrow to dom node \
-with id: HelloWorldWithLogAndThrow-react-component-0"]);
+with id: HelloWorldWithLogAndThrow-react-component-0 with props, railsContext:"
 console.log.apply(console, ["[SERVER] console.log in HelloWorld"]);
 console.warn.apply(console, ["[SERVER] console.warn in HelloWorld"]);
 console.error.apply(console, ["[SERVER] console.error in HelloWorld"]);
