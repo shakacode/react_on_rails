@@ -13,9 +13,10 @@ module ReactOnRails
     # RSpec.configure do |config|
     #   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
     #
-    # You can pass an RSpec metatag as an optional second parameter to this helper method
-    # if you want this helper to run on examples other than where `js: true` (default). The helper
-    # will compile webpack files at most once per test run.
+    # You can pass an RSpec metatag as an list of parameter to this helper method
+    # if you want this helper to run on examples other than where `js: true` or
+    # `server_rendering: true` (default). The helper will compile webpack files at most
+    # once per test run.
     #
     # If you do not want to be slowed down by re-compiling webpack assets from scratch every test
     # run, you can call `npm run build:client` (and `npm run build:server` if doing server
@@ -23,9 +24,18 @@ module ReactOnRails
     # faster. The helper looks for these processes and will abort recompiling if it finds them
     # to be running.
     #
-    # See docs/additional_reading/rspec_configuration.md for more info
-    def self.configure_rspec_to_compile_assets(config, metatag = :js)
-      config.before(:example, metatag) { ReactOnRails::TestHelper.ensure_assets_compiled }
+    # See docs/additional-reading/rspec-configuration.md for more info
+    #
+    # Params:
+    # config - config for rspec
+    # metatags - metatags to add the ensure_assets_compiled check.
+    #            Default is :js, :server_rendering
+    def self.configure_rspec_to_compile_assets(config, *metatags)
+      metatags = [:js, :server_rendering] if metatags.empty?
+
+      metatags.each do |metatag|
+        config.before(:example, metatag) { ReactOnRails::TestHelper.ensure_assets_compiled }
+      end
     end
 
     # Main entry point to ensuring assets are compiled. See `configure_rspec_to_compile_assets` for
@@ -38,20 +48,35 @@ module ReactOnRails
     #                         defaults to ReactOnRails::TestHelper::WebpackProcessChecker
     # webpack_assets_compiler: provide one method: `def compile`
     #                         defaults to ReactOnRails::TestHelper::WebpackAssetsCompiler
-    # client_dir and compiled_dirs are passed into the default webpack_assets_status_checker if you
-    #                         don't provide one.
+    # client_dir and generated_assets_dir are passed into the default webpack_assets_status_checker if you
+    #                        don't provide one.
+    # webpack_generated_files List of files to check for up-to-date-status, defaulting to
+    #                        webpack_generated_files in your configuration
     def self.ensure_assets_compiled(webpack_assets_status_checker: nil,
                                     webpack_assets_compiler: nil,
                                     webpack_process_checker: nil,
                                     client_dir: nil,
-                                    compiled_dirs: nil)
+                                    generated_assets_dir: nil,
+                                    webpack_generated_files: nil)
 
       if webpack_assets_status_checker.nil?
         client_dir ||= Rails.root.join("client")
-        compiled_dirs ||= ReactOnRails.configuration.generated_assets_dirs
+        generated_assets_dir ||= ReactOnRails.configuration.generated_assets_dir
+        webpack_generated_files ||= ReactOnRails.configuration.webpack_generated_files
+
         webpack_assets_status_checker ||=
           WebpackAssetsStatusChecker.new(client_dir: client_dir,
-                                         compiled_dirs: compiled_dirs)
+                                         generated_assets_dir: generated_assets_dir,
+                                         webpack_generated_files: webpack_generated_files
+                                        )
+
+        unless @printed_once
+          puts
+          puts "====> React On Rails: Checking #{webpack_assets_status_checker.generated_assets_dir} for "\
+          "outdated/missing bundles"
+          puts
+          @printed_once = true
+        end
       end
 
       webpack_assets_compiler ||= WebpackAssetsCompiler.new

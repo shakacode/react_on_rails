@@ -1,4 +1,3 @@
-
 import test from 'tape';
 import StoreRegistry from '../src/StoreRegistry';
 import React from 'react';
@@ -32,10 +31,22 @@ test('StoreRegistry registers and retrieves generator function stores', (assert)
 test('StoreRegistry throws error for retrieving unregistered store', (assert) => {
   assert.plan(1);
   assert.throws(() => StoreRegistry.getStoreGenerator('foobar'),
-    /Could not find store registered with name foobar/,
-    'Expected an exception for calling StoreRegistry.get with an invalid name.'
+    /Could not find store registered with name 'foobar'\. Registered store names include/,
+    'Expected an exception for calling StoreRegistry.getStoreGenerator with an invalid name.'
   );
 });
+
+test('StoreRegistry returns undefined for retrieving unregistered store, ' +
+  'passing throwIfMissing = false',
+  (assert) => {
+    assert.plan(1);
+    const actual = StoreRegistry.getStore('foobar', false);
+    const expected = undefined;
+    assert.equals(actual, expected, 'StoreRegistry.get should return undefined for missing ' +
+      'store if throwIfMissing is passed as false'
+    );
+  }
+);
 
 test('StoreRegistry getStore, setStore', (assert) => {
   assert.plan(1);
@@ -44,5 +55,13 @@ test('StoreRegistry getStore, setStore', (assert) => {
   const actual = StoreRegistry.getStore('storeGenerator');
   const expected = store;
   assert.deepEqual(actual, expected, 'StoreRegistry should store and retrieve the store');
+});
+
+test('StoreRegistry throws error for retrieving unregistered hydrated store', (assert) => {
+  assert.plan(1);
+  assert.throws(() => StoreRegistry.getStore('foobar'),
+    /Could not find hydrated store with name 'foobar'\. Hydrated store names include/,
+    'Expected an exception for calling StoreRegistry.getStore with an invalid name.'
+  );
 });
 

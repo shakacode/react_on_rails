@@ -13,7 +13,7 @@ module ReactOnRails
 
     def self.reset_pool_if_server_bundle_was_modified
       return unless ReactOnRails.configuration.development_mode
-      file_mtime = File.mtime(ReactOnRails.configuration.server_bundle_js_file)
+      file_mtime = File.mtime(ReactOnRails::Utils.default_server_bundle_js_file_path)
       @server_bundle_timestamp ||= file_mtime
       return if @server_bundle_timestamp == file_mtime
       ReactOnRails::ServerRenderingPool.reset_pool
@@ -70,7 +70,7 @@ module ReactOnRails
       end
 
       def create_js_context
-        server_js_file = ReactOnRails.configuration.server_bundle_js_file
+        server_js_file = ReactOnRails::Utils.default_server_bundle_js_file_path
         if server_js_file.present? && File.exist?(server_js_file)
           bundle_js_code = File.read(server_js_file)
           base_js_code = <<-JS

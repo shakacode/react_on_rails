@@ -68,14 +68,14 @@ end
 gem 'bootstrap-sass'
 
 group :test do
-  gem "rspec-rails"
   gem "coveralls", require: false
   gem "capybara"
   gem "capybara-screenshot"
-  gem "selenium-webdriver"
-  gem "chromedriver-helper"
-  gem "launchy"
-  gem "generator_spec"
-  gem "poltergeist"
   gem "capybara-webkit"
+  gem "chromedriver-helper"
+  gem "generator_spec"
+  gem "launchy"
+  gem "poltergeist"
+  gem "rspec-rails"
+  gem "selenium-webdriver"
 end

@@ -7,6 +7,7 @@
   "excludeFiles": [
     "**/build/**",
     "**/node_modules/**",
+    "**/assets/webpack/**",
     "**/generated/**",
     "**/docs/**",
     "**/tmp/**",

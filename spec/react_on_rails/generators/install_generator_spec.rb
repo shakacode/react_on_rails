@@ -221,7 +221,7 @@ describe InstallGenerator, type: :generator do
         node_modules
 
         # Generated js bundles
-        /app/assets/javascripts/generated/*
+        /app/assets/webpack/*
 
         MSG
       expect(GeneratorMessages.output)

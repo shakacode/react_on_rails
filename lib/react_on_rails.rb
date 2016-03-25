@@ -1,5 +1,6 @@
 require "rails"
 
+require "react_on_rails/controller"
 require "react_on_rails/version"
 require "react_on_rails/version_checker"
 require "react_on_rails/configuration"

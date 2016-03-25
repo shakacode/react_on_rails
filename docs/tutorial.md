@@ -1,10 +1,10 @@
-# Tutorial for v2.0
+# Tutorial for React on Rails
 
-I just released RC3 of [React On Rails](https://github.com/shakacode/react_on_rails/tree/npm-react-on-rails-js). Here's a tiny tutorial to get you started. This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
+This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
 You can find:
 
-* [Source code for this sample app](https://github.com/justin808/test-react-on-rails-3)
+* [Source code for this sample app](https://github.com/justin808/test-react-on-rails-3) (for an older version)
 * [Live on Heroku](https://shakacode-react-on-rails.herokuapp.com/hello_world)
 
 By the time you read this, the latest may have changed. Be sure to check the versions here:
@@ -12,7 +12,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 * https://rubygems.org/gems/react_on_rails
 * https://www.npmjs.com/package/react-on-rails
 
-Trying out v2 is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 4.x and node version 4+. I recommend `rvm` and `nvm` to install Ruby and Node.
+Trying out v4 is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 4.x and node version 5+. I recommend `rvm` and `nvm` to install Ruby and Node.
 
 ```
 cd <directory where you want to create your new Rails app>
@@ -57,7 +57,7 @@ Visit http://localhost:4000 and see your React On Rails app running using the We
 
 With this setup, you can make changes to your JS or CSS and the browser will hot reload the changes (no page refresh required).
 
-I'm going to add this line to:
+I'm going to add this line to client/app/bundles/HelloWorld/HelloWorldWidget.jsx:
 
 ```html
 <h1>Welcome to React On Rails!</h1>
@@ -127,7 +127,7 @@ Completed all linting
 
 It's super important to exclude certain directories from RubyMine or else it will slow to a crawl as it tries to parse all the npm files.
 
-* `app/assets/javascripts/generated`
+* `app/assets/webpack`
 * `client/node_modules`
 
 <img src="http://forum.shakacode.com/uploads/default/original/1X/a1b3e1146d86915f7d5d1c89548e81ec208458cc.png" width="338" height="500">
@@ -146,9 +146,10 @@ Run this command that looks like this from your new heroku app
 
     heroku git:remote -a my-name-react-on-rails
 
-Set the correct buildpack for using react-on-rails:
+Set heroku to use multiple buildpacks:
 
-    heroku buildpacks:set https://github.com/heroku/heroku-buildpack-multi
+    heroku buildpacks:set heroku/ruby
+    heroku buildpacks:add --index 1 heroku/nodejs
 
 
 ### Swap out sqlite for postgres by doing the following:

@@ -16,22 +16,6 @@ const DEFAULT_OPTIONS = {
 
 ctx.ReactOnRails = {
   /**
-   * Set options for ReactOnRails, typically before you call ReactOnRails.register
-   * Available Options:
-   * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
-   */
-  setOptions(options) {
-    if (options.hasOwnProperty('traceTurbolinks')) {
-      this._options.traceTurbolinks = options.traceTurbolinks;
-      delete options.traceTurbolinks;
-    }
-
-    if (Object.keys(options).length > 0) {
-      throw new Error('Invalid options passed to ReactOnRails.options: ', JSON.stringify(options));
-    }
-  },
-
-  /**
    * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
    * find you components for rendering.
    * @param components (key is component name, value is component)
@@ -51,13 +35,32 @@ ctx.ReactOnRails = {
   },
 
   /**
-   * Allows retrieval of the store by name. This store will be hydrated by any
-   * Rails form props.
+   * Allows retrieval of the store by name. This store will be hydrated by any Rails form props.
+   * Pass optional param throwIfMissing = false if you want to use this call to get back null if the
+   * store with name is not registered.
    * @param name
+   * @param throwIfMissing Defaults to true. Set to false to have this call return undefined if
+   *        there is no store with the given name.
    * @returns Redux Store, possibly hydrated
    */
-  getStore(name) {
-    return StoreRegistry.getStore(name);
+  getStore(name, throwIfMissing = true) {
+    return StoreRegistry.getStore(name, throwIfMissing);
+  },
+
+  /**
+   * Set options for ReactOnRails, typically before you call ReactOnRails.register
+   * Available Options:
+   * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
+   */
+  setOptions(options) {
+    if (options.hasOwnProperty('traceTurbolinks')) {
+      this._options.traceTurbolinks = options.traceTurbolinks;
+      delete options.traceTurbolinks;
+    }
+
+    if (Object.keys(options).length > 0) {
+      throw new Error('Invalid options passed to ReactOnRails.options: ', JSON.stringify(options));
+    }
   },
 
   ////////////////////////////////////////////////////////////////////////////////

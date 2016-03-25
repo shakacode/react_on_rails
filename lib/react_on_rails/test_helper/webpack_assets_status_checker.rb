@@ -6,47 +6,54 @@ require "fileutils"
 module ReactOnRails
   module TestHelper
     class WebpackAssetsStatusChecker
-      attr_reader :client_dir, :compiled_dirs
+      # client_dir is typically /client, where all client files go
+      attr_reader :client_dir, :generated_assets_dir
 
-      def initialize(args = {})
-        @compiled_dirs = args.fetch(:compiled_dirs)
-        @client_dir = args.fetch(:client_dir)
-        @last_stale_files = ""
+      def initialize(generated_assets_dir:, client_dir:, webpack_generated_files:)
+        @generated_assets_dir = generated_assets_dir
+        @client_dir = client_dir
+        @webpack_generated_files = webpack_generated_files
       end
 
-      def up_to_date?
-        # binding.pry
-        return false unless assets_exist?
-        all_compiled_assets.all? do |asset|
-          FileUtils.uptodate?(asset, client_files)
+      def stale_generated_webpack_files
+        most_recent_mtime = find_most_recent_mtime
+        all_compiled_assets.each_with_object([]) do |webpack_generated_file, stale_gen_list|
+          if !File.exist?(webpack_generated_file) ||
+             File.mtime(webpack_generated_file) < most_recent_mtime
+            stale_gen_list << webpack_generated_file
+          end
+          stale_gen_list
         end
-      end
-
-      def whats_not_up_to_date
-        return [] unless assets_exist?
-        result = []
-        all_compiled_assets.all? do |asset|
-          result += whats_not_up_to_date_worker(asset, client_files)
-        end
-        result.uniq
       end
 
       private
 
-      def whats_not_up_to_date_worker(new, old_list)
-        # derived from lib/ruby/2.2.0/fileutils.rb:147
-        not_up_to_date = []
-        new_time = File.mtime(new)
-        old_list.each do |old|
-          if File.exist?(old)
-            not_up_to_date << old unless new_time > File.mtime(old)
-          end
+      def find_most_recent_mtime
+        client_files.reduce(1.year.ago) do |newest_time, file|
+          mt = File.mtime(file)
+          mt > newest_time ? mt : newest_time
         end
-        not_up_to_date
       end
 
       def all_compiled_assets
-        make_file_list(make_globs(compiled_dirs)).to_ary
+        @all_compiled_assets ||= begin
+          webpack_generated_files = @webpack_generated_files.map do |file|
+            File.join(@generated_assets_dir, file)
+          end
+          if webpack_generated_files.present?
+            webpack_generated_files
+          else
+            file_list = make_file_list(make_globs(generated_assets_dir)).to_ary
+            puts "V" * 80
+            puts "Please define config.webpack_generated_files (array) so the test helper knows "\
+            "which files are required."
+            puts "Detected the possible following files to check for webpack compilation in "\
+              "#{generated_assets_dir}"
+            puts file_list.join("\n")
+            puts "^" * 80
+            file_list
+          end
+        end
       end
 
       def client_files
@@ -58,12 +65,12 @@ module ReactOnRails
       end
 
       def assets_exist?
-        all_compiled_assets.to_ary.size > 0
+        !all_compiled_assets.empty?
       end
 
       def make_file_list(glob)
         FileList.new(glob) do |fl|
-          fl.exclude(%r{/node_modules/})
+          fl.exclude(%r{/node_modules})
           fl.exclude(".DS_Store")
           fl.exclude(".keep")
           fl.exclude("thumbs.db")

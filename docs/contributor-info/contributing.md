@@ -16,7 +16,7 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 * /gen-examples
 * /node_package/lib
 * /node_modules
-* /spec/dummy/app/assets/javascripts/generated
+* /spec/dummy/app/assets/webpack
 * /spec/dummy/log
 * /spec/dummy/node_modules
 * /spec/dummy/tmp

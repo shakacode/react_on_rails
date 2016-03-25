@@ -120,7 +120,7 @@ end
 def bootstrap_related_js_contents
   <<-DATA.strip_heredoc
 
-    // bootstrap-sprockets depends on generated/vendor-bundle for jQuery.
+    // bootstrap-sprockets depends on vendor-bundle for jQuery.
     //= require bootstrap-sprockets
 
   DATA

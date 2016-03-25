@@ -54,7 +54,15 @@ describe ReactOnRailsHelper, type: :helper do
             data-component-name="App"
             data-props="{&quot;name&quot;:&quot;My Test Name&quot;}"
             data-trace="false"
-            #{turbolinks_line}
+            data-dom-id="#{id}"></div>).squish
+    end
+
+    let(:react_definition_div_no_params) do
+      %(<div class="js-react-on-rails-component"
+            style="display:none"
+            data-component-name="App"
+            data-props="{}"
+            data-trace="false"
             data-dom-id="#{id}"></div>).squish
     end
 
@@ -65,16 +73,30 @@ describe ReactOnRailsHelper, type: :helper do
       it { is_expected.to include react_definition_div }
     end
 
+    describe "API with component name only" do
+      subject { react_component("App") }
+      it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
+      it { is_expected.to include react_component_div }
+      it { is_expected.to include react_definition_div_no_params }
+    end
+
+    describe "Deprecated API with component name and empty props" do
+      subject { react_component("App", "") }
+      it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
+      it { is_expected.to include react_component_div }
+      it { is_expected.to include react_definition_div_no_params }
+    end
+
     it { expect(self).to respond_to :react_component }
 
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
     it { is_expected.to start_with "<div" }
-    it { is_expected.to end_with "</div>\n\n" }
+    it { is_expected.to match %r{</div>\s*$} }
     it { is_expected.to include react_component_div }
     it { is_expected.to include react_definition_div }
 
     context "with 'id' option" do
-      subject { react_component("App", props, id: id) }
+      subject { react_component("App", props: props, id: id) }
 
       let(:id) { "shaka_div" }
 
@@ -91,7 +113,6 @@ describe ReactOnRailsHelper, type: :helper do
               data-component-name=\"App\"
               data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
               data-trace=\"false\"
-              #{turbolinks_line}
               data-dom-id=\"#{id}\"></div>".squish
       end
 
@@ -107,7 +128,6 @@ describe ReactOnRailsHelper, type: :helper do
               data-component-name=\"App\"
               data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
               data-trace=\"false\"
-              #{turbolinks_line}
               data-dom-id=\"#{id}\"></div>".squish
       end
 
@@ -116,7 +136,7 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#redux_store" do
-    subject { redux_store("reduxStore", props) }
+    subject { redux_store("reduxStore", props: props) }
 
     let(:props) do
       { name: "My Test Name" }
@@ -165,9 +185,5 @@ describe ReactOnRailsHelper, type: :helper do
 
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
     it { is_expected.to eq hello_world }
-  end
-
-  def turbolinks_line
-    %(data-expect-turbolinks="#{ENV['DISABLE_TURBOLINKS'].present? ? 'false' : 'true'}")
   end
 end

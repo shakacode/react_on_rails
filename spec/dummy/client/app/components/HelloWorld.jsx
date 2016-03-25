@@ -1,5 +1,8 @@
 import React, { PropTypes } from 'react';
 
+// Example of CSS modules.
+import css from './HelloWorld.scss';
+
 // Super simple example of the simplest possible React component
 class HelloWorld extends React.Component {
 
@@ -36,7 +39,7 @@ spec/dummy/client/app/components/HelloWorld.jsx:18`);
 
     return (
       <div>
-        <h3>
+        <h3 className={css.brightColor}>
           Hello, {name}!
         </h3>
         <p>

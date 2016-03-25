@@ -13,5 +13,10 @@ module ReactOnRails
     def self.last_process_completed_successfully?
       $CHILD_STATUS.exitstatus == 0
     end
+
+    def self.default_server_bundle_js_file_path
+      File.join(ReactOnRails.configuration.generated_assets_dir,
+                ReactOnRails.configuration.server_bundle_js_file)
+    end
   end
 end

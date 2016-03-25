@@ -35,6 +35,7 @@ ActiveRecord::Migration.maintain_test_schema!
 
 RSpec.configure do |config|
   # Ensure that if we are running js tests, we are using latest webpack assets
+  # This will use the defaults of :js and :server_rendering meta tags
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
 
   # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
@@ -64,34 +65,51 @@ RSpec.configure do |config|
   #
   # selenium_firefox webdriver only works for Travis-CI builds.
   default_driver = :poltergeist
-  supported_drivers = %w( poltergeist webkit selenium_chrome selenium_firefox)
+
+  supported_drivers = %i( poltergeist poltergeist_errors_ok webkit
+                          selenium_chrome selenium_firefox selenium)
   driver = ENV["DRIVER"].try(:to_sym) || default_driver
 
-  unless supported_drivers.include?(driver.to_s)
-    fail "Unsupported driver: #{driver} (supported = #{supported_drivers})"
+  unless supported_drivers.include?(driver)
+    raise "Unsupported driver: #{driver} (supported = #{supported_drivers})"
   end
 
-  if driver == :poltergeist
+  case driver
+  when :poltergeist, :poltergeist_errors_ok
     require "capybara/poltergeist"
-  elsif driver == :selenium_chrome
+    Capybara.register_driver :poltergeist_errors_ok do |app|
+      Capybara::Poltergeist::Driver.new(app, js_errors: false)
+    end
+  when :selenium_chrome
     Capybara.register_driver :selenium_chrome do |app|
       Capybara::Selenium::Driver.new(app, browser: :chrome)
     end
     Capybara::Screenshot.register_driver(:selenium_chrome) do |js_driver, path|
       js_driver.browser.save_screenshot(path)
     end
-  elsif driver == :selenium_firefox
+  when :selenium_firefox, :selenium
     Capybara.register_driver :selenium_firefox do |app|
       Capybara::Selenium::Driver.new(app, browser: :firefox)
     end
     Capybara::Screenshot.register_driver(:selenium_firefox) do |js_driver, path|
       js_driver.browser.save_screenshot(path)
     end
+    driver = :selenium_firefox
   end
+
   Capybara.javascript_driver = driver
 
   puts "Capybara using driver: #{Capybara.javascript_driver}"
 
   Capybara::Screenshot.prune_strategy = { keep: 10 }
   # [END] Capybara config
+
+  # This will insert a <base> tag with the asset host into the pages created by
+  # save_and_open_page, meaning that relative links will be loaded from the
+  # development server if it is running.
+  Capybara.asset_host = "http://localhost:3000"
+
+  def js_errors_driver
+    Capybara.javascript_driver == :poltergeist ? :poltergeist_errors_ok : Capybara.javascript_driver
+  end
 end
