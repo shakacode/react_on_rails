@@ -191,7 +191,7 @@ In most cases, you should use the `prerender: false` (default behavior) with the
 
 Now the server will interpret your JavaScript using [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. We recommend using [therubyracer](https://github.com/cowboyd/therubyracer) as ExecJS's runtime. The generator will automatically add it to your Gemfile for you.
 
-Note that **server-rendering requires globally exposing your components by setting them to `global`, not `window`** (as is the case with client-rendering). If using the generator, you can pass the `--server-rendering` option to configure your application for server-side rendering.
+Note that **server-rendering requires globally exposing your components by setting them to `global`, not `window`** (as is the case with client-rendering). If using the generator, you can pass the `--server-rendering` option to configure your application for server-side rendering.  If you require additional JS on the server side [please refer to below `before_render`/`after_render` hooks](#migrate-from-react-rails)
 
 In the following screenshot you can see the 3 parts of React on Rails rendering:
 
@@ -557,6 +557,22 @@ If you are using [react-rails](https://github.com/reactjs/react-rails) in your p
 //= require react
 //= require react_ujs
 //= require components
+```
+
+- Add `before_render` and `after_render` hooks
+
+```
+module ReactOnRails
+  class ServerRenderingPool
+    def self.before_render(component_name, props, prerender_options, request)
+        "console.log('Before Render');"
+    end
+
+    def self.after_render(component_name, props, prerender_options, request)
+      "console.log('After Render');"
+    end
+  end
+end
 ```
 
 - Follow our getting started guide: https://github.com/shakacode/react_on_rails#getting-started.
