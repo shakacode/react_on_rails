@@ -1,4 +1,4 @@
-import clientStartup from './clientStartup';
+import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
 import ComponentRegistry from './ComponentRegistry';
 import StoreRegistry from './StoreRegistry';
@@ -61,6 +61,10 @@ ctx.ReactOnRails = {
     if (Object.keys(options).length > 0) {
       throw new Error('Invalid options passed to ReactOnRails.options: ', JSON.stringify(options));
     }
+  },
+
+  reactOnRailsPageLoaded() {
+    ClientStartup.reactOnRailsPageLoaded();
   },
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -175,6 +179,6 @@ ctx.ReactOnRails = {
 
 ReactOnRails.resetOptions();
 
-clientStartup(ctx);
+ClientStartup.clientStartup(ctx);
 
 export default ctx.ReactOnRails;

@@ -28,6 +28,24 @@ Turbolinks 5 is now being supported. React on Rails will automatically detect wh
 
 For more information on Turbolinks 5: [https://github.com/turbolinks/turbolinks](https://github.com/turbolinks/turbolinks)
 
+### async script loading
+Generally async script loading can be done like:
+```erb
+  <%= javascript_include_tag 'application', async: Rails.env.production? %>
+```
+If you use ```document.addEventListener("turbolinks:load", function() {...});``` somewhere in your code, you will notice, that Turbolinks 5 does not fire ```turbolinks:load``` on initial page load. A quick workaround is to use ```defer``` instead of ```async```:
+```erb
+  <%= javascript_include_tag 'application', defer: Rails.env.production? %>
+```
+More information on this issue can be found here: https://github.com/turbolinks/turbolinks/issues/28
+
+When loading your scripts asynchronously you may experience, that your Components are not registered correctly. Call ```ReactOnRails.reactOnRailsPageLoaded()``` to re-initialize like so:
+```
+  document.addEventListener("turbolinks:load", function() {
+    ReactOnRails.reactOnRailsPageLoaded();
+  });
+```
+
 ## Troubleshooting
 To turn on tracing of Turbolinks events, put this in your registration file, where you register your components.
 
