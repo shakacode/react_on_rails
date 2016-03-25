@@ -9,8 +9,8 @@ module ReactOnRails
   def self.setup_config_values
     if @configuration.webpack_generated_files.empty?
       files = ["client-bundle.js"]
-      if @configuration.server_bundle_js_file.present?
-        files << @configuration.server_bundle_js_file
+      if @configuration.server_bundle_js_files.present?
+        files += @configuration.server_bundle_js_files
       end
       @configuration.webpack_generated_files = files
     end
@@ -31,11 +31,7 @@ module ReactOnRails
       puts "ReactOnRails: Set generated_assets_dir to default: #{DEFAULT_GENERATED_ASSETS_DIR}"
     end
 
-    if @configuration.server_bundle_js_file.include?(File::SEPARATOR)
-      puts "[DEPRECATION] ReactOnRails: remove path from server_bundle_js_file in configuration. "\
-        "All generated files must go in #{@configuration.generated_assets_dir}"
-      @configuration.server_bundle_js_file = File.basename(@configuration.server_bundle_js_file)
-    end
+    @configuration.normalize_server_bundle_js_files!
   end
 
   def self.configuration
@@ -45,7 +41,7 @@ module ReactOnRails
       # generated_assets_dirs is deprecated
       generated_assets_dir: "",
 
-      server_bundle_js_file: "",
+      server_bundle_js_files: [],
       prerender: false,
       replay_console: true,
       logging_on_server: true,
@@ -60,20 +56,20 @@ module ReactOnRails
   end
 
   class Configuration
-    attr_accessor :server_bundle_js_file, :prerender, :replay_console,
+    attr_accessor :server_bundle_js_files, :prerender, :replay_console,
                   :trace, :development_mode,
                   :logging_on_server, :server_renderer_pool_size,
                   :server_renderer_timeout, :raise_on_prerender_error,
                   :skip_display_none, :generated_assets_dirs, :generated_assets_dir,
                   :webpack_generated_files
 
-    def initialize(server_bundle_js_file: nil, prerender: nil, replay_console: nil,
+    def initialize(server_bundle_js_files: [], prerender: nil, replay_console: nil,
                    trace: nil, development_mode: nil,
                    logging_on_server: nil, server_renderer_pool_size: nil,
                    server_renderer_timeout: nil, raise_on_prerender_error: nil,
                    skip_display_none: nil, generated_assets_dirs: nil,
                    generated_assets_dir: nil, webpack_generated_files: nil)
-      self.server_bundle_js_file = server_bundle_js_file
+      self.server_bundle_js_files = server_bundle_js_files
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir
 
@@ -94,6 +90,18 @@ module ReactOnRails
       self.server_renderer_timeout = server_renderer_timeout # seconds
 
       self.webpack_generated_files = webpack_generated_files
+    end
+
+    def normalize_server_bundle_js_files!
+      @server_bundle_js_files.map! do |server_bundle_js_file|
+        if server_bundle_js_file.include?(File::SEPARATOR)
+          puts "[DEPRECATION] ReactOnRails: remove path from server_bundle_js_files in configuration. "\
+          "All generated files must go in #{@generated_assets_dir}"
+          File.basename(server_bundle_js_file)
+        else
+          server_bundle_js_file
+        end
+      end
     end
   end
 end

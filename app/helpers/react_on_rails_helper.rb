@@ -69,7 +69,7 @@ module ReactOnRailsHelper
   #   Exposing the react_component_name is necessary to both a plain ReactComponent as well as
   #     a generator:
   #   See README.md for how to "register" your react components.
-  #   See spec/dummy/client/app/startup/serverRegistration.jsx and
+  #   See spec/dummy/client/app/startup/server.jsx and
   #     spec/dummy/client/app/startup/ClientRegistration.jsx for examples of this
   #
   # options:
@@ -84,6 +84,8 @@ module ReactOnRailsHelper
   #                   true, you'll still see the errors on the server.
   #   raise_on_prerender_error: <true/false> Default to false. True will raise exception on server
   #      if the JS code throws
+  #   server_bundle_js_file: the name of the server bundle js file you want to use for rendering the component.
+  #      If this is not specified, the default file specified in your config/initializers/react_on_rails.rb is used.
   # Any other options are passed to the content tag, including the id.
   def react_component(component_name, options = {}, other_options = nil)
     # Create the JavaScript and HTML to allow either client or server rendering of the
@@ -217,7 +219,8 @@ module ReactOnRailsHelper
 })()
     JS
 
-    result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
+    server_js_file = server_bundle_js_file(options)
+    result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(server_js_file, wrapper_js)
 
     # IMPORTANT: To ensure that Rails doesn't auto-escape HTML tags, use the 'raw' method.
     html = result["html"]
@@ -258,7 +261,7 @@ module ReactOnRailsHelper
     # On server `location` option is added (`location = request.fullpath`)
     # React Router needs this to match the current route
 
-    # Make sure that we use up-to-date server-bundle
+    # Make sure that we use up-to-date server bundles js files
     ReactOnRails::ServerRenderingPool.reset_pool_if_server_bundle_was_modified
 
     # Since this code is not inserted on a web page, we don't need to escape props
@@ -277,7 +280,8 @@ module ReactOnRailsHelper
 })()
     JS
 
-    result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
+    server_js_file = server_bundle_js_file(options)
+    result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(server_js_file, wrapper_js)
 
     if result["hasErrors"] && raise_on_prerender_error(options)
       # We caught this exception on our backtrace handler
@@ -335,6 +339,10 @@ ReactOnRails.setStore('#{store_name}', store);
 
   def replay_console(options)
     options.fetch(:replay_console) { ReactOnRails.configuration.replay_console }
+  end
+
+  def server_bundle_js_file(options = {})
+    options[:server_bundle_js_file] || ReactOnRails::Utils.default_server_bundle_js_file
   end
 
   # rubocop:disable Metrics/CyclomaticComplexity

@@ -3,11 +3,12 @@ const path = require('path');
 module.exports = {
   entry: [
     'babel-polyfill',
-    'startup/serverRegistration',
+    'startup/server',
+    'startup/alternative-server',
   ],
   output: {
     path: '../app/assets/webpack',
-    filename: 'server.js',
+    filename: '[name]-bundle.js',
   },
   resolve: {
     root: [path.join(__dirname, 'app')],

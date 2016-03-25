@@ -1,7 +1,7 @@
 require "rails_helper"
 
 describe "Server Rendering", :server_rendering do
-  it "generates server rendered HTML if server renderering enabled" do
+  it "generates server rendered HTML if server rendering enabled" do
     get server_side_hello_world_with_options_path
     html_nodes = Nokogiri::HTML(response.body)
     expect(html_nodes.css("div#my-hello-world-id").children.size).to eq(1)
@@ -11,7 +11,7 @@ describe "Server Rendering", :server_rendering do
       .to eq("Mr. Server Side Rendering")
   end
 
-  it "generates server rendered HTML if server renderering enabled for shared redux" do
+  it "generates server rendered HTML if server rendering enabled for shared redux" do
     get server_side_hello_world_shared_store_path
     html_nodes = Nokogiri::HTML(response.body)
     top_id = "#ReduxSharedStoreApp-react-component-0"
@@ -22,10 +22,19 @@ describe "Server Rendering", :server_rendering do
       .to eq("Mr. Server Side Rendering")
   end
 
-  it "generates no server rendered HTML if server renderering not enabled" do
+  it "generates no server rendered HTML if server rendering not enabled" do
     get client_side_hello_world_path
     html_nodes = Nokogiri::HTML(response.body)
     expect(html_nodes.css("div#HelloWorld-react-component-0").children.size).to eq(0)
+  end
+
+  describe "when using multiple bundles" do
+    it "generates server rendered HTML using the specified bundle" do
+      get server_side_hello_world_with_server_bundle_via_options_path
+      html_nodes = Nokogiri::HTML(response.body)
+      expect(html_nodes.css("div#my-hello-world-id").children.size).to eq(1)
+      expect(html_nodes.css("div#my-hello-world-id h3").text).to eq("Hi, Mr. Server Side Rendering!")
+    end
   end
 
   describe "reloading the server bundle" do

@@ -10,12 +10,12 @@ module.exports = {
 
   // the project dir
   context: __dirname,
-  entry: [
-    'babel-polyfill',
-    './app/startup/serverRegistration',
-  ],
+  entry: {
+    server: ['babel-polyfill', './app/startup/server'],
+    'alternative-server': ['babel-polyfill', './app/startup/alternative-server']
+  },
   output: {
-    filename: 'server-bundle.js',
+    filename: '[name]-bundle.js',
     path: '../app/assets/webpack',
   },
   resolve: {

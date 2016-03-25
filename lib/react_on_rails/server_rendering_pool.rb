@@ -8,16 +8,23 @@ module ReactOnRails
     def self.reset_pool
       options = { size: ReactOnRails.configuration.server_renderer_pool_size,
                   timeout: ReactOnRails.configuration.server_renderer_pool_size }
-      @js_context_pool = ConnectionPool.new(options) { create_js_context }
+      @js_context_pools =
+        ReactOnRails.configuration.server_bundle_js_files.each_with_object({}) do |server_bundle_js_file, hash|
+          hash[server_bundle_js_file] = ConnectionPool.new(options) { create_js_context(server_bundle_js_file) }
+        end
     end
 
     def self.reset_pool_if_server_bundle_was_modified
       return unless ReactOnRails.configuration.development_mode
-      file_mtime = File.mtime(ReactOnRails::Utils.default_server_bundle_js_file_path)
-      @server_bundle_timestamp ||= file_mtime
-      return if @server_bundle_timestamp == file_mtime
-      ReactOnRails::ServerRenderingPool.reset_pool
-      @server_bundle_timestamp = file_mtime
+      @server_bundle_timestamps ||= {}
+      do_reset_pool = false
+      ReactOnRails.configuration.server_bundle_js_files.each do |server_bundle_js_file|
+        file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path(server_bundle_js_file))
+        next if @server_bundle_timestamps[server_bundle_js_file] == file_mtime
+        @server_bundle_timestamps[server_bundle_js_file] = file_mtime
+        do_reset_pool = true
+      end
+      ReactOnRails::ServerRenderingPool.reset_pool if do_reset_pool
     end
 
     # js_code: JavaScript expression that returns a string.
@@ -28,11 +35,10 @@ module ReactOnRails
     # Note, js_code does not have to be based on React.
     # js_code MUST RETURN json stringify Object
     # Calling code will probably call 'html_safe' on return value before rendering to the view.
-    def self.server_render_js_with_console_logging(js_code)
-      trace_messsage(js_code)
-      json_string = eval_js(js_code)
+    def self.server_render_js_with_console_logging(server_bundle_js_file, js_code)
+      trace_message(js_code)
+      json_string = eval_js(server_bundle_js_file, js_code)
       result = JSON.parse(json_string)
-
       if ReactOnRails.configuration.logging_on_server
         console_script = result["consoleReplayScript"]
         console_script_lines = console_script.split("\n")
@@ -51,7 +57,7 @@ module ReactOnRails
     class << self
       private
 
-      def trace_messsage(js_code, file_name = "tmp/server-generated.js")
+      def trace_message(js_code, file_name = "tmp/server-generated.js")
         return unless ENV["TRACE_REACT_ON_RAILS"].present?
         # Set to anything to print generated code.
         puts "Z" * 80
@@ -61,18 +67,26 @@ module ReactOnRails
         puts "Z" * 80
       end
 
-      def eval_js(js_code)
-        @js_context_pool.with do |js_context|
+      def eval_js(server_js_file, js_code)
+        server_js_file_context_pool = js_context_pool_for_file(server_js_file)
+        raise "Bundle [#{server_js_file}] not set in js context pools" if server_js_file_context_pool.nil?
+        server_js_file_context_pool.with do |js_context|
           result = js_context.eval(js_code)
           js_context.eval("console.history = []")
           result
         end
       end
 
-      def create_js_context
-        server_js_file = ReactOnRails::Utils.default_server_bundle_js_file_path
-        if server_js_file.present? && File.exist?(server_js_file)
-          bundle_js_code = File.read(server_js_file)
+      def js_context_pool_for_file(server_js_file)
+        @js_context_pools[server_js_file]
+      end
+
+      def create_js_context(server_js_file)
+        return unless server_js_file.present?
+
+        server_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path(server_js_file)
+        if File.exist?(server_js_file_path)
+          bundle_js_code = File.read(server_js_file_path)
           base_js_code = <<-JS
 #{console_polyfill}
 #{execjs_timer_polyfills}
@@ -88,17 +102,15 @@ module ReactOnRails
               "\n\n#{e.backtrace.join("\n")}"
             puts msg
             Rails.logger.error(msg)
-            trace_messsage(base_js_code, file_name)
+            trace_message(base_js_code, file_name)
             raise e
           end
         else
-          if server_js_file.present?
-            msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
-              "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\
-              "avoid this warning"
-            Rails.logger.warn msg
-            puts msg
-          end
+          msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
+            "read. You may set the server_bundle_js_files in your configuration to be \"[]\" to "\
+            "avoid this warning"
+          Rails.logger.warn msg
+          puts msg
           ExecJS.compile("")
         end
       end
