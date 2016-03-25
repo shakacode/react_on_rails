@@ -147,7 +147,7 @@ shared_examples "React Component Shared Store" do |url|
   subject { page }
   background { visit url }
   context url do
-    scenario "Type in one component changes the other compnent" do
+    scenario "Type in one component changes the other component" do
       expect(current_path).to eq(url)
       new_text = "John Doe"
       new_text_2 = "Jane Smith"

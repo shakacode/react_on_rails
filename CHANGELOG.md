@@ -7,7 +7,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [4.0.3] - 2016-03-17
 
 ##### Fixed
-- `ReactOnRailsHelper#react_compnent`: Invalid deprecation message when called with only one paramter, the component name.
+- `ReactOnRailsHelper#react_component`: Invalid deprecation message when called with only one paramter, the component name.
 
 ## [4.0.2] - 2016-03-17
 
