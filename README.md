@@ -601,7 +601,7 @@ Note: If you have components from react-rails you want to use, then you will nee
 ## Contributing
 Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant Code of Conduct](docs/code_of_conduct.md)).
 
-See [Contributing](docs/contributing.md) to get started.
+See [Contributing](docs/contributor-info/contributing.md) to get started.
 
 ## License
 The gem is available as open source under the terms of the [MIT License](docs/LICENSE).
