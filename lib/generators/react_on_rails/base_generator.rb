@@ -21,25 +21,6 @@ module ReactOnRails
                    default: false,
                    desc: "Configure for server-side rendering of webpack JavaScript",
                    aliases: "-S"
-      # --skip-js-linters
-      class_option :skip_js_linters,
-                   type: :boolean,
-                   default: false,
-                   desc: "Skip installing JavaScript linting files",
-                   aliases: "-j"
-      # --ruby-linters
-      class_option :ruby_linters,
-                   type: :boolean,
-                   default: false,
-                   desc: "Install ruby linting files, tasks, and configs",
-                   aliases: "-L"
-
-      # --skip-bootstrap
-      class_option :skip_bootstrap,
-                   type: :boolean,
-                   default: false,
-                   desc: "Skip integrating Bootstrap and don't initialize files and regarding configs",
-                   aliases: "-b"
 
       def add_hello_world_route
         route "get 'hello_world', to: 'hello_world#index'"
@@ -74,7 +55,6 @@ module ReactOnRails
           // DO NOT REQUIRE jQuery or jQuery-ujs in this file!
           // DO NOT REQUIRE TREE!
 
-          // CRITICAL that vendor-bundle must be BEFORE bootstrap-sprockets and turbolinks
           // since it is exposing jQuery and jQuery-ujs
 
           //= require vendor-bundle
@@ -112,12 +92,8 @@ module ReactOnRails
         base_path = "base/base/"
         %w(app/controllers/hello_world_controller.rb
            client/.babelrc
-           client/index.jade
-           client/server.js
            client/webpack.client.base.config.js
            client/webpack.client.rails.config.js
-           REACT_ON_RAILS.md
-           client/REACT_ON_RAILS_CLIENT_README.md
            package.json).each { |file| copy_file(base_path + file, file) }
       end
 
@@ -125,16 +101,9 @@ module ReactOnRails
         base_path = "base/base/"
         %w(config/initializers/react_on_rails.rb
            Procfile.dev
-           Procfile.dev-hot
            app/views/hello_world/index.html.erb
            client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
-           client/webpack.client.hot.config.js
            client/package.json).each { |file| template(base_path + file + ".tt", file) }
-      end
-
-      def add_base_gems_to_gemfile
-        return unless options.server_rendering?
-        append_to_file("Gemfile", "\ngem 'therubyracer', platforms: :ruby\n")
       end
 
       def template_client_registration_file
@@ -150,15 +119,6 @@ module ReactOnRails
            client/app/bundles/HelloWorld/startup/serverRegistration.jsx).each do |file|
           copy_file(base_path + file, file)
         end
-      end
-
-      def template_linter_files_if_appropriate
-        return if !options.ruby_linters? && options.skip_js_linters?
-        template("base/base/lib/tasks/linters.rake.tt", "lib/tasks/linters.rake")
-      end
-
-      def template_assets_rake_file
-        template("base/base/lib/tasks/assets.rake.tt", "lib/tasks/assets.rake")
       end
 
       ASSETS_RB_APPEND = <<-DATA.strip_heredoc
@@ -184,19 +144,6 @@ Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpa
         end
       end
 
-      # rename to application.scss from application.css or application.css.scss
-      def force_application_scss_naming_if_necessary
-        base_path = "app/assets/stylesheets/"
-        application_css = "#{base_path}application.css"
-        application_css_scss = "#{base_path}application.css.scss"
-
-        bad_name = dest_file_exists?(application_css) || dest_file_exists?(application_css_scss)
-        return unless bad_name
-
-        new_name = File.join(destination_root, "#{base_path}application.scss")
-        File.rename(bad_name, new_name)
-      end
-
       def print_helpful_message
         message = <<-MSG.strip_heredoc
 
@@ -211,12 +158,6 @@ Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpa
                 npm run rails-server
 
             - Visit http://localhost:3000/hello_world and see your React On Rails app running!
-
-            - Run the npm express-server command to load the node server with hot reloading support.
-
-                npm run express-server
-
-            - Visit http://localhost:4000 and see your React On Rails app running using the Webpack Dev server.
         MSG
         GeneratorMessages.add_info(message)
       end

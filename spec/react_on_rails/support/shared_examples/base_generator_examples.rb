@@ -32,7 +32,6 @@ shared_examples "base_generator:base" do |options|
       // DO NOT REQUIRE jQuery or jQuery-ujs in this file!
       // DO NOT REQUIRE TREE!
 
-      // CRITICAL that vendor-bundle must be BEFORE bootstrap-sprockets and turbolinks
       // since it is exposing jQuery and jQuery-ujs
 
       //= require vendor-bundle
@@ -71,19 +70,13 @@ shared_examples "base_generator:base" do |options|
   it "copies react files" do
     %w(app/controllers/hello_world_controller.rb
        app/views/hello_world/index.html.erb
-       client/REACT_ON_RAILS_CLIENT_README.md
        client/app/bundles/HelloWorld/startup/clientRegistration.jsx
-       client/webpack.client.hot.config.js
        client/webpack.client.rails.config.js
        client/.babelrc
-       client/index.jade
        client/package.json
-       client/server.js
        config/initializers/react_on_rails.rb
-       lib/tasks/assets.rake
        package.json
-       Procfile.dev
-       REACT_ON_RAILS.md).each { |file| assert_file(file) }
+       Procfile.dev).each { |file| assert_file(file) }
   end
 
   it "appends path configurations to assets.rb" do
@@ -94,16 +87,10 @@ end
 
 shared_examples "base_generator:no_server_rendering" do
   it "copies client-side-rendering version of Procfile.dev and Procfile.dev-hot" do
-    %w(Procfile.dev Procfile.dev-hot).each do |file|
+    %w(Procfile.dev).each do |file|
       assert_file(file) do |contents|
         refute_match(/server: sh -c 'cd client && npm run build:dev:server'/, contents)
       end
-    end
-  end
-
-  it "copies client-side-rendering version of assets.rake" do
-    assert_file("lib/tasks/assets.rake") do |contents|
-      refute_match(/sh "cd client && npm run build:server"/, contents)
     end
   end
 
@@ -116,12 +103,6 @@ shared_examples "base_generator:no_server_rendering" do
   it "templates client-side-rendering version of webpack.client.base.js" do
     assert_file("client/webpack.client.base.config.js") do |contents|
       assert_match("clientRegistration", contents)
-    end
-  end
-
-  it "doesn't add therubyracer to the Gemfile" do
-    assert_file("Gemfile") do |contents|
-      refute_match("gem 'therubyracer', platforms: :ruby", contents)
     end
   end
 
@@ -138,12 +119,6 @@ shared_examples "base_generator:no_server_rendering" do
 end
 
 shared_examples "base_generator:server_rendering" do
-  it "copies server-side-rendering version of assets.rake" do
-    assert_file("lib/tasks/assets.rake") do |contents|
-      assert_match(/sh "cd client && npm run build:server"/, contents)
-    end
-  end
-
   it "copies server-rendering-only files" do
     %w(client/webpack.server.rails.config.js
        client/app/bundles/HelloWorld/startup/serverRegistration.jsx).each { |file| assert_file(file) }
@@ -156,7 +131,7 @@ shared_examples "base_generator:server_rendering" do
   end
 
   it "copies server-side-rendering version of Procfile.dev and Procfile.dev-hot" do
-    %w(Procfile.dev Procfile.dev-hot).each do |file|
+    %w(Procfile.dev).each do |file|
       assert_file(file) do |contents|
         assert_match(/server: sh -c 'cd client && npm run build:dev:server'/, contents)
       end
@@ -166,12 +141,6 @@ shared_examples "base_generator:server_rendering" do
   it "copies the server-side-rendering version of hello_world/index.html.erb" do
     assert_file("app/views/hello_world/index.html.erb") do |contents|
       assert_match("prerender: true", contents)
-    end
-  end
-
-  it "adds therubyracer to the Gemfile" do
-    assert_file("Gemfile") do |contents|
-      assert_match("gem 'therubyracer', platforms: :ruby", contents)
     end
   end
 
