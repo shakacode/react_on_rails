@@ -1,5 +1,4 @@
 module RenderingExtension
-
   # Return a Hash that contains custom values from the view context that will get passed to
   # all calls to react_component and redux_store for rendering
   def self.custom_context(view_context)

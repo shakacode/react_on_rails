@@ -248,10 +248,10 @@ module ReactOnRailsHelper
     @rendered_rails_context = true
 
     rails_context_content = content_tag(:div,
-                "",
-                id: "js-react-on-rails-context",
-                style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
-                data: data)
+                                        "",
+                                        id: "js-react-on-rails-context",
+                                        style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
+                                        data: data)
     "#{rails_context_content}\n#{render_value}".html_safe
   end
 
@@ -361,14 +361,12 @@ ReactOnRails.setStore('#{store_name}', store);
         # Locale settings
         i18nLocale: I18n.locale,
         i18nDefaultLocale: I18n.default_locale,
-        httpAcceptLanguage: request.env['HTTP_ACCEPT_LANGUAGE']
+        httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"]
       }
 
       if ReactOnRails.configuration.rendering_extension
         custom_context = ReactOnRails.configuration.rendering_extension.custom_context(self)
-        if custom_context
-          result.merge!(custom_context)
-        end
+        result.merge!(custom_context) if custom_context
       end
       result
     end
