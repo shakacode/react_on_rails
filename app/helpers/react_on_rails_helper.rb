@@ -352,7 +352,8 @@ ReactOnRails.setStore('#{store_name}', store);
 
       result = {
         # URL settings
-        location: request.original_url,
+        href: request.original_url,
+        location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}" : ''}",
         scheme: uri.scheme, # http
         host: uri.host, # foo.com
         pathname: uri.path, # /posts

@@ -3,10 +3,12 @@ import { match, RouterContext } from 'react-router';
 
 import routes from '../routes/routes';
 
-export default (props, location) => {
+export default (props, railsContext) => {
   let error;
   let redirectLocation;
   let routeProps;
+
+  const { location } = railsContext;
 
   // See https://github.com/reactjs/react-router/blob/master/docs/guides/ServerRendering.md
   match({ routes, location }, (_error, _redirectLocation, _routeProps) => {
