@@ -1,4 +1,5 @@
-import React, { PropTypes } from 'react';
+import React, {PropTypes} from 'react';
+import RailsContext from './RailsContext';
 
 // Super simple example of the simplest possible React component
 export default class HelloWorldRedux extends React.Component {
@@ -6,7 +7,7 @@ export default class HelloWorldRedux extends React.Component {
   static propTypes = {
     actions: PropTypes.object.isRequired,
     data: PropTypes.object.isRequired,
-    locationData: PropTypes.object.isRequired,
+    railsContext: PropTypes.object.isRequired,
   };
 
   // Not necessary if we only call super, but we'll need to initialize state, etc.
@@ -26,27 +27,14 @@ export default class HelloWorldRedux extends React.Component {
   }
 
   render() {
-    const { data, locationData } = this.props;
-    const { name } = data;
-    const { location } = locationData;
-
-    console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
-    console.log("HelloWorldRedux");
-    console.log("location", location);
-    console.log("props", this.props);
-    console.log("data", this.data);
-    console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
-
-
+    const {data, railsContext} = this.props;
+    const {name} = data;
+    
     return (
       <div>
         <h3>
           Redux Hello, {name}!
         </h3>
-        <p>
-          Location is:<br/>
-          <span id="location">{location}</span>
-        </p>
         <p>
           With Redux, say hello to:
           <input
@@ -56,6 +44,7 @@ export default class HelloWorldRedux extends React.Component {
             onChange={this.handleChange}
           />
         </p>
+        <RailsContext {...{railsContext}} />
       </div>
     );
   }

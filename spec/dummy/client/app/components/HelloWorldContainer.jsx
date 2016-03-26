@@ -6,32 +6,21 @@ import HelloWorldRedux from './HelloWorldRedux';
 
 import * as helloWorldActions from '../actions/HelloWorldActions';
 
-const HelloWorldContainer = ({ actions, data, locationData }) => {
-  console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
-  console.log("HelloWorldContainer");
-  console.log("location = ", locationData);
-  console.log("data = ", data);
-  console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
-
+const HelloWorldContainer = ({ actions, data, railsContext }) => {
   return (
-    <HelloWorldRedux {...{actions, data, locationData}} />
+    <HelloWorldRedux {...{actions, data, railsContext}} />
   );
 }
 HelloWorldContainer.propTypes = {
   actions: PropTypes.object.isRequired,
   data: PropTypes.object.isRequired,
-  locationData: PropTypes.object.isRequired
+  railsContext: PropTypes.object.isRequired
 };
 
 function mapStateToProps(state) {
-  console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
-  console.log("mapStateToProps");
-  console.log("state", state);
-  console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
-
   return { 
     data: state.helloWorldData,
-    locationData: state.locationData,
+    railsContext: state.railsContext,
   };
 }
 

@@ -27,6 +27,7 @@
     "jquery": "^2.2.1",
     "jquery-ujs": "^1.2.0",
     "loader-utils": "^0.2.12",
+    "lodash": "^4.6.1",
     "node-libs-browser": "^1.0.0",
     "node-sass": "^3.4.2",
     "postcss-loader": "^0.8.1",
