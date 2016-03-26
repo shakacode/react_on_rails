@@ -345,6 +345,8 @@ ReactOnRails.setStore('#{store_name}', store);
     result
   end
 
+  # This is the definitive list of the default values used for the rails_context, which is the
+  # second parameter passed to both component and store generator functions.
   def rails_context
     @rails_context ||= begin
       uri = URI.parse(request.original_url)

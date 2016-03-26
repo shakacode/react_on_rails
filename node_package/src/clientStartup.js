@@ -40,10 +40,6 @@ function turbolinksVersion5() {
   return (typeof Turbolinks.controller !== 'undefined');
 }
 
-function location() {
-  return window.location.href + window.location.hash;
-}
-
 function initializeStore(el, railsContext) {
   const name = el.getAttribute('data-store-name');
   const props = JSON.parse(el.getAttribute('data-props'));
