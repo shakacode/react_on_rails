@@ -21,18 +21,18 @@ function turbolinksInstalled() {
   return (typeof Turbolinks !== 'undefined');
 }
 
-function forEachComponent(fn) {
-  forEach(fn, REACT_ON_RAILS_COMPONENT_CLASS_NAME);
+function forEachComponent(fn, railsContext) {
+  forEach(fn, REACT_ON_RAILS_COMPONENT_CLASS_NAME, railsContext);
 }
 
-function forEachStore(fn) {
-  forEach(fn, REACT_ON_RAILS_STORE_CLASS_NAME);
+function forEachStore(railsContext) {
+  forEach(initializeStore, REACT_ON_RAILS_STORE_CLASS_NAME, railsContext);
 }
 
-function forEach(fn, className) {
+function forEach(fn, className, railsContext) {
   const els = document.getElementsByClassName(className);
   for (let i = 0; i < els.length; i++) {
-    fn(els[i]);
+    fn(els[i], railsContext);
   }
 }
 
@@ -40,11 +40,11 @@ function turbolinksVersion5() {
   return (typeof Turbolinks.controller !== 'undefined');
 }
 
-function initializeStore(el) {
+function initializeStore(el, railsContext) {
   const name = el.getAttribute('data-store-name');
   const props = JSON.parse(el.getAttribute('data-props'));
   const storeGenerator = ReactOnRails.getStoreGenerator(name);
-  const store = storeGenerator(props);
+  const store = storeGenerator(props, railsContext);
   ReactOnRails.setStore(name, store);
 }
 
@@ -52,7 +52,7 @@ function initializeStore(el) {
  * Used for client rendering by ReactOnRails
  * @param el
  */
-function render(el) {
+function render(el, railsContext) {
   const name = el.getAttribute('data-component-name');
   const domNodeId = el.getAttribute('data-dom-id');
   const props = JSON.parse(el.getAttribute('data-props'));
@@ -66,6 +66,7 @@ function render(el) {
         props,
         domNodeId,
         trace,
+        railsContext
       });
 
       if (isRouterResult(reactElementOrRouterResult)) {
@@ -85,11 +86,21 @@ You should return a React.Component always for the client side entry point.`);
   }
 }
 
+function parseRailsContext() {
+  const el = document.getElementById('js-react-on-rails-context');
+  if (el) {
+    return JSON.parse(el.getAttribute('data-rails-context'));
+  } else {
+    return null;
+  }
+}
+
 function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded');
 
-  forEachStore(initializeStore);
-  forEachComponent(render);
+  const railsContext = parseRailsContext();
+  forEachStore(railsContext);
+  forEachComponent(render, railsContext);
 }
 
 function unmount(el) {

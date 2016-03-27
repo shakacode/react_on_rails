@@ -94,6 +94,7 @@ module ReactOnRailsHelper
     # server has already rendered the HTML.
     # We use this react_component_index in case we have the same component multiple times on the page.
 
+    # TODO: remove this
     options, props = parse_options_props(component_name, options, other_options)
 
     react_component_index = next_react_component_index
@@ -139,11 +140,13 @@ module ReactOnRailsHelper
                                   content_tag_options)
 
     # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
-    <<-HTML.html_safe
+    result = <<-HTML.html_safe
 #{component_specification_tag}
     #{rendered_output}
     #{replay_console(options) ? console_script : ''}
     HTML
+
+    prepend_render_rails_context(result)
   end
 
   # Separate initialization of store from react_component allows multiple react_component calls to
@@ -165,7 +168,8 @@ module ReactOnRailsHelper
     else
       @registered_stores ||= []
       @registered_stores << redux_store_data
-      render_redux_store_data(redux_store_data)
+      result = render_redux_store_data(redux_store_data)
+      prepend_render_rails_context(result)
     end
   end
 
@@ -233,12 +237,31 @@ module ReactOnRailsHelper
 
   private
 
+  # prepend the rails_context if not yet applied
+  def prepend_render_rails_context(render_value)
+    return render_value if @rendered_rails_context
+
+    data = {
+      rails_context: rails_context
+    }
+
+    @rendered_rails_context = true
+
+    rails_context_content = content_tag(:div,
+                                        "",
+                                        id: "js-react-on-rails-context",
+                                        style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
+                                        data: data)
+    "#{rails_context_content}\n#{render_value}".html_safe
+  end
+
   def render_redux_store_data(redux_store_data)
-    content_tag(:div,
-                "",
-                class: "js-react-on-rails-store",
-                style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
-                data: redux_store_data)
+    result = content_tag(:div,
+                         "",
+                         class: "js-react-on-rails-store",
+                         style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
+                         data: redux_store_data)
+    prepend_render_rails_context(result)
   end
 
   def next_react_component_index
@@ -265,6 +288,7 @@ module ReactOnRailsHelper
 
     wrapper_js = <<-JS
 (function() {
+  var railsContext = #{rails_context.to_json};
 #{initialize_redux_stores}
   var props = #{props_string(props)};
   return ReactOnRails.serverRenderReactComponent({
@@ -272,7 +296,7 @@ module ReactOnRailsHelper
     domNodeId: '#{dom_id}',
     props: props,
     trace: #{trace(options)},
-    location: '#{request.fullpath}'
+    railsContext: railsContext
   });
 })()
     JS
@@ -314,11 +338,41 @@ module ReactOnRailsHelper
       memo << <<-JS
 reduxProps = #{props};
 storeGenerator = ReactOnRails.getStoreGenerator('#{store_name}');
-store = storeGenerator(reduxProps);
+store = storeGenerator(reduxProps, railsContext);
 ReactOnRails.setStore('#{store_name}', store);
       JS
     end
     result
+  end
+
+  # This is the definitive list of the default values used for the rails_context, which is the
+  # second parameter passed to both component and store generator functions.
+  def rails_context
+    @rails_context ||= begin
+      uri = URI.parse(request.original_url)
+      # uri = URI("http://foo.com/posts?id=30&limit=5#time=1305298413")
+
+      result = {
+        # URL settings
+        href: request.original_url,
+        location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}" : ''}",
+        scheme: uri.scheme, # http
+        host: uri.host, # foo.com
+        pathname: uri.path, # /posts
+        search: uri.query, # id=30&limit=5
+
+        # Locale settings
+        i18nLocale: I18n.locale,
+        i18nDefaultLocale: I18n.default_locale,
+        httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"]
+      }
+
+      if ReactOnRails.configuration.rendering_extension
+        custom_context = ReactOnRails.configuration.rendering_extension.custom_context(self)
+        result.merge!(custom_context) if custom_context
+      end
+      result
+    end
   end
 
   def raise_on_prerender_error(options)

@@ -1,6 +1,15 @@
 require "rails_helper"
 
 describe ReactOnRailsHelper, type: :helper do
+  before do
+    allow(self).to receive(:request) {
+      OpenStruct.new(
+        original_url: "http://foobar.com/development",
+        env: { "HTTP_ACCEPT_LANGUAGE" => "en" }
+      )
+    }
+  end
+
   describe "#sanitized_props_string(props)" do
     let(:hash) do
       {
