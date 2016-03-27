@@ -659,7 +659,7 @@ Note: If you have components from react-rails you want to use, then you will nee
 + [Node Dependencies and NPM](docs/additional-reading/node-dependencies-and-npm.md)
 + [React Router](docs/additional-reading/react-router.md)
 + [RSpec Configuration](docs/additional-reading/rspec-configuration.md)
-+ [Server Rendering Tips](docs/additional-reading/server-rendering_tips.md)
++ [Server Rendering Tips](docs/additional-reading/server-rendering-tips.md)
 + [Rails View Rendering from Inline JavaScript](docs/additional-reading/rails_view_rendering_from_inline_javascript.md)
 + [Tips](docs/additional-reading/tips.md)
 + [Tutorial for v2.0](docs/tutorial-v2.md), deployed [here](https://shakacode-react-on-rails.herokuapp.com/).
