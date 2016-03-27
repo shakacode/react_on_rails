@@ -75,22 +75,8 @@ describe ReactOnRailsHelper, type: :helper do
             data-dom-id="#{id}"></div>).squish
     end
 
-    describe "deprecated API" do
-      subject { react_component("App", props) }
-      it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
-      it { is_expected.to include react_component_div }
-      it { is_expected.to include react_definition_div }
-    end
-
     describe "API with component name only" do
       subject { react_component("App") }
-      it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
-      it { is_expected.to include react_component_div }
-      it { is_expected.to include react_definition_div_no_params }
-    end
-
-    describe "Deprecated API with component name and empty props" do
-      subject { react_component("App", "") }
       it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
       it { is_expected.to include react_component_div }
       it { is_expected.to include react_definition_div_no_params }
