@@ -1,16 +1,10 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails)  [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
 # NEWS
+* 5.0.0.rc.1 has shipped! Please let me know if you're tried it and if you like the changes. Please see the  [CHANGELOG.md](./CHANGELOG.md) for details on the breaking changes.
 * [New slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
 * Always see the [CHANGELOG.md](./CHANGELOG.md) for the latest project changes.
-* 2016-03-17: **4.0.3** Shipped! Includes using the new Heroku buildpack steps, several smaller changes detailed in the [CHANGELOG.md](./CHANGELOG.md). 
-* 2016-03-14: **4.0.0** Highlights
-  * Better support for hot reloading of assets from Rails with new helpers and updates to the sample testing app, [spec/dummy](spec/dummy).
-  * Better support for Turbolinks 5.
-  * Controller rendering of shared redux stores and ability to render store data at bottom of HTML page.
-  * See [#311](https://github.com/shakacode/react_on_rails/pull/311/files).
-  * Some breaking changes! See [CHANGELOG.md](./CHANGELOG.md) for details.
-* 2016-02-28: We added a [Projects page](PROJECTS.md). Please edit the page your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors. [jbhatab](https://github.com/jbhatab) is leading an effort to ease the onboarding process for newbies with simpler project generators. See [#245](https://github.com/shakacode/react_on_rails/issues/245).
+* 2016-02-28: We added a [Projects page](PROJECTS.md). Please edit the page your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors.
 * *See [NEWS.md](NEWS.md) for the full news history.*
 
 # NOTES
@@ -77,7 +71,7 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
 + [How it Works](#how-it-works)
     - [Client-Side Rendering vs. Server-Side Rendering](#client-side-rendering-vs-server-side-rendering)
     - [Building the Bundles](#building-the-bundles)
-    - [Rails Context)(#rails-context)
+    - [Rails Context](#rails-context)
     - [Globally Exposing Your React Components](#globally-exposing-your-react-components)
     - [ReactOnRails View Helpers API](#reactonrails-view-helpers-api)
     - [ReactOnRails JavaScript API](#reactonrails-javascript-api)
@@ -215,9 +209,9 @@ When you use a "generator function" to create react components or you used share
 1. Props that you pass in the view helper of either `react_component` or `redux_store`
 2. Rails contextual information, such as the current pathname. You can customize this in your config file.
 
-This information should be the same regardless of either client or server side rendering.
+This information (`props` and `railsContext`) should be the same regardless of either client or server side rendering.
 
-While you could manually pass this information in as "props", the rails_context is a convenience because it's pass consistently to all invocations of generator functions.
+While you could manually pass the `railsContext` information in as "props", the `rails_context` is a convenience because it's passed consistently to all invocations of generator functions.
 
 So if you register your generator function `MyAppComponent`, it will get called like:
 
@@ -229,6 +223,8 @@ and for a store:
 ```js
 reduxStore = MyReduxStore(props, railsContext);
 ```
+
+Note, you never make these calls. This is what React on Rails does when either server or client rendering.
 
 The `railsContext` has: (see implementation in file react_on_rails_helper.rb for method rails_context for the definitive list).
 
@@ -251,23 +247,23 @@ The `railsContext` has: (see implementation in file react_on_rails_helper.rb for
 
 #### Use Cases
 ##### Needing the current url path for server rendering
-Suppose you want to display a nav bar with the current navigation link highlighted by the URL. When you server render the code, you will need to know the current URL/path if that is what you want your logic to be based on. This could be added to props, or ReactOnRails can add this automatically as another param to the generator function (or maybe an additional object, where we'll consider other additional bits of system info from Rails, like maybe the locale, later).
+Suppose you want to display a nav bar with the current navigation link highlighted by the URL. When you server render the code, you will need to know the current URL/path if that is what you want your logic to be based on. The new `railsContext` has this information so the application of an "active" class can be done server side.
 
 ##### Needing the I18n.locale
-Suppose you want to server render your react components with a the current Rails locale. We need to pass the I18n.locale to the view rendering.
-
+Suppose you want to server render your react components with localization applied given the current Rails locale. The `railsContext` contains the I18n.locale.
 
 #### Customization of the rails_context
-You can customize the values passed in the rails_context in your `config/initializers/react_on_rails.rb`
+You can customize the values passed in the `railsContext` in your `config/initializers/react_on_rails.rb`. Here's how.
 
-
-Set the class for the `rendering_extension`:
+Set the config value for the `rendering_extension`:
 
 ```ruby
   config.rendering_extension = RenderingExtension
 ```
 
-Implement it like this above in the same file. Create a class method on the module called `custom_context` that takes the `view_context` for a param.
+Implement it like this above in the same file. Create a class method on the module called `custom_context` that takes the `view_context` for a param. 
+
+See [spec/dummy/config/initializers/react_on_rails.rb](spec/dummy/config/initializers/react_on_rails.rb) for a detailed example.
 
 ```ruby
 module RenderingExtension
@@ -283,9 +279,7 @@ module RenderingExtension
 end
 ```
 
-In this case, a prop and value for `somethingUseful` will go into the railsContext passed to all react_component and redux_store calls.
-
-Since you can't access the rails session from JavaScript (or other values available in the view rendering context), this might useful.
+In this case, a prop and value for `somethingUseful` will go into the railsContext passed to all react_component and redux_store calls. You may set any values available in the view rendering context.
 
 ### Globally Exposing Your React Components
 Place your JavaScript code inside of the provided `client/app` folder. Use modules just as you would when using webpack alone. The difference here is that instead of mounting React components directly to an element using `React.render`, you **expose your components globally and then mount them with helpers inside of your Rails views**.
@@ -416,7 +410,7 @@ The `env_javascript_include_tag` and `env_stylesheet_link_tag` support the usage
 
 The key options are `static` and `hot` which specify what you want for static vs. hot. Both of these params are optional, and support either a single value, or an array.
 
-static vs. hot is picked based on whether ENV["REACT_ON_RAILS_ENV"] == "HOT"
+static vs. hot is picked based on whether `ENV["REACT_ON_RAILS_ENV"] == "HOT"`
 
 ```erb
  <%= env_stylesheet_link_tag(static: 'application_static',
@@ -666,8 +660,8 @@ Note: If you have components from react-rails you want to use, then you will nee
 + [Hot Reloading of Assets For Rails Development](docs/additional-reading/hot-reloading-rails-development.md)
 + [Node Dependencies and NPM](docs/additional-reading/node-dependencies-and-npm.md)
 + [React Router](docs/additional-reading/react-router.md)
-+ [RSpec Configuration](docs/additional-reading/rspec_configuration.md)
-+ [Server Rendering Tips](docs/additional-reading/server_rendering_tips.md)
++ [RSpec Configuration](docs/additional-reading/rspec-configuration.md)
++ [Server Rendering Tips](docs/additional-reading/server-rendering-tips.md)
 + [Rails View Rendering from Inline JavaScript](docs/additional-reading/rails_view_rendering_from_inline_javascript.md)
 + [Tips](docs/additional-reading/tips.md)
 + [Tutorial for v2.0](docs/tutorial-v2.md), deployed [here](https://shakacode-react-on-rails.herokuapp.com/).
