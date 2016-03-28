@@ -319,16 +319,24 @@ Once the bundled files have been generated in your `app/assets/webpack` folder a
 This is how you actually render the React components you exposed to `window` inside of `clientRegistration` (and `global` inside of `serverRegistration` if you are server rendering).
 
 ### react_component
-`react_component(component_name, options = {})`
+`react_component(component_name,
+                props: {},
+                prerender: nil,
+                trace: nil,
+                replay_console: nil,
+                raise_on_prerender_error: nil,
+                id: nil,
+                html_options: {})`
 
 + **component_name:** Can be a React component, created using a ES6 class, or `React.createClass`, or a generator function that returns a React component.
 + **options:**
   + **props:** Ruby Hash which contains the properties to pass to the react object, or a JSON string. If you pass a string, we'll escape it for you.
   + **prerender:** enable server-side rendering of component. Set to false when debugging!
+  + **id:** Id for the div. This will get assigned automatically if you do not provide an id.
+  + **html_options:** Any other html options to get placed on the added div for the component.
   + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise.
   + **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the default configuration of logging_on_server set to true, you'll still see the errors on the server.
   + **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
-+ Any other options are passed to the content tag, including the id
 
 ### redux_store
 #### Controller Extension
