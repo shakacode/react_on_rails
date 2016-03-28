@@ -13,7 +13,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 - Previously, you could pass arbitrary additional html attributes to react_component. Now, you need to pass them in as a named parameter `html_options` to react_component.
 
 ##### Breaking Changes
-- You must provide named attributes, including `props` for view helper `react_compnent`.
+- You must provide named attributes, including `props` for view helper `react_compnent`. See [this commit]](https://github.com/shakacode/react-webpack-rails-tutorial/commit/a97fa90042cbe27be7fd7fa70b5622bfcf9c3673) for an example migration used for [www.reactrails.com](http://www.reactrails.com).
 
 ## [4.0.3] - 2016-03-17
 
