@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails",
-  "version": "4.0.3",
+  "version": "5.0.0-rc.1",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "node_package/lib/ReactOnRails.js",
   "directories": {
