@@ -22,7 +22,7 @@ Be sure to see:
 * [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v4032)
 * [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 * [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial) along with the live example at [www.reactrails.com](http://www.reactrails.com).
-* [Projects](PROJECTS.md) using React on Rails. Please submit yours! If you have or want to see testimonials, see this page [KUDOS](./KUDOS.md)
+* [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours!
 * On Twitter, follow [@railsonmaui](https://twitter.com/railsonmaui) and [@shakacode](https://twitter.com/shakacode) for updates on releases.
 
 ## Including your React Component in your Rails Views
