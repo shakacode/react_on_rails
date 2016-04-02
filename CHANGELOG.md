@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
 
+##### Added
+- Generator enhancements
+  - Generator adds line to spec/rails_helper.rb so that running specs will ensure assets are compiled.
+  - Other small changes to the generator including adding necessary npm scripts to allow React on Rails to build assets.
+  - Npm modules updated for generator.
+  - Added babel-runtime in to the client/package.json created.
+- Server rendering
+  - Added more diagnostics for server rendering.
+  - Calls to setTimeout and setInterval are not logged for server rendering unless env TRACE_REACT_ON_RAILS is set to YES.
+- Updated all project npm dependencies to latest.
+- Update to node 5.10.0 for CI.
+- Added babel-runtime as a peer dependency for the npm module.
+
 ## [5.0.0] - 2016-04-01
 
 ##### Added

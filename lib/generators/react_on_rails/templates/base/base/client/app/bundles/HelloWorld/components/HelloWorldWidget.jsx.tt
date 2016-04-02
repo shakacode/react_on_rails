@@ -38,7 +38,7 @@ export default class HelloWorldWidget extends React.Component {
         <h3>
           Hello, {name}!
         </h3>
-        <hr/>
+        <hr />
         <form className="form-horizontal">
             <%- if options.skip_bootstrap? -%>
             <label>
