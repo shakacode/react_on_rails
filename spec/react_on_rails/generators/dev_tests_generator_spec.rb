@@ -3,7 +3,12 @@ require File.expand_path("../../support/generator_spec_helper", __FILE__)
 describe DevTestsGenerator, type: :generator do
   destination File.expand_path("../../dummy-for-generators/", __FILE__)
 
-  before(:all) { run_generator_test_with_args(%w(), package_json: true, webpack_client_base_config: true) }
+  before(:all) do
+    run_generator_test_with_args(%w(),
+                                 package_json: true,
+                                 webpack_client_base_config: true,
+                                 spec: false)
+  end
 
   it "copies rspec files" do
     %w(spec/spec_helper.rb

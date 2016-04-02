@@ -192,6 +192,14 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:base", assets_rb: true
   end
 
+  context "with rails_helper" do
+    before(:all) { run_generator_test_with_args([], spec: true) }
+    it "adds ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)" do
+      expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_RSPEC_TO_COMPILE_ASSETS
+      assert_file("spec/rails_helper.rb") { |contents| assert_match(expected, contents) }
+    end
+  end
+
   context "without existing spec dir" do
     before(:all) { run_generator_test_with_args(%w(--ruby-linters), spec: false) }
     it "does not add the spec directory to the ruby-lint.yml" do
@@ -201,7 +209,7 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "without existing spec dir" do
+  context "with existing spec dir" do
     before(:all) { run_generator_test_with_args(%w(--ruby-linters), spec: true) }
     it "adds the spec directory to the ruby-lint.yml" do
       assert_file("ruby-lint.yml") do |contents|

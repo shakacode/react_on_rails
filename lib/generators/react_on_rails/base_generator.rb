@@ -110,15 +110,15 @@ module ReactOnRails
 
       def copy_base_files
         base_path = "base/base/"
-        %w(app/controllers/hello_world_controller.rb
-           client/.babelrc
-           client/index.jade
-           client/server.js
-           client/webpack.client.base.config.js
-           client/webpack.client.rails.config.js
-           REACT_ON_RAILS.md
-           client/REACT_ON_RAILS_CLIENT_README.md
-           package.json).each { |file| copy_file(base_path + file, file) }
+        base_files = %w(app/controllers/hello_world_controller.rb
+                        client/.babelrc
+                        client/index.jade
+                        client/server.js
+                        client/webpack.client.base.config.js
+                        client/webpack.client.rails.config.js
+                        REACT_ON_RAILS.md
+                        client/REACT_ON_RAILS_CLIENT_README.md)
+        base_files.each { |file| copy_file(base_path + file, file) }
       end
 
       def template_base_files
@@ -127,6 +127,7 @@ module ReactOnRails
            Procfile.dev
            Procfile.dev-hot
            app/views/hello_world/index.html.erb
+           package.json
            client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
            client/webpack.client.hot.config.js
            client/package.json).each { |file| template(base_path + file + ".tt", file) }
@@ -184,6 +185,32 @@ Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpa
         end
       end
 
+      def append_to_spec_rails_helper
+        rails_helper = File.join(destination_root, "spec/rails_helper.rb")
+        if File.exist?(rails_helper)
+          add_configure_rspec_to_compile_assets(rails_helper)
+        else
+          spec_helper = File.join(destination_root, "spec/spec_helper.rb")
+          if File.exist?(spec_helper)
+            add_configure_rspec_to_compile_assets(spec_helper)
+          else
+            GeneratorMessages.add_info(
+              <<-MSG.strip_heredoc
+              Did not find spec/rails_helper.rb or spec/spec_helper.rb to add line
+              config.example_status_persistence_file_path = "spec/examples.txt"
+              MSG
+            )
+          end
+        end
+      end
+
+      CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<-STR.strip_heredoc
+        RSpec.configure do |config|
+          # Ensure that if we are running js tests, we are using latest webpack assets
+          # This will use the defaults of :js and :server_rendering meta tags
+          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+      STR
+
       # rename to application.scss from application.css or application.css.scss
       def force_application_scss_naming_if_necessary
         base_path = "app/assets/stylesheets/"
@@ -219,6 +246,13 @@ Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpa
             - Visit http://localhost:4000 and see your React On Rails app running using the Webpack Dev server.
         MSG
         GeneratorMessages.add_info(message)
+      end
+
+      private
+
+      def add_configure_rspec_to_compile_assets(helper_file)
+        search_str = "RSpec.configure do |config|"
+        gsub_file(helper_file, search_str, CONFIGURE_RSPEC_TO_COMPILE_ASSETS)
       end
     end
   end

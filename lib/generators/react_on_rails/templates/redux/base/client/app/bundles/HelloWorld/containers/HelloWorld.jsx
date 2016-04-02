@@ -12,35 +12,29 @@ function select(state) {
 }
 
 // Simple example of a React "smart" component
-class HelloWorld extends React.Component {
-  static propTypes = {
-    dispatch: PropTypes.func.isRequired,
+const HelloWorld = (props) => {
+  const { dispatch, $$helloWorldStore } = props;
+  const actions = bindActionCreators(helloWorldActionCreators, dispatch);
+  const { updateName } = actions;
+  const name = $$helloWorldStore.get('name');
 
-    // This corresponds to the value used in function select above.
-    // We prefix all property and variable names pointing to Immutable.js objects with '$$'.
-    // This allows us to immediately know we don't call $$helloWorldStore['someProperty'], but
-    // instead use the Immutable.js `get` API for Immutable.Map
-    $$helloWorldStore: PropTypes.instanceOf(Immutable.Map).isRequired,
-  };
+  // This uses the ES2015 spread operator to pass properties as it is more DRY
+  // This is equivalent to:
+  // <HelloWorldWidget $$helloWorldStore={$$helloWorldStore} actions={actions} />
+  return (
+    <HelloWorldWidget {...{ updateName, name }} />
+  );
+};
 
-  constructor(props, context) {
-    super(props, context);
-  }
+HelloWorld.propTypes = {
+  dispatch: PropTypes.func.isRequired,
 
-  render() {
-    const { dispatch, $$helloWorldStore } = this.props;
-    const actions = bindActionCreators(helloWorldActionCreators, dispatch);
-    const { updateName } = actions;
-    const name = $$helloWorldStore.get('name');
-
-    // This uses the ES2015 spread operator to pass properties as it is more DRY
-    // This is equivalent to:
-    // <HelloWorldWidget $$helloWorldStore={$$helloWorldStore} actions={actions} />
-    return (
-      <HelloWorldWidget {...{ updateName, name }} />
-    );
-  }
-}
+  // This corresponds to the value used in function select above.
+  // We prefix all property and variable names pointing to Immutable.js objects with '$$'.
+  // This allows us to immediately know we don't call $$helloWorldStore['someProperty'], but
+  // instead use the Immutable.js `get` API for Immutable.Map
+  $$helloWorldStore: PropTypes.instanceOf(Immutable.Map).isRequired,
+};
 
 // Don't forget to actually use connect!
 // Note that we don't export HelloWorld, but the redux "connected" version of it.
