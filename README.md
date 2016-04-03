@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails)  [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
 # NEWS
-* 5.0.0 has shipped!Please see the [CHANGELOG.md](./CHANGELOG.md) for details on the latest release and any breaking changes.
+* 5.1.0 has shipped!Please see the [CHANGELOG.md](./CHANGELOG.md) for details on the latest release and any breaking changes.
 * [New slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
 * 2016-02-28: We added a [Projects page](./PROJECTS.md) and a [Kudos page](./KUDOS.md). Please edit the page your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors.
 * *See [NEWS.md](NEWS.md) for the full news history.*
@@ -66,7 +66,7 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
 + [Why Webpack?](#why-webpack)
 + [Getting Started](#getting-started)
     - [Installation Summary](#installation-summary)
-    - [Initializer Configuration: config/initializers/react_on_rails.rb](#initializer-configuration) 
+    - [Initializer Configuration: config/initializers/react_on_rails.rb](#initializer-configuration)
 + [How it Works](#how-it-works)
     - [Client-Side Rendering vs. Server-Side Rendering](#client-side-rendering-vs-server-side-rendering)
     - [Building the Bundles](#building-the-bundles)
@@ -260,7 +260,7 @@ Set the config value for the `rendering_extension`:
   config.rendering_extension = RenderingExtension
 ```
 
-Implement it like this above in the same file. Create a class method on the module called `custom_context` that takes the `view_context` for a param. 
+Implement it like this above in the same file. Create a class method on the module called `custom_context` that takes the `view_context` for a param.
 
 See [spec/dummy/config/initializers/react_on_rails.rb](spec/dummy/config/initializers/react_on_rails.rb) for a detailed example.
 
@@ -386,11 +386,11 @@ The best source of docs is the main [ReactOnRails.js](node_package/src/ReactOnRa
   registerStore(stores)
 
   /**
-   * Allows retrieval of the store by name. This store will be hydrated by any Rails form props. 
+   * Allows retrieval of the store by name. This store will be hydrated by any Rails form props.
    * Pass optional param throwIfMissing = false if you want to use this call to get back null if the
    * store with name is not registered.
    * @param name
-   * @param throwIfMissing Defaults to true. Set to false to have this call return undefined if 
+   * @param throwIfMissing Defaults to true. Set to false to have this call return undefined if
    *        there is no store with the given name.
    * @returns Redux Store, possibly hydrated
    */
@@ -427,7 +427,7 @@ static vs. hot is picked based on whether `ENV["REACT_ON_RAILS_ENV"] == "HOT"`
                                 hot: 'application_non_webpack',
                                 'data-turbolinks-track' => true) %>
 ```
-                                
+
 See application.html.erb for usage example and [application.html.erb](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/app%2Fviews%2Flayouts%2Fapplication.html.erb)
 
 **env_javascript_include_tag(args = {})**
@@ -563,7 +563,7 @@ You will need to make a function that can create the store you will be using for
 
 ```
 function appStore(props, railsContext) {
-  // Create a hydrated redux store, using props and the railsContext (object with 
+  // Create a hydrated redux store, using props and the railsContext (object with
   // Rails contextual information).
   return myAppStore;
 }
@@ -612,9 +612,9 @@ Components are created as [stateless function(al) components](https://facebook.g
 
 ## React Router
 [React Router](https://github.com/reactjs/react-router) is supported, including server side rendering! See:
-  
+
 1. [React on Rails docs for react-router](docs/additional-reading/react-router.md)
-1. Examples in [spec/dummy/app/views/react_router](spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](spec/dummy/client/app/startup/ServerRouterApp.jsx). 
+1. Examples in [spec/dummy/app/views/react_router](spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](spec/dummy/client/app/startup/ServerRouterApp.jsx).
 
 ## Developing with the Webpack Dev Server
 One of the benefits of using webpack is access to [webpack's dev server](https://webpack.github.io/docs/webpack-dev-server.html) and its [hot module replacement](https://webpack.github.io/docs/hot-module-replacement-with-webpack.html) functionality.
@@ -652,7 +652,7 @@ Note: If you have components from react-rails you want to use, then you will nee
 ## Additional Reading
 + [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v4032)
 + [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
-+ [Installation Overview](docs/additional-reading/installation-overview.md) 
++ [Installation Overview](docs/additional-reading/installation-overview.md)
 + [Babel](docs/additional-reading/babel.md)
 + [Heroku Deployment](docs/additional-reading/heroku-deployment.md)
 + [Manual Installation](docs/additional-reading/manual-installation.md)
