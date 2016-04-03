@@ -129,7 +129,7 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
 1. Add the following to your Gemfile and bundle install:
 
   ```ruby
-  gem "react_on_rails", "~> 4"
+  gem "react_on_rails", "~> 5"
   ```
 
 2. See help for the generator:
