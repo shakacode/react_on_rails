@@ -17,6 +17,11 @@ def simulate_existing_rails_files(options)
   simulate_existing_file("config/routes.rb", "Rails.application.routes.draw do\nend\n")
   simulate_existing_file("config/application.rb",
                          "module Gentest\nclass Application < Rails::Application\nend\nend)")
+  if options.fetch(:spec, true)
+    simulate_existing_dir("spec")
+    simulate_existing_file("spec/rails_helper.rb",
+                           "RSpec.configure do |config|\nend\n")
+  end
 end
 
 def simulate_existing_assets_files(options)
@@ -32,8 +37,6 @@ def simulate_existing_assets_files(options)
     DATA
     simulate_existing_file(app_js, app_js_data)
   end
-
-  simulate_existing_dir("spec") if options.fetch(:spec, true)
 
   return unless options.fetch(:application_css, true)
 
@@ -85,6 +88,7 @@ end
 
 # Simulate having an existing file for cases where the generator needs to modify, not create, a file
 def simulate_existing_file(file, data = "some existing text\n")
+  # raise "File #{file} already exists in call to simulate_existing_file" if File.exist?(file)
   path = Pathname.new(File.join(destination_root, file))
   mkdir_p(path.dirname)
   File.open(path, "w+") do |f|
