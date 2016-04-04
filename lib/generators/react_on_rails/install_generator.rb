@@ -22,30 +22,6 @@ module ReactOnRails
                    default: false,
                    desc: "Add necessary files and configurations for server-side rendering. Default: false",
                    aliases: "-S"
-      # --skip-js-linters
-      class_option :skip_js_linters,
-                   type: :boolean,
-                   default: false,
-                   desc: "Skip installing JavaScript linting files. Default: false",
-                   aliases: "-j"
-      # --ruby-linters
-      class_option :ruby_linters,
-                   type: :boolean,
-                   default: false,
-                   desc: "Install ruby linting files, tasks, and configs. Default: false",
-                   aliases: "-L"
-      # --ruby-linters
-      class_option :heroku_deployment,
-                   type: :boolean,
-                   default: false,
-                   desc: "Install files necessary for deploying to Heroku. Default: false",
-                   aliases: "-H"
-      # --skip-bootstrap
-      class_option :skip_bootstrap,
-                   type: :boolean,
-                   default: false,
-                   desc: "Skip integrating Bootstrap and don't initialize files and regarding configs. Default: false",
-                   aliases: "-b"
 
       # --ignore-warnings
       class_option :ignore_warnings,
@@ -76,10 +52,6 @@ module ReactOnRails
         invoke "react_on_rails:base"
         invoke "react_on_rails:react_no_redux" unless options.redux?
         invoke "react_on_rails:react_with_redux" if options.redux?
-        invoke "react_on_rails:js_linters" unless options.skip_js_linters?
-        invoke "react_on_rails:ruby_linters" if options.ruby_linters?
-        invoke "react_on_rails:heroku_deployment" if options.heroku_deployment?
-        invoke "react_on_rails:bootstrap" unless options.skip_bootstrap?
       end
 
       # NOTE: other requirements for existing files such as .gitignore or application.

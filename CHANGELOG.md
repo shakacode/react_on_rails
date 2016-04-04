@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
 
+## [5.2.0] - 2016-04-03
+##### Removed
+All 5.2.0 changes can be found in [#363](https://github.com/shakacode/react_on_rails/pull/363) by [jbhatab](https://github.com/jbhatab).
+- Generator removals
+  - removed heroku from installer
+  - removed bootstrap from generator
+  - removed express server from generator
+  - removed hot module replacement from generator
+  - removed ruby and js linting from generator
+
 ## [5.1.0] - 2016-04-03
 ##### Added
 All 5.1.0 changes can be found in [#362](https://github.com/shakacode/react_on_rails/pull/362) by [justin808](https://github.com/justin808).

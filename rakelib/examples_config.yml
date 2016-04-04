@@ -11,9 +11,4 @@ example_type_data:
   -
     name: redux-server-rendering
     generator_options: --redux --server-rendering
-  -
-    name: heroku-deployment
-    generator_options: --heroku-deployment
-  -
-    name: skip-bootstrap
-    generator_options: --skip-bootstrap
+
