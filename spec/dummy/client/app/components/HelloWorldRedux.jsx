@@ -29,7 +29,11 @@ export default class HelloWorldRedux extends React.Component {
   render() {
     const {data, railsContext} = this.props;
     const {name} = data;
-    
+
+    // If this creates an alert, we have a problem!
+    // see file node_package/src/scriptSanitizedVal.js for the fix to this prior issue.
+    console.log('This is a script:"</div>"</script> <script>alert(\'WTF\')</script>');
+
     return (
       <div>
         <h3>
