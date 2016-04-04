@@ -51,14 +51,9 @@ GEM
       io-like (~> 0.3.0)
     arel (6.0.3)
     ast (2.2.0)
-    autoprefixer-rails (6.3.3.1)
-      execjs
     awesome_print (1.6.1)
     binding_of_caller (0.7.2)
       debug_inspector (>= 0.0.1)
-    bootstrap-sass (3.3.6)
-      autoprefixer-rails (>= 5.2.1)
-      sass (>= 3.3.4)
     builder (3.2.2)
     byebug (8.2.2)
     capybara (2.6.2)
@@ -262,8 +257,9 @@ GEM
     thread_safe (0.3.5)
     tilt (2.0.2)
     tins (1.6.0)
-    turbolinks (2.5.3)
-      coffee-rails
+    turbolinks (5.0.0.beta2)
+      turbolinks-source
+    turbolinks-source (5.0.0.beta4)
     tzinfo (1.2.2)
       thread_safe (~> 0.1)
     uglifier (2.7.2)
@@ -287,7 +283,6 @@ PLATFORMS
 
 DEPENDENCIES
   awesome_print
-  bootstrap-sass
   capybara
   capybara-screenshot
   capybara-webkit
@@ -317,7 +312,7 @@ DEPENDENCIES
   spring
   sqlite3
   therubyracer
-  turbolinks (= 2.5.3)
+  turbolinks (~> 5.0.0.beta)
   uglifier (>= 2.7.2)
   web-console
 
