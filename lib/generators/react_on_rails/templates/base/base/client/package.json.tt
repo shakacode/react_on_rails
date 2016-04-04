@@ -94,9 +94,7 @@
     "css-loader": "^0.23.1",
     <%- unless options.skip_js_linters? -%>
     "eslint": "^2.6.0",
-    <%- unless options.skip_js_linters? -%>
     "eslint-config-shakacode": "^4.0.0",
-    <%- end -%>
     "eslint-plugin-react": "^4.2.3",
     <%- end -%>
     "express": "^4.13.4",
