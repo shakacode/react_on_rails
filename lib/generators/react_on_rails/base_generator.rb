@@ -21,35 +21,9 @@ module ReactOnRails
                    default: false,
                    desc: "Configure for server-side rendering of webpack JavaScript",
                    aliases: "-S"
-      # --skip-js-linters
-      class_option :skip_js_linters,
-                   type: :boolean,
-                   default: false,
-                   desc: "Skip installing JavaScript linting files",
-                   aliases: "-j"
-      # --ruby-linters
-      class_option :ruby_linters,
-                   type: :boolean,
-                   default: false,
-                   desc: "Install ruby linting files, tasks, and configs",
-                   aliases: "-L"
-
-      # --skip-bootstrap
-      class_option :skip_bootstrap,
-                   type: :boolean,
-                   default: false,
-                   desc: "Skip integrating Bootstrap and don't initialize files and regarding configs",
-                   aliases: "-b"
 
       def add_hello_world_route
         route "get 'hello_world', to: 'hello_world#index'"
-      end
-
-      def create_client_assets_directories
-        empty_directory("client/assets")
-        empty_directory("client/assets/stylesheets")
-        empty_directory_with_keep_file("client/assets/fonts")
-        empty_directory_with_keep_file("client/assets/images")
       end
 
       def update_git_ignore
@@ -112,8 +86,6 @@ module ReactOnRails
         base_path = "base/base/"
         base_files = %w(app/controllers/hello_world_controller.rb
                         client/.babelrc
-                        client/index.jade
-                        client/server.js
                         client/webpack.client.base.config.js
                         client/webpack.client.rails.config.js
                         REACT_ON_RAILS.md
@@ -125,11 +97,9 @@ module ReactOnRails
         base_path = "base/base/"
         %w(config/initializers/react_on_rails.rb
            Procfile.dev
-           Procfile.dev-hot
            app/views/hello_world/index.html.erb
            package.json
            client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx
-           client/webpack.client.hot.config.js
            client/package.json).each { |file| template(base_path + file + ".tt", file) }
       end
 
@@ -153,11 +123,6 @@ module ReactOnRails
         end
       end
 
-      def template_linter_files_if_appropriate
-        return if !options.ruby_linters? && options.skip_js_linters?
-        template("base/base/lib/tasks/linters.rake.tt", "lib/tasks/linters.rake")
-      end
-
       def template_assets_rake_file
         template("base/base/lib/tasks/assets.rake.tt", "lib/tasks/assets.rake")
       end
@@ -167,9 +132,6 @@ module ReactOnRails
 # If you do not want to move existing images and fonts from your Rails app
 # you could also consider creating symlinks there that point to the original
 # rails directories. In that case, you would not add these paths here.
-Rails.application.config.assets.paths << Rails.root.join("client", "assets", "stylesheets")
-Rails.application.config.assets.paths << Rails.root.join("client", "assets", "images")
-Rails.application.config.assets.paths << Rails.root.join("client", "assets", "fonts")
 Rails.application.config.assets.precompile += %w( server-bundle.js )
 
 # Add folder with webpack generated assets to assets.paths
@@ -211,19 +173,6 @@ Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpa
           ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
       STR
 
-      # rename to application.scss from application.css or application.css.scss
-      def force_application_scss_naming_if_necessary
-        base_path = "app/assets/stylesheets/"
-        application_css = "#{base_path}application.css"
-        application_css_scss = "#{base_path}application.css.scss"
-
-        bad_name = dest_file_exists?(application_css) || dest_file_exists?(application_css_scss)
-        return unless bad_name
-
-        new_name = File.join(destination_root, "#{base_path}application.scss")
-        File.rename(bad_name, new_name)
-      end
-
       def print_helpful_message
         message = <<-MSG.strip_heredoc
 
@@ -238,12 +187,6 @@ Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpa
                 npm run rails-server
 
             - Visit http://localhost:3000/hello_world and see your React On Rails app running!
-
-            - Run the npm express-server command to load the node server with hot reloading support.
-
-                npm run express-server
-
-            - Visit http://localhost:4000 and see your React On Rails app running using the Webpack Dev server.
         MSG
         GeneratorMessages.add_info(message)
       end
