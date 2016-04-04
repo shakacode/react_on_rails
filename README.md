@@ -101,7 +101,7 @@ See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpac
 
 ## Why Webpack?
 
-Webpack is used to generate several JavaScript "bundles" for inclusion in `application.js`.
+Webpack is used to generate several JavaScript "bundles" for inclusion in `application.js` or directly in your layout.
 
 This usage of webpack fits neatly and simply into the existing Rails sprockets system and you can include React components on a Rails view with a simple helper.
 

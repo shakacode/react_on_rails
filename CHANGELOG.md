@@ -6,8 +6,8 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [5.2.0] - 2016-04-03
 ##### Removed
-All 5.1.0 changes can be found in [#363](https://github.com/shakacode/react_on_rails/pull/363) by [jbhatab](https://github.com/jbhatab).
-- Generator enhancements
+All 5.2.0 changes can be found in [#363](https://github.com/shakacode/react_on_rails/pull/363) by [jbhatab](https://github.com/jbhatab).
+- Generator removals
   - removed heroku from installer
   - removed bootstrap from generator
   - removed express server from generator
