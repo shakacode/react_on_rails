@@ -123,6 +123,10 @@ module ReactOnRails
         end
       end
 
+      def template_assets_rake_file   
+        template("base/base/lib/tasks/assets.rake.tt", "lib/tasks/assets.rake")   
+      end
+
       ASSETS_RB_APPEND = <<-DATA.strip_heredoc
 # Add client/assets/ folders to asset pipeline's search path.
 # If you do not want to move existing images and fonts from your Rails app

@@ -65,7 +65,7 @@ bin/rake db:migrate
 bin/rake db:setup
 ```
 
-3. Add assets.rake file to help make heroku deployment simple
+3. Add assets.rake file to help make heroku deployment simple if you did not run the installer.
 
 ```rake
 # lib/tasks/assets.rake
