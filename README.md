@@ -234,13 +234,19 @@ The `railsContext` has: (see implementation in file react_on_rails_helper.rb for
     location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}": ""}",
     scheme: uri.scheme, # http
     host: uri.host, # foo.com
+    port: uri.port, 
     pathname: uri.path, # /posts
     search: uri.query, # id=30&limit=5
 
     # Locale settings
     i18nLocale: I18n.locale,
     i18nDefaultLocale: I18n.default_locale,
-    httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"]
+    httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"],
+    
+    # Other
+    serverSide: boolean # Are we being called on the server or client? NOTE, if you conditionally
+     # render something different on the server than the client, then React will only show the
+     # server version!
   }
 ```
 
@@ -327,7 +333,7 @@ This is how you actually render the React components you exposed to `window` ins
   + **prerender:** enable server-side rendering of component. Set to false when debugging!
   + **id:** Id for the div. This will get assigned automatically if you do not provide an id.
   + **html_options:** Any other html options to get placed on the added div for the component.
-  + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise.
+  + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise. Note, on the client you will so both the railsContext and your props. On the server, you only see the railsContext being logged.
   + **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the default configuration of logging_on_server set to true, you'll still see the errors on the server.
   + **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
 

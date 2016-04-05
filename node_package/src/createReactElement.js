@@ -21,8 +21,13 @@ export default function createReactElement({
   location,
   }) {
   if (trace) {
-    console.log(`RENDERED ${name} to dom node with id: ${domNodeId} with props, railsContext:`,
-      props, railsContext);
+    if (railsContext && railsContext.serverSide) {
+      console.log(`RENDERED ${name} to dom node with id: ${domNodeId} with railsContext:`,
+        railsContext);
+    } else {
+      console.log(`RENDERED ${name} to dom node with id: ${domNodeId} with props, railsContext:`,
+        props, railsContext);
+    }
   }
 
   const componentObj = ReactOnRails.getComponent(name);

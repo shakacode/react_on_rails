@@ -22,6 +22,7 @@ shared_examples "railsContext" do |pathname, id_base|
       keys_to_vals = {
         href: "http://#{host_port}/#{pathname}?ab=cd",
         location: "/#{pathname}?ab=cd",
+        port: port,
         scheme: "http",
         host: host,
         pathname: "/#{pathname}",
