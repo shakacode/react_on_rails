@@ -2,16 +2,19 @@ import React, { PropTypes } from 'react';
 import _ from 'lodash';
 
 function renderContextRows(railsContext) {
+  console.log('railsContext.serverSide is ', railsContext.serverSide)
   return _.transform(railsContext, (accum, value, key) => {
-    const className = `js-${key}`;
-    accum.push(
-      <tr key={className}>
-        <td><strong>
-          {key}:&nbsp;
-        </strong></td>
-        <td className={className}>{value}</td>
-      </tr>
-    );
+    if (key !== 'serverSide') {
+      const className = `js-${key}`;
+      accum.push(
+        <tr key={className}>
+          <td><strong>
+            {key}:&nbsp;
+          </strong></td>
+          <td className={className}>{value + ''}</td>
+        </tr>
+      );
+    }
   }, []);
 }
 

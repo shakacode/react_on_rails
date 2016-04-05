@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
 
+## [5.1.1] - 2016-04-04
+##### Fixed
+- [Security] Address failure to sanitize console messages when server rendering and displaying in the browser console. See [#366](https://github.com/shakacode/react_on_rails/pull/366) and [#370](https://github.com/shakacode/react_on_rails/pull/370) by [justin808](https://github.com/justin808)
+##### Added
+- railsContext includes the port number and a boolean if the code is being run on the server or client. 
+
 ## [5.1.0] - 2016-04-03
 ##### Added
 All 5.1.0 changes can be found in [#362](https://github.com/shakacode/react_on_rails/pull/362) by [justin808](https://github.com/justin808).
@@ -262,7 +268,8 @@ Best done with Object destructing:
 
 ##### Fixed
 - Fix several generator related issues.
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/5.1.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/5.1.1...master
+[5.1.1]: https://github.com/shakacode/react_on_rails/compare/5.0.0...5.1.1
 [5.1.0]: https://github.com/shakacode/react_on_rails/compare/5.0.0...5.1.0
 [5.0.0]: https://github.com/shakacode/react_on_rails/compare/4.0.3...5.0.0
 [4.0.3]: https://github.com/shakacode/react_on_rails/compare/4.0.2...4.0.3
