@@ -250,7 +250,7 @@ module ReactOnRailsHelper
     return render_value if @rendered_rails_context
 
     data = {
-      rails_context: rails_context
+      rails_context: rails_context(server_side: false)
     }
 
     @rendered_rails_context = true
@@ -297,7 +297,7 @@ module ReactOnRailsHelper
 
     wrapper_js = <<-JS
 (function() {
-  var railsContext = #{rails_context.to_json};
+  var railsContext = #{rails_context(server_side: true).to_json};
 #{initialize_redux_stores}
   var props = #{props_string(props)};
   return ReactOnRails.serverRenderReactComponent({
@@ -356,10 +356,10 @@ ReactOnRails.setStore('#{store_name}', store);
 
   # This is the definitive list of the default values used for the rails_context, which is the
   # second parameter passed to both component and store generator functions.
-  def rails_context
+  def rails_context(server_side:)
     @rails_context ||= begin
       uri = URI.parse(request.original_url)
-      # uri = URI("http://foo.com/posts?id=30&limit=5#time=1305298413")
+      # uri = URI("http://foo.com:3000/posts?id=30&limit=5#time=1305298413")
 
       result = {
         # URL settings
@@ -367,6 +367,7 @@ ReactOnRails.setStore('#{store_name}', store);
         location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}" : ''}",
         scheme: uri.scheme, # http
         host: uri.host, # foo.com
+        port: uri.port,
         pathname: uri.path, # /posts
         search: uri.query, # id=30&limit=5
 
@@ -382,6 +383,8 @@ ReactOnRails.setStore('#{store_name}', store);
       end
       result
     end
+
+    @rails_context.merge(serverSide: server_side)
   end
 
   def raise_on_prerender_error_option(val)
