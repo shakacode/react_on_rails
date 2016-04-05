@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails)  [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
 # NEWS
-* 5.1.0 has shipped!Please see the [CHANGELOG.md](./CHANGELOG.md) for details on the latest release and any breaking changes.
+* 5.1.1 has shipped! Please see the [CHANGELOG.md](./CHANGELOG.md) for details on the latest release and any breaking changes.
 * [New slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
 * 2016-02-28: We added a [Projects page](./PROJECTS.md) and a [Kudos page](./KUDOS.md). Please edit the page your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors.
 * *See [NEWS.md](NEWS.md) for the full news history.*
