@@ -90,7 +90,7 @@ module ReactOnRails
       end
 
       # Cross-platform way of finding an executable in the $PATH.
-      #
+      # Source: http://stackoverflow.com/questions/2108727/which-in-ruby-checking-if-program-exists-in-path-from-ruby
       #   which('ruby') #=> /usr/bin/ruby
       def which(cmd)
         exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
