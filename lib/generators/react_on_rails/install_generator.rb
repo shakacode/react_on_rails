@@ -89,8 +89,22 @@ module ReactOnRails
         !(missing_node? || missing_npm? || ReactOnRails::GitUtils.uncommitted_changes?(GeneratorMessages))
       end
 
+      # Cross-platform way of finding an executable in the $PATH.
+      #
+      #   which('ruby') #=> /usr/bin/ruby
+      def which(cmd)
+        exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
+        ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
+          exts.each { |ext|
+            exe = File.join(path, "#{cmd}#{ext}")
+            return exe if File.executable?(exe) && !File.directory?(exe)
+          }
+        end
+        return nil
+      end
+
       def missing_npm?
-        return false unless `which npm`.blank?
+        return false unless which('npm').blank?
         error = "npm is required. Please install it before continuing. "
         error << "https://www.npmjs.com/"
         GeneratorMessages.add_error(error)
@@ -98,7 +112,7 @@ module ReactOnRails
       end
 
       def missing_node?
-        return false unless `which node`.blank?
+        return false unless which('node').blank?
         error = "** nodejs is required. Please install it before continuing. "
         error << "https://nodejs.org/en/"
         GeneratorMessages.add_error(error)
