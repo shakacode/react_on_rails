@@ -299,7 +299,7 @@ module ReactOnRailsHelper
 (function() {
   var railsContext = #{rails_context(server_side: true).to_json};
 #{initialize_redux_stores}
-  var props = #{props_string(props)};
+  var props = #{props_string(props).gsub("\u2028", '').gsub("\u2029", '')};
   return ReactOnRails.serverRenderReactComponent({
     name: '#{react_component_name}',
     domNodeId: '#{dom_id}',
