@@ -71,11 +71,11 @@
     <%- if options.redux? -%>
     "mirror-creator": "1.1.0",
     <%- end -%>
-    "react": "^0.14.8",
+    "react": "^15.0.0",
     <%- unless options.skip_bootstrap? -%>
     "react-bootstrap": "^0.28.5",
     <%- end -%>
-    "react-dom": "^0.14.8",
+    "react-dom": "^15.0.0",
     "react-on-rails": "<%= VersionSyntaxConverter.new.rubygem_to_npm %>",
     <%- if options.redux? -%>
     "react-redux": "^4.4.1",
