@@ -1,12 +1,14 @@
 # Tips for Contributors
-*See [Releasing](../releasing.md) for instructions on releasing.*
+*See [Releasing](./releasing.md) for instructions on releasing.*
 
-* After Syncing, to prepare all examples and run all tests
+## To run tests:
+* After updating code via git, to prepare all examples and run all tests:
 
 ```
-bundle && npm i && rake examples:prepare_all && rake symlink_node_package && rake
+bundle && npm i && rake examples:prepare_all && rake node_package && rake
 ```
 
+See Dev Initial Setup, below for, well... initial setup.
 
 # IDE/IDE SETUP
 It's critical to configure your IDE/editor to ignore certain directories. Otherwise your IDE might slow to a crawl!
@@ -19,6 +21,7 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 * /spec/dummy/app/assets/webpack
 * /spec/dummy/log
 * /spec/dummy/node_modules
+* /spec/dummy/client/node_modules
 * /spec/dummy/tmp
 * /spec/react_on_rails/dummy-for-generators
 
@@ -81,17 +84,19 @@ This is the error:
 ### Prereqs
 After checking out the repo, making sure you have rvm and nvm setup (setup ruby and node), cd to `spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
-Additionally, our RSpec tests use the poltergeist web driver. You will need to install the poltergeist node module:
+Additionally, our RSpec tests use the poltergeist web driver. You will need to install the phantomjs node module:
 
 ```sh
-npm install -g poltergeist
+npm install -g phantomjs
 ```
+
+Note this *must* be installed globally for the dummy test project rspec runner to see it properly.
 
 ### NPM link
 Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the app's root directory and run:
 
 ```sh
-npm run symlink_node_package
+npm run node_package
 ```
 
 From now on, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:prepare_all` rake task.
