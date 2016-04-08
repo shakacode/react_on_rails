@@ -1,4 +1,6 @@
-# Tutorial for React on Rails
+# Tutorial for React on Rails (THIS ONLY WORKS UP TO VERSION 5.1.1)
+
+*Version 5.2 and greater have removed the non-essential options. See the [changelog](../CHANGELOG.md) for details on what was removed.*
 
 This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 

@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
 
+## [5.2.0] - 2016-04-08
+##### Added
+- [React 15.0] Added React 15.0 to react_on_rails. See [#379](https://github.com/shakacode/react_on_rails/pull/379) by [brucek](https://github.com/brucek).
+
+##### Removed
+- Generator removals to simplify installer. See [#363](https://github.com/shakacode/react_on_rails/pull/363) by [jbhatab](https://github.com/jbhatab).
+  - Removed heroku from installer.
+  - Removed bootstrap from generator.
+  - Removed express server from generator.
+  - Removed hot module replacement from generator.
+  - Removed ruby and js linting from generator.
+  - Documentation related to installer options have been added to separate documentation files.
+
 ## [5.1.1] - 2016-04-04
 ##### Fixed
 - [Security] Address failure to sanitize console messages when server rendering and displaying in the browser console. See [#366](https://github.com/shakacode/react_on_rails/pull/366) and [#370](https://github.com/shakacode/react_on_rails/pull/370) by [justin808](https://github.com/justin808)

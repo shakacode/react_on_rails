@@ -8,12 +8,6 @@ shared_examples "base_generator:base" do |options|
     assert_file "config/routes.rb", match
   end
 
-  it "adds client assets directories" do
-    assert_directory("client/assets/stylesheets")
-    assert_directory_with_keep_file("client/assets/fonts")
-    assert_directory_with_keep_file("client/assets/images")
-  end
-
   it "updates the .gitignore file" do
     match = <<-MATCH.strip_heredoc
       some existing text
@@ -73,14 +67,10 @@ shared_examples "base_generator:base" do |options|
        app/views/hello_world/index.html.erb
        client/REACT_ON_RAILS_CLIENT_README.md
        client/app/bundles/HelloWorld/startup/clientRegistration.jsx
-       client/webpack.client.hot.config.js
        client/webpack.client.rails.config.js
        client/.babelrc
-       client/index.jade
        client/package.json
-       client/server.js
        config/initializers/react_on_rails.rb
-       lib/tasks/assets.rake
        package.json
        Procfile.dev
        REACT_ON_RAILS.md).each { |file| assert_file(file) }
@@ -93,17 +83,11 @@ shared_examples "base_generator:base" do |options|
 end
 
 shared_examples "base_generator:no_server_rendering" do
-  it "copies client-side-rendering version of Procfile.dev and Procfile.dev-hot" do
-    %w(Procfile.dev Procfile.dev-hot).each do |file|
+  it "copies client-side-rendering version of Procfile.dev" do
+    %w(Procfile.dev).each do |file|
       assert_file(file) do |contents|
         refute_match(/server: sh -c 'cd client && npm run build:dev:server'/, contents)
       end
-    end
-  end
-
-  it "copies client-side-rendering version of assets.rake" do
-    assert_file("lib/tasks/assets.rake") do |contents|
-      refute_match(/sh "cd client && npm run build:server"/, contents)
     end
   end
 
@@ -138,12 +122,6 @@ shared_examples "base_generator:no_server_rendering" do
 end
 
 shared_examples "base_generator:server_rendering" do
-  it "copies server-side-rendering version of assets.rake" do
-    assert_file("lib/tasks/assets.rake") do |contents|
-      assert_match(/sh "cd client && npm run build:server"/, contents)
-    end
-  end
-
   it "copies server-rendering-only files" do
     %w(client/webpack.server.rails.config.js
        client/app/bundles/HelloWorld/startup/serverRegistration.jsx).each { |file| assert_file(file) }
@@ -155,8 +133,8 @@ shared_examples "base_generator:server_rendering" do
     end
   end
 
-  it "copies server-side-rendering version of Procfile.dev and Procfile.dev-hot" do
-    %w(Procfile.dev Procfile.dev-hot).each do |file|
+  it "copies server-side-rendering version of Procfile.dev" do
+    %w(Procfile.dev).each do |file|
       assert_file(file) do |contents|
         assert_match(/server: sh -c 'cd client && npm run build:dev:server'/, contents)
       end

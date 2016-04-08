@@ -65,8 +65,6 @@ group :development, :test do
   gem 'spring'
 end
 
-gem 'bootstrap-sass'
-
 group :test do
   gem "coveralls", require: false
   gem "capybara"

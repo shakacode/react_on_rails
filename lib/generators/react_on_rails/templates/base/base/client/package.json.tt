@@ -1,31 +1,12 @@
 <%- require "react_on_rails/version_syntax_converter" -%>
 {
   "name": "react-webpack-rails-tutorial",
-  "version": "1.1.0",
-  "description": "Built using the react_on_rails generator.",
-  "main": "server.js",
+  "version": "0.0.1",
   "engines": {
-    "node": "5.0.0",
+    "node": "5.10.0",
     "npm": "3.5.0"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/shakacode/react-webpack-rails-tutorial.git"
-  },
-  "keywords": [
-    "react",
-    "tutorial",
-    "comment",
-    "example"
-  ],
-  "author": "justin808",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/shakacode/react-webpack-rails-tutorial/issues"
-  },
-  "homepage": "https://github.com/shakacode/react-webpack-rails-tutorial",
   "scripts": {
-    "start": "node server.js",
     "build:client": "NODE_ENV=production webpack --config webpack.client.rails.config.js",
     <%- if options.server_rendering? -%>
     "build:server": "NODE_ENV=production webpack --config webpack.server.rails.config.js",
@@ -37,11 +18,6 @@
     "build:production:client": "NODE_ENV=production webpack --config webpack.client.rails.build.config.js",
     <%- if options.server_rendering? -%>
     "build:production:server": "NODE_ENV=production webpack --config webpack.server.rails.build.config.js",
-    <%- end -%>
-    <%- unless options.skip_js_linters? -%>
-    "lint": "npm run eslint && npm run jscs",
-    "eslint": "eslint --ext .js,.jsx .",
-    "jscs": "jscs --verbose .",
     <%- end -%>
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -72,9 +48,6 @@
     "mirror-creator": "1.1.0",
     <%- end -%>
     "react": "^0.14.8 || ^15.0.0",
-    <%- unless options.skip_bootstrap? -%>
-    "react-bootstrap": "^0.28.5",
-    <%- end -%>
     "react-dom": "^0.14.8 || ^15.0.0",
     "react-on-rails": "<%= VersionSyntaxConverter.new.rubygem_to_npm %>",
     <%- if options.redux? -%>
@@ -86,28 +59,5 @@
     "webpack": "^1.12.14"
   },
   "devDependencies": {
-    "babel-plugin-react-transform": "^2.0.2",
-    <%- unless options.skip_bootstrap? -%>
-    "bootstrap-sass": "^3.3.6",
-    "bootstrap-sass-loader": "^1.0.10",
-    <%- end -%>
-    "css-loader": "^0.23.1",
-    <%- unless options.skip_js_linters? -%>
-    "eslint": "^2.6.0",
-    "eslint-config-shakacode": "^4.0.0",
-    "eslint-plugin-react": "^4.2.3",
-    <%- end -%>
-    "express": "^4.13.4",
-    "file-loader": "^0.8.5",
-    "jade": "^1.11.0",
-    <%- unless options.skip_js_linters? -%>
-    "jscs": "^2.11.0",
-    <%- end -%>
-    "node-sass": "^3.4.2",
-    "react-transform-hmr": "^1.0.4",
-    "sass-loader": "^3.2.0",
-    "style-loader": "^0.13.1",
-    "url-loader": "^0.5.7",
-    "webpack-dev-server": "^1.14.1"
   }
 }

@@ -10,50 +10,6 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:no_server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:no_server_rendering"
-    include_examples "bootstrap:enabled"
-    include_examples "js_linters:enabled"
-  end
-
-  context "--skip-js-linters" do
-    before(:all) { run_generator_test_with_args(%w(--skip-js-linters)) }
-    include_examples "base_generator:base", application_js: true
-    include_examples "base_generator:no_server_rendering"
-    include_examples "no_redux_generator:base"
-    include_examples "no_redux_generator:no_server_rendering"
-    include_examples "bootstrap:enabled"
-    include_examples "js_linters:disabled"
-  end
-
-  context "-j" do
-    before(:all) { run_generator_test_with_args(%w(-j)) }
-    include_examples "base_generator:base", application_js: true
-    include_examples "base_generator:no_server_rendering"
-    include_examples "no_redux_generator:base"
-    include_examples "no_redux_generator:no_server_rendering"
-    include_examples "bootstrap:enabled"
-    include_examples "js_linters:disabled"
-  end
-
-  context "--ruby-linters" do
-    before(:all) { run_generator_test_with_args(%w(--ruby-linters)) }
-    include_examples "base_generator:base", application_js: true
-    include_examples "base_generator:no_server_rendering"
-    include_examples "no_redux_generator:base"
-    include_examples "no_redux_generator:no_server_rendering"
-    include_examples "bootstrap:enabled"
-    include_examples "js_linters:enabled"
-    include_examples "ruby_linters"
-  end
-
-  context "-L" do
-    before(:all) { run_generator_test_with_args(%w(-L)) }
-    include_examples "base_generator:base", application_js: true
-    include_examples "base_generator:no_server_rendering"
-    include_examples "no_redux_generator:base"
-    include_examples "no_redux_generator:no_server_rendering"
-    include_examples "bootstrap:enabled"
-    include_examples "js_linters:enabled"
-    include_examples "ruby_linters"
   end
 
   context "--server-rendering" do
@@ -62,8 +18,6 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:server_rendering"
-    include_examples "bootstrap:enabled"
-    include_examples "js_linters:enabled"
   end
 
   context "-S" do
@@ -72,8 +26,6 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:server_rendering"
     include_examples "no_redux_generator:base"
     include_examples "no_redux_generator:server_rendering"
-    include_examples "bootstrap:enabled"
-    include_examples "js_linters:enabled"
   end
 
   context "--redux" do
@@ -82,8 +34,6 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:no_server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:no_server_rendering"
-    include_examples "bootstrap:enabled"
-    include_examples "js_linters:enabled"
   end
 
   context "-R" do
@@ -92,8 +42,6 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:no_server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:no_server_rendering"
-    include_examples "bootstrap:enabled"
-    include_examples "js_linters:enabled"
   end
 
   context "--redux --server_rendering" do
@@ -102,8 +50,6 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:server_rendering"
-    include_examples "bootstrap:enabled"
-    include_examples "js_linters:enabled"
   end
 
   context "-R -S" do
@@ -112,8 +58,6 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:server_rendering"
-    include_examples "bootstrap:enabled"
-    include_examples "js_linters:enabled"
   end
 
   context "-R -S" do
@@ -122,54 +66,6 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator:server_rendering"
     include_examples "react_with_redux_generator:base"
     include_examples "react_with_redux_generator:server_rendering"
-    include_examples "bootstrap:enabled"
-    include_examples "js_linters:enabled"
-  end
-
-  context "without existing application.css/scss file" do
-    before(:all) { run_generator_test_with_args([], application_css: false) }
-    it "creates its own application.scss file" do
-      assert_file("app/assets/stylesheets/application.scss")
-    end
-  end
-
-  context "--heroku-deployment" do
-    before(:all) { run_generator_test_with_args(%w(--heroku-deployment)) }
-    include_examples "heroku_deployment"
-  end
-
-  context "-H" do
-    before(:all) { run_generator_test_with_args(%w(-H)) }
-    include_examples "heroku_deployment"
-  end
-
-  context "--no-skip-bootstrap" do
-    before(:all) { run_generator_test_with_args(%w(--no-skip-bootstrap)) }
-    include_examples "base_generator:base", application_js: true
-    include_examples "bootstrap:enabled"
-  end
-
-  context "--no-skip-bootstrap" do
-    before(:all) { run_generator_test_with_args(%w(--no-skip-bootstrap), application_js: false) }
-    include_examples "base_generator:base", application_js: false
-    include_examples "bootstrap:enabled"
-  end
-
-  context "-b" do
-    before(:all) { run_generator_test_with_args(%w(-b)) }
-    include_examples "bootstrap:disabled"
-  end
-
-  context "--skip-bootstrap" do
-    before(:all) { run_generator_test_with_args(%w(--skip-bootstrap)) }
-    include_examples "base_generator:base", application_js: true
-    include_examples "bootstrap:disabled"
-  end
-
-  context "--skip-bootstrap" do
-    before(:all) { run_generator_test_with_args(%w(--skip-bootstrap), application_js: false) }
-    include_examples "base_generator:base", application_js: false
-    include_examples "bootstrap:disabled"
   end
 
   context "without existing application.js or application.js.coffee file" do
@@ -197,24 +93,6 @@ describe InstallGenerator, type: :generator do
     it "adds ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)" do
       expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_RSPEC_TO_COMPILE_ASSETS
       assert_file("spec/rails_helper.rb") { |contents| assert_match(expected, contents) }
-    end
-  end
-
-  context "without existing spec dir" do
-    before(:all) { run_generator_test_with_args(%w(--ruby-linters), spec: false) }
-    it "does not add the spec directory to the ruby-lint.yml" do
-      assert_file("ruby-lint.yml") do |contents|
-        refute_match(/- spec/, contents)
-      end
-    end
-  end
-
-  context "with existing spec dir" do
-    before(:all) { run_generator_test_with_args(%w(--ruby-linters), spec: true) }
-    it "adds the spec directory to the ruby-lint.yml" do
-      assert_file("ruby-lint.yml") do |contents|
-        assert_match(/- spec/, contents)
-      end
     end
   end
 
@@ -253,12 +131,6 @@ describe InstallGenerator, type: :generator do
               npm run rails-server
 
           - Visit http://localhost:3000/hello_world and see your React On Rails app running!
-
-          - Run the npm express-server command to load the node server with hot reloading support.
-
-              npm run express-server
-
-          - Visit http://localhost:4000 and see your React On Rails app running using the Webpack Dev server.
         MSG
       expect(GeneratorMessages.output)
         .to include(GeneratorMessages.format_info(expected))
@@ -279,12 +151,6 @@ describe InstallGenerator, type: :generator do
               npm run rails-server
 
           - Visit http://localhost:3000/hello_world and see your React On Rails app running!
-
-          - Run the npm express-server command to load the node server with hot reloading support.
-
-              npm run express-server
-
-          - Visit http://localhost:4000 and see your React On Rails app running using the Webpack Dev server.
         MSG
       expect(GeneratorMessages.output)
         .to include(GeneratorMessages.format_info(expected))

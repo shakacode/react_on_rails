@@ -1,7 +1,6 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails)  [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
  
 # NEWS
-* 5.1.1 has shipped! Please see the [CHANGELOG.md](./CHANGELOG.md) for details on the latest release and any breaking changes.
 * [New slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
 * 2016-02-28: We added a [Projects page](./PROJECTS.md) and a [Kudos page](./KUDOS.md). Please edit the page your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors.
 * *See [NEWS.md](NEWS.md) for the full news history.*
@@ -74,23 +73,11 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
     - [Globally Exposing Your React Components](#globally-exposing-your-react-components)
     - [ReactOnRails View Helpers API](#reactonrails-view-helpers-api)
     - [ReactOnRails JavaScript API](#reactonrails-javascript-api)
-    - [Hot Reloading View Helpers](#hot-reloading-view-helpers)
     - [React-Router](#react-router)
 + [Generator](#generator)
     - [Understanding the Organization of the Generated Client Code](#understanding-the-organization-of-the-generated-client-code)
     - [Redux](#redux)
       - [Multiple React Components on a Page with One Store](#multiple-react-components-on-a-page-with-one-store)
-    - [Using Images and Fonts](#using-images-and-fonts)
-    - [Bootstrap Integration](#bootstrap-integration)
-        + [Bootstrap via Rails Server](#bootstrap-via-rails-server)
-        + [Bootstrap via Webpack HMR Dev Server](#bootstrap-via-webpack-hmr-dev-server)
-        + [Keeping Custom Bootstrap Configurations Synced](#keeping-custom-bootstrap-configurations-synced)
-        + [Skip Bootstrap Integration](#skip-bootstrap-integration)
-    - [Linters](#linters)
-        + [JavaScript Linters](#javascript-linters)
-        + [Ruby Linters](#ruby-linters)
-        + [Running the Linters](#running-the-linters)
-+ [Developing with the Webpack Dev Server](#developing-with-the-webpack-dev-server)
 + [Adding Additional Routes for the Dev Server](#adding-additional-routes-for-the-dev-server)
 + [Migrate From react-rails](#migrate-from-react-rails)
 + [Additional Reading](#additional-reading)
@@ -105,7 +92,6 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
 Like the [react-rails](https://github.com/reactjs/react-rails) gem, React on Rails is capable of server-side rendering with fragment caching and is compatible with [turbolinks](https://github.com/turbolinks/turbolinks). Unlike react-rails, which depends heavily on sprockets and jquery-ujs, React on Rails uses [webpack](http://webpack.github.io/) and does not depend on jQuery. While the initial setup is slightly more involved, it allows for advanced functionality such as:
 
 + [Redux](https://github.com/reactjs/redux)
-+ [Webpack dev server](https://webpack.github.io/docs/webpack-dev-server.html) with [hot module replacement](https://webpack.github.io/docs/hot-module-replacement-with-webpack.html)
 + [Webpack optimization functionality](https://github.com/webpack/docs/wiki/optimization)
 + [React Router](https://github.com/reactjs/react-router)
 
@@ -113,10 +99,7 @@ See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpac
 
 ## Why Webpack?
 
-Webpack is used for 2 purposes:
-
-1. Generate several JavaScript "bundles" for inclusion in `application.js`.
-2. Providing the Webpack Dev Server for quick prototyping of components without needing to refresh your browser to see updates.
+Webpack is used to generate several JavaScript "bundles" for inclusion in `application.js` or directly in your layout.
 
 This usage of webpack fits neatly and simply into the existing Rails sprockets system and you can include React components on a Rails view with a simple helper.
 
@@ -468,10 +451,6 @@ Usage:
 Options:
   -R, [--redux], [--no-redux]                          # Install Redux gems and Redux version of Hello World Example
   -S, [--server-rendering], [--no-server-rendering]    # Add necessary files and configurations for server-side rendering
-  -j, [--skip-js-linters], [--no-skip-js-linters]      # Skip installing JavaScript linting files
-  -L, [--ruby-linters], [--no-ruby-linters]            # Install ruby linting files, tasks, and configs
-  -H, [--heroku-deployment], [--no-heroku-deployment]  # Install files necessary for deploying to Heroku
-  -b, [--skip-bootstrap], [--no-skip-bootstrap]        # Skip installing files for bootstrap support
 
 Runtime options:
   -f, [--force]                    # Overwrite files that already exist
@@ -505,60 +484,6 @@ Note the organizational paradigm of "bundles". These are like application domain
 The generator has amended the folders created in `client/assets/` to Rails's asset path. We recommend that if you have any existing assets that you want to use with your client code, you should move them to these folders and use webpack as normal. This allows webpack's development server to have access to your assets, as it will not be able to see any assets in the default Rails directories which are above the `/client` directory.
 
 Alternatively, if you have many existing assets and don't wish to move them, you could consider creating symlinks from client/assets that point to your Rails assets folders inside of `app/assets/`. The assets there will then be visible to both Rails and webpack.
-
-### Bootstrap Integration
-React on Rails ships with Twitter Bootstrap already integrated into the build. Note that the generator removes `require_tree` in both the application.js and application.css.scss files. This is to ensure the correct load order for the bootstrap integration, and is usually a good idea in general. You will therefore need to explicitly require your files.
-
-How the Bootstrap library is loaded depends upon whether one is using the Rails server or the HMR development server.
-
-#### Bootstrap via Rails Server
-In the former case, the Rails server loads `bootstrap-sprockets`, provided by the `bootstrap-sass` ruby gem (added automatically to your Gemfile by the generator) via the `app/assets/stylesheets/_bootstrap-custom.scss` partial.
-
-This allows for using Bootstrap in your regular Rails stylesheets. If you wish to customize any of the Bootstrap variables, you can do so via the `client/assets/stylesheets/_pre-bootstrap.scss` partial.
-
-#### Bootstrap via Webpack HMR Dev Server
-When using the webpack dev server, which does not go through Rails, bootstrap is loaded via the [bootstrap-sass-loader](https://github.com/shakacode/bootstrap-sass-loader) which uses the `client/bootstrap-sass-config.js` file.
-
-#### Keeping Custom Bootstrap Configurations Synced
-Because the webpack dev server and Rails each load Bootstrap via a different file (explained in the two sections immediately above), any changes to the way components are loaded in one file must also be made to the other file in order to keep styling consistent between the two. For example, if an import is excluded in `_bootstrap-custom.scss`, the same import should be excluded in `bootstrap-sass-config.js` so that styling in the Rails server and the webpack dev server will be the same.
-
-#### Skip Bootstrap Integration
-Bootstrap integration is enabled by default, but can be disabled by passing the `--skip-bootstrap` flag (alias `-b`). When you don't need Bootstrap in your existing project, just skip it as needed.
-
-### Linters
-The React on Rails generator can add linters and their recommended accompanying configurations to your project. There are two classes of linters: ruby linters and JavaScript linters.
-
-##### JavaScript Linters
-JavaScript linters are **enabled by default**, but can be disabled by passing the `--skip-js-linters` flag (alias `j`) , and those that run in Node have been added to `client/package.json` under `devDependencies`.
-
-##### Ruby Linters
-Ruby linters are **disabled by default**, but can be enabled by passing the `--ruby-linters` flag when generating. These linters have been added to your Gemfile in addition to the appropriate Rake tasks.
-
-We really love using all the linters! Give them a try.
-
-#### Running the Linters
-To run the linters (runs all linters you have installed, even if you installed both Ruby and Node):
-
-```bash
-rake lint
-```
-
-Run this command to see all the linters available
-
-```bash
-rake -T lint
-```
-
-**Here's the list:**
-```bash
-rake lint               # Runs all linters
-rake lint:eslint        # eslint
-rake lint:js            # JS Linting
-rake lint:jscs          # jscs
-rake lint:rubocop[fix]  # Run Rubocop lint in shell
-rake lint:ruby          # Run ruby-lint as shell
-rake lint:scss          # See docs for task 'scss_lint'
-```
 
 ## Multiple React Components on a Page with One Store
 You may wish to have 2 React components share the same the Redux store. For example, if your navbar is a React component, you may want it to use the same store as your component in the main area of the page. You may even want multiple React components in the main area, which allows for greater modularity. In addition, you may want this to work with Turbolinks to minimize reloading the JavaScript. A good example of this would be something like an a notifications counter in a header. As each notifications is read in the body of the page, you would like to update the header. If both the header and body share the same Redux store, then this is trivial. Otherwise, we have to rely on other solutions, such as the header polling the server to see how many unread notifications exist.
