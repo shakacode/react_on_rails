@@ -6,20 +6,18 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [5.2.0] - 2016-04-08
 ##### Added
-- [React 15.0] Added React 15.0 to react_on_rails. See [#379](https://github.com/shakacode/react_on_rails/pull/379) by [brucek](https://github.com/brucek).
+- Support for React 15.0 to react_on_rails. See [#379](https://github.com/shakacode/react_on_rails/pull/379) by [brucek](https://github.com/brucek).
 
 ##### Removed
 - Generator removals to simplify installer. See [#363](https://github.com/shakacode/react_on_rails/pull/363) by [jbhatab](https://github.com/jbhatab).
-  - Removed heroku from installer.
-  - Removed bootstrap from generator.
-  - Removed express server from generator.
-  - Removed hot module replacement from generator.
-  - Removed ruby and js linting from generator.
-  - Documentation related to installer options have been added to separate documentation files.
+  - Removed options for heroku, boostrap, and the linters from generator.
+  - Removed install for the Webpack Dev Server, as we can now do hot reloading with Rails, so the complexity of this feature is not justified. Nevertheless, the setup of React on Rails still supports this setup, just not with the generator.
+  - Documentation added for removed installer options.
 
 ## [5.1.1] - 2016-04-04
 ##### Fixed
 - [Security] Address failure to sanitize console messages when server rendering and displaying in the browser console. See [#366](https://github.com/shakacode/react_on_rails/pull/366) and [#370](https://github.com/shakacode/react_on_rails/pull/370) by [justin808](https://github.com/justin808)
+
 ##### Added
 - railsContext includes the port number and a boolean if the code is being run on the server or client. 
 
@@ -281,8 +279,9 @@ Best done with Object destructing:
 
 ##### Fixed
 - Fix several generator related issues.
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/5.1.1...master
-[5.1.1]: https://github.com/shakacode/react_on_rails/compare/5.0.0...5.1.1
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/5.2.0...master
+[5.2.0]: https://github.com/shakacode/react_on_rails/compare/5.1.1...5.2.0
+[5.1.1]: https://github.com/shakacode/react_on_rails/compare/5.1.0...5.1.1
 [5.1.0]: https://github.com/shakacode/react_on_rails/compare/5.0.0...5.1.0
 [5.0.0]: https://github.com/shakacode/react_on_rails/compare/4.0.3...5.0.0
 [4.0.3]: https://github.com/shakacode/react_on_rails/compare/4.0.2...4.0.3
