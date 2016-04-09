@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (5.1.1)
+    react_on_rails (5.2.0)
       connection_pool
       execjs (~> 2.5)
       foreman
@@ -51,14 +51,9 @@ GEM
       io-like (~> 0.3.0)
     arel (6.0.3)
     ast (2.2.0)
-    autoprefixer-rails (6.3.3.1)
-      execjs
     awesome_print (1.6.1)
     binding_of_caller (0.7.2)
       debug_inspector (>= 0.0.1)
-    bootstrap-sass (3.3.6)
-      autoprefixer-rails (>= 5.2.1)
-      sass (>= 3.3.4)
     builder (3.2.2)
     byebug (8.2.2)
     capybara (2.6.2)
@@ -287,7 +282,6 @@ PLATFORMS
 
 DEPENDENCIES
   awesome_print
-  bootstrap-sass
   capybara
   capybara-screenshot
   capybara-webkit
