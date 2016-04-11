@@ -10,7 +10,11 @@ module ReactOnRails
 
     class << self
       def pool
-        ServerRenderingPool::Node
+        if ReactOnRails.configuration.server_render_method == "NodeJS"
+          ServerRenderingPool::Node
+        else
+          ServerRenderingPool::Exec
+        end
       end
 
       def method_missing(sym, *args, &block)
