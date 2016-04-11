@@ -29,17 +29,17 @@ describe ReactOnRailsHelper, type: :helper do
     end
 
     it "converts a hash to JSON and escapes </script>" do
-      sanitized = helper.sanitized_props_string(hash)
+      sanitized = ReactOnRailsHelper::ReactComponent::Options.new("", 1, props: hash).props_sanitized
       expect(sanitized).to eq(hash_sanitized)
     end
 
     it "leaves a string alone that does not contain xss tags" do
-      sanitized = helper.sanitized_props_string(hash_sanitized)
+      sanitized = ReactOnRailsHelper::ReactComponent::Options.new("", 1, props: hash_sanitized).props_sanitized
       expect(sanitized).to eq(hash_sanitized)
     end
 
     it "fixes a string alone that contain xss tags" do
-      sanitized = helper.sanitized_props_string(hash_unsanitized)
+      sanitized = ReactOnRailsHelper::ReactComponent::Options.new("", 1, props: hash_unsanitized).props_sanitized
       expect(sanitized).to eq(hash_sanitized)
     end
   end
