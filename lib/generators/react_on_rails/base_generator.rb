@@ -123,10 +123,14 @@ module ReactOnRails
            client/node/server.js).each do |file|
           copy_file(base_path + file, file)
         end
+
+        copy_file("base/base/lib/tasks/load_test.rake", "lib/tasks/load_test.rake")
+
       end
 
       def template_assets_rake_file
         template("base/base/lib/tasks/assets.rake.tt", "lib/tasks/assets.rake")
+
       end
 
       ASSETS_RB_APPEND = <<-DATA.strip_heredoc
