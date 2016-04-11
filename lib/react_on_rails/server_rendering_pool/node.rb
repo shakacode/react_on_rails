@@ -1,0 +1,92 @@
+module ReactOnRails
+  module ServerRenderingPool
+    class Node
+
+      MAX_RESPONSE_LENGTH = 10000
+
+      def self.reset_pool
+        options = {size: ReactOnRails.configuration.server_renderer_pool_size,
+                   timeout: ReactOnRails.configuration.server_renderer_pool_size}
+        @js_context_pool = ConnectionPool.new(options) { create_js_context }
+      end
+
+      def self.reset_pool_if_server_bundle_was_modified
+        reset_pool
+      end
+
+      # js_code: JavaScript expression that returns a string.
+      # Returns a Hash:
+      #   html: string of HTML for direct insertion on the page by evaluating js_code
+      #   consoleReplayScript: script for replaying console
+      #   hasErrors: true if server rendering errors
+      # Note, js_code does not have to be based on React.
+      # js_code MUST RETURN json stringify Object
+      # Calling code will probably call 'html_safe' on return value before rendering to the view.
+      def self.server_render_js_with_console_logging(js_code)
+        if trace_react_on_rails?
+          @file_index ||= 1
+          trace_messsage(js_code, "tmp/server-generated-#{@file_index % 10}.js")
+          @file_index += 1
+        end
+        json_string = eval_js(js_code)
+        result = JSON.parse(json_string)
+
+        if ReactOnRails.configuration.logging_on_server
+          console_script = result["consoleReplayScript"]
+          console_script_lines = console_script.split("\n")
+          console_script_lines = console_script_lines[2..-2]
+          re = /console\.log\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
+          if console_script_lines
+            console_script_lines.each do |line|
+              match = re.match(line)
+              Rails.logger.info { "[react_on_rails] #{match[:msg]}" } if match
+            end
+          end
+        end
+        result
+      end
+
+      class << self
+        private
+
+        def trace_messsage(js_code, file_name = "tmp/server-generated.js", force = false)
+          return unless trace_react_on_rails? || force
+          # Set to anything to print generated code.
+          puts "Z" * 80
+          puts "react_renderer.rb: 92"
+          puts "wrote file #{file_name}"
+          File.write(file_name, js_code)
+          puts "Z" * 80
+        end
+
+        def trace_react_on_rails?
+          ENV["TRACE_REACT_ON_RAILS"].present?
+        end
+
+        def eval_js(js_code)
+          @js_context_pool.with do |js_context|
+            js_context.send(js_code, 0)
+            result = js_context.recv(MAX_RESPONSE_LENGTH)
+            result
+          end
+        end
+
+        def create_js_context
+          begin
+            client = UNIXSocket.new("client/node/node.sock")
+          rescue Exception => e
+            Rails.logger.error("Unable to connect to socket: client/node/node.sock.
+Make sure node server is up and running.")
+            Rails.logger.error(e)
+            raise e
+          end
+          client
+        end
+
+      end
+
+
+    end
+  end
+end
+
