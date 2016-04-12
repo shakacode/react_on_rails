@@ -1,9 +1,11 @@
-# rubocop:disable Metrics/ModuleLength
 # NOTE:
 # For any heredoc JS:
 # 1. The white spacing in this file matters!
 # 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 require "react_on_rails/prerender_error"
+require_relative "react_on_rails_helper/react_component/renderer"
+require_relative "react_on_rails_helper/react_component/options"
+require_relative "react_on_rails_helper/react_component/index"
 
 module ReactOnRailsHelper
   # The env_javascript_include_tag and env_stylesheet_link_tag support the usage of a webpack
@@ -59,101 +61,12 @@ module ReactOnRailsHelper
     send_tag_method(:stylesheet_link_tag, args)
   end
 
-  # react_component_name: can be a React component, created using a ES6 class, or
-  #   React.createClass, or a
-  #    `generator function` that returns a React component
-  #      using ES6
-  #         let MyReactComponentApp = (props, railsContext) => <MyReactComponent {...props}/>;
-  #      or using ES5
-  #         var MyReactComponentApp = function(props, railsContext) { return <YourReactComponent {...props}/>; }
-  #   Exposing the react_component_name is necessary to both a plain ReactComponent as well as
-  #     a generator:
-  #   See README.md for how to "register" your react components.
-  #   See spec/dummy/client/app/startup/serverRegistration.jsx and
-  #     spec/dummy/client/app/startup/ClientRegistration.jsx for examples of this
-  #
-  # options:
-  #   props: Ruby Hash or JSON string which contains the properties to pass to the react object. Do
-  #      not pass any props if you are separately initializing the store by the `redux_store` helper.
-  #   prerender: <true/false> set to false when debugging!
-  #   id: You can optionally set the id, or else a unique one is automatically generated.
-  #   html_options: You can set other html attributes that will go on this component
-  #   trace: <true/false> set to true to print additional debugging information in the browser
-  #          default is true for development, off otherwise
-  #   replay_console: <true/false> Default is true. False will disable echoing server rendering
-  #                   logs to browser. While this can make troubleshooting server rendering difficult,
-  #                   so long as you have the default configuration of logging_on_server set to
-  #                   true, you'll still see the errors on the server.
-  #   raise_on_prerender_error: <true/false> Default to false. True will raise exception on server
-  #      if the JS code throws
-  # Any other options are passed to the content tag, including the id.
-  def react_component(component_name,
-                      props: {},
-                      prerender: nil,
-                      trace: nil,
-                      replay_console: nil,
-                      raise_on_prerender_error: nil,
-                      id: nil,
-                      html_options: {})
-    # Create the JavaScript and HTML to allow either client or server rendering of the
-    # react_component.
-    #
-    # Create the JavaScript setup of the global to initialize the client rendering
-    # (re-hydrate the data). This enables react rendered on the client to see that the
-    # server has already rendered the HTML.
-    # We use this react_component_index in case we have the same component multiple times on the page.
-
-    react_component_index = next_react_component_index
-    react_component_name = component_name.camelize # Not sure if we should be doing this (JG)
-    dom_id = id.presence || "#{component_name}-react-component-#{react_component_index}"
-
-    # Setup the page_loaded_js, which is the same regardless of prerendering or not!
-    # The reason is that React is smart about not doing extra work if the server rendering did its job.
-
-    props = {} if props.nil?
-
-    prerender = prerender_option(prerender)
-    trace = trace_option(trace)
-    replay_console = replay_console_option(replay_console)
-    raise_on_prerender_error = raise_on_prerender_error_option(raise_on_prerender_error)
-
-    data = {
-      component_name: react_component_name,
-      props: props,
-      trace: trace,
-      dom_id: dom_id
-    }
-
-    component_specification_tag =
-      content_tag(:div,
-                  "",
-                  class: "js-react-on-rails-component",
-                  style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
-                  data: data)
-
-    # Create the HTML rendering part
-    result = server_rendered_react_component_html(props, react_component_name, dom_id,
-                                                  prerender: prerender,
-                                                  trace: trace,
-                                                  raise_on_prerender_error: raise_on_prerender_error)
-
-    server_rendered_html = result["html"]
-    console_script = result["consoleReplayScript"]
-
-    content_tag_options = html_options
-    content_tag_options[:id] = dom_id
-
-    rendered_output = content_tag(:div,
-                                  server_rendered_html.html_safe,
-                                  content_tag_options)
-
-    # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
-    result = <<-HTML.html_safe
-#{component_specification_tag}
-    #{rendered_output}
-    #{replay_console ? console_script : ''}
-    HTML
-
+  def react_component(component_name, options = {})
+    index = next_react_component_index
+    react_component_options = ReactComponent::Options.new(component_name,
+                                                          index,
+                                                          options)
+    result = ReactComponent::Renderer.new(react_component_options).call
     prepend_render_rails_context(result)
   end
 
@@ -191,10 +104,6 @@ module ReactOnRailsHelper
     @registered_stores_defer_render.reduce("") do |accum, redux_store_data|
       accum << render_redux_store_data(redux_store_data)
     end.html_safe
-  end
-
-  def sanitized_props_string(props)
-    props.is_a?(String) ? json_escape(props) : props.to_json
   end
 
   # Helper method to take javascript expression and returns the output from evaluating it.
@@ -273,85 +182,8 @@ module ReactOnRailsHelper
   end
 
   def next_react_component_index
-    @react_component_index ||= -1
-    @react_component_index += 1
-  end
-
-  def props_string(props)
-    props.is_a?(String) ? props : props.to_json
-  end
-
-  # Returns Array [0]: html, [1]: script to console log
-  # NOTE, these are NOT html_safe!
-  def server_rendered_react_component_html(props, react_component_name, dom_id,
-                                           prerender:, trace:, raise_on_prerender_error:)
-    return { "html" => "", "consoleReplayScript" => "" } unless prerender
-
-    # On server `location` option is added (`location = request.fullpath`)
-    # React Router needs this to match the current route
-
-    # Make sure that we use up-to-date server-bundle
-    ReactOnRails::ServerRenderingPool.reset_pool_if_server_bundle_was_modified
-
-    # Since this code is not inserted on a web page, we don't need to escape props
-
-    wrapper_js = <<-JS
-(function() {
-  var railsContext = #{rails_context(server_side: true).to_json};
-#{initialize_redux_stores}
-  var props = #{props_string(props)};
-  return ReactOnRails.serverRenderReactComponent({
-    name: '#{react_component_name}',
-    domNodeId: '#{dom_id}',
-    props: props,
-    trace: #{trace},
-    railsContext: railsContext
-  });
-})()
-    JS
-
-    result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
-
-    if result["hasErrors"] && raise_on_prerender_error
-      # We caught this exception on our backtrace handler
-      # rubocop:disable Style/RaiseArgs
-      raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
-                                             # Sanitize as this might be browser logged
-                                             props: sanitized_props_string(props),
-                                             err: nil,
-                                             js_code: wrapper_js,
-                                             console_messages: result["consoleReplayScript"])
-      # rubocop:enable Style/RaiseArgs
-    end
-    result
-  rescue ExecJS::ProgramError => err
-    # This error came from execJs
-    # rubocop:disable Style/RaiseArgs
-    raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
-                                           # Sanitize as this might be browser logged
-                                           props: sanitized_props_string(props),
-                                           err: err,
-                                           js_code: wrapper_js)
-    # rubocop:enable Style/RaiseArgs
-  end
-
-  def initialize_redux_stores
-    return "" unless @registered_stores.present? || @registered_stores_defer_render.present?
-    declarations = "var reduxProps, store, storeGenerator;\n"
-
-    all_stores = (@registered_stores || []) + (@registered_stores_defer_render || [])
-
-    result = all_stores.each_with_object(declarations) do |redux_store_data, memo|
-      store_name = redux_store_data[:store_name]
-      props = props_string(redux_store_data[:props])
-      memo << <<-JS
-reduxProps = #{props};
-storeGenerator = ReactOnRails.getStoreGenerator('#{store_name}');
-store = storeGenerator(reduxProps, railsContext);
-ReactOnRails.setStore('#{store_name}', store);
-      JS
-    end
-    result
+    @react_component_index ||= ReactComponent::Index.new
+    @react_component_index.next
   end
 
   # This is the definitive list of the default values used for the rails_context, which is the
@@ -385,18 +217,6 @@ ReactOnRails.setStore('#{store_name}', store);
     end
 
     @rails_context.merge(serverSide: server_side)
-  end
-
-  def raise_on_prerender_error_option(val)
-    val.nil? ? ReactOnRails.configuration.raise_on_prerender_error : val
-  end
-
-  def trace_option(val)
-    val.nil? ? ReactOnRails.configuration.trace : val
-  end
-
-  def prerender_option(val)
-    val.nil? ? ReactOnRails.configuration.prerender : val
   end
 
   def replay_console_option(val)
