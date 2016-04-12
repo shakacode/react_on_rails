@@ -1,12 +1,12 @@
 module ReactOnRails
   module ServerRenderingPool
     class Node
-
-      MAX_RESPONSE_LENGTH = 10000
-
+      # This implementation of the rendering pool uses ExecJS to execute javasript code
       def self.reset_pool
-        options = {size: ReactOnRails.configuration.server_renderer_pool_size,
-                   timeout: ReactOnRails.configuration.server_renderer_pool_size}
+        options = {
+          size: ReactOnRails.configuration.server_renderer_pool_size,
+          timeout: ReactOnRails.configuration.server_renderer_pool_size
+        }
         @js_context_pool = ConnectionPool.new(options) { create_js_context }
       end
 
@@ -64,9 +64,10 @@ module ReactOnRails
         end
 
         def eval_js(js_code)
+          max_int = (2**(32 - 2) - 1)
           @js_context_pool.with do |js_context|
             js_context.send(js_code, 0)
-            result = js_context.recv(MAX_RESPONSE_LENGTH)
+            result = js_context.recv(max_int)
             result
           end
         end
@@ -74,7 +75,8 @@ module ReactOnRails
         def create_js_context
           begin
             client = UNIXSocket.new("client/node/node.sock")
-          rescue Exception => e
+            client.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
+          rescue StandardError => e
             Rails.logger.error("Unable to connect to socket: client/node/node.sock.
 Make sure node server is up and running.")
             Rails.logger.error(e)
@@ -82,11 +84,7 @@ Make sure node server is up and running.")
           end
           client
         end
-
       end
-
-
     end
   end
 end
-
