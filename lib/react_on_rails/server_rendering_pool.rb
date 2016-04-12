@@ -6,8 +6,7 @@ require_relative "server_rendering_pool/node"
 # None of these methods should be called directly.
 # See app/helpers/react_on_rails_helper.rb
 module ReactOnRails
- module ServerRenderingPool
-
+  module ServerRenderingPool
     class << self
       def pool
         if ReactOnRails.configuration.server_render_method == "NodeJS"

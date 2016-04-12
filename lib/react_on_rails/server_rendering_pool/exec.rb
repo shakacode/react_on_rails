@@ -1,9 +1,12 @@
 module ReactOnRails
   module ServerRenderingPool
+    # This implementation of the rendering pool uses ExecJS to execute javasript code
     class Exec
       def self.reset_pool
-        options = {size: ReactOnRails.configuration.server_renderer_pool_size,
-                   timeout: ReactOnRails.configuration.server_renderer_pool_size}
+        options = {
+          size: ReactOnRails.configuration.server_renderer_pool_size,
+          timeout: ReactOnRails.configuration.server_renderer_pool_size
+        }
         @js_context_pool = ConnectionPool.new(options) { create_js_context }
       end
 
