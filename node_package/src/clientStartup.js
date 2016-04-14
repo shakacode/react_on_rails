@@ -4,9 +4,6 @@ import createReactElement from './createReactElement';
 import handleError from './handleError';
 import isRouterResult from './isRouterResult';
 
-const REACT_ON_RAILS_COMPONENT_CLASS_NAME = 'js-react-on-rails-component';
-const REACT_ON_RAILS_STORE_CLASS_NAME = 'js-react-on-rails-store';
-
 function debugTurbolinks(...msg) {
   if (!window) {
     return;
@@ -22,11 +19,13 @@ function turbolinksInstalled() {
 }
 
 function forEachComponent(fn, railsContext) {
-  forEach(fn, REACT_ON_RAILS_COMPONENT_CLASS_NAME, railsContext);
+  const reactOnRailsComponentClassName = `${ReactOnRails.option('domPrefix')}-component`;
+  forEach(fn, reactOnRailsComponentClassName, railsContext);
 }
 
 function forEachStore(railsContext) {
-  forEach(initializeStore, REACT_ON_RAILS_STORE_CLASS_NAME, railsContext);
+  const reactOnRailsStoreClassName = `${ReactOnRails.option('domPrefix')}-store`;
+  forEach(initializeStore, reactOnRailsStoreClassName, railsContext);
 }
 
 function forEach(fn, className, railsContext) {
@@ -87,7 +86,8 @@ You should return a React.Component always for the client side entry point.`);
 }
 
 function parseRailsContext() {
-  const el = document.getElementById('js-react-on-rails-context');
+  const contextId = `${ReactOnRails.option('domPrefix')}-context`;
+  const el = document.getElementById(contextId);
   if (el) {
     return JSON.parse(el.getAttribute('data-rails-context'));
   } else {
