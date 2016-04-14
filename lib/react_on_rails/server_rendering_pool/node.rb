@@ -1,7 +1,7 @@
 module ReactOnRails
   module ServerRenderingPool
     class Node
-      # This implementation of the rendering pool uses ExecJS to execute javasript code
+      # This implementation of the rendering pool uses NodeJS to execute javasript code
       def self.reset_pool
         options = {
           size: ReactOnRails.configuration.server_renderer_pool_size,
@@ -29,21 +29,7 @@ module ReactOnRails
           @file_index += 1
         end
         json_string = eval_js(js_code)
-        result = JSON.parse(json_string)
-
-        if ReactOnRails.configuration.logging_on_server
-          console_script = result["consoleReplayScript"]
-          console_script_lines = console_script.split("\n")
-          console_script_lines = console_script_lines[2..-2]
-          re = /console\.log\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
-          if console_script_lines
-            console_script_lines.each do |line|
-              match = re.match(line)
-              Rails.logger.info { "[react_on_rails] #{match[:msg]}" } if match
-            end
-          end
-        end
-        result
+        JSON.parse(json_string)
       end
 
       class << self
