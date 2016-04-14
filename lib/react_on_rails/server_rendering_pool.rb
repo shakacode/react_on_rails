@@ -79,7 +79,7 @@ module ReactOnRails
 
       def create_js_context
         server_js_file = ReactOnRails::Utils.default_server_bundle_js_file_path
-        if server_js_file.present? && File.exist?(server_js_file)
+        if server_js_file.present? && File.file?(server_js_file)
           bundle_js_code = File.read(server_js_file)
           base_js_code = <<-JS
 #{console_polyfill}
