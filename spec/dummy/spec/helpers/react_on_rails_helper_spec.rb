@@ -128,6 +128,13 @@ describe ReactOnRailsHelper, type: :helper do
 
       it { is_expected.to include react_definition_div_skip_display_none_false }
     end
+
+    context "with custom dom_prefix string" do
+      before { ReactOnRails.configuration.dom_prefix = "js-foobar" }
+      after { ReactOnRails.configuration.dom_prefix = "js-react-on-rails" }
+
+      it { is_expected.to include 'id="js-foobar-context"' }
+    end
   end
 
   describe "#redux_store" do
@@ -166,6 +173,13 @@ describe ReactOnRailsHelper, type: :helper do
     context "with skip_display_none option false" do
       before { ReactOnRails.configuration.skip_display_none = false }
       it { is_expected.to include react_store_div }
+    end
+
+    context "with custom dom_prefix string" do
+      before { ReactOnRails.configuration.dom_prefix = "js-foobar" }
+      after { ReactOnRails.configuration.dom_prefix = "js-react-on-rails" }
+
+      it { is_expected.to include 'class="js-foobar-store"' }
     end
   end
 
