@@ -35,7 +35,7 @@ install:
   - docker-compose up lint
 
 before_script:
-  - sh -c 'cd client/node && npm start' &
+  - cd client/node && npm start &
   - "export DISPLAY=:99"
   - Xvfb :99 -ac -screen scn 1600x1200x16 &
 
