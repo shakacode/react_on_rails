@@ -5,7 +5,7 @@ module ReactOnRails
       def self.reset_pool
         options = {
           size: ReactOnRails.configuration.server_renderer_pool_size,
-          timeout: ReactOnRails.configuration.server_renderer_pool_size
+          timeout: ReactOnRails.configuration.server_renderer_timeout
         }
         @js_context_pool = ConnectionPool.new(options) { create_js_context }
       end

@@ -5,13 +5,14 @@ module ReactOnRails
       def self.reset_pool
         options = {
           size: ReactOnRails.configuration.server_renderer_pool_size,
-          timeout: ReactOnRails.configuration.server_renderer_pool_size
+          timeout: ReactOnRails.configuration.server_renderer_timeout
         }
         @js_context_pool = ConnectionPool.new(options) { create_js_context }
       end
 
       def self.reset_pool_if_server_bundle_was_modified
-        reset_pool
+        # No need for this method, the server bundle is automatically reset by node when changes
+        # Empty implementation to conform to ServerRenderingPool interface
       end
 
       # js_code: JavaScript expression that returns a string.
