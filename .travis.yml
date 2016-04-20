@@ -35,7 +35,6 @@ install:
   - docker-compose up lint
 
 before_script:
-  - cd $TRAVIS_BUILD_DIR/gen-examples/examples/basic-server-rendering/client/node && npm start &
   - "export DISPLAY=:99"
   - Xvfb :99 -ac -screen scn 1600x1200x16 &
 
