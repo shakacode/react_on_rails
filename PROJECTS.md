@@ -9,6 +9,7 @@
 * **[Madrone Analytics](http://madroneco.com/)**: The original client of [ShakaCode](http://www.shakacode.com) that led to the development of React on Rails, as described in [Fast Rich Client Rails Development With Webpack and the ES6 Transpiler](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/).
 * **[Pivotal Tracker](http://www.pivotaltracker.com/)**: The first (and most-loved) agile project management tool built on Rails.  React on Rails has greatly simplified integration and workflow for our React components in Rails!
 * **[Confident Financial Solutions](https://www.mycfsapp.com/)**: Auto Repair Financing to help people get back on the road and back to life.
+* **[Apprentus](https://www.apprentus.com/)**: A marketplace to find the best private teachers. Using react-on-rails from the homepage to infinity!
 
 --------
 
