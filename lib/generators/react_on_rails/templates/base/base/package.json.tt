@@ -12,7 +12,7 @@
     <%- if options.server_rendering? -%>
     "build:production:server": "(cd client && npm run build:production:server --silent)",
     <%- end -%>
-    "build:client": "(cd client && npm run build:client --silent",
+    "build:client": "(cd client && npm run build:client --silent)",
     <%- if options.server_rendering? -%>
     "build:server": "(cd client && npm run build:server --silent)",
     <%- end -%>
