@@ -4,7 +4,8 @@ module ReactOnRails
       if ReactOnRails.configuration.server_render_method == "NodeJS"
         path = "#{::Rails.root}/client/node"
         puts "Launching NodeJS server at #{path}"
-        system("cd #{::Rails.root}/client/node && npm start &")
+        system("cd #{path} && npm start &")
+        sleep(5)
       end
     end
   end
