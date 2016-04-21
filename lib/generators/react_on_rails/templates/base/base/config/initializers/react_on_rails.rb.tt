@@ -42,5 +42,5 @@ ReactOnRails.configure do |config|
   config.skip_display_none = false
 
   # The server render method - either ExecJS or NodeJS
-  config.server_render_method = "NodeJS"
+  config.server_render_method = "ExecJS"
 end
