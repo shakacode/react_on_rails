@@ -13,7 +13,7 @@ module ReactOnRails
       end
 
       def props
-        options.fetch(:props) { NO_PROPS }
+        @props ||= options[:props] ? options[:props].to_json.delete("\u2028\u2029") : NO_PROPS
       end
 
       def name
