@@ -39,7 +39,6 @@ RSpec.configure do |config|
   ReactOnRails::TestHelper.launch_node if ReactOnRails.configuration.server_render_method == "NodeJS"
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
 
-
   # Remove this line if you"re not using ActiveRecord or ActiveRecord fixtures
   config.fixture_path = "#{::Rails.root}/spec/fixtures"
 

@@ -5,7 +5,7 @@ module ReactOnRails
         path = "#{::Rails.root}/client/node"
         puts "Launching NodeJS server at #{path}"
         system("cd #{path} && npm start &")
-        sleep(5)
+        sleep(1)
       end
     end
   end
