@@ -87,14 +87,7 @@ module ReactOnRailsHelper
   #   raise_on_prerender_error: <true/false> Default to false. True will raise exception on server
   #      if the JS code throws
   # Any other options are passed to the content tag, including the id.
-  def react_component(component_name,
-                      props: {},
-                      prerender: nil,
-                      trace: nil,
-                      replay_console: nil,
-                      raise_on_prerender_error: nil,
-                      id: nil,
-                      html_options: {})
+  def react_component(component_name, raw_options = {})
     # Create the JavaScript and HTML to allow either client or server rendering of the
     # react_component.
     #
@@ -104,44 +97,31 @@ module ReactOnRailsHelper
     # We use this react_component_index in case we have the same component multiple times on the page.
 
     react_component_index = next_react_component_index
-    react_component_name = component_name.camelize # Not sure if we should be doing this (JG)
-    dom_id = id.presence || "#{component_name}-react-component-#{react_component_index}"
+    options = ReactOnRails::ReactComponent::Options.new(name: component_name,
+                                                        index: react_component_index,
+                                                        options: raw_options)
 
     # Setup the page_loaded_js, which is the same regardless of prerendering or not!
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
-
-    props = {} if props.nil?
-
-    prerender = prerender_option(prerender)
-    trace = trace_option(trace)
-    replay_console = replay_console_option(replay_console)
-    raise_on_prerender_error = raise_on_prerender_error_option(raise_on_prerender_error)
-
-    data = {
-      component_name: react_component_name,
-      props: props,
-      trace: trace,
-      dom_id: dom_id
-    }
 
     component_specification_tag =
       content_tag(:div,
                   "",
                   class: "js-react-on-rails-component",
-                  style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
-                  data: data)
+                  style: options.style,
+                  data: options.data)
 
     # Create the HTML rendering part
-    result = server_rendered_react_component_html(props, react_component_name, dom_id,
-                                                  prerender: prerender,
-                                                  trace: trace,
-                                                  raise_on_prerender_error: raise_on_prerender_error)
+    result = server_rendered_react_component_html(options.props, options.name, options.dom_id,
+                                                  prerender: options.prerender,
+                                                  trace: options.trace,
+                                                  raise_on_prerender_error: options.raise_on_prerender_error)
 
     server_rendered_html = result["html"]
     console_script = result["consoleReplayScript"]
 
-    content_tag_options = html_options
-    content_tag_options[:id] = dom_id
+    content_tag_options = options.html_options
+    content_tag_options[:id] = options.dom_id
 
     rendered_output = content_tag(:div,
                                   server_rendered_html.html_safe,
@@ -151,7 +131,7 @@ module ReactOnRailsHelper
     result = <<-HTML.html_safe
 #{component_specification_tag}
     #{rendered_output}
-    #{replay_console ? console_script : ''}
+    #{options.replay_console ? console_script : ''}
     HTML
 
     prepend_render_rails_context(result)
@@ -385,18 +365,6 @@ ReactOnRails.setStore('#{store_name}', store);
     end
 
     @rails_context.merge(serverSide: server_side)
-  end
-
-  def raise_on_prerender_error_option(val)
-    val.nil? ? ReactOnRails.configuration.raise_on_prerender_error : val
-  end
-
-  def trace_option(val)
-    val.nil? ? ReactOnRails.configuration.trace : val
-  end
-
-  def prerender_option(val)
-    val.nil? ? ReactOnRails.configuration.prerender : val
   end
 
   def replay_console_option(val)
