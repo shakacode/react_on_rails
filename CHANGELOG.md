@@ -8,6 +8,14 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ##### Added
 - Non-digested version of assets in public folder [#413](https://github.com/shakacode/react_on_rails/pull/413) by [alleycat-at-git]
+##### Changed
+- Only one webpack config is generated for server and client config. Package.json files were changed to reflect this [#398](https://github.com/shakacode/react_on_rails/pull/398).
+- Added npm_build_test_command to allow developers to change what npm command is automatically run from rspec [#398](https://github.com/shakacode/react_on_rails/pull/398).
+##### Removed
+- Server rendering is no longer an option in the generator and is always accessible [#398](https://github.com/shakacode/react_on_rails/pull/398).
+- removed lodash, jquery, and loggerMiddleware from the generated code [#398](https://github.com/shakacode/react_on_rails/pull/398).
+- removed webpack watch check for test helper automatic compilation [#398](https://github.com/shakacode/react_on_rails/pull/398).
+
 
 ##### Changed
 - Replace URI with Addressable gem. See [#405](https://github.com/shakacode/react_on_rails/pull/405) by [lucke84]

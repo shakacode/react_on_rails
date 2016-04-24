@@ -20,6 +20,8 @@ ReactOnRails.configure do |config|
   # If you are not using server rendering `(prerender: true)`, set this to "".
   config.server_bundle_js_file = "server-bundle.js"
 
+  config.npm_build_test_command = "npm run build:test"
+
   ################################################################################
   # CLIENT RENDERING OPTIONS
   # Below options can be overriden by passing options to the react_on_rails
