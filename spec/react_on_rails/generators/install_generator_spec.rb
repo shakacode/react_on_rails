@@ -6,86 +6,40 @@ describe InstallGenerator, type: :generator do
 
   context "no args" do
     before(:all) { run_generator_test_with_args(%w()) }
-    include_examples "base_generator:base", application_js: true
-    include_examples "base_generator:no_server_rendering"
-    include_examples "no_redux_generator:base"
-    include_examples "no_redux_generator:no_server_rendering"
-  end
-
-  context "--server-rendering" do
-    before(:all) { run_generator_test_with_args(%w(--server-rendering)) }
-    include_examples "base_generator:base", application_js: true
-    include_examples "base_generator:server_rendering"
-    include_examples "no_redux_generator:base"
-    include_examples "no_redux_generator:server_rendering"
-  end
-
-  context "-S" do
-    before(:all) { run_generator_test_with_args(%w(-S)) }
-    include_examples "base_generator:base", application_js: true
-    include_examples "base_generator:server_rendering"
-    include_examples "no_redux_generator:base"
-    include_examples "no_redux_generator:server_rendering"
+    include_examples "base_generator", application_js: true
+    include_examples "no_redux_generator"
   end
 
   context "--redux" do
     before(:all) { run_generator_test_with_args(%w(--redux)) }
-    include_examples "base_generator:base", application_js: true
-    include_examples "base_generator:no_server_rendering"
-    include_examples "react_with_redux_generator:base"
-    include_examples "react_with_redux_generator:no_server_rendering"
+    include_examples "base_generator", application_js: true
+    include_examples "react_with_redux_generator"
   end
 
   context "-R" do
     before(:all) { run_generator_test_with_args(%w(-R)) }
-    include_examples "base_generator:base", application_js: true
-    include_examples "base_generator:no_server_rendering"
-    include_examples "react_with_redux_generator:base"
-    include_examples "react_with_redux_generator:no_server_rendering"
-  end
-
-  context "--redux --server_rendering" do
-    before(:all) { run_generator_test_with_args(%w(--redux --server-rendering)) }
-    include_examples "base_generator:base", application_js: true
-    include_examples "base_generator:server_rendering"
-    include_examples "react_with_redux_generator:base"
-    include_examples "react_with_redux_generator:server_rendering"
-  end
-
-  context "-R -S" do
-    before(:all) { run_generator_test_with_args(%w(-R -S)) }
-    include_examples "base_generator:base", application_js: true
-    include_examples "base_generator:server_rendering"
-    include_examples "react_with_redux_generator:base"
-    include_examples "react_with_redux_generator:server_rendering"
-  end
-
-  context "-R -S" do
-    before(:all) { run_generator_test_with_args(%w(-R -S)) }
-    include_examples "base_generator:base", application_js: true
-    include_examples "base_generator:server_rendering"
-    include_examples "react_with_redux_generator:base"
-    include_examples "react_with_redux_generator:server_rendering"
+    include_examples "base_generator", application_js: true
+    include_examples "react_with_redux_generator"
   end
 
   context "without existing application.js or application.js.coffee file" do
     before(:all) { run_generator_test_with_args([], application_js: false) }
-    include_examples "base_generator:base", application_js: false
+    include_examples "base_generator", application_js: false
   end
 
   context "with existing application.js or application.js.coffee file" do
     before(:all) { run_generator_test_with_args([], application_js: true) }
-    include_examples "base_generator:base", application_js: true
+    include_examples "base_generator", application_js: true
   end
 
   context "without existing assets.rb file" do
     before(:all) { run_generator_test_with_args([], assets_rb: false) }
-    include_examples "base_generator:base", assets_rb: false
+    include_examples "base_generator", assets_rb: false
   end
 
   context "with existing assets.rb file" do
     before(:all) { run_generator_test_with_args([], assets_rb: true) }
-    include_examples "base_generator:base", assets_rb: true
+    include_examples "base_generator", assets_rb: true
   end
 
   context "with rails_helper" do

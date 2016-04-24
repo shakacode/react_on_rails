@@ -13,6 +13,12 @@ end
 
 def simulate_existing_rails_files(options)
   simulate_existing_file(".gitignore") if options.fetch(:gitignore, true)
+  if options.fetch(:hello_world_file, false)
+    simulate_existing_file(
+      "app/views/hello_world/index.html.erb",
+      "<%= react_component('HelloWorldApp', props: @hello_world_props, prerender: false) %>"
+    )
+  end
   simulate_existing_file("Gemfile", "")
   simulate_existing_file("config/routes.rb", "Rails.application.routes.draw do\nend\n")
   simulate_existing_file("config/application.rb",
@@ -48,12 +54,12 @@ end
 def simulate_npm_files(options)
   if options.fetch(:package_json, false)
     package_json = "client/package.json"
-    package_json_data = '    "react-on-rails": "2.0.0-beta.1",'
+    package_json_data = '    "react-on-rails": "5.2.0",'
     simulate_existing_file(package_json, package_json_data)
   end
 
   return unless options.fetch(:webpack_client_base_config, false)
-  config = "client/webpack.client.base.config.js"
+  config = "client/webpack.config.js"
   text = <<-TEXT
   resolve: {
     ...
@@ -72,18 +78,6 @@ def run_generator_test_with_args(args, options = {})
   simulate_existing_assets_files(options)
   simulate_npm_files(options)
   run_generator(args + ["--ignore-warnings"])
-end
-
-def assert_server_render_procfile
-  assert_file "Procfile.dev" do |contents|
-    assert_match(/\n\s*server:/, contents)
-  end
-end
-
-def assert_client_render_procfile
-  assert_file "Procfile.dev" do |contents|
-    refute_match(/\n\s*server:/, contents)
-  end
 end
 
 # Simulate having an existing file for cases where the generator needs to modify, not create, a file

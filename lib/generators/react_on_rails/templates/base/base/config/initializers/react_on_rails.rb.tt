@@ -6,20 +6,18 @@ ReactOnRails.configure do |config|
   config.generated_assets_dir = File.join(%w(app assets webpack))
 
   # Define the files for we need to check for webpack compilation when running tests
-  <%- if options.server_rendering? %>
-  config.webpack_generated_files = %w( client-bundle.js server-bundle.js )
-  <% else %>
-  config.webpack_generated_files = %w( client-bundle.js )
-  <%- end %>
+  config.webpack_generated_files = %w( webpack-bundle.js )
 
-  # Server rendering:
-  # Server bundle is a single file for all server rendering of components.
-  # Set the server_bundle_js_file to "" if you know that you will not be server rendering.
-  <%- if options.server_rendering? %>
-  config.server_bundle_js_file = "server-bundle.js"
-  <% else %>
-  config.server_bundle_js_file = ""
-  <%- end %>
+  # This is the file used for server rendering.
+  # This only needs to be modified for advanced usage
+  # or if you change your webpack bundle file name.
+  config.server_bundle_js_file = "webpack-bundle.js"
+
+  # If you are using the ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  # with rspec then this controls what npm command is run
+  # to automatically refresh your webpack assets on every test run.
+  config.npm_build_test_command = "npm run build:test"
+
   # increase if you're on JRuby
   config.server_renderer_pool_size = 1
   # seconds

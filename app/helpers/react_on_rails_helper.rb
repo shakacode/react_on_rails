@@ -270,7 +270,7 @@ module ReactOnRailsHelper
     # On server `location` option is added (`location = request.fullpath`)
     # React Router needs this to match the current route
 
-    # Make sure that we use up-to-date server-bundle
+    # Make sure that we use up-to-date webpack-bundle
     ReactOnRails::ServerRenderingPool.reset_pool_if_server_bundle_was_modified
 
     # Since this code is not inserted on a web page, we don't need to escape props
