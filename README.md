@@ -355,7 +355,7 @@ Suppose the Redux store is called `appStore`, and you have 3 React components th
 
 You will need to make a function that can create the store you will be using for all components and register it via the `registerStore` method. Note, this is a **storeCreator**, meaning that it is a function that takes (props, location) and returns a store:
 
-```
+```js
 function appStore(props, railsContext) {
   // Create a hydrated redux store, using props and the railsContext (object with
   // Rails contextual information).
