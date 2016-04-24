@@ -1,4 +1,4 @@
-shared_examples "base_generator" do |options|
+shared_examples "base_generator" do
   it "adds a route for get 'hello_world' to 'hello_world#index'" do
     match = <<-MATCH.strip_heredoc
       Rails.application.routes.draw do
@@ -23,33 +23,11 @@ shared_examples "base_generator" do |options|
 
   it "updates application.js" do
     match = <<-MATCH.strip_heredoc
-      // DO NOT REQUIRE jQuery or jQuery-ujs in this file!
-      // DO NOT REQUIRE TREE!
-
       //= require webpack-bundle
 
     MATCH
     assert_file("app/assets/javascripts/application.js") do |contents|
       assert_match(match, contents)
-    end
-  end
-
-  it "doesn't include incompatible sprockets require statements" do
-    assert_file("app/assets/javascripts/application.js") do |contents|
-      refute_match(%r{//= require_tree \.$}, contents)
-      refute_match(%r{//= require jquery$}, contents)
-      refute_match("//= require jquery_ujs", contents)
-    end
-  end
-
-  it "comments out incompatible sprockets require statements" do
-    assert_file("app/assets/javascripts/application.js") do |contents|
-      if options[:application_js]
-        assert_match(%r{// require_tree \.$}, contents)
-        assert_match(%r{// require jquery$}, contents)
-        assert_match("//= require jquery-ui", contents)
-        assert_match("// require jquery_ujs", contents)
-      end
     end
   end
 
@@ -59,11 +37,11 @@ shared_examples "base_generator" do |options|
   end
 
   it "copies react files" do
-    # client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx
     %w(app/controllers/hello_world_controller.rb
        app/views/hello_world/index.html.erb
        client/webpack.config.js
        client/.babelrc
+       client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx
        client/package.json
        config/initializers/react_on_rails.rb
        package.json

@@ -4,7 +4,7 @@ require_relative "generator_helper"
 
 module ReactOnRails
   module Generators
-    class BaseGenerator < Rails::Generators::Base # rubocop:disable Metrics/ClassLength
+    class BaseGenerator < Rails::Generators::Base
       include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates", __FILE__))
@@ -39,9 +39,6 @@ module ReactOnRails
 
       def update_application_js
         data = <<-DATA.strip_heredoc
-          // DO NOT REQUIRE jQuery or jQuery-ujs in this file!
-          // DO NOT REQUIRE TREE!
-
           //= require webpack-bundle
 
         DATA
@@ -53,13 +50,6 @@ module ReactOnRails
         else
           create_file(app_js_path, data)
         end
-      end
-
-      def strip_application_js_of_incompatible_sprockets_statements
-        application_js = File.join(destination_root, "app/assets/javascripts/application.js")
-        gsub_file(application_js, "//= require jquery_ujs", "// require jquery_ujs")
-        gsub_file(application_js, %r{//= require jquery$}, "// require jquery")
-        gsub_file(application_js, %r{//= require_tree \.$}, "// require_tree .")
       end
 
       def strip_application_js_of_double_blank_lines

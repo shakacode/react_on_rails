@@ -16,7 +16,7 @@ def simulate_existing_rails_files(options)
   if options.fetch(:hello_world_file, false)
     simulate_existing_file(
       "app/views/hello_world/index.html.erb",
-      "<%= react_component('HelloWorldApp', props: @hello_world_props) %>"
+      "<%= react_component('HelloWorldApp', props: @hello_world_props, prerender: false) %>"
     )
   end
   simulate_existing_file("Gemfile", "")

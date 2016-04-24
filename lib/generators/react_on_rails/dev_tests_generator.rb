@@ -61,11 +61,11 @@ TEXT
       end
 
       def gsub_prerender_if_server_rendering
-        return if !options.example_server_rendering
+        return unless options.example_server_rendering
         hello_world_index = File.join(destination_root, "app", "views", "hello_world", "index.html.erb")
         hello_world_contents = File.read(hello_world_index)
-        new_hello_world_contents = hello_world_contents.gsub(/\) %>/,
-                                                             ', prerender: true) %>')
+        new_hello_world_contents = hello_world_contents.gsub(/prerender: false/,
+                                                             "prerender: true")
 
         File.open(hello_world_index, "w+") { |f| f.puts new_hello_world_contents }
       end

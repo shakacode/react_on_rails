@@ -26,8 +26,6 @@
     "immutable": "^3.7.6",
     <%- end -%>
     "imports-loader": "^0.6.5",
-    "jquery": "^2.2.2",
-    "jquery-ujs": "^1.2.1",
     <%- if options.redux? -%>
     "mirror-creator": "1.1.0",
     <%- end -%>
