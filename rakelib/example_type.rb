@@ -28,10 +28,6 @@ module ReactOnRails
         "#{@name} example app"
       end
 
-      def server_rendering?
-        generator_options.include?("--server-rendering")
-      end
-
       def dir
         File.join(examples_dir, name)
       end
@@ -53,14 +49,12 @@ module ReactOnRails
       end
 
       def webpack_bundles_dir
-        File.join(dir, "app", "assets", "javascripts", "generated")
+        File.join(dir, "app", "assets", "javascripts", "webpack")
       end
 
       def webpack_bundles
         bundles = []
-        bundles << File.join(webpack_bundles_dir, "app-bundle.js")
-        bundles << File.join(webpack_bundles_dir, "server-bundle.js") if server_rendering?
-        bundles << File.join(webpack_bundles_dir, "vendor-bundle.js")
+        bundles << File.join(webpack_bundles_dir, "webpack-bundle.js")
       end
 
       def gemfile
@@ -137,8 +131,7 @@ module ReactOnRails
       def build_webpack_bundles_shell_commands
         webpack_command = File.join("$(npm bin)", "webpack")
         shell_commands = []
-        shell_commands << "#{webpack_command} --config webpack.server.rails.config.js" if server_rendering?
-        shell_commands << "#{webpack_command} --config webpack.client.rails.config.js"
+        shell_commands << "#{webpack_command} --config webpack.config.js"
       end
 
       # Assumes we are inside a rails app's folder and necessary gems have been installed

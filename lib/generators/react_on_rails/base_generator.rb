@@ -15,12 +15,6 @@ module ReactOnRails
                    default: false,
                    desc: "Install Redux gems and Redux version of Hello World Example",
                    aliases: "-R"
-      # --server-rendering
-      class_option :server_rendering,
-                   type: :boolean,
-                   default: false,
-                   desc: "Configure for server-side rendering of webpack JavaScript",
-                   aliases: "-S"
 
       def add_hello_world_route
         route "get 'hello_world', to: 'hello_world#index'"
@@ -48,11 +42,7 @@ module ReactOnRails
           // DO NOT REQUIRE jQuery or jQuery-ujs in this file!
           // DO NOT REQUIRE TREE!
 
-          // CRITICAL that vendor-bundle must be BEFORE bootstrap-sprockets and turbolinks
-          // since it is exposing jQuery and jQuery-ujs
-
-          //= require vendor-bundle
-          //= require app-bundle
+          //= require webpack-bundle
 
         DATA
 
@@ -86,10 +76,7 @@ module ReactOnRails
         base_path = "base/base/"
         base_files = %w(app/controllers/hello_world_controller.rb
                         client/.babelrc
-                        client/webpack.client.base.config.js
-                        client/webpack.client.rails.config.js
-                        REACT_ON_RAILS.md
-                        client/REACT_ON_RAILS_CLIENT_README.md)
+                        client/webpack.config.js)
         base_files.each { |file| copy_file(base_path + file, file) }
       end
 
@@ -104,31 +91,21 @@ module ReactOnRails
       end
 
       def add_base_gems_to_gemfile
-        return unless options.server_rendering?
         append_to_file("Gemfile", "\ngem 'therubyracer', platforms: :ruby\n")
       end
 
-      def template_client_registration_file
-        filename = "clientRegistration.jsx"
-        location = "client/app/bundles/HelloWorld/startup"
-        template("base/base/#{location}/clientRegistration.jsx.tt", "#{location}/#{filename}")
-      end
 
-      def install_server_rendering_files_if_enabled
-        return unless options.server_rendering?
+      def install_node_files
         base_path = "base/server_rendering/"
-        %w(client/webpack.server.rails.config.js
-           client/app/bundles/HelloWorld/startup/serverRegistration.jsx
-           client/node/package.json
+        %w(client/node/package.json
            client/node/server.js).each do |file|
           copy_file(base_path + file, file)
         end
-
-        copy_file("base/base/lib/tasks/load_test.rake", "lib/tasks/load_test.rake")
       end
 
       def template_assets_rake_file
         template("base/base/lib/tasks/assets.rake.tt", "lib/tasks/assets.rake")
+        copy_file("base/base/lib/tasks/load_test.rake", "lib/tasks/load_test.rake")
       end
 
       ASSETS_RB_APPEND = <<-DATA.strip_heredoc
@@ -136,7 +113,7 @@ module ReactOnRails
 # If you do not want to move existing images and fonts from your Rails app
 # you could also consider creating symlinks there that point to the original
 # rails directories. In that case, you would not add these paths here.
-Rails.application.config.assets.precompile += %w( server-bundle.js )
+Rails.application.config.assets.precompile += %w( webpack-bundle.js )
 
 # Add folder with webpack generated assets to assets.paths
 Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpack")

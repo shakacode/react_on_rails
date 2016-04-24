@@ -8,7 +8,7 @@ module ReactOnRails
 
   def self.setup_config_values
     if @configuration.webpack_generated_files.empty?
-      files = ["client-bundle.js"]
+      files = ["webpack-bundle.js"]
       if @configuration.server_bundle_js_file.present?
         files << @configuration.server_bundle_js_file
       end
@@ -44,7 +44,6 @@ module ReactOnRails
 
       # generated_assets_dirs is deprecated
       generated_assets_dir: "",
-
       server_bundle_js_file: "",
       prerender: false,
       replay_console: true,
