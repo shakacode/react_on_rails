@@ -65,10 +65,7 @@ module ReactOnRails
         webpack_generated_files ||= ReactOnRails.configuration.webpack_generated_files
 
         webpack_assets_status_checker ||=
-          WebpackAssetsStatusChecker.new(client_dir: client_dir,
-                                         generated_assets_dir: generated_assets_dir,
-                                         webpack_generated_files: webpack_generated_files
-                                        )
+          WebpackAssetsStatusChecker.new(client_dir, generated_assets_dir, webpack_generated_files)
 
         unless @printed_once
           puts

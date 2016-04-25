@@ -612,7 +612,7 @@ Note: If you have components from react-rails you want to use, then you will nee
   ```
 
 ## Dependencies
-+ Ruby 2.1 or greater
++ Ruby 2.0 or greater
 + Rails 3.2 or greater
 + Node 5.5 or great
 

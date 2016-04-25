@@ -11,9 +11,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
 
     let(:checker) do
       ReactOnRails::TestHelper::WebpackAssetsStatusChecker
-        .new(generated_assets_dir: generated_assets_dir,
-             client_dir: client_dir,
-             webpack_generated_files: webpack_generated_files)
+        .new(generated_assets_dir, client_dir, webpack_generated_files)
     end
 
     context "when compiled assets exist and are up-to-date" do
