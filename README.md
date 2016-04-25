@@ -136,7 +136,7 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
 
 ### Installation Summary
 
-See the [Installation Overview](docs/additional-reading/installation-overview.md) for a concise set summary of what's in a React on Rails installation.
+See the [Installation Overview](docs/basics/installation-overview.md) for a concise set summary of what's in a React on Rails installation.
 
 ### Initializer Configuration
 
@@ -416,7 +416,7 @@ Components are created as [stateless function(al) components](https://facebook.g
 + [Setting up Hot Reloading during Rails Development, API docs](docs/api/ruby-api-hot-reload-view-helpers.md)
 + [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v4032)
 + [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
-+ [Installation Overview](docs/additional-reading/installation-overview.md)
++ [Installation Overview](docs/basics/installation-overview.md)
 + [Babel](docs/additional-reading/babel.md)
 + [Heroku Deployment](docs/additional-reading/heroku-deployment.md)
 + [Manual Installation](docs/additional-reading/manual-installation.md)
