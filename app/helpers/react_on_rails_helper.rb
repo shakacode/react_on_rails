@@ -338,8 +338,8 @@ ReactOnRails.setStore('#{store_name}', store);
   # second parameter passed to both component and store generator functions.
   def rails_context(server_side:)
     @rails_context ||= begin
-      uri = URI.parse(request.original_url)
-      # uri = URI("http://foo.com:3000/posts?id=30&limit=5#time=1305298413")
+      uri = Addressable::URI.parse(request.original_url)
+      # uri = Addressable::URI.parse("http://foo.com:3000/posts?id=30&limit=5#time=1305298413")
 
       result = {
         # URL settings
@@ -350,6 +350,7 @@ ReactOnRails.setStore('#{store_name}', store);
         port: uri.port,
         pathname: uri.path, # /posts
         search: uri.query, # id=30&limit=5
+        fragment: uri.fragment, # time=1305298413
 
         # Locale settings
         i18nLocale: I18n.locale,
