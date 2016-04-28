@@ -7,7 +7,6 @@ gemspec
 # They must be defined here because of the way Travis CI works, in that it will only
 # bundle install from a single Gemfile. Therefore, all gems that we will need for any dummy/example
 # app have to be manually added to this file.
-gem "addressable"
 gem "bootstrap-sass"
 gem "coffee-rails", "~> 4.1.0"
 gem "jbuilder", "~> 2.0"
