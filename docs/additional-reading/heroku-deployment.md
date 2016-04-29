@@ -26,13 +26,13 @@ If for some reason you need custom buildpacks that are not officially supported 
 
 ### Swap out sqlite for postgres by doing the following:
 
-1. Delete the line with `sqlite` and replace it with:
+#### 1. Delete the line with `sqlite` and replace it with:
 
 ```ruby
    gem 'pg'
 ```
 
-2. Replace your `database.yml` file with this (assuming your app name is "ror")
+#### 2. Replace your `database.yml` file with this (assuming your app name is "ror")
 
 ```yml
 default: &default
@@ -65,7 +65,7 @@ bin/rake db:migrate
 bin/rake db:setup
 ```
 
-3. Create a rake file to add webpack compilation to asset precompilation. You may already have this file if you used the React on Rails generator.
+#### 3. Create a rake file to add webpack compilation to asset precompilation. You may already have this file if you used the React on Rails generator.
 
 ```ruby
 # lib/tasks/assets.rake
