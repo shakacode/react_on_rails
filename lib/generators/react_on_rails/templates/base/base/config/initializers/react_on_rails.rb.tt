@@ -13,6 +13,8 @@ ReactOnRails.configure do |config|
   # or if you change your webpack bundle file name.
   config.server_bundle_js_file = "webpack-bundle.js"
 
+  config.npm_build_command = "npm run build"
+
   # increase if you're on JRuby
   config.server_renderer_pool_size = 1
   # seconds

@@ -14,7 +14,7 @@ namespace :assets do
 
   desc "Compile assets with webpack"
   task :webpack do
-    sh "cd client && npm run build"
+    sh "cd client && #{ReactOnRails.configuration.npm_build_command}"
   end
 
   task :clobber do
