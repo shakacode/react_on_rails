@@ -65,13 +65,13 @@ describe "Server Rendering", :server_rendering do
       html_nodes = Nokogiri::HTML(response.body)
       top_id = "##{id_base}-react-component-0"
       keys_to_vals = {
-        href: "http://www.example.com/#{pathname}?ab=cd#123",
+        href: "http://www.example.com/#{pathname}?ab=cd",
         location: "/#{pathname}?ab=cd#123",
         scheme: "http",
         host: "www.example.com",
         pathname: "/#{pathname}",
         search: "ab=cd",
-        fragment: "#123",
+        fragment: "123",
         i18nLocale: "en",
         i18nDefaultLocale: "en",
         httpAcceptLanguage: http_accept_language,
