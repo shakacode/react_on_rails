@@ -346,7 +346,7 @@ ReactOnRails.setStore('#{store_name}', store);
       result = {
         # URL settings
         href: request.original_url,
-        location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}" : ''}",
+        location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}" : ''}#{uri.fragment.present? ? "##{uri.fragment}" : ''}",
         scheme: uri.scheme, # http
         host: uri.host, # foo.com
         port: uri.port,
