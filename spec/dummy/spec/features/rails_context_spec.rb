@@ -10,7 +10,7 @@ shared_examples "railsContext" do |pathname, id_base|
 
   background do
     set_driver_header("ACCEPT-LANGUAGE", http_accept_language)
-    visit "/#{pathname}?ab=cd#"
+    visit "/#{pathname}?ab=cd"
   end
 
   context pathname, :js do
