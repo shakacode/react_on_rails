@@ -66,12 +66,11 @@ describe "Server Rendering", :server_rendering do
       top_id = "##{id_base}-react-component-0"
       keys_to_vals = {
         href: "http://www.example.com/#{pathname}?ab=cd",
-        location: "/#{pathname}?ab=cd#123",
+        location: "/#{pathname}?ab=cd",
         scheme: "http",
         host: "www.example.com",
         pathname: "/#{pathname}",
         search: "ab=cd",
-        fragment: "123",
         i18nLocale: "en",
         i18nDefaultLocale: "en",
         httpAcceptLanguage: http_accept_language,

@@ -10,7 +10,7 @@ shared_examples "railsContext" do |pathname, id_base|
 
   background do
     set_driver_header("ACCEPT-LANGUAGE", http_accept_language)
-    visit "/#{pathname}?ab=cd#123"
+    visit "/#{pathname}?ab=cd#"
   end
 
   context pathname, :js do
@@ -21,13 +21,12 @@ shared_examples "railsContext" do |pathname, id_base|
       host_port = "#{host}:#{port}"
       keys_to_vals = {
         href: "http://#{host_port}/#{pathname}?ab=cd",
-        location: "/#{pathname}?ab=cd#123",
+        location: "/#{pathname}?ab=cd",
         port: port,
         scheme: "http",
         host: host,
         pathname: "/#{pathname}",
         search: "ab=cd",
-        fragment: "123",
         i18nLocale: "en",
         i18nDefaultLocale: "en",
         httpAcceptLanguage: http_accept_language,

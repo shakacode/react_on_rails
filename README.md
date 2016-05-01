@@ -213,7 +213,6 @@ The `railsContext` has: (see implementation in file react_on_rails_helper.rb for
     port: uri.port, 
     pathname: uri.path, # /posts
     search: uri.query, # id=30&limit=5
-    fragment: uri.fragment, # time=1305298413
 
     # Locale settings
     i18nLocale: I18n.locale,

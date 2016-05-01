@@ -346,13 +346,12 @@ ReactOnRails.setStore('#{store_name}', store);
       result = {
         # URL settings
         href: request.original_url,
-        location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}" : ''}#{uri.fragment.present? ? "##{uri.fragment}" : ''}",
+        location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}" : ''}",
         scheme: uri.scheme, # http
         host: uri.host, # foo.com
         port: uri.port,
         pathname: uri.path, # /posts
         search: uri.query, # id=30&limit=5
-        fragment: uri.fragment, # time=1305298413
 
         # Locale settings
         i18nLocale: I18n.locale,
