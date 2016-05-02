@@ -338,8 +338,10 @@ ReactOnRails.setStore('#{store_name}', store);
   # second parameter passed to both component and store generator functions.
   def rails_context(server_side:)
     @rails_context ||= begin
-      uri = URI.parse(request.original_url)
-      # uri = URI("http://foo.com:3000/posts?id=30&limit=5#time=1305298413")
+      # Using Addressable instead of standard URI to better deal with
+      # non-ASCII characters (see https://github.com/shakacode/react_on_rails/pull/405)
+      uri = Addressable::URI.parse(request.original_url)
+      # uri = Addressable::URI.parse("http://foo.com:3000/posts?id=30&limit=5#time=1305298413")
 
       result = {
         # URL settings

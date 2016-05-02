@@ -2,6 +2,7 @@ PATH
   remote: ../..
   specs:
     react_on_rails (5.2.0)
+      addressable
       connection_pool
       execjs (~> 2.5)
       foreman
@@ -97,7 +98,7 @@ GEM
     erubis (2.7.0)
     execjs (2.6.0)
     ffi (1.9.10)
-    foreman (0.78.0)
+    foreman (0.81.0)
       thor (~> 0.19.1)
     generator_spec (0.9.3)
       activesupport (>= 3.0.0)
