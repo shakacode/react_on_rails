@@ -1,9 +1,9 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails)  [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
- 
+
 # NEWS
-* 2016-04-08: 5.2.0 Released! Support for React 15.0 and upates to the Generator. See the [CHANGELOG.md](./CHANGELOG.md) for details.
+* 2016-04-08: 5.2.0 Released! Support for React 15.0 and updates to the Generator. See the [CHANGELOG.md](./CHANGELOG.md) for details.
 * [New slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
-* 2016-02-28: We added a [Projects page](./PROJECTS.md) and a [Kudos page](./KUDOS.md). Please edit the page your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors.
+* 2016-02-28: We added a [Projects page](./PROJECTS.md) and a [Kudos page](./KUDOS.md). Please edit the page and add your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors.
 * *See [NEWS.md](NEWS.md) for more notes over time.*
 
 # NOTES
@@ -210,7 +210,7 @@ The `railsContext` has: (see implementation in file react_on_rails_helper.rb for
     location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}": ""}",
     scheme: uri.scheme, # http
     host: uri.host, # foo.com
-    port: uri.port, 
+    port: uri.port,
     pathname: uri.path, # /posts
     search: uri.query, # id=30&limit=5
 
@@ -218,7 +218,7 @@ The `railsContext` has: (see implementation in file react_on_rails_helper.rb for
     i18nLocale: I18n.locale,
     i18nDefaultLocale: I18n.default_locale,
     httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"],
-    
+
     # Other
     serverSide: boolean # Are we being called on the server or client? NOTE, if you conditionally
      # render something different on the server than the client, then React will only show the
@@ -294,14 +294,16 @@ Once the bundled files have been generated in your `app/assets/webpack` folder a
 This is how you actually render the React components you exposed to `window` inside of `clientRegistration` (and `global` inside of `serverRegistration` if you are server rendering).
 
 ### react_component
-`react_component(component_name,
+```ruby
+react_component(component_name,
                 props: {},
                 prerender: nil,
                 trace: nil,
                 replay_console: nil,
                 raise_on_prerender_error: nil,
                 id: nil,
-                html_options: {})`
+                html_options: {})
+```
 
 + **component_name:** Can be a React component, created using a ES6 class, or `React.createClass`, or a generator function that returns a React component.
 + **options:**
