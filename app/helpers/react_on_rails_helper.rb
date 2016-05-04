@@ -129,12 +129,12 @@ module ReactOnRailsHelper
 
     # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
     result = <<-HTML.html_safe
-#{component_specification_tag}
     #{rendered_output}
+    #{component_specification_tag}
     #{options.replay_console ? console_script : ''}
     HTML
 
-    prepend_render_rails_context(result)
+    add_render_rails_context(result)
   end
 
   # Separate initialization of store from react_component allows multiple react_component calls to
@@ -226,7 +226,7 @@ module ReactOnRailsHelper
   private
 
   # prepend the rails_context if not yet applied
-  def prepend_render_rails_context(render_value)
+  def add_render_rails_context(render_value)
     return render_value if @rendered_rails_context
 
     data = {
@@ -240,7 +240,7 @@ module ReactOnRailsHelper
                                         id: "js-react-on-rails-context",
                                         style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
                                         data: data)
-    "#{rails_context_content}\n#{render_value}".html_safe
+    "#{render_value}\n#{rails_context_content}".html_safe
   end
 
   def render_redux_store_data(redux_store_data)
