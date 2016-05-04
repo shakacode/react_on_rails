@@ -52,29 +52,23 @@ test('consoleReplay replays converts console param objects to JSON', (assert) =>
   ];
   const actual = consoleReplay();
 
-  // https://github.com/jscs-dev/node-jscs/issues/2137
-  // jscs:disable disallowSpacesInsideTemplateStringPlaceholders
   const expected = `console.log.apply(console, ["some message","{\\"a\\":1,\\"b\\":2}"]);
 console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);`;
   assert.equals(actual, expected, 'Unexpected value for console replay history');
-
-  // jscs:enable disallowSpacesInsideTemplateStringPlaceholders
 });
 
-test('consoleReplay replays converts console param objects to JSON', (assert) => {
+test('consoleReplay replays converts script tag inside of object string to be safe ', (assert) => {
   assert.plan(1);
   console.history = [
-    { arguments: ['some message', { a: 1, b: 2 }], level: 'log' },
+    { arguments: ['some message </script><script>alert(\'WTF\')</script>',
+      { a: 'Wow</script><script>alert(\'WTF\')</script>', b: 2 }], level: 'log' },
     { arguments: ['other message', { c: 3, d: 4 }], level: 'warn' },
   ];
   const actual = consoleReplay();
 
-  // https://github.com/jscs-dev/node-jscs/issues/2137
-  // jscs:disable disallowSpacesInsideTemplateStringPlaceholders
-  const expected = `console.log.apply(console, ["some message","{\\"a\\":1,\\"b\\":2}"]);
+  const expected = `console.log.apply(console, ["some message (/script><script>alert(\'WTF\')\
+(/script>","{\\"a\\":\\"Wow(/script><script>alert(\'WTF\')(/script>\\",\\"b\\":2}"]);
 console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);`;
-
-  // jscs:enable disallowSpacesInsideTemplateStringPlaceholders
 
   assert.equals(actual, expected, 'Unexpected value for console replay history');
 });

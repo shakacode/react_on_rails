@@ -1,4 +1,5 @@
 import RenderUtils from './RenderUtils';
+import scriptSanitizedVal from './scriptSanitizedVal';
 
 export function consoleReplay() {
   // console.history is a global polyfill used in server rendering.
@@ -9,11 +10,14 @@ export function consoleReplay() {
 
   const lines = history.map(msg => {
     const stringifiedList = msg.arguments.map(arg => {
+      let val;
       try {
-        return (typeof arg === 'string' || arg instanceof String) ? arg : JSON.stringify(arg);
+        val = (typeof arg === 'string' || arg instanceof String) ? arg : JSON.stringify(arg);
       } catch (e) {
-        return `${e.message}: ${arg}`;
+        val = `${e.message}: ${arg}`;
       }
+
+      return scriptSanitizedVal(val);
     });
 
     return `console.${msg.level}.apply(console, ${JSON.stringify(stringifiedList)});`;

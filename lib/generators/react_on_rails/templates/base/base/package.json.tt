@@ -1,0 +1,25 @@
+{
+  "name": "react-webpack-rails-tutorial",
+  "version": "0.0.1",
+  "engines": {
+    "node": "5.10.0",
+    "npm": "3.5.0"
+  },
+  "scripts": {
+    "postinstall": "cd client && npm install",
+    "rails-server": "echo 'visit http://localhost:3000/hello_world' && foreman start -f Procfile.dev",
+    "build:production:client": "(cd client && npm run build:production:client --silent)",
+    <%- if options.server_rendering? -%>
+    "build:production:server": "(cd client && npm run build:production:server --silent)",
+    <%- end -%>
+    "build:client": "(cd client && npm run build:client --silent)",
+    <%- if options.server_rendering? -%>
+    "build:server": "(cd client && npm run build:server --silent)",
+    <%- end -%>
+    "build:dev:client": "(cd client && npm run build:dev:client --silent)",
+    <%- if options.server_rendering? -%>
+    "build:dev:server": "(cd client && npm run build:dev:server --silent)",
+    <%- end -%>
+    "test": "rspec"
+  }
+}

@@ -1,4 +1,5 @@
 import React, { PropTypes } from 'react';
+import RailsContext from './RailsContext';
 
 // Example of CSS modules.
 import css from './HelloWorld.scss';
@@ -10,6 +11,7 @@ class HelloWorld extends React.Component {
     helloWorldData: PropTypes.shape({
       name: PropTypes.string,
     }).isRequired,
+    railsContext: PropTypes.object,
 
     error: PropTypes.any,
   };
@@ -36,6 +38,7 @@ class HelloWorld extends React.Component {
 spec/dummy/client/app/components/HelloWorld.jsx:18`);
 
     const { name } = this.state;
+    const { railsContext } = this.props;
 
     return (
       <div>
@@ -51,6 +54,7 @@ spec/dummy/client/app/components/HelloWorld.jsx:18`);
             onChange={this.handleChange}
           />
         </p>
+        { railsContext && <RailsContext {...{railsContext}} /> }
       </div>
     );
   }

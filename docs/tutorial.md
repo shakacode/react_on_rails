@@ -1,4 +1,6 @@
-# Tutorial for React on Rails
+# Tutorial for React on Rails (THIS ONLY WORKS UP TO VERSION 5.1.1)
+
+*Version 5.2 and greater have removed the non-essential options. See the [changelog](../CHANGELOG.md) for details on what was removed.*
 
 This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
@@ -27,10 +29,9 @@ vim Gemfile
 Add this line to your Gemfile:
 
 ```
-gem 'react_on_rails', '~> 2.0.0.rc.3'
+gem 'react_on_rails'
 ```
 
-<img src="http://forum.shakacode.com/uploads/default/original/1X/fb2c41941cdc2b6cdfcc563f8a837a9cf5a51cec.png" width="482" height="113">
 
 ```
 bundle

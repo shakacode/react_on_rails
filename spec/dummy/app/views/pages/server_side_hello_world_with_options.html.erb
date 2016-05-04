@@ -1,12 +1,12 @@
 <%= render "header" %>
 
 <%= react_component("HelloWorld",
-                    @app_props_server_render.to_json,
+                    props: @app_props_server_render.to_json,
                     prerender: true,
                     trace: true,
                     id: "my-hello-world-id",
-                    class: "my-hello-world-class",
-                    data: { x: 1, y: 2}
+                    html_options: { class: "my-hello-world-class",
+                    data: { x: 1, y: 2} }
     ) %>
 <hr/>
 
@@ -27,7 +27,7 @@
 </ul>
 <pre>
 <%%= react_component("HelloWorld",
-                    @app_props_server_render.to_json,
+                    props: @app_props_server_render.to_json,
                     prerender: true,
                     trace: true,
                     id: "my-hello-world-id",

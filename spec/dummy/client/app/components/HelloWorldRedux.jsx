@@ -1,4 +1,5 @@
-import React, { PropTypes } from 'react';
+import React, {PropTypes} from 'react';
+import RailsContext from './RailsContext';
 
 // Super simple example of the simplest possible React component
 export default class HelloWorldRedux extends React.Component {
@@ -6,6 +7,7 @@ export default class HelloWorldRedux extends React.Component {
   static propTypes = {
     actions: PropTypes.object.isRequired,
     data: PropTypes.object.isRequired,
+    railsContext: PropTypes.object.isRequired,
   };
 
   // Not necessary if we only call super, but we'll need to initialize state, etc.
@@ -25,8 +27,16 @@ export default class HelloWorldRedux extends React.Component {
   }
 
   render() {
-    const { data } = this.props;
-    const { name } = data;
+    const {data, railsContext} = this.props;
+    const {name} = data;
+
+    // If this creates an alert, we have a problem!
+    // see file node_package/src/scriptSanitizedVal.js for the fix to this prior issue.
+    console.log('This is a script:"</div>"</script> <script>alert(\'WTF1\')</script>');
+    console.log('Script2:"</div>"</script xx> <script>alert(\'WTF2\')</script xx>');
+    console.log('Script3:"</div>"</  SCRIPT xx> <script>alert(\'WTF3\')</script xx>');
+    console.log('Script4"</div>"</script <script>alert(\'WTF4\')</script>');
+    console.log('Script5:"</div>"</ script> <script>alert(\'WTF5\')</script>');
 
     return (
       <div>
@@ -42,6 +52,7 @@ export default class HelloWorldRedux extends React.Component {
             onChange={this.handleChange}
           />
         </p>
+        <RailsContext {...{railsContext}} />
       </div>
     );
   }

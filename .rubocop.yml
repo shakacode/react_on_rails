@@ -48,7 +48,7 @@ Lint/HandleExceptions:
     - 'spec/dummy/bin/rake'
 
 Metrics/AbcSize:
-  Max: 26
+  Max: 28
 
 Metrics/CyclomaticComplexity:
   Max: 7
@@ -57,7 +57,7 @@ Metrics/PerceivedComplexity:
   Max: 10
 
 Metrics/ClassLength:
-  Max: 114
+  Max: 140
 
 Metrics/ParameterLists:
   Max: 5

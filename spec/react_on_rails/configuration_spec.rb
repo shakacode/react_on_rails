@@ -4,7 +4,7 @@ module ReactOnRails
   RSpec.describe Configuration do
     it "be able to config default configuration of the gem" do
       ReactOnRails.configure do |config|
-        config.server_bundle_js_file = "client/dist/server.js"
+        config.server_bundle_js_file = "server.js"
         config.prerender = false
       end
 
@@ -14,7 +14,7 @@ module ReactOnRails
 
     it "be able to config default configuration of the gem" do
       ReactOnRails.configure do |config|
-        config.server_bundle_js_file = "client/dist/something.js"
+        config.server_bundle_js_file = "something.js"
         config.prerender = true
       end
 

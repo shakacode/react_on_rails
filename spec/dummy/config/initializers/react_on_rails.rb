@@ -1,3 +1,13 @@
+module RenderingExtension
+  # Return a Hash that contains custom values from the view context that will get passed to
+  # all calls to react_component and redux_store for rendering
+  def self.custom_context(view_context)
+    {
+      somethingUseful: view_context.session[:something_useful]
+    }
+  end
+end
+
 ReactOnRails.configure do |config|
   # Directory where your generated assets go. All generated assets must go to the same directory.
   # Configure this in your webpack config files. This relative to your Rails root directory.
@@ -34,12 +44,16 @@ ReactOnRails.configure do |config|
   # (see [discussion](https://github.com/reactjs/react-rails/pull/290))
   # On MRI, you'll get a deadlock with `pool_size` > 1
   # If you're using JRuby, you can increase `pool_size` to have real multi-threaded rendering.
-  config.server_renderer_pool_size  = 1   # increase if you're on JRuby
-  config.server_renderer_timeout    = 20  # seconds
+  config.server_renderer_pool_size = 1 # increase if you're on JRuby
+  config.server_renderer_timeout = 20 # seconds
 
   ################################################################################
   # MISCELLANEOUS OPTIONS
   ################################################################################
   # Default is false, enable if your content security policy doesn't include `style-src: 'unsafe-inline'`
   config.skip_display_none = false
+
+  # This allows you to add additional values to the Rails Context. Implement one static method
+  # called `custom_context(view_context)` and return a Hash.
+  config.rendering_extension = RenderingExtension
 end

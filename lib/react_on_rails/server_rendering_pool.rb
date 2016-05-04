@@ -7,7 +7,7 @@ module ReactOnRails
   class ServerRenderingPool
     def self.reset_pool
       options = { size: ReactOnRails.configuration.server_renderer_pool_size,
-                  timeout: ReactOnRails.configuration.server_renderer_pool_size }
+                  timeout: ReactOnRails.configuration.server_renderer_timeout }
       @js_context_pool = ConnectionPool.new(options) { create_js_context }
     end
 
@@ -29,7 +29,11 @@ module ReactOnRails
     # js_code MUST RETURN json stringify Object
     # Calling code will probably call 'html_safe' on return value before rendering to the view.
     def self.server_render_js_with_console_logging(js_code)
-      trace_messsage(js_code)
+      if trace_react_on_rails?
+        @file_index ||= 1
+        trace_messsage(js_code, "tmp/server-generated-#{@file_index % 10}.js")
+        @file_index += 1
+      end
       json_string = eval_js(js_code)
       result = JSON.parse(json_string)
 
@@ -51,14 +55,18 @@ module ReactOnRails
     class << self
       private
 
-      def trace_messsage(js_code, file_name = "tmp/server-generated.js")
-        return unless ENV["TRACE_REACT_ON_RAILS"].present?
+      def trace_messsage(js_code, file_name = "tmp/server-generated.js", force = false)
+        return unless trace_react_on_rails? || force
         # Set to anything to print generated code.
         puts "Z" * 80
         puts "react_renderer.rb: 92"
         puts "wrote file #{file_name}"
         File.write(file_name, js_code)
         puts "Z" * 80
+      end
+
+      def trace_react_on_rails?
+        ENV["TRACE_REACT_ON_RAILS"].present?
       end
 
       def eval_js(js_code)
@@ -71,24 +79,25 @@ module ReactOnRails
 
       def create_js_context
         server_js_file = ReactOnRails::Utils.default_server_bundle_js_file_path
-        if server_js_file.present? && File.exist?(server_js_file)
+        if server_js_file.present? && File.file?(server_js_file)
           bundle_js_code = File.read(server_js_file)
           base_js_code = <<-JS
 #{console_polyfill}
 #{execjs_timer_polyfills}
           #{bundle_js_code};
           JS
+          file_name = "tmp/base_js_code.js"
           begin
+            trace_messsage(base_js_code, file_name)
             ExecJS.compile(base_js_code)
           rescue => e
-            file_name = "tmp/base_js_code.js"
-            msg = "ERROR when compiling base_js_code! See #{file_name} to "\
-              "ERROR when compiling base_js_code! See #{file_name} to "\
+            msg = "ERROR when compiling base_js_code! "\
+              "See file #{file_name} to "\
               "correlate line numbers of error. Error is\n\n#{e.message}"\
               "\n\n#{e.backtrace.join("\n")}"
             puts msg
             Rails.logger.error(msg)
-            trace_messsage(base_js_code, file_name)
+            trace_messsage(base_js_code, file_name, true)
             raise e
           end
         else
@@ -105,14 +114,36 @@ module ReactOnRails
 
       def execjs_timer_polyfills
         <<-JS
+function getStackTrace () {
+  var stack;
+  try {
+    throw new Error('');
+  }
+  catch (error) {
+    stack = error.stack || '';
+  }
+  stack = stack.split('\\n').map(function (line) { return line.trim(); });
+  return stack.splice(stack[0] == 'Error' ? 2 : 1);
+}
+
 function setInterval() {
- console.error('setInterval is not defined for execJS. See https://github.com/sstephenson/execjs#faq');
+  #{undefined_for_exec_js_logging('setInterval')}
 }
 
 function setTimeout() {
- console.error('setTimeout is not defined for execJS. See https://github.com/sstephenson/execjs#faq');
+  #{undefined_for_exec_js_logging('setTimeout')}
 }
         JS
+      end
+
+      def undefined_for_exec_js_logging(function_name)
+        if trace_react_on_rails?
+          "console.error('#{function_name} is not defined for execJS. See "\
+          "https://github.com/sstephenson/execjs#faq. Note babel-polyfill may call this.');\n"\
+          "  console.error(getStackTrace().join('\\n'));"
+        else
+          ""
+        end
       end
 
       # Reimplement console methods for replaying on the client

@@ -63,9 +63,9 @@ module ReactOnRailsHelper
   #   React.createClass, or a
   #    `generator function` that returns a React component
   #      using ES6
-  #         let MyReactComponentApp = (props) => <MyReactComponent {...props}/>;
+  #         let MyReactComponentApp = (props, railsContext) => <MyReactComponent {...props}/>;
   #      or using ES5
-  #         var MyReactComponentApp = function(props) { return <YourReactComponent {...props}/>; }
+  #         var MyReactComponentApp = function(props, railsContext) { return <YourReactComponent {...props}/>; }
   #   Exposing the react_component_name is necessary to both a plain ReactComponent as well as
   #     a generator:
   #   See README.md for how to "register" your react components.
@@ -76,6 +76,8 @@ module ReactOnRailsHelper
   #   props: Ruby Hash or JSON string which contains the properties to pass to the react object. Do
   #      not pass any props if you are separately initializing the store by the `redux_store` helper.
   #   prerender: <true/false> set to false when debugging!
+  #   id: You can optionally set the id, or else a unique one is automatically generated.
+  #   html_options: You can set other html attributes that will go on this component
   #   trace: <true/false> set to true to print additional debugging information in the browser
   #          default is true for development, off otherwise
   #   replay_console: <true/false> Default is true. False will disable echoing server rendering
@@ -85,7 +87,7 @@ module ReactOnRailsHelper
   #   raise_on_prerender_error: <true/false> Default to false. True will raise exception on server
   #      if the JS code throws
   # Any other options are passed to the content tag, including the id.
-  def react_component(component_name, options = {}, other_options = nil)
+  def react_component(component_name, raw_options = {})
     # Create the JavaScript and HTML to allow either client or server rendering of the
     # react_component.
     #
@@ -94,56 +96,45 @@ module ReactOnRailsHelper
     # server has already rendered the HTML.
     # We use this react_component_index in case we have the same component multiple times on the page.
 
-    options, props = parse_options_props(component_name, options, other_options)
-
     react_component_index = next_react_component_index
-    react_component_name = component_name.camelize # Not sure if we should be doing this (JG)
-    dom_id = if options[:id].nil?
-               "#{component_name}-react-component-#{react_component_index}"
-             else
-               options[:id]
-             end
+    options = ReactOnRails::ReactComponent::Options.new(name: component_name,
+                                                        index: react_component_index,
+                                                        options: raw_options)
 
     # Setup the page_loaded_js, which is the same regardless of prerendering or not!
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
-
-    props = {} if props.nil?
-
-    data = {
-      component_name: react_component_name,
-      props: props,
-      trace: trace(options),
-      dom_id: dom_id
-    }
 
     component_specification_tag =
       content_tag(:div,
                   "",
                   class: "js-react-on-rails-component",
-                  style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
-                  data: data)
+                  style: options.style,
+                  data: options.data)
 
     # Create the HTML rendering part
-    result = server_rendered_react_component_html(options, props, react_component_name, dom_id)
+    result = server_rendered_react_component_html(options.props, options.name, options.dom_id,
+                                                  prerender: options.prerender,
+                                                  trace: options.trace,
+                                                  raise_on_prerender_error: options.raise_on_prerender_error)
 
     server_rendered_html = result["html"]
     console_script = result["consoleReplayScript"]
 
-    content_tag_options = options.except(:generator_function, :prerender, :trace,
-                                         :replay_console, :id, :react_component_name,
-                                         :server_side, :raise_on_prerender_error)
-    content_tag_options[:id] = dom_id
+    content_tag_options = options.html_options
+    content_tag_options[:id] = options.dom_id
 
     rendered_output = content_tag(:div,
                                   server_rendered_html.html_safe,
                                   content_tag_options)
 
     # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
-    <<-HTML.html_safe
+    result = <<-HTML.html_safe
 #{component_specification_tag}
     #{rendered_output}
-    #{replay_console(options) ? console_script : ''}
+    #{options.replay_console ? console_script : ''}
     HTML
+
+    prepend_render_rails_context(result)
   end
 
   # Separate initialization of store from react_component allows multiple react_component calls to
@@ -165,7 +156,8 @@ module ReactOnRailsHelper
     else
       @registered_stores ||= []
       @registered_stores << redux_store_data
-      render_redux_store_data(redux_store_data)
+      result = render_redux_store_data(redux_store_data)
+      prepend_render_rails_context(result)
     end
   end
 
@@ -222,7 +214,7 @@ module ReactOnRailsHelper
     # IMPORTANT: To ensure that Rails doesn't auto-escape HTML tags, use the 'raw' method.
     html = result["html"]
     console_log_script = result["consoleLogScript"]
-    raw("#{html}#{replay_console(options) ? console_log_script : ''}")
+    raw("#{html}#{replay_console_option(options[:replay_console_option]) ? console_log_script : ''}")
   rescue ExecJS::ProgramError => err
     # rubocop:disable Style/RaiseArgs
     raise ReactOnRails::PrerenderError.new(component_name: "N/A (server_render_js called)",
@@ -233,12 +225,31 @@ module ReactOnRailsHelper
 
   private
 
+  # prepend the rails_context if not yet applied
+  def prepend_render_rails_context(render_value)
+    return render_value if @rendered_rails_context
+
+    data = {
+      rails_context: rails_context(server_side: false)
+    }
+
+    @rendered_rails_context = true
+
+    rails_context_content = content_tag(:div,
+                                        "",
+                                        id: "js-react-on-rails-context",
+                                        style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
+                                        data: data)
+    "#{rails_context_content}\n#{render_value}".html_safe
+  end
+
   def render_redux_store_data(redux_store_data)
-    content_tag(:div,
-                "",
-                class: "js-react-on-rails-store",
-                style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
-                data: redux_store_data)
+    result = content_tag(:div,
+                         "",
+                         class: "js-react-on-rails-store",
+                         style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
+                         data: redux_store_data)
+    prepend_render_rails_context(result)
   end
 
   def next_react_component_index
@@ -252,8 +263,9 @@ module ReactOnRailsHelper
 
   # Returns Array [0]: html, [1]: script to console log
   # NOTE, these are NOT html_safe!
-  def server_rendered_react_component_html(options, props, react_component_name, dom_id)
-    return { "html" => "", "consoleReplayScript" => "" } unless prerender(options)
+  def server_rendered_react_component_html(props, react_component_name, dom_id,
+                                           prerender:, trace:, raise_on_prerender_error:)
+    return { "html" => "", "consoleReplayScript" => "" } unless prerender
 
     # On server `location` option is added (`location = request.fullpath`)
     # React Router needs this to match the current route
@@ -265,21 +277,22 @@ module ReactOnRailsHelper
 
     wrapper_js = <<-JS
 (function() {
+  var railsContext = #{rails_context(server_side: true).to_json};
 #{initialize_redux_stores}
   var props = #{props_string(props)};
   return ReactOnRails.serverRenderReactComponent({
     name: '#{react_component_name}',
     domNodeId: '#{dom_id}',
     props: props,
-    trace: #{trace(options)},
-    location: '#{request.fullpath}'
+    trace: #{trace},
+    railsContext: railsContext
   });
 })()
     JS
 
     result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
 
-    if result["hasErrors"] && raise_on_prerender_error(options)
+    if result["hasErrors"] && raise_on_prerender_error
       # We caught this exception on our backtrace handler
       # rubocop:disable Style/RaiseArgs
       raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
@@ -314,66 +327,51 @@ module ReactOnRailsHelper
       memo << <<-JS
 reduxProps = #{props};
 storeGenerator = ReactOnRails.getStoreGenerator('#{store_name}');
-store = storeGenerator(reduxProps);
+store = storeGenerator(reduxProps, railsContext);
 ReactOnRails.setStore('#{store_name}', store);
       JS
     end
     result
   end
 
-  def raise_on_prerender_error(options)
-    options.fetch(:raise_on_prerender_error) { ReactOnRails.configuration.raise_on_prerender_error }
-  end
+  # This is the definitive list of the default values used for the rails_context, which is the
+  # second parameter passed to both component and store generator functions.
+  def rails_context(server_side:)
+    @rails_context ||= begin
+      # Using Addressable instead of standard URI to better deal with
+      # non-ASCII characters (see https://github.com/shakacode/react_on_rails/pull/405)
+      uri = Addressable::URI.parse(request.original_url)
+      # uri = Addressable::URI.parse("http://foo.com:3000/posts?id=30&limit=5#time=1305298413")
 
-  def trace(options)
-    options.fetch(:trace) { ReactOnRails.configuration.trace }
-  end
+      result = {
+        # URL settings
+        href: request.original_url,
+        location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}" : ''}",
+        scheme: uri.scheme, # http
+        host: uri.host, # foo.com
+        port: uri.port,
+        pathname: uri.path, # /posts
+        search: uri.query, # id=30&limit=5
 
-  def prerender(options)
-    options.fetch(:prerender) { ReactOnRails.configuration.prerender }
-  end
+        # Locale settings
+        i18nLocale: I18n.locale,
+        i18nDefaultLocale: I18n.default_locale,
+        httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"]
+      }
 
-  def replay_console(options)
-    options.fetch(:replay_console) { ReactOnRails.configuration.replay_console }
-  end
-
-  # rubocop:disable Metrics/CyclomaticComplexity
-  # rubocop:disable Metrics/PerceivedComplexity
-  def parse_options_props(component_name, options, other_options)
-    other_options ||= {}
-    if options.is_a?(Hash) && options.key?(:props)
-      props = options[:props]
-      final_options = options.except(:props)
-      final_options.merge!(other_options) if other_options.present?
-    else
-      # either no props specified or deprecated
-      if other_options.present? || options.is_a?(String)
-        deprecated_syntax = true
-      else
-        options_has_no_reserved_keys =
-          %i(prerender trace replay_console raise_on_prerender_error).none? do |key|
-            options.key?(key)
-          end
-        deprecated_syntax = options_has_no_reserved_keys && options.present?
+      if ReactOnRails.configuration.rendering_extension
+        custom_context = ReactOnRails.configuration.rendering_extension.custom_context(self)
+        result.merge!(custom_context) if custom_context
       end
-
-      if deprecated_syntax
-        puts "Deprecation: react_component now takes props as an explicity named parameter :props. "\
-          " Props as the second arg will be removed in a future release. Called for "\
-          "component_name: #{component_name}, controller: #{controller_name}, "\
-          "action: #{action_name}."
-        options = {} if options.is_a?(String) && options.blank?
-        props = options
-        final_options = other_options
-      else
-        options ||= {}
-        final_options = options.merge(other_options)
-      end
+      result
     end
-    [final_options, props]
+
+    @rails_context.merge(serverSide: server_side)
   end
-  # rubocop:enable Metrics/CyclomaticComplexity
-  # rubocop:enable Metrics/PerceivedComplexity
+
+  def replay_console_option(val)
+    val.nil? ? ReactOnRails.configuration.replay_console : val
+  end
 
   def use_hot_reloading?
     ENV["REACT_ON_RAILS_ENV"] == "HOT"

@@ -3,6 +3,51 @@ All notable changes to this project will be documented in this file. Items under
 
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
+##### Changed
+- Replace URI with Addressable gem. See [#405](https://github.com/shakacode/react_on_rails/pull/405) by [lucke84]
+
+## [5.2.0] - 2016-04-08
+##### Added
+- Support for React 15.0 to react_on_rails. See [#379](https://github.com/shakacode/react_on_rails/pull/379) by [brucek](https://github.com/brucek).
+
+##### Removed
+- Generator removals to simplify installer. See [#363](https://github.com/shakacode/react_on_rails/pull/363) by [jbhatab](https://github.com/jbhatab).
+  - Removed options for heroku, boostrap, and the linters from generator.
+  - Removed install for the Webpack Dev Server, as we can now do hot reloading with Rails, so the complexity of this feature is not justified. Nevertheless, the setup of React on Rails still supports this setup, just not with the generator.
+  - Documentation added for removed installer options.
+
+## [5.1.1] - 2016-04-04
+##### Fixed
+- [Security] Address failure to sanitize console messages when server rendering and displaying in the browser console. See [#366](https://github.com/shakacode/react_on_rails/pull/366) and [#370](https://github.com/shakacode/react_on_rails/pull/370) by [justin808](https://github.com/justin808)
+
+##### Added
+- railsContext includes the port number and a boolean if the code is being run on the server or client. 
+
+## [5.1.0] - 2016-04-03
+##### Added
+All 5.1.0 changes can be found in [#362](https://github.com/shakacode/react_on_rails/pull/362) by [justin808](https://github.com/justin808).
+- Generator enhancements
+  - Generator adds line to spec/rails_helper.rb so that running specs will ensure assets are compiled.
+  - Other small changes to the generator including adding necessary npm scripts to allow React on Rails to build assets.
+  - Npm modules updated for generator.
+  - Added babel-runtime in to the client/package.json created.
+- Server rendering
+  - Added more diagnostics for server rendering.
+  - Calls to setTimeout and setInterval are not logged for server rendering unless env TRACE_REACT_ON_RAILS is set to YES.
+- Updated all project npm dependencies to latest.
+- Update to node 5.10.0 for CI.
+- Added babel-runtime as a peer dependency for the npm module.
+
+## [5.0.0] - 2016-04-01
+
+##### Added
+- Added `railsContext`, an object which gets passed always as the second parameter to both react component and redux store generator functions, both for server and client rendering. This provides data like the current locale, the pathname, etc. The data values are customizable by a new configuration called `rendering_extension` where you can create a module with a method called `rendering_extension`. This allows you to add additional values to the Rails Context. Implement one static method called `custom_context(view_context)` and return a Hash. See [#345](https://github.com/shakacode/react_on_rails/pull/345) by [justin808](https://github.com/justin808)
+
+##### Changed
+- Previously, you could pass arbitrary additional html attributes to react_component. Now, you need to pass them in as a named parameter `html_options` to react_component.
+
+##### Breaking Changes
+- You must provide named attributes, including `props` for view helper `react_compnent`. See [this commit]](https://github.com/shakacode/react-webpack-rails-tutorial/commit/a97fa90042cbe27be7fd7fa70b5622bfcf9c3673) for an example migration used for [www.reactrails.com](http://www.reactrails.com).
 
 ## [4.0.3] - 2016-03-17
 
@@ -85,12 +130,12 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 - Support for Turbolinks 5! [#270](https://github.com/shakacode/react_on_rails/pull/270).
 - Added better error messages for `ReactOnRails.register()`. [#273](https://github.com/shakacode/react_on_rails/pull/273).
 
-##### Breaking Change  
+##### Breaking Change
 - Calls to `react_component` should use a named argument of props. For example, change this:
   ```ruby
   <%= react_component("ReduxSharedStoreApp", {}, prerender: false, trace: true) %>
   ```
- 
+
   to
   ```ruby
   <%= react_component("ReduxSharedStoreApp", props: {}, prerender: false, trace: true) %>
@@ -98,7 +143,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
   You'll get a deprecation message to change this.
 - Renamed `ReactOnRails.configure_rspec_to_compile_assets` to `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`. The code has also been optimized to check for whether or not the compiled webpack bundles are up to date or not and will not run if not necessary. If you are using non-standard directories for your generated webpack assets (`app/assets/javascripts/generated` and `app/assets/stylesheets/generated`) or have additional directories you wish the helper to check, you need to update your ReactOnRails configuration accordingly. See [documentation](https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/rspec_configuration.md) for how to do this.  [#253](https://github.com/shakacode/react_on_rails/pull/253).
 - You have to call `ReactOnRails.register` to register react components. This was deprecated in v2. [#273](https://github.com/shakacode/react_on_rails/pull/273).
-  
+
 ##### Migration Steps v2 to v3
 - [spec/dummy/spec/rails_helper.rb](https://github.com/shakacode/react_on_rails/blob/master/spec%2Fdummy%2Fspec%2Frails_helper.rb#L36..38) for an example. Add this line to your `rails_helper.rb`:
 ```ruby
@@ -236,7 +281,11 @@ Best done with Object destructing:
 
 ##### Fixed
 - Fix several generator related issues.
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/4.0.3...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/5.2.0...master
+[5.2.0]: https://github.com/shakacode/react_on_rails/compare/5.1.1...5.2.0
+[5.1.1]: https://github.com/shakacode/react_on_rails/compare/5.1.0...5.1.1
+[5.1.0]: https://github.com/shakacode/react_on_rails/compare/5.0.0...5.1.0
+[5.0.0]: https://github.com/shakacode/react_on_rails/compare/4.0.3...5.0.0
 [4.0.3]: https://github.com/shakacode/react_on_rails/compare/4.0.2...4.0.3
 [4.0.2]: https://github.com/shakacode/react_on_rails/compare/4.0.1...4.0.2
 [4.0.1]: https://github.com/shakacode/react_on_rails/compare/4.0.0...4.0.1
