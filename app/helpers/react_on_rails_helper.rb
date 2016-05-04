@@ -105,7 +105,7 @@ module ReactOnRailsHelper
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
 
     component_specification_tag =
-      content_tag(:div,
+      content_tag(:script,
                   "",
                   class: "js-react-on-rails-component",
                   style: options.style,
@@ -129,7 +129,7 @@ module ReactOnRailsHelper
 
     # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
     result = <<-HTML.html_safe
-#{component_specification_tag}
+    #{component_specification_tag}
     #{rendered_output}
     #{options.replay_console ? console_script : ''}
     HTML
@@ -235,7 +235,7 @@ module ReactOnRailsHelper
 
     @rendered_rails_context = true
 
-    rails_context_content = content_tag(:div,
+    rails_context_content = content_tag(:script,
                                         "",
                                         id: "js-react-on-rails-context",
                                         style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
