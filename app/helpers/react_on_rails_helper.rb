@@ -104,15 +104,16 @@ module ReactOnRailsHelper
     # Setup the page_loaded_js, which is the same regardless of prerendering or not!
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
 
+    props = options.delete(:props)
     component_specification_tag =
       content_tag(:script,
-                  "",
+                  props,
                   class: "js-react-on-rails-component",
                   style: options.style,
                   data: options.data)
 
     # Create the HTML rendering part
-    result = server_rendered_react_component_html(options.props, options.name, options.dom_id,
+    result = server_rendered_react_component_html(props, options.name, options.dom_id,
                                                   prerender: options.prerender,
                                                   trace: options.trace,
                                                   raise_on_prerender_error: options.raise_on_prerender_error)
@@ -134,7 +135,7 @@ module ReactOnRailsHelper
     #{options.replay_console ? console_script : ''}
     HTML
 
-    prepend_render_rails_context(result)
+    add_render_rails_context(result)
   end
 
   # Separate initialization of store from react_component allows multiple react_component calls to
@@ -157,7 +158,7 @@ module ReactOnRailsHelper
       @registered_stores ||= []
       @registered_stores << redux_store_data
       result = render_redux_store_data(redux_store_data)
-      prepend_render_rails_context(result)
+      add_render_rails_context(result)
     end
   end
 
@@ -225,22 +226,17 @@ module ReactOnRailsHelper
 
   private
 
-  # prepend the rails_context if not yet applied
-  def prepend_render_rails_context(render_value)
+  # add the rails_context if not yet applied
+  def add_render_rails_context(render_value)
     return render_value if @rendered_rails_context
-
-    data = {
-      rails_context: rails_context(server_side: false)
-    }
 
     @rendered_rails_context = true
 
     rails_context_content = content_tag(:script,
-                                        "",
+                                        rails_context(server_side: false),
                                         id: "js-react-on-rails-context",
-                                        style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
-                                        data: data)
-    "#{rails_context_content}\n#{render_value}".html_safe
+                                        style: ReactOnRails.configuration.skip_display_none ? nil : "display:none")
+    "#{render_value}\n#{rails_context_content}".html_safe
   end
 
   def render_redux_store_data(redux_store_data)
@@ -249,7 +245,7 @@ module ReactOnRailsHelper
                          class: "js-react-on-rails-store",
                          style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
                          data: redux_store_data)
-    prepend_render_rails_context(result)
+    add_render_rails_context(result)
   end
 
   def next_react_component_index

@@ -42,7 +42,7 @@ function turbolinksVersion5() {
 
 function initializeStore(el, railsContext) {
   const name = el.getAttribute('data-store-name');
-  const props = JSON.parse(el.getAttribute('data-props'));
+  const props = JSON.parse(el.innerHTML);
   const storeGenerator = ReactOnRails.getStoreGenerator(name);
   const store = storeGenerator(props, railsContext);
   ReactOnRails.setStore(name, store);
@@ -89,7 +89,7 @@ You should return a React.Component always for the client side entry point.`);
 function parseRailsContext() {
   const el = document.getElementById('js-react-on-rails-context');
   if (el) {
-    return JSON.parse(el.getAttribute('data-rails-context'));
+    return JSON.parse(el.innerHTML);
   } else {
     return null;
   }
