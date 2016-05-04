@@ -40,4 +40,9 @@ ReactOnRails.configure do |config|
   config.trace = Rails.env.development?
   # Default is false, enable if your content security policy doesn't include `style-src: 'unsafe-inline'`
   config.skip_display_none = false
+
+  # Client js uses assets not digested by rails.
+  # For any asset matching this regex, non-digested symlink will be created
+  config.symlink_non_digested_assets_regex = /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg)/
+
 end
