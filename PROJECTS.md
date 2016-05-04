@@ -10,6 +10,7 @@
 * **[Pivotal Tracker](http://www.pivotaltracker.com/)**: The first (and most-loved) agile project management tool built on Rails.  React on Rails has greatly simplified integration and workflow for our React components in Rails!
 * **[Confident Financial Solutions](https://www.mycfsapp.com/)**: Auto Repair Financing to help people get back on the road and back to life.
 * **[Apprentus](https://www.apprentus.com/)**: A marketplace to find the best private teachers. Using react-on-rails from the homepage to infinity!
+* **[Deliveroo](https://deliveroo.co.uk)**: The food you love delivered to your door.
 
 --------
 
