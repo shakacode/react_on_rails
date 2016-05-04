@@ -12,6 +12,7 @@ const ctx = context();
 
 const DEFAULT_OPTIONS = {
   traceTurbolinks: false,
+  domPrefix: 'js-react-on-rails'
 };
 
 ctx.ReactOnRails = {
@@ -51,11 +52,17 @@ ctx.ReactOnRails = {
    * Set options for ReactOnRails, typically before you call ReactOnRails.register
    * Available Options:
    * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
+   * `domPrefix: string If specified must match ReactOnRails.config.dom_prefix in the Rails project
    */
   setOptions(options) {
     if (options.hasOwnProperty('traceTurbolinks')) {
       this._options.traceTurbolinks = options.traceTurbolinks;
       delete options.traceTurbolinks;
+    }
+
+    if (options.hasOwnProperty('domPrefix')) {
+      this._options.domPrefix = options.domPrefix;
+      delete options.domPrefix;
     }
 
     if (Object.keys(options).length > 0) {

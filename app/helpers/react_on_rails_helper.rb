@@ -107,7 +107,7 @@ module ReactOnRailsHelper
     component_specification_tag =
       content_tag(:div,
                   "",
-                  class: "js-react-on-rails-component",
+                  class: "#{ReactOnRails.configuration.dom_prefix}-component",
                   style: options.style,
                   data: options.data)
 
@@ -237,7 +237,7 @@ module ReactOnRailsHelper
 
     rails_context_content = content_tag(:div,
                                         "",
-                                        id: "js-react-on-rails-context",
+                                        id: "#{ReactOnRails.configuration.dom_prefix}-context",
                                         style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
                                         data: data)
     "#{rails_context_content}\n#{render_value}".html_safe
@@ -246,7 +246,7 @@ module ReactOnRailsHelper
   def render_redux_store_data(redux_store_data)
     result = content_tag(:div,
                          "",
-                         class: "js-react-on-rails-store",
+                         class: "#{ReactOnRails.configuration.dom_prefix}-store",
                          style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
                          data: redux_store_data)
     prepend_render_rails_context(result)

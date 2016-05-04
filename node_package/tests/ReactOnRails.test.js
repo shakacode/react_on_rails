@@ -50,6 +50,22 @@ test('ReactOnRails not specified has traceTurbolinks as false', (assert) => {
   assert.equal(actual, false);
 });
 
+test('ReactOnRails accepts domPrefix as an option string', (assert) => {
+  ReactOnRails.resetOptions();
+  assert.plan(1);
+  ReactOnRails.setOptions({ domPrefix: 'js-foobar' });
+  const actual = ReactOnRails.option('domPrefix');
+  assert.equal(actual, 'js-foobar');
+});
+
+test('ReactOnRails not specified has domPrefix as js-react-on-rails', (assert) => {
+  ReactOnRails.resetOptions();
+  assert.plan(1);
+  ReactOnRails.setOptions({ });
+  const actual = ReactOnRails.option('domPrefix');
+  assert.equal(actual, 'js-react-on-rails');
+});
+
 test('serverRenderReactComponent throws error for invalid options', (assert) => {
   ReactOnRails.resetOptions();
   assert.plan(1);
