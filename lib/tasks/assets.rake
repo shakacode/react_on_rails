@@ -1,5 +1,5 @@
 Rake::Task["assets:precompile"].enhance do
-  Rake::Task["assets:symlink_non_digested_assets"].invoke
+  Rake::Task["assets:symlink_non_digested_assets"].invoke if ReactOnRails.configuration.symlink_non_digested_assets_regex
 end
 
 namespace :assets do
