@@ -57,7 +57,7 @@ module ReactOnRails
       skip_display_none: false,
       webpack_generated_files: [],
       rendering_extension: nil,
-      symlink_non_digested_assets_regex: nil
+      symlink_non_digested_assets_regex: /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg)/
     )
   end
 
