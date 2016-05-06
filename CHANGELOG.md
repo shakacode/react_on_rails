@@ -3,10 +3,27 @@ All notable changes to this project will be documented in this file. Items under
 
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
+##### Added
+- Non-digested version of assets in public folder [#413](https://github.com/shakacode/react_on_rails/pull/413) by [alleycat-at-git]
+
+##### Changed
+- Replace URI with Addressable gem. See [#405](https://github.com/shakacode/react_on_rails/pull/405) by [lucke84]
+
+## [5.2.0] - 2016-04-08
+##### Added
+- Support for React 15.0 to react_on_rails. See [#379](https://github.com/shakacode/react_on_rails/pull/379) by [brucek](https://github.com/brucek).
+- Support for Node.js server side rendering. See [#380](https://github.com/shakacode/react_on_rails/pull/380) by [alleycat](https://github.com/alleycat-at-git) and [doc](https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/node-server-rendering.md)
+
+##### Removed
+- Generator removals to simplify installer. See [#363](https://github.com/shakacode/react_on_rails/pull/363) by [jbhatab](https://github.com/jbhatab).
+  - Removed options for heroku, boostrap, and the linters from generator.
+  - Removed install for the Webpack Dev Server, as we can now do hot reloading with Rails, so the complexity of this feature is not justified. Nevertheless, the setup of React on Rails still supports this setup, just not with the generator.
+  - Documentation added for removed installer options.
 
 ## [5.1.1] - 2016-04-04
 ##### Fixed
 - [Security] Address failure to sanitize console messages when server rendering and displaying in the browser console. See [#366](https://github.com/shakacode/react_on_rails/pull/366) and [#370](https://github.com/shakacode/react_on_rails/pull/370) by [justin808](https://github.com/justin808)
+
 ##### Added
 - railsContext includes the port number and a boolean if the code is being run on the server or client. 
 
@@ -268,8 +285,9 @@ Best done with Object destructing:
 
 ##### Fixed
 - Fix several generator related issues.
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/5.1.1...master
-[5.1.1]: https://github.com/shakacode/react_on_rails/compare/5.0.0...5.1.1
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/5.2.0...master
+[5.2.0]: https://github.com/shakacode/react_on_rails/compare/5.1.1...5.2.0
+[5.1.1]: https://github.com/shakacode/react_on_rails/compare/5.1.0...5.1.1
 [5.1.0]: https://github.com/shakacode/react_on_rails/compare/5.0.0...5.1.0
 [5.0.0]: https://github.com/shakacode/react_on_rails/compare/4.0.3...5.0.0
 [4.0.3]: https://github.com/shakacode/react_on_rails/compare/4.0.2...4.0.3

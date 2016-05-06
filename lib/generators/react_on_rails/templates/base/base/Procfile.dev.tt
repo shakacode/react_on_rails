@@ -1,3 +1,6 @@
 web: rails s
 client: sh -c 'rm app/assets/webpack/* || true && cd client && npm run build:dev:client'
-<%- if options.server_rendering? %>server: sh -c 'cd client && npm run build:dev:server'<%- end %>
+<%- if options.server_rendering? %>
+server: sh -c 'cd client && npm run build:dev:server'
+node: sh -c 'cd client/node && npm start'
+<%- end %>
