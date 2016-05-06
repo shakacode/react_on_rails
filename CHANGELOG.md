@@ -9,6 +9,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [5.2.0] - 2016-04-08
 ##### Added
 - Support for React 15.0 to react_on_rails. See [#379](https://github.com/shakacode/react_on_rails/pull/379) by [brucek](https://github.com/brucek).
+- Support for Node.js server side rendering. See [#380](https://github.com/shakacode/react_on_rails/pull/380) by [alleycat](https://github.com/alleycat-at-git) and [doc](https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/node-server-rendering.md)
 
 ##### Removed
 - Generator removals to simplify installer. See [#363](https://github.com/shakacode/react_on_rails/pull/363) by [jbhatab](https://github.com/jbhatab).
