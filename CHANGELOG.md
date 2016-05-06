@@ -3,12 +3,17 @@ All notable changes to this project will be documented in this file. Items under
 
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
+##### Added
+- Non-digested version of assets in public folder [#413](https://github.com/shakacode/react_on_rails/pull/413) by [alleycat-at-git]
+- Cross-platform `which` method to find node.js and NPM when running on Windows.  See [#374](https://github.com/shakacode/react_on_rails/pull/374) by [john-osullivan](https://github.com/john-osullivan/).
+
 ##### Changed
 - Replace URI with Addressable gem. See [#405](https://github.com/shakacode/react_on_rails/pull/405) by [lucke84]
 
 ## [5.2.0] - 2016-04-08
 ##### Added
 - Support for React 15.0 to react_on_rails. See [#379](https://github.com/shakacode/react_on_rails/pull/379) by [brucek](https://github.com/brucek).
+- Support for Node.js server side rendering. See [#380](https://github.com/shakacode/react_on_rails/pull/380) by [alleycat](https://github.com/alleycat-at-git) and [doc](https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/node-server-rendering.md)
 
 ##### Removed
 - Generator removals to simplify installer. See [#363](https://github.com/shakacode/react_on_rails/pull/363) by [jbhatab](https://github.com/jbhatab).
