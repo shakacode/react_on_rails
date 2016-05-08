@@ -84,7 +84,6 @@ module ReactOnRails
         append_to_file("Gemfile", "\ngem 'therubyracer', platforms: :ruby\n")
       end
 
-
       def install_node_files
         base_path = "base/base/"
         %w(client/node/package.json
