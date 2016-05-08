@@ -86,7 +86,7 @@ module ReactOnRails
 
 
       def install_node_files
-        base_path = "base/server_rendering/"
+        base_path = "base/base/"
         %w(client/node/package.json
            client/node/server.js).each do |file|
           copy_file(base_path + file, file)
