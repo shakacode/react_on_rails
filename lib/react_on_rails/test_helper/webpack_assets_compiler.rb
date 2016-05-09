@@ -6,7 +6,7 @@ module ReactOnRails
       def compile_assets
         puts "\nBuilding Webpack assets..."
 
-        build_output = `cd client && #{ReactOnRails.configuration.npm_build_command}`
+        build_output = `cd client && #{ReactOnRails.configuration.npm_build_test_command}`
 
         raise "Error in building assets!\n#{build_output}" unless Utils.last_process_completed_successfully?
 

@@ -22,7 +22,7 @@ module ReactOnRails
       #    the generated bundles.
       def call
         # Only check this ONCE during a test run
-        return if self.class.has_been_run
+        return if self.class.has_been_run || ReactOnRails.configuration.npm_build_test_command.blank?
 
         # Be sure we don't do this again.
         self.class.has_been_run = true
@@ -45,7 +45,7 @@ Detected are the following stale generated files:
 #{stale_files.join("\n")}
 
 React on Rails will ensure your JavaScript generated files are up to date, using your
-client level package.json `build` command.
+client level package.json `build:test` command.
 
         MSG
       end

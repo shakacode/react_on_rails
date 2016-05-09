@@ -7,7 +7,8 @@
     "npm": "3.5.0"
   },
   "scripts": {
-    "build": "NODE_ENV=production webpack --config webpack.config.js",
+    "build:test": "webpack --config webpack.config.js",
+    "build:production": "NODE_ENV=production webpack --config webpack.config.js",
     "build:dev": "webpack -w --config webpack.config.js"
   },
   "dependencies": {

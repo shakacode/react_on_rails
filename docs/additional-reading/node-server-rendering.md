@@ -3,7 +3,7 @@
 ### Warning: this is an experimental feature
 
 The default server rendering exploits ExecJS to render react components.
-Node server rendering allows you to use separate NodeJS process as a renderer. The process loads server-bundle.js and
+Node server rendering allows you to use separate NodeJS process as a renderer. The process loads webpack-bundle.js and
 then executes javascript to render the component inside its environment. The communication between rails and node occurs
 via socket (`client/node/node.sock`)
  

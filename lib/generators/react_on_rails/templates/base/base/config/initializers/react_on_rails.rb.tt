@@ -13,7 +13,10 @@ ReactOnRails.configure do |config|
   # or if you change your webpack bundle file name.
   config.server_bundle_js_file = "webpack-bundle.js"
 
-  config.npm_build_command = "npm run build"
+  # If you are using the ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  # with rspec then this controls what npm command is run
+  # to automatically refresh your webpack assets on every test run.
+  config.npm_test_build_command = "npm run build:test"
 
   # increase if you're on JRuby
   config.server_renderer_pool_size = 1
