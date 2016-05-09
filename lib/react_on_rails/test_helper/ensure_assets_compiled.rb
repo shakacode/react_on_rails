@@ -22,7 +22,7 @@ module ReactOnRails
       #    the generated bundles.
       def call
         # Only check this ONCE during a test run
-        return if self.class.has_been_run || ReactOnRails.configuration.npm_build_test_command.blank?
+        return if self.class.has_been_run
 
         # Be sure we don't do this again.
         self.class.has_been_run = true
