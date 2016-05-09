@@ -10,8 +10,8 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 - Added npm_build_test_command to allow developers to change what npm command is automatically run from rspec [#398](https://github.com/shakacode/react_on_rails/pull/398).
 ##### Removed
 - Server rendering is no longer an option in the generator and is always accessible [#398](https://github.com/shakacode/react_on_rails/pull/398).
-- removed lodash, jquery, and loggerMiddleware from the generatred code [#398](https://github.com/shakacode/react_on_rails/pull/398).
-- removed webpack watch check for test helper automatic compiltion [#398](https://github.com/shakacode/react_on_rails/pull/398).
+- removed lodash, jquery, and loggerMiddleware from the generated code [#398](https://github.com/shakacode/react_on_rails/pull/398).
+- removed webpack watch check for test helper automatic compilition [#398](https://github.com/shakacode/react_on_rails/pull/398).
 
 
 ##### Changed
