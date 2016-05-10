@@ -1,6 +1,7 @@
 Description:
 
-The react_on_rails:install generator integrates webpack with rails with ease. You can pass the redux option if you'd like to have redux setup for you automatically.
+The react_on_rails:install generator integrates webpack with rails with ease. You
+can pass the redux option if you'd like to have redux setup for you automatically.
 
 * Redux
 
