@@ -8,7 +8,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ##### Added
 - Non-digested version of assets in public folder [#413](https://github.com/shakacode/react_on_rails/pull/413) by [alleycat-at-git]
-
+- Cache client/node_modules directory to prevent Heroku from reinstalling all modules from scratch [#324](https://github.com/shakacode/react_on_rails/pull/324) by [modosc]
 ##### Changed
 - Replace URI with Addressable gem. See [#405](https://github.com/shakacode/react_on_rails/pull/405) by [lucke84]
 
@@ -28,7 +28,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 - [Security] Address failure to sanitize console messages when server rendering and displaying in the browser console. See [#366](https://github.com/shakacode/react_on_rails/pull/366) and [#370](https://github.com/shakacode/react_on_rails/pull/370) by [justin808](https://github.com/justin808)
 
 ##### Added
-- railsContext includes the port number and a boolean if the code is being run on the server or client. 
+- railsContext includes the port number and a boolean if the code is being run on the server or client.
 
 ## [5.1.0] - 2016-04-03
 ##### Added
