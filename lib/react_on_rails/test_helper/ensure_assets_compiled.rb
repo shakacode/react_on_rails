@@ -35,7 +35,7 @@ module ReactOnRails
         # Inform the developer that we're ensuring gen assets are ready.
         puts_start_compile_check_message(stale_gen_files)
 
-        webpack_assets_compiler.compile_assets
+        webpack_assets_compiler.compile_asseta
       end
 
       def puts_start_compile_check_message(stale_files)

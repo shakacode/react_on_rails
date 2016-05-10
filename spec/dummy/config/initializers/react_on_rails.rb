@@ -27,11 +27,6 @@ ReactOnRails.configure do |config|
   # to automatically refresh your webpack assets on every test run.
   config.npm_build_test_command = "npm run build:test"
 
-  # If you are using the ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
-  # with rspec then this controls what npm command is run
-  # to automatically refresh your webpack assets on every test run.
-  config.npm_build_test_command = "npm run build:test"
-
   # This configures the script to run to build the production assets by webpack. Set this to nil
   # if you don't want react_on_rails building this file for you.
   config.npm_build_production_command = "npm run build:production"

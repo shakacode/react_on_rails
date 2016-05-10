@@ -4,6 +4,7 @@
 # 1. The white spacing in this file matters!
 # 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 require "react_on_rails/prerender_error"
+require "addressable/uri"
 
 module ReactOnRailsHelper
   # The env_javascript_include_tag and env_stylesheet_link_tag support the usage of a webpack
