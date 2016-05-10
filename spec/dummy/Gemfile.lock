@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (6.0.0.beta.3)
+    react_on_rails (6.0.0.beta.4)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -259,9 +259,8 @@ GEM
     thread_safe (0.3.5)
     tilt (2.0.2)
     tins (1.6.0)
-    turbolinks (5.0.0.beta2)
-      turbolinks-source
-    turbolinks-source (5.0.0.beta4)
+    turbolinks (2.5.3)
+      coffee-rails
     tzinfo (1.2.2)
       thread_safe (~> 0.1)
     uglifier (3.0.0)
@@ -313,7 +312,7 @@ DEPENDENCIES
   spring
   sqlite3
   therubyracer
-  turbolinks (~> 5.0.0.beta2)
+  turbolinks (= 2.5.3)
   uglifier (>= 2.7.2)
   web-console
 
