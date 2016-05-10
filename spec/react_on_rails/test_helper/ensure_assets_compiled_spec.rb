@@ -29,7 +29,8 @@ describe ReactOnRails::TestHelper do
     def invoke_ensurer_with_doubles
       ReactOnRails::TestHelper.ensure_assets_compiled(
         webpack_assets_status_checker: assets_checker,
-        webpack_assets_compiler: compiler)
+        webpack_assets_compiler: compiler
+      )
     end
 
     def double_assets_checker(args = {})

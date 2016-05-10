@@ -13,30 +13,48 @@ ReactOnRails.configure do |config|
   # Configure this in your webpack config files. This relative to your Rails root directory.
   config.generated_assets_dir = File.join(%w(app assets webpack))
 
-  # Define the files for we need to check for webpack compilation when running tests.
+  # Define the files we need to check for webpack compilation when running tests.
   config.webpack_generated_files = %w( app-bundle.js vendor-bundle.js server-bundle.js )
 
-  # The server bundle is a single file for all server rendering of components.
-  # If you are not using server rendering `(prerender: true)`, set this to "".
+  # This is the file used for server rendering of React when using `(prerender: true)`
+  # If you are never using server rendering, you may set this to "".
+  # If you are using the same file for client and server rendering, having this set probably does
+  # not affect performance.
   config.server_bundle_js_file = "server-bundle.js"
 
+  # If you are using the ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  # with rspec then this controls what npm command is run
+  # to automatically refresh your webpack assets on every test run.
   config.npm_build_test_command = "npm run build:test"
+
+  # This configures the script to run to build the production assets by webpack. Set this to nil
+  # if you don't want react_on_rails building this file for you.
+  config.npm_build_production_command = "npm run build:production"
 
   ################################################################################
   # CLIENT RENDERING OPTIONS
   # Below options can be overriden by passing options to the react_on_rails
   # `render_component` view helper method.
   ################################################################################
-  config.prerender = false # default is false
-  config.trace = Rails.env.development? # default is true for development, off otherwise
+  # default is false
+  config.prerender = false
+
+  # default is true for development, off otherwise
+  config.trace = Rails.env.development?
 
   ################################################################################
   # SERVER RENDERING OPTIONS
   ################################################################################
-  # For server rendering. This can be set to false so that server side messages are discarded.
-  config.replay_console = true # Default is true. Be cautious about turning this off.
 
-  config.logging_on_server = true # Default is true. Logs server rendering messags to Rails.logger.info
+  # If set to true, this forces Rails to reload the server bundle if it is modified
+  config.development_mode = Rails.env.development?
+
+  # For server rendering. This can be set to false so that server side messages are discarded.
+  # Default is true. Be cautious about turning this off.
+  config.replay_console = true
+
+  # Default is true. Logs server rendering messages to Rails.logger.info
+  config.logging_on_server = true
 
   config.raise_on_prerender_error = false # change to true to raise exception on server if the JS code throws
 
@@ -58,4 +76,12 @@ ReactOnRails.configure do |config|
   # This allows you to add additional values to the Rails Context. Implement one static method
   # called `custom_context(view_context)` and return a Hash.
   config.rendering_extension = RenderingExtension
+
+  # The server render method - either ExecJS or NodeJS
+  config.server_render_method = "ExecJS"
+
+  # Client js uses assets not digested by rails.
+  # For any asset matching this regex, non-digested symlink will be created
+  # To disable symlinks set this parameter to nil.
+  config.symlink_non_digested_assets_regex = /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg)/
 end

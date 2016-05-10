@@ -197,7 +197,9 @@ and for a store:
 reduxStore = MyReduxStore(props, railsContext);
 ```
 
-Note, you never make these calls. This is what React on Rails does when either server or client rendering.
+Note, you never make these calls. This is what React on Rails does when either server or client rendering. You'll be definining functions that take take these params and return a React component or a Redux Store. 
+
+(Note, see below [section](#multiple-react-components-on-a-page-with-one-store) on how to setup redux stores that allow multiple components to talk to the same store.)
 
 The `railsContext` has: (see implementation in file react_on_rails_helper.rb for method rails_context for the definitive list).
 
@@ -231,6 +233,9 @@ Suppose you want to display a nav bar with the current navigation link highlight
 ##### Needing the I18n.locale
 Suppose you want to server render your react components with localization applied given the current Rails locale. The `railsContext` contains the I18n.locale.
 
+##### Configuring different code for server side rendering
+Suppose you want to turn off animation when doing server side rendering. The `serverSide` value is just what you need.
+
 #### Customization of the rails_context
 You can customize the values passed in the `railsContext` in your `config/initializers/react_on_rails.rb`. Here's how.
 
@@ -263,10 +268,7 @@ In this case, a prop and value for `somethingUseful` will go into the railsConte
 ### Globally Exposing Your React Components
 Place your JavaScript code inside of the provided `client/app` folder. Use modules just as you would when using webpack alone. The difference here is that instead of mounting React components directly to an element using `React.render`, you **expose your components globally and then mount them with helpers inside of your Rails views**.
 
-
-
-*Default Mode (works for server and client rendering):*
-  This is an example of how to expose a component to the `react_component` view helper.
+This is an example of how to expose a component to the `react_component` view helper.
 
   ```javascript
   // client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx
@@ -275,19 +277,11 @@ Place your JavaScript code inside of the provided `client/app` folder. Use modul
   ReactOnRails.register({ HelloWorld });
   ```
 
-*Separated Server-Side Rendering:*
-  
-  You can add a separate webpack configuration file for server rendering that has a separate entry file. ex. 'serverHelloWorldApp.jsx'. Note, you might be initializing HelloWorld with version specialized for server rendering.
- 
-  ```javascript
-  import HelloWorld from '../components/HelloWorld';
-  import ReactOnRails from 'react-on-rails';
-  ReactOnRails.register({ HelloWorld });
-  ```
- 
-  In general, you may want different initialization for your server rendered components.
- 
-See below section on how to setup redux stores that allow multiple components to talk to the same store.
+#### Different Server-Side Rendering Code (and a Server Specific Bundle)
+
+You may want different initialization for your server rendered components. For example, if you have animation that runs when a component is displayed, you might need to turn that off when server rendering. However, the `railsContext` will tell you if your JavaScript code is running client side or server side. So code that required a different server bundle previously may no longer require this!
+ 
+If you do want different code to run, you'd setup a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverHelloWorldApp.jsx'. Note, you might be initializing HelloWorld with version specialized for server rendering.
 
 ## ReactOnRails View Helpers API
 Once the bundled files have been generated in your `app/assets/webpack` folder and you have exposed your components globally, you will want to run your code in your Rails views using the included helper method.

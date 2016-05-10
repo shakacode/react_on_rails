@@ -45,7 +45,7 @@ Detected are the following stale generated files:
 #{stale_files.join("\n")}
 
 React on Rails will ensure your JavaScript generated files are up to date, using your
-client level package.json `build:test` command.
+/client level package.json `build:test` command.
 
         MSG
       end
