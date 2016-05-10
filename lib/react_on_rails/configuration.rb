@@ -58,7 +58,8 @@ module ReactOnRails
       rendering_extension: nil,
       server_render_method: "",
       symlink_non_digested_assets_regex: /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg)/,
-      npm_build_test_command: ""
+      npm_build_test_command: "",
+      npm_build_production_command: ""
     )
   end
 
@@ -69,6 +70,7 @@ module ReactOnRails
                   :server_renderer_timeout, :raise_on_prerender_error,
                   :skip_display_none, :generated_assets_dirs, :generated_assets_dir,
                   :webpack_generated_files, :rendering_extension, :npm_build_test_command,
+                  :npm_build_production_command,
                   :server_render_method, :symlink_non_digested_assets_regex
 
     def initialize(server_bundle_js_file: nil, prerender: nil, replay_console: nil,
@@ -78,11 +80,13 @@ module ReactOnRails
                    skip_display_none: nil, generated_assets_dirs: nil,
                    generated_assets_dir: nil, webpack_generated_files: nil,
                    rendering_extension: nil, npm_build_test_command: nil,
+                   npm_build_production_command: nil,
                    server_render_method: nil, symlink_non_digested_assets_regex: nil)
       self.server_bundle_js_file = server_bundle_js_file
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir
       self.npm_build_test_command = npm_build_test_command
+      self.npm_build_production_command = npm_build_production_command
 
       self.prerender = prerender
       self.replay_console = replay_console

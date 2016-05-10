@@ -4,6 +4,7 @@
 # 1. The white spacing in this file matters!
 # 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 require "react_on_rails/prerender_error"
+require "addressable/uri"
 
 module ReactOnRailsHelper
   # The env_javascript_include_tag and env_stylesheet_link_tag support the usage of a webpack
@@ -270,7 +271,8 @@ module ReactOnRailsHelper
     # On server `location` option is added (`location = request.fullpath`)
     # React Router needs this to match the current route
 
-    # Make sure that we use up-to-date webpack-bundle
+    # Make sure that we use up-to-date bundle file used for server rendering, which is defined
+    # by config file value for config.server_bundle_js_file
     ReactOnRails::ServerRenderingPool.reset_pool_if_server_bundle_was_modified
 
     # Since this code is not inserted on a web page, we don't need to escape props
