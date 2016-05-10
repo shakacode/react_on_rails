@@ -274,12 +274,24 @@ module ReactOnRailsHelper
     ReactOnRails::ServerRenderingPool.reset_pool_if_server_bundle_was_modified
 
     # Since this code is not inserted on a web page, we don't need to escape props
+    #
+    # However, as JSON (returned from `props_string(props)`) isn't JavaScript,
+    # but we want treat it as such, we need to compensate for the difference.
+    #
+    # \u2028 and \u2029 are valid characters in strings in JSON, but are treated
+    # as newline separators in JavaScript. As no newlines are allowed in
+    # strings in JavaScript, this causes an exception.
+    #
+    # We fix this by replacing these unicode characters with their escaped versions.
+    # This should be safe, as the only place they can appear is in strings anyway.
+    #
+    # Read more here: http://timelessrepo.com/json-isnt-a-javascript-subset
 
     wrapper_js = <<-JS
 (function() {
   var railsContext = #{rails_context(server_side: true).to_json};
 #{initialize_redux_stores}
-  var props = #{props_string(props)};
+  var props = #{props_string(props).gsub("\u2028", '\u2028').gsub("\u2029", '\u2029')};
   return ReactOnRails.serverRenderReactComponent({
     name: '#{react_component_name}',
     domNodeId: '#{dom_id}',
