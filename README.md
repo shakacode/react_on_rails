@@ -3,7 +3,7 @@
 # NEWS
 * 2016-05-11: 6.0.0-rc.1 Released! Simplified generator and install process! See the [CHANGELOG.md](./CHANGELOG.md) for details.
 * [New slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
-* 2016-02-28: We added a [Projects page](./PROJECTS.md) and a [Kudos page](./KUDOS.md). Please edit the page and add your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors.
+* 2016-02-28: We added a [Projects page](./PROJECTS.md) and a [Kudos page](./KUDOS.md). Please edit the page and add your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors. Also, see [Positive Feedback](https://github.com/shakacode/react_on_rails/issues/347) for screen grabs of nice comments!
 * *See [NEWS.md](NEWS.md) for more notes over time.*
 
 # NOTES
@@ -11,14 +11,14 @@
 * [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for "React on Rails". [Click here](http://www.shakacode.com/work/index.html) for more information.
 * Be sure to read our article [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724) and see [slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
 * [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial) along with the live example at [www.reactrails.com](http://www.reactrails.com).
-* [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours!
+* See [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours!
 * On Twitter, follow [@railsonmaui](https://twitter.com/railsonmaui) and [@shakacode](https://twitter.com/shakacode) for updates on releases.
 
 # React on Rails
 
 **Project Objective**: To provide an opinionated and optimal framework for integrating **Ruby on Rails** with modern JavaScript tooling and libraries, including [**Webpack**](http://webpack.github.io/), [**Babel**](https://babeljs.io/), [**React**](https://facebook.github.io/react/), [**Redux**](https://github.com/reactjs/redux), [**React-Router**](https://github.com/reactjs/react-router). This differs significantly from typical Rails. When considering what goes into **react_on_rails**, we ask ourselves, is the functionality related to the intersection of using Rails and with modern JavaScript? If so, then the functionality belongs right here. In other cases, we're releasing separate npm packages or Ruby gems. If you are interested in implementing React using traditional Rails architecture, see [react-rails](https://github.com/reactjs/react-rails).
 
-React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x and greate is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering. See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
+React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x and greate is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering, using either **execJS** or a [Node.js server](https://github.com/shakacode/react_on_rails/blob/master/docs%2Fadditional-reading%2Fnode-server-rendering.md). See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
 
 ## Including your React Component in your Rails Views
 Please see [Getting Started](#getting-started) for how to set up your Rails project for React on Rails to understand how `react_on_rails` can see your ReactComponents.
@@ -72,8 +72,6 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
     - [ReactOnRails JavaScript API](#reactonrails-javascript-api)
     - [React-Router](#react-router)
     - [Deployment](#deployment)
-+ [Adding Additional Routes for the Dev Server](#adding-additional-routes-for-the-dev-server)
-+ [Migrate From react-rails](#migrate-from-react-rails)
 + [Additional Reading](#additional-reading)
 + [Contributing](#contributing)
 + [License](#license)
@@ -402,6 +400,9 @@ Components are created as [stateless function(al) components](https://facebook.g
 
 *Note:* You will not be doing any partial updates to the Redux store when loading a new page. When the page content loads, React on Rails will rehydrate a new version of the store with whatever props are placed on the page.
 
+## ReactOnRails JavaScript API
+See [ReactOnRails JavaScriptAPI](docs/api/javascript-api.md).
+
 ## React Router
 [React Router](https://github.com/reactjs/react-router) is supported, including server side rendering! See:
 
@@ -420,6 +421,7 @@ Components are created as [stateless function(al) components](https://facebook.g
 + [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v4032)
 + [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 + [Installation Overview](docs/basics/installation-overview.md)
++ [Migration from react-rails](docs/basics/migrating-from-react-rails.md)
 + [Babel](docs/additional-reading/babel.md)
 + [Heroku Deployment](docs/additional-reading/heroku-deployment.md)
 + [Manual Installation](docs/additional-reading/manual-installation.md)
@@ -467,8 +469,7 @@ The origins of the project began with the need to do a rich JavaScript interface
 
 The gem project started with [Justin Gordon](https://github.com/justin808/) pairing with [Samnang Chhun](https://github.com/samnang) to figure out how to do server rendering with Webpack plus Rails. [Alex Fedoseev](https://github.com/alexfedoseev) then joined in. [Rob Wise](https://github.com/robwise), [Aaron Van Bokhoven](https://github.com/aaronvb), and [Andy Wang](https://github.com/yorzi) did the bulk of the generators. Many others have [contributed](https://github.com/shakacode/react_on_rails/graphs/contributors).
 
-We owe much gratitude to the work of the [react-rails gem](https://github.com/reactjs/react-rails). We've also been inspired by the [react_webpack_rails gem](https://github.com/netguru/react_webpack_rails).
-
+We owe much gratitude to the work of the [react-rails gem](https://github.com/reactjs/react-rails).
 
 ## About [ShakaCode](http://www.shakacode.com/)
 
