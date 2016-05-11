@@ -2,12 +2,13 @@
 All notable changes to this project will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version.
 
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
-
 ## [Unreleased]
+
+## [6.0.0-rc1]
 ##### Breaking Changes
 - Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own assets.rake file that does the precompilation. 
-  [#398](https://github.com/shakacode/react_on_rails/pull/398).
-- Migration: you can either
+  [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808).
+- **Migration to v6: you can either:**
   
   1. Specify a `config/react_on_rails` setting for `npm_build_production_command` to be nil to turn this feature off.
   2. Specify the script command you want to run to build your production assets, and remove your assets.rake file.
@@ -20,25 +21,25 @@ Here is the addition to the generated config file:
 ```
 
 ##### Fixed
-- Fixed errors when server rendered props contain \u2028 or \u2029 characters [#375](https://github.com/shakacode/react_on_rails/pull/375) by [mariusandra]
+- Fixed errors when server rendered props contain \u2028 or \u2029 characters [#375](https://github.com/shakacode/react_on_rails/pull/375) by [mariusandra](https://github.com/mariusandra)
 
 ##### Added
-- Non-digested version of assets in public folder [#413](https://github.com/shakacode/react_on_rails/pull/413) by [alleycat-at-git](https://github.com/alleycat-at-git)
-- Cache client/node_modules directory to prevent Heroku from reinstalling all modules from scratch [#324](https://github.com/shakacode/react_on_rails/pull/324) by [modosc](https://github.com/modosc)
+- Experimental ability to use node.js process for server rendering. See [#380](https://github.com/shakacode/react_on_rails/pull/380) by [alleycat-at-git](https://github.com/alleycat-at-git).
+- Non-digested version of assets in public folder [#413](https://github.com/shakacode/react_on_rails/pull/413) by [alleycat-at-git](https://github.com/alleycat-at-git).
+- Cache client/node_modules directory to prevent Heroku from reinstalling all modules from scratch [#324](https://github.com/shakacode/react_on_rails/pull/324) by [modosc](https://github.com/modosc).
+- ReactOnRails.reactOnRailsPageLoaded() is exposed in case one needs to call this manually and information on async script loading added. See [#315](https://github.com/shakacode/react_on_rails/pull/315) by [SqueezedLight](https://github.com/SqueezedLight).
 
 ##### Changed
-- [#398](https://github.com/shakacode/react_on_rails/pull/398) by Rob, Blaine, and Justin has:
+- [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808) contains:
   - Only one webpack config is generated for server and client config. Package.json files were changed to reflect this.
   - Added npm_build_test_command to allow developers to change what npm command is automatically run from rspec.
+- Replace URI with Addressable gem. See [#405](https://github.com/shakacode/react_on_rails/pull/405) by [lucke84](https://github.com/lucke84)
 
 ##### Removed
-- [#398](https://github.com/shakacode/react_on_rails/pull/398) by Rob, Blaine, and Justin has:
+- [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808) contains:
   - Server rendering is no longer an option in the generator and is always accessible.
   - Removed lodash, jquery, and loggerMiddleware from the generated code.
   - Removed webpack watch check for test helper automatic compilation.
-
-##### Changed
-- Replace URI with Addressable gem. See [#405](https://github.com/shakacode/react_on_rails/pull/405) by [lucke84]
 
 ## [5.2.0] - 2016-04-08
 ##### Added
@@ -316,7 +317,9 @@ Best done with Object destructing:
 
 ##### Fixed
 - Fix several generator related issues.
+
 [Unreleased]: https://github.com/shakacode/react_on_rails/compare/5.2.0...master
+[6.0.0-rc.1]: https://github.com/shakacode/react_on_rails/compare/5.2.0...6.0.0-rc.1
 [5.2.0]: https://github.com/shakacode/react_on_rails/compare/5.1.1...5.2.0
 [5.1.1]: https://github.com/shakacode/react_on_rails/compare/5.1.0...5.1.1
 [5.1.0]: https://github.com/shakacode/react_on_rails/compare/5.0.0...5.1.0
