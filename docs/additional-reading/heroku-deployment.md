@@ -7,6 +7,17 @@ The generator has created the necessary files and gems for deployment to Heroku.
 + `config/puma.rb`: Puma webserver config file
 + `lib/tasks/assets.rake`: This rake task file is provided by the generator regardless of whether the user chose Heroku Deployment as an option. It is highlighted here because it is helpful to understand that this task is what generates your JavaScript bundles in production.
 
+
+By default Heroku will cache the root `node_modules` directory between deploys but since we're installing in `client/node_modules` you'll need to add the following line to the `package.json` in your root directory (otherwise you'll have to sit through a full `npm install` on each deploy):
+
+```js
+"cacheDirectories": [
+  "node_modules",
+  "client/node_modules"
+],
+
+```
+
 ## How to Deploy
 
 React on Rails requires both a ruby environment (for Rails) and a Node environment (for Webpack), so you will need to have Heroku use multiple buildpacks.

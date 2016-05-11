@@ -23,16 +23,22 @@ Here is the addition to the generated config file:
 - Fixed errors when server rendered props contain \u2028 or \u2029 characters [#375](https://github.com/shakacode/react_on_rails/pull/375) by [mariusandra]
 
 ##### Added
-- Non-digested version of assets in public folder [#413](https://github.com/shakacode/react_on_rails/pull/413) by [alleycat-at-git]
+- Non-digested version of assets in public folder [#413](https://github.com/shakacode/react_on_rails/pull/413) by [alleycat-at-git](https://github.com/alleycat-at-git)
+- Cache client/node_modules directory to prevent Heroku from reinstalling all modules from scratch [#324](https://github.com/shakacode/react_on_rails/pull/324) by [modosc](https://github.com/modosc)
 
 ##### Changed
-- Only one webpack config is generated for server and client config. Package.json files were changed to reflect this [#398](https://github.com/shakacode/react_on_rails/pull/398).
-- Added npm_build_test_command to allow developers to change what npm command is automatically run from rspec [#398](https://github.com/shakacode/react_on_rails/pull/398).
-- Replace URI with Addressable gem. See [#405](https://github.com/shakacode/react_on_rails/pull/405) by [lucke84]
+- [#398](https://github.com/shakacode/react_on_rails/pull/398) by Rob, Blaine, and Justin has:
+  - Only one webpack config is generated for server and client config. Package.json files were changed to reflect this.
+  - Added npm_build_test_command to allow developers to change what npm command is automatically run from rspec.
 
 ##### Removed
-- Server rendering is no longer an option in the generator and is always accessible [#398](https://github.com/shakacode/react_on_rails/pull/398).
-- removed lodash, jquery, and loggerMiddleware from the generated code [#398](https://github.com/shakacode/react_on_rails/pull/398).
+- [#398](https://github.com/shakacode/react_on_rails/pull/398) by Rob, Blaine, and Justin has:
+  - Server rendering is no longer an option in the generator and is always accessible.
+  - Removed lodash, jquery, and loggerMiddleware from the generated code.
+  - Removed webpack watch check for test helper automatic compilation.
+
+##### Changed
+- Replace URI with Addressable gem. See [#405](https://github.com/shakacode/react_on_rails/pull/405) by [lucke84]
 
 ## [5.2.0] - 2016-04-08
 ##### Added
