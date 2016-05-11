@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails)  [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
 # NEWS
-* 2016-04-08: 5.2.0 Released! Support for React 15.0 and updates to the Generator. See the [CHANGELOG.md](./CHANGELOG.md) for details.
+* 2016-05-11: 6.0.0-rc.1 Released! Simplified generator and install process! See the [CHANGELOG.md](./CHANGELOG.md) for details.
 * [New slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
 * 2016-02-28: We added a [Projects page](./PROJECTS.md) and a [Kudos page](./KUDOS.md). Please edit the page and add your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors.
 * *See [NEWS.md](NEWS.md) for more notes over time.*
@@ -18,7 +18,7 @@
 
 **Project Objective**: To provide an opinionated and optimal framework for integrating **Ruby on Rails** with modern JavaScript tooling and libraries, including [**Webpack**](http://webpack.github.io/), [**Babel**](https://babeljs.io/), [**React**](https://facebook.github.io/react/), [**Redux**](https://github.com/reactjs/redux), [**React-Router**](https://github.com/reactjs/react-router). This differs significantly from typical Rails. When considering what goes into **react_on_rails**, we ask ourselves, is the functionality related to the intersection of using Rails and with modern JavaScript? If so, then the functionality belongs right here. In other cases, we're releasing separate npm packages or Ruby gems. If you are interested in implementing React using traditional Rails architecture, see [react-rails](https://github.com/reactjs/react-rails).
 
-React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering. See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
+React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x and greate is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering. See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
 
 ## Including your React Component in your Rails Views
 Please see [Getting Started](#getting-started) for how to set up your Rails project for React on Rails to understand how `react_on_rails` can see your ReactComponents.
@@ -71,6 +71,7 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
     - [ReactOnRails View Helpers API](#reactonrails-view-helpers-api)
     - [ReactOnRails JavaScript API](#reactonrails-javascript-api)
     - [React-Router](#react-router)
+    - [Deployment](#deployment)
 + [Adding Additional Routes for the Dev Server](#adding-additional-routes-for-the-dev-server)
 + [Migrate From react-rails](#migrate-from-react-rails)
 + [Additional Reading](#additional-reading)
@@ -406,6 +407,11 @@ Components are created as [stateless function(al) components](https://facebook.g
 
 1. [React on Rails docs for react-router](docs/additional-reading/react-router.md)
 1. Examples in [spec/dummy/app/views/react_router](spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](spec/dummy/client/app/startup/ServerRouterApp.jsx).
+
+## Deployment
+* Version 6.0 puts the necessary precompile steps automatically in the rake precompile step. You can, however, disable this by setting certain values to nil in the [config/react_on_rails.rb](config/react_on_rails.rb).
+* See the [Heroku Deployment](docs/additional-reading/heroku-deployment.md) doc for specifics regarding Heroku.
+* If you're using the node server for server rendering, you may want to do your own AWS install. We'll have more docs on this in the future.
 
 ## Additional Reading
 + [JavaScript API](docs/api/javascript-api.md)

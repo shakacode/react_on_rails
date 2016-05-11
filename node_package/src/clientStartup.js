@@ -95,7 +95,7 @@ function parseRailsContext() {
   }
 }
 
-function reactOnRailsPageLoaded() {
+export function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded');
 
   const railsContext = parseRailsContext();
@@ -114,7 +114,7 @@ function reactOnRailsPageUnloaded() {
   forEachComponent(unmount);
 }
 
-export default function clientStartup(context) {
+export function clientStartup(context) {
   const document = context.document;
 
   // Check if server rendering
