@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
 
-## [6.0.0-rc1]
+## [6.0.0-rc.1]
 ##### Breaking Changes
 - Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own assets.rake file that does the precompilation. 
   [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808).
@@ -12,6 +12,8 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
   
   1. Specify a `config/react_on_rails` setting for `npm_build_production_command` to be nil to turn this feature off.
   2. Specify the script command you want to run to build your production assets, and remove your assets.rake file.
+   
+- See [shakacode/react-webpack-rails-tutorial #287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287/files) for an upgrade example. The PR has a few comments on the upgrade.
 
 Here is the addition to the generated config file:
 ```ruby
