@@ -2,7 +2,6 @@
 // all your dump component names with Widget.
 
 import React, { PropTypes } from 'react';
-import _ from 'lodash';
 
 // Simple example of a React "dumb" component
 export default class HelloWorldWidget extends React.Component {
@@ -12,15 +11,6 @@ export default class HelloWorldWidget extends React.Component {
     updateName: PropTypes.func.isRequired,
     name: PropTypes.string.isRequired,
   };
-
-  constructor(props, context) {
-    super(props, context);
-
-    // Uses lodash to bind all methods to the context of the object instance, otherwise
-    // the methods defined here would not refer to the component's class, not the component
-    // instance itself.
-    _.bindAll(this, 'handleChange');
-  }
 
   // React will automatically provide us with the event `e`
   handleChange(e) {
@@ -43,7 +33,7 @@ export default class HelloWorldWidget extends React.Component {
           <input
             type="text"
             value={name}
-            onChange={this.handleChange}
+            onChange={e => this.handleChange(e)}
           />
         </form>
       </div>

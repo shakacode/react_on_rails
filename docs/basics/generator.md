@@ -14,7 +14,6 @@ Usage:
 
 Options:
   -R, [--redux], [--no-redux]                          # Install Redux gems and Redux version of Hello World Example
-  -S, [--server-rendering], [--no-server-rendering]    # Add necessary files and configurations for server-side rendering
 
 Runtime options:
   -f, [--force]                    # Overwrite files that already exist
@@ -33,7 +32,7 @@ The generated client code follows our organization scheme. Each unique set of fu
 
 Inside of the generated "HelloWorld" domain you will find the following folders:
 
-+  `startup`: two types of files, one that return a container component and implement any code that differs between client and server code (if using server-rendering), and a `clientRegistration` file that exposes the aforementioned files (as well as a `serverRegistration` file if using server rendering). These registration files are what webpack is using as an entry point.
++  `startup`: This contains the entry point files for webpack. It defaults to a single file that is used for server and client compilation, but if these need to be different, then you can create two webpack configurations with separate endpoints.
 + `containers`: "smart components" (components that have functionality and logic that is passed to child "dumb components").
 + `components`: includes "dumb components", or components that simply render their properties and call functions given to them as properties by a parent component. Ultimately, at least one of these dumb components will have a parent container component.
 

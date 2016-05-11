@@ -2,7 +2,23 @@
 All notable changes to this project will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version.
 
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
+
 ## [Unreleased]
+##### Breaking Changes
+- Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own assets.rake file that does the precompilation. 
+  [#398](https://github.com/shakacode/react_on_rails/pull/398).
+- Migration: you can either
+  
+  1. Specify a `config/react_on_rails` setting for `npm_build_production_command` to be nil to turn this feature off.
+  2. Specify the script command you want to run to build your production assets, and remove your assets.rake file.
+
+Here is the addition to the generated config file:
+```ruby
+  # This configures the script to run to build the production assets by webpack. Set this to nil
+  # if you don't want react_on_rails building this file for you.
+  config.npm_build_production_command = "npm run build:production"
+```
+
 ##### Fixed
 - Fixed errors when server rendered props contain \u2028 or \u2029 characters [#375](https://github.com/shakacode/react_on_rails/pull/375) by [mariusandra]
 
@@ -10,7 +26,13 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 - Non-digested version of assets in public folder [#413](https://github.com/shakacode/react_on_rails/pull/413) by [alleycat-at-git]
 
 ##### Changed
+- Only one webpack config is generated for server and client config. Package.json files were changed to reflect this [#398](https://github.com/shakacode/react_on_rails/pull/398).
+- Added npm_build_test_command to allow developers to change what npm command is automatically run from rspec [#398](https://github.com/shakacode/react_on_rails/pull/398).
 - Replace URI with Addressable gem. See [#405](https://github.com/shakacode/react_on_rails/pull/405) by [lucke84]
+
+##### Removed
+- Server rendering is no longer an option in the generator and is always accessible [#398](https://github.com/shakacode/react_on_rails/pull/398).
+- removed lodash, jquery, and loggerMiddleware from the generated code [#398](https://github.com/shakacode/react_on_rails/pull/398).
 
 ## [5.2.0] - 2016-04-08
 ##### Added
