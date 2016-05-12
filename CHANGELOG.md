@@ -8,10 +8,13 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ##### Breaking Changes
 - Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own assets.rake file that does the precompilation. 
   [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808).
-- **Migration to v6: you can either:**
+- **Migration to v6**
   
-  1. Specify a `config/react_on_rails` setting for `npm_build_production_command` to be nil to turn this feature off.
-  2. Specify the script command you want to run to build your production assets, and remove your assets.rake file.
+  - To configure the asset compliation you can either
+    1. Specify a `config/react_on_rails` setting for `npm_build_production_command` to be nil to turn this feature off.
+    2. Specify the script command you want to run to build your production assets, and remove your assets.rake file.
+
+  - If you are using the ReactOnRails test helper, then you will need to add the 'config.npm_build_test_command' to your config to tell react_on_rails what command to run when you run rspec.
    
 - See [shakacode/react-webpack-rails-tutorial #287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287/files) for an upgrade example. The PR has a few comments on the upgrade.
 
@@ -20,6 +23,11 @@ Here is the addition to the generated config file:
   # This configures the script to run to build the production assets by webpack. Set this to nil
   # if you don't want react_on_rails building this file for you.
   config.npm_build_production_command = "npm run build:production"
+
+  # If you are using the ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  # with rspec then this controls what npm command is run
+  # to automatically refresh your webpack assets on every test run.
+  config.npm_build_test_command = "npm run build:test"
 ```
 
 ##### Fixed
