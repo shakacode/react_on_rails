@@ -113,25 +113,30 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
   rails generate react_on_rails:install --help
   ```
 
-2. Run the generator with a simple "Hello World" example (more options below):
+3. Run the generator with a simple "Hello World" example (more options below):
 
   ```bash
   rails generate react_on_rails:install
   ```
 
-3. NPM install. Make sure you are on a recent version of node. Please use at least Node v5.
+4. NPM install. Make sure you are on a recent version of node. Please use at least Node v5.
 
   ```bash
   npm install
   ```
+5. After running the generator, you will want to:
+  
+  ```bash
+  bundle && npm i
+  ```
 
-4. Start your Rails server:
+6. Start your Rails server:
 
   ```bash
   foreman start -f Procfile.dev
   ```
 
-5. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world)
+7. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world)
 
 ### Installation Summary
 
