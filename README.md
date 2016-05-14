@@ -101,37 +101,39 @@ Universal React with Rails: Part I](https://medium.com/@alexfedoseev/isomorphic-
 We're definitely not doing that. With react_on_rails, webpack is mainly generating a nice JavaScript file for inclusion into `application.js`. We're going to KISS. And that's all relative given how much there is to get right in an enterprise class web application.
 
 ## Getting Started
-1. Add the following to your Gemfile and bundle install:
+1. Add the following to your Gemfile and bundle install.
 
   ```ruby
   gem "react_on_rails", "~> 5"
   ```
 
-2. See help for the generator:
+2. Commit this to git (you cannot run the generator unless you do this).
+
+3. See help for the generator:
 
   ```bash
   rails generate react_on_rails:install --help
   ```
 
-2. Run the generator with a simple "Hello World" example (more options below):
+4. Run the generator with a simple "Hello World" example (more options below):
 
   ```bash
   rails generate react_on_rails:install
   ```
 
-3. NPM install. Make sure you are on a recent version of node. Please use at least Node v5.
+5. NPM install. Make sure you are on a recent version of node. Please use at least Node v5.
 
   ```bash
   npm install
   ```
 
-4. Start your Rails server:
+6. Start your Rails server:
 
   ```bash
   foreman start -f Procfile.dev
   ```
 
-5. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world)
+7. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world)
 
 ### Installation Summary
 
