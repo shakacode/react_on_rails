@@ -85,14 +85,6 @@ module ReactOnRails
         append_to_file("Gemfile", "\ngem 'therubyracer', platforms: :ruby\n")
       end
 
-      def install_node_files
-        base_path = "base/base/"
-        %w(client/node/package.json
-           client/node/server.js).each do |file|
-          copy_file(base_path + file, file)
-        end
-      end
-
       ASSETS_RB_APPEND = <<-DATA.strip_heredoc
 # Add client/assets/ folders to asset pipeline's search path.
 # If you do not want to move existing images and fonts from your Rails app
