@@ -122,10 +122,10 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
   rails generate react_on_rails:install
   ```
 
-5. NPM install. Make sure you are on a recent version of node. Please use at least Node v5.
+5. Bundle and NPM install. Make sure you are on a recent version of node. Please use at least Node v5. Bundle is for adding execJs. You can remove that if you are sure you will not server render.
 
   ```bash
-  npm install
+  bundle && npm install
   ```
 
 6. Start your Rails server:
