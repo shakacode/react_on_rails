@@ -566,7 +566,7 @@ config.server_render_method = "NodeJS"
 ## Dependencies
 + Ruby 2.1 or greater
 + Rails 3.2 or greater
-+ Node 5.5 or great
++ Node 5.5 or greater
 
 ## Contributing
 Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant Code of Conduct](docs/code_of_conduct.md)).
