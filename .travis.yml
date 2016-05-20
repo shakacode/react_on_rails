@@ -23,7 +23,7 @@ before_install:
 
 install:
   - rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install 5.10.0
-  - npm install -g npm@3.8.9
+  - npm install -g npm
   - npm install -g poltergeist
   - gem install bundler
   - bundle install
