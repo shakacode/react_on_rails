@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
 
-## [6.0.0-rc.1]
+## [6.0.0-rc.5]
 ##### Breaking Changes
 - Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own assets.rake file that does the precompilation. 
   [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808).
@@ -32,6 +32,7 @@ Here is the addition to the generated config file:
 
 ##### Fixed
 - Fixed errors when server rendered props contain \u2028 or \u2029 characters [#375](https://github.com/shakacode/react_on_rails/pull/375) by [mariusandra](https://github.com/mariusandra)
+- Fixed "too early unmount" which caused problems with Turbolinks 5 not updating the screen [#425](https://github.com/shakacode/react_on_rails/pull/425) by [szyablitsky](https://github.com/szyablitsky)
 
 ##### Added
 - Experimental ability to use node.js process for server rendering. See [#380](https://github.com/shakacode/react_on_rails/pull/380) by [alleycat-at-git](https://github.com/alleycat-at-git).
@@ -329,7 +330,7 @@ Best done with Object destructing:
 - Fix several generator related issues.
 
 [Unreleased]: https://github.com/shakacode/react_on_rails/compare/5.2.0...master
-[6.0.0-rc.1]: https://github.com/shakacode/react_on_rails/compare/5.2.0...6.0.0-rc.1
+[6.0.0-rc.5]: https://github.com/shakacode/react_on_rails/compare/5.2.0...6.0.0-rc.5
 [5.2.0]: https://github.com/shakacode/react_on_rails/compare/5.1.1...5.2.0
 [5.1.1]: https://github.com/shakacode/react_on_rails/compare/5.1.0...5.1.1
 [5.1.0]: https://github.com/shakacode/react_on_rails/compare/5.0.0...5.1.0
