@@ -44,8 +44,6 @@ module ReactOnRails
     # Typical usage passes all params as nil defaults.
     # webpack_assets_status_checker: provide: `up_to_date?`, `whats_not_up_to_date`, `client_dir`
     #                         defaults to ReactOnRails::TestHelper::WebpackAssetsStatusChecker
-    # webpack_process_checker: provide one method: `def running?`
-    #                         defaults to ReactOnRails::TestHelper::WebpackProcessChecker
     # webpack_assets_compiler: provide one method: `def compile`
     #                         defaults to ReactOnRails::TestHelper::WebpackAssetsCompiler
     # client_dir and generated_assets_dir are passed into the default webpack_assets_status_checker if you
@@ -54,7 +52,6 @@ module ReactOnRails
     #                        webpack_generated_files in your configuration
     def self.ensure_assets_compiled(webpack_assets_status_checker: nil,
                                     webpack_assets_compiler: nil,
-                                    webpack_process_checker: nil,
                                     client_dir: nil,
                                     generated_assets_dir: nil,
                                     webpack_generated_files: nil)
@@ -67,8 +64,7 @@ module ReactOnRails
         webpack_assets_status_checker ||=
           WebpackAssetsStatusChecker.new(client_dir: client_dir,
                                          generated_assets_dir: generated_assets_dir,
-                                         webpack_generated_files: webpack_generated_files
-                                        )
+                                         webpack_generated_files: webpack_generated_files)
 
         unless @printed_once
           puts
@@ -80,12 +76,10 @@ module ReactOnRails
       end
 
       webpack_assets_compiler ||= WebpackAssetsCompiler.new
-      webpack_process_checker ||= WebpackProcessChecker.new
 
       ReactOnRails::TestHelper::EnsureAssetsCompiled.new(
         webpack_assets_status_checker: webpack_assets_status_checker,
-        webpack_assets_compiler: webpack_assets_compiler,
-        webpack_process_checker: webpack_process_checker
+        webpack_assets_compiler: webpack_assets_compiler
       ).call
     end
   end

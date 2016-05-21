@@ -8,6 +8,12 @@ module ReactOnRails
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates/dev_tests", __FILE__))
 
+      # --example-server-rendering
+      class_option :example_server_rendering,
+                   type: :boolean,
+                   default: false,
+                   desc: "Setup prerender true for server rendered examples"
+
       def copy_rspec_files
         %w(spec/spec_helper.rb
            spec/rails_helper.rb
@@ -40,7 +46,7 @@ module ReactOnRails
   plugins: [
 TEXT
         sentinel = /^\s\s},\n\s\splugins: \[\n/
-        config = File.join(destination_root, "client", "webpack.client.base.config.js")
+        config = File.join(destination_root, "client", "webpack.config.js")
         old_contents = File.read(config)
         new_contents = old_contents.gsub(sentinel, text)
         File.open(config, "w+") { |f| f.puts new_contents }
@@ -52,6 +58,16 @@ TEXT
         gem("selenium-webdriver", group: :test)
         gem("coveralls", require: false)
         gem("poltergeist")
+      end
+
+      def gsub_prerender_if_server_rendering
+        return unless options.example_server_rendering
+        hello_world_index = File.join(destination_root, "app", "views", "hello_world", "index.html.erb")
+        hello_world_contents = File.read(hello_world_index)
+        new_hello_world_contents = hello_world_contents.gsub(/prerender: false/,
+                                                             "prerender: true")
+
+        File.open(hello_world_index, "w+") { |f| f.puts new_hello_world_contents }
       end
     end
   end
