@@ -9,6 +9,9 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 - Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own assets.rake file that does the precompilation. 
   [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808).
 - **Migration to v6**
+  - Do not run the generator again if you've already run it.
+
+  - See [shakacode/react-webpack-rails-tutorial/pull/287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287) for an    example of upgrading from v5.
   
   - To configure the asset compliation you can either
     1. Specify a `config/react_on_rails` setting for `npm_build_production_command` to be nil to turn this feature off.
