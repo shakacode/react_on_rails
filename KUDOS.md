@@ -12,3 +12,9 @@ See comments [here](https://lorefnon.me/2015/11/15/a-minimal-setup-for-using-es6
 https://twitter.com/ollieglass/status/713372606804729856
 
 ![2016-03-25_07-40-01](https://cloud.githubusercontent.com/assets/1118459/14053652/d05480f0-f276-11e5-9d9a-62d1146cd82d.png)
+
+![2016-05-11_01-17-57](https://cloud.githubusercontent.com/assets/1118459/15179255/47418adc-1716-11e6-975e-c659a7de54d7.png)
+
+![2016-05-11_00-54-57](https://cloud.githubusercontent.com/assets/1118459/15178739/1549ec2a-1713-11e6-961c-dc064186fc69.png)
+
+![2016-05-10_18-19-32](https://cloud.githubusercontent.com/assets/1118459/15170483/f00e344c-16e1-11e6-93f6-ded2637b227b.png)

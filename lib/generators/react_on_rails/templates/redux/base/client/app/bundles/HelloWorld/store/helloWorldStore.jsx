@@ -6,10 +6,6 @@ import { compose, createStore, applyMiddleware, combineReducers } from 'redux';
 // once your app has asynchronous actions.
 import thunkMiddleware from 'redux-thunk';
 
-// This provides an example of logging redux actions to the console.
-// You'd want to disable this for production.
-import loggerMiddleware from 'lib/middlewares/loggerMiddleware';
-
 import reducers from '../reducers';
 import { initialStates } from '../reducers';
 
@@ -27,7 +23,7 @@ export default props => {
 
   const reducer = combineReducers(reducers);
   const composedStore = compose(
-    applyMiddleware(thunkMiddleware, loggerMiddleware)
+    applyMiddleware(thunkMiddleware)
   );
   const storeCreator = composedStore(createStore);
   const store = storeCreator(reducer, initialState);

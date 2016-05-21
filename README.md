@@ -1,9 +1,9 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails)  [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
 # NEWS
-* 2016-04-08: 5.2.0 Released! Support for React 15.0 and updates to the Generator. See the [CHANGELOG.md](./CHANGELOG.md) for details.
+* 2016-05-11: 6.0.0-rc.1 Released! Simplified generator and install process! See the [CHANGELOG.md](./CHANGELOG.md) for details.
 * [New slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
-* 2016-02-28: We added a [Projects page](./PROJECTS.md) and a [Kudos page](./KUDOS.md). Please edit the page and add your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors.
+* 2016-02-28: We added a [Projects page](./PROJECTS.md) and a [Kudos page](./KUDOS.md). Please edit the page and add your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors. Also, see [Positive Feedback](https://github.com/shakacode/react_on_rails/issues/347) for screen grabs of nice comments!
 * *See [NEWS.md](NEWS.md) for more notes over time.*
 
 # NOTES
@@ -11,14 +11,14 @@
 * [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for "React on Rails". [Click here](http://www.shakacode.com/work/index.html) for more information.
 * Be sure to read our article [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724) and see [slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
 * [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial) along with the live example at [www.reactrails.com](http://www.reactrails.com).
-* [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours!
+* See [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours!
 * On Twitter, follow [@railsonmaui](https://twitter.com/railsonmaui) and [@shakacode](https://twitter.com/shakacode) for updates on releases.
 
 # React on Rails
 
 **Project Objective**: To provide an opinionated and optimal framework for integrating **Ruby on Rails** with modern JavaScript tooling and libraries, including [**Webpack**](http://webpack.github.io/), [**Babel**](https://babeljs.io/), [**React**](https://facebook.github.io/react/), [**Redux**](https://github.com/reactjs/redux), [**React-Router**](https://github.com/reactjs/react-router). This differs significantly from typical Rails. When considering what goes into **react_on_rails**, we ask ourselves, is the functionality related to the intersection of using Rails and with modern JavaScript? If so, then the functionality belongs right here. In other cases, we're releasing separate npm packages or Ruby gems. If you are interested in implementing React using traditional Rails architecture, see [react-rails](https://github.com/reactjs/react-rails).
 
-React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering. See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
+React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x and greater is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering, using either **execJS** or a [Node.js server](https://github.com/shakacode/react_on_rails/blob/master/docs%2Fadditional-reading%2Fnode-server-rendering.md). See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
 
 ## Including your React Component in your Rails Views
 Please see [Getting Started](#getting-started) for how to set up your Rails project for React on Rails to understand how `react_on_rails` can see your ReactComponents.
@@ -71,8 +71,8 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
     - [ReactOnRails View Helpers API](#reactonrails-view-helpers-api)
     - [ReactOnRails JavaScript API](#reactonrails-javascript-api)
     - [React-Router](#react-router)
-+ [Adding Additional Routes for the Dev Server](#adding-additional-routes-for-the-dev-server)
-+ [Migrate From react-rails](#migrate-from-react-rails)
+    - [Deployment](#deployment)
++ [Integration with Node](#integration-with-node)
 + [Additional Reading](#additional-reading)
 + [Contributing](#contributing)
 + [License](#license)
@@ -102,37 +102,39 @@ Universal React with Rails: Part I](https://medium.com/@alexfedoseev/isomorphic-
 We're definitely not doing that. With react_on_rails, webpack is mainly generating a nice JavaScript file for inclusion into `application.js`. We're going to KISS. And that's all relative given how much there is to get right in an enterprise class web application.
 
 ## Getting Started
-1. Add the following to your Gemfile and bundle install:
+1. Add the following to your Gemfile and bundle install.
 
   ```ruby
   gem "react_on_rails", "~> 5"
   ```
 
-2. See help for the generator:
+2. Commit this to git (you cannot run the generator unless you do this).
+
+3. See help for the generator:
 
   ```bash
   rails generate react_on_rails:install --help
   ```
 
-2. Run the generator with a simple "Hello World" example (more options below):
+4. Run the generator with a simple "Hello World" example (more options below):
 
   ```bash
   rails generate react_on_rails:install
   ```
 
-3. NPM install. Make sure you are on a recent version of node. Please use at least Node v5.
+5. Bundle and NPM install. Make sure you are on a recent version of node. Please use at least Node v5. Bundle is for adding execJs. You can remove that if you are sure you will not server render.
 
   ```bash
-  npm install
+  bundle && npm install
   ```
 
-4. Start your Rails server:
+6. Start your Rails server:
 
   ```bash
   foreman start -f Procfile.dev
   ```
 
-5. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world)
+7. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world)
 
 ### Installation Summary
 
@@ -160,8 +162,6 @@ Inside your Rails views, you can now use the `react_component` helper method pro
 In most cases, you should use the `prerender: false` (default behavior) with the provided helper method to render the React component from your Rails views. In some cases, such as when SEO is vital or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
 
 Now the server will interpret your JavaScript using [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. We recommend using [therubyracer](https://github.com/cowboyd/therubyracer) as ExecJS's runtime. The generator will automatically add it to your Gemfile for you.
-
-Note that **server-rendering requires globally exposing your components by setting them to `global`, not `window`** (as is the case with client-rendering). If using the generator, you can pass the `--server-rendering` option to configure your application for server-side rendering.
 
 In the following screenshot you can see the 3 parts of React on Rails rendering:
 
@@ -199,7 +199,9 @@ and for a store:
 reduxStore = MyReduxStore(props, railsContext);
 ```
 
-Note, you never make these calls. This is what React on Rails does when either server or client rendering.
+Note, you never make these calls. This is what React on Rails does when either server or client rendering. You'll be definining functions that take take these params and return a React component or a Redux Store. 
+
+(Note, see below [section](#multiple-react-components-on-a-page-with-one-store) on how to setup redux stores that allow multiple components to talk to the same store.)
 
 The `railsContext` has: (see implementation in file react_on_rails_helper.rb for method rails_context for the definitive list).
 
@@ -233,6 +235,9 @@ Suppose you want to display a nav bar with the current navigation link highlight
 ##### Needing the I18n.locale
 Suppose you want to server render your react components with localization applied given the current Rails locale. The `railsContext` contains the I18n.locale.
 
+##### Configuring different code for server side rendering
+Suppose you want to turn off animation when doing server side rendering. The `serverSide` value is just what you need.
+
 #### Customization of the rails_context
 You can customize the values passed in the `railsContext` in your `config/initializers/react_on_rails.rb`. Here's how.
 
@@ -265,28 +270,20 @@ In this case, a prop and value for `somethingUseful` will go into the railsConte
 ### Globally Exposing Your React Components
 Place your JavaScript code inside of the provided `client/app` folder. Use modules just as you would when using webpack alone. The difference here is that instead of mounting React components directly to an element using `React.render`, you **expose your components globally and then mount them with helpers inside of your Rails views**.
 
-+ *Normal Mode (JavaScript is Rendered on client):*
-
-  If you are not server rendering, `clientRegistration.jsx` will have
+This is an example of how to expose a component to the `react_component` view helper.
 
   ```javascript
-  import HelloWorld from '../components/HelloWorld';
-  import ReactOnRails from 'react-on-rails';
-  ReactOnRails.register({ HelloWorld });
-  ```
-+ *Server-Side Rendering:*
-
-  If you are server rendering, `serverRegistration.jsx` will have this. Note, you might be initializing HelloWorld with version specialized for server rendering.
-
-  ```javascript
+  // client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx
   import HelloWorld from '../components/HelloWorld';
   import ReactOnRails from 'react-on-rails';
   ReactOnRails.register({ HelloWorld });
   ```
 
-  In general, you may want different initialization for your server rendered components.
+#### Different Server-Side Rendering Code (and a Server Specific Bundle)
 
-See below section on how to setup redux stores that allow multiple components to talk to the same store.
+You may want different initialization for your server rendered components. For example, if you have animation that runs when a component is displayed, you might need to turn that off when server rendering. However, the `railsContext` will tell you if your JavaScript code is running client side or server side. So code that required a different server bundle previously may no longer require this!
+ 
+If you do want different code to run, you'd setup a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverHelloWorldApp.jsx'. Note, you might be initializing HelloWorld with version specialized for server rendering.
 
 ## ReactOnRails View Helpers API
 Once the bundled files have been generated in your `app/assets/webpack` folder and you have exposed your components globally, you will want to run your code in your Rails views using the included helper method.
@@ -406,11 +403,130 @@ Components are created as [stateless function(al) components](https://facebook.g
 
 *Note:* You will not be doing any partial updates to the Redux store when loading a new page. When the page content loads, React on Rails will rehydrate a new version of the store with whatever props are placed on the page.
 
+## ReactOnRails JavaScript API
+See [ReactOnRails JavaScriptAPI](docs/api/javascript-api.md).
+
 ## React Router
 [React Router](https://github.com/reactjs/react-router) is supported, including server side rendering! See:
 
 1. [React on Rails docs for react-router](docs/additional-reading/react-router.md)
 1. Examples in [spec/dummy/app/views/react_router](spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](spec/dummy/client/app/startup/ServerRouterApp.jsx).
+
+## Deployment
+* Version 6.0 puts the necessary precompile steps automatically in the rake precompile step. You can, however, disable this by setting certain values to nil in the [config/react_on_rails.rb](config/react_on_rails.rb).
+* See the [Heroku Deployment](docs/additional-reading/heroku-deployment.md) doc for specifics regarding Heroku.
+* If you're using the node server for server rendering, you may want to do your own AWS install. We'll have more docs on this in the future.
+
+## Integration with Node
+NodeJS can be used as the backend for server-side rendering instead of ExecJS. To do this you need to add a few files and then configure react_on_rails to use NodeJS. Here are the relevant files to add.
+
+```javascript
+// client/node/package.json
+{
+    "name": "react_on_rails_node",
+    "version": "0.0.0",
+    "private": true,
+    "scripts": {
+        "start": "node ./server.js -s webpack-bundle.js"
+    },
+    "dependencies": {
+    }
+}
+```
+
+```javascript
+// client/node/server.js
+var net = require('net');
+var fs = require('fs');
+
+var bundlePath = '../../app/assets/webpack/';
+var bundleFileName = 'webpack-bundle.js';
+
+var currentArg;
+
+function Handler() {
+  this.queue = [];
+  this.initialized = false;
+}
+
+Handler.prototype.handle = function (connection) {
+  var callback = function () {
+    connection.setEncoding('utf8');
+    connection.on('data', (data)=> {
+      console.log('Processing request: ' + data);
+      var result = eval(data);
+      connection.write(result);
+    });
+  };
+
+  if (this.initialized) {
+    callback();
+  } else {
+    this.queue.push(callback);
+  }
+};
+
+Handler.prototype.initialize = function () {
+  console.log('Processing ' + this.queue.length + ' pending requests');
+  var callback;
+  while (callback = this.queue.pop()) {
+    callback();
+  }
+
+  this.initialized = true;
+};
+
+var handler = new Handler();
+
+process.argv.forEach((val) => {
+  if (val[0] == '-') {
+    currentArg = val.slice(1);
+    return;
+  }
+
+  if (currentArg == 's') {
+    bundleFileName = val;
+  }
+});
+
+try {
+  fs.mkdirSync(bundlePath);
+} catch (e) {
+  if (e.code != 'EEXIST') throw e;
+}
+
+fs.watchFile(bundlePath + bundleFileName, (curr) => {
+  if (curr && curr.blocks && curr.blocks > 0) {
+    if (handler.initialized) {
+      console.log('Reloading server bundle must be implemented by restarting the node process!');
+      return;
+    }
+
+    require(bundlePath + bundleFileName);
+    console.log('Loaded server bundle: ' + bundlePath + bundleFileName);
+    handler.initialize();
+  }
+});
+
+var unixServer = net.createServer(function (connection) {
+  handler.handle(connection);
+});
+
+unixServer.listen('node.sock');
+
+process.on('SIGINT', () => {
+  unixServer.close();
+  process.exit();
+});
+
+```
+
+The last thing you'll need to do is change the server_render_method to "NodeJS".
+
+```ruby
+# app/config/initializers/react_on_rails.rb
+config.server_render_method = "NodeJS"
+```
 
 ## Additional Reading
 + [JavaScript API](docs/api/javascript-api.md)
@@ -419,6 +535,7 @@ Components are created as [stateless function(al) components](https://facebook.g
 + [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v4032)
 + [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 + [Installation Overview](docs/basics/installation-overview.md)
++ [Migration from react-rails](docs/basics/migrating-from-react-rails.md)
 + [Babel](docs/additional-reading/babel.md)
 + [Heroku Deployment](docs/additional-reading/heroku-deployment.md)
 + [Manual Installation](docs/additional-reading/manual-installation.md)
@@ -449,7 +566,7 @@ Components are created as [stateless function(al) components](https://facebook.g
 ## Dependencies
 + Ruby 2.1 or greater
 + Rails 3.2 or greater
-+ Node 5.5 or great
++ Node 5.5 or greater
 
 ## Contributing
 Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant Code of Conduct](docs/code_of_conduct.md)).
@@ -466,8 +583,7 @@ The origins of the project began with the need to do a rich JavaScript interface
 
 The gem project started with [Justin Gordon](https://github.com/justin808/) pairing with [Samnang Chhun](https://github.com/samnang) to figure out how to do server rendering with Webpack plus Rails. [Alex Fedoseev](https://github.com/alexfedoseev) then joined in. [Rob Wise](https://github.com/robwise), [Aaron Van Bokhoven](https://github.com/aaronvb), and [Andy Wang](https://github.com/yorzi) did the bulk of the generators. Many others have [contributed](https://github.com/shakacode/react_on_rails/graphs/contributors).
 
-We owe much gratitude to the work of the [react-rails gem](https://github.com/reactjs/react-rails). We've also been inspired by the [react_webpack_rails gem](https://github.com/netguru/react_webpack_rails).
-
+We owe much gratitude to the work of the [react-rails gem](https://github.com/reactjs/react-rails).
 
 ## About [ShakaCode](http://www.shakacode.com/)
 

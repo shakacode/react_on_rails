@@ -95,7 +95,7 @@ function parseRailsContext() {
   }
 }
 
-function reactOnRailsPageLoaded() {
+export function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded');
 
   const railsContext = parseRailsContext();
@@ -114,7 +114,7 @@ function reactOnRailsPageUnloaded() {
   forEachComponent(unmount);
 }
 
-export default function clientStartup(context) {
+export function clientStartup(context) {
   const document = context.document;
 
   // Check if server rendering
@@ -145,10 +145,10 @@ export default function clientStartup(context) {
     } else {
       if (turbolinksVersion5()) {
         debugTurbolinks(
-          'USING TURBOLINKS 5: document added event listeners turbolinks:before-cache and ' +
+          'USING TURBOLINKS 5: document added event listeners turbolinks:before-render and ' +
           'turbolinks:load.'
         );
-        document.addEventListener('turbolinks:before-cache', reactOnRailsPageUnloaded);
+        document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
         document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
       } else {
         debugTurbolinks(

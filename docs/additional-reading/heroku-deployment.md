@@ -7,6 +7,17 @@ The generator has created the necessary files and gems for deployment to Heroku.
 + `config/puma.rb`: Puma webserver config file
 + `lib/tasks/assets.rake`: This rake task file is provided by the generator regardless of whether the user chose Heroku Deployment as an option. It is highlighted here because it is helpful to understand that this task is what generates your JavaScript bundles in production.
 
+
+By default Heroku will cache the root `node_modules` directory between deploys but since we're installing in `client/node_modules` you'll need to add the following line to the `package.json` in your root directory (otherwise you'll have to sit through a full `npm install` on each deploy):
+
+```js
+"cacheDirectories": [
+  "node_modules",
+  "client/node_modules"
+],
+
+```
+
 ## How to Deploy
 
 React on Rails requires both a ruby environment (for Rails) and a Node environment (for Webpack), so you will need to have Heroku use multiple buildpacks.
@@ -64,36 +75,3 @@ bundle
 bin/rake db:migrate
 bin/rake db:setup
 ```
-
-#### 3. Create a rake file to add webpack compilation to asset precompilation. You may already have this file if you used the React on Rails generator.
-
-```ruby
-# lib/tasks/assets.rake
-# The webpack task must run before assets:environment task.
-# Otherwise Sprockets cannot find the files that webpack produces.
-# This is the secret sauce for how a Heroku deployment knows to create the webpack generated JavaScript files.
-Rake::Task["assets:precompile"]
-  .clear_prerequisites
-  .enhance(["assets:compile_environment"])
-
-namespace :assets do
-  # In this task, set prerequisites for the assets:precompile task
-  task compile_environment: :webpack do
-    Rake::Task["assets:environment"].invoke
-  end
-
-  desc "Compile assets with webpack"
-  task :webpack do
-    sh "cd client && npm run build:client"
-    # If you are doing server rendering
-    # sh "cd client && npm run build:server"
-  end
-
-  task :clobber do
-    rm_r Dir.glob(Rails.root.join("app/assets/webpack/*"))
-  end
-end
-```
-
-
-

@@ -3,12 +3,59 @@ All notable changes to this project will be documented in this file. Items under
 
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
+
+## [6.0.0-rc.5]
+##### Breaking Changes
+- Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own assets.rake file that does the precompilation. 
+  [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808).
+- **Migration to v6**
+  
+  - To configure the asset compliation you can either
+    1. Specify a `config/react_on_rails` setting for `npm_build_production_command` to be nil to turn this feature off.
+    2. Specify the script command you want to run to build your production assets, and remove your assets.rake file.
+
+  - If you are using the ReactOnRails test helper, then you will need to add the 'config.npm_build_test_command' to your config to tell react_on_rails what command to run when you run rspec.
+   
+- See [shakacode/react-webpack-rails-tutorial #287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287/files) for an upgrade example. The PR has a few comments on the upgrade.
+
+Here is the addition to the generated config file:
+```ruby
+  # This configures the script to run to build the production assets by webpack. Set this to nil
+  # if you don't want react_on_rails building this file for you.
+  config.npm_build_production_command = "npm run build:production"
+
+  # If you are using the ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  # with rspec then this controls what npm command is run
+  # to automatically refresh your webpack assets on every test run.
+  config.npm_build_test_command = "npm run build:test"
+```
+
+##### Fixed
+- Fixed errors when server rendered props contain \u2028 or \u2029 characters [#375](https://github.com/shakacode/react_on_rails/pull/375) by [mariusandra](https://github.com/mariusandra)
+- Fixed "too early unmount" which caused problems with Turbolinks 5 not updating the screen [#425](https://github.com/shakacode/react_on_rails/pull/425) by [szyablitsky](https://github.com/szyablitsky)
+
+##### Added
+- Experimental ability to use node.js process for server rendering. See [#380](https://github.com/shakacode/react_on_rails/pull/380) by [alleycat-at-git](https://github.com/alleycat-at-git).
+- Non-digested version of assets in public folder [#413](https://github.com/shakacode/react_on_rails/pull/413) by [alleycat-at-git](https://github.com/alleycat-at-git).
+- Cache client/node_modules directory to prevent Heroku from reinstalling all modules from scratch [#324](https://github.com/shakacode/react_on_rails/pull/324) by [modosc](https://github.com/modosc).
+- ReactOnRails.reactOnRailsPageLoaded() is exposed in case one needs to call this manually and information on async script loading added. See [#315](https://github.com/shakacode/react_on_rails/pull/315) by [SqueezedLight](https://github.com/SqueezedLight).
+
 ##### Changed
-- Replace URI with Addressable gem. See [#405](https://github.com/shakacode/react_on_rails/pull/405) by [lucke84]
+- [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808) contains:
+  - Only one webpack config is generated for server and client config. Package.json files were changed to reflect this.
+  - Added npm_build_test_command to allow developers to change what npm command is automatically run from rspec.
+- Replace URI with Addressable gem. See [#405](https://github.com/shakacode/react_on_rails/pull/405) by [lucke84](https://github.com/lucke84)
+
+##### Removed
+- [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808) contains:
+  - Server rendering is no longer an option in the generator and is always accessible.
+  - Removed lodash, jquery, and loggerMiddleware from the generated code.
+  - Removed webpack watch check for test helper automatic compilation.
 
 ## [5.2.0] - 2016-04-08
 ##### Added
 - Support for React 15.0 to react_on_rails. See [#379](https://github.com/shakacode/react_on_rails/pull/379) by [brucek](https://github.com/brucek).
+- Support for Node.js server side rendering. See [#380](https://github.com/shakacode/react_on_rails/pull/380) by [alleycat](https://github.com/alleycat-at-git) and [doc](https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/node-server-rendering.md)
 
 ##### Removed
 - Generator removals to simplify installer. See [#363](https://github.com/shakacode/react_on_rails/pull/363) by [jbhatab](https://github.com/jbhatab).
@@ -281,7 +328,9 @@ Best done with Object destructing:
 
 ##### Fixed
 - Fix several generator related issues.
+
 [Unreleased]: https://github.com/shakacode/react_on_rails/compare/5.2.0...master
+[6.0.0-rc.5]: https://github.com/shakacode/react_on_rails/compare/5.2.0...6.0.0-rc.5
 [5.2.0]: https://github.com/shakacode/react_on_rails/compare/5.1.1...5.2.0
 [5.1.1]: https://github.com/shakacode/react_on_rails/compare/5.1.0...5.1.1
 [5.1.0]: https://github.com/shakacode/react_on_rails/compare/5.0.0...5.1.0

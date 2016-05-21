@@ -1,5 +1,5 @@
 # ReactOnRails JavaScript API
-The best source of docs is the main [ReactOnRails.js](node_package/src/ReactOnRails.js) file. Here's a quick summary. No guarantees that this won't be outdated!
+The best source of docs is the main [ReactOnRails.js](../../node_package/src/ReactOnRails.js) file. Here's a quick summary. No guarantees that this won't be outdated!
 
 ```js
   /**
