@@ -24,8 +24,9 @@ namespace :react_on_rails do
     desc "Creates non-digested symlinks for the assets in the public asset dir"
     task symlink_non_digested_assets: :"assets:environment" do
       if ReactOnRails.configuration.symlink_non_digested_assets_regex
-        manifest_path = Dir.glob(ReactOnRails::assets_path.join(".sprockets-manifest-*.json"))
-                          .first
+        manifest_path = Dir.glob(ReactOnRails::assets_path
+                           .join(".sprockets-manifest-*.json"))
+                           .first
         manifest_data = JSON.load(File.new(manifest_path))
 
         manifest_data["assets"].each do |logical_path, digested_path|
@@ -51,7 +52,7 @@ namespace :react_on_rails do
             target = File.readlink(filename)
           rescue
             puts "React on Rails: Warning: your platform doesn't support File::readlink method."/
-                   "Skipping broken link check."
+                 "Skipping broken link check."
             return
           end
           path = Pathname.new(File.dirname(filename))
@@ -102,11 +103,12 @@ end
 # These tasks run as pre-requisites of assets:precompile.
 # Note, it's not possible to refer to ReactOnRails configuration values at this point.
 Rake::Task["assets:precompile"]
-  .clear_prerequisites
-  .enhance([:environment,
-            "react_on_rails:assets:compile_environment",
-            "react_on_rails:assets:symlink_non_digested_assets",
-            "react_on_rails:assets:delete_broken_symlinks"])
+    .clear_prerequisites
+    .enhance([:environment, "react_on_rails:assets:compile_environment"])
+    .enhance do
+      Rake::Task["react_on_rails:assets:symlink_non_digested_assets"].invoke
+      Rake::Task["react_on_rails:assets:delete_broken_symlinks"].invoke
+    end
 
 # puts "Enhancing assets:precompile with react_on_rails:assets:compile_environment"
 # Rake::Task["assets:precompile"]
