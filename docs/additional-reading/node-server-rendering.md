@@ -26,5 +26,3 @@ You need to configure the name of the server bundle in two places:
   # not affect performance.
   config.server_bundle_js_file = "webpack-bundle.js"
 ``` 
- 
-
