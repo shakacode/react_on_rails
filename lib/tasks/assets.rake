@@ -24,9 +24,14 @@ namespace :react_on_rails do
     desc "Creates non-digested symlinks for the assets in the public asset dir"
     task symlink_non_digested_assets: :"assets:environment" do
       if ReactOnRails.configuration.symlink_non_digested_assets_regex
-        manifest_path = Dir.glob(ReactOnRails::assets_path
-                           .join(".sprockets-manifest-*.json"))
-                           .first
+        manifest_glob = Dir.glob(ReactOnRails::assets_path.join(".sprockets-manifest-*.json")) +
+            Dir.glob(ReactOnRails::assets_path.join("manifest-*.json"))
+        if manifest_glob.empty?
+          puts "Warning: React On Rails: expected to find .sprockets-manifest-*.json or manifest-*.json "\
+                   "at #{ReactOnRails::assets_path}, but found none. Canceling symlinking tasks."
+          next
+        end
+        manifest_path = manifest_glob.first
         manifest_data = JSON.load(File.new(manifest_path))
 
         manifest_data["assets"].each do |logical_path, digested_path|
