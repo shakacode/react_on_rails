@@ -6,7 +6,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [6.0.1]
 ##### Fixed
-- Allow for older version of manifest.json for older versions of sprockets. See [Isseu #435](https://github.com/shakacode/react_on_rails/issues/435). Fixed in [#436](https://github.com/shakacode/react_on_rails/pull/436) by [alleycat-at-git](https://github.com/alleycat-at-git).
+- Allow for older version of manifest.json for older versions of sprockets. See [Issue #435](https://github.com/shakacode/react_on_rails/issues/435). Fixed in [#436](https://github.com/shakacode/react_on_rails/pull/436) by [alleycat-at-git](https://github.com/alleycat-at-git).
 
 ## [6.0.0]
 ##### Breaking Changes
