@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 ## [Unreleased]
 
+## [6.0.1]
+##### Fixed
+- Allow for older version of manifest.json for older versions of sprockets. See [Isseu #435](https://github.com/shakacode/react_on_rails/issues/435). Fixed in [#436](https://github.com/shakacode/react_on_rails/pull/436) by [alleycat-at-git](https://github.com/alleycat-at-git).
+
 ## [6.0.0]
 ##### Breaking Changes
 - Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own assets.rake file that does the precompilation. 
@@ -332,7 +336,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.0.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.0.1...master
+[6.0.1]: https://github.com/shakacode/react_on_rails/compare/6.0.0...6.0.1
 [6.0.0]: https://github.com/shakacode/react_on_rails/compare/5.2.0...6.0.0
 [5.2.0]: https://github.com/shakacode/react_on_rails/compare/5.1.1...5.2.0
 [5.1.1]: https://github.com/shakacode/react_on_rails/compare/5.1.0...5.1.1
