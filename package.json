@@ -1,6 +1,6 @@
 {
   "name": "react-relay-on-rails",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "description": "react-relay-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "node_package/lib/ReactOnRails.js",
   "directories": {
@@ -37,8 +37,8 @@
   "peerDependencies": {
     "react": ">= 15.0.2",
     "react-dom": ">= 15.0.2",
-    "babel-relay-plugin": "^0.8.1",
-    "react-relay": "^0.8.1"
+    "babel-relay-plugin": "^0.9.0",
+    "react-relay": "^0.9.0"
   },
   "files": [
     "node_package/lib"
