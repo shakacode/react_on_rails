@@ -1,6 +1,6 @@
 {
   "name": "react-relay-on-rails",
-  "version": "4.0.2",
+  "version": "4.1.0",
   "description": "react-relay-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "node_package/lib/ReactOnRails.js",
   "directories": {

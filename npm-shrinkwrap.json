@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails",
-  "version": "3.0.2",
+  "version": "4.1.0",
   "dependencies": {
     "abab": {
       "version": "1.0.3",
