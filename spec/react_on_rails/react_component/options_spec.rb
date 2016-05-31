@@ -8,10 +8,9 @@ describe ReactOnRails::ReactComponent::Options do
     raise_on_prerender_error
   ).freeze
 
-  def the_attrs(name: "App", index: 1, options: {})
+  def the_attrs(name: "App", options: {})
     {
       name: name,
-      index: index,
       options: options
     }
   end
@@ -69,32 +68,25 @@ describe ReactOnRails::ReactComponent::Options do
     end
   end
 
-  describe "#index" do
-    it "returns index" do
-      index = 2
-      attrs = the_attrs(index: index)
-
-      opts = described_class.new(attrs)
-
-      expect(opts.index).to eq index
-    end
-  end
-
   describe "#dom_id" do
     context "without id option" do
-      it "returns dom_id" do
-        index = 2
-        name = "some_app"
-        attrs = the_attrs(name: name, index: index)
-
+      it "returns a unique identifier" do
+        attrs = the_attrs(name: "some_app")
         opts = described_class.new(attrs)
 
-        expect(opts.dom_id).to eq "some_app-react-component-2"
+        expect(SecureRandom).to receive(:uuid).and_return("123456789")
+        expect(opts.dom_id).to eq "some_app-react-component-123456789"
+      end
+
+      it "is memoized" do
+        opts = described_class.new(the_attrs)
+
+        expect(opts.dom_id).to eq opts.dom_id
       end
     end
 
     context "with id option" do
-      it "returns dom_id" do
+      it "returns given id" do
         options = { id: "im-an-id" }
         attrs = the_attrs(options: options)
 

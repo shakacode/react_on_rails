@@ -95,12 +95,8 @@ module ReactOnRailsHelper
     # Create the JavaScript setup of the global to initialize the client rendering
     # (re-hydrate the data). This enables react rendered on the client to see that the
     # server has already rendered the HTML.
-    # We use this react_component_index in case we have the same component multiple times on the page.
 
-    react_component_index = next_react_component_index
-    options = ReactOnRails::ReactComponent::Options.new(name: component_name,
-                                                        index: react_component_index,
-                                                        options: raw_options)
+    options = ReactOnRails::ReactComponent::Options.new(name: component_name, options: raw_options)
 
     # Setup the page_loaded_js, which is the same regardless of prerendering or not!
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
@@ -251,11 +247,6 @@ module ReactOnRailsHelper
                          style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
                          data: redux_store_data)
     prepend_render_rails_context(result)
-  end
-
-  def next_react_component_index
-    @react_component_index ||= -1
-    @react_component_index += 1
   end
 
   def props_string(props)

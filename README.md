@@ -306,7 +306,7 @@ react_component(component_name,
 + **options:**
   + **props:** Ruby Hash which contains the properties to pass to the react object, or a JSON string. If you pass a string, we'll escape it for you.
   + **prerender:** enable server-side rendering of component. Set to false when debugging!
-  + **id:** Id for the div. This will get assigned automatically if you do not provide an id.
+  + **id:** Id for the div, will be used to attach the React component. This will get assigned automatically if you do not provide an id. Must be unique.
   + **html_options:** Any other html options to get placed on the added div for the component.
   + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise. Note, on the client you will so both the railsContext and your props. On the server, you only see the railsContext being logged.
   + **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the default configuration of logging_on_server set to true, you'll still see the errors on the server.

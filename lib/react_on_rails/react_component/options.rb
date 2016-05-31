@@ -4,11 +4,8 @@ module ReactOnRails
       NO_PROPS = {}.freeze
       HIDDEN = "display:none".freeze
 
-      attr_reader :index
-
-      def initialize(name:, index:, options:)
+      def initialize(name:, options:)
         @name = name
-        @index = index
         @options = options
       end
 
@@ -21,7 +18,7 @@ module ReactOnRails
       end
 
       def dom_id
-        options.fetch(:id) { default_dom_id }
+        @dom_id ||= options.fetch(:id) { generate_unique_dom_id }
       end
 
       def html_options
@@ -62,8 +59,8 @@ module ReactOnRails
 
       attr_reader :options
 
-      def default_dom_id
-        "#{@name}-react-component-#{@index}"
+      def generate_unique_dom_id
+        "#{@name}-react-component-#{SecureRandom.uuid}"
       end
 
       def retrieve_key(key)
