@@ -3,10 +3,10 @@
 YO
 <% redux_store("SharedReduxStore", props: @app_props_server_render, defer: true) %>
 
-<%= react_component("ReduxSharedStoreApp", prerender: false, trace: true) %>
+<%= react_component("ReduxSharedStoreApp", prerender: false, trace: true, id: "ReduxSharedStoreApp-react-component-0") %>
 <hr/>
 <h1>Second Hello World</h1>
-<%= react_component("ReduxSharedStoreApp", prerender: false, trace: true) %>
+<%= react_component("ReduxSharedStoreApp", prerender: false, trace: true, id: "ReduxSharedStoreApp-react-component-1") %>
 <hr/>
 
 <h1>React Rails Client Side Only Rendering, 2 components, same Redux store </h1>
@@ -32,10 +32,10 @@ YO
     <pre>
 <%%= redux_store("SharedReduxStore", props: @app_props_server_render) %>
 
-<%%= react_component("ReduxSharedStoreApp", prerender: false, trace: true) %>
+<%%= react_component("ReduxSharedStoreApp", prerender: false, trace: true, id: "ReduxSharedStoreApp-react-component-0") %>
 
 Second Hello World
-<%%= react_component("ReduxSharedStoreApp", prerender: false, trace: true) %>
+<%%= react_component("ReduxSharedStoreApp", prerender: false, trace: true, id: "ReduxSharedStoreApp-react-component-1") %>
     </pre>
   </li>
 </ol>
