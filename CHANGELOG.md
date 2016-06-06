@@ -340,7 +340,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.0.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.0.2...master
+[6.0.2]: https://github.com/shakacode/react_on_rails/compare/6.0.1...6.0.2
 [6.0.1]: https://github.com/shakacode/react_on_rails/compare/6.0.0...6.0.1
 [6.0.0]: https://github.com/shakacode/react_on_rails/compare/5.2.0...6.0.0
 [5.2.0]: https://github.com/shakacode/react_on_rails/compare/5.1.1...5.2.0

@@ -3,8 +3,9 @@
 *We'll keep a history of the news. A few bullets at the top will also show on the [README.md](./README.md).*
 
 * Always see the [CHANGELOG.md](./CHANGELOG.md) for the latest project changes.
-
+* 2016-05-24: 6.0.0 Released! Simplified generator and install process! See the [CHANGELOG.md](./CHANGELOG.md) for details.
 * 2016-04-08: 5.2.0 Released! Support for React 15.0 and updates to the Generator.
+* 2016-03-18: [Slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
 * 2016-03-17: **4.0.3** Shipped! Includes using the new Heroku buildpack steps, several smaller changes detailed in the [CHANGELOG.md](./CHANGELOG.md). 
 * 2016-03-17: **4.0.2** Shipped! Includes using the new Heroku buildpack steps.
   * Better support for hot reloading of assets from Rails with new helpers and updates to the sample testing app, [spec/dummy](spec/dummy).
