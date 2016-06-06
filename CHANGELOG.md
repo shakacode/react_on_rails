@@ -2,7 +2,12 @@
 All notable changes to this project will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version.
 
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
+
 ## [Unreleased]
+
+## [6.0.3]
+##### Fixed
+- Added assets symlinking support on Heroku [#446](https://github.com/shakacode/react_on_rails/pull/446) by [Alexey Karasev](https://github.com/alleycat-at-git).
 
 ## [6.0.2]
 ##### Fixed
@@ -340,7 +345,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.0.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.0.3...master
+[6.0.3]: https://github.com/shakacode/react_on_rails/compare/6.0.2...6.0.3
 [6.0.2]: https://github.com/shakacode/react_on_rails/compare/6.0.1...6.0.2
 [6.0.1]: https://github.com/shakacode/react_on_rails/compare/6.0.0...6.0.1
 [6.0.0]: https://github.com/shakacode/react_on_rails/compare/5.2.0...6.0.0
