@@ -7,13 +7,15 @@ module ReactOnRails
     end
 
     def symlink_file(target, symlink)
-      if not File.exist?(symlink) or File.lstat(symlink).symlink?
-        if File.exist?(target)
-          puts "React On Rails: Symlinking #{target} to #{symlink}"
-          FileUtils.ln_s target, symlink, force: true
+      target_path = ReactOnRails::assets_path.join(target)
+      symlink_path = ReactOnRails::assets_path.join(symlink)
+      if not File.exist?(symlink_path) or File.lstat(symlink_path).symlink?
+        if File.exist?(target_path)
+          puts "React On Rails: Symlinking #{target_path} to #{symlink_path}"
+          `cd #{ReactOnRails::assets_path} && ln -s #{target} #{symlink}`
         end
       else
-        puts "React On Rails: File #{symlink} already exists. Failed to symlink #{target}"
+        puts "React On Rails: File #{symlink_path} already exists. Failed to symlink #{target_path}"
       end
     end
   end
@@ -37,13 +39,10 @@ namespace :react_on_rails do
         manifest_data["assets"].each do |logical_path, digested_path|
           regex = ReactOnRails.configuration.symlink_non_digested_assets_regex
           if logical_path =~ regex
-            full_digested_path = ReactOnRails::assets_path.join(digested_path)
-            full_nondigested_path = ReactOnRails::assets_path.join(logical_path)
-            extension = full_digested_path.extname
-            full_digested_gz_path = full_digested_path.sub_ext("#{extension}.gz")
-            full_nondigested_gz_path = full_nondigested_path.sub_ext("#{extension}.gz")
-            ReactOnRails::symlink_file(full_digested_path, full_nondigested_path)
-            ReactOnRails::symlink_file(full_digested_gz_path, full_nondigested_gz_path)
+            digested_gz_path = "#{digested_path}.gz"
+            logical_gz_path = "#{logical_path}.gz"
+            ReactOnRails::symlink_file(digested_path, logical_path)
+            ReactOnRails::symlink_file(digested_gz_path, logical_gz_path)
           end
         end
       end
@@ -115,11 +114,3 @@ Rake::Task["assets:precompile"]
       Rake::Task["react_on_rails:assets:delete_broken_symlinks"].invoke
     end
 
-# puts "Enhancing assets:precompile with react_on_rails:assets:compile_environment"
-# Rake::Task["assets:precompile"]
-#   .clear_prerequisites
-#   .enhance([:environment]) do
-#   Rake::Task["react_on_rails:assets:compile_environment"].invoke
-#   Rake::Task["react_on_rails:assets:symlink_non_digested_assets"].invoke
-#   Rake::Task["react_on_rails:assets:delete_broken_symlinks"].invoke
-# end
