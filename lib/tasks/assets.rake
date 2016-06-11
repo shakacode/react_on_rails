@@ -7,13 +7,15 @@ module ReactOnRails
     end
 
     def symlink_file(target, symlink)
-      if not File.exist?(symlink) or File.lstat(symlink).symlink?
-        if File.exist?(target)
-          puts "React On Rails: Symlinking #{target} to #{symlink}"
-          FileUtils.ln_s target, symlink, force: true
+      target_path = ReactOnRails::assets_path.join(target)
+      symlink_path = ReactOnRails::assets_path.join(symlink)
+      if not File.exist?(symlink_path) or File.lstat(symlink_path).symlink?
+        if File.exist?(target_path)
+          puts "React On Rails: Symlinking #{target_path} to #{symlink_path}"
+          `cd #{ReactOnRails::assets_path} && ln -s #{target} #{symlink}`
         end
       else
-        puts "React On Rails: File #{symlink} already exists. Failed to symlink #{target}"
+        puts "React On Rails: File #{symlink_path} already exists. Failed to symlink #{target_path}"
       end
     end
   end
@@ -24,20 +26,23 @@ namespace :react_on_rails do
     desc "Creates non-digested symlinks for the assets in the public asset dir"
     task symlink_non_digested_assets: :"assets:environment" do
       if ReactOnRails.configuration.symlink_non_digested_assets_regex
-        manifest_path = Dir.glob(ReactOnRails::assets_path.join(".sprockets-manifest-*.json"))
-                          .first
+        manifest_glob = Dir.glob(ReactOnRails::assets_path.join(".sprockets-manifest-*.json")) +
+            Dir.glob(ReactOnRails::assets_path.join("manifest-*.json"))
+        if manifest_glob.empty?
+          puts "Warning: React On Rails: expected to find .sprockets-manifest-*.json or manifest-*.json "\
+                   "at #{ReactOnRails::assets_path}, but found none. Canceling symlinking tasks."
+          next
+        end
+        manifest_path = manifest_glob.first
         manifest_data = JSON.load(File.new(manifest_path))
 
         manifest_data["assets"].each do |logical_path, digested_path|
           regex = ReactOnRails.configuration.symlink_non_digested_assets_regex
           if logical_path =~ regex
-            full_digested_path = ReactOnRails::assets_path.join(digested_path)
-            full_nondigested_path = ReactOnRails::assets_path.join(logical_path)
-            extension = full_digested_path.extname
-            full_digested_gz_path = full_digested_path.sub_ext("#{extension}.gz")
-            full_nondigested_gz_path = full_nondigested_path.sub_ext("#{extension}.gz")
-            ReactOnRails::symlink_file(full_digested_path, full_nondigested_path)
-            ReactOnRails::symlink_file(full_digested_gz_path, full_nondigested_gz_path)
+            digested_gz_path = "#{digested_path}.gz"
+            logical_gz_path = "#{logical_path}.gz"
+            ReactOnRails::symlink_file(digested_path, logical_path)
+            ReactOnRails::symlink_file(digested_gz_path, logical_gz_path)
           end
         end
       end
@@ -51,7 +56,7 @@ namespace :react_on_rails do
             target = File.readlink(filename)
           rescue
             puts "React on Rails: Warning: your platform doesn't support File::readlink method."/
-                   "Skipping broken link check."
+                 "Skipping broken link check."
             return
           end
           path = Pathname.new(File.dirname(filename))
@@ -102,17 +107,10 @@ end
 # These tasks run as pre-requisites of assets:precompile.
 # Note, it's not possible to refer to ReactOnRails configuration values at this point.
 Rake::Task["assets:precompile"]
-  .clear_prerequisites
-  .enhance([:environment,
-            "react_on_rails:assets:compile_environment",
-            "react_on_rails:assets:symlink_non_digested_assets",
-            "react_on_rails:assets:delete_broken_symlinks"])
+    .clear_prerequisites
+    .enhance([:environment, "react_on_rails:assets:compile_environment"])
+    .enhance do
+      Rake::Task["react_on_rails:assets:symlink_non_digested_assets"].invoke
+      Rake::Task["react_on_rails:assets:delete_broken_symlinks"].invoke
+    end
 
-# puts "Enhancing assets:precompile with react_on_rails:assets:compile_environment"
-# Rake::Task["assets:precompile"]
-#   .clear_prerequisites
-#   .enhance([:environment]) do
-#   Rake::Task["react_on_rails:assets:compile_environment"].invoke
-#   Rake::Task["react_on_rails:assets:symlink_non_digested_assets"].invoke
-#   Rake::Task["react_on_rails:assets:delete_broken_symlinks"].invoke
-# end

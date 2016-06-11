@@ -1,7 +1,7 @@
 # Turbolinks
 
 * See [Turbolinks on Github](https://github.com/rails/turbolinks)
-* Currently support 2.5.x of Turbolinks and 5.0.0.beta1 of Turbolinks 5.
+* Currently support 2.5.x of Turbolinks and 5.0.0 of Turbolinks 5.
 * Turbolinks is currently included only via the Rails gem and the Rails manifest file rather than NPM. [Turbolinks Issue #658 ](https://github.com/rails/turbolinks/issues/658) discusses this.
 
 ## Why Turbolinks?

@@ -45,6 +45,8 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#react_component" do
+    before { allow(SecureRandom).to receive(:uuid).and_return(0, 1, 2, 3) }
+
     subject { react_component("App", props: props) }
 
     let(:props) do

@@ -13,7 +13,7 @@ css files compiled by webpack on the client side, because they don't use
 
 ### Solution
 
-Create symlinks of non-digested versions to digested versions when Rails assets compile.
+React on Rails creates symlinks of non-digested versions to digested versions when doing a Rails assets compile.
 The solution is implemented using `assets:precompile` after-hook. The assets for symlinking
 are defined by `config.symlink_non_digested_assets_regex` in `config/initializers/react_on_rails.rb`.
 To disable symlinks set this parameter to `nil`.
