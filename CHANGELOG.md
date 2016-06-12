@@ -5,6 +5,10 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 
+## [6.0.4]
+##### Fixed
+- Added polyfill for clearTimeout which is used by babel-polyfill.
+
 ## [6.0.3]
 ##### Fixed
 - Added assets symlinking support on Heroku [#446](https://github.com/shakacode/react_on_rails/pull/446) by [Alexey Karasev](https://github.com/alleycat-at-git).
