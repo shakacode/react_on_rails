@@ -7,7 +7,7 @@
 * **[Madrone Analytics](http://madroneco.com/)**: The original client of [ShakaCode](http://www.shakacode.com) that led to the development of React on Rails, as described in [Fast Rich Client Rails Development With Webpack and the ES6 Transpiler](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/).
 * **[Deliveroo](https://deliveroo.co.uk/)**: The leading food delivery site in Europe has gone live with React on Rails, with multi-lingual JavaScript support! 
 ![2016-05-03_19-18-34](https://cloud.githubusercontent.com/assets/1118459/15027253/91fd151a-11de-11e6-93e3-720518995fe0.png)
-* **[Nootrobox](https://nootrobox.coms)**: Web ecommerce site built with React on Rails. :)
+* **[Nootrobox](https://nootrobox.com)**: Web ecommerce site built with React on Rails. :)
 
 ## Commercial Products in Development
 * **[GuavaPass](https://guavapass.com/)**: Coaching client of [ShakaCode](http://www.shakacode.com) and React on Rails fan!
