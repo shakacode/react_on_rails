@@ -25,6 +25,7 @@ Gem::Specification.new do |s|
   s.add_dependency "rails", ">= 3.2"
   s.add_dependency "foreman"
   s.add_dependency "addressable"
+  s.add_dependency "yajl-ruby"
 
   s.add_development_dependency "bundler", "~> 1.10"
   s.add_development_dependency "rake", "~> 10.0"

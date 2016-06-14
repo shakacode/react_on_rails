@@ -5,6 +5,7 @@
 # 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 require "react_on_rails/prerender_error"
 require "addressable/uri"
+require "yajl"
 
 module ReactOnRailsHelper
   # The env_javascript_include_tag and env_stylesheet_link_tag support the usage of a webpack
@@ -103,10 +104,11 @@ module ReactOnRailsHelper
 
     component_specification_tag =
       content_tag(:script,
-                  options.props,
                   class: "js-react-on-rails-component",
                   style: options.style,
-                  data: options.data)
+                  data: options.data) do
+        "var #{options.dom_id.tr('-', '_')} = #{Yajl.dump(options.props.is_a?(String) ? JSON.parse(options.props) : options.props)};".html_safe
+      end
 
     # Create the HTML rendering part
     result = server_rendered_react_component_html(options.props, options.name, options.dom_id,
@@ -229,18 +231,23 @@ module ReactOnRailsHelper
     @rendered_rails_context = true
 
     rails_context_content = content_tag(:script,
-                                        rails_context(server_side: false),
                                         id: "js-react-on-rails-context",
-                                        style: ReactOnRails.configuration.skip_display_none ? nil : "display:none")
+                                        style: ReactOnRails.configuration.skip_display_none ? nil : "display:none") do
+      "var #{'js-react-on-rails-context'.tr('-', '_')} = #{Yajl.dump(rails_context(server_side: false))};".html_safe
+    end
     "#{render_value}\n#{rails_context_content}".html_safe
   end
 
   def render_redux_store_data(redux_store_data)
-    result = content_tag(:div,
+    result = content_tag(:script,
                          "",
                          class: "js-react-on-rails-store",
                          style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
-                         data: redux_store_data)
+                         data: redux_store_data) do
+      # redux_store_data
+      "var #{redux_store_data[:store_name].tr('-', '_')} = #{Yajl.dump(redux_store_data[:props])};".html_safe
+    end
+
     add_render_rails_context(result)
   end
 
