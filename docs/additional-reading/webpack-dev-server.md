@@ -13,4 +13,3 @@ Note that **React-related error messages are possibly more helpful when encounte
 
 ### Adding Additional Routes for the Dev Server
 As you add more routes to your front-end application, you will need to make the corresponding API for the dev server in `client/server.js`. See our example `server.js` from our [tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client%2Fserver-express.js).
-
