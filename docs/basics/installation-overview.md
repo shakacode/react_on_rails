@@ -27,6 +27,6 @@ The only requirements within this directory for basic React on Rails integration
 1. Configure your top level JavaScript files for inclusion in your layout. You'll want a version that you use for static assets, and you want a file for any files in your setup that are not part of your webpack build. The reason for this is for use with hot-reloading. If you are not using hot reloading, then you only need to configure your `application.js` file to include your Webpack generated files. For more information on hot reloading, see [Hot Reloading of Assets For Rails Development](hot-reloading-rails-development.md)
  
 1. Configure your `lib/tasks/assets.rake` file to run webpack during asset precompilation.
-1. If you are deploying to Heroku, see [heroku-deployment.md](heroku-deployment.md)
+1. If you are deploying to Heroku, see [heroku-deployment.md](/docs/additional-reading/heroku-deployment.md)
 
 If I missed anything, please submit a PR or file an issue.
