@@ -15,7 +15,7 @@ const RouterApp = (props, railsContext) => {
   // create your hydrated store
   const store = createStore(props);
 
-  // See https://github.com/reactjs/react-router/blob/master/docs/guides/advanced/ServerRendering.md
+  // See https://github.com/reactjs/react-router/blob/master/docs/guides/ServerRendering.md
   match({ routes, location }, (_error, _redirectLocation, _routeProps) => {
     error = _error;
     redirectLocation = _redirectLocation;
