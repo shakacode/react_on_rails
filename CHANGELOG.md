@@ -5,6 +5,10 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 
+## [6.0.5]
+##### Added
+- Node option for installer added as alternative for server rendering.
+
 ## [6.0.4]
 ##### Fixed
 - Added polyfill for clearTimeout which is used by babel-polyfill.

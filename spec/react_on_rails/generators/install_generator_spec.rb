@@ -22,6 +22,18 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator"
   end
 
+  context "--node" do
+    before(:all) { run_generator_test_with_args(%w(--node)) }
+    include_examples "base_generator", application_js: true
+    include_examples "node_generator"
+  end
+
+  context "-N" do
+    before(:all) { run_generator_test_with_args(%w(-N)) }
+    include_examples "base_generator", application_js: true
+    include_examples "node_generator"
+  end
+
   context "without existing application.js or application.js.coffee file" do
     before(:all) { run_generator_test_with_args([], application_js: false) }
     include_examples "base_generator", application_js: false
