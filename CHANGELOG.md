@@ -5,9 +5,13 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 
+## [6.0.5]
+##### Added
+- Added better error messages to avoid issues with shared redux stores [#470](https://github.com/shakacode/react_on_rails/pull/470).
+
 ## [6.0.4]
 ##### Fixed
-- Added polyfill for clearTimeout which is used by babel-polyfill.
+- Added polyfill for clearTimeout which is used by babel-polyfill [#451](https://github.com/shakacode/react_on_rails/pull/451).
 
 ## [6.0.3]
 ##### Fixed
@@ -349,7 +353,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.0.4...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.0.5...master
+[6.0.5]: https://github.com/shakacode/react_on_rails/compare/6.0.4...6.0.5
 [6.0.4]: https://github.com/shakacode/react_on_rails/compare/6.0.3...6.0.4
 [6.0.3]: https://github.com/shakacode/react_on_rails/compare/6.0.2...6.0.3
 [6.0.2]: https://github.com/shakacode/react_on_rails/compare/6.0.1...6.0.2
