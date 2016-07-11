@@ -15,6 +15,28 @@ function storeGenerator2(props) {
   return createStore(reducer, props);
 };
 
+test('StoreRegistry throws error for registering null or undefined store', (assert) => {
+  assert.plan(2);
+  StoreRegistry.stores().clear();
+  assert.throws(() => StoreRegistry.register({ storeGenerator: null }),
+    /Called ReactOnRails.registerStores with a null or undefined as a value/,
+    'Expected an exception for calling StoreRegistry.register with an invalid store generator.'
+  );
+  assert.throws(() => StoreRegistry.register({ storeGenerator: undefined }),
+    /Called ReactOnRails.registerStores with a null or undefined as a value/,
+    'Expected an exception for calling StoreRegistry.register with an invalid store generator.'
+  );
+});
+
+test('StoreRegistry throws error for retrieving unregistered store', (assert) => {
+  assert.plan(1);
+  StoreRegistry.stores().clear();
+  assert.throws(() => StoreRegistry.getStore('foobar'),
+    /There are no stores hydrated and you are requesting the store/,
+    'Expected an exception for calling StoreRegistry.getStore with no registered stores.'
+  );
+});
+
 test('StoreRegistry registers and retrieves generator function stores', (assert) => {
   assert.plan(2);
   StoreRegistry.register({ storeGenerator, storeGenerator2 });
@@ -40,6 +62,7 @@ test('StoreRegistry returns undefined for retrieving unregistered store, ' +
   'passing throwIfMissing = false',
   (assert) => {
     assert.plan(1);
+    StoreRegistry.setStore('foobarX', {});
     const actual = StoreRegistry.getStore('foobar', false);
     const expected = undefined;
     assert.equals(actual, expected, 'StoreRegistry.get should return undefined for missing ' +
@@ -64,4 +87,3 @@ test('StoreRegistry throws error for retrieving unregistered hydrated store', (a
     'Expected an exception for calling StoreRegistry.getStore with an invalid name.'
   );
 });
-

@@ -60,6 +60,28 @@ test('serverRenderReactComponent throws error for invalid options', (assert) => 
   );
 });
 
+test('registerStore throws if passed a falsey object (null, undefined, etc)', (assert) => {
+  assert.plan(3);
+
+  assert.throws(
+    () => ReactOnRails.registerStore(null),
+    /null or undefined/,
+    'registerStore should throw an error if a falsey value is passed (null)'
+  );
+
+  assert.throws(
+    () => ReactOnRails.registerStore(undefined),
+    /null or undefined/,
+    'registerStore should throw an error if a falsey value is passed (undefined)'
+  );
+
+  assert.throws(
+    () => ReactOnRails.registerStore(false),
+    /null or undefined/,
+    'registerStore should throw an error if a falsey value is passed (false)'
+  );
+});
+
 test('register store and getStoreGenerator allow registration', (assert) => {
   assert.plan(2);
   function reducer(state = {}, action) {
