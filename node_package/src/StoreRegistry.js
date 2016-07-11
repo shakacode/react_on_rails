@@ -31,15 +31,22 @@ export default {
   getStore(name, throwIfMissing = true) {
     if (_stores.has(name)) {
       return _stores.get(name);
-    } else {
-      if (throwIfMissing)  {
-        const storeKeys = Array.from(_stores.keys()).join(', ');
-        console.log('storeKeys', storeKeys);
-        throw new Error(`Could not find hydrated store with name '${name}'. ` +
-          `Hydrated store names include [${storeKeys}].`);
-      } else {
-        return;
-      }
+    }
+
+    const storeKeys = Array.from(_stores.keys()).join(', ');
+
+    if (storeKeys.length === 0) {
+      const msg = `There are no stores hydrated and you are requesting the store ` +
+        `${name}. This can happen if you are server rendering and you do not call ` +
+        `redux_store near the top of your controller action's view (not the layout) ` +
+        `and before any call to react_component.`;
+      throw new Error(msg);
+    }
+
+    if (throwIfMissing)  {
+      console.log('storeKeys', storeKeys);
+      throw new Error(`Could not find hydrated store with name '${name}'. ` +
+        `Hydrated store names include [${storeKeys}].`);
     }
   },
 
