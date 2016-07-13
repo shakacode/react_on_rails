@@ -6,17 +6,11 @@ module ReactOnRails
       Pathname.new(dir)
     end
 
-    def symlink_file(target, symlink)
+    def copy_file(target, destination)
       target_path = ReactOnRails::assets_path.join(target)
-      symlink_path = ReactOnRails::assets_path.join(symlink)
-      if not File.exist?(symlink_path) or File.lstat(symlink_path).symlink?
-        if File.exist?(target_path)
-          puts "React On Rails: Symlinking #{target_path} to #{symlink_path}"
-          `cd #{ReactOnRails::assets_path} && ln -s #{target} #{symlink}`
-        end
-      else
-        puts "React On Rails: File #{symlink_path} already exists. Failed to symlink #{target_path}"
-      end
+      dest_path = ReactOnRails::assets_path.join(destination)
+      puts "React On Rails: Copying #{target_path} to #{dest_path}"
+      `cp -rf #{target_path} #{dest_path}`
     end
   end
 end
@@ -30,7 +24,7 @@ namespace :react_on_rails do
             Dir.glob(ReactOnRails::assets_path.join("manifest-*.json"))
         if manifest_glob.empty?
           puts "Warning: React On Rails: expected to find .sprockets-manifest-*.json or manifest-*.json "\
-                   "at #{ReactOnRails::assets_path}, but found none. Canceling symlinking tasks."
+                   "at #{ReactOnRails::assets_path}, but found none. Canceling copying tasks."
           next
         end
         manifest_path = manifest_glob.first
@@ -41,29 +35,8 @@ namespace :react_on_rails do
           if logical_path =~ regex
             digested_gz_path = "#{digested_path}.gz"
             logical_gz_path = "#{logical_path}.gz"
-            ReactOnRails::symlink_file(digested_path, logical_path)
-            ReactOnRails::symlink_file(digested_gz_path, logical_gz_path)
-          end
-        end
-      end
-    end
-
-    desc "Cleans all broken symlinks for the assets in the public asset dir"
-    task delete_broken_symlinks: :"assets:environment" do
-      Dir.glob(ReactOnRails::assets_path.join("*")).each do |filename|
-        if File.lstat(filename).symlink?
-          begin
-            target = File.readlink(filename)
-          rescue
-            puts "React on Rails: Warning: your platform doesn't support File::readlink method."/
-                 "Skipping broken link check."
-            return
-          end
-          path = Pathname.new(File.dirname(filename))
-          target_path = path.join(target)
-          unless File.exist?(target_path)
-            puts "React on Rails: Deleting broken link: #{filename}"
-            File.delete(filename)
+            ReactOnRails::copy_file(digested_path, logical_path)
+            ReactOnRails::copy_file(digested_gz_path, logical_gz_path)
           end
         end
       end
@@ -110,7 +83,6 @@ Rake::Task["assets:precompile"]
     .clear_prerequisites
     .enhance([:environment, "react_on_rails:assets:compile_environment"])
     .enhance do
-      Rake::Task["react_on_rails:assets:symlink_non_digested_assets"].invoke
-      Rake::Task["react_on_rails:assets:delete_broken_symlinks"].invoke
-    end
+  Rake::Task["react_on_rails:assets:copy_non_digested_assets"].invoke
+end
 
