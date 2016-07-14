@@ -7,6 +7,12 @@ module ReactOnRails
   DEFAULT_GENERATED_ASSETS_DIR = File.join(%w(app assets webpack)).freeze
 
   def self.setup_config_values
+    if @configuration.symlink_non_digested_assets_regex.present? &&
+       @configuration.non_digested_assets_regex.blank?
+      puts "[DEPRECATION] ReactOnRails: rename config.symlink_non_digested_assets_regex to "\
+        "non_digested_assets_regex"
+      @configuration.non_digested_assets_regex = @configuration.symlink_non_digested_assets_regex
+    end
     if @configuration.webpack_generated_files.empty?
       files = ["webpack-bundle.js"]
       if @configuration.server_bundle_js_file.present?
@@ -58,6 +64,7 @@ module ReactOnRails
       rendering_extension: nil,
       server_render_method: "",
       symlink_non_digested_assets_regex: /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg)/,
+      non_digested_assets_regex: /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg)/,
       npm_build_test_command: "",
       npm_build_production_command: ""
     )
@@ -71,7 +78,8 @@ module ReactOnRails
                   :skip_display_none, :generated_assets_dirs, :generated_assets_dir,
                   :webpack_generated_files, :rendering_extension, :npm_build_test_command,
                   :npm_build_production_command,
-                  :server_render_method, :symlink_non_digested_assets_regex
+                  :server_render_method, :symlink_non_digested_assets_regex,
+                  :non_digested_assets_regex
 
     def initialize(server_bundle_js_file: nil, prerender: nil, replay_console: nil,
                    trace: nil, development_mode: nil,
@@ -81,7 +89,8 @@ module ReactOnRails
                    generated_assets_dir: nil, webpack_generated_files: nil,
                    rendering_extension: nil, npm_build_test_command: nil,
                    npm_build_production_command: nil,
-                   server_render_method: nil, symlink_non_digested_assets_regex: nil)
+                   server_render_method: nil, symlink_non_digested_assets_regex: nil,
+                   non_digested_assets_regex: nil)
       self.server_bundle_js_file = server_bundle_js_file
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir
@@ -109,6 +118,7 @@ module ReactOnRails
 
       self.server_render_method = server_render_method
       self.symlink_non_digested_assets_regex = symlink_non_digested_assets_regex
+      self.non_digested_assets_regex = non_digested_assets_regex
     end
   end
 end

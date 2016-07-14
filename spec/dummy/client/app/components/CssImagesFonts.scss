@@ -1,0 +1,37 @@
+// Test out a custom font
+.heading {
+  font-family: $font-family-sans-serif;
+}
+
+// Small image is url encode
+$check-svg: url("../assets/images/guest-list-accepted.png");
+$check-size: 132px;
+.check {
+  display: inline-block;
+  background: $check-svg;
+  background-size: $check-size $check-size;
+  width: $check-size;
+  height: $check-size;
+}
+
+// Relative path of larger image
+$last-call-svg: url("../assets/images/last-call.png");
+$last-call-width: 1440px;
+$last-call-height: 373px;
+
+.lastCall {
+  display: inline-block;
+  background: $last-call-svg;
+  background-size: $last-call-width/2 $last-call-height/2;
+  width: $last-call-width/2;
+  height: $last-call-height/2;
+}
+
+// This is an absolute path to the image, defined in app-variables.scss
+.railsOnMaui {
+  display: inline-block;
+  background: $rails-on-maui-png;
+  background-size: $rails-on-maui-width $rails-on-maui-height;
+  width: $rails-on-maui-width;
+  height: $rails-on-maui-height;
+}

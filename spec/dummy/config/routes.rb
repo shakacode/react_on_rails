@@ -23,4 +23,5 @@ Rails.application.routes.draw do
   get "render_js" => "pages#render_js"
   get "react_router(/*all)" => "react_router#index", as: :react_router
   get "pure_component" => "pages#pure_component"
+  get "css_images_fonts" => "pages#css_images_fonts"
 end

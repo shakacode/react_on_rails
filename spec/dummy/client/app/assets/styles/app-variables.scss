@@ -3,3 +3,16 @@
 // It will be used in SASS components imported as CSS Modules
 
 $bright-color: red;
+
+$font-family-sans-serif: 'OpenSans-Light';  // apply custom font
+$fonts-url-path: '/assets/fonts';
+@font-face {
+  font-family: 'OpenSans-Light';
+  src: url('#{$fonts-url-path}/OpenSans-Light.ttf') format('truetype');
+}
+
+$images-url-path: '/assets/images';
+
+$rails-on-maui-width: 140px;
+$rails-on-maui-height: 40px;
+$rails-on-maui-png: url("#{$images-url-path}/logos/railsonmaui.png");

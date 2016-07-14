@@ -9,6 +9,7 @@ import ReduxApp from './ClientReduxApp';
 import ReduxSharedStoreApp from './ClientReduxSharedStoreApp';
 import RouterApp from './ClientRouterApp';
 import PureComponent from '../components/PureComponent';
+import CssImagesFonts from '../components/CssImagesFonts';
 
 import SharedReduxStore from '../stores/SharedReduxStore'
 
@@ -25,6 +26,7 @@ ReactOnRails.register({
   HelloWorldApp,
   RouterApp,
   PureComponent,
+  CssImagesFonts,
 });
 
 ReactOnRails.registerStore({

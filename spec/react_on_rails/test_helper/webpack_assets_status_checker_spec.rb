@@ -5,7 +5,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
   describe "#stale_generated_webpack_files" do
     let(:client_dir) { client_dir_for(fixture_dirname) }
     let(:generated_assets_dir) { compiled_js_dir_for(fixture_dirname) }
-    let(:webpack_generated_files) { %w( client-bundle.js server-bundle.js ) }
+    let(:webpack_generated_files) { %w(client-bundle.js server-bundle.js) }
     let(:server_bundle_js_file) { File.join(generated_assets_dir, "server-bundle.js") }
     let(:client_bundle_js_file) { File.join(generated_assets_dir, "client-bundle.js") }
 
