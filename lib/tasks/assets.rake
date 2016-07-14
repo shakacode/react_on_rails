@@ -5,11 +5,14 @@ module ReactOnRailsAssetUtility
     Pathname.new(dir)
   end
 
-  def self.copy_file(target, destination)
-    target_path = ReactOnRailsAssetUtility::assets_path.join(target)
+  def self.copy_file(source, destination)
+    source_path = ReactOnRailsAssetUtility::assets_path.join(source)
     dest_path = ReactOnRailsAssetUtility::assets_path.join(destination)
-    puts "React On Rails: Copying #{target_path} to #{dest_path}"
-    `cp -f #{target_path} #{dest_path}`
+    puts "React On Rails: Copying #{source_path} to #{dest_path}"
+    # Some .gz assets like images doesn't exist
+    if File.exist?(source_path)
+      `cp -f #{source_path} #{dest_path}`
+    end
   end
 end
 
