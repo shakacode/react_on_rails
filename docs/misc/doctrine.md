@@ -23,9 +23,9 @@ The React on Rails setup provides several key components related to front-end de
 
 ## Convention over Configuration
 * React on Rails has taken the hard work out of figuring out the JavaScript tooling that works best with Rails. Not only could you spend lots of time researching different tooling, but then you'd have to figure out how to splice it all together. This is where a lot of "JavaScript fatigue" comes from. The following keep the code clean and consistent:
-* [Style Guide](coding-style/style.md)
-* [linters](coding-style/linters.md)
-* [Recommended Project Structure](recommended-project-structure.md)
+* [Style Guide](../coding-style/style.md)
+* [linters](../contributor-info/linters.md)
+* [Recommended Project Structure](../additional-reading/recommended-project-structure.md)
 
 We're big believers in this quote from the Rails Doctrine: 
 
