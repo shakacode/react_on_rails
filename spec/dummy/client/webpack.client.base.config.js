@@ -24,6 +24,7 @@ module.exports = {
 
     // This will contain the app entry points defined by webpack.hot.config and webpack.rails.config
     app: [
+      // './app/assets/styles/global-styles.scss',
       './app/startup/clientRegistration',
     ],
   },
@@ -60,9 +61,8 @@ module.exports = {
   ],
   module: {
     loaders: [
-      { test: /\.(woff2?|svg)$/, loader: 'url?limit=10000' },
       { test: /\.(ttf|eot)$/, loader: 'file' },
-      { test: /\.(jpe?g|png|gif|svg|ico)$/, loader: 'url?limit=10000' },
+      { test: /\.(jpe?g|png|gif|svg|ico|woff2?)$/, loader: 'url?limit=10000' },
       { test: require.resolve('jquery'), loader: 'expose?jQuery' },
       { test: require.resolve('jquery'), loader: 'expose?$' },
     ],

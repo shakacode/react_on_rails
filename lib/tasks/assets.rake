@@ -9,13 +9,21 @@ module ReactOnRails
     def symlink_file(target, symlink)
       target_path = ReactOnRails::assets_path.join(target)
       symlink_path = ReactOnRails::assets_path.join(symlink)
-      if not File.exist?(symlink_path) or File.lstat(symlink_path).symlink?
-        if File.exist?(target_path)
-          puts "React On Rails: Symlinking #{target_path} to #{symlink_path}"
-          `cd #{ReactOnRails::assets_path} && ln -s #{target} #{symlink}`
+      target_exists = File.exist?(target_path)
+
+      # File.exist?(symlink_path) will check the file the sym is pointing to is existing
+      # File.lstat(symlink_path).symlink? confirms that this is a symlink
+      symlink_already_there_and_valid = File.exist?(symlink_path) &&
+        File.lstat(symlink_path).symlink?
+      if symlink_already_there_and_valid
+        puts "React On Rails: Digested #{symlink_path} already exists indicating #{target_path} did not change."
+      elsif target_exists
+        if File.exist?(symlink_path) && File.lstat(symlink_path).symlink?
+          puts "React On Rails: Removing invalid symlink #{symlink_path}"
+          `cd #{ReactOnRails::assets_path} && rm #{symlink}`
         end
-      else
-        puts "React On Rails: File #{symlink_path} already exists. Failed to symlink #{target_path}"
+        puts "React On Rails: Symlinking #{target_path} to #{symlink_path}"
+        `cd #{ReactOnRails::assets_path} && ln -s #{target} #{symlink}`
       end
     end
   end
@@ -25,6 +33,12 @@ namespace :react_on_rails do
   namespace :assets do
     desc "Creates non-digested symlinks for the assets in the public asset dir"
     task symlink_non_digested_assets: :"assets:environment" do
+      # digest ==> means that the file has a unique sha so the browser will load a new copy.
+      # Webpack's CSS extract-text-plugin copies digested asset files over to directory where we put
+      # we deploy the webpack compiled JS file. Since Rails will deploy the image files in this
+      # directory with a digest, then the files are essentially "double-digested" and the CSS
+      # references from webpack's CSS would be invalid. The fix is to symlink the double-digested
+      # file back to the original digested name, and make a similar symlink for the gz version.
       if ReactOnRails.configuration.symlink_non_digested_assets_regex
         manifest_glob = Dir.glob(ReactOnRails::assets_path.join(".sprockets-manifest-*.json")) +
             Dir.glob(ReactOnRails::assets_path.join("manifest-*.json"))
@@ -36,13 +50,18 @@ namespace :react_on_rails do
         manifest_path = manifest_glob.first
         manifest_data = JSON.load(File.new(manifest_path))
 
-        manifest_data["assets"].each do |logical_path, digested_path|
+        # We realize that we're copying other Rails assets that match the regexp, but this just
+        # means that we'd be exposing the original, undigested names.
+        manifest_data["assets"].each do |original_filename, rails_digested_filename|
+          # TODO: we should remove any original_filename that is NOT in the webpack deploy folder.
           regex = ReactOnRails.configuration.symlink_non_digested_assets_regex
-          if logical_path =~ regex
-            digested_gz_path = "#{digested_path}.gz"
-            logical_gz_path = "#{logical_path}.gz"
-            ReactOnRails::symlink_file(digested_path, logical_path)
-            ReactOnRails::symlink_file(digested_gz_path, logical_gz_path)
+          if original_filename =~ regex
+            # We're symlinking from the digested filename back to the original filename which has
+            # already been symlinked by Webpack
+            ReactOnRails::symlink_file(rails_digested_filename, original_filename)
+
+            # We want the gz ones as well
+            ReactOnRails::symlink_file("#{rails_digested_filename}.gz", "#{original_filename}.gz")
           end
         end
       end
