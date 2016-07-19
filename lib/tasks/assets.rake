@@ -6,6 +6,7 @@ module ReactOnRails
       Pathname.new(dir)
     end
 
+    # target and symlink are relative to the assets directory
     def symlink_file(target, symlink)
       target_path = ReactOnRails::assets_path.join(target)
       symlink_path = ReactOnRails::assets_path.join(symlink)
@@ -16,14 +17,20 @@ module ReactOnRails
       symlink_already_there_and_valid = File.exist?(symlink_path) &&
         File.lstat(symlink_path).symlink?
       if symlink_already_there_and_valid
-        puts "React On Rails: Digested #{symlink_path} already exists indicating #{target_path} did not change."
+        puts "React On Rails: Digested #{symlink} already exists indicating #{target} did not change."
       elsif target_exists
         if File.exist?(symlink_path) && File.lstat(symlink_path).symlink?
           puts "React On Rails: Removing invalid symlink #{symlink_path}"
           `cd #{ReactOnRails::assets_path} && rm #{symlink}`
         end
-        puts "React On Rails: Symlinking #{target_path} to #{symlink_path}"
-        `cd #{ReactOnRails::assets_path} && ln -s #{target} #{symlink}`
+        # Might be like:
+        # "images/5cf5db49df178f9357603f945752a1ef.png":"images/5cf5db49df178f9357603f945752a1ef-033650e1d6193b70d59bb60e773f47b6d9aefdd56abc7ccdba3c7bed4e57ccad.png"
+        # need to cd to directory and then symlink
+        target_sub_path, _divider, target_filename = target.rpartition("/")
+        _symlink_sub_path, _divider, symlink_filename = symlink.rpartition("/")
+        puts "React On Rails: Symlinking #{target} to #{symlink}"
+        dest_path = File.join(ReactOnRails::assets_path, target_sub_path)
+        `cd #{dest_path} && ln -s #{target_filename} #{symlink_filename}`
       end
     end
   end

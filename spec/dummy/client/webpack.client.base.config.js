@@ -62,7 +62,9 @@ module.exports = {
   module: {
     loaders: [
       { test: /\.(ttf|eot)$/, loader: 'file' },
-      { test: /\.(jpe?g|png|gif|svg|ico|woff2?)$/, loader: 'url?limit=10000' },
+
+      // Example to confirm that subdirectories work
+      { test: /\.(jpe?g|png|gif|svg|ico|woff2?)$/, loader: 'url?limit=10000&name=images-fonts/[hash].[ext]' },
       { test: require.resolve('jquery'), loader: 'expose?jQuery' },
       { test: require.resolve('jquery'), loader: 'expose?$' },
     ],
