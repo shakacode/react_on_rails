@@ -8,6 +8,7 @@ module RenderingExtension
         somethingUseful: view_context.session[:something_useful]
       }
     rescue
+      result = {}
     end
     result
   end

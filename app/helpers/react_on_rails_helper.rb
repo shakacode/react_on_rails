@@ -341,6 +341,7 @@ ReactOnRails.setStore('#{store_name}', store);
 
   # This is the definitive list of the default values used for the rails_context, which is the
   # second parameter passed to both component and store generator functions.
+  # rubocop:disable Metrics/AbcSize
   def rails_context(server_side:)
     @rails_context ||= begin
       result = {}
