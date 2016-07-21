@@ -63,4 +63,8 @@ ${e.stack}`;
     const reactElement = React.createElement('pre', null, msg);
     return ReactDOMServer.renderToString(reactElement);
   }
+
+  if (typeof window.logException === 'function') {
+    window.logException(e);
+  }
 };
