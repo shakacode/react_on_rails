@@ -62,6 +62,7 @@ describe "Server Rendering", :server_rendering do
     it 'sends email okay' do
       mail = DummyMailer.hello_email
       expect(mail.subject).to match 'mail'
+      expect(mail.body).to match 'Mr. Mailing Server Side Rendering'
     end
   end
 
