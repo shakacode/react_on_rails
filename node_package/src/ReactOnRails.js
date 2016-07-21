@@ -12,6 +12,7 @@ const ctx = context();
 
 const DEFAULT_OPTIONS = {
   traceTurbolinks: false,
+  exceptionLogger: function(e) {}
 };
 
 ctx.ReactOnRails = {
@@ -56,11 +57,17 @@ ctx.ReactOnRails = {
    * Set options for ReactOnRails, typically before you call ReactOnRails.register
    * Available Options:
    * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
+   * `exceptionLogger: function Gets passed the exception as the first argument
    */
   setOptions(options) {
     if (options.hasOwnProperty('traceTurbolinks')) {
       this._options.traceTurbolinks = options.traceTurbolinks;
       delete options.traceTurbolinks;
+    }
+
+    if (options.hasOwnProperty('exceptionLogger')) {
+      this._options.exceptionLogger = options.exceptionLogger;
+      delete options.exceptionLogger;
     }
 
     if (Object.keys(options).length > 0) {

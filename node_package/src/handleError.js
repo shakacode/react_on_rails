@@ -63,4 +63,6 @@ ${e.stack}`;
     const reactElement = React.createElement('pre', null, msg);
     return ReactDOMServer.renderToString(reactElement);
   }
+
+  ReactOnRails.options('exceptionLogger')(e);
 };
