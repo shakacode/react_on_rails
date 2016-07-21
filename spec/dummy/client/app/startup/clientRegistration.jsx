@@ -14,7 +14,10 @@ import CssModulesImagesFontsExample from '../components/CssModulesImagesFontsExa
 import SharedReduxStore from '../stores/SharedReduxStore'
 
 ReactOnRails.setOptions({
-  traceTurbolinks: true
+  traceTurbolinks: true,
+  exceptionLogger: function(e) {
+    console.log('Log from exceptionLogger:', e);
+  }
 });
 
 ReactOnRails.register({
