@@ -365,11 +365,10 @@ ReactOnRails.setStore('#{store_name}', store);
           i18nDefaultLocale: I18n.default_locale,
           httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"]
         }
-
-        if ReactOnRails.configuration.rendering_extension
-          custom_context = ReactOnRails.configuration.rendering_extension.custom_context(self)
-          result.merge!(custom_context) if custom_context
-        end
+      end
+      if ReactOnRails.configuration.rendering_extension
+        custom_context = ReactOnRails.configuration.rendering_extension.custom_context(self)
+        result.merge!(custom_context) if custom_context
       end
       result
     end
