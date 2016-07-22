@@ -4,12 +4,12 @@ namespace :react_on_rails do
   namespace :assets do
     desc "Creates non-digested symlinks for the assets in the public asset dir"
     task symlink_non_digested_assets: :"assets:environment" do
-      ReactOnRails::AssetsPrecompile.symlink_non_digested_assets
+      ReactOnRails::AssetsPrecompile.new.symlink_non_digested_assets
     end
 
     desc "Cleans all broken symlinks for the assets in the public asset dir"
     task delete_broken_symlinks: :"assets:environment" do
-      ReactOnRails::AssetsPrecompile.delete_broken_symlinks
+      ReactOnRails::AssetsPrecompile.new.delete_broken_symlinks
     end
 
     # In this task, set prerequisites for the assets:precompile task
@@ -36,7 +36,7 @@ sh "cd client && `ReactOnRails.configuration.npm_build_production_command`"
 
     desc "Delete assets created with webpack, in the generated assetst directory (/app/assets/webpack)"
     task clobber: :environment do
-      ReactOnRails::AssetsPrecompile.clobber
+      ReactOnRails::AssetsPrecompile.new.clobber
     end
   end
 end
