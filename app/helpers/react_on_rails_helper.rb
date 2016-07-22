@@ -345,7 +345,7 @@ ReactOnRails.setStore('#{store_name}', store);
   def rails_context(server_side:)
     @rails_context ||= begin
       result = {}
-      unless request.nil?
+      if request.present?
         # Using Addressable instead of standard URI to better deal with
         # non-ASCII characters (see https://github.com/shakacode/react_on_rails/pull/405)
         uri = Addressable::URI.parse(request.original_url)
