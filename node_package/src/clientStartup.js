@@ -40,6 +40,10 @@ function forEach(fn, className) {
   }
 }
 
+function turbolinksVersion5() {
+  return (typeof Turbolinks.controller !== 'undefined');
+}
+
 function initializeStore(el) {
   const name = el.getAttribute('data-store-name');
   const props = JSON.parse(el.getAttribute('data-props'));
@@ -154,6 +158,17 @@ function reactOnRailsPageLoaded() {
   forEachComponent(render);
 }
 
+function unmount(el) {
+  const domNodeId = el.getAttribute('data-dom-id');
+  const domNode = document.getElementById(domNodeId);
+  ReactDOM.unmountComponentAtNode(domNode);
+}
+
+function reactOnRailsPageUnloaded() {
+  debugTurbolinks('reactOnRailsPageUnloaded');
+  forEachComponent(unmount);
+}
+
 export default function clientStartup(context) {
   const document = context.document;
 
@@ -173,6 +188,30 @@ export default function clientStartup(context) {
   debugTurbolinks('Adding DOMContentLoaded event to install event listeners.');
 
   document.addEventListener('DOMContentLoaded', () => {
+    // Install listeners when running on the client (browser).
+    // We must do this check for turbolinks AFTER the document is loaded because we load the
+    // Webpack bundles first.
+
+    if (!turbolinksInstalled()) {
+      debugTurbolinks(
+        'NOT USING TURBOLINKS: DOMContentLoaded event, calling reactOnRailsPageLoaded'
+      );
       reactOnRailsPageLoaded();
+    } else {
+      if (turbolinksVersion5()) {
+        debugTurbolinks(
+          'USING TURBOLINKS 5: document added event listeners turbolinks:before-cache and ' +
+          'turbolinks:load.'
+        );
+        document.addEventListener('turbolinks:before-cache', reactOnRailsPageUnloaded);
+        document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
+      } else {
+        debugTurbolinks(
+          'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +
+          'page:change.');
+        document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
+        document.addEventListener('page:change', reactOnRailsPageLoaded);
+      }
+    }
   });
 }
