@@ -201,7 +201,7 @@ and for a store:
 reduxStore = MyReduxStore(props, railsContext);
 ```
 
-Note, you never make these calls. This is what React on Rails does when either server or client rendering. You'll be definining functions that take take these params and return a React component or a Redux Store. 
+Note, you never make these calls. This is what React on Rails does when either server or client rendering. You'll be definining functions that take these params and return a React component or a Redux Store. 
 
 (Note, see below [section](#multiple-react-components-on-a-page-with-one-store) on how to setup redux stores that allow multiple components to talk to the same store.)
 
