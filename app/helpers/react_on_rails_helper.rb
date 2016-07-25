@@ -351,7 +351,7 @@ ReactOnRails.setStore('#{store_name}', store);
         uri = Addressable::URI.parse(request.original_url)
         # uri = Addressable::URI.parse("http://foo.com:3000/posts?id=30&limit=5#time=1305298413")
 
-        result = {
+        result.merge!({
           # URL settings
           href: request.original_url,
           location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}" : ''}",
@@ -365,7 +365,7 @@ ReactOnRails.setStore('#{store_name}', store);
           i18nLocale: I18n.locale,
           i18nDefaultLocale: I18n.default_locale,
           httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"]
-        }
+        })
       end
       if ReactOnRails.configuration.rendering_extension
         custom_context = ReactOnRails.configuration.rendering_extension.custom_context(self)
