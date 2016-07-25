@@ -344,7 +344,7 @@ ReactOnRails.setStore('#{store_name}', store);
   # rubocop:disable Metrics/AbcSize
   def rails_context(server_side:)
     @rails_context ||= begin
-      result = {}
+      result = { inMailer: self.controller.present? && self.controller.kind_of?(ActionMailer::Base) }
       if request.present?
         # Using Addressable instead of standard URI to better deal with
         # non-ASCII characters (see https://github.com/shakacode/react_on_rails/pull/405)
