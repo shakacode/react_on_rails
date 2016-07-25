@@ -3,7 +3,7 @@ module RenderingExtension
   # all calls to react_component and redux_store for rendering
   def self.custom_context(view_context)
     result = {}
-    unless view_context.controller.kind_of?(ActionMailer::Base)
+    unless view_context.controller.is_a?(ActionMailer::Base)
       result = {
         somethingUseful: view_context.session[:something_useful]
       }
