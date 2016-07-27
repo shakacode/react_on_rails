@@ -5,6 +5,8 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 
+- React on Rails now correctly parses single-digit version strings from package.json [#491](https://github.com/shakacode/react_on_rails/pull/491)
+
 ## [6.0.5]
 ##### Added
 - Added better error messages to avoid issues with shared redux stores [#470](https://github.com/shakacode/react_on_rails/pull/470).
@@ -27,19 +29,19 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [6.0.0]
 ##### Breaking Changes
-- Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own assets.rake file that does the precompilation. 
+- Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own assets.rake file that does the precompilation.
   [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808).
 - **Migration to v6**
   - Do not run the generator again if you've already run it.
 
   - See [shakacode/react-webpack-rails-tutorial/pull/287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287) for an    example of upgrading from v5.
-  
+
   - To configure the asset compliation you can either
     1. Specify a `config/react_on_rails` setting for `npm_build_production_command` to be nil to turn this feature off.
     2. Specify the script command you want to run to build your production assets, and remove your assets.rake file.
 
   - If you are using the ReactOnRails test helper, then you will need to add the 'config.npm_build_test_command' to your config to tell react_on_rails what command to run when you run rspec.
-   
+
 - See [shakacode/react-webpack-rails-tutorial #287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287/files) for an upgrade example. The PR has a few comments on the upgrade.
 
 Here is the addition to the generated config file:
@@ -92,7 +94,7 @@ Here is the addition to the generated config file:
 - [Security] Address failure to sanitize console messages when server rendering and displaying in the browser console. See [#366](https://github.com/shakacode/react_on_rails/pull/366) and [#370](https://github.com/shakacode/react_on_rails/pull/370) by [justin808](https://github.com/justin808)
 
 ##### Added
-- railsContext includes the port number and a boolean if the code is being run on the server or client. 
+- railsContext includes the port number and a boolean if the code is being run on the server or client.
 
 ## [5.1.0] - 2016-04-03
 ##### Added
