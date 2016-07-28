@@ -1,5 +1,7 @@
 # Server Rendering Tips
 
+Be sure to use mini_racer. See [issues/428](https://github.com/shakacode/react_on_rails/issues/428)
+
 ## General Tips
 - Your code can't reference `document`. Server side JS execution does not have access to `document`, so jQuery and some
   other libs won't work in this environment. You can debug this by putting in `console.log`
