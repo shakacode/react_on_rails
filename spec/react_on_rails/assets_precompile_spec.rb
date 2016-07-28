@@ -6,7 +6,7 @@ require "tempfile"
 
 module ReactOnRails
   RSpec.describe AssetsPrecompile do
-    let (:assets_path) { Pathname.new(Dir.mktmpdir) }
+    let(:assets_path) { Pathname.new(Dir.mktmpdir) }
 
     describe "#symlink_file" do
       it "creates a proper symlink" do
@@ -35,40 +35,47 @@ module ReactOnRails
     end
 
     describe "symlink_non_digested_assets" do
-      it "creates the necessary symlinks" do
-        manifest_filename = "manifest-alfa.json"
-        digest_filename = "alfa.12345.js"
-        nondigest_filename = "alfa.js"
-        digest_bad_filename = "alfa.12345.jsx"
-        nondigest_bad_filename = "alfa.jsx"
+      let(:digest_filename) { "alfa.12345.js" }
+      let(:nondigest_filename) { "alfa.js" }
 
-        Dir.chdir(assets_path)
-        f = File.new(assets_path.join(manifest_filename), "w")
+      let(:checker) do
+        f = File.new(assets_path.join("manifest-alfa.json"), "w")
         f.write("{\"assets\":{\"#{nondigest_filename}\": \"#{digest_filename}\"}}")
         f.close
 
-        FileUtils.touch assets_path.join(digest_filename)
-        FileUtils.touch assets_path.join("#{digest_filename}.gz")
-        FileUtils.touch assets_path.join(digest_bad_filename)
-
         AssetsPrecompile.new(assets_path: assets_path,
                              symlink_non_digested_assets_regex: Regexp.new('.*\.js$'))
-                        .symlink_non_digested_assets
+      end
 
-        # testing for alfa.js symlink
-        expect(assets_path.join(digest_filename).exist?).to be true
-        expect(assets_path.join(nondigest_filename).lstat.symlink?).to be true
-        expect(File.identical?(assets_path.join(nondigest_filename),
-                               assets_path.join(digest_filename))).to be true
+      context "correct nondigest filename" do
+        it "create valid symlink" do
+          FileUtils.touch assets_path.join(digest_filename)
+          checker.symlink_non_digested_assets
 
-        # testing for alfa.js.gz symlink
-        expect(assets_path.join("#{digest_filename}.gz").exist?).to be true
-        expect(assets_path.join("#{nondigest_filename}.gz").lstat.symlink?).to be true
-        expect(File.identical?(assets_path.join("#{nondigest_filename}.gz"),
-                               assets_path.join("#{digest_filename}.gz"))).to be true
+          expect(assets_path.join(nondigest_filename).lstat.symlink?).to be true
+          expect(File.identical?(assets_path.join(nondigest_filename),
+                                 assets_path.join(digest_filename))).to be true
+        end
+      end
 
-        # testing for NO symlink for alfa.jsx
-        expect(assets_path.join(nondigest_bad_filename).exist?).to be false
+      context "zipped nondigest filename" do
+        it "create valid symlink" do
+          FileUtils.touch assets_path.join("#{digest_filename}.gz")
+          checker.symlink_non_digested_assets
+
+          expect(assets_path.join("#{nondigest_filename}.gz").lstat.symlink?).to be true
+          expect(File.identical?(assets_path.join("#{nondigest_filename}.gz"),
+                                 assets_path.join("#{digest_filename}.gz"))).to be true
+        end
+      end
+
+      context "wrong nondigest filename" do
+        it "should not create symlink" do
+          FileUtils.touch assets_path.join("alfa.12345.jsx")
+          checker.symlink_non_digested_assets
+
+          expect(assets_path.join("alfa.jsx")).not_to exist
+        end
       end
     end
 
@@ -89,7 +96,7 @@ module ReactOnRails
 
     describe "clobber" do
       it "deletes files in ReactOnRails.configuration.generated_assets_dir" do
-        file = Tempfile.new("tempfile", assets_path)
+        file = Tempfile.new("tempfile", Rails.root.join(assets_path))
         expect(file).to exist
         AssetsPrecompile.new(assets_path: assets_path,
                              generated_assets_dir: assets_path).clobber
