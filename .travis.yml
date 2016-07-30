@@ -16,9 +16,6 @@ env:
 
 before_install:
   - sudo apt-get update
-  - curl -L https://github.com/docker/compose/releases/download/1.4.0/docker-compose-`uname -s`-`uname -m` > docker-compose
-  - chmod +x docker-compose
-  - sudo mv docker-compose /usr/local/bin
   - sudo apt-get install -y xvfb libappindicator1 fonts-liberation
   - wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
   - sudo dpkg -i google-chrome*.deb
@@ -34,7 +31,6 @@ install:
   - rake dummy_apps
   - rake examples
   - rake node_package
-  - docker-compose up lint
 
 before_script:
   - "export DISPLAY=:99"
