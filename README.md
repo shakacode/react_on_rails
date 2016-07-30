@@ -545,7 +545,7 @@ config.server_render_method = "NodeJS"
 + [Migration from react-rails](docs/basics/migrating-from-react-rails.md)
 + [Babel](docs/additional-reading/babel.md)
 + [Heroku Deployment](docs/additional-reading/heroku-deployment.md)
-+ [Manual Installation](docs/additional-reading/manual-installation.md)
++ [Recommended Project Structure](docs/additional-reading/recommended-project-structure.md)
 + [Hot Reloading of Assets For Rails Development](docs/additional-reading/hot-reloading-rails-development.md)
 + [Node Dependencies and NPM](docs/additional-reading/node-dependencies-and-npm.md)
 + [React Router](docs/additional-reading/react-router.md)
