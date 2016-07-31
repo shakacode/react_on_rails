@@ -21,7 +21,7 @@ module ReactOnRails
       end
 
       it "creates a proper symlink when nested" do
-        Dir.mkdir(assets_path.join("images"))
+        Dir.mkdir assets_path.join("images")
         filename = "images/" + File.basename(Tempfile.new("tempfile",
                                                           assets_path.join("images")))
         digest_filename = "#{filename}_digest"
@@ -96,11 +96,18 @@ module ReactOnRails
 
     describe "clobber" do
       it "deletes files in ReactOnRails.configuration.generated_assets_dir" do
-        file = Tempfile.new("tempfile", Rails.root.join(assets_path))
-        expect(file).to exist
+        allow(Rails).to receive(:root).and_return(Pathname.new(Dir.mktmpdir))
+
+        generated_assets_dir  = "generated_dir"
+        generated_assets_path = Rails.root.join(generated_assets_dir)
+        Dir.mkdir generated_assets_path
+
+        filepath = Pathname.new(Tempfile.new("tempfile", generated_assets_path))
+
         AssetsPrecompile.new(assets_path: assets_path,
-                             generated_assets_dir: assets_path).clobber
-        expect(file).not_to exist
+                             generated_assets_dir: generated_assets_dir).clobber
+
+        expect(filepath).not_to exist
       end
     end
   end
