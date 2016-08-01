@@ -2,13 +2,13 @@ module RenderingExtension
   # Return a Hash that contains custom values from the view context that will get passed to
   # all calls to react_component and redux_store for rendering
   def self.custom_context(view_context)
-    result = {}
-    unless view_context.controller.is_a?(ActionMailer::Base)
-      result = {
+    if view_context.controller.is_a?(ActionMailer::Base)
+      {}
+    else
+      {
         somethingUseful: view_context.session[:something_useful]
       }
     end
-    result
   end
 end
 

@@ -344,7 +344,12 @@ ReactOnRails.setStore('#{store_name}', store);
   # rubocop:disable Metrics/AbcSize
   def rails_context(server_side:)
     @rails_context ||= begin
-      result = { inMailer: controller.present? && controller.is_a?(ActionMailer::Base) }
+      result = {
+        inMailer: controller.present? && controller.is_a?(ActionMailer::Base),
+        # Locale settings
+        i18nLocale: I18n.locale,
+        i18nDefaultLocale: I18n.default_locale
+      }
       if request.present?
         # Using Addressable instead of standard URI to better deal with
         # non-ASCII characters (see https://github.com/shakacode/react_on_rails/pull/405)
@@ -360,10 +365,6 @@ ReactOnRails.setStore('#{store_name}', store);
           port: uri.port,
           pathname: uri.path, # /posts
           search: uri.query, # id=30&limit=5
-
-          # Locale settings
-          i18nLocale: I18n.locale,
-          i18nDefaultLocale: I18n.default_locale,
           httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"]
         )
       end
