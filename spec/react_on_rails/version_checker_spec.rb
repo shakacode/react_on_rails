@@ -47,6 +47,24 @@ module ReactOnRails
           expect(logger.message).to be_nil
         end
       end
+
+      context "when package json uses a one-digit version string" do
+        let(:node_package_version) do
+          double_package_version(raw: "^6", major: "6")
+        end
+
+        it "does not log a warning" do
+          stub_gem_version("6")
+          check_version(node_package_version, logger)
+          expect(logger.message).to be_nil
+        end
+
+        it "logs a warning" do
+          stub_gem_version("5")
+          check_version(node_package_version, logger)
+          expect(logger.message).to be_present
+        end
+      end
     end
 
     def double_package_version(raw: nil, major: nil, relative_path: false)

@@ -1,5 +1,7 @@
 # Tips for Contributors
-*See [Releasing](./releasing.md) for instructions on releasing.*
+
+* See [docs/contributor-info/Releasing](./docs/contributor-info/releasing.md) for instructions on releasing.
+* See other docs in [docs/contributor-info](./docs/contributor-info)
 
 ## Sumary
 
