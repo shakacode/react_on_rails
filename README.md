@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails)  [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
-Aloha from Justin Gordon and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking new projects. If you like **React on Rails**, please consider contacting me if we could potentially help you in any way. I'm offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development, including both consumer and enterprise products. You can read more about my background [here](http://www.railsonmaui.com/about). Whether you have a new project or need help on an existing project, please email me directly at [justin@shakacode.com](mailto:justin@shakacode.com). And thanks in advance for any referrals! Your support keeps this project going. In addition to React.js and Rails, we're doing react-native iOS and Android apps!
+Aloha from Justin Gordon and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects. If you like **React on Rails**, please consider contacting me if we could potentially help you in any way. I'm offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development, including both consumer and enterprise products. You can read more about my background [here](http://www.railsonmaui.com/about). Whether you have a new project or need help on an existing project, please email me directly at [justin@shakacode.com](mailto:justin@shakacode.com). And thanks in advance for any referrals! Your support keeps this project going. In addition to React.js and Rails, we're doing react-native iOS and Android apps!
 
 Want to become a contributor? See ["easy" issues](https://github.com/shakacode/react_on_rails/labels/easy) and [issues for the tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/issues?q=is%3Aissue+is%3Aopen+label%3Aeasy).
 
@@ -203,7 +203,7 @@ and for a store:
 reduxStore = MyReduxStore(props, railsContext);
 ```
 
-Note, you never make these calls. This is what React on Rails does when either server or client rendering. You'll be defining functions that take these params and return a React component or a Redux Store. 
+Note, you never make these calls. This is what React on Rails does when either server or client rendering. You'll be defining functions that take these params and return a React component or a Redux Store.
 
 (Note, see below [section](#multiple-react-components-on-a-page-with-one-store) on how to setup redux stores that allow multiple components to talk to the same store.)
 
@@ -286,7 +286,7 @@ This is an example of how to expose a component to the `react_component` view he
 #### Different Server-Side Rendering Code (and a Server Specific Bundle)
 
 You may want different initialization for your server rendered components. For example, if you have animation that runs when a component is displayed, you might need to turn that off when server rendering. However, the `railsContext` will tell you if your JavaScript code is running client side or server side. So code that required a different server bundle previously may no longer require this!
- 
+
 If you do want different code to run, you'd setup a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverHelloWorldApp.jsx'. Note, you might be initializing HelloWorld with version specialized for server rendering.
 
 ## ReactOnRails View Helpers API
@@ -446,7 +446,7 @@ Node.js can be used as the backend for server-side rendering instead of [execJS]
 + [Server Rendering Tips](docs/additional-reading/server-rendering-tips.md)
 + [Rails View Rendering from Inline JavaScript](docs/additional-reading/rails_view_rendering_from_inline_javascript.md)
 + [Tips](docs/additional-reading/tips.md)
-+ [Tutorial for up to v5.1.1](docs/tutorial.md), deployed [here](https://shakacode-react-on-rails.herokuapp.com/) (See [Issue #500](https://github.com/shakacode/react_on_rails/issues/500). 
++ [Tutorial for up to v5.1.1](docs/tutorial.md), deployed [here](https://shakacode-react-on-rails.herokuapp.com/) (See [Issue #500](https://github.com/shakacode/react_on_rails/issues/500).
 + [Turbolinks](docs/additional-reading/turbolinks.md)
 + [Webpack Configuration](docs/additional-reading/webpack.md)
 + [Webpack Cookbook](https://christianalfoni.github.io/react-webpack-cookbook/index.html)
@@ -485,7 +485,7 @@ The gem project started with [Justin Gordon](https://github.com/justin808/) pair
 
 We owe much gratitude to the work of the [react-rails gem](https://github.com/reactjs/react-rails).
 
-## A Personal Note From Justin 
+## A Personal Note From Justin
 
 Aloha from Justin Gordon and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking new projects. If you like **React on Rails**, please consider contacting me if we could potentially help you in any way. I'm offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development, including both consumer and enterprise products. You can read more about my background [here](http://www.railsonmaui.com/about). Whether you have a new project or need help on an existing project, please email me directly at [justin@shakacode.com](mailto:justin@shakacode.com). And thanks in advance for any referrals! Your support keeps this project going. In addition to React.js and Rails, we're doing react-native iOS and Android apps!
 
