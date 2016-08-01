@@ -22,6 +22,7 @@ import ReduxSharedStoreApp from './ServerReduxSharedStoreApp';
 import RouterApp from './ServerRouterApp';
 
 import PureComponent from '../components/PureComponent';
+import CssModulesImagesFontsExample from '../components/CssModulesImagesFontsExample';
 
 import SharedReduxStore from '../stores/SharedReduxStore';
 
@@ -35,6 +36,7 @@ ReactOnRails.register({
   RouterApp,
   HelloString,
   PureComponent,
+  CssModulesImagesFontsExample,
 });
 
 ReactOnRails.registerStore({
