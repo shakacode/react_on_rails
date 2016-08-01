@@ -471,7 +471,7 @@ Node.js can be used as the backend for server-side rendering instead of [execJS]
 ## Contributing
 Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant Code of Conduct](docs/code_of_conduct.md)).
 
-See [Contributing](docs/contributor-info/contributing.md) to get started.
+See [Contributing](CONTRIBUTING.md) to get started.
 
 ## License
 The gem is available as open source under the terms of the [MIT License](docs/LICENSE).
