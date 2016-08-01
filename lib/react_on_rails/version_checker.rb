@@ -3,6 +3,7 @@ module ReactOnRails
   # against each otherat runtime.
   class VersionChecker
     attr_reader :node_package_version, :logger
+    MAJOR_VERSION_REGEX = /(\d+)\.?/
 
     def self.build
       new(NodePackageVersion.build, Rails.logger)
@@ -38,7 +39,7 @@ module ReactOnRails
     end
 
     def gem_major_version
-      gem_version.match(/(\d+)\./)[1]
+      gem_version.match(MAJOR_VERSION_REGEX)[1]
     end
 
     class NodePackageVersion
@@ -66,7 +67,7 @@ module ReactOnRails
 
       def major
         return if relative_path?
-        raw.match(/(\d+)\./)[1]
+        raw.match(MAJOR_VERSION_REGEX)[1]
       end
 
       private
