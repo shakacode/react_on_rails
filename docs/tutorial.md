@@ -1,6 +1,5 @@
-# Tutorial for React on Rails (THIS ONLY WORKS UP TO VERSION 5.1.1)
+# Tutorial for React on Rails
 
-*Version 5.2 and greater have removed the non-essential options. See the [changelog](../CHANGELOG.md) for details on what was removed.*
 
 This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
@@ -14,51 +13,61 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 * https://rubygems.org/gems/react_on_rails
 * https://www.npmjs.com/package/react-on-rails
 
-Trying out v4 is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 4.x and node version 5+. I recommend `rvm` and `nvm` to install Ruby and Node.
+##Seting up environment
+
+Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 4.x and node version 5+. I recommend `rvm` and `nvm` to install Ruby and Node.
 
 ```
-cd <directory where you want to create your new Rails app>
+# update to latest stable version number of Node
+nvm install 5.12
+nvm list
+
+# update to latest stable version number of Ruby
+rvm install 2.3.1
+rvm list
+```
+
+Than we need to do normal blank Rails app as following:
+
+```
+cd <basic directory where you want to create your new Rails app>
+
 # any name you like
-rails new test-react-on-rails-3
-cd test-react-on-rails-3
-# git-extras command to make a new git repo and commit everything
-git setup
-vim Gemfile
+rails new test-react-on-rails
+
+cd test-react-on-rails
+
+# git command to make a new git repo and commit everything
+git init
+git add -A
+git commit -m "First commit"
 ```
 
-Add this line to your Gemfile:
+Add **React On Rails** gem to your Gemfile (`vim Gemfile` or `nano Gemfile`):
 
 ```
-gem 'react_on_rails'
+gem 'react_on_rails', '~>6'
 ```
 
+update dependencies and generate empty app via `react_on_rails:install`. If you haven't done first git commit it will generate error and you just need to commit.
 
 ```
 bundle
-bundle exec rails generate react_on_rails:install -R -S -H -L
-bundle && npm i
-npm run rails-server
+rails generate react_on_rails:install
+bundle && npm install
 ```
 
-* R => Redux
-* S => Server Rendering
-* H => Heroku setup
-* L => Linters
-
-
-Visit http://localhost:3000/hello_world and see your React On Rails app running!
+and run server with
 
 ```
-npm run express-server
+foreman start -f Procfile.dev
 ```
 
-<img src="http://forum.shakacode.com/uploads/default/original/1X/5bd396a7f9c0764929b693fb79eb6685ec6f62cf.png" width="470" height="499">
-
-Visit http://localhost:4000 and see your React On Rails app running using the Webpack Dev server.
+Visit http://localhost:5000/hello_world and see your **React On Rails** app running!
 
 With this setup, you can make changes to your JS or CSS and the browser will hot reload the changes (no page refresh required).
 
-I'm going to add this line to client/app/bundles/HelloWorld/HelloWorldWidget.jsx:
+I'm going to add this line to client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx:
 
 ```html
 <h1>Welcome to React On Rails!</h1>
@@ -66,63 +75,7 @@ I'm going to add this line to client/app/bundles/HelloWorld/HelloWorldWidget.jsx
 
 <img src="http://forum.shakacode.com/uploads/default/original/1X/d20719a52541e95ddd968a95192d3247369c3bf6.png" width="498" height="500">
 
-If you save, you'll soon see this screen:
-
-<img src="http://forum.shakacode.com/uploads/default/original/1X/228706a99a411548a4539f72446d3f115ed36f95.png" width="555" height="500">
-
-
-If you're motivated to try the linting setup, you'll want to run the following commands:
-
-     bin/rake lint
-
-You'll see a few rubocop errors.
-
-    rubocop -a
-
-That will fix almost all the errors. However, the linter setup expects you to have rspec (small bug currently). These two commands address that issue:
-
-```
-rm -rf test
-mkdir spec
-```
-
-    bin/rake lint
-
-The edit `application.scss`. Delete the comment at the top.
-
-    bin/rake lint
-
-You should see 
-
-```
-bin/rake lint                                                                                                                                                                                                   
-
-Running via Spring preloader in process 26674
-Running Rubocop Linters via `rubocop -S -D .`
-rubocop -S -D .
-Warning: Deprecated pattern style '/Users/justin/scratch/test-react-on-rails-3/client/node_modules/**/*' in /Users/justin/scratch/test-react-on-rails-3/.rubocop.yml
-Inspecting 22 files
-......................
-
-22 files inspected, no offenses detected
-Running ruby-lint Linters via `ruby-lint app config spec lib`
-ruby-lint app config spec lib
-scss-lint found no lints
-Running eslint via `cd client && npm run eslint . -- --ext .jsx,.js`
-cd client && npm run eslint . -- --ext .jsx,.js
-
-> react-webpack-rails-tutorial@1.1.0 eslint /Users/justin/scratch/test-react-on-rails-3/client
-> eslint --ext .js,.jsx . "." "--ext" ".jsx,.js"
-
-Running jscs via `cd client && npm run jscs .`
-cd client && npm run jscs .
-
-> react-webpack-rails-tutorial@1.1.0 jscs /Users/justin/scratch/test-react-on-rails-3/client
-> jscs --verbose . "."
-
-Completed running all JavaScript Linters
-Completed all linting
-```
+If you save the browser will be updated automatically.
 
 ## RubyMine
 
@@ -131,17 +84,12 @@ It's super important to exclude certain directories from RubyMine or else it wil
 * `app/assets/webpack`
 * `client/node_modules`
 
-<img src="http://forum.shakacode.com/uploads/default/original/1X/a1b3e1146d86915f7d5d1c89548e81ec208458cc.png" width="338" height="500">
-
-
 ## Deploying to Heroku
 
 ### Create Your Heroku App
 *Assuming you can login to heroku.com and have logged into to your shell for heroku.*
 
 1. Visit https://dashboard.heroku.com/new and create an app, say named `my-name-react-on-rails`:
-
-<img src="http://forum.shakacode.com/uploads/default/original/1X/2d1b6abc40eef8e411e84d2679de91353f617567.png" width="690" height="319">
 
 Run this command that looks like this from your new heroku app
 
