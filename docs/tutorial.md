@@ -15,16 +15,17 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 
 ##Seting up environment
 
-Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 4.x and node version 5+. I recommend `rvm` and `nvm` to install Ruby and Node.
+Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 4.x and node version 5+. I recommend `rvm` and `nvm` to install Ruby and Node. Rails can be installed as ordinary gem.
 
 ```
-# update to latest stable version number of Node
-nvm install 5.12
-nvm list
+nvm install 5.12            # download and install latest stable Node
+nvm alias default 5.12      # make 5.12 default version
+nvm list                    # check
 
-# update to latest stable version number of Ruby
-rvm install 2.3.1
-rvm list
+rvm install 2.3.1           # download and install latest stable Ruby
+rvm list                    # check
+
+gem install rails           # download and install latest stable Rails
 ```
 
 Than we need to do normal blank Rails app as following:
@@ -32,21 +33,24 @@ Than we need to do normal blank Rails app as following:
 ```
 cd <basic directory where you want to create your new Rails app>
 
-# any name you like
-rails new test-react-on-rails
+rails new test-react-on-rails       # any name you like
 
 cd test-react-on-rails
+```
 
+Add **React On Rails** gem to your Gemfile (`vim Gemfile` or `nano Gemfile` or in IDE):
+
+```
+gem 'react_on_rails', '~>6'         # use latest gem version > 6
+```
+
+put everything under git repository (or rails generate will not work properly)
+
+```
 # git command to make a new git repo and commit everything
 git init
 git add -A
 git commit -m "First commit"
-```
-
-Add **React On Rails** gem to your Gemfile (`vim Gemfile` or `nano Gemfile`):
-
-```
-gem 'react_on_rails', '~>6'
 ```
 
 update dependencies and generate empty app via `react_on_rails:install`. If you haven't done first git commit it will generate error and you just need to commit.
@@ -57,25 +61,23 @@ rails generate react_on_rails:install
 bundle && npm install
 ```
 
-and run server with
+and than run server with
 
 ```
 foreman start -f Procfile.dev
 ```
 
-Visit http://localhost:5000/hello_world and see your **React On Rails** app running!
+Visit http://localhost:3000/hello_world and see your **React On Rails** app running!
 
-With this setup, you can make changes to your JS or CSS and the browser will hot reload the changes (no page refresh required).
+### Custom IP & PORT setup (Cloud9 example)
 
-I'm going to add this line to client/app/bundles/HelloWorld/components/HelloWorldWidget.jsx:
+In case you are running some custom setup with different IP or PORT you should also edit Procfile.dev. For example to be able to run on free Cloud9 IDE we are putting IP 0.0.0.0 and PORT 8080
 
-```html
-<h1>Welcome to React On Rails!</h1>
+``` Procfile.dev
+web: rails s -p 8080 -b 0.0.0.0
 ```
 
-<img src="http://forum.shakacode.com/uploads/default/original/1X/d20719a52541e95ddd968a95192d3247369c3bf6.png" width="498" height="500">
-
-If you save the browser will be updated automatically.
+Than visit  https://your-shared-addr.c9users.io:8080/hello_world 
 
 ## RubyMine
 
