@@ -23,7 +23,7 @@ module ReactOnRails
       it "creates a proper symlink when nested" do
         Dir.mkdir assets_path.join("test images")
         filename = "test images/" + File.basename(Tempfile.new("temp file",
-                                                          assets_path.join("test images")))
+                                                               assets_path.join("test images")))
         digest_filename = "#{filename} digest"
         AssetsPrecompile.new(assets_path: assets_path)
                         .symlink_file(filename, digest_filename)

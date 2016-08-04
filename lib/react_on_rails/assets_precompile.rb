@@ -42,7 +42,7 @@ module ReactOnRails
         puts "React On Rails: Symlinking \"#{target}\" to \"#{symlink}\""
         dest_path = File.join(@assets_path, target_sub_path)
         FileUtils.chdir(dest_path)
-        File.symlink(File.expand_path(target_filename),File.expand_path(symlink_filename))
+        File.symlink(File.expand_path(target_filename), File.expand_path(symlink_filename))
       end
     end
 
