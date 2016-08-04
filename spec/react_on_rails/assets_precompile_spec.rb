@@ -20,6 +20,27 @@ module ReactOnRails
                                assets_path.join(digest_filename))).to be true
       end
 
+      it "doesn't create global symlink" do
+        filename = File.basename(Tempfile.new("tempfile", assets_path))
+        digest_filename = "#{filename}_digest"
+        AssetsPrecompile.new(assets_path: assets_path)
+                        .symlink_file(filename, digest_filename)
+
+        expect(File.readlink(assets_path.join(digest_filename)).to_s)
+          .not_to eq(File.expand_path(assets_path.join(filename)).to_s)
+      end
+
+      it "creates a proper symlink with spaces in path" do
+        filename = File.basename(Tempfile.new("temp file", assets_path))
+        digest_filename = "#{filename} digest"
+        AssetsPrecompile.new(assets_path: assets_path)
+                        .symlink_file(filename, digest_filename)
+
+        expect(assets_path.join(digest_filename).lstat.symlink?).to be true
+        expect(File.identical?(assets_path.join(filename),
+                               assets_path.join(digest_filename))).to be true
+      end
+
       it "creates a proper symlink when nested" do
         Dir.mkdir assets_path.join("images")
         filename = "images/" + File.basename(Tempfile.new("tempfile",
@@ -48,7 +69,7 @@ module ReactOnRails
       end
 
       context "correct nondigest filename" do
-        it "create valid symlink" do
+        it "creates valid symlink" do
           FileUtils.touch assets_path.join(digest_filename)
           checker.symlink_non_digested_assets
 
@@ -59,7 +80,7 @@ module ReactOnRails
       end
 
       context "zipped nondigest filename" do
-        it "create valid symlink" do
+        it "creates valid symlink" do
           FileUtils.touch assets_path.join("#{digest_filename}.gz")
           checker.symlink_non_digested_assets
 
