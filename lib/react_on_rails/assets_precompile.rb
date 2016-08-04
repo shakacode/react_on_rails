@@ -39,9 +39,11 @@ module ReactOnRails
         # need to cd to directory and then symlink
         target_sub_path, _divider, target_filename = target.rpartition("/")
         _symlink_sub_path, _divider, symlink_filename = symlink.rpartition("/")
-        puts "React On Rails: Symlinking #{target} to #{symlink}"
+        puts "React On Rails: Symlinking \"#{target}\" to \"#{symlink}\""
         dest_path = File.join(@assets_path, target_sub_path)
-        `cd #{dest_path} && ln -s #{target_filename} #{symlink_filename}`
+        FileUtils.chdir(dest_path) do
+          File.symlink(target_filename, symlink_filename)
+        end
       end
     end
 
