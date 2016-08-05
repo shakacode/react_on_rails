@@ -41,8 +41,9 @@ module ReactOnRails
         _symlink_sub_path, _divider, symlink_filename = symlink.rpartition("/")
         puts "React On Rails: Symlinking \"#{target}\" to \"#{symlink}\""
         dest_path = File.join(@assets_path, target_sub_path)
-        FileUtils.chdir(dest_path)
-        File.symlink(File.expand_path(target_filename), File.expand_path(symlink_filename))
+        FileUtils.chdir(dest_path) do
+          File.symlink(target_filename, symlink_filename)
+        end
       end
     end
 
