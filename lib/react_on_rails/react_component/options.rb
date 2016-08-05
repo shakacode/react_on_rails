@@ -4,7 +4,7 @@ module ReactOnRails
       NO_PROPS = {}.freeze
       HIDDEN = "display:none".freeze
 
-      def initialize(name:, options:)
+      def initialize(name, options)
         @name = name
         @options = options
       end
