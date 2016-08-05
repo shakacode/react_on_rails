@@ -256,7 +256,7 @@ module ReactOnRailsHelper
   # Returns Array [0]: html, [1]: script to console log
   # NOTE, these are NOT html_safe!
   def server_rendered_react_component_html(props, react_component_name, dom_id,
-                                           prerender:, trace:, raise_on_prerender_error:)
+                                           prerender, trace, raise_on_prerender_error)
     return { "html" => "", "consoleReplayScript" => "" } unless prerender
 
     # On server `location` option is added (`location = request.fullpath`)
@@ -341,7 +341,7 @@ ReactOnRails.setStore('#{store_name}', store);
 
   # This is the definitive list of the default values used for the rails_context, which is the
   # second parameter passed to both component and store generator functions.
-  def rails_context(server_side:)
+  def rails_context(server_side)
     @rails_context ||= begin
       # Using Addressable instead of standard URI to better deal with
       # non-ASCII characters (see https://github.com/shakacode/react_on_rails/pull/405)
