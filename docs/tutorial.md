@@ -1,5 +1,4 @@
-# Tutorial for React on Rails
-
+# React on Rails Basic Tutorial
 
 This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
