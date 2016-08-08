@@ -5,6 +5,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 
+- React on Rails server rendering now supports contexts outside of browser rendering, such as ActionMailer templates [#486](https://github.com/shakacode/react_on_rails/pull/486) by [eacaps](https://github.com/eacaps)
 - React on Rails now correctly parses single-digit version strings from package.json [#491](https://github.com/shakacode/react_on_rails/pull/491)
 
 ## [6.0.5]
