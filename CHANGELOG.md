@@ -5,16 +5,16 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 
-- React on Rails server rendering now supports contexts outside of browser rendering, such as ActionMailer templates [#486](https://github.com/shakacode/react_on_rails/pull/486) by [eacaps](https://github.com/eacaps)
-- React on Rails now correctly parses single-digit version strings from package.json [#491](https://github.com/shakacode/react_on_rails/pull/491)
+- React on Rails server rendering now supports contexts outside of browser rendering, such as ActionMailer templates [#486](https://github.com/shakacode/react_on_rails/pull/486) by [eacaps](https://github.com/eacaps).
+- React on Rails now correctly parses single-digit version strings from package.json [#491](https://github.com/shakacode/react_on_rails/pull/491) by [samphilipd ](https://github.com/samphilipd ).
 
 ## [6.0.5]
 ##### Added
-- Added better error messages to avoid issues with shared redux stores [#470](https://github.com/shakacode/react_on_rails/pull/470).
+- Added better error messages to avoid issues with shared redux stores [#470](https://github.com/shakacode/react_on_rails/pull/470) by by [justin808](https://github.com/justin808).
 
 ## [6.0.4]
 ##### Fixed
-- Added polyfill for clearTimeout which is used by babel-polyfill [#451](https://github.com/shakacode/react_on_rails/pull/451).
+- Added polyfill for clearTimeout which is used by babel-polyfill [#451](https://github.com/shakacode/react_on_rails/pull/451) by [martyphee](https://github.com/martyphee)
 
 ## [6.0.3]
 ##### Fixed
