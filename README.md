@@ -139,7 +139,7 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
   foreman start -f Procfile.dev
   ```
 
-7. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world)
+7. Visit [localhost:5000/hello_world](http://localhost:5000/hello_world)
 
 ### Installation Summary
 
