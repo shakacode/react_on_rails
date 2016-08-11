@@ -27,6 +27,8 @@ module ReactOnRails
                         .symlink_file(filename, digest_filename)
 
         expect(File.readlink(assets_path.join(digest_filename)).to_s).to eq(filename)
+        expect(File.readlink(assets_path.join(digest_filename)).to_s)
+            .not_to eq(File.expand_path(assets_path.join(filename)).to_s)
       end
 
       it "creates a proper symlink with spaces in path" do
