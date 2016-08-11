@@ -72,6 +72,25 @@ ctx.ReactOnRails = {
     ClientStartup.reactOnRailsPageLoaded();
   },
 
+  authenticityHeader (options) {
+    options = options || {};
+    return Object.assign(options, {
+      'X-CSRF-Token': getAuthenticityToken(),
+      'X-Requested-With': 'XMLHttpRequest'
+    });
+  },
+
+  /**
+   * Return CFRS authenticity token inserted by Rails
+   *
+   * @returns CFRS token
+   */
+
+  getAuthenticityToken () {
+    let header = document.querySelector(`meta[name="csrf-token"]`);
+    return header && header.content;
+  },
+
   ////////////////////////////////////////////////////////////////////////////////
   // INTERNALLY USED APIs
   ////////////////////////////////////////////////////////////////////////////////
