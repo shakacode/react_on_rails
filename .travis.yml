@@ -8,33 +8,40 @@ rvm:
 services:
   - docker
 
+cache:
+  bundler: true
+  directories:
+    - node_modules # NPM packages
+
 gemfile:
   - spec/dummy/Gemfile
 
 env:
-  - export RAILS_ENV=test DRIVER=selenium_chrome CHROME_BIN=/usr/bin/google-chrome
+  global:
+    - RAILS_ENV=test
+    - DRIVER=selenium_chrome
+    - CHROME_BIN=/usr/bin/google-chrome
+    - ENABLE_TURBOLINKS_5=TRUE
 
 before_install:
   - sudo apt-get update
   - sudo apt-get install -y xvfb libappindicator1 fonts-liberation
   - wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
   - sudo dpkg -i google-chrome*.deb
+  - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen scn 1600x1200x16"
 
 install:
-  - rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install 5.10.0
-  - npm install -g npm
-  - npm install -g poltergeist
-  - gem install bundler
-  - bundle install
-  - ENABLE_TURBOLINKS_5=TRUE bundle install
+  - nvm install node
+  - node -v
+  - npm config set spin false
   - npm install
+  - bundle install
   - rake dummy_apps
   - rake examples
   - rake node_package
 
 before_script:
   - "export DISPLAY=:99"
-  - Xvfb :99 -ac -screen scn 1600x1200x16 &
 
 script:
   - rake
@@ -42,4 +49,3 @@ script:
 notifications:
   slack:
     secure: LfcUk4AJ4vAxWwRIyw4tFh8QNbYefMwfG/oLfsN3CdRMWMOtCOHR1GGsRhAOlfVVJ/FvHqVqWj5gK7z7CaO5Uvl7rD3/zJ8QzExKx/iH9yWj55iIPuKLzwFNnBwRpFW/cqyU2lFPPRxGD50BUn3c+qybkuSqtKZ6qtTowwqlxLa5iyM3N95aZp7MEIKCP7cPcnHfLbJyP8wBpotp/rtw62eXM2HIRJJwgjcp+n+My7VFR9DnBXNFf6R91aZHM4U4cHHDbu15HFtH8honVrzK1JQdyqMNHga+j04dFuaS7z9Q369/hsELMOBp/227+Pz7ZRfWZFK4UASguOvyeX7RmGTRpTuWLm1XJeUzfsPZVROecaSVQBve+U7F12yKqilt97QlvRXn2EGyBILqvxtFNNR4S9kgAf72/6EFgiM1TKq7i9zy6lVOnagU2+7amq7UeopX1uoFsUfNKMR7YbgV1WjF0IK95UP0b0/7ZOJlPYgi5zzkQi129qAFWSMmxGk+ZpsttHh/tjJtvAh0A3mHq/zb5w4ub/MbSyZqeDUNgGj72QArOWUFSAStQT1ybsVLeDoKPgOvVq7OV1D64rpcHjBXcqOCit8tDZ+TqkFhcYJo2cITSaqE4zJXn+4F5s7So5O8CyfKYQq+kFJCooYGmfgTUckJpGl7eIvKmL4TN9Q=
-
