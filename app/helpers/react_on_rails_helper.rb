@@ -358,7 +358,7 @@ ReactOnRails.setStore('#{store_name}', store);
         # This is quite a common config as many people on Windows 7 still use IE11.
         begin
           original_url_normalized = request.original_url if request.original_url.present?
-        rescue UndefinedConversionError => ex
+        rescue Encoding::UndefinedConversionError => ex
           original_url_normalized = Utils.utf8_encode_string(request.original_url, 'iso-8859-2')
         end
 
