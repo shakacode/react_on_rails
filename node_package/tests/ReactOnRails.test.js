@@ -124,3 +124,4 @@ test('setStore and getStore', (assert) => {
 
   assert.deepEqual(ReactOnRails.stores(), expected);
 });
+
