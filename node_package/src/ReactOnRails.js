@@ -1,3 +1,4 @@
+import _ from 'lodash';
 import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
 import ComponentRegistry from './ComponentRegistry';
@@ -72,23 +73,29 @@ ctx.ReactOnRails = {
     ClientStartup.reactOnRailsPageLoaded();
   },
 
-  authenticityHeader (options) {
-    options = options || {};
-    return Object.assign(options, {
-      'X-CSRF-Token': getAuthenticityToken(),
-      'X-Requested-With': 'XMLHttpRequest'
-    });
-  },
-
   /**
    * Return CFRS authenticity token inserted by Rails
    *
    * @returns CFRS token
    */
 
-  getAuthenticityToken () {
-    let header = document.querySelector(`meta[name="csrf-token"]`);
-    return header && header.content;
+  getAuthenticityToken() {
+    const token = _.find(document.querySelectorAll('meta'), ['name', 'csrf-token']);
+    return token ? token.content : null;
+  },
+
+  /**
+   *
+   * @param options
+   * @returns {*}
+   */
+
+  authenticityHeader(options) {
+    options = options || {};
+    return Object.assign(options, {
+      'X-CSRF-Token': ReactOnRails.getAuthenticityToken(),
+      'X-Requested-With': 'XMLHttpRequest'
+    });
   },
 
   ////////////////////////////////////////////////////////////////////////////////
