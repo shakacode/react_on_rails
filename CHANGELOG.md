@@ -5,6 +5,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 
+- Option to add an exceptionLogger for the ReactOnRails npm package [#485](https://github.com/shakacode/react_on_rails/pull/485) by [squaresurf](https://github.com/squaresurf)
 - React on Rails server rendering now supports contexts outside of browser rendering, such as ActionMailer templates [#486](https://github.com/shakacode/react_on_rails/pull/486) by [eacaps](https://github.com/eacaps).
 - React on Rails now correctly parses single-digit version strings from package.json [#491](https://github.com/shakacode/react_on_rails/pull/491) by [samphilipd ](https://github.com/samphilipd ).
 - Fixed assets symlinking to correctly use filenames with spaces. Begining in [#510](https://github.com/shakacode/react_on_rails/pull/510), ending in [#513](https://github.com/shakacode/react_on_rails/pull/513) by [dzirtusss](https://github.com/dzirtusss) 
