@@ -351,17 +351,14 @@ ReactOnRails.setStore('#{store_name}', store);
         i18nDefaultLocale: I18n.default_locale
       }
       if request.present?
-        # Check for encoding failure of the request's original_url and try
-        # to recover by force-encoding the URLs inside the payload as utf-8,
-        # assuming they were encoded in Windows Latin-2. This situation can only occur in browsers
-        # that do not encode the entire URL as UTF-8 already, meaning IE11 and lower.
-        # This is quite a common config as many people on Windows 7 still use IE11.
-        begin
-          request.original_url.present? # this is enough to trigger the UndefinedConversionError
-          original_url_normalized = request.original_url
-        rescue Encoding::UndefinedConversionError => _ex
-          ec = Encoding::Converter.new("iso-8859-2", "utf-8")
-          original_url_normalized = ec.convert(request.original_url) + ec.finish
+        # Check for encoding of the request's original_url and try to force-encoding the
+        # URLs as utf-8. This situation can only occur in browsers that do not encode the
+        # entire URL as UTF-8 already, meaning IE11 and lower.
+        original_url_normalized = request.original_url
+        if original_url_normalized.encoding.to_s == "ASCII-8BIT"
+          original_url_normalized = original_url_normalized
+                                      .force_encoding("ISO-8859-1")
+                                      .encode("UTF-8")
         end
 
         # Using Addressable instead of standard URI to better deal with
@@ -371,7 +368,7 @@ ReactOnRails.setStore('#{store_name}', store);
 
         result.merge!(
           # URL settings
-          href: original_url_normalized,
+          href: uri.to_s,
           location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}" : ''}",
           scheme: uri.scheme, # http
           host: uri.host, # foo.com
