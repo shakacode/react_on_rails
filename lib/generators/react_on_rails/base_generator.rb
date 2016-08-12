@@ -23,7 +23,7 @@ module ReactOnRails
       def update_git_ignore
         data = <<-DATA.strip_heredoc
           # React on Rails
-          npm-debug.log
+          npm-debug.log*
           node_modules
 
           # Generated js bundles

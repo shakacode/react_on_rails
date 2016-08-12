@@ -1,4 +1,5 @@
-// Common client-side webpack configuration used by webpack.hot.config and webpack.rails.config.
+// Common client-side webpack configuration used by
+// webpack.client.rails.hot.config and webpack.client.rails.build.config.
 
 const webpack = require('webpack');
 const path = require('path');
@@ -22,9 +23,9 @@ module.exports = {
       'jquery',
     ],
 
-    // This will contain the app entry points defined by webpack.hot.config and webpack.rails.config
+    // This will contain the app entry points defined by
+    // webpack.client.rails.hot.config and webpack.client.rails.build.config
     app: [
-      // './app/assets/styles/global-styles.scss',
       './app/startup/clientRegistration',
     ],
   },

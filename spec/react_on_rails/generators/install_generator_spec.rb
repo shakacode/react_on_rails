@@ -57,7 +57,7 @@ describe InstallGenerator, type: :generator do
         .gitignore was not found.
         Please add the following content to your .gitignore file:
         # React on Rails
-        npm-debug.log
+        npm-debug.log*
         node_modules
 
         # Generated js bundles
