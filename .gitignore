@@ -25,7 +25,7 @@ node_modules
 /node_package/lib
 
 npm-debug.*
-spec/dummy/client/npm-debug.log.*
+spec/dummy/client/npm-debug.log*
 
 /gen-examples
 
