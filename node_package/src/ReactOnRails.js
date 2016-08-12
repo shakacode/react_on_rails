@@ -1,4 +1,3 @@
-import _ from 'lodash';
 import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
 import ComponentRegistry from './ComponentRegistry';
@@ -74,18 +73,18 @@ ctx.ReactOnRails = {
   },
 
   /**
-   * Return CFRS authenticity token inserted by Rails
-   *
-   * @returns CFRS token
+   * Returns CFRS authenticity token inserted by Rails csrf_meta_tags
+   * @returns String or null
    */
 
   getAuthenticityToken() {
-    const token = _.find(document.querySelectorAll('meta'), ['name', 'csrf-token']);
+    /*const token = _.find(document.querySelectorAll('meta'), ['name', 'csrf-token']);*/
+    const token = document.querySelector('meta[name="csrf-token"]');
     return token ? token.content : null;
   },
 
   /**
-   *
+   * Returns header with csrf authenticity token
    * @param options
    * @returns {*}
    */
