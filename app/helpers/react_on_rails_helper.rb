@@ -357,9 +357,10 @@ ReactOnRails.setStore('#{store_name}', store);
         # that do not encode the entire URL as UTF-8 already, meaning IE11 and lower.
         # This is quite a common config as many people on Windows 7 still use IE11.
         begin
-          original_url_normalized = request.original_url if request.original_url.present?
+          request.original_url.present? # this is enough to trigger the UndefinedConversionError
+          original_url_normalized = request.original_url
         rescue Encoding::UndefinedConversionError => _ex
-          ec = Encoding::Converter.new('iso-8859-2', 'utf-8')
+          ec = Encoding::Converter.new("iso-8859-2", "utf-8")
           original_url_normalized = ec.convert(request.original_url) + ec.finish
         end
 
