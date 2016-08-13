@@ -78,7 +78,6 @@ ctx.ReactOnRails = {
    */
 
   getAuthenticityToken() {
-    /*const token = _.find(document.querySelectorAll('meta'), ['name', 'csrf-token']);*/
     const token = document.querySelector('meta[name="csrf-token"]');
     return token ? token.content : null;
   },
