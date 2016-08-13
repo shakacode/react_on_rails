@@ -73,7 +73,7 @@ ctx.ReactOnRails = {
   },
 
   /**
-   * Returns CFRS authenticity token inserted by Rails csrf_meta_tags
+   * Returns CSRF authenticity token inserted by Rails csrf_meta_tags
    * @returns String or null
    */
 
