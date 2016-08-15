@@ -5,6 +5,7 @@ import StoreRegistry from './StoreRegistry';
 import serverRenderReactComponent from './serverRenderReactComponent';
 import buildConsoleReplay from './buildConsoleReplay';
 import createReactElement from './createReactElement';
+import Authenticity from './Authenticity';
 import ReactDOM from 'react-dom';
 import context from './context';
 
@@ -68,6 +69,12 @@ ctx.ReactOnRails = {
     }
   },
 
+  /**
+   * Allow directly calling the page loaded script in case the default events that trigger react
+   * rendering are not sufficient, such as when loading JavaScript asynchronously with TurboLinks:
+   * More details can be found here:
+   * https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/turbolinks.md
+   */
   reactOnRailsPageLoaded() {
     ClientStartup.reactOnRailsPageLoaded();
   },
@@ -77,23 +84,18 @@ ctx.ReactOnRails = {
    * @returns String or null
    */
 
-  getAuthenticityToken() {
-    const token = document.querySelector('meta[name="csrf-token"]');
-    return token ? token.content : null;
+  authenticityToken() {
+    return Authenticity.authenticityToken();
   },
 
   /**
-   * Returns header with csrf authenticity token
-   * @param options
-   * @returns {*}
+   * Returns header with csrf authenticity token and XMLHttpRequest
+   * @param {*} other headers
+   * @returns {*} header
    */
 
-  authenticityHeader(options) {
-    options = options || {};
-    return Object.assign(options, {
-      'X-CSRF-Token': ReactOnRails.getAuthenticityToken(),
-      'X-Requested-With': 'XMLHttpRequest'
-    });
+  authenticityHeaders(otherHeaders = {}) {
+    return Authenticity.authenticityHeaders(otherHeaders);
   },
 
   ////////////////////////////////////////////////////////////////////////////////

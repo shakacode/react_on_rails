@@ -125,24 +125,3 @@ test('setStore and getStore', (assert) => {
   assert.deepEqual(ReactOnRails.stores(), expected);
 });
 
-test('getAuthenticityToken and authenticityHeader', (assert) => {
-  assert.plan(2);
-
-  const testToken = 'TEST_CSRF_TOKEN';
-
-  var meta = document.createElement('meta');
-  meta.name = 'csrf-token';
-  meta.content = testToken;
-  document.head.appendChild(meta);
-
-  var realToken = ReactOnRails.getAuthenticityToken();
-
-  assert.equal(realToken, testToken,
-    'getAuthenticityToken can read Rails CSRF token from <meta>');
-
-  var realHeader = ReactOnRails.authenticityHeader();
-
-  assert.deepEqual(realHeader, { 'X-CSRF-Token': testToken, 'X-Requested-With': 'XMLHttpRequest' },
-    'authenticityHeader returns valid header with CFRS token'
-  );
-});
