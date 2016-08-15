@@ -6,11 +6,9 @@ export default {
   },
 
   authenticityHeaders(otherHeaders = {}) {
-//    options = options || {};
     return Object.assign(otherHeaders, {
       'X-CSRF-Token': this.authenticityToken(),
       'X-Requested-With': 'XMLHttpRequest'
     });
   },
-
-}
+};
