@@ -220,3 +220,9 @@ Docker CI and Tests containers have a xvfd server automatically started for head
 Run `docker-compose build ci` to build the CI container. Run `docker-compose run ci` to start all rspec tests and linting. `docker-compose run --entrypoint=/bin/bash` will override the default CI action and place you inside the CI container in a bash session. This is what is run on Travis-CI.
 
 Run `docker-compose build tests` to build the tests container. Run `docker-compose run tests` to start all RSpec tests.
+
+### Why is my PR not Merged Yet?
+
+[sstephenson](https://github.com/sstephenson) wrote in the [turbolinks](https://github.com/turbolinks/turbolinks) repo:
+
+> [Why this is not still fully merged?](https://github.com/turbolinks/turbolinks/pull/124#issuecomment-239826060)
