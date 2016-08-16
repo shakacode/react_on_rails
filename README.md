@@ -422,7 +422,9 @@ See [ReactOnRails JavaScriptAPI](docs/api/javascript-api.md).
 1. Examples in [spec/dummy/app/views/react_router](spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](spec/dummy/client/app/startup/ServerRouterApp.jsx).
 
 ## Deployment
-* Version 6.0 puts the necessary precompile steps automatically in the rake precompile step. You can, however, disable this by setting certain values to nil in the [config/react_on_rails.rb](config/react_on_rails.rb).
+* Version 6.0 puts the necessary precompile steps automatically in the rake precompile step. You can, however, disable this by setting certain values to nil in the [config/initializers/react_on_rails.rb](spec/dummy/config/initializers/react_on_rails.rb).
+  * `config.symlink_non_digested_assets_regex`: Set to nil to turn off the setup of non-js assets.
+  * `npm_build_production_command`: Set to nil to turn off the precompilation of the js assets.
 * See the [Heroku Deployment](docs/additional-reading/heroku-deployment.md) doc for specifics regarding Heroku.
 * If you're using the node server for server rendering, you may want to do your own AWS install. We'll have more docs on this in the future.
 
@@ -470,7 +472,7 @@ Node.js can be used as the backend for server-side rendering instead of [execJS]
 + Node 5.5 or greater
 
 ## Contributing
-Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant Code of Conduct](docs/code_of_conduct.md)).
+Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant Code of Conduct](docs/misc/code_of_conduct.md)).
 
 See [Contributing](CONTRIBUTING.md) to get started.
 
@@ -490,4 +492,4 @@ We owe much gratitude to the work of the [react-rails gem](https://github.com/re
 
 Aloha from Justin Gordon and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects. If you like **React on Rails**, please consider contacting me if we could potentially help you in any way. I'm offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development, including both consumer and enterprise products. You can read more about my background [here](http://www.railsonmaui.com/about). Whether you have a new project or need help on an existing project, please email me directly at [justin@shakacode.com](mailto:justin@shakacode.com). And thanks in advance for any referrals! Your support keeps this project going. In addition to React.js and Rails, we're doing react-native iOS and Android apps!
 
-I'm also looking for great developers for the ShakaCode team! [Contact me](mailtojustin@shakacode.com) or click [here](http://www.shakacode.com/about/index.html#work-with-us) if you want to work with Rails + React + React-Native on a distributed, worldwide team.
+I'm also looking for great developers for the ShakaCode team! [Contact me](mailto:justin@shakacode.com) or click [here](http://www.shakacode.com/about/index.html#work-with-us) if you want to work with Rails + React + React-Native on a distributed, worldwide team.
