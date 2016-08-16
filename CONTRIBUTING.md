@@ -221,8 +221,8 @@ Run `docker-compose build ci` to build the CI container. Run `docker-compose run
 
 Run `docker-compose build tests` to build the tests container. Run `docker-compose run tests` to start all RSpec tests.
 
-### Why is my PR not Merged Yet?
+# Advice for Project Maintainers and Contributors
 
-[sstephenson](https://github.com/sstephenson) wrote in the [turbolinks](https://github.com/turbolinks/turbolinks) repo:
+What do project maintainers do? What sort of work is involved? [sstephenson](https://github.com/sstephenson) wrote in the [turbolinks](https://github.com/turbolinks/turbolinks) repo:
 
 > [Why this is not still fully merged?](https://github.com/turbolinks/turbolinks/pull/124#issuecomment-239826060)
