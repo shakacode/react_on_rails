@@ -11,6 +11,7 @@ module ReactOnRails
     end
 
     def self.last_process_completed_successfully?
+      # rubocop:disable Style/NumericPredicate
       $CHILD_STATUS.exitstatus == 0
     end
 

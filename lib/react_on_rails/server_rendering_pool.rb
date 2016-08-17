@@ -16,6 +16,7 @@ module ReactOnRails
         end
       end
 
+      # rubocop:disable Style/MethodMissing
       def method_missing(sym, *args, &block)
         pool.send sym, *args, &block
       end
