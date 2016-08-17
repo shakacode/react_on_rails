@@ -34,4 +34,27 @@ The best source of docs is the main [ReactOnRails.js](../../node_package/src/Rea
    * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
    */
   setOptions(options)
+
+  /**
+   * Allow directly calling the page loaded script in case the default events that trigger react
+   * rendering are not sufficient, such as when loading JavaScript asynchronously with TurboLinks:
+   * More details can be found here:
+   * https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/turbolinks.md
+   */
+  reactOnRailsPageLoaded()
+
+  /**
+   * Returns CSRF authenticity token inserted by Rails csrf_meta_tags
+   * @returns String or null
+   */
+
+  authenticityToken()
+
+  /**
+   * Returns header with csrf authenticity token and XMLHttpRequest
+   * @param {*} other headers
+   * @returns {*} header
+   */
+
+  authenticityHeaders(otherHeaders = {})
 ```
