@@ -1,7 +1,6 @@
 // key = name used by react_on_rails
 // value = { name, component, generatorFunction: boolean }
 import generatorFunction from './generatorFunction';
-import context from './context';
 const _components = new Map();
 
 export default {
@@ -36,11 +35,11 @@ export default {
   get(name) {
     if (_components.has(name)) {
       return _components.get(name);
-    } else {
-      const keys = Array.from(_components.keys()).join(', ');
-      throw new Error(`Could not find component registered with name ${name}. \
-Registered component names include [ ${keys} ]. Maybe you forgot to register the component?`);
     }
+
+    const keys = Array.from(_components.keys()).join(', ');
+    throw new Error(`Could not find component registered with name ${name}. \
+Registered component names include [ ${keys} ]. Maybe you forgot to register the component?`);
   },
 
   /**

@@ -1,4 +1,7 @@
 /* eslint-disable react/no-multi-comp */
+/* eslint-disable react/prefer-es6-class */
+/* eslint-disable react/prefer-stateless-function */
+
 import test from 'tape';
 import { createStore } from 'redux';
 import React from 'react';
@@ -84,13 +87,13 @@ test('registerStore throws if passed a falsey object (null, undefined, etc)', (a
 
 test('register store and getStoreGenerator allow registration', (assert) => {
   assert.plan(2);
-  function reducer(state = {}, action) {
+  function reducer() {
     return {};
   }
 
   function storeGenerator(props) {
     return createStore(reducer, props);
-  };
+  }
 
   ReactOnRails.registerStore({ storeGenerator });
 
@@ -104,13 +107,13 @@ ${JSON.stringify(ReactOnRails.storeGenerators())}.`);
 
 test('setStore and getStore', (assert) => {
   assert.plan(2);
-  function reducer(state = {}, action) {
+  function reducer() {
     return {};
   }
 
   function storeGenerator(props) {
     return createStore(reducer, props);
-  };
+  }
 
   const store = storeGenerator({});
 
@@ -124,4 +127,3 @@ test('setStore and getStore', (assert) => {
 
   assert.deepEqual(ReactOnRails.stores(), expected);
 });
-

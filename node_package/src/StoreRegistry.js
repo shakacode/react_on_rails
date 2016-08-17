@@ -1,6 +1,5 @@
 // key = name used by react_on_rails to identify the store
 // value = redux store creator, which is a function that takes props and returns a store
-import context from './context';
 const _storeGenerators = new Map();
 const _stores = new Map();
 
@@ -17,7 +16,7 @@ export default {
 
       const store = storeGenerators[name];
       if (!store) {
-        throw new Error(`Called ReactOnRails.registerStores with a null or undefined as a value ` +
+        throw new Error('Called ReactOnRails.registerStores with a null or undefined as a value ' +
           `for the store generator with key ${name}.`);
       }
 
@@ -40,18 +39,20 @@ export default {
     const storeKeys = Array.from(_stores.keys()).join(', ');
 
     if (storeKeys.length === 0) {
-      const msg = `There are no stores hydrated and you are requesting the store ` +
+      const msg = 'There are no stores hydrated and you are requesting the store ' +
         `${name}. This can happen if you are server rendering and you do not call ` +
-        `redux_store near the top of your controller action's view (not the layout) ` +
-        `and before any call to react_component.`;
+        "redux_store near the top of your controller action's view (not the layout) " +
+        'and before any call to react_component.';
       throw new Error(msg);
     }
 
-    if (throwIfMissing)  {
+    if (throwIfMissing) {
       console.log('storeKeys', storeKeys);
       throw new Error(`Could not find hydrated store with name '${name}'. ` +
         `Hydrated store names include [${storeKeys}].`);
     }
+
+    return undefined;
   },
 
   /**
@@ -62,11 +63,11 @@ export default {
   getStoreGenerator(name) {
     if (_storeGenerators.has(name)) {
       return _storeGenerators.get(name);
-    } else {
-      const storeKeys = Array.from(_storeGenerators.keys()).join(', ');
-      throw new Error(`Could not find store registered with name '${name}'. Registered store ` +
-        `names include [ ${storeKeys} ]. Maybe you forgot to register the store?`);
     }
+
+    const storeKeys = Array.from(_storeGenerators.keys()).join(', ');
+    throw new Error(`Could not find store registered with name '${name}'. Registered store ` +
+      `names include [ ${storeKeys} ]. Maybe you forgot to register the store?`);
   },
 
   /**

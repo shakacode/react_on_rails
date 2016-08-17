@@ -1,5 +1,6 @@
 /* eslint-disable react/no-multi-comp */
 /* eslint-disable react/prefer-es6-class */
+/* eslint-disable react/prefer-stateless-function */
 
 import test from 'tape';
 import ComponentRegistry from '../src/ComponentRegistry';
@@ -19,9 +20,7 @@ test('ComponentRegistry registers and retrieves ES5 class components', (assert) 
   assert.plan(1);
   const C2 = React.createClass({
     render() {
-      return (
-        <div> WORLD </div>
-      );
+      return <div> WORLD </div>;
     },
   });
   ComponentRegistry.register({ C2 });
@@ -81,4 +80,3 @@ test('ComponentRegistry throws error for setting null component', (assert) => {
     'Expected an exception for calling ComponentRegistry.set with a null component.'
   );
 });
-

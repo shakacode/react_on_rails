@@ -5,6 +5,7 @@ spec/dummy
 node_package/lib/
 node_package/tests/node_modules
 node_package/webpack.config.js
+gen-examples
 **/node_modules/**
 **/assets/webpack/**
 **/generated/**
