@@ -8,7 +8,7 @@ Want to become a contributor? See ["easy" issues](https://github.com/shakacode/r
 * Besides consulting on bigger projects, [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for "React on Rails". [Click here](http://www.shakacode.com/work/index.html) for more information.
 * See our article [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724) and see [slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
 * For a complete example, see the [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial) along with the live example at [www.reactrails.com](http://www.reactrails.com).
-* For a quick start, see the [React on Rails Basic Tutorial](docs/tutorial.md).
+* **For a quick start**, see the [React on Rails Basic Tutorial](docs/tutorial.md).
 * The generator of React on Rails does not setup CSS modules and hot reloading via the Rails server as is demonstrated in the [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/). *We do support this, but we don't generate the code.* If you did generate a fresh app from react_on_rails and wanted to move to CSS Modules, then see [PR 175: Babel 6 / CSS Modules / Rails hot reloading](https://github.com/shakacode/react-webpack-rails-tutorial/pull/175). Note, while there are probably fixes after this PR was accepted, this has the majority of the changes. See [the tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/#news) for more information. For more information on how to setup hot reloading in a Rails app, see [Hot Reloading of Assets For Rails Development](docs/additional-reading/hot-reloading-rails-development.md).
 * See [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
 * On Twitter, follow [@railsonmaui](https://twitter.com/railsonmaui) and [@shakacode](https://twitter.com/shakacode) for updates on releases. We've got a forum category dedicated to [react_on_rails](http://forum.shakacode.com/c/rails/reactonrails).
@@ -422,7 +422,9 @@ See [ReactOnRails JavaScriptAPI](docs/api/javascript-api.md).
 1. Examples in [spec/dummy/app/views/react_router](spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](spec/dummy/client/app/startup/ServerRouterApp.jsx).
 
 ## Deployment
-* Version 6.0 puts the necessary precompile steps automatically in the rake precompile step. You can, however, disable this by setting certain values to nil in the [config/react_on_rails.rb](config/react_on_rails.rb).
+* Version 6.0 puts the necessary precompile steps automatically in the rake precompile step. You can, however, disable this by setting certain values to nil in the [config/initializers/react_on_rails.rb](spec/dummy/config/initializers/react_on_rails.rb).
+  * `config.symlink_non_digested_assets_regex`: Set to nil to turn off the setup of non-js assets.
+  * `npm_build_production_command`: Set to nil to turn off the precompilation of the js assets.
 * See the [Heroku Deployment](docs/additional-reading/heroku-deployment.md) doc for specifics regarding Heroku.
 * If you're using the node server for server rendering, you may want to do your own AWS install. We'll have more docs on this in the future.
 
@@ -470,7 +472,7 @@ Node.js can be used as the backend for server-side rendering instead of [execJS]
 + Node 5.5 or greater
 
 ## Contributing
-Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant Code of Conduct](docs/code_of_conduct.md)).
+Bug reports and pull requests are welcome. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant Code of Conduct](docs/misc/code_of_conduct.md)).
 
 See [Contributing](CONTRIBUTING.md) to get started.
 
@@ -490,4 +492,4 @@ We owe much gratitude to the work of the [react-rails gem](https://github.com/re
 
 Aloha from Justin Gordon and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects. If you like **React on Rails**, please consider contacting me if we could potentially help you in any way. I'm offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development, including both consumer and enterprise products. You can read more about my background [here](http://www.railsonmaui.com/about). Whether you have a new project or need help on an existing project, please email me directly at [justin@shakacode.com](mailto:justin@shakacode.com). And thanks in advance for any referrals! Your support keeps this project going. In addition to React.js and Rails, we're doing react-native iOS and Android apps!
 
-I'm also looking for great developers for the ShakaCode team! [Contact me](mailtojustin@shakacode.com) or click [here](http://www.shakacode.com/about/index.html#work-with-us) if you want to work with Rails + React + React-Native on a distributed, worldwide team.
+I'm also looking for great developers for the ShakaCode team! [Contact me](mailto:justin@shakacode.com) or click [here](http://www.shakacode.com/about/index.html#work-with-us) if you want to work with Rails + React + React-Native on a distributed, worldwide team.
