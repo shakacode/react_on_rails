@@ -356,9 +356,7 @@ ReactOnRails.setStore('#{store_name}', store);
         # entire URL as UTF-8 already, meaning IE11 and lower.
         original_url_normalized = request.original_url
         if original_url_normalized.encoding.to_s == "ASCII-8BIT"
-          original_url_normalized = original_url_normalized
-                                      .force_encoding("ISO-8859-1")
-                                      .encode("UTF-8")
+          original_url_normalized = original_url_normalized.force_encoding("ISO-8859-1").encode("UTF-8")
         end
 
         # Using Addressable instead of standard URI to better deal with
