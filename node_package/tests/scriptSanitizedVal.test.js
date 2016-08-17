@@ -1,5 +1,5 @@
 import test from 'tape';
-import scriptSanitizedVal, { consoleReplay } from '../src/scriptSanitizedVal';
+import scriptSanitizedVal from '../src/scriptSanitizedVal';
 
 test('scriptSanitizedVal returns no </script if spaces, uppercase 1', (assert) => {
   assert.plan(1);

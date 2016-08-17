@@ -1,3 +1,5 @@
+/* global ReactOnRails */
+
 import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
 import ComponentRegistry from './ComponentRegistry';
@@ -33,8 +35,8 @@ ctx.ReactOnRails = {
    */
   registerStore(stores) {
     if (!stores) {
-      throw new Error(`Called ReactOnRails.registerStores with a null or undefined, rather than ` +
-        `an Object with keys being the store names and the values are the store generators.`);
+      throw new Error('Called ReactOnRails.registerStores with a null or undefined, rather than ' +
+        'an Object with keys being the store names and the values are the store generators.');
     }
 
     StoreRegistry.register(stores);
@@ -98,9 +100,9 @@ ctx.ReactOnRails = {
     return Authenticity.authenticityHeaders(otherHeaders);
   },
 
-  ////////////////////////////////////////////////////////////////////////////////
+  // /////////////////////////////////////////////////////////////////////////////
   // INTERNALLY USED APIs
-  ////////////////////////////////////////////////////////////////////////////////
+  // /////////////////////////////////////////////////////////////////////////////
 
   /**
    * Retrieve an option by key.

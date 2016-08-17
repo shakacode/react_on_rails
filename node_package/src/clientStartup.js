@@ -1,3 +1,5 @@
+/* global ReactOnRails Turbolinks */
+
 import ReactDOM from 'react-dom';
 
 import createReactElement from './createReactElement';
@@ -21,14 +23,6 @@ function turbolinksInstalled() {
   return (typeof Turbolinks !== 'undefined');
 }
 
-function forEachComponent(fn, railsContext) {
-  forEach(fn, REACT_ON_RAILS_COMPONENT_CLASS_NAME, railsContext);
-}
-
-function forEachStore(railsContext) {
-  forEach(initializeStore, REACT_ON_RAILS_STORE_CLASS_NAME, railsContext);
-}
-
 function forEach(fn, className, railsContext) {
   const els = document.getElementsByClassName(className);
   for (let i = 0; i < els.length; i++) {
@@ -36,8 +30,8 @@ function forEach(fn, className, railsContext) {
   }
 }
 
-function turbolinksVersion5() {
-  return (typeof Turbolinks.controller !== 'undefined');
+function forEachComponent(fn, railsContext) {
+  forEach(fn, REACT_ON_RAILS_COMPONENT_CLASS_NAME, railsContext);
 }
 
 function initializeStore(el, railsContext) {
@@ -46,6 +40,14 @@ function initializeStore(el, railsContext) {
   const storeGenerator = ReactOnRails.getStoreGenerator(name);
   const store = storeGenerator(props, railsContext);
   ReactOnRails.setStore(name, store);
+}
+
+function forEachStore(railsContext) {
+  forEach(initializeStore, REACT_ON_RAILS_STORE_CLASS_NAME, railsContext);
+}
+
+function turbolinksVersion5() {
+  return (typeof Turbolinks.controller !== 'undefined');
 }
 
 /**
@@ -66,7 +68,7 @@ function render(el, railsContext) {
         props,
         domNodeId,
         trace,
-        railsContext
+        railsContext,
       });
 
       if (isRouterResult(reactElementOrRouterResult)) {
@@ -88,9 +90,9 @@ function parseRailsContext() {
   const el = document.getElementById('js-react-on-rails-context');
   if (el) {
     return JSON.parse(el.getAttribute('data-rails-context'));
-  } else {
-    return null;
   }
+
+  return null;
 }
 
 export function reactOnRailsPageLoaded() {
