@@ -53,19 +53,14 @@ export default (options) => {
   console.error(`message: ${e.message}`);
   console.error(`stack: ${e.stack}`);
 
-  msg += `Exception in rendering!
+  if (serverSide) {
+    msg += `Exception in rendering!
 ${e.fileName ? `\nlocation: ${e.fileName}:${e.lineNumber}` : ''}
 Message: ${e.message}
 
 ${e.stack}`;
 
-  if (serverSide) {
     const reactElement = React.createElement('pre', null, msg);
     return ReactDOMServer.renderToString(reactElement);
-  } else {
-    var newError = new Error(msg);
-
-    newError.cause = e;
-    throw newError;
   }
 };

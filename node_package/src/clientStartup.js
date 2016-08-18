@@ -78,11 +78,8 @@ You should return a React.Component always for the client side entry point.`);
       }
     }
   } catch (e) {
-    handleError({
-      e,
-      name,
-      serverSide: false,
-    });
+    e.message = `Exception in rendering ${name}. ${e.message}`;
+    throw e;
   }
 }
 
