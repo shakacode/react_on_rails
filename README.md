@@ -12,7 +12,7 @@ Want to become a contributor? See ["easy" issues](https://github.com/shakacode/r
 
 # React on Rails
 
-**Project Objective**: To provide an opinionated and optimal framework for integrating **Ruby on Rails** with modern JavaScript tooling and libraries, including [**Webpack**](http://webpack.github.io/), [**Babel**](https://babeljs.io/), [**React**](https://facebook.github.io/react/), [**Redux**](https://github.com/reactjs/redux), [**React-Router**](https://github.com/reactjs/react-router). This differs significantly from typical Rails. When considering what goes into **react_on_rails**, we ask ourselves, is the functionality related to the intersection of using Rails and with modern JavaScript? If so, then the functionality belongs right here. In other cases, we're releasing separate npm packages or Ruby gems. If you are interested in implementing React using traditional Rails architecture, see [react-rails](https://github.com/reactjs/react-rails).
+**Project Objective**: To provide an opinionated and optimal framework for integrating **Ruby on Rails** with modern JavaScript tooling and libraries, including [**Webpack**](http://webpack.github.io/), [**Babel**](https://babeljs.io/), [**React**](https://facebook.github.io/react/), [**Redux**](https://github.com/reactjs/redux), [**React-Router**](https://github.com/reactjs/react-router). This differs significantly from typical Rails architecture. When considering what goes into **react_on_rails**, we ask ourselves, is the functionality related to the intersection of using Rails and modern JavaScript? If so, then the functionality belongs right here. In other cases, we're releasing separate npm packages or Ruby gems. If you are interested in implementing React using traditional Rails architecture, see [react-rails](https://github.com/reactjs/react-rails).
 
 React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x and greater is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering, using either **execJS** or a [Node.js server](https://github.com/shakacode/react_on_rails/blob/master/docs%2Fadditional-reading%2Fnode-server-rendering.md). See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
 
@@ -408,7 +408,7 @@ Components are created as [stateless function(al) components](https://facebook.g
 *Note:* You will not be doing any partial updates to the Redux store when loading a new page. When the page content loads, React on Rails will rehydrate a new version of the store with whatever props are placed on the page.
 
 ## ReactOnRails JavaScript API
-See [ReactOnRails JavaScriptAPI](docs/api/javascript-api.md).
+See [ReactOnRails JavaScript API](docs/api/javascript-api.md).
 
 #### Using Rails built-in CSRF protection in JavaScript
 
@@ -443,30 +443,52 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 Node.js can be used as the backend for server-side rendering instead of [execJS](https://github.com/rails/execjs). Before you try this, consider the tradeoff of extra complexity with your deployments versus *potential* performance gains. We've found that using ExecJS with [mini_racer](https://github.com/discourse/mini_racer) to be "fast enough" so far. That being said, we've heard of other large websites using Node.js for better server rendering performance. See [Node.js for Server Rendering](docs/additional-reading/node-server-rendering.md) for more information.
 
 ## Additional Reading
-+ [JavaScript API](docs/api/javascript-api.md)
-+ [Ruby API](docs/api/ruby-api.md)
-+ [Setting up Hot Reloading during Rails Development, API docs](docs/api/ruby-api-hot-reload-view-helpers.md)
-+ [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v4032)
-+ [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
-+ [Installation Overview](docs/basics/installation-overview.md)
-+ [Migration from react-rails](docs/basics/migrating-from-react-rails.md)
-+ [Babel](docs/additional-reading/babel.md)
-+ [Heroku Deployment](docs/additional-reading/heroku-deployment.md)
-+ [Recommended Project Structure](docs/additional-reading/recommended-project-structure.md)
-+ [Hot Reloading of Assets For Rails Development](docs/additional-reading/hot-reloading-rails-development.md)
-+ [Node Dependencies and NPM](docs/additional-reading/node-dependencies-and-npm.md)
-+ [React Router](docs/additional-reading/react-router.md)
-+ [RSpec Configuration](docs/additional-reading/rspec-configuration.md)
-+ [Server Rendering Tips](docs/additional-reading/server-rendering-tips.md)
-+ [Rails View Rendering from Inline JavaScript](docs/additional-reading/rails_view_rendering_from_inline_javascript.md)
-+ [Tips](docs/additional-reading/tips.md)
-+ [React on Rails Basic Tutorial](docs/tutorial.md), deployed [here](https://hello-react-on-rails.herokuapp.com)
-+ [Turbolinks](docs/additional-reading/turbolinks.md)
-+ [Webpack Configuration](docs/additional-reading/webpack.md)
-+ [Webpack Cookbook](https://christianalfoni.github.io/react-webpack-cookbook/index.html)
-+ [Changelog](CHANGELOG.md)
-+ [Projects](PROJECTS.md)
-+ [Developing with the Webpack Dev Server](docs/additional-reading/webpack-dev-server.md)
++ **Rails**
+  + [Rails Assets](docs/additional-reading/rails-assets.md)
+  + [Rails View Rendering from Inline JavaScript](docs/additional-reading/rails_view_rendering_from_inline_javascript.md)
+  + [RSpec Configuration](docs/additional-reading/rspec-configuration.md)
+  + [Turbolinks](docs/additional-reading/turbolinks.md)
+
++ **Javascript**
+  + [Node Dependencies and NPM](docs/additional-reading/node-dependencies-and-npm.md)
+  + [Babel](docs/additional-reading/babel.md)
+  + [React Router](docs/additional-reading/react-router.md)
+  + [React & Redux](docs/additional-reading/react-and-redux.md)
+  + [Webpack](docs/additional-reading/webpack.md)
+  + [Webpack Configuration](docs/additional-reading/webpack.md)
+  + [Webpack Cookbook](https://christianalfoni.github.io/react-webpack-cookbook/index.html)
+  + [Developing with the Webpack Dev Server](docs/additional-reading/webpack-dev-server.md)
+  + [Node Server Rendering](docs/additional-reading/node-server-rendering.md)
+  + [Server Rendering Tips](docs/additional-reading/server-rendering-tips.md)
+
++ **Development**
+  + [React on Rails Basic Installation Tutorial](docs/tutorial.md) ([live demo](https://hello-react-on-rails.herokuapp.com))
+  + [Installation Overview](docs/basics/installation-overview.md)
+  + [Migration from react-rails](docs/basics/migrating-from-react-rails.md)
+  + [Recommended Project Structure](docs/additional-reading/recommended-project-structure.md)
+  + [Generator Tips](docs/basics/generator.md)
+  + [Hot Reloading of Assets For Rails Development](docs/additional-reading/hot-reloading-rails-development.md)
+  + [Heroku Deployment](docs/additional-reading/heroku-deployment.md)
+  + [Updating Dependencies](docs/additional-reading/updating-dependencies.md)
+
++ **API**
+  + [JavaScript API](docs/api/javascript-api.md)
+  + [Ruby API](docs/api/ruby-api.md)
+  + [Setting up Hot Reloading during Rails Development, API docs](docs/api/ruby-api-hot-reload-view-helpers.md)
+
++ **[CONTRIBUTING](CONTRIBUTING.MD)**
+  + [Generator Testing](docs/contributor-info/generator-testing.md)
+  + [Linting](docs/contributor-info/linters.md)
+  + [Releasing](docs/contributor-info/releasing.md)
+
++ **Misc**
+  + [Tips](docs/additional-reading/tips.md)
+  + [Changelog](CHANGELOG.md)
+  + [Projects](PROJECTS.md)
+  + [Shaka Code Style](docs/coding-style/style.md)
+  + [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v4032)
+  + [Code of Conduct](docs/misc/code_of_conduct.md)
+  + [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 
 ## Demos
 + [www.reactrails.com](http://www.reactrails.com) with the source at [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/).
