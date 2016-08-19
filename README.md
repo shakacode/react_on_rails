@@ -16,42 +16,6 @@ Want to become a contributor? See ["easy" issues](https://github.com/shakacode/r
 
 React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x and greater is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering, using either **execJS** or a [Node.js server](https://github.com/shakacode/react_on_rails/blob/master/docs%2Fadditional-reading%2Fnode-server-rendering.md). See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
 
-## Including your React Component in your Rails Views
-Please see [Getting Started](#getting-started) for how to set up your Rails project for React on Rails to understand how `react_on_rails` can see your ReactComponents.
-
-+ *Normal Mode (React component will be rendered on client):*
-
-  ```erb
-  <%= react_component("HelloWorldApp", props: @some_props) %>
-  ```
-+ *Server-Side Rendering (React component is first rendered into HTML on the server):*
-
-  ```erb
-  <%= react_component("HelloWorldApp", props: @some_props, prerender: true) %>
-  ```
-
-+ The `component_name` parameter is a string matching the name you used to expose your React component globally. So, in the above examples, if you had a React component named "HelloWorldApp," you would register it with the following lines:
-
-  ```js
-  import ReactOnRails from 'react-on-rails';
-  import HelloWorldApp from './HelloWorldApp';
-  ReactOnRails.register({ HelloWorldApp });
-  ```
-
-  Exposing your component in this way is how React on Rails is able to reference your component from a Rails view. You can expose as many components as you like, as long as their names do not collide. See below for the details of how you expose your components via the react_on_rails webpack configuration.
-
-+ `@some_props` can be either a hash or JSON string. This is an optional argument assuming you do not need to pass any options (if you want to pass options, such as `prerender: true`, but you do not want to pass any properties, simply pass an empty hash `{}`). This will make the data available in your component:
-
-  ```ruby
-    # Rails View
-    <%= react_component("HelloWorldApp", props: { name: "Stranger" }) %>
-  ```
-
-  ```javascript
-    // inside your React component
-    this.props.name // "Stranger"
-  ```
-
 ## Documentation
 
 + [Features](#features)
@@ -59,6 +23,7 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
 + [Getting Started](#getting-started)
     - [Installation Summary](#installation-summary)
     - [Initializer Configuration: config/initializers/react_on_rails.rb](#initializer-configuration)
+	  - [Including your React Component in your Rails Views](#including-your-react-component-in-your-rails-views)
 + [How it Works](#how-it-works)
     - [Client-Side Rendering vs. Server-Side Rendering](#client-side-rendering-vs-server-side-rendering)
     - [Building the Bundles](#building-the-bundles)
@@ -100,6 +65,7 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
 For a complete example, see our live demo at [www.reactrails.com](http://www.reactrails.com). ([Source Code](https://github.com/shakacode/react-webpack-rails-tutorial))
 
 ## Getting Started
+
 **For more detailed instructions**, see the [React on Rails Basic Tutorial](docs/tutorial.md).
 1. Add the following to your Gemfile and bundle install.
 
@@ -143,6 +109,41 @@ See the [Installation Overview](docs/basics/installation-overview.md) for a conc
 
 Configure the `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [spec/dummy/config/initializers/react_on_rails.rb](spec/dummy/config/initializers/react_on_rails.rb) for a detailed example of configuration, including comments on the different values to configure.
 
+### Including your React Component in your Rails Views
+
++ *Normal Mode (React component will be rendered on client):*
+
+  ```erb
+  <%= react_component("HelloWorldApp", props: @some_props) %>
+  ```
++ *Server-Side Rendering (React component is first rendered into HTML on the server):*
+
+  ```erb
+  <%= react_component("HelloWorldApp", props: @some_props, prerender: true) %>
+  ```
+
++ The `component_name` parameter is a string matching the name you used to expose your React component globally. So, in the above examples, if you had a React component named "HelloWorldApp," you would register it with the following lines:
+
+  ```js
+  import ReactOnRails from 'react-on-rails';
+  import HelloWorldApp from './HelloWorldApp';
+  ReactOnRails.register({ HelloWorldApp });
+  ```
+
+  Exposing your component in this way is how React on Rails is able to reference your component from a Rails view. You can expose as many components as you like, as long as their names do not collide. See below for the details of how you expose your components via the react_on_rails webpack configuration.
+
++ `@some_props` can be either a hash or JSON string. This is an optional argument assuming you do not need to pass any options (if you want to pass options, such as `prerender: true`, but you do not want to pass any properties, simply pass an empty hash `{}`). This will make the data available in your component:
+
+  ```ruby
+    # Rails View
+    <%= react_component("HelloWorldApp", props: { name: "Stranger" }) %>
+  ```
+
+  ```javascript
+    // inside your React component
+    this.props.name // "Stranger"
+  ```
+  
 ## NPM
 All JavaScript in React On Rails is loaded from npm: [react-on-rails](https://www.npmjs.com/package/react-on-rails). To manually install this (you did not use the generator), assuming you have a standard configuration, run this command:
 
