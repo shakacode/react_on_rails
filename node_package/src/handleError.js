@@ -35,7 +35,7 @@ component \'${name}\' is not a generator function.\n${lastLine}`;
   return msg;
 }
 
-export default (options) => {
+const handleError = (options) => {
   const { e, jsCode, serverSide } = options;
 
   console.error('Exception in rendering!');
@@ -64,3 +64,5 @@ ${e.stack}`;
     return ReactDOMServer.renderToString(reactElement);
   }
 };
+
+export default handleError;
