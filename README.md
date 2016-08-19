@@ -1,17 +1,8 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails)  [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
-Aloha from Justin Gordon and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects. If you like **React on Rails**, please consider contacting me if we could potentially help you in any way. I'm offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development, including both consumer and enterprise products. You can read more about my background [here](http://www.railsonmaui.com/about). Whether you have a new project or need help on an existing project, please email me directly at [justin@shakacode.com](mailto:justin@shakacode.com). And thanks in advance for any referrals! Your support keeps this project going. In addition to React.js and Rails, we're doing react-native iOS and Android apps!
+Aloha from Justin Gordon and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects. If you like **React on Rails**, please consider contacting me if we could potentially help you in any way. Besides consulting on bigger projects, [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for React on Rails. [Click here](http://www.shakacode.com/work/index.html) for more information. I'm offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development, including both consumer and enterprise products. You can read more about my background [here](http://www.railsonmaui.com/about). Whether you have a new project or need help on an existing project, please email me directly at [justin@shakacode.com](mailto:justin@shakacode.com). And thanks in advance for any referrals! Your support keeps this project going. In addition to React.js and Rails, we're doing react-native iOS and Android apps!
 
 Want to become a contributor? See ["easy" issues](https://github.com/shakacode/react_on_rails/labels/easy) and [issues for the full tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/issues?q=is%3Aissue+is%3Aopen+label%3Aeasy).
-
-# NOTES
-* Besides consulting on bigger projects, [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for "React on Rails". [Click here](http://www.shakacode.com/work/index.html) for more information.
-* See our article [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724) and see [slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
-* For a complete example, see the [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial) along with the live example at [www.reactrails.com](http://www.reactrails.com).
-* **For a quick start**, see the [React on Rails Basic Tutorial](docs/tutorial.md).
-* The generator of React on Rails does not setup CSS modules and hot reloading via the Rails server as is demonstrated in the [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/). *We do support this, but we don't generate the code.* If you did generate a fresh app from react_on_rails and wanted to move to CSS Modules, then see [PR 175: Babel 6 / CSS Modules / Rails hot reloading](https://github.com/shakacode/react-webpack-rails-tutorial/pull/175). Note, while there are probably fixes after this PR was accepted, this has the majority of the changes. See [the tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/#news) for more information. For more information on how to setup hot reloading in a Rails app, see [Hot Reloading of Assets For Rails Development](docs/additional-reading/hot-reloading-rails-development.md).
-* See [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
-* On Twitter, follow [@railsonmaui](https://twitter.com/railsonmaui) and [@shakacode](https://twitter.com/shakacode) for updates on releases. We've got a forum category dedicated to [react_on_rails](http://forum.shakacode.com/c/rails/reactonrails).
 
 # NEWS
 * 2016-07-28: If you're doing server rendering, be sure to use mini\_racer! See [issues/428](https://github.com/shakacode/react_on_rails/issues/428). It's supposedly much faster than `execjs`.
@@ -106,7 +97,10 @@ Universal React with Rails: Part I](https://medium.com/@alexfedoseev/isomorphic-
 
 We're definitely not doing that. With react_on_rails, webpack is mainly generating a nice JavaScript file for inclusion into `application.js`. We're going to KISS. And that's all relative given how much there is to get right in an enterprise class web application.
 
+For a complete example, see our live demo at [www.reactrails.com](http://www.reactrails.com). ([Source Code](https://github.com/shakacode/react-webpack-rails-tutorial))
+
 ## Getting Started
+**For more detailed instructions**, see the [React on Rails Basic Tutorial](docs/tutorial.md).
 1. Add the following to your Gemfile and bundle install.
 
   ```ruby
@@ -503,3 +497,7 @@ The origins of the project began with the need to do a rich JavaScript interface
 The gem project started with [Justin Gordon](https://github.com/justin808/) pairing with [Samnang Chhun](https://github.com/samnang) to figure out how to do server rendering with Webpack plus Rails. [Alex Fedoseev](https://github.com/alexfedoseev) then joined in. [Rob Wise](https://github.com/robwise), [Aaron Van Bokhoven](https://github.com/aaronvb), and [Andy Wang](https://github.com/yorzi) did the bulk of the generators. Many others have [contributed](https://github.com/shakacode/react_on_rails/graphs/contributors).
 
 We owe much gratitude to the work of the [react-rails gem](https://github.com/reactjs/react-rails).
+
+# FINAL NOTES
+* See [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
+* On Twitter, follow [@railsonmaui](https://twitter.com/railsonmaui) and [@shakacode](https://twitter.com/shakacode) for updates on releases. We've got a forum category dedicated to [react_on_rails](http://forum.shakacode.com/c/rails/reactonrails).
