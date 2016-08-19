@@ -448,7 +448,7 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 ## Integration with Node
 Node.js can be used as the backend for server-side rendering instead of [execJS](https://github.com/rails/execjs). Before you try this, consider the tradeoff of extra complexity with your deployments versus *potential* performance gains. We've found that using ExecJS with [mini_racer](https://github.com/discourse/mini_racer) to be "fast enough" so far. That being said, we've heard of other large websites using Node.js for better server rendering performance. See [Node.js for Server Rendering](docs/additional-reading/node-server-rendering.md) for more information.
 
-## Additional Reading
+## Additional Documentation
 + **Rails**
   + [Rails Assets](docs/additional-reading/rails-assets.md)
   + [Rails View Rendering from Inline JavaScript](docs/additional-reading/rails_view_rendering_from_inline_javascript.md)
