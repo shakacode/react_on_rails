@@ -13,6 +13,21 @@ For non-doc fixes:
 * Please address all code review comments.
 * Ensure that docs are updated accordingly if a feature is added.
 
+## Commit Messages
+
+From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/)
+
+#### The seven rules of a great git commit message
+> Keep in mind: This has all been said before.
+
+1. Separate subject from body with a blank line
+1. Limit the subject line to 50 characters
+1. Capitalize the subject line
+1. Do not end the subject line with a period
+1. Use the imperative mood in the subject line
+1. Wrap the body at 72 characters
+1. Use the body to explain what and why vs. how
+
 
 ## To run tests:
 * After updating code via git, to prepare all examples and run all tests:
