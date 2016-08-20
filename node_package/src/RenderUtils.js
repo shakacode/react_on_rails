@@ -1,10 +1,10 @@
 export default {
-  wrapInScriptTags(scriptBody) {
+  wrapInScriptTags(scriptId, scriptBody) {
     if (!scriptBody) {
       return '';
     }
 
-    return `\n<script>
+    return `\n<script id="${scriptId}">
 ${scriptBody}
 </script>`;
   },
