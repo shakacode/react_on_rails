@@ -84,7 +84,7 @@ test('buildConsoleReplay wraps console replay in a script tag', (assert) => {
   // https://github.com/jscs-dev/node-jscs/issues/2137
   // jscs:disable disallowSpacesInsideTemplateStringPlaceholders
   const expected = `
-<script>
+<script script id="consoleReplayLog">
 console.log.apply(console, ["some message","{\\"a\\":1,\\"b\\":2}"]);
 console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);
 </script>`;
