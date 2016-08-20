@@ -89,6 +89,7 @@ module ReactOnRailsHelper
   #   raise_on_prerender_error: <true/false> Default to false. True will raise exception on server
   #      if the JS code throws
   # Any other options are passed to the content tag, including the id.
+  # rubocop:disable Metrics/AbcSize
   def react_component(component_name, raw_options = {})
     # Create the JavaScript and HTML to allow either client or server rendering of the
     # react_component.
@@ -105,11 +106,10 @@ module ReactOnRailsHelper
     component_specification_tag =
       content_tag(:script,
                   class: "js-react-on-rails-component",
-                  style: options.style,
+                  style: nil,
                   data: options.data) do
-        "var #{options.dom_id.tr('-', '_')} = #{Yajl.dump(options.props.is_a?(String) ?
-                                                              JSON.parse(options.props) :
-                                                              options.props)};".html_safe
+        props = Yajl.dump(options.props.is_a?(String) ? JSON.parse(options.props) : options.props)
+        "var #{options.dom_id.tr('-', '_')} = #{props};".html_safe
       end
 
     # Create the HTML rendering part
@@ -234,7 +234,7 @@ module ReactOnRailsHelper
 
     rails_context_content = content_tag(:script,
                                         id: "js-react-on-rails-context",
-                                        style: ReactOnRails.configuration.skip_display_none ? nil : "display:none") do
+                                        style: nil) do
       "var #{'js-react-on-rails-context'.tr('-', '_')} = #{Yajl.dump(rails_context(server_side: false))};".html_safe
     end
     "#{render_value}\n#{rails_context_content}".html_safe
@@ -244,7 +244,7 @@ module ReactOnRailsHelper
     result = content_tag(:script,
                          "",
                          class: "js-react-on-rails-store",
-                         style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
+                         style: nil,
                          data: redux_store_data) do
       # redux_store_data
       "var #{redux_store_data[:store_name].tr('-', '_')} = #{Yajl.dump(redux_store_data[:props])};".html_safe
