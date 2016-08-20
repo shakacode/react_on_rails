@@ -1,8 +1,11 @@
 /* eslint-disable react/no-multi-comp */
 /* eslint-disable react/prefer-es6-class */
+/* eslint-disable react/prefer-stateless-function */
+/* eslint-disable react/jsx-filename-extension */
 
 import test from 'tape';
 import React from 'react';
+
 import generatorFunction from '../src/generatorFunction';
 
 test('generatorFunction: ES5 Component recognized as React.Component', (assert) => {
