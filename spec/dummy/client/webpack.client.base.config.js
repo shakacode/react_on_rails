@@ -1,4 +1,5 @@
-// Common client-side webpack configuration used by webpack.hot.config and webpack.rails.config.
+// Common client-side webpack configuration used by
+// webpack.client.rails.hot.config and webpack.client.rails.build.config.
 
 const webpack = require('webpack');
 const path = require('path');
@@ -22,7 +23,8 @@ module.exports = {
       'jquery',
     ],
 
-    // This will contain the app entry points defined by webpack.hot.config and webpack.rails.config
+    // This will contain the app entry points defined by
+    // webpack.client.rails.hot.config and webpack.client.rails.build.config
     app: [
       './app/startup/clientRegistration',
     ],
@@ -60,9 +62,10 @@ module.exports = {
   ],
   module: {
     loaders: [
-      { test: /\.(woff2?|svg)$/, loader: 'url?limit=10000' },
       { test: /\.(ttf|eot)$/, loader: 'file' },
-      { test: /\.(jpe?g|png|gif|svg|ico)$/, loader: 'url?limit=10000' },
+
+      // Example to confirm that subdirectories work
+      { test: /\.(jpe?g|png|gif|svg|ico|woff2?)$/, loader: 'url?limit=10000&name=images/[hash].[ext]' },
       { test: require.resolve('jquery'), loader: 'expose?jQuery' },
       { test: require.resolve('jquery'), loader: 'expose?$' },
     ],

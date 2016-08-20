@@ -5,6 +5,7 @@ import StoreRegistry from './StoreRegistry';
 import serverRenderReactComponent from './serverRenderReactComponent';
 import buildConsoleReplay from './buildConsoleReplay';
 import createReactElement from './createReactElement';
+import Authenticity from './Authenticity';
 import ReactDOM from 'react-dom';
 import context from './context';
 
@@ -28,9 +29,14 @@ ctx.ReactOnRails = {
    * Allows registration of store generators to be used by multiple react components on one Rails
    * view. store generators are functions that take one arg, props, and return a store. Note that
    * the setStore API is different in tha it's the actual store hydrated with props.
-   * @param stores (key is store name, value is the store generator)
+   * @param stores (keys are store names, values are the store generators)
    */
   registerStore(stores) {
+    if (!stores) {
+      throw new Error(`Called ReactOnRails.registerStores with a null or undefined, rather than ` +
+        `an Object with keys being the store names and the values are the store generators.`);
+    }
+
     StoreRegistry.register(stores);
   },
 
@@ -63,8 +69,33 @@ ctx.ReactOnRails = {
     }
   },
 
+  /**
+   * Allow directly calling the page loaded script in case the default events that trigger react
+   * rendering are not sufficient, such as when loading JavaScript asynchronously with TurboLinks:
+   * More details can be found here:
+   * https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/turbolinks.md
+   */
   reactOnRailsPageLoaded() {
     ClientStartup.reactOnRailsPageLoaded();
+  },
+
+  /**
+   * Returns CSRF authenticity token inserted by Rails csrf_meta_tags
+   * @returns String or null
+   */
+
+  authenticityToken() {
+    return Authenticity.authenticityToken();
+  },
+
+  /**
+   * Returns header with csrf authenticity token and XMLHttpRequest
+   * @param {*} other headers
+   * @returns {*} header
+   */
+
+  authenticityHeaders(otherHeaders = {}) {
+    return Authenticity.authenticityHeaders(otherHeaders);
   },
 
   ////////////////////////////////////////////////////////////////////////////////

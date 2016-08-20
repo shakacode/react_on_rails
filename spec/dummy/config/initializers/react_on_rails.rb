@@ -2,9 +2,13 @@ module RenderingExtension
   # Return a Hash that contains custom values from the view context that will get passed to
   # all calls to react_component and redux_store for rendering
   def self.custom_context(view_context)
-    {
-      somethingUseful: view_context.session[:something_useful]
-    }
+    if view_context.controller.is_a?(ActionMailer::Base)
+      {}
+    else
+      {
+        somethingUseful: view_context.session[:something_useful]
+      }
+    end
   end
 end
 
@@ -14,7 +18,7 @@ ReactOnRails.configure do |config|
   config.generated_assets_dir = File.join(%w(app assets webpack))
 
   # Define the files we need to check for webpack compilation when running tests.
-  config.webpack_generated_files = %w( app-bundle.js vendor-bundle.js server-bundle.js )
+  config.webpack_generated_files = %w(app-bundle.js vendor-bundle.js server-bundle.js)
 
   # This is the file used for server rendering of React when using `(prerender: true)`
   # If you are never using server rendering, you may set this to "".
@@ -81,7 +85,7 @@ ReactOnRails.configure do |config|
   config.server_render_method = "ExecJS"
 
   # Client js uses assets not digested by rails.
-  # For any asset matching this regex, non-digested symlink will be created
-  # To disable symlinks set this parameter to nil.
-  config.symlink_non_digested_assets_regex = /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg)/
+  # For any asset matching this regex, a file is copied to the correct path to have a digest.
+  # To disable creating digested assets, set this parameter to nil.
+  config.symlink_non_digested_assets_regex = /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/
 end

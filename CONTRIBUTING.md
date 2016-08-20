@@ -1,5 +1,7 @@
 # Tips for Contributors
-*See [Releasing](./releasing.md) for instructions on releasing.*
+
+* See [docs/contributor-info/Releasing](./docs/contributor-info/releasing.md) for instructions on releasing.
+* See other docs in [docs/contributor-info](./docs/contributor-info)
 
 ## Sumary
 
@@ -10,6 +12,21 @@ For non-doc fixes:
 * Squash all commits down to one with a nice commit message *ONLY* once final review is given. Make sure this single commit is rebased on top of master.
 * Please address all code review comments.
 * Ensure that docs are updated accordingly if a feature is added.
+
+## Commit Messages
+
+From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/)
+
+#### The seven rules of a great git commit message
+> Keep in mind: This has all been said before.
+
+1. Separate subject from body with a blank line
+1. Limit the subject line to 50 characters
+1. Capitalize the subject line
+1. Do not end the subject line with a period
+1. Use the imperative mood in the subject line
+1. Wrap the body at 72 characters
+1. Use the body to explain what and why vs. how
 
 
 ## To run tests:
@@ -218,3 +235,9 @@ Docker CI and Tests containers have a xvfd server automatically started for head
 Run `docker-compose build ci` to build the CI container. Run `docker-compose run ci` to start all rspec tests and linting. `docker-compose run --entrypoint=/bin/bash` will override the default CI action and place you inside the CI container in a bash session. This is what is run on Travis-CI.
 
 Run `docker-compose build tests` to build the tests container. Run `docker-compose run tests` to start all RSpec tests.
+
+# Advice for Project Maintainers and Contributors
+
+What do project maintainers do? What sort of work is involved? [sstephenson](https://github.com/sstephenson) wrote in the [turbolinks](https://github.com/turbolinks/turbolinks) repo:
+
+> [Why this is not still fully merged?](https://github.com/turbolinks/turbolinks/pull/124#issuecomment-239826060)

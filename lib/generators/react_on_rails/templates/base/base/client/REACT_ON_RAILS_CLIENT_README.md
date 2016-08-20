@@ -5,5 +5,5 @@ See documentation [at github.com/shakacode/react_on_rails](https://github.com/sh
 If you need additional help, please consider:
 
 * [Our ShakaCode Forum for React on Rails](https://forum.shakacode.com/c/rails/reactonrails).
-* Joining our Slack discussion room by [email us a bit about you and your project](mailto:contact@shakacode.com).
+* Joining our Slack discussion room by [emailing us a bit about you and your project](mailto:contact@shakacode.com).
 * [Hiring us](https://forum.shakacode.com/c/rails/reactonrails) for coaching and custom web application development for your project.
