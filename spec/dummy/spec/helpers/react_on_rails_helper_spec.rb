@@ -139,7 +139,8 @@ describe ReactOnRailsHelper, type: :helper do
       %(<script class="js-react-on-rails-store"
             style="display:none"
             data-store-name="reduxStore"
-            data-props="{&quot;name&quot;:&quot;My Test Name&quot;}">var reduxStore = {"name":"My Test Name"};</script>).squish
+            data-props="{&quot;name&quot;:&quot;My Test Name&quot;}">var reduxStore = {"name":"My Test Name"};
+      </script>).squish
     end
 
     it { expect(self).to respond_to :redux_store }
@@ -155,7 +156,8 @@ describe ReactOnRailsHelper, type: :helper do
       let(:react_store_definition_script_skip_display_none_true) do
         %(<script class="js-react-on-rails-store"
             data-store-name="reduxStore"
-            data-props="{&quot;name&quot;:&quot;My Test Name&quot;}">var reduxStore = {"name":"My Test Name"};</script>).squish
+            data-props="{&quot;name&quot;:&quot;My Test Name&quot;}">var reduxStore = {"name":"My Test Name"};
+        </script>).squish
       end
 
       it { is_expected.to include react_store_definition_script_skip_display_none_true }

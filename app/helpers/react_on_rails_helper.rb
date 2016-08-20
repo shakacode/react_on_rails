@@ -107,7 +107,9 @@ module ReactOnRailsHelper
                   class: "js-react-on-rails-component",
                   style: options.style,
                   data: options.data) do
-        "var #{options.dom_id.tr('-', '_')} = #{Yajl.dump(options.props.is_a?(String) ? JSON.parse(options.props) : options.props)};".html_safe
+        "var #{options.dom_id.tr('-', '_')} = #{Yajl.dump(options.props.is_a?(String) ?
+                                                              JSON.parse(options.props) :
+                                                              options.props)};".html_safe
       end
 
     # Create the HTML rendering part
