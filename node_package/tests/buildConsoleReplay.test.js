@@ -61,7 +61,9 @@ test('consoleReplay replays converts script tag inside of object string to be sa
   assert.plan(1);
   console.history = [
     { arguments: ['some message </script><script>alert(\'WTF\')</script>',
-      { a: 'Wow</script><script>alert(\'WTF\')</script>', b: 2 }], level: 'log' },
+      { a: 'Wow</script><script>alert(\'WTF\')</script>', b: 2 }],
+      level: 'log',
+    },
     { arguments: ['other message', { c: 3, d: 4 }], level: 'warn' },
   ];
   const actual = consoleReplay();

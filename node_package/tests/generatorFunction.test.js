@@ -1,6 +1,7 @@
 /* eslint-disable react/no-multi-comp */
 /* eslint-disable react/prefer-es6-class */
 /* eslint-disable react/prefer-stateless-function */
+/* eslint-disable react/jsx-filename-extension */
 
 import test from 'tape';
 import React from 'react';

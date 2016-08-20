@@ -3,9 +3,9 @@ import scriptSanitizedVal from '../src/scriptSanitizedVal';
 
 test('scriptSanitizedVal returns no </script if spaces, uppercase 1', (assert) => {
   assert.plan(1);
-  const input = '[SERVER] This is a script:\"</div>\"</script> <script>alert(\'WTF\')</  SCRIPT >';
+  const input = '[SERVER] This is a script:"</div>"</script> <script>alert(\'WTF\')</  SCRIPT >';
   const actual = scriptSanitizedVal(input);
-  const expected = '[SERVER] This is a script:\"</div>\"(/script> <script>alert(\'WTF\')(/script >';
+  const expected = '[SERVER] This is a script:"</div>"(/script> <script>alert(\'WTF\')(/script >';
   assert.equals(actual, expected,
     'scriptSanitizedVal replaces closing script tags');
 });
