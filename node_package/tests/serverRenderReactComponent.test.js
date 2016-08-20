@@ -1,7 +1,10 @@
+/* eslint-disable react/jsx-filename-extension */
+
+import React from 'react';
 import test from 'tape';
+
 import serverRenderReactComponent from '../src/serverRenderReactComponent';
 import ComponentStore from '../src/ComponentRegistry';
-import React from 'react';
 
 test('serverRenderReactComponent renders a registered component', (assert) => {
   assert.plan(2);

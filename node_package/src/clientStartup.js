@@ -3,7 +3,6 @@
 import ReactDOM from 'react-dom';
 
 import createReactElement from './createReactElement';
-import handleError from './handleError';
 import isRouterResult from './isRouterResult';
 
 const REACT_ON_RAILS_COMPONENT_CLASS_NAME = 'js-react-on-rails-component';
@@ -123,12 +122,13 @@ export function clientStartup(context) {
   }
 
   // Tried with a file local variable, but the install handler gets called twice.
+  // eslint-disable-next-line no-underscore-dangle
   if (context.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__) {
     return;
   }
 
-  context.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = // eslint-disable-line no-param-reassign
-    true;
+  // eslint-disable-next-line no-underscore-dangle
+  context.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
 
   debugTurbolinks('Adding DOMContentLoaded event to install event listeners.');
 
@@ -142,21 +142,19 @@ export function clientStartup(context) {
         'NOT USING TURBOLINKS: DOMContentLoaded event, calling reactOnRailsPageLoaded'
       );
       reactOnRailsPageLoaded();
+    } else if (turbolinksVersion5()) {
+      debugTurbolinks(
+        'USING TURBOLINKS 5: document added event listeners turbolinks:before-render and ' +
+        'turbolinks:load.'
+      );
+      document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
+      document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
     } else {
-      if (turbolinksVersion5()) {
-        debugTurbolinks(
-          'USING TURBOLINKS 5: document added event listeners turbolinks:before-render and ' +
-          'turbolinks:load.'
-        );
-        document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
-        document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
-      } else {
-        debugTurbolinks(
-          'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +
-          'page:change.');
-        document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
-        document.addEventListener('page:change', reactOnRailsPageLoaded);
-      }
+      debugTurbolinks(
+        'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +
+        'page:change.');
+      document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
+      document.addEventListener('page:change', reactOnRailsPageLoaded);
     }
   });
 }

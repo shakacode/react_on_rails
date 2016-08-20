@@ -1,7 +1,8 @@
 // key = name used by react_on_rails
 // value = { name, component, generatorFunction: boolean }
 import generatorFunction from './generatorFunction';
-const _components = new Map();
+
+const registeredComponents = new Map();
 
 export default {
   /**
@@ -9,7 +10,7 @@ export default {
    */
   register(components) {
     Object.keys(components).forEach(name => {
-      if (_components.has(name)) {
+      if (registeredComponents.has(name)) {
         console.warn('Called register for component that is already registered', name);
       }
 
@@ -20,7 +21,7 @@ export default {
 
       const isGeneratorFunction = generatorFunction(component);
 
-      _components.set(name, {
+      registeredComponents.set(name, {
         name,
         component,
         generatorFunction: isGeneratorFunction,
@@ -33,11 +34,11 @@ export default {
    * @returns { name, component, generatorFunction }
    */
   get(name) {
-    if (_components.has(name)) {
-      return _components.get(name);
+    if (registeredComponents.has(name)) {
+      return registeredComponents.get(name);
     }
 
-    const keys = Array.from(_components.keys()).join(', ');
+    const keys = Array.from(registeredComponents.keys()).join(', ');
     throw new Error(`Could not find component registered with name ${name}. \
 Registered component names include [ ${keys} ]. Maybe you forgot to register the component?`);
   },
@@ -48,6 +49,6 @@ Registered component names include [ ${keys} ]. Maybe you forgot to register the
    * { name, component, generatorFunction}
    */
   components() {
-    return _components;
+    return registeredComponents;
   },
 };

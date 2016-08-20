@@ -1,4 +1,4 @@
-/* global ReactOnRails */
+import ReactDOM from 'react-dom';
 
 import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
@@ -8,7 +8,6 @@ import serverRenderReactComponent from './serverRenderReactComponent';
 import buildConsoleReplay from './buildConsoleReplay';
 import createReactElement from './createReactElement';
 import Authenticity from './Authenticity';
-import ReactDOM from 'react-dom';
 import context from './context';
 
 const ctx = context();
@@ -60,14 +59,16 @@ ctx.ReactOnRails = {
    * Available Options:
    * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
    */
-  setOptions(options) {
-    if (options.hasOwnProperty('traceTurbolinks')) {
-      this._options.traceTurbolinks = options.traceTurbolinks;
-      delete options.traceTurbolinks;
+  setOptions(newOptions) {
+    if ('traceTurbolinks' in newOptions) {
+      this.options.traceTurbolinks = newOptions.traceTurbolinks;
+      delete newOptions.traceTurbolinks;
     }
 
-    if (Object.keys(options).length > 0) {
-      throw new Error('Invalid options passed to ReactOnRails.options: ', JSON.stringify(options));
+    if (Object.keys(newOptions).length > 0) {
+      throw new Error(
+        'Invalid options passed to ReactOnRails.options: ', JSON.stringify(newOptions)
+      );
     }
   },
 
@@ -110,7 +111,7 @@ ctx.ReactOnRails = {
    * @returns option value
    */
   option(key) {
-    return this._options[key];
+    return this.options[key];
   },
 
   /**
@@ -146,6 +147,8 @@ ctx.ReactOnRails = {
    */
   render(name, props, domNodeId) {
     const reactElement = createReactElement({ name, props, domNodeId });
+
+    // eslint-disable-next-line react/no-render-return-value
     return ReactDOM.render(reactElement, document.getElementById(domNodeId));
   },
 
@@ -206,11 +209,11 @@ ctx.ReactOnRails = {
   },
 
   resetOptions() {
-    this._options = Object.assign({}, DEFAULT_OPTIONS);
+    this.options = Object.assign({}, DEFAULT_OPTIONS);
   },
 };
 
-ReactOnRails.resetOptions();
+ctx.ReactOnRails.resetOptions();
 
 ClientStartup.clientStartup(ctx);
 

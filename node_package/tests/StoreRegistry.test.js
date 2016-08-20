@@ -1,6 +1,7 @@
 import test from 'tape';
-import StoreRegistry from '../src/StoreRegistry';
 import { createStore } from 'redux';
+
+import StoreRegistry from '../src/StoreRegistry';
 
 function reducer() {
   return {};

@@ -1,6 +1,6 @@
 import ReactDOMServer from 'react-dom/server';
-import createReactElement from './createReactElement';
 
+import createReactElement from './createReactElement';
 import isRouterResult from './isRouterResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
@@ -22,14 +22,12 @@ export default function serverRenderReactComponent(options) {
         console.error(
           `React Router ERROR: ${JSON.stringify(reactElementOrRouterResult.routeError)}`
         );
-      } else {
-        if (trace) {
-          const redirectLocation = reactElementOrRouterResult.redirectLocation;
-          const redirectPath = redirectLocation.pathname + redirectLocation.search;
-          console.log(`\
+      } else if (trace) {
+        const redirectLocation = reactElementOrRouterResult.redirectLocation;
+        const redirectPath = redirectLocation.pathname + redirectLocation.search;
+        console.log(`\
 ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redirectPath}`
-          );
-        }
+        );
       }
     } else {
       htmlResult = ReactDOMServer.renderToString(reactElementOrRouterResult);

@@ -1,13 +1,15 @@
 /* eslint-disable react/no-multi-comp */
 /* eslint-disable react/prefer-es6-class */
 /* eslint-disable react/prefer-stateless-function */
+/* eslint-disable react/jsx-filename-extension */
 
 import test from 'tape';
 import { createStore } from 'redux';
 import React from 'react';
-import ReactOnRails from '../src/ReactOnRails';
 import { canUseDOM } from 'fbjs/lib/ExecutionEnvironment';
 import JsDom from 'jsdom';
+
+import ReactOnRails from '../src/ReactOnRails';
 
 if (!canUseDOM) {
   global.document = JsDom.jsdom('<div id="root"></div>');
@@ -24,6 +26,8 @@ test('ReactOnRails render returns a virtual DOM element for component', (assert)
     },
   });
   ReactOnRails.register({ R1 });
+
+  // eslint-disable-next-line no-underscore-dangle
   const actual = ReactOnRails.render('R1', {}, 'root')._reactInternalInstance._currentElement.type;
   assert.deepEqual(actual, R1,
     'ReactOnRails render should return a virtual DOM element for component');
