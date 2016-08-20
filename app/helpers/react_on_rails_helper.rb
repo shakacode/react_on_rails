@@ -5,6 +5,7 @@
 # 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 require "react_on_rails/prerender_error"
 require "addressable/uri"
+require "yajl"
 
 module ReactOnRailsHelper
   # The env_javascript_include_tag and env_stylesheet_link_tag support the usage of a webpack
@@ -88,6 +89,7 @@ module ReactOnRailsHelper
   #   raise_on_prerender_error: <true/false> Default to false. True will raise exception on server
   #      if the JS code throws
   # Any other options are passed to the content tag, including the id.
+  # rubocop:disable Metrics/AbcSize
   def react_component(component_name, raw_options = {})
     # Create the JavaScript and HTML to allow either client or server rendering of the
     # react_component.
@@ -102,11 +104,13 @@ module ReactOnRailsHelper
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
 
     component_specification_tag =
-      content_tag(:div,
-                  "",
+      content_tag(:script,
                   class: "js-react-on-rails-component",
-                  style: options.style,
-                  data: options.data)
+                  style: nil,
+                  data: options.data) do
+        props = Yajl.dump(options.props.is_a?(String) ? JSON.parse(options.props) : options.props)
+        "var #{options.dom_id.tr('-', '_')} = #{props};".html_safe
+      end
 
     # Create the HTML rendering part
     result = server_rendered_react_component_html(options.props, options.name, options.dom_id,
@@ -126,12 +130,12 @@ module ReactOnRailsHelper
 
     # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
     result = <<-HTML.html_safe
-#{component_specification_tag}
+    #{component_specification_tag}
     #{rendered_output}
     #{options.replay_console ? console_script : ''}
     HTML
 
-    prepend_render_rails_context(result)
+    add_render_rails_context(result)
   end
 
   # Separate initialization of store from react_component allows multiple react_component calls to
@@ -154,7 +158,7 @@ module ReactOnRailsHelper
       @registered_stores ||= []
       @registered_stores << redux_store_data
       result = render_redux_store_data(redux_store_data)
-      prepend_render_rails_context(result)
+      add_render_rails_context(result)
     end
   end
 
@@ -222,31 +226,31 @@ module ReactOnRailsHelper
 
   private
 
-  # prepend the rails_context if not yet applied
-  def prepend_render_rails_context(render_value)
+  # add the rails_context if not yet applied
+  def add_render_rails_context(render_value)
     return render_value if @rendered_rails_context
-
-    data = {
-      rails_context: rails_context(server_side: false)
-    }
 
     @rendered_rails_context = true
 
-    rails_context_content = content_tag(:div,
-                                        "",
+    rails_context_content = content_tag(:script,
                                         id: "js-react-on-rails-context",
-                                        style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
-                                        data: data)
-    "#{rails_context_content}\n#{render_value}".html_safe
+                                        style: nil) do
+      "var #{'js-react-on-rails-context'.tr('-', '_')} = #{Yajl.dump(rails_context(server_side: false))};".html_safe
+    end
+    "#{render_value}\n#{rails_context_content}".html_safe
   end
 
   def render_redux_store_data(redux_store_data)
-    result = content_tag(:div,
+    result = content_tag(:script,
                          "",
                          class: "js-react-on-rails-store",
-                         style: ReactOnRails.configuration.skip_display_none ? nil : "display:none",
-                         data: redux_store_data)
-    prepend_render_rails_context(result)
+                         style: nil,
+                         data: redux_store_data) do
+      # redux_store_data
+      "var #{redux_store_data[:store_name].tr('-', '_')} = #{Yajl.dump(redux_store_data[:props])};".html_safe
+    end
+
+    add_render_rails_context(result)
   end
 
   def props_string(props)

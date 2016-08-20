@@ -126,7 +126,6 @@ describe ReactOnRails::ReactComponent::Options do
       attrs = the_attrs(name: "app", options: { trace: false, id: 2 })
       expected_data = {
         component_name: "App",
-        props: {},
         trace: false,
         dom_id: 2
       }
