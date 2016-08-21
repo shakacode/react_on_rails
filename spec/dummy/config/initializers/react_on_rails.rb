@@ -64,7 +64,7 @@ ReactOnRails.configure do |config|
 
   # Server rendering only (not for render_component helper)
   # You can configure your pool of JS virtual machines and specify where it should load code:
-  # On MRI, use `therubyracer` for the best performance
+  # On MRI, use `mini_racer` for the best performance
   # (see [discussion](https://github.com/reactjs/react-rails/pull/290))
   # On MRI, you'll get a deadlock with `pool_size` > 1
   # If you're using JRuby, you can increase `pool_size` to have real multi-threaded rendering.

@@ -118,7 +118,7 @@ GEM
     json (1.8.3)
     launchy (2.4.3)
       addressable (~> 2.3)
-    libv8 (3.16.14.15)
+    libv8 (5.0.71.48.3)
     loofah (2.0.3)
       nokogiri (>= 1.5.9)
     mail (2.6.4)
@@ -128,6 +128,8 @@ GEM
       mime-types-data (~> 3.2015)
     mime-types-data (3.2016.0221)
     mini_portile2 (2.1.0)
+    mini_racer (0.1.4)
+      libv8 (~> 5.0, < 5.1.11)
     minitest (5.9.0)
     multi_json (1.12.0)
     nokogiri (1.6.8)
@@ -191,7 +193,6 @@ GEM
     rake (11.2.2)
     rdoc (4.2.2)
       json (~> 1.4)
-    ref (2.0.0)
     rspec-core (3.4.4)
       rspec-support (~> 3.4.0)
     rspec-expectations (3.4.0)
@@ -254,9 +255,6 @@ GEM
     sqlite3 (1.3.11)
     term-ansicolor (1.3.2)
       tins (~> 1.0)
-    therubyracer (0.12.2)
-      libv8 (~> 3.16.14.0)
-      ref
     thor (0.19.1)
     thread_safe (0.3.5)
     tilt (2.0.2)
@@ -295,6 +293,7 @@ DEPENDENCIES
   jbuilder (~> 2.0)
   jquery-rails
   launchy
+  mini_racer
   poltergeist
   pry
   pry-byebug
@@ -313,7 +312,6 @@ DEPENDENCIES
   selenium-webdriver
   spring
   sqlite3
-  therubyracer
   turbolinks (= 2.5.3)
   uglifier (>= 2.7.2)
   web-console
