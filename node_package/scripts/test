@@ -1,9 +1,0 @@
-#!/bin/sh
-
-echo "Running JS tests in node"
-$(npm bin)/babel-tape-runner node_package/tests/*.js | $(npm bin)/tap-spec
-# $(npm bin)/babel-tape-runner node_package/tests/*.js | $(npm bin)/faucet
-
-# If we want to run tests in the browser
-# echo "Running JS tests in browser"
-# $(npm bin)/browserify -t babelify node_package/tests/*.js | tape-run | $(npm bin)/faucet
