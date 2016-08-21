@@ -67,7 +67,11 @@ ReactOnRails.configure do |config|
   config.skip_display_none = false
 
   # The server render method - either ExecJS or NodeJS
+  <%- if options.node? -%>
+  config.server_render_method = "NodeJS"
+  <%- else -%>
   config.server_render_method = "ExecJS"
+  <%- end -%>
 
   # Client js uses assets not digested by rails.
   # For any asset matching this regex, non-digested symlink will be created (what webpack's css wants)

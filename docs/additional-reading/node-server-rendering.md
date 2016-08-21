@@ -7,6 +7,8 @@ If you're serious about this comparing Node.js versus execJS/mini_racer, then [g
 ## Setup of React on Rails with Node.js Server Rendering
 **Warning: this is an experimental feature.**
 
+* Every time the webpack bundle changes, you have to restart the server yourself.
+
 To do this you need to add a few files and then configure react_on_rails to use NodeJS. Here are the relevant files to add.
 
 Node server rendering allows you to use separate NodeJS process as a renderer. The process loads your configured server_bundle_js file and then executes javascript to render the component inside its environment. The communication between rails and node occurs
