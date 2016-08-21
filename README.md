@@ -1,17 +1,16 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails)  [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
-Aloha from Justin Gordon and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects. If you like **React on Rails**, please consider contacting me if we could potentially help you in any way. I'm offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development, including both consumer and enterprise products. You can read more about my background [here](http://www.railsonmaui.com/about). Whether you have a new project or need help on an existing project, please email me directly at [justin@shakacode.com](mailto:justin@shakacode.com). And thanks in advance for any referrals! Your support keeps this project going. In addition to React.js and Rails, we're doing react-native iOS and Android apps!
+**For a complete example of this gem, see our live demo at [www.reactrails.com](http://www.reactrails.com). ([Source Code](https://github.com/shakacode/react-webpack-rails-tutorial))**
 
-Want to become a contributor? See ["easy" issues](https://github.com/shakacode/react_on_rails/labels/easy) and [issues for the full tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/issues?q=is%3Aissue+is%3Aopen+label%3Aeasy).
+Aloha from Justin Gordon ([bio](http://www.railsonmaui.com/about)) and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects. If you like **React on Rails**, please consider contacting me at [justin@shakacode.com](mailto:justin@shakacode.com) if we could potentially help you in any way. Besides consulting on bigger projects, [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for React on Rails. [Click here](http://www.shakacode.com/work/index.html) for more information.
 
-# NOTES
-* Besides consulting on bigger projects, [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for "React on Rails". [Click here](http://www.shakacode.com/work/index.html) for more information.
-* See our article [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724) and see [slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
-* For a complete example, see the [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial) along with the live example at [www.reactrails.com](http://www.reactrails.com).
-* **For a quick start**, see the [React on Rails Basic Tutorial](docs/tutorial.md).
-* The generator of React on Rails does not setup CSS modules and hot reloading via the Rails server as is demonstrated in the [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/). *We do support this, but we don't generate the code.* If you did generate a fresh app from react_on_rails and wanted to move to CSS Modules, then see [PR 175: Babel 6 / CSS Modules / Rails hot reloading](https://github.com/shakacode/react-webpack-rails-tutorial/pull/175). Note, while there are probably fixes after this PR was accepted, this has the majority of the changes. See [the tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/#news) for more information. For more information on how to setup hot reloading in a Rails app, see [Hot Reloading of Assets For Rails Development](docs/additional-reading/hot-reloading-rails-development.md).
-* See [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
-* On Twitter, follow [@railsonmaui](https://twitter.com/railsonmaui) and [@shakacode](https://twitter.com/shakacode) for updates on releases. We've got a forum category dedicated to [react_on_rails](http://forum.shakacode.com/c/rails/reactonrails).
+We're offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development for both consumer and enterprise products. In addition to React.js and Rails, we're doing react-native iOS and Android apps!
+
+Whether you have a new project or need help on an existing project, feel free to contact me directly at [justin@shakacode.com](mailto:justin@shakacode.com) and thanks in advance for any referrals!
+
+Your support keeps this project going.
+
+(Want to become a contributor? [Contact us](mailto:contact@shakacode.com) for an Slack team invite! Also, see ["easy" issues](https://github.com/shakacode/react_on_rails/labels/easy) and [issues for the full tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/issues?q=is%3Aissue+is%3Aopen+label%3Aeasy).)
 
 # NEWS
 * 2016-07-28: If you're doing server rendering, be sure to use mini\_racer! See [issues/428](https://github.com/shakacode/react_on_rails/issues/428). It's supposedly much faster than `execjs`.
@@ -21,53 +20,18 @@ Want to become a contributor? See ["easy" issues](https://github.com/shakacode/r
 
 # React on Rails
 
-**Project Objective**: To provide an opinionated and optimal framework for integrating **Ruby on Rails** with modern JavaScript tooling and libraries, including [**Webpack**](http://webpack.github.io/), [**Babel**](https://babeljs.io/), [**React**](https://facebook.github.io/react/), [**Redux**](https://github.com/reactjs/redux), [**React-Router**](https://github.com/reactjs/react-router). This differs significantly from typical Rails. When considering what goes into **react_on_rails**, we ask ourselves, is the functionality related to the intersection of using Rails and with modern JavaScript? If so, then the functionality belongs right here. In other cases, we're releasing separate npm packages or Ruby gems. If you are interested in implementing React using traditional Rails architecture, see [react-rails](https://github.com/reactjs/react-rails).
+**Project Objective**: To provide an opinionated and optimal framework for integrating Ruby on Rails with modern JavaScript tooling and libraries, including [**Webpack**](http://webpack.github.io/), [**Babel**](https://babeljs.io/), [**React**](https://facebook.github.io/react/), [**Redux**](https://github.com/reactjs/redux), [**React-Router**](https://github.com/reactjs/react-router). This differs significantly from typical Rails architecture. When considering what goes into **react_on_rails**, we ask ourselves, is the functionality related to the intersection of using Rails and modern JavaScript? If so, then the functionality belongs right here. In other cases, we're releasing separate npm packages or Ruby gems. If you are interested in implementing React using traditional Rails architecture, see [react-rails](https://github.com/reactjs/react-rails).
 
 React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x and greater is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering, using either **execJS** or a [Node.js server](https://github.com/shakacode/react_on_rails/blob/master/docs%2Fadditional-reading%2Fnode-server-rendering.md). See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
 
-## Including your React Component in your Rails Views
-Please see [Getting Started](#getting-started) for how to set up your Rails project for React on Rails to understand how `react_on_rails` can see your ReactComponents.
-
-+ *Normal Mode (React component will be rendered on client):*
-
-  ```erb
-  <%= react_component("HelloWorldApp", props: @some_props) %>
-  ```
-+ *Server-Side Rendering (React component is first rendered into HTML on the server):*
-
-  ```erb
-  <%= react_component("HelloWorldApp", props: @some_props, prerender: true) %>
-  ```
-
-+ The `component_name` parameter is a string matching the name you used to expose your React component globally. So, in the above examples, if you had a React component named "HelloWorldApp," you would register it with the following lines:
-
-  ```js
-  import ReactOnRails from 'react-on-rails';
-  import HelloWorldApp from './HelloWorldApp';
-  ReactOnRails.register({ HelloWorldApp });
-  ```
-
-  Exposing your component in this way is how React on Rails is able to reference your component from a Rails view. You can expose as many components as you like, as long as their names do not collide. See below for the details of how you expose your components via the react_on_rails webpack configuration.
-
-+ `@some_props` can be either a hash or JSON string. This is an optional argument assuming you do not need to pass any options (if you want to pass options, such as `prerender: true`, but you do not want to pass any properties, simply pass an empty hash `{}`). This will make the data available in your component:
-
-  ```ruby
-    # Rails View
-    <%= react_component("HelloWorldApp", props: { name: "Stranger" }) %>
-  ```
-
-  ```javascript
-    // inside your React component
-    this.props.name // "Stranger"
-  ```
-
-## Documentation
+## Table of Contents
 
 + [Features](#features)
 + [Why Webpack?](#why-webpack)
 + [Getting Started](#getting-started)
     - [Installation Summary](#installation-summary)
     - [Initializer Configuration: config/initializers/react_on_rails.rb](#initializer-configuration)
+    - [Including your React Component in your Rails Views](#including-your-react-component-in-your-rails-views)
 + [How it Works](#how-it-works)
     - [Client-Side Rendering vs. Server-Side Rendering](#client-side-rendering-vs-server-side-rendering)
     - [Building the Bundles](#building-the-bundles)
@@ -78,7 +42,7 @@ Please see [Getting Started](#getting-started) for how to set up your Rails proj
     - [React-Router](#react-router)
     - [Deployment](#deployment)
 + [Integration with Node](#integration-with-node)
-+ [Additional Reading](#additional-reading)
++ [Additional Documentation](#additional-documentation)
 + [Contributing](#contributing)
 + [License](#license)
 + [Authors](#authors)
@@ -107,6 +71,8 @@ Universal React with Rails: Part I](https://medium.com/@alexfedoseev/isomorphic-
 We're definitely not doing that. With react_on_rails, webpack is mainly generating a nice JavaScript file for inclusion into `application.js`. We're going to KISS. And that's all relative given how much there is to get right in an enterprise class web application.
 
 ## Getting Started
+
+**For more detailed instructions**, see the [React on Rails Basic Tutorial](docs/tutorial.md).
 1. Add the following to your Gemfile and bundle install.
 
   ```ruby
@@ -149,6 +115,41 @@ See the [Installation Overview](docs/basics/installation-overview.md) for a conc
 
 Configure the `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [spec/dummy/config/initializers/react_on_rails.rb](spec/dummy/config/initializers/react_on_rails.rb) for a detailed example of configuration, including comments on the different values to configure.
 
+### Including your React Component in your Rails Views
+
++ *Normal Mode (React component will be rendered on client):*
+
+  ```erb
+  <%= react_component("HelloWorldApp", props: @some_props) %>
+  ```
++ *Server-Side Rendering (React component is first rendered into HTML on the server):*
+
+  ```erb
+  <%= react_component("HelloWorldApp", props: @some_props, prerender: true) %>
+  ```
+
++ The `component_name` parameter is a string matching the name you used to expose your React component globally. So, in the above examples, if you had a React component named "HelloWorldApp," you would register it with the following lines:
+
+  ```js
+  import ReactOnRails from 'react-on-rails';
+  import HelloWorldApp from './HelloWorldApp';
+  ReactOnRails.register({ HelloWorldApp });
+  ```
+
+  Exposing your component in this way is how React on Rails is able to reference your component from a Rails view. You can expose as many components as you like, as long as their names do not collide. See below for the details of how you expose your components via the react_on_rails webpack configuration.
+
++ `@some_props` can be either a hash or JSON string. This is an optional argument assuming you do not need to pass any options (if you want to pass options, such as `prerender: true`, but you do not want to pass any properties, simply pass an empty hash `{}`). This will make the data available in your component:
+
+  ```ruby
+    # Rails View
+    <%= react_component("HelloWorldApp", props: { name: "Stranger" }) %>
+  ```
+
+  ```javascript
+    // inside your React component
+    this.props.name // "Stranger"
+  ```
+  
 ## NPM
 All JavaScript in React On Rails is loaded from npm: [react-on-rails](https://www.npmjs.com/package/react-on-rails). To manually install this (you did not use the generator), assuming you have a standard configuration, run this command:
 
@@ -208,7 +209,7 @@ Note, you never make these calls. This is what React on Rails does when either s
 
 (Note, see below [section](#multiple-react-components-on-a-page-with-one-store) on how to setup redux stores that allow multiple components to talk to the same store.)
 
-The `railsContext` has: (see implementation in file react_on_rails_helper.rb for method rails_context for the definitive list).
+The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](app/helpers/react_on_rails_helper.rb), method `rails_context` for the definitive list).
 
 ```ruby
   {
@@ -413,7 +414,7 @@ Components are created as [stateless function(al) components](https://facebook.g
 *Note:* You will not be doing any partial updates to the Redux store when loading a new page. When the page content loads, React on Rails will rehydrate a new version of the store with whatever props are placed on the page.
 
 ## ReactOnRails JavaScript API
-See [ReactOnRails JavaScriptAPI](docs/api/javascript-api.md).
+See [ReactOnRails JavaScript API](docs/api/javascript-api.md).
 
 #### Using Rails built-in CSRF protection in JavaScript
 
@@ -447,31 +448,53 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 ## Integration with Node
 Node.js can be used as the backend for server-side rendering instead of [execJS](https://github.com/rails/execjs). Before you try this, consider the tradeoff of extra complexity with your deployments versus *potential* performance gains. We've found that using ExecJS with [mini_racer](https://github.com/discourse/mini_racer) to be "fast enough" so far. That being said, we've heard of other large websites using Node.js for better server rendering performance. See [Node.js for Server Rendering](docs/additional-reading/node-server-rendering.md) for more information.
 
-## Additional Reading
-+ [JavaScript API](docs/api/javascript-api.md)
-+ [Ruby API](docs/api/ruby-api.md)
-+ [Setting up Hot Reloading during Rails Development, API docs](docs/api/ruby-api-hot-reload-view-helpers.md)
-+ [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v4032)
-+ [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
-+ [Installation Overview](docs/basics/installation-overview.md)
-+ [Migration from react-rails](docs/basics/migrating-from-react-rails.md)
-+ [Babel](docs/additional-reading/babel.md)
-+ [Heroku Deployment](docs/additional-reading/heroku-deployment.md)
-+ [Recommended Project Structure](docs/additional-reading/recommended-project-structure.md)
-+ [Hot Reloading of Assets For Rails Development](docs/additional-reading/hot-reloading-rails-development.md)
-+ [Node Dependencies and NPM](docs/additional-reading/node-dependencies-and-npm.md)
-+ [React Router](docs/additional-reading/react-router.md)
-+ [RSpec Configuration](docs/additional-reading/rspec-configuration.md)
-+ [Server Rendering Tips](docs/additional-reading/server-rendering-tips.md)
-+ [Rails View Rendering from Inline JavaScript](docs/additional-reading/rails_view_rendering_from_inline_javascript.md)
-+ [Tips](docs/additional-reading/tips.md)
-+ [React on Rails Basic Tutorial](docs/tutorial.md), deployed [here](https://hello-react-on-rails.herokuapp.com)
-+ [Turbolinks](docs/additional-reading/turbolinks.md)
-+ [Webpack Configuration](docs/additional-reading/webpack.md)
-+ [Webpack Cookbook](https://christianalfoni.github.io/react-webpack-cookbook/index.html)
-+ [Changelog](CHANGELOG.md)
-+ [Projects](PROJECTS.md)
-+ [Developing with the Webpack Dev Server](docs/additional-reading/webpack-dev-server.md)
+## Additional Documentation
++ **Rails**
+  + [Rails Assets](docs/additional-reading/rails-assets.md)
+  + [Rails View Rendering from Inline JavaScript](docs/additional-reading/rails_view_rendering_from_inline_javascript.md)
+  + [RSpec Configuration](docs/additional-reading/rspec-configuration.md)
+  + [Turbolinks](docs/additional-reading/turbolinks.md)
+
++ **Javascript**
+  + [Node Dependencies and NPM](docs/additional-reading/node-dependencies-and-npm.md)
+  + [Babel](docs/additional-reading/babel.md)
+  + [React Router](docs/additional-reading/react-router.md)
+  + [React & Redux](docs/additional-reading/react-and-redux.md)
+  + [Webpack](docs/additional-reading/webpack.md)
+  + [Webpack Configuration](docs/additional-reading/webpack.md)
+  + [Webpack Cookbook](https://christianalfoni.github.io/react-webpack-cookbook/index.html)
+  + [Developing with the Webpack Dev Server](docs/additional-reading/webpack-dev-server.md)
+  + [Node Server Rendering](docs/additional-reading/node-server-rendering.md)
+  + [Server Rendering Tips](docs/additional-reading/server-rendering-tips.md)
+
++ **Development**
+  + [React on Rails Basic Installation Tutorial](docs/tutorial.md) ([live demo](https://hello-react-on-rails.herokuapp.com))
+  + [Installation Overview](docs/basics/installation-overview.md)
+  + [Migration from react-rails](docs/basics/migrating-from-react-rails.md)
+  + [Recommended Project Structure](docs/additional-reading/recommended-project-structure.md)
+  + [Generator Tips](docs/basics/generator.md)
+  + [Hot Reloading of Assets For Rails Development](docs/additional-reading/hot-reloading-rails-development.md)
+  + [Heroku Deployment](docs/additional-reading/heroku-deployment.md)
+  + [Updating Dependencies](docs/additional-reading/updating-dependencies.md)
+
++ **API**
+  + [JavaScript API](docs/api/javascript-api.md)
+  + [Ruby API](docs/api/ruby-api.md)
+  + [Setting up Hot Reloading during Rails Development, API docs](docs/api/ruby-api-hot-reload-view-helpers.md)
+
++ **[CONTRIBUTING](CONTRIBUTING.MD)**
+  + [Generator Testing](docs/contributor-info/generator-testing.md)
+  + [Linting](docs/contributor-info/linters.md)
+  + [Releasing](docs/contributor-info/releasing.md)
+
++ **Misc**
+  + [Tips](docs/additional-reading/tips.md)
+  + [Changelog](CHANGELOG.md)
+  + [Projects](PROJECTS.md)
+  + [Shaka Code Style](docs/coding-style/style.md)
+  + [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v4032)
+  + [Code of Conduct](docs/misc/code_of_conduct.md)
+  + [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 
 ## Demos
 + [www.reactrails.com](http://www.reactrails.com) with the source at [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/).
@@ -504,8 +527,16 @@ The gem project started with [Justin Gordon](https://github.com/justin808/) pair
 
 We owe much gratitude to the work of the [react-rails gem](https://github.com/reactjs/react-rails).
 
-## A Personal Note From Justin
+# FINAL NOTES
+* See [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
+* Follow [@railsonmaui](https://twitter.com/railsonmaui) and [@shakacode](https://twitter.com/shakacode) on Twitter for updates on releases. We've also got a forum category dedicated to [react_on_rails](http://forum.shakacode.com/c/rails/ReactOnRails).
 
-Aloha from Justin Gordon and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects. If you like **React on Rails**, please consider contacting me if we could potentially help you in any way. I'm offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development, including both consumer and enterprise products. You can read more about my background [here](http://www.railsonmaui.com/about). Whether you have a new project or need help on an existing project, please email me directly at [justin@shakacode.com](mailto:justin@shakacode.com). And thanks in advance for any referrals! Your support keeps this project going. In addition to React.js and Rails, we're doing react-native iOS and Android apps!
+---
 
-I'm also looking for great developers for the ShakaCode team! [Contact me](mailto:justin@shakacode.com) or click [here](http://www.shakacode.com/about/index.html#work-with-us) if you want to work with Rails + React + React-Native on a distributed, worldwide team.
+Aloha from Justin Gordon ([bio](http://www.railsonmaui.com/about)) and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects. If you like **React on Rails**, please consider contacting me at [justin@shakacode.com](mailto:justin@shakacode.com) if we could potentially help you in any way. Besides consulting on bigger projects, [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for React on Rails. [Click here](http://www.shakacode.com/work/index.html) for more information.
+
+We're offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development for both consumer and enterprise products. In addition to React.js and Rails, we're doing react-native iOS and Android apps!
+
+Whether you have a new project or need help on an existing project, feel free to contact me directly at [justin@shakacode.com](mailto:justin@shakacode.com) and thanks in advance for any referrals!
+
+Your support keeps this project going.
