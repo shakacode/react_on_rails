@@ -8,7 +8,7 @@ export default {
   authenticityHeaders(otherHeaders = {}) {
     return Object.assign(otherHeaders, {
       'X-CSRF-Token': this.authenticityToken(),
-      'X-Requested-With': 'XMLHttpRequest'
+      'X-Requested-With': 'XMLHttpRequest',
     });
   },
 };

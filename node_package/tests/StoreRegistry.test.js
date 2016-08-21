@@ -1,19 +1,19 @@
 import test from 'tape';
-import StoreRegistry from '../src/StoreRegistry';
-import React from 'react';
 import { createStore } from 'redux';
 
-function reducer(state = {}, action) {
+import StoreRegistry from '../src/StoreRegistry';
+
+function reducer() {
   return {};
 }
 
 function storeGenerator(props) {
   return createStore(reducer, props);
-};
+}
 
 function storeGenerator2(props) {
   return createStore(reducer, props);
-};
+}
 
 test('StoreRegistry throws error for registering null or undefined store', (assert) => {
   assert.plan(2);

@@ -1,8 +1,7 @@
 // key = name used by react_on_rails to identify the store
 // value = redux store creator, which is a function that takes props and returns a store
-import context from './context';
-const _storeGenerators = new Map();
-const _stores = new Map();
+const registeredStoreGenerators = new Map();
+const hydratedStores = new Map();
 
 export default {
   /**
@@ -11,17 +10,17 @@ export default {
    */
   register(storeGenerators) {
     Object.keys(storeGenerators).forEach(name => {
-      if (_storeGenerators.has(name)) {
+      if (registeredStoreGenerators.has(name)) {
         console.warn('Called registerStore for store that is already registered', name);
       }
 
       const store = storeGenerators[name];
       if (!store) {
-        throw new Error(`Called ReactOnRails.registerStores with a null or undefined as a value ` +
+        throw new Error('Called ReactOnRails.registerStores with a null or undefined as a value ' +
           `for the store generator with key ${name}.`);
       }
 
-      _storeGenerators.set(name, store);
+      registeredStoreGenerators.set(name, store);
     });
   },
 
@@ -33,25 +32,27 @@ export default {
    * @returns Redux Store, possibly hydrated
    */
   getStore(name, throwIfMissing = true) {
-    if (_stores.has(name)) {
-      return _stores.get(name);
+    if (hydratedStores.has(name)) {
+      return hydratedStores.get(name);
     }
 
-    const storeKeys = Array.from(_stores.keys()).join(', ');
+    const storeKeys = Array.from(hydratedStores.keys()).join(', ');
 
     if (storeKeys.length === 0) {
-      const msg = `There are no stores hydrated and you are requesting the store ` +
+      const msg = 'There are no stores hydrated and you are requesting the store ' +
         `${name}. This can happen if you are server rendering and you do not call ` +
-        `redux_store near the top of your controller action's view (not the layout) ` +
-        `and before any call to react_component.`;
+        "redux_store near the top of your controller action's view (not the layout) " +
+        'and before any call to react_component.';
       throw new Error(msg);
     }
 
-    if (throwIfMissing)  {
+    if (throwIfMissing) {
       console.log('storeKeys', storeKeys);
       throw new Error(`Could not find hydrated store with name '${name}'. ` +
         `Hydrated store names include [${storeKeys}].`);
     }
+
+    return undefined;
   },
 
   /**
@@ -60,13 +61,13 @@ export default {
    * @returns storeCreator with given name
    */
   getStoreGenerator(name) {
-    if (_storeGenerators.has(name)) {
-      return _storeGenerators.get(name);
-    } else {
-      const storeKeys = Array.from(_storeGenerators.keys()).join(', ');
-      throw new Error(`Could not find store registered with name '${name}'. Registered store ` +
-        `names include [ ${storeKeys} ]. Maybe you forgot to register the store?`);
+    if (registeredStoreGenerators.has(name)) {
+      return registeredStoreGenerators.get(name);
     }
+
+    const storeKeys = Array.from(registeredStoreGenerators.keys()).join(', ');
+    throw new Error(`Could not find store registered with name '${name}'. Registered store ` +
+      `names include [ ${storeKeys} ]. Maybe you forgot to register the store?`);
   },
 
   /**
@@ -75,7 +76,7 @@ export default {
    * @param store (not the storeGenerator, but the hydrated store)
    */
   setStore(name, store) {
-    _stores.set(name, store);
+    hydratedStores.set(name, store);
   },
 
   /**
@@ -83,7 +84,7 @@ export default {
    * @returns Map where key is the component name and values are the store generators.
    */
   storeGenerators() {
-    return _storeGenerators;
+    return registeredStoreGenerators;
   },
 
   /**
@@ -91,6 +92,6 @@ export default {
    * @returns Map where key is the component name and values are the hydrated stores.
    */
   stores() {
-    return _stores;
+    return hydratedStores;
   },
 };
