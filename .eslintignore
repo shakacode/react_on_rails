@@ -10,3 +10,5 @@ node_package/webpack.config.js
 **/generated/**
 **/app/assets/javascripts/application.js
 **/coverage/**
+
+lib/generators/react_on_rails/templates/node/base/client/node/server.js
