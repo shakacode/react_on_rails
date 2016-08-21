@@ -1,4 +1,7 @@
+/* eslint-disable react/prop-types */
+
 import React from 'react';
+
 import ReactOnRails from './ReactOnRails';
 
 /**
@@ -18,7 +21,6 @@ export default function createReactElement({
   railsContext,
   domNodeId,
   trace,
-  location,
   }) {
   if (trace) {
     if (railsContext && railsContext.serverSide) {
