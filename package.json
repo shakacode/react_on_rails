@@ -45,10 +45,11 @@
     "node_package/lib"
   ],
   "scripts": {
-    "test": "node_package/scripts/test",
-    "clean": "node_package/scripts/clean",
+    "test": "babel-tape-runner node_package/tests/*.js | tap-spec",
+    "clean": "rm -rf node_package/lib",
     "prepublish": "npm run build",
-    "build": "node_package/scripts/build",
+    "babel": "babel --out-dir node_package/lib node_package/src",
+    "build": "npm run clean && npm run babel",
     "build-watch": "babel --watch --out-dir node_package/lib node_package/src",
     "eslint": "eslint .",
     "jscs": "jscs -e -v .",

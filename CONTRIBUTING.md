@@ -36,6 +36,12 @@ From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/
 bundle && npm i && rake examples:prepare_all && rake node_package && rake
 ```
 
+In order to run tests in browser
+```
+npm i -g browserify babelify tape-run faucet
+browserify -t babelify node_package/tests/*.js | tape-run | faucet
+```
+
 See Dev Initial Setup, below for, well... initial setup.
 
 # IDE/IDE SETUP
