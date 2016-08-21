@@ -3,7 +3,7 @@ React on Rails supports the use of React Router. Client-side code doesn't need a
 
 However, when attempting to use server-rendering, it is necessary to take steps that prevent rendering when there is a router error or redirect. In these cases, the client code should return an object containing the `error` and a `redirectLocation` instead of the React component. The `react_component` helper method in your Rails view will automatically detect that there was an error/redirect and handle it accordingly.
 
-If you are working with the HelloWorldApp created by the react_on_rails generator, then the code below corresponds to the module in `client/app/bundles/HelloWorld/startup/HelloWorldAppServer.jsx`.
+If you are working with the HelloWorldApp created by the react_on_rails generator, then the code below corresponds to the module in `client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx`.
 
 ```js
 const RouterApp = (props, railsContext) => {

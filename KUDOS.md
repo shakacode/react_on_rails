@@ -4,6 +4,9 @@ I'm looking for quotes on why you like using React on Rails. You might mention a
 
 > Gone are the days of using bower or rails gems to manage front end dependencies! React on Rails provides webpack integration to give us a modern build process, es6 syntax and the entire npm ecosystem of libraries to use, along with view helpers to make React integration with Rails feel better than a cool summer breeze. - [@kalamyty](https://twitter.com/kalamyty) 
 
+### August 9, 2016
+![2016-08-09_13-39-08](https://cloud.githubusercontent.com/assets/1118459/17543077/bf7c2c6a-5e69-11e6-8370-d714015c0296.png)
+
 ### Compared to Browserify
 See comments [here](https://lorefnon.me/2015/11/15/a-minimal-setup-for-using-es6-modules-in-rails.html)
 

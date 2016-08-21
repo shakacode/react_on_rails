@@ -4,7 +4,7 @@ By Justin Gordon, January 26, 2016
 
 This document is an extension and complement to [The Rails Doctrine](http://rubyonrails.org/doctrine/). If you haven't read that document, I suggest you do so first.
 
-As stated in the [React on Rails README](../README.md), the project objective is to provide an opinionated and optimal framework for integrating **Ruby on Rails** with modern JavaScript tooling and libraries. When considering what goes into **react_on_rails**, we ask ourselves, is the functionality related to the intersection of using Rails and with modern JavaScript? A good example is view helper integration of React components on a Rails view. If the answer is yes, then the functionality belongs right here. In other cases, we're releasing separate npm packages or Ruby gems. For example, we needed an easy way to integrate [Twitter Bootstrap](http://getbootstrap.com/) with Webpack, and we released the [npm bootstrap-loader](https://github.com/shakacode/bootstrap-loader/). 
+As stated in the [React on Rails README](../../README.md), the project objective is to provide an opinionated and optimal framework for integrating **Ruby on Rails** with modern JavaScript tooling and libraries. When considering what goes into **react_on_rails**, we ask ourselves, is the functionality related to the intersection of using Rails and with modern JavaScript? A good example is view helper integration of React components on a Rails view. If the answer is yes, then the functionality belongs right here. In other cases, we're releasing separate npm packages or Ruby gems. For example, we needed an easy way to integrate [Twitter Bootstrap](http://getbootstrap.com/) with Webpack, and we released the [npm bootstrap-loader](https://github.com/shakacode/bootstrap-loader/). 
 
 Besides the project objective, let's stick with the "Rails Doctrine" and keep the following in mind.
 
@@ -19,13 +19,13 @@ The React on Rails setup provides several key components related to front-end de
 6. Happiness for us is actively participating in open source, so we want to be where the action is, which is with the npm libraries on github.com.
 7. You can get set up on React on Rails **FAST** using our application generator.
 8. By placing all client-side development inside of the `/client` directory, pure JavaScript developers can productively do development separate from Rails. Instead of Rails APIs, stub APIs on an express server can provide a simple backend, allowing for rapid iteration of UI prototypes.
-9. Just because we're not relying on the Rails asset pipeline for ES6 conversion does not mean that we're deploying Rails apps in any different way. We still use the asset pipeline to include our Webpack compiled JavaScript. This only requires a few small modifications, as explained in our doc [Heroku Deployment](additional-reading/heroku_deployment.md).
+9. Just because we're not relying on the Rails asset pipeline for ES6 conversion does not mean that we're deploying Rails apps in any different way. We still use the asset pipeline to include our Webpack compiled JavaScript. This only requires a few small modifications, as explained in our doc [Heroku Deployment](../additional-reading/heroku-deployment.md).
 
 ## Convention over Configuration
 * React on Rails has taken the hard work out of figuring out the JavaScript tooling that works best with Rails. Not only could you spend lots of time researching different tooling, but then you'd have to figure out how to splice it all together. This is where a lot of "JavaScript fatigue" comes from. The following keep the code clean and consistent:
-* [Style Guide](coding-style/style.md)
-* [linters](coding-style/linters.md)
-* [Recommended Project Structure](recommended-project-structure.md)
+* [Style Guide](../coding-style/style.md)
+* [linters](../contributor-info/linters.md)
+* [Recommended Project Structure](../additional-reading/recommended-project-structure.md)
 
 We're big believers in this quote from the Rails Doctrine: 
 
@@ -61,7 +61,7 @@ ES5 was ugly. ES6 is beautiful. React is beautiful. Client side code written wit
 Assuming that you're building the type of app that's a good fit for Rails (document/database based with lots of business rules), the tight integration of modern JavaScript with React on top of Ruby on Rails is better than building a pure client side app and separate microservices. Here's why:
 
 * Via React on Rails, we can seamlessly integrate React UI components with Rails.
-* Tight integration allows for trivial set up of server rendering of React on top of Rails, complete with support for fragment caching of the server rendered HTML, and integration with [Turbolinks](https://github.com/rails/turbolinks).
+* Tight integration allows for trivial set up of server rendering of React on top of Rails, complete with support for fragment caching of the server rendered HTML, and integration with [Turbolinks](https://github.com/turbolinks/turbolinks).
 * Tight integration allows mixing and matching Rails pages with React driven pages, even on the same page. Not every part of a UI requires the high fidelity achievable using React. Many existing apps may have hundreds of standards Rails forms. Support for mixing and matching React with Rails forms provides the best of both worlds.
 
 ## Progress over Stability

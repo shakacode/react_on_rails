@@ -58,6 +58,22 @@ describe "Server Rendering", :server_rendering do
     end
   end
 
+  describe "server render mailer" do
+    it "sends email okay" do
+      mail = DummyMailer.hello_email
+      expect(mail.subject).to match "mail"
+      expect(mail.body).to match "Mr. Mailing Server Side Rendering"
+      expect(mail.body).to match "inMailer&quot;:true"
+    end
+
+    it "sets inMailer properly" do
+      get client_side_hello_world_path
+      html_nodes = Nokogiri::HTML(response.body)
+      expect(html_nodes.css("div#js-react-on-rails-context").attr("data-rails-context").value)
+        .to match('inMailer\":false')
+    end
+  end
+
   describe "server rendering railsContext" do
     let(:http_accept_language) { "en-US,en;q=0.8" }
 

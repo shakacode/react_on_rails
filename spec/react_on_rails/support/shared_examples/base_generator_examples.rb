@@ -12,7 +12,7 @@ shared_examples "base_generator" do
     match = <<-MATCH.strip_heredoc
       some existing text
       # React on Rails
-      npm-debug.log
+      npm-debug.log*
       node_modules
 
       # Generated js bundles
