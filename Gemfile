@@ -21,7 +21,7 @@ gem "scss_lint", require: false
 gem "sdoc", "~> 0.4.0", group: :doc
 gem "spring"
 gem "sqlite3"
-gem "therubyracer"
+gem "mini_racer"
 if ENV["ENABLE_TURBOLINKS_5"].nil? || ENV["ENABLE_TURBOLINKS_5"].strip.empty?
   gem "turbolinks", "2.5.3"
 else

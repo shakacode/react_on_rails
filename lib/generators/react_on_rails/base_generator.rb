@@ -82,7 +82,7 @@ module ReactOnRails
       end
 
       def add_base_gems_to_gemfile
-        append_to_file("Gemfile", "\ngem 'therubyracer', platforms: :ruby\n")
+        append_to_file("Gemfile", "\ngem 'mini_racer', platforms: :ruby\n")
       end
 
       ASSETS_RB_APPEND = <<-DATA.strip_heredoc
