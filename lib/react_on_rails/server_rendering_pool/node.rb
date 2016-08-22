@@ -51,11 +51,15 @@ module ReactOnRails
         end
 
         def eval_js(js_code)
+          eof_symbol="\r\n\0"
           max_int = (2**(32 - 2) - 1)
           @js_context_pool.with do |js_context|
-            js_context.send(js_code, 0)
-            result = js_context.recv(max_int)
-            result
+            js_context.send(js_code+eof_symbol, 0)
+            result = ""
+            while (result[-eof_symbol.length..-1] != eof_symbol)
+              result += js_context.recv(max_int)
+            end
+            result[0..-eof_symbol.length]
           end
         end
 
