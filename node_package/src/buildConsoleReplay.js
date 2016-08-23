@@ -1,14 +1,15 @@
+// @flow
+
 import RenderUtils from './RenderUtils';
 import scriptSanitizedVal from './scriptSanitizedVal';
 
 export function consoleReplay() {
   // console.history is a global polyfill used in server rendering.
-  const history = console.history;
-  if (!history || history.length === 0) {
+  if (!(console.history instanceof Array)) {
     return '';
   }
 
-  const lines = history.map(msg => {
+  const lines = console.history.map(msg => {
     const stringifiedList = msg.arguments.map(arg => {
       let val;
       try {

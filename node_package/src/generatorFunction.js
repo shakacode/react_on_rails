@@ -1,3 +1,5 @@
+// @flow
+
 // See discussion:
 // https://discuss.reactjs.org/t/how-to-determine-if-js-object-is-react-component/2825/2
 
@@ -7,12 +9,11 @@
  * @param component
  * @returns {boolean}
  */
-export default function generatorFunction(component) {
+export default function generatorFunction(component: any) {
   if (!component.prototype) {
     return false;
   }
 
   // es5 or es6 React Component
-  const es5OrEs6ReactComponent = component.prototype.isReactComponent;
-  return !es5OrEs6ReactComponent;
+  return !component.prototype.isReactComponent;
 }

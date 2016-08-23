@@ -1,3 +1,5 @@
+// @flow
+
 /**
  * Get the context, be it window or global
  * @returns {boolean|Window|*|context}
