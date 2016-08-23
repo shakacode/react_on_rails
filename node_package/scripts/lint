@@ -1,3 +1,0 @@
-#!/bin/sh
-
-$(npm bin)/eslint --ext .js node_package && $(npm bin)/jscs . && (cd spec/dummy && npm run lint)
