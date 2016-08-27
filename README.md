@@ -13,6 +13,7 @@ Your support keeps this project going.
 (Want to become a contributor? [Contact us](mailto:contact@shakacode.com) for an Slack team invite! Also, see ["easy" issues](https://github.com/shakacode/react_on_rails/labels/easy) and [issues for the full tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/issues?q=is%3Aissue+is%3Aopen+label%3Aeasy).)
 
 # NEWS
+* 2016-08-27: We now have a [Documentation Gitbook](https://shakacode.gitbooks.io/react_on_rails/content/) for improved readability & reference.
 * 2016-08-21: v6.1 ships with serveral new features and bug fixes. See the [Changelog](CHANGELOG.md).
 * 2016-07-28: If you're doing server rendering, be sure to use mini\_racer! See [issues/428](https://github.com/shakacode/react_on_rails/issues/428). It's supposedly much faster than `therubyracer`.
 * *See [NEWS.md](NEWS.md) for more notes over time.*
@@ -447,7 +448,8 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 ## Integration with Node
 Node.js can be used as the backend for server-side rendering instead of [execJS](https://github.com/rails/execjs). Before you try this, consider the tradeoff of extra complexity with your deployments versus *potential* performance gains. We've found that using ExecJS with [mini_racer](https://github.com/discourse/mini_racer) to be "fast enough" so far. That being said, we've heard of other large websites using Node.js for better server rendering performance. See [Node.js for Server Rendering](docs/additional-reading/node-server-rendering.md) for more information.
 
-## Additional Documentation
+## Additional Documentation 
+**Try out our new [Documentation Gitbook](https://shakacode.gitbooks.io/react_on_rails/content/) for improved readability & reference!**
 + **Rails**
   + [Rails Assets](docs/additional-reading/rails-assets.md)
   + [Rails View Rendering from Inline JavaScript](docs/additional-reading/rails_view_rendering_from_inline_javascript.md)
