@@ -1,0 +1,18 @@
+{
+  "gitbook": "3.1.1",
+  "title": "React on Rails Documentation",
+  "plugins": ["prism", "-highlight", "github"],
+  "pluginsConfig": {
+    "github": {
+      "url": "https://github.com/shakacode/react_on_rails/"
+    },
+    "sharing": {
+      "facebook":   true,
+      "twitter":    true,
+      "google":     true,
+      "weibo":      true,
+      "instapaper": true,
+      "vk":         true
+    }
+  }
+}
