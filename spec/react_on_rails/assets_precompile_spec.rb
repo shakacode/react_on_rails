@@ -69,9 +69,9 @@ module ReactOnRails
       let(:nondigest_filename) { "alfa.js" }
 
       let(:checker) do
-        f = File.new(assets_path.join("manifest-alfa.json"), "w")
-        f.write("{\"assets\":{\"#{nondigest_filename}\": \"#{digest_filename}\"}}")
-        f.close
+        File.open(assets_path.join("manifest-alfa.json"), "w") do |f|
+          f.write("{\"assets\":{\"#{nondigest_filename}\": \"#{digest_filename}\"}}")
+        end
 
         AssetsPrecompile.new(assets_path: assets_path,
                              symlink_non_digested_assets_regex: Regexp.new('.*\.js$'))
