@@ -26,11 +26,7 @@ module ReactOnRails
       target_exists = File.exist?(target_path)
       raise SymlinkTargetDoesNotExistException, "Target Path was: #{target_path}" unless target_exists
 
-      # File.exist?(symlink_path) will check the file the sym is pointing to is existing
-      # File.lstat(symlink_path).symlink? confirms that this is a symlink
-      valid_symlink_already_exists = File.exist?(symlink_path) && File.lstat(symlink_path).symlink?
-
-      if valid_symlink_already_exists
+      if symlink_and_points_to_existing_file?(symlink_path)
         puts "React On Rails: Digested version of #{symlink} already exists indicating #{target} did not change."
         return
       end
@@ -120,7 +116,15 @@ module ReactOnRails
 
     private
 
+    def symlink_and_points_to_existing_file?(symlink_path)
+      # File.exist?(symlink_path) will check the file the sym is pointing to is existing
+      # File.lstat(symlink_path).symlink? confirms that this is a symlink
+      File.exist?(symlink_path) && File.lstat(symlink_path).symlink?
+    end
+
     def file_or_symlink_exists_at_path?(path)
+      # We use lstat and not stat, we we don't want to visit the file that the symlink maybe
+      # pointing to. We can't use File.exist?, as that would check the file pointed at by the symlink.
       File.lstat(path)
       true
     rescue

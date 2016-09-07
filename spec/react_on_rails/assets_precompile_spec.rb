@@ -62,6 +62,48 @@ module ReactOnRails
           end.to raise_exception(AssetsPrecompile::SymlinkTargetDoesNotExistException)
         end
       end
+
+      it "creates a proper symlink when a file exists at destination" do
+        filename = File.basename(Tempfile.new("tempfile", assets_path))
+        existing_filename = File.basename(Tempfile.new("tempfile", assets_path))
+        digest_filename = existing_filename
+
+        AssetsPrecompile.new(assets_path: assets_path).symlink_file(filename, digest_filename)
+        expect(assets_path.join(digest_filename).lstat.symlink?).to be true
+        expect(File.identical?(assets_path.join(filename),
+                               assets_path.join(digest_filename))).to be true
+      end
+
+      it "creates a proper symlink when a symlink file exists at destination" do
+        filename = File.basename(Tempfile.new("tempfile", assets_path))
+        existing_filename = File.basename(Tempfile.new("tempfile", assets_path))
+        digest_file = Tempfile.new("tempfile", assets_path)
+        digest_filename = File.basename(digest_file)
+        File.delete(digest_file)
+        File.symlink(existing_filename, digest_filename)
+
+        AssetsPrecompile.new(assets_path: assets_path).symlink_file(filename, digest_filename)
+        expect(assets_path.join(digest_filename).lstat.symlink?).to be true
+        expect(File.identical?(assets_path.join(filename),
+                               assets_path.join(digest_filename))).to be true
+        File.delete(digest_filename)
+      end
+
+      it "creates a proper symlink when an invalid symlink exists at destination" do
+        filename = File.basename(Tempfile.new("tempfile", assets_path))
+        existing_file = Tempfile.new("tempfile", assets_path)
+        existing_filename = File.basename(existing_file)
+        digest_file = Tempfile.new("tempfile", assets_path)
+        digest_filename = File.basename(digest_file)
+        File.symlink(existing_filename, digest_filename)
+        File.delete(existing_file) # now digest_filename is an invalid link
+
+        AssetsPrecompile.new(assets_path: assets_path).symlink_file(filename, digest_filename)
+        expect(assets_path.join(digest_filename).lstat.symlink?).to be true
+        expect(File.identical?(assets_path.join(filename),
+                               assets_path.join(digest_filename))).to be true
+        File.delete(digest_filename)
+      end
     end
 
     describe "symlink_non_digested_assets" do
