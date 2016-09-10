@@ -430,7 +430,7 @@ csrfToken = ReactOnRails.authenticityToken();
 header = ReactOnRails.authenticityHeaders(otherHeader);
 ```
 
-If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX calls, than these helpers are not needed because the [jquery-ujs](https://github.com/rails/jquery-ujs) library updates header automatically, see [jquery-ujs documentation](https://robots.thoughtbot.com/a-tour-of-rails-jquery-ujs#cross-site-request-forgery-protection).
+If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX calls, then these helpers are not needed because the [jquery-ujs](https://github.com/rails/jquery-ujs) library updates header automatically, see [jquery-ujs documentation](https://robots.thoughtbot.com/a-tour-of-rails-jquery-ujs#cross-site-request-forgery-protection).
 
 ## React Router
 [React Router](https://github.com/reactjs/react-router) is supported, including server side rendering! See:
