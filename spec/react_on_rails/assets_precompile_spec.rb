@@ -54,6 +54,58 @@ module ReactOnRails
         expect(File.identical?(assets_path.join(filename),
                                assets_path.join(digest_filename))).to be true
       end
+
+      context "when no file exists at the target path" do
+        it "raises a ReactOnRails::AssetsPrecompile::SymlinkTargetDoesNotExistException" do
+          expect do
+            AssetsPrecompile.new(assets_path: assets_path).symlink_file("non_existent", "non_existent-digest")
+          end.to raise_exception(AssetsPrecompile::SymlinkTargetDoesNotExistException)
+        end
+      end
+
+      it "creates a proper symlink when a file exists at destination" do
+        filename = File.basename(Tempfile.new("tempfile", assets_path))
+        existing_filename = File.basename(Tempfile.new("tempfile", assets_path))
+        digest_filename = existing_filename
+        AssetsPrecompile.new(assets_path: assets_path).symlink_file(filename, digest_filename)
+
+        expect(assets_path.join(digest_filename).lstat.symlink?).to be true
+        expect(File.identical?(assets_path.join(filename),
+                               assets_path.join(digest_filename))).to be true
+      end
+
+      it "creates a proper symlink when a symlink file exists at destination" do
+        filename = File.basename(Tempfile.new("tempfile", assets_path))
+        existing_filename = File.basename(Tempfile.new("tempfile", assets_path))
+        digest_file = Tempfile.new("tempfile", assets_path)
+        digest_filename = File.basename(digest_file)
+        File.delete(digest_file)
+        File.symlink(existing_filename, digest_filename)
+        AssetsPrecompile.new(assets_path: assets_path).symlink_file(filename, digest_filename)
+
+        expect(assets_path.join(digest_filename).lstat.symlink?).to be true
+        expect(File.identical?(assets_path.join(filename),
+                               assets_path.join(digest_filename))).to be true
+
+        File.delete(digest_filename)
+      end
+
+      it "creates a proper symlink when an invalid symlink exists at destination" do
+        filename = File.basename(Tempfile.new("tempfile", assets_path))
+        existing_file = Tempfile.new("tempfile", assets_path)
+        existing_filename = File.basename(existing_file)
+        digest_file = Tempfile.new("tempfile", assets_path)
+        digest_filename = File.basename(digest_file)
+        File.symlink(existing_filename, digest_filename)
+        File.delete(existing_file) # now digest_filename is an invalid link
+        AssetsPrecompile.new(assets_path: assets_path).symlink_file(filename, digest_filename)
+
+        expect(assets_path.join(digest_filename).lstat.symlink?).to be true
+        expect(File.identical?(assets_path.join(filename),
+                               assets_path.join(digest_filename))).to be true
+
+        File.delete(digest_filename)
+      end
     end
 
     describe "symlink_non_digested_assets" do
@@ -61,43 +113,31 @@ module ReactOnRails
       let(:nondigest_filename) { "alfa.js" }
 
       let(:checker) do
-        f = File.new(assets_path.join("manifest-alfa.json"), "w")
-        f.write("{\"assets\":{\"#{nondigest_filename}\": \"#{digest_filename}\"}}")
-        f.close
+        File.open(assets_path.join("manifest-alfa.json"), "w") do |f|
+          f.write("{\"assets\":{\"#{nondigest_filename}\": \"#{digest_filename}\"}}")
+        end
 
         AssetsPrecompile.new(assets_path: assets_path,
                              symlink_non_digested_assets_regex: Regexp.new('.*\.js$'))
       end
 
-      context "correct nondigest filename" do
-        it "creates valid symlink" do
-          FileUtils.touch assets_path.join(digest_filename)
-          checker.symlink_non_digested_assets
+      it "creates a symlink with the original filename that points to the digested filename" do
+        FileUtils.touch assets_path.join(digest_filename)
+        checker.symlink_non_digested_assets
 
-          expect(assets_path.join(nondigest_filename).lstat.symlink?).to be true
-          expect(File.identical?(assets_path.join(nondigest_filename),
-                                 assets_path.join(digest_filename))).to be true
-        end
+        expect(assets_path.join(nondigest_filename).lstat.symlink?).to be true
+        expect(File.identical?(assets_path.join(nondigest_filename),
+                               assets_path.join(digest_filename))).to be true
       end
 
-      context "zipped nondigest filename" do
-        it "creates valid symlink" do
-          FileUtils.touch assets_path.join("#{digest_filename}.gz")
-          checker.symlink_non_digested_assets
+      it "creates a symlink with the original filename plus .gz that points to the gzipped digested filename" do
+        FileUtils.touch assets_path.join(digest_filename)
+        FileUtils.touch assets_path.join("#{digest_filename}.gz")
+        checker.symlink_non_digested_assets
 
-          expect(assets_path.join("#{nondigest_filename}.gz").lstat.symlink?).to be true
-          expect(File.identical?(assets_path.join("#{nondigest_filename}.gz"),
-                                 assets_path.join("#{digest_filename}.gz"))).to be true
-        end
-      end
-
-      context "wrong nondigest filename" do
-        it "should not create symlink" do
-          FileUtils.touch assets_path.join("alfa.12345.jsx")
-          checker.symlink_non_digested_assets
-
-          expect(assets_path.join("alfa.jsx")).not_to exist
-        end
+        expect(assets_path.join("#{nondigest_filename}.gz").lstat.symlink?).to be true
+        expect(File.identical?(assets_path.join("#{nondigest_filename}.gz"),
+                               assets_path.join("#{digest_filename}.gz"))).to be true
       end
     end
 

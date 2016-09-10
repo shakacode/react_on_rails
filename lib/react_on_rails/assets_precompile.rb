@@ -1,5 +1,7 @@
 module ReactOnRails
   class AssetsPrecompile
+    class SymlinkTargetDoesNotExistException < StandardError; end
+
     # Used by the rake task
     def default_asset_path
       dir = File.join(Rails.configuration.paths["public"].first,
@@ -20,30 +22,31 @@ module ReactOnRails
     def symlink_file(target, symlink)
       target_path = @assets_path.join(target)
       symlink_path = @assets_path.join(symlink)
-      target_exists = File.exist?(target_path)
 
-      # File.exist?(symlink_path) will check the file the sym is pointing to is existing
-      # File.lstat(symlink_path).symlink? confirms that this is a symlink
-      symlink_already_there_and_valid = File.exist?(symlink_path) &&
-                                        File.lstat(symlink_path).symlink?
-      if symlink_already_there_and_valid
-        puts "React On Rails: Digested #{symlink} already exists indicating #{target} did not change."
-      elsif target_exists
-        if File.exist?(symlink_path) && File.lstat(symlink_path).symlink?
-          puts "React On Rails: Removing invalid symlink #{symlink_path}"
-          `cd #{@assets_path} && rm #{symlink}`
-        end
-        # Might be like:
-        # "images/5cf5db49df178f9357603f945752a1ef.png":
-        # "images/5cf5db49df178f9357603f945752a1ef-033650e1d6193b70d59bb60e773f47b6d9aefdd56abc7cc.png"
-        # need to cd to directory and then symlink
-        target_sub_path, _divider, target_filename = target.rpartition("/")
-        _symlink_sub_path, _divider, symlink_filename = symlink.rpartition("/")
-        puts "React On Rails: Symlinking \"#{target}\" to \"#{symlink}\""
-        dest_path = File.join(@assets_path, target_sub_path)
-        FileUtils.chdir(dest_path) do
-          File.symlink(target_filename, symlink_filename)
-        end
+      target_exists = File.exist?(target_path)
+      raise SymlinkTargetDoesNotExistException, "Target Path was: #{target_path}" unless target_exists
+
+      if symlink_and_points_to_existing_file?(symlink_path)
+        puts "React On Rails: Digested version of #{symlink} already exists indicating #{target} did not change."
+        return
+      end
+
+      if file_or_symlink_exists_at_path?(symlink_path)
+        puts "React On Rails: Removing existing invalid symlink or file #{symlink_path}"
+        FileUtils.remove_file(symlink_path, true)
+      end
+
+      # Might be like:
+      # "images/5cf5db49df178f9357603f945752a1ef.png":
+      # "images/5cf5db49df178f9357603f945752a1ef-033650e1d6193b70d59bb60e773f47b6d9aefdd56abc7cc.png"
+      # need to cd to directory and then symlink
+      target_sub_path, _divider, target_filename = target.rpartition("/")
+      _symlink_sub_path, _divider, symlink_filename = symlink.rpartition("/")
+      dest_path = File.join(@assets_path, target_sub_path)
+
+      puts "React On Rails: Symlinking \"#{target}\" to \"#{symlink}\""
+      FileUtils.chdir(dest_path) do
+        File.symlink(target_filename, symlink_filename)
       end
     end
 
@@ -74,8 +77,10 @@ module ReactOnRails
           # already been symlinked by Webpack
           symlink_file(rails_digested_filename, original_filename)
 
-          # We want the gz ones as well
-          symlink_file("#{rails_digested_filename}.gz", "#{original_filename}.gz")
+          # We want the gz ones as well if they exist
+          if File.exist?(@assets_path.join("#{rails_digested_filename}.gz"))
+            symlink_file("#{rails_digested_filename}.gz", "#{original_filename}.gz")
+          end
         end
       end
     end
@@ -107,6 +112,23 @@ module ReactOnRails
       else
         puts "Could not find generated_assets_dir #{dir} defined in react_on_rails initializer: "
       end
+    end
+
+    private
+
+    def symlink_and_points_to_existing_file?(symlink_path)
+      # File.exist?(symlink_path) will check the file the sym is pointing to is existing
+      # File.lstat(symlink_path).symlink? confirms that this is a symlink
+      File.exist?(symlink_path) && File.lstat(symlink_path).symlink?
+    end
+
+    def file_or_symlink_exists_at_path?(path)
+      # We use lstat and not stat, we we don't want to visit the file that the symlink maybe
+      # pointing to. We can't use File.exist?, as that would check the file pointed at by the symlink.
+      File.lstat(path)
+      true
+    rescue
+      false
     end
   end
 end
