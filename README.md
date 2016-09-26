@@ -483,7 +483,7 @@ Node.js can be used as the backend for server-side rendering instead of [execJS]
   + [Ruby API](docs/api/ruby-api.md)
   + [Setting up Hot Reloading during Rails Development, API docs](docs/api/ruby-api-hot-reload-view-helpers.md)
 
-+ **[CONTRIBUTING](CONTRIBUTING.MD)**
++ **[CONTRIBUTING](CONTRIBUTING.md)**
   + [Generator Testing](docs/contributor-info/generator-testing.md)
   + [Linting](docs/contributor-info/linters.md)
   + [Releasing](docs/contributor-info/releasing.md)
