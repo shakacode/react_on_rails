@@ -3,7 +3,7 @@
 * See [docs/contributor-info/Releasing](./docs/contributor-info/releasing.md) for instructions on releasing.
 * See other docs in [docs/contributor-info](./docs/contributor-info)
 
-## Sumary
+## Summary
 
 For non-doc fixes:
 
