@@ -11,7 +11,7 @@ We'll use a Webpack Dev server on port 3500 to provide the assets to Rails, rath
 
 `Procfile.static` provides an alternative that uses "static" assets, similar to a production deployment.
 
-The secret sauce is in the [app/views/layouts/application.html.erb](../../spec/dummy/app/views/layouts/application.html.erb) where it uses view helpes to configure the correct assets to load, being either the "hot" assets or the "static" assets.
+The secret sauce is in the [app/views/layouts/application.html.erb](../../spec/dummy/app/views/layouts/application.html.erb) where it uses view helps to configure the correct assets to load, being either the "hot" assets or the "static" assets.
 
 ## Places to Configure (Files to Examine)
 
