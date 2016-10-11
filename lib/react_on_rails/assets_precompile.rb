@@ -59,18 +59,25 @@ module ReactOnRails
       # file back to the original digested name, and make a similar symlink for the gz version.
       if @symlink_non_digested_assets_regex
         manifest_glob = Dir.glob(@assets_path.join(".sprockets-manifest-*.json")) +
-                        Dir.glob(@assets_path.join("manifest-*.json"))
+                        Dir.glob(@assets_path.join("manifest-*.json")) +
+                        Dir.glob(@assets_path.join("manifest.yml"))
         if manifest_glob.empty?
-          puts "Warning: React On Rails: expected to find .sprockets-manifest-*.json or manifest-*.json "\
-                   "at #{@assets_path}, but found none. Canceling symlinking tasks."
+          puts "Warning: React On Rails: expected to find .sprockets-manifest-*.json, manifest-*.json "\
+                   "or manifest.yml at #{@assets_path}, but found none. Canceling symlinking tasks."
           return -1
         end
         manifest_path = manifest_glob.first
-        manifest_data = JSON.load(File.new(manifest_path))
+        manifest_file = File.new(manifest_path)
+        manifest_data = case File.extname(manifest_file)
+                        when ".json"
+                          JSON.load(manifest_file)
+                        when ".yml"
+                          YAML.load(manifest_file)
+                        end
 
         # We realize that we're copying other Rails assets that match the regexp, but this just
         # means that we'd be exposing the original, undigested names.
-        manifest_data["assets"].each do |original_filename, rails_digested_filename|
+        (manifest_data["assets"] || manifest_data).each do |original_filename, rails_digested_filename|
           # TODO: we should remove any original_filename that is NOT in the webpack deploy folder.
           next unless original_filename =~ @symlink_non_digested_assets_regex
           # We're symlinking from the digested filename back to the original filename which has

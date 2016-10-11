@@ -112,17 +112,36 @@ module ReactOnRails
       let(:digest_filename) { "alfa.12345.js" }
       let(:nondigest_filename) { "alfa.js" }
 
-      let(:checker) do
+      let(:create_json_manifest) do
         File.open(assets_path.join("manifest-alfa.json"), "w") do |f|
           f.write("{\"assets\":{\"#{nondigest_filename}\": \"#{digest_filename}\"}}")
         end
+      end
 
+      let(:create_yaml_manifest) do
+        File.open(assets_path.join("manifest.yml"), "w") do |f|
+          f.write("---\n#{nondigest_filename}: #{digest_filename}")
+        end
+      end
+
+      let(:checker) do
         AssetsPrecompile.new(assets_path: assets_path,
                              symlink_non_digested_assets_regex: Regexp.new('.*\.js$'))
       end
 
       it "creates a symlink with the original filename that points to the digested filename" do
         FileUtils.touch assets_path.join(digest_filename)
+        create_json_manifest
+        checker.symlink_non_digested_assets
+
+        expect(assets_path.join(nondigest_filename).lstat.symlink?).to be true
+        expect(File.identical?(assets_path.join(nondigest_filename),
+                               assets_path.join(digest_filename))).to be true
+      end
+
+      it "creates a symlink that points to the digested filename for the original filename found in the manifest.yml" do
+        FileUtils.touch assets_path.join(digest_filename)
+        create_yaml_manifest
         checker.symlink_non_digested_assets
 
         expect(assets_path.join(nondigest_filename).lstat.symlink?).to be true
@@ -133,6 +152,7 @@ module ReactOnRails
       it "creates a symlink with the original filename plus .gz that points to the gzipped digested filename" do
         FileUtils.touch assets_path.join(digest_filename)
         FileUtils.touch assets_path.join("#{digest_filename}.gz")
+        create_json_manifest
         checker.symlink_non_digested_assets
 
         expect(assets_path.join("#{nondigest_filename}.gz").lstat.symlink?).to be true
