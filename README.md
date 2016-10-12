@@ -493,7 +493,7 @@ Node.js can be used as the backend for server-side rendering instead of [execJS]
   + [Changelog](CHANGELOG.md)
   + [Projects](PROJECTS.md)
   + [Shaka Code Style](docs/coding-style/style.md)
-  + [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v4032)
+  + [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v61)
   + [Code of Conduct](docs/misc/code_of_conduct.md)
   + [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 
