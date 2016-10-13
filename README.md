@@ -14,8 +14,8 @@ Your support keeps this project going.
 
 # Videos
 1. [Overview](https://youtu.be/F4oymbUHvoY)
-2. [Running the generator](https://youtu.be/_bjScw60FBk)
-3. [Generator code walkthrough](https://youtu.be/McQ9UM-_ocQ)
+2. [Running the Generator](https://youtu.be/_bjScw60FBk)
+3. [Generator Code Walkthrough](https://youtu.be/McQ9UM-_ocQ)
 
 # NEWS
 * 2016-08-27: We now have a [Documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) for improved readability & reference.
