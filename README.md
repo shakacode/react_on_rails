@@ -14,7 +14,7 @@ Your support keeps this project going.
 
 # Videos
 
-## [React On Rails Tutorial Series](https://www.youtube.com/playlist?list=PL5VAKH-U1M6dj84BApfUtvBjvF-0-JfEU)
+### [React On Rails Tutorial Series](https://www.youtube.com/playlist?list=PL5VAKH-U1M6dj84BApfUtvBjvF-0-JfEU)
 
 1. [History and Motivation](https://youtu.be/F4oymbUHvoY)
 2. [Basic Tutorial Walkthrough](https://youtu.be/_bjScw60FBk)
