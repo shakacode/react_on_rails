@@ -13,9 +13,12 @@ Your support keeps this project going.
 (Want to become a contributor? [Contact us](mailto:contact@shakacode.com) for an Slack team invite! Also, see ["easy" issues](https://github.com/shakacode/react_on_rails/labels/easy) and [issues for the full tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/issues?q=is%3Aissue+is%3Aopen+label%3Aeasy).)
 
 # Videos
-1. [Overview](https://youtu.be/F4oymbUHvoY)
-2. [Running the Generator](https://youtu.be/_bjScw60FBk)
-3. [Generator Code Walkthrough](https://youtu.be/McQ9UM-_ocQ)
+
+## [React On Rails Tutorial Series](https://www.youtube.com/playlist?list=PL5VAKH-U1M6dj84BApfUtvBjvF-0-JfEU)
+
+1. [History and Motivation](https://youtu.be/F4oymbUHvoY)
+2. [Basic Tutorial Walkthrough](https://youtu.be/_bjScw60FBk)
+3. [Code Walkthrough](https://youtu.be/McQ9UM-_ocQ)
 
 # NEWS
 * 2016-08-27: We now have a [Documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) for improved readability & reference.
