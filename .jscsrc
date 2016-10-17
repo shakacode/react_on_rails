@@ -5,6 +5,7 @@
     ".jsx"
   ],
   "excludeFiles": [
+    "**/.c9/**",
     "**/build/**",
     "**/node_modules/**",
     "**/assets/webpack/**",

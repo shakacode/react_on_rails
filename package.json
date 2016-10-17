@@ -47,7 +47,7 @@
     "node_package/lib"
   ],
   "scripts": {
-    "test": "babel-tape-runner node_package/tests/*.js | tap-spec",
+    "test": "babel-tape-runner -r node_package/tests/helpers/test_helper.js node_package/tests/*.js | tap-spec",
     "clean": "rm -rf node_package/lib",
     "prepublish": "npm run build",
     "babel": "babel --out-dir node_package/lib node_package/src",

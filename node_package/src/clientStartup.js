@@ -8,12 +8,25 @@ import isRouterResult from './isRouterResult';
 const REACT_ON_RAILS_COMPONENT_CLASS_NAME = 'js-react-on-rails-component';
 const REACT_ON_RAILS_STORE_CLASS_NAME = 'js-react-on-rails-store';
 
+function findContext() {
+  if (typeof window.ReactOnRails !== 'undefined') {
+    return window;
+  } else if (typeof ReactOnRails !== 'undefined') {
+    return global;
+  }
+
+  throw new Error(`\
+ReactOnRails is undefined in both global and window namespaces.
+  `);
+}
+
 function debugTurbolinks(...msg) {
   if (!window) {
     return;
   }
 
-  if (ReactOnRails.option('traceTurbolinks')) {
+  const context = findContext();
+  if (context.ReactOnRails.option('traceTurbolinks')) {
     console.log('TURBO:', ...msg);
   }
 }
@@ -34,11 +47,12 @@ function forEachComponent(fn, railsContext) {
 }
 
 function initializeStore(el, railsContext) {
+  const context = findContext();
   const name = el.getAttribute('data-store-name');
   const props = JSON.parse(el.getAttribute('data-props'));
-  const storeGenerator = ReactOnRails.getStoreGenerator(name);
+  const storeGenerator = context.ReactOnRails.getStoreGenerator(name);
   const store = storeGenerator(props, railsContext);
-  ReactOnRails.setStore(name, store);
+  context.ReactOnRails.setStore(name, store);
 }
 
 function forEachStore(railsContext) {

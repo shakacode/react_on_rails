@@ -1,5 +1,4 @@
 import test from 'tape';
-
 import ReactOnRails from '../src/ReactOnRails.js';
 
 test('authenticityToken and authenticityHeaders', (assert) => {
