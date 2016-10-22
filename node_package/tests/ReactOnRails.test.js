@@ -6,15 +6,8 @@
 import test from 'tape';
 import { createStore } from 'redux';
 import React from 'react';
-import { canUseDOM } from 'fbjs/lib/ExecutionEnvironment';
-import JsDom from 'jsdom';
 
 import ReactOnRails from '../src/ReactOnRails';
-
-if (!canUseDOM) {
-  global.document = JsDom.jsdom('<div id="root"></div>');
-  global.window = document.defaultView;
-}
 
 test('ReactOnRails render returns a virtual DOM element for component', (assert) => {
   assert.plan(1);

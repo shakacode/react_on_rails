@@ -1,6 +1,4 @@
 ---
-parser: babel-eslint
-
 extends: eslint-config-shakacode
 
 plugins:
