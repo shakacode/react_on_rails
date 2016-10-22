@@ -69,8 +69,8 @@ test('consoleReplay replays converts script tag inside of object string to be sa
   ];
   const actual = consoleReplay();
 
-  const expected = `console.log.apply(console, ["some message (/script><script>alert(\'WTF\')\
-(/script>","{\\"a\\":\\"Wow(/script><script>alert(\'WTF\')(/script>\\",\\"b\\":2}"]);
+  const expected = `console.log.apply(console, ["some message (/script><script>alert('WTF')\
+(/script>","{\\"a\\":\\"Wow(/script><script>alert('WTF')(/script>\\",\\"b\\":2}"]);
 console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);`;
 
   assert.equals(actual, expected, 'Unexpected value for console replay history');

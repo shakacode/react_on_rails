@@ -2,4 +2,4 @@
 // to coerce it into exactly what you want your initial redux state.
 export default (props, railsContext) => (
   Object.assign({}, props, { railsContext })
-)
+);

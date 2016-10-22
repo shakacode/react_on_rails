@@ -11,10 +11,10 @@ import RouterApp from './ClientRouterApp';
 import PureComponent from '../components/PureComponent';
 import CssModulesImagesFontsExample from '../components/CssModulesImagesFontsExample';
 
-import SharedReduxStore from '../stores/SharedReduxStore'
+import SharedReduxStore from '../stores/SharedReduxStore';
 
 ReactOnRails.setOptions({
-  traceTurbolinks: true
+  traceTurbolinks: true,
 });
 
 ReactOnRails.register({
@@ -30,5 +30,5 @@ ReactOnRails.register({
 });
 
 ReactOnRails.registerStore({
-  SharedReduxStore
+  SharedReduxStore,
 });
