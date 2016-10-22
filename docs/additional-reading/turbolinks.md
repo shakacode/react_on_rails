@@ -2,15 +2,23 @@
 
 * See [Turbolinks on Github](https://github.com/rails/turbolinks)
 * Currently support 2.5.x of Turbolinks and 5.0.0 of Turbolinks 5.
-* Turbolinks is currently included only via the Rails gem and the Rails manifest file rather than NPM. [Turbolinks Issue #658 ](https://github.com/rails/turbolinks/issues/658) discusses this.
+* You may include Turbolinks either via npm (recommended) or via the gem.
 
 ## Why Turbolinks?
 As you switch between Rails HTML controller requests, you will only load the HTML and you will
 not reload JavaScript and stylesheets. This definitely can make an app perform better, even if
 the JavaScript and stylesheets are cached by the browser, as they will still require parsing.
 
+## Requirements for Using Turbolinks
+1. You are **not using [react-router](https://github.com/ReactTraining/react-router)** or you are prepared to deal with some potential issues with where react-router and Turbolinks overlaps.
+2. You are **using one JS and one CSS file** throughout your app. Otherwise, you will have to figure out how best to handle multiple JS and CSS files throughout the app given Turbolinks.
+
+## Why Not Turbolinks
+1. [react-router](https://github.com/ReactTraining/react-router) handles the back and forward buttons, as does TurboLinks. You *might* be able to make this work. *Please share your findings.*
+1. You want to do code splitting to minimize the JavaScript loaded.
+
 ### Install Checklist
-1. Include the gem "turbolinks".
+1. Include turbolinks via npm as shown in the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/blob/8a6c8aa2e3b7ae5b08b0a9744fb3a63a2fe0f002/client/webpack.client.base.config.js#L22) or include the gem "turbolinks".
 1. Included the proper "track" tags when you include the javascript and stylesheet:
   ```erb
     <%= stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track' => 'reload' %>
@@ -21,7 +29,6 @@ the JavaScript and stylesheets are cached by the browser, as they will still req
    ```javascript
    //= require turbolinks
    ```
-Note, in the future, we will change to installing this via npm.
 
 ## Turbolinks 5
 Turbolinks 5 is now being supported. React on Rails will automatically detect which version of Turbolinks you are using and use the correct event handlers.
