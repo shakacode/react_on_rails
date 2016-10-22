@@ -1,14 +1,14 @@
-/* eslint no-var: 0, no-console: 0 */
+/* eslint no-var: 0, no-console: 0, import/no-extraneous-dependencies: 0 */
 
 // This file is used by the npm script:
 // "hot-assets": "babel-node server-rails-hot.js"
-// 
+//
 // This is what creates the hot assets so that you can edit assets, JavaScript and Sass,
 // referenced in your webpack config, and the page updated without you needing to reload
 // the page.
 //
 // Steps
-// 1. Update your application.html.erb or equivalent to use the env_javascript_include_tag 
+// 1. Update your application.html.erb or equivalent to use the env_javascript_include_tag
 //    and env_stylesheet_link_tag helpers.
 // 2. Make sure you have a hot-assets target in your client/package.json
 // 3. Start up `forman start -f Procfile.hot` to start both Rails and the hot reload server.

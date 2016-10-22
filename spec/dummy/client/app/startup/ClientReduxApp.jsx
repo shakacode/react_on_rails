@@ -21,7 +21,7 @@ import HelloWorldContainer from '../components/HelloWorldContainer';
 export default (props, railsContext) => {
   const combinedReducer = combineReducers(reducers);
   const combinedProps = composeInitialState(props, railsContext);
-  
+
   // This is where we'll put in the middleware for the async function. Placeholder.
   // store will have helloWorldData as a top level property
   const store = applyMiddleware(middleware)(createStore)(combinedReducer, combinedProps);
@@ -29,8 +29,8 @@ export default (props, railsContext) => {
   // Provider uses the this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
   return (
-      <Provider store={store}>
-        <HelloWorldContainer />
-      </Provider>
+    <Provider store={store}>
+      <HelloWorldContainer />
+    </Provider>
     );
 };

@@ -2,9 +2,10 @@
 // Compare this to the ./ServerApp.jsx file which is used for server side rendering.
 
 import React from 'react';
-import ReactOnRails from 'react-on-rails';
-import HelloWorldContainer from '../components/HelloWorldContainer';
 import { Provider } from 'react-redux';
+import ReactOnRails from 'react-on-rails';
+
+import HelloWorldContainer from '../components/HelloWorldContainer';
 
 /*
  *  Export a function that returns a ReactComponent, depending on a store named SharedReduxStore.
@@ -12,13 +13,12 @@ import { Provider } from 'react-redux';
  *  React will see that the state is the same and not do anything.
  */
 export default () => {
-
   // This is where we get the existing store.
   const store = ReactOnRails.getStore('SharedReduxStore');
 
   return (
-      <Provider store={store}>
-        <HelloWorldContainer />
-      </Provider>
+    <Provider store={store}>
+      <HelloWorldContainer />
+    </Provider>
     );
 };

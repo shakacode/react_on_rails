@@ -3,8 +3,9 @@
 
 import React from 'react';
 import ReactOnRails from 'react-on-rails';
-import HelloWorldContainer from '../components/HelloWorldContainer';
 import { Provider } from 'react-redux';
+
+import HelloWorldContainer from '../components/HelloWorldContainer';
 
 /*
  *  Export a function that returns a ReactComponent, depending on a store named SharedReduxStore.
@@ -16,8 +17,8 @@ export default () => {
   const store = ReactOnRails.getStore('SharedReduxStore');
 
   return (
-      <Provider store={store}>
-        <HelloWorldContainer />
-      </Provider>
+    <Provider store={store}>
+      <HelloWorldContainer />
+    </Provider>
     );
 };
