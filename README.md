@@ -2,15 +2,19 @@
 
 **For a complete example of this gem, see our live demo at [www.reactrails.com](http://www.reactrails.com). ([Source Code](https://github.com/shakacode/react-webpack-rails-tutorial))**
 
-Aloha from Justin Gordon ([bio](http://www.railsonmaui.com/about)) and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects. If you like **React on Rails**, please consider contacting me at [justin@shakacode.com](mailto:justin@shakacode.com) if we could potentially help you in any way. Besides consulting on bigger projects, [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for React on Rails. [Click here](http://www.shakacode.com/work/index.html) for more information.
+Aloha from Justin Gordon ([bio](http://www.railsonmaui.com/about)) and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects involving React, React-Native, and Rails. Please contact me at [justin@shakacode.com](mailto:justin@shakacode.com) if we could potentially help you in any way. Besides consulting on bigger projects, [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for React on Rails. [Click here](http://www.shakacode.com/work/index.html) for more information.
 
-We're offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development for both consumer and enterprise products. In addition to React.js and Rails, we're doing react-native iOS and Android apps!
+We're offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development for both consumer and enterprise products. In addition to React.js and Rails, we're doing React-Native iOS and Android apps!
 
 Whether you have a new project or need help on an existing project, feel free to contact me directly at [justin@shakacode.com](mailto:justin@shakacode.com) and thanks in advance for any referrals!
 
 Your support keeps this project going.
 
 (Want to become a contributor? [Contact us](mailto:contact@shakacode.com) for an Slack team invite! Also, see ["easy" issues](https://github.com/shakacode/react_on_rails/labels/easy) and [issues for the full tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/issues?q=is%3Aissue+is%3Aopen+label%3Aeasy).)
+
+# Articles
+* [React on Rails, 2000+ 🌟 Stars](https://medium.com/shakacode/react-on-rails-2000-stars-32ff5cfacfbf#.6gmfb2gpy)
+* [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 
 # Videos
 
@@ -504,6 +508,7 @@ Node.js can be used as the backend for server-side rendering instead of [execJS]
   + [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v61)
   + [Code of Conduct](docs/misc/code_of_conduct.md)
   + [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
+  + [React on Rails, 2000+ 🌟 Stars](https://medium.com/shakacode/react-on-rails-2000-stars-32ff5cfacfbf#.6gmfb2gpy)
 
 ## Demos
 + [www.reactrails.com](http://www.reactrails.com) with the source at [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/).
@@ -542,9 +547,9 @@ We owe much gratitude to the work of the [react-rails gem](https://github.com/re
 
 ---
 
-Aloha from Justin Gordon ([bio](http://www.railsonmaui.com/about)) and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects. If you like **React on Rails**, please consider contacting me at [justin@shakacode.com](mailto:justin@shakacode.com) if we could potentially help you in any way. Besides consulting on bigger projects, [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for React on Rails. [Click here](http://www.shakacode.com/work/index.html) for more information.
+Aloha from Justin Gordon ([bio](http://www.railsonmaui.com/about)) and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects involving React, React-Native, and Rails. Please contact me at [justin@shakacode.com](mailto:justin@shakacode.com) if we could potentially help you in any way. Besides consulting on bigger projects, [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for React on Rails. [Click here](http://www.shakacode.com/work/index.html) for more information.
 
-We're offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development for both consumer and enterprise products. In addition to React.js and Rails, we're doing react-native iOS and Android apps!
+We're offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development for both consumer and enterprise products. In addition to React.js and Rails, we're doing React-Native iOS and Android apps!
 
 Whether you have a new project or need help on an existing project, feel free to contact me directly at [justin@shakacode.com](mailto:justin@shakacode.com) and thanks in advance for any referrals!
 
