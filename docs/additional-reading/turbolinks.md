@@ -17,6 +17,11 @@ the JavaScript and stylesheets are cached by the browser, as they will still req
 1. [react-router](https://github.com/ReactTraining/react-router) handles the back and forward buttons, as does TurboLinks. You *might* be able to make this work. *Please share your findings.*
 1. You want to do code splitting to minimize the JavaScript loaded.
 
+## More Information
+* CSRF tokens need thorough checking with Turbolinks5. Turbolinks5 changes the head element by JavaScript (not only body) on page changes with the correct csrf meta tag, but if the JS code parsed this from head when several windows were opened, then our specs were not all passing. I didn't look details however, may be it is app code related, not library code. Anyway it may need additional check because there is CSRF helper in ReactOnRails and it need to work with Turbolinks5.
+* Turbolinks5 send requests without the `Accept: */*` in the header, only exactly like `Accept: text/html` which makes Rails behave a bit specifically compared to normal and mime-parsing, which is skipped by when Rails see */*. For some more details on Rails and */* can read [Mime Type Resolution in Rails](http://blog.bigbinary.com/2010/11/23/mime-type-resolution-in-rails.html)
+* If you're using multiple Webpack bundles, be sure to ensure that there are no name conflicts between JS objects or redux store paths.
+
 ### Install Checklist
 1. Include turbolinks via npm as shown in the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/blob/8a6c8aa2e3b7ae5b08b0a9744fb3a63a2fe0f002/client/webpack.client.base.config.js#L22) or include the gem "turbolinks".
 1. Included the proper "track" tags when you include the javascript and stylesheet:
