@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Items under
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+
+## [6.1.2] 2016-10-24
 ##### Fixed
 - Added compatibility with older manifest.yml files produced by Rails 3 Sprockets when symlinking digested assets during precompilation [#566](https://github.com/shakacode/react_on_rails/pull/566) by [etripier](https://github.com/etripier).
 
@@ -372,7 +374,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.1.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.1.2...master
+[6.1.2]: https://github.com/shakacode/react_on_rails/compare/6.1.1...6.1.2
 [6.1.1]: https://github.com/shakacode/react_on_rails/compare/6.1.0...6.1.1
 [6.1.0]: https://github.com/shakacode/react_on_rails/compare/6.0.5...6.1.0
 [6.0.5]: https://github.com/shakacode/react_on_rails/compare/6.0.4...6.0.5
