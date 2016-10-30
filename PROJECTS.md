@@ -27,3 +27,10 @@
 ## Demos and Tutorials
 * [reactrails.com](http://www.reactrails.com), source code [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/)
 * [Relay Rails Blog](https://github.com/gauravtiwari/relay-rails-blog): Tutorial to learn Relay with Rails.
+
+--------
+
+## Projects Based on React on Rails
+
+* [github.com/Limenius/symfony-react-sandbox](https://github.com/Limenius/symfony-react-sandbox)
+* [github.com/tswayne/react-helper](https://github.com/tswayne/react-helper)
