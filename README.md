@@ -543,7 +543,7 @@ We owe much gratitude to the work of the [react-rails gem](https://github.com/re
 
 # FINAL NOTES
 * See [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
-* Follow [@railsonmaui](https://twitter.com/railsonmaui) and [@shakacode](https://twitter.com/shakacode) on Twitter for updates on releases. We've also got a forum category dedicated to [react_on_rails](http://forum.shakacode.com/c/rails/ReactOnRails).
+* Follow [@railsonmaui](https://twitter.com/railsonmaui) and [@shakacode](https://twitter.com/shakacode) on Twitter for updates on releases. We've also got a forum category dedicated to [react_on_rails](https://forum.shakacode.com/c/rails/reactonrails).
 
 ---
 
