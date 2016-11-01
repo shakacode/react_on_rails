@@ -99,11 +99,11 @@ Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpa
       DATA
 
       def append_to_assets_initializer
-        assets_intializer = File.join(destination_root, "config/initializers/assets.rb")
-        if File.exist?(assets_intializer)
-          append_to_file(assets_intializer, ASSETS_RB_APPEND)
+        assets_initializer = File.join(destination_root, "config/initializers/assets.rb")
+        if File.exist?(assets_initializer)
+          append_to_file(assets_initializer, ASSETS_RB_APPEND)
         else
-          create_file(assets_intializer, ASSETS_RB_APPEND)
+          create_file(assets_initializer, ASSETS_RB_APPEND)
         end
       end
 
