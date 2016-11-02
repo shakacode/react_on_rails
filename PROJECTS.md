@@ -3,7 +3,7 @@
 *Please add your project to this list.*
 
 ## Commercial Products Live
-* **[Friends and Guests](https://www.friendsandguests.com/listings)**, the signature product of [ShakaCode](http://www.shakacode.com), which is a "Network Connecting Hosts and Guests".
+* **[Friends and Guests](https://www.friendsandguests.com/)**, the signature product of [ShakaCode](http://www.shakacode.com), which is a "Network Connecting Hosts and Guests".
 * **[Blink Inc](https://www.blinkinc.com)**: Website and more built by [ShakaCode](http://www.shakacode.com).
 * **[Madrone Analytics](http://madroneco.com/)**: The original client of [ShakaCode](http://www.shakacode.com) that led to the development of React on Rails, as described in [Fast Rich Client Rails Development With Webpack and the ES6 Transpiler](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/).
 * **[Deliveroo](https://deliveroo.co.uk/)**: The leading food delivery site in Europe has gone live with React on Rails, with multi-lingual JavaScript support! 
