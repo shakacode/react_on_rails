@@ -1,8 +1,8 @@
 import React, { PropTypes } from 'react';
-import HelloWorldWidget from '../components/HelloWorldWidget';
+import HelloWorld from '../components/HelloWorld';
 
 // Simple example of a React "smart" component
-export default class HelloWorld extends React.Component {
+export default class HelloWorldContainer extends React.Component {
   static propTypes = {
     name: PropTypes.string.isRequired, // this is passed from the Rails view
   };
@@ -15,14 +15,12 @@ export default class HelloWorld extends React.Component {
     this.state = { name: this.props.name };
   }
 
-  updateName(name) {
-    this.setState({ name });
-  }
+  updateName = (name) => { this.setState({ name }); };
 
   render() {
     return (
       <div>
-        <HelloWorldWidget name={this.state.name} updateName={e => this.updateName(e)} />
+        <HelloWorld name={this.state.name} updateName={this.updateName} />
       </div>
     );
   }

@@ -10,7 +10,7 @@ module ReactOnRails
 
       def copy_base_files
         base_path = "no_redux/base/"
-        file = "client/app/bundles/HelloWorld/containers/HelloWorld.jsx"
+        file = "client/app/bundles/HelloWorld/containers/HelloWorldContainer.jsx"
         copy_file(base_path + file, file)
       end
 
