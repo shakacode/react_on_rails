@@ -2,6 +2,7 @@
 {
   "name": "react-webpack-rails-tutorial",
   "version": "0.0.1",
+  "private": true,
   "engines": {
     "node": "5.10.0",
     "npm": "3.5.0"
@@ -24,21 +25,13 @@
     "babel-preset-stage-0": "^6.5.0",
     "es5-shim": "^4.5.7",
     "expose-loader": "^0.7.1",
-    <%- if options.redux? -%>
-    "immutable": "^3.7.6",
-    <%- end -%>
     "imports-loader": "^0.6.5",
-    <%- if options.redux? -%>
-    "mirror-creator": "1.1.0",
-    <%- end -%>
-    "react": "^0.14.8 || ^15.0.0",
-    "react-dom": "^0.14.8 || ^15.0.0",
+    "react": "^15.0.0",
+    "react-dom": "^15.0.0",
     "react-on-rails": "<%= VersionSyntaxConverter.new.rubygem_to_npm %>",
     <%- if options.redux? -%>
     "react-redux": "^4.4.1",
     "redux": "^3.3.1",
-    "redux-promise": "^0.5.3",
-    "redux-thunk": "^2.0.1",
     <%- end -%>
     "webpack": "^1.12.14"
   },

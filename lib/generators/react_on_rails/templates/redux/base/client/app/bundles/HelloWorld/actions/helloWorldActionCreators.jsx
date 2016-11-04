@@ -1,8 +1,8 @@
-import actionTypes from '../constants/helloWorldConstants';
+/* eslint-disable import/prefer-default-export */
 
-export function updateName(name) {
-  return {
-    type: actionTypes.HELLO_WORLD_NAME_UPDATE,
-    name,
-  };
-}
+import { HELLO_WORLD_NAME_UPDATE } from '../constants/helloWorldConstants';
+
+export const updateName = (text) => ({
+  type: HELLO_WORLD_NAME_UPDATE,
+  text,
+});
