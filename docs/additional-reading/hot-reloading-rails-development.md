@@ -2,7 +2,7 @@
 
 This document outlines the steps to setup your React On Rails Environment so that you can experience the pleasure of hot reloading of JavaScript and Sass during your Rails development work. There are 2 examples of this setup:
 
-1. [spec/dummy](../../spec/dummy): Simpler setup used for integration testing this gem.
+1. [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy): Simpler setup used for integration testing this gem.
 1. [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/). Full featured setup using Twitter bootstrap.
 
 ## High Level Strategy
