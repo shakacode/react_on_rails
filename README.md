@@ -435,7 +435,7 @@ See [ReactOnRails JavaScript API](docs/api/javascript-api.md).
 
 #### Using Rails built-in CSRF protection in JavaScript
 
-Rails has built-in protection for Cross-Site Request Forgery (CSRF), see [Rails Documentation](http://guides.rubyonrails.org/security.html#cross-site-request-forgery-csrf). To nicely utilize this feature in JavaScript requests, React on Rails is offerring two helpers that can be used as following for POST, PULL or DELETE requests:
+Rails has built-in protection for Cross-Site Request Forgery (CSRF), see [Rails Documentation](http://guides.rubyonrails.org/security.html#cross-site-request-forgery-csrf). To nicely utilize this feature in JavaScript requests, React on Rails is offerring two helpers that can be used as following for POST, PUT or DELETE requests:
 
 ```
 import ReactOnRails from 'react-on-rails';
