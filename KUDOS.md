@@ -25,3 +25,9 @@ https://twitter.com/ollieglass/status/713372606804729856
 ![2016-06-15_08-57-25](https://cloud.githubusercontent.com/assets/1118459/16093324/33077310-32d7-11e6-88f3-69aa73bd7d9f.png)
 
 ![2016-09-11_17-55-46](https://cloud.githubusercontent.com/assets/1118459/18424209/0c8bdade-7849-11e6-96a7-3b58b26308ce.png)
+
+### October 29, 2016 by Email
+![2016-10-29_17-10-25](https://cloud.githubusercontent.com/assets/1118459/20163712/72307a82-a6b3-11e6-9c46-aee526192b23.png)
+
+### November 9, 2016, in our Slack Room for ShakaCode
+![2016-11-09_19-28-32](https://cloud.githubusercontent.com/assets/1118459/20163679/405229ca-a6b3-11e6-8dff-6dc3f59bf341.png)
