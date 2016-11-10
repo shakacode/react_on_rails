@@ -2,7 +2,7 @@
 
 Here's an overview of installation if you're not using the generator. 
 
-Note, the best to understand how to use ReactOnRails is to study the examples:
+Note, the best way to understand how to use ReactOnRails is to study the examples:
 
 1. [spec/dummy](../../spec/dummy): Simple, no DB example.
 2. [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial): Full featured example.
