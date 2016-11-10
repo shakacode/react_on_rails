@@ -58,7 +58,13 @@ module ReactOnRails
       end
 
       def raw
-        JSON.parse(package_json_contents)["dependencies"]["react-on-rails"]
+        parsed_package_contents = JSON.parse(package_json_contents)
+        if parsed_package_contents.key?("dependencies") &&
+           parsed_package_contents["dependencies"].key?("react-on-rails")
+          parsed_package_contents["dependencies"]["react-on-rails"]
+        else
+          raise "no 'react-on-rails' entry in package.json dependencies"
+        end
       end
 
       def relative_path?
