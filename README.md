@@ -89,7 +89,8 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
 ## Getting Started
 
 **For more detailed instructions**, see the [React on Rails Basic Tutorial](docs/tutorial.md).
-1. Add the following to your Gemfile and bundle install.
+
+1. Add the following to your Gemfile and `bundle install`.
 
   ```ruby
   gem "react_on_rails", "~> 6"
