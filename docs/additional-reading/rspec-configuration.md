@@ -12,7 +12,7 @@ RSpec.configure do |config|
 You can pass an RSpec metatag as an optional second parameter to this helper method if you want this helper to run on examples other than where `js: true` (default). The helper will compile webpack files at most once per test run. The helper will not compile the webpack files unless they are out of date (stale). The helper is configurable in terms of what command is used to prepare the files.
 
 Please take note of the following:
-- This utility uses your `npm_build_test_command' to build the static generated files. This command **must** not include the `--watch` option. If you have different server and client bundle files, this command **must** create all the bundles.
+- This utility uses your `npm_build_test_command` to build the static generated files. This command **must** not include the `--watch` option. If you have different server and client bundle files, this command **must** create all the bundles.
 - By default, the webpack processes look for the `app/assets/webpack` folders (configured as setting `webpack_generated_files` in the `config/react_on_rails.rb`. If this folder is missing, is empty, or contains files in the `config.webpack_generated_files` list with `mtime`s older than any of the files in your `client` folder, the helper will recompile your assets. You can override the location of these files inside of `config/initializers/react_on_rails.rb` by passing a filepath (relative to the root of the app) to the `generated_assets_dir` configuration option.
 
 The following `config/react_on_rails.rb` settings **must** match your setup:
