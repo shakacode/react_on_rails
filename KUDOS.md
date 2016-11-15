@@ -29,5 +29,10 @@ https://twitter.com/ollieglass/status/713372606804729856
 ### October 29, 2016 by Email
 ![2016-10-29_17-10-25](https://cloud.githubusercontent.com/assets/1118459/20163712/72307a82-a6b3-11e6-9c46-aee526192b23.png)
 
+### November 6, 2016
+https://github.com/shakacode/react_on_rails/pull/591#issuecomment-258685925
+![2016-11-15_08-36-29](https://cloud.githubusercontent.com/assets/1118459/20318599/ec4882b0-ab0e-11e6-83e2-7f398e2cdf5b.png)
+
 ### November 9, 2016, in our Slack Room for ShakaCode
 ![2016-11-09_19-28-32](https://cloud.githubusercontent.com/assets/1118459/20163679/405229ca-a6b3-11e6-8dff-6dc3f59bf341.png)
+
