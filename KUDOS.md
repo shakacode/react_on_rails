@@ -36,3 +36,5 @@ https://github.com/shakacode/react_on_rails/pull/591#issuecomment-258685925
 ### November 9, 2016, in our Slack Room for ShakaCode
 ![2016-11-09_19-28-32](https://cloud.githubusercontent.com/assets/1118459/20163679/405229ca-a6b3-11e6-8dff-6dc3f59bf341.png)
 
+### November 15, 2016
+![2016-11-15_18-15-31](https://cloud.githubusercontent.com/assets/1118459/20334680/23eaab0c-ab60-11e6-8830-8528c2f829a3.png)
