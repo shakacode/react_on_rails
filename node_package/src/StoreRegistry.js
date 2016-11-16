@@ -40,10 +40,10 @@ export default {
 
     if (storeKeys.length === 0) {
       const msg = 'There are no stores hydrated and you are requesting the store ' +
-        `${name}. This can happen if you are server rendering and either you do not call ` +
+        `${name}. This can happen if you are server rendering and either \nyou do not call ` +
         "redux_store near the top of your controller action's view (not the layout) " +
-        'and before any call to react_component or you do not render ' +
-        '`redux_store_hydration_data` anywhere on your page';
+        'and before any call to react_component \nor you do not render ' +
+        'redux_store_hydration_data anywhere on your page';
       throw new Error(msg);
     }
 
