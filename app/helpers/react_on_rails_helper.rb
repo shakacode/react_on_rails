@@ -345,7 +345,7 @@ ReactOnRails.setStore('#{store_name}', store);
   def rails_context(server_side:)
     @rails_context ||= begin
       result = {
-        inMailer: controller.present? && controller.is_a?(ActionMailer::Base),
+        inMailer: in_mailer?,
         # Locale settings
         i18nLocale: I18n.locale,
         i18nDefaultLocale: I18n.default_locale
@@ -399,5 +399,12 @@ ReactOnRails.setStore('#{store_name}', store);
     assets = Array(args[asset_type])
     options = args.delete_if { |key, _value| %i(hot static).include?(key) }
     send(tag_method_name, *assets, options) unless assets.empty?
+  end
+
+  def in_mailer?
+    return false unless controller.present?
+    return false unless defined?(ActionMailer::Base)
+
+    controller.is_a?(ActionMailer::Base)
   end
 end
