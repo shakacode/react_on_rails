@@ -12,6 +12,8 @@ Your support keeps this project going.
 
 (Want to become a contributor? [Contact us](mailto:contact@shakacode.com) for an Slack team invite! Also, see ["easy" issues](https://github.com/shakacode/react_on_rails/labels/easy) and [issues for the full tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/issues?q=is%3Aissue+is%3Aopen+label%3Aeasy).)
 
+Follow [@ShakaCode](https://twitter.com/shakacode) for notications of new releases.
+
 # Articles, Videos, and Podcasts
 
 ### Articles
