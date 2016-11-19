@@ -1,19 +1,15 @@
-import Immutable from 'immutable';
+import { combineReducers } from 'redux';
+import { HELLO_WORLD_NAME_UPDATE } from '../constants/helloWorldConstants';
 
-import actionTypes from '../constants/helloWorldConstants';
-
-export const $$initialState = Immutable.fromJS({
-  name: '', // this is the default state that would be used if one were not passed into the store
-});
-
-export default function helloWorldReducer($$state = $$initialState, action) {
-  const { type, name } = action;
-
-  switch (type) {
-    case actionTypes.HELLO_WORLD_NAME_UPDATE:
-      return $$state.set('name', name);
-
+const name = (state = '', action) => {
+  switch (action.type) {
+    case HELLO_WORLD_NAME_UPDATE:
+      return action.text;
     default:
-      return $$state;
+      return state;
   }
-}
+};
+
+const helloWorldReducer = combineReducers({ name });
+
+export default helloWorldReducer;

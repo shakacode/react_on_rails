@@ -1,6 +1,7 @@
 {
   "name": "react-webpack-rails-tutorial",
   "version": "0.0.1",
+  "private": true,
   "engines": {
     "node": "5.10.0",
     "npm": "3.5.0"
