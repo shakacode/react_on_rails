@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (6.1.2)
+    react_on_rails (6.2.0)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -85,7 +85,7 @@ GEM
       execjs
     coffee-script-source (1.10.0)
     concurrent-ruby (1.0.2)
-    connection_pool (2.2.0)
+    connection_pool (2.2.1)
     coveralls (0.8.13)
       json (~> 1.8)
       simplecov (~> 0.11.0)
@@ -317,4 +317,4 @@ DEPENDENCIES
   web-console
 
 BUNDLED WITH
-   1.13.5
+   1.13.6
