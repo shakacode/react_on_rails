@@ -39,11 +39,12 @@ export default {
     const storeKeys = Array.from(hydratedStores.keys()).join(', ');
 
     if (storeKeys.length === 0) {
-      const msg = `There are no stores hydrated and you are requesting the store ${name}.\n` +
-        'This can happen if you are server rendering and either: \n' +
-        "1) You do not call redux_store near the top of your controller action's " +
-        'view (not the layout) and before any call to react_component \n' +
-        '2) You do not render redux_store_hydration_data anywhere on your page';
+      const msg =
+        `There are no stores hydrated and you are requesting the store ${name}.
+        This can happen if you are server rendering and either:
+        1) You do not call redux_store near the top of your controller action's
+        view (not the layout) and before any call to react_component
+        2) You do not render redux_store_hydration_data anywhere on your page`;
       throw new Error(msg);
     }
 
