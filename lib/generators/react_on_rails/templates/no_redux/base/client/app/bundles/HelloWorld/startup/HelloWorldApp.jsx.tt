@@ -3,7 +3,8 @@ import ReactOnRails from 'react-on-rails';
 
 import HelloWorldContainer from '../containers/HelloWorldContainer';
 
-const HelloWorldApp = (props) => (
+// _railsContext is the Rails context, providing contextual information for rendering
+const HelloWorldApp = (props, _railsContext) => (
   <HelloWorldContainer {...props} />
 );
 

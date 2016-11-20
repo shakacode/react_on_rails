@@ -17,8 +17,8 @@ class HelloWorld extends React.Component {
   };
 
   // Not necessary if we only call super, but we'll need to initialize state, etc.
-  constructor(props, context) {
-    super(props, context);
+  constructor(props) {
+    super(props);
     this.state = props.helloWorldData;
     this.setNameDomRef = this.setNameDomRef.bind(this);
     this.handleChange = this.handleChange.bind(this);
