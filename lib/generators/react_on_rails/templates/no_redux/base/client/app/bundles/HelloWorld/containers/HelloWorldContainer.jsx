@@ -19,9 +19,7 @@ export default class HelloWorldContainer extends React.Component {
 
   render() {
     return (
-      <div>
-        <HelloWorld name={this.state.name} updateName={this.updateName} />
-      </div>
+      <HelloWorld name={this.state.name} updateName={this.updateName} />
     );
   }
 }
