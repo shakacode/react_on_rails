@@ -471,6 +471,7 @@ Node.js can be used as the backend for server-side rendering instead of [execJS]
 **Try out our new [Documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) for improved readability & reference!**
 + **Rails**
   + [Rails Assets](docs/additional-reading/rails-assets.md)
+  + [Rails Engine Integration](docs/additional-reading/rails-engine-integration.md)
   + [Rails View Rendering from Inline JavaScript](docs/additional-reading/rails_view_rendering_from_inline_javascript.md)
   + [RSpec Configuration](docs/additional-reading/rspec-configuration.md)
   + [Turbolinks](docs/additional-reading/turbolinks.md)
