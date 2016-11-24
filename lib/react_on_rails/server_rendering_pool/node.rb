@@ -68,7 +68,8 @@ module ReactOnRails
             client = UNIXSocket.new("client/node/node.sock")
             client.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
           rescue StandardError => e
-            Rails.logger.error("Unable to connect to socket: client/node/node.sock. Make sure node server is up and running.")
+            Rails.logger.error("Unable to connect to socket: client/node/node.sock. \
+              Make sure node server is up and running.")
             Rails.logger.error(e)
             raise e
           end
