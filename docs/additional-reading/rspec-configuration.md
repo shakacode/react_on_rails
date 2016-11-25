@@ -25,12 +25,12 @@ The following `config/react_on_rails.rb` settings **must** match your setup:
   config.webpack_generated_files = %w( webpack-bundle.js )
   
   # If you are using the ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
-  # with rspec then this controls what npm command is run
+  # with rspec then this controls what yarn command is run
   # to automatically refresh your webpack assets on every test run.
-  config.npm_build_test_command = "npm run build:test"
+  config.npm_build_test_command = "yarn run build:test"
 ```
 
-If you want to speed up the re-compiling process, you can call `npm run build:development` (per below script) to have webpack run in "watch" mode and recompile these files in the background, which will be much faster when making incremental changes than compiling from scratch, assuming you have your setup like this:
+If you want to speed up the re-compiling process, you can call `yarn run build:development` (per below script) to have webpack run in "watch" mode and recompile these files in the background, which will be much faster when making incremental changes than compiling from scratch, assuming you have your setup like this:
 
 ```
   "scripts": {

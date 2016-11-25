@@ -7,12 +7,12 @@ require_relative File.join(gem_root, "lib", "react_on_rails", "utils")
 desc("Releases both the gem and node package using the given version.
 
 IMPORTANT: the gem version must be in valid rubygem format (no dashes).
-It will be automatically converted to a valid npm semver by the rake task
+It will be automatically converted to a valid yarn semver by the rake task
 for the node package version. This only makes a difference for pre-release
-versions such as `3.0.0.beta.1` (npm version would be `3.0.0-beta.1`).
+versions such as `3.0.0.beta.1` (yarn version would be `3.0.0-beta.1`).
 
 This task depends on the gem-release (ruby gem) and release-it (node package)
-which are installed via `bundle install` and `npm install`
+which are installed via `bundle install` and `yarn`
 
 1st argument: The new version in rubygem format (no dashes). Pass no argument to
               automatically perform a patch version bump.
@@ -54,8 +54,8 @@ task :release, [:gem_version, :dry_run, :tools_install] do |_t, args|
   # Stage changes so far
   sh_in_dir(gem_root, "git add .")
 
-  # Will bump the npm version, commit, tag the commit, push to repo, and release on npm
-  release_it_command = "$(npm bin)/release-it --non-interactive --npm.publish"
+  # Will bump the yarn version, commit, tag the commit, push to repo, and release on yarn
+  release_it_command = "$(yarn bin)/release-it --non-interactive --npm.publish"
   release_it_command << " --dry-run --verbose" if is_dry_run
   release_it_command << " #{npm_version}" unless npm_version.strip.empty?
   sh_in_dir(gem_root, release_it_command)

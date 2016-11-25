@@ -2,6 +2,8 @@ sudo: required
 
 language: ruby
 
+cache: yarn
+
 rvm:
   - 2.3.1
 
@@ -33,8 +35,7 @@ before_install:
 install:
   - nvm install node
   - node -v
-  - npm config set spin false
-  - npm install
+  - yarn
   - bundle install
   - rake dummy_apps
   - rake examples

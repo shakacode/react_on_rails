@@ -3,7 +3,7 @@
 # in rails_helper.rb.
 
 # Build client assets, watching for changes.
-rails-client-assets: npm run build:dev:client
+rails-client-assets: yarn run build:dev:client
 
 # Build server assets, watching for changes. Remove if not server rendering.
-rails-server-assets: npm run build:dev:server
+rails-server-assets: yarn run build:dev:server
