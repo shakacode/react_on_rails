@@ -20,13 +20,13 @@ export default function serverRenderReactComponent(options) {
       hasErrors = !!reactElementOrRouterResult.routeError;
       if (hasErrors) {
         console.error(
-          `React Router ERROR: ${JSON.stringify(reactElementOrRouterResult.routeError)}`
+          `React Router ERROR: ${JSON.stringify(reactElementOrRouterResult.routeError)}`,
         );
       } else if (trace) {
         const redirectLocation = reactElementOrRouterResult.redirectLocation;
         const redirectPath = redirectLocation.pathname + redirectLocation.search;
         console.log(`\
-ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redirectPath}`
+ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redirectPath}`,
         );
       }
     } else {

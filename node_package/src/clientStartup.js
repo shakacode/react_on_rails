@@ -37,7 +37,7 @@ function turbolinksInstalled() {
 
 function forEach(fn, className, railsContext) {
   const els = document.getElementsByClassName(className);
-  for (let i = 0; i < els.length; i++) {
+  for (let i = 0; i < els.length; i += 1) {
     fn(els[i], railsContext);
   }
 }
@@ -141,7 +141,7 @@ export function clientStartup(context) {
     return;
   }
 
-  // eslint-disable-next-line no-underscore-dangle
+  // eslint-disable-next-line no-underscore-dangle, no-param-reassign
   context.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
 
   debugTurbolinks('Adding DOMContentLoaded event to install event listeners.');
@@ -153,13 +153,13 @@ export function clientStartup(context) {
 
     if (!turbolinksInstalled()) {
       debugTurbolinks(
-        'NOT USING TURBOLINKS: DOMContentLoaded event, calling reactOnRailsPageLoaded'
+        'NOT USING TURBOLINKS: DOMContentLoaded event, calling reactOnRailsPageLoaded',
       );
       reactOnRailsPageLoaded();
     } else if (turbolinksVersion5()) {
       debugTurbolinks(
         'USING TURBOLINKS 5: document added event listeners turbolinks:before-cache and ' +
-        'turbolinks:load.'
+        'turbolinks:load.',
       );
       document.addEventListener('turbolinks:before-cache', reactOnRailsPageUnloaded);
       document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);

@@ -62,12 +62,14 @@ ctx.ReactOnRails = {
   setOptions(newOptions) {
     if ('traceTurbolinks' in newOptions) {
       this.options.traceTurbolinks = newOptions.traceTurbolinks;
+
+      // eslint-disable-next-line no-param-reassign
       delete newOptions.traceTurbolinks;
     }
 
     if (Object.keys(newOptions).length > 0) {
       throw new Error(
-        'Invalid options passed to ReactOnRails.options: ', JSON.stringify(newOptions)
+        'Invalid options passed to ReactOnRails.options: ', JSON.stringify(newOptions),
       );
     }
   },
