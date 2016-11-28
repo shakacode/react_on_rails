@@ -58,7 +58,7 @@ module ReactOnRails
       end
 
       def create_react_directories
-        dirs = %w(components containers startup)
+        dirs = %w(components startup)
         dirs.each { |name| empty_directory("client/app/bundles/HelloWorld/#{name}") }
       end
 
@@ -77,7 +77,6 @@ module ReactOnRails
            Procfile.dev
            app/views/hello_world/index.html.erb
            package.json
-           client/app/bundles/HelloWorld/components/HelloWorldApp.jsx
            client/package.json).each { |file| template(base_path + file + ".tt", file) }
       end
 

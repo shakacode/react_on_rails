@@ -32,7 +32,7 @@ shared_examples "base_generator" do
   end
 
   it "creates react directories" do
-    dirs = %w(components containers startup)
+    dirs = %w(components startup)
     dirs.each { |dirname| assert_directory "client/app/bundles/HelloWorld/#{dirname}" }
   end
 
