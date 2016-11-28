@@ -51,7 +51,7 @@ RSpec.configure do |config|
     # ...rather than:
     #     # => "be bigger than 2"
     expectations.include_chain_clauses_in_custom_matcher_descriptions = true
-    
+
     ### Fix Net::ReadTimeout error on first test
     # Show retry status in spec process
     config.verbose_retry = true

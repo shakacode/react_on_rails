@@ -1,6 +1,12 @@
 shared_examples "react_with_redux_generator" do
   it "creates redux directories" do
-    %w(actions constants containers reducers store).each { |dir| assert_directory("client/app/bundles/HelloWorld/#{dir}") }
+    %w(actions
+       constants
+       containers
+       reducers
+       store).each do |dir|
+         assert_directory("client/app/bundles/HelloWorld/#{dir}")
+       end
   end
 
   it "copies base redux files" do

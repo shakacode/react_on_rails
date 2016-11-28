@@ -7,7 +7,7 @@ module ReactOnRails
       include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates", __FILE__))
-      
+
       def copy_react_files
         base_path = "no_redux/base/"
         %w(client/app/bundles/HelloWorld/components/HelloWorldApp.jsx
