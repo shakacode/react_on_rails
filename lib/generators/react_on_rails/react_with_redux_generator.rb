@@ -17,7 +17,8 @@ module ReactOnRails
            client/app/bundles/HelloWorld/containers/HelloWorldContainer.jsx
            client/app/bundles/HelloWorld/constants/helloWorldConstants.jsx
            client/app/bundles/HelloWorld/reducers/helloWorldReducer.jsx
-           client/app/bundles/HelloWorld/store/helloWorldStore.jsx).each do |file|
+           client/app/bundles/HelloWorld/store/helloWorldStore.jsx
+           client/app/bundles/HelloWorld/startup/registration.jsx).each do |file|
              copy_file(base_path + file, file)
            end
       end

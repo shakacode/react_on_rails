@@ -16,5 +16,4 @@ const HelloWorldApp = (props, _railsContext) => (
   </Provider>
 );
 
-// This is how react_on_rails can see the HelloWorldApp in the browser.
-ReactOnRails.register({ HelloWorldApp });
+export default HelloWorldApp;

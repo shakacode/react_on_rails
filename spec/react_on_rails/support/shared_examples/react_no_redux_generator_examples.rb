@@ -1,7 +1,7 @@
 shared_examples "no_redux_generator" do
   it "copies non-redux base files" do
     assert_file("client/app/bundles/HelloWorld/startup/registration.jsx") do |contents|
-      assert_match("HelloWorld", contents)
+      assert_match("HelloWorldApp", contents)
     end
   end
   

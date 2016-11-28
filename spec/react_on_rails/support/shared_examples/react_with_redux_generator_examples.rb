@@ -9,6 +9,7 @@ shared_examples "react_with_redux_generator" do
        client/app/bundles/HelloWorld/constants/helloWorldConstants.jsx
        client/app/bundles/HelloWorld/reducers/helloWorldReducer.jsx
        client/app/bundles/HelloWorld/store/helloWorldStore.jsx
-       client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx).each { |file| assert_file(file) }
+       client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx
+       client/app/bundles/HelloWorld/startup/registration.jsx).each { |file| assert_file(file) }
   end
 end
