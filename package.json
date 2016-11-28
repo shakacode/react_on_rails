@@ -55,7 +55,6 @@
     "eslint": "eslint .",
     "flow": "flow check node_package",
     "lint": "npm run eslint && npm run flow",
-    "lint:fix": "node_package/scripts/lint-fix",
     "check": "npm run lint && npm run test",
     "prerelease": "npm run check && npm run clean && npm run build",
     "release:patch": "node_package/scripts/release patch",
