@@ -7,11 +7,17 @@ module ReactOnRails
       include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates", __FILE__))
-      
-      def template_appropriate_version_of_hello_world_app
-        filename = "registration.jsx"
-        location = "client/app/bundles/HelloWorld/startup"
-        template("no_redux/base/#{location}/registration.jsx.tt", "#{location}/#{filename}")
+
+      def create_appropriate_templates
+        base_path = "base/base/"
+        location = "client/app/bundles/HelloWorld/"
+        source = base_path + location
+        config = {
+          class_name: "HelloWorldApp",
+          app_relative_path: "../components/HelloWorldApp"
+        }
+        template(source + "/startup/registration.jsx" + ".tt", location + "/startup/registration.jsx", config)
+        template(source + "/components/HelloWorld.jsx" + ".tt", location + "/components/HelloWorldApp.jsx", config)
       end
     end
   end

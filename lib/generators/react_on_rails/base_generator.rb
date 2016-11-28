@@ -77,7 +77,6 @@ module ReactOnRails
            Procfile.dev
            app/views/hello_world/index.html.erb
            package.json
-           client/app/bundles/HelloWorld/components/HelloWorldApp.jsx
            client/package.json).each { |file| template(base_path + file + ".tt", file) }
       end
 

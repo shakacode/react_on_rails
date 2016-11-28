@@ -1,12 +1,11 @@
 shared_examples "no_redux_generator" do
-  it "copies non-redux base files" do
+  it "creates appropriate templates" do
     assert_file("client/app/bundles/HelloWorld/startup/registration.jsx") do |contents|
-      assert_match("HelloWorldApp", contents)
+      assert_match("../components/HelloWorldApp", contents)
     end
-  end
-
-  it "copies react files" do
-    assert_file("client/app/bundles/HelloWorld/startup/registration.jsx")
+    assert_file("client/app/bundles/HelloWorld/components/HelloWorldApp.jsx") do |contents|
+      assert_match("class HelloWorldApp extends", contents)
+    end
   end
 
   it "does not place react folders in root" do

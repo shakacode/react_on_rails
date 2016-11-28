@@ -18,15 +18,22 @@ module ReactOnRails
            client/app/bundles/HelloWorld/constants/helloWorldConstants.jsx
            client/app/bundles/HelloWorld/reducers/helloWorldReducer.jsx
            client/app/bundles/HelloWorld/store/helloWorldStore.jsx
-           client/app/bundles/HelloWorld/startup/registration.jsx).each do |file|
+           client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx).each do |file|
              copy_file(base_path + file, file)
            end
       end
 
-      def template_appropriate_version_of_hello_world_app
-        filename = "HelloWorldApp.jsx"
-        location = "client/app/bundles/HelloWorld/startup"
-        template("redux/base/#{location}/HelloWorldApp.jsx.tt", "#{location}/#{filename}")
+      def create_appropriate_templates
+        base_path = "base/base/"
+        destination = "client/app/bundles/HelloWorld/"
+        config = {
+          class_name: "HelloWorld",
+          app_relative_path: "./HelloWorldApp"
+        }
+        %w(/startup/registration.jsx
+           /components/HelloWorld.jsx).each do |file|
+             template(base_path + destination + file + ".tt", destination + file, config)
+           end
       end
     end
   end
