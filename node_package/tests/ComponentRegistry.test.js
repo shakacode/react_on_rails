@@ -77,6 +77,19 @@ test('ComponentRegistry registers and retrieves multiple components', (assert) =
     { name: 'C6', component: C6, generatorFunction: true, isRenderer: false });
 });
 
+test('ComponentRegistry only detects a renderer function if it has three arguments', (assert) => {
+  assert.plan(2);
+  const C7 = (a1, a2) => null;
+  const C8 = (a1) => null;
+  ComponentRegistry.register({ C7 });
+  ComponentRegistry.register({ C8 });
+  const components = ComponentRegistry.components();
+  assert.deepEqual(components.get('C7'),
+    { name: 'C7', component: C7, generatorFunction: true, isRenderer: false });
+  assert.deepEqual(components.get('C8'),
+    { name: 'C8', component: C8, generatorFunction: true, isRenderer: false });
+});
+
 test('ComponentRegistry throws error for retrieving unregistered component', (assert) => {
   assert.plan(1);
   assert.throws(() => ComponentRegistry.get('foobar'),
@@ -87,9 +100,9 @@ test('ComponentRegistry throws error for retrieving unregistered component', (as
 
 test('ComponentRegistry throws error for setting null component', (assert) => {
   assert.plan(1);
-  const C7 = null;
-  assert.throws(() => ComponentRegistry.register({ C7 }),
-    /Called register with null component named C7/,
+  const C9 = null;
+  assert.throws(() => ComponentRegistry.register({ C9 }),
+    /Called register with null component named C9/,
     'Expected an exception for calling ComponentRegistry.set with a null component.'
   );
 });
