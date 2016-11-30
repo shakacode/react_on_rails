@@ -1,8 +1,10 @@
 shared_examples "no_redux_generator" do
-  it "copies non-redux base files" do
-    assert_file("client/app/bundles/HelloWorld/containers/HelloWorldContainer.jsx")
-    assert_file("client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx") do |contents|
-      assert_match("HelloWorld", contents)
+  it "creates appropriate templates" do
+    assert_file("client/app/bundles/HelloWorld/startup/registration.jsx") do |contents|
+      assert_match("import HelloWorld from '../components/HelloWorld';", contents)
+    end
+    assert_file("app/views/hello_world/index.html.erb") do |contents|
+      assert_match(/"HelloWorld"/, contents)
     end
   end
 

@@ -32,6 +32,7 @@ gem "web-console", "~> 2.0", group: :development
 
 # below are copied from spec/dummy/Gemfile
 gem "rspec-rails"
+gem "rspec-retry"
 gem "capybara"
 gem "capybara-screenshot"
 gem "capybara-webkit"

@@ -44,7 +44,7 @@ module ReactOnRails
         DATA
 
         app_js_path = "app/assets/javascripts/application.js"
-        found_app_js = dest_file_exists?(app_js_path) || dest_file_exists?(app_js_path + ".coffee")
+        found_app_js = dest_file_exists?(app_js_path) || dest_file_exists?("#{app_js_path}.coffee")
         if found_app_js
           prepend_to_file(found_app_js, data)
         else
@@ -65,20 +65,19 @@ module ReactOnRails
       def copy_base_files
         base_path = "base/base/"
         base_files = %w(app/controllers/hello_world_controller.rb
+                        client/app/bundles/HelloWorld/components/HelloWorld.jsx
                         client/.babelrc
                         client/webpack.config.js
                         client/REACT_ON_RAILS_CLIENT_README.md)
-        base_files.each { |file| copy_file(base_path + file, file) }
+        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
       def template_base_files
         base_path = "base/base/"
         %w(config/initializers/react_on_rails.rb
            Procfile.dev
-           app/views/hello_world/index.html.erb
            package.json
-           client/app/bundles/HelloWorld/components/HelloWorld.jsx
-           client/package.json).each { |file| template(base_path + file + ".tt", file) }
+           client/package.json).each { |file| template("#{base_path}#{file}.tt", file) }
       end
 
       def add_base_gems_to_gemfile

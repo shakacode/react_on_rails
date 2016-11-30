@@ -56,7 +56,7 @@ test('serverRenderReactComponent throws error for invalid options', (assert) => 
   assert.throws(
     () => ReactOnRails.setOptions({ foobar: true }),
     /Invalid option/,
-    'setOptions should throw an error for invalid options'
+    'setOptions should throw an error for invalid options',
   );
 });
 
@@ -66,19 +66,19 @@ test('registerStore throws if passed a falsey object (null, undefined, etc)', (a
   assert.throws(
     () => ReactOnRails.registerStore(null),
     /null or undefined/,
-    'registerStore should throw an error if a falsey value is passed (null)'
+    'registerStore should throw an error if a falsey value is passed (null)',
   );
 
   assert.throws(
     () => ReactOnRails.registerStore(undefined),
     /null or undefined/,
-    'registerStore should throw an error if a falsey value is passed (undefined)'
+    'registerStore should throw an error if a falsey value is passed (undefined)',
   );
 
   assert.throws(
     () => ReactOnRails.registerStore(false),
     /null or undefined/,
-    'registerStore should throw an error if a falsey value is passed (false)'
+    'registerStore should throw an error if a falsey value is passed (false)',
   );
 });
 

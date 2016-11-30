@@ -70,7 +70,7 @@ test('ComponentRegistry throws error for retrieving unregistered component', (as
   assert.plan(1);
   assert.throws(() => ComponentRegistry.get('foobar'),
     /Could not find component registered with name foobar/,
-    'Expected an exception for calling ComponentRegistry.get with an invalid name.'
+    'Expected an exception for calling ComponentRegistry.get with an invalid name.',
   );
 });
 
@@ -79,6 +79,6 @@ test('ComponentRegistry throws error for setting null component', (assert) => {
   const C6 = null;
   assert.throws(() => ComponentRegistry.register({ C6 }),
     /Called register with null component named C6/,
-    'Expected an exception for calling ComponentRegistry.set with a null component.'
+    'Expected an exception for calling ComponentRegistry.set with a null component.',
   );
 });

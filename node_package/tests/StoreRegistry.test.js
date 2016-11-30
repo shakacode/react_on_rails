@@ -20,11 +20,11 @@ test('StoreRegistry throws error for registering null or undefined store', (asse
   StoreRegistry.stores().clear();
   assert.throws(() => StoreRegistry.register({ storeGenerator: null }),
     /Called ReactOnRails.registerStores with a null or undefined as a value/,
-    'Expected an exception for calling StoreRegistry.register with an invalid store generator.'
+    'Expected an exception for calling StoreRegistry.register with an invalid store generator.',
   );
   assert.throws(() => StoreRegistry.register({ storeGenerator: undefined }),
     /Called ReactOnRails.registerStores with a null or undefined as a value/,
-    'Expected an exception for calling StoreRegistry.register with an invalid store generator.'
+    'Expected an exception for calling StoreRegistry.register with an invalid store generator.',
   );
 });
 
@@ -33,7 +33,7 @@ test('StoreRegistry throws error for retrieving unregistered store', (assert) =>
   StoreRegistry.stores().clear();
   assert.throws(() => StoreRegistry.getStore('foobar'),
     /There are no stores hydrated and you are requesting the store/,
-    'Expected an exception for calling StoreRegistry.getStore with no registered stores.'
+    'Expected an exception for calling StoreRegistry.getStore with no registered stores.',
   );
 });
 
@@ -54,7 +54,7 @@ test('StoreRegistry throws error for retrieving unregistered store', (assert) =>
   assert.plan(1);
   assert.throws(() => StoreRegistry.getStoreGenerator('foobar'),
     /Could not find store registered with name 'foobar'\. Registered store names include/,
-    'Expected an exception for calling StoreRegistry.getStoreGenerator with an invalid name.'
+    'Expected an exception for calling StoreRegistry.getStoreGenerator with an invalid name.',
   );
 });
 
@@ -66,9 +66,9 @@ test('StoreRegistry returns undefined for retrieving unregistered store, ' +
     const actual = StoreRegistry.getStore('foobar', false);
     const expected = undefined;
     assert.equals(actual, expected, 'StoreRegistry.get should return undefined for missing ' +
-      'store if throwIfMissing is passed as false'
+      'store if throwIfMissing is passed as false',
     );
-  }
+  },
 );
 
 test('StoreRegistry getStore, setStore', (assert) => {
@@ -84,6 +84,6 @@ test('StoreRegistry throws error for retrieving unregistered hydrated store', (a
   assert.plan(1);
   assert.throws(() => StoreRegistry.getStore('foobar'),
     /Could not find hydrated store with name 'foobar'\. Hydrated store names include/,
-    'Expected an exception for calling StoreRegistry.getStore with an invalid name.'
+    'Expected an exception for calling StoreRegistry.getStore with an invalid name.',
   );
 });

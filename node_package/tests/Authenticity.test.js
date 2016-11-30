@@ -1,5 +1,5 @@
 import test from 'tape';
-import ReactOnRails from '../src/ReactOnRails.js';
+import ReactOnRails from '../src/ReactOnRails';
 
 test('authenticityToken and authenticityHeaders', (assert) => {
   assert.plan(4);
@@ -25,6 +25,6 @@ test('authenticityToken and authenticityHeaders', (assert) => {
   const realHeader = ReactOnRails.authenticityHeaders();
 
   assert.deepEqual(realHeader, { 'X-CSRF-Token': testToken, 'X-Requested-With': 'XMLHttpRequest' },
-    'authenticityHeaders returns valid header with CFRS token'
+    'authenticityHeaders returns valid header with CFRS token',
   );
 });
