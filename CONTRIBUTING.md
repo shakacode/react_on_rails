@@ -33,12 +33,12 @@ From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/
 * After updating code via git, to prepare all examples and run all tests:
 
 ```
-bundle && npm i && rake examples:prepare_all && rake node_package && rake
+bundle && yarn && rake examples:prepare_all && rake node_package && rake
 ```
 
 In order to run tests in browser
 ```
-npm i -g browserify babelify tape-run faucet
+yarn global add  browserify babelify tape-run faucet
 browserify -t babelify node_package/tests/*.js | tape-run | faucet
 ```
 
@@ -74,19 +74,19 @@ Note that you will need to bundle install after making this change, but also tha
 First, be **sure** to build the NPM package
 
 ```sh
-npm i
-npm run build
+yarn
+yarn run build
 ```
 
 Use a relative path in your `package.json`, like this:
 ```sh
 cd client
-npm install --save "react-on-rails@../../react_on_rails"
+yarn add "react-on-rails@../../react_on_rails"
 ```
 
-When you use a relative path, be sure to run the above `npm install` command whenever you change the node package for react-on-rails.
+When you use a relative path, be sure to run the above `yarn` command whenever you change the node package for react-on-rails.
 
-Wihle we'd prefer to us `npm link`, we get errors. If you can figure out how to get `npm link react-on-rails` to work with this project, please file an issue or PR! This used to work with babel 5.
+Wihle we'd prefer to us `yarn link`, we get errors. If you can figure out how to get `yarn link react-on-rails` to work with this project, please file an issue or PR! This used to work with babel 5.
 
 This is the error:
 
@@ -121,7 +121,7 @@ After checking out the repo, making sure you have rvm and nvm setup (setup ruby 
 Additionally, our RSpec tests use the poltergeist web driver. You will need to install the phantomjs node module:
 
 ```sh
-npm install -g phantomjs
+yarn global add phantomjs
 ```
 
 Note this *must* be installed globally for the dummy test project rspec runner to see it properly.
@@ -130,7 +130,7 @@ Note this *must* be installed globally for the dummy test project rspec runner t
 Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the app's root directory and run:
 
 ```sh
-npm run node_package
+yarn run node_package
 ```
 
 From now on, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:prepare_all` rake task.
@@ -149,11 +149,11 @@ From now on, the example and dummy apps will use your local node_package folder 
 
 ```sh
 cd <top level>
-npm i
+yarn
 npm build
 ```
 
-Or run this which builds the npm package, then the webpack files for spec/dummy, and runs tests in
+Or run this which builds the yarn package, then the webpack files for spec/dummy, and runs tests in
 spec/dummy.
 
 
@@ -161,21 +161,21 @@ spec/dummy.
 # Optionally change default selenium_firefox driver
 export DRIVER=poltergeist
 cd <top level>
-npm dummy:spec
+yarn run dummy:spec
 ```
 
 ### Run NPM JS tests
 
 ```sh
 cd <top level>
-npm test
+yarn test
 ```
 
 ### Run spec/dummy tests
 
 ```sh
 cd spec/dummy
-npm run test
+yarn run test
 ```
 
 ### Run most tests and linting
@@ -186,7 +186,7 @@ node_package/scripts/ci
 ```
 
 ### Starting the Dummy App
-To run the test app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the webpack configs, then you need to restart foreman. If you change the JS code for react-on-rails, you need to run `node_package/scripts/build`. Since the react-on-rails package should be sym linked, you don't have to `npm i react-on-rails` after every change.
+To run the test app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the webpack configs, then you need to restart foreman. If you change the JS code for react-on-rails, you need to run `node_package/scripts/build`. Since the react-on-rails package should be sym linked, you don't have to `yarn react-on-rails` after every change.
 
 ### RSpec Testing
 Run `rake` for testing the gem and `spec/dummy`. Otherwise, the `rspec` command only works for testing within the sample apps, like `spec/dummy`.

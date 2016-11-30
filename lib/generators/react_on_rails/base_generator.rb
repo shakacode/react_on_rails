@@ -138,13 +138,13 @@ Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpa
 
           What to do next:
 
-            - Ensure your bundle and npm are up to date.
+            - Ensure your bundle and yarn installs of dependencies are up to date.
 
-                bundle && npm i
+                bundle && yarn
 
-            - Run the npm rails-server command to load the rails server.
+            - Run the foreman command to load the rails server and webpack process
 
-                npm run rails-server
+                foreman start -f Procfile.dev
 
             - Visit http://localhost:3000/hello_world and see your React On Rails app running!
         MSG

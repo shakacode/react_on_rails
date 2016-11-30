@@ -14,10 +14,10 @@ namespace :assets do
 
   desc "Compile assets with webpack"
   task :webpack do
-    sh "cd client && npm run build:client"
+    sh "cd client && yarn run build:client"
 
     # Skip next line if not doing server rendering
-    sh "cd client && npm run build:server"
+    sh "cd client && yarn run build:server"
   end
 
   task :clobber do

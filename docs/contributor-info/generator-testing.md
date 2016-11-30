@@ -12,7 +12,7 @@ You can specify additional apps to generate and test by adding to the rakelib/ex
 ## More on the Rake Tasks
 In order to maximize efficiency, we took several steps to improve the performance of the rake tasks that utilize somewhat advanced rake functionality such as task dependencies, `file` tasks, task synthesizing, and concurrent tasks with `multitask`.
 
-For example, re-generating the app, running `npm install`, and re-generating the webpack bundles are all only done when they need to be done. Rake will also run certain tasks, including those that generate multiple applications, concurrently. When running `npm install`, this may produce strange-looking output due to the way the npm's console progress bar works. This is normal.
+For example, re-generating the app, running `yarn`, and re-generating the webpack bundles are all only done when they need to be done. Rake will also run certain tasks, including those that generate multiple applications, concurrently. 
 
 For more insight, see:
 

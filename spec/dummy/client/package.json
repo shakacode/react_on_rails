@@ -63,12 +63,12 @@
     "fs": false
   },
   "scripts": {
-    "lint": "npm run eslint --silent && npm run jscs --silent",
+    "lint": "yarn run eslint --silent && yarn run jscs --silent",
     "eslint": "eslint --ext .js,.jsx .",
     "jscs": "jscs --verbose .",
     "jscs:fix": "jscs --verbose -x . --silent",
-    "test": "npm run build:test && rspec",
-    "build:test": "npm run build:client && npm run build:server",
+    "test": "yarn run build:test && rspec",
+    "build:test": "yarn run build:client && yarn run build:server",
     "build:production:client": "NODE_ENV=production webpack --config webpack.client.rails.build.config.js",
     "build:production:server": "NODE_ENV=production webpack --config webpack.server.rails.build.config.js",
     "build:client": "webpack --config webpack.client.rails.build.config.js",
@@ -76,7 +76,7 @@
     "build:dev:server": "webpack -w --config webpack.server.rails.build.config.js",
     "build:server": "webpack --config webpack.server.rails.build.config.js",
     "hot-assets": "babel-node server-rails-hot.js",
-    "install-react-on-rails": "npm install 'react-on-rails@../../..'"
+    "install-react-on-rails": "yarn 'react-on-rails@../../..'"
   },
   "author": "",
   "license": "ISC"
