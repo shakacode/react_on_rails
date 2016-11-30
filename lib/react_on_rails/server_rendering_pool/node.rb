@@ -51,11 +51,15 @@ module ReactOnRails
         end
 
         def eval_js(js_code)
-          max_int = (2**(32 - 2) - 1)
+          eof_symbol = "\r\n\0".freeze
+          max_int = (2**30 - 1)
           @js_context_pool.with do |js_context|
-            js_context.send(js_code, 0)
-            result = js_context.recv(max_int)
-            result
+            js_context.send(js_code + eof_symbol, 0)
+            result = ""
+            while result[-eof_symbol.length..-1] != eof_symbol
+              result += js_context.recv(max_int)
+            end
+            result[0..-eof_symbol.length]
           end
         end
 
@@ -64,8 +68,8 @@ module ReactOnRails
             client = UNIXSocket.new("client/node/node.sock")
             client.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
           rescue StandardError => e
-            Rails.logger.error("Unable to connect to socket: client/node/node.sock.
-Make sure node server is up and running.")
+            Rails.logger.error("Unable to connect to socket: client/node/node.sock. \
+              Make sure node server is up and running.")
             Rails.logger.error(e)
             raise e
           end
