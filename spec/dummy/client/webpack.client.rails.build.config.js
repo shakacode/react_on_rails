@@ -12,6 +12,7 @@ const devBuild = process.env.NODE_ENV !== 'production';
 config.output = {
   filename: '[name]-bundle.js',
   path: '../app/assets/webpack',
+  publicPath: '/assets/',
 };
 
 // See webpack.client.base.config for adding modules common to both the webpack dev server and rails

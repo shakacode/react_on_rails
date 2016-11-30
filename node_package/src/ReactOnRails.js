@@ -148,7 +148,8 @@ ctx.ReactOnRails = {
    * @returns {virtualDomElement} Reference to your component's backing instance
    */
   render(name, props, domNodeId) {
-    const reactElement = createReactElement({ name, props, domNodeId });
+    const componentObj = ComponentRegistry.get(name);
+    const reactElement = createReactElement({ componentObj, props, domNodeId });
 
     // eslint-disable-next-line react/no-render-return-value
     return ReactDOM.render(reactElement, document.getElementById(domNodeId));
@@ -157,7 +158,7 @@ ctx.ReactOnRails = {
   /**
    * Get the component that you registered
    * @param name
-   * @returns {name, component, generatorFunction}
+   * @returns {name, component, generatorFunction, isRenderer}
    */
   getComponent(name) {
     return ComponentRegistry.get(name);

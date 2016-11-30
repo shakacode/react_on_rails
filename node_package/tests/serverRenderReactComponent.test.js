@@ -1,4 +1,5 @@
 /* eslint-disable react/jsx-filename-extension */
+/* eslint-disable no-unused-vars */
 
 import React from 'react';
 import test from 'tape';
@@ -35,4 +36,19 @@ test('serverRenderReactComponent renders errors', (assert) => {
   const okHtml = html.indexOf('XYZ') > 0 && html.indexOf('Exception in rendering!') > 0;
   assert.ok(okHtml, 'serverRenderReactComponent HTML should render error message XYZ');
   assert.ok(hasErrors, 'serverRenderReactComponent should have errors if exception thrown');
+});
+
+test('serverRenderReactComponent renders an error if attempting to render a renderer', (assert) => {
+  assert.plan(1);
+  const X3 = (a1, a2, a3) => null;
+  ComponentStore.register({ X3 });
+
+  const { html } =
+    JSON.parse(serverRenderReactComponent({ name: 'X3', domNodeId: 'myDomId', trace: false }));
+
+  const ok = html.indexOf('renderer') > 0 && html.indexOf('Exception in rendering!') > 0;
+  assert.ok(
+    ok,
+    'serverRenderReactComponent renders an error if attempting to render a renderer',
+  );
 });
