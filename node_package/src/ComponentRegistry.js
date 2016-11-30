@@ -1,5 +1,5 @@
 // key = name used by react_on_rails
-// value = { name, component, generatorFunction: boolean }
+// value = { name, component, generatorFunction: boolean, isRenderer: boolean }
 import generatorFunction from './generatorFunction';
 
 const registeredComponents = new Map();
@@ -20,11 +20,13 @@ export default {
       }
 
       const isGeneratorFunction = generatorFunction(component);
+      const isRenderer = isGeneratorFunction && component.length === 3;
 
       registeredComponents.set(name, {
         name,
         component,
         generatorFunction: isGeneratorFunction,
+        isRenderer,
       });
     });
   },

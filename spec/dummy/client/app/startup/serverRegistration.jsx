@@ -26,6 +26,9 @@ import CssModulesImagesFontsExample from '../components/CssModulesImagesFontsExa
 
 import SharedReduxStore from '../stores/SharedReduxStore';
 
+// Deferred render on the client side w/ server render
+import DeferredRenderApp from './DeferredRenderAppServer';
+
 ReactOnRails.register({
   HelloWorld,
   HelloWorldWithLogAndThrow,
@@ -37,6 +40,7 @@ ReactOnRails.register({
   HelloString,
   PureComponent,
   CssModulesImagesFontsExample,
+  DeferredRenderApp,
 });
 
 ReactOnRails.registerStore({

@@ -10,6 +10,8 @@ import ReduxSharedStoreApp from './ClientReduxSharedStoreApp';
 import RouterApp from './ClientRouterApp';
 import PureComponent from '../components/PureComponent';
 import CssModulesImagesFontsExample from '../components/CssModulesImagesFontsExample';
+import ManualRenderApp from './ManualRenderAppRenderer';
+import DeferredRenderApp from './DeferredRenderAppRenderer';
 
 import SharedReduxStore from '../stores/SharedReduxStore';
 
@@ -27,6 +29,8 @@ ReactOnRails.register({
   RouterApp,
   PureComponent,
   CssModulesImagesFontsExample,
+  ManualRenderApp,
+  DeferredRenderApp,
 });
 
 ReactOnRails.registerStore({

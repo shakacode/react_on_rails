@@ -5,6 +5,10 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 
+## [6.3.0]
+##### Added
+- Modify register API to allow registration of renderers, allowing a user to manually render their app to the DOM [#581](https://github.com/shakacode/react_on_rails/pull/581) by [jtibbertsma](https://github.com/jtibbertsma).
+
 ## [6.2.1] - 2016-11-19
 - Removed unnecesary passing of context in the HelloWorld Container example and basic generator. [#612](https://github.com/shakacode/react_on_rails/pull/612) by [justin808](https://github.com/justin808)
 
@@ -383,7 +387,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.2.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.3.0...master
+[6.3.0]: https://github.com/shakacode/react_on_rails/compare/6.2.1...6.3.0
 [6.2.1]: https://github.com/shakacode/react_on_rails/compare/6.2.0...6.2.1
 [6.2.0]: https://github.com/shakacode/react_on_rails/compare/6.1.2...6.2.0
 [6.1.2]: https://github.com/shakacode/react_on_rails/compare/6.1.1...6.1.2
