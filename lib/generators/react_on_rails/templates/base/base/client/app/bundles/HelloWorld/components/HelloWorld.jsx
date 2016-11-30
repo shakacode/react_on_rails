@@ -1,6 +1,6 @@
 import React, { PropTypes } from 'react';
 
-export default class <%= config[:class_name] %> extends React.Component {
+export default class HelloWorld extends React.Component {
   static propTypes = {
     name: PropTypes.string.isRequired, // this is passed from the Rails view
   };

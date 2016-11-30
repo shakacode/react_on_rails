@@ -38,7 +38,7 @@ shared_examples "base_generator" do
 
   it "copies react files" do
     %w(app/controllers/hello_world_controller.rb
-       app/views/hello_world/index.html.erb
+       client/app/bundles/HelloWorld/components/HelloWorld.jsx
        client/REACT_ON_RAILS_CLIENT_README.md
        client/webpack.config.js
        client/.babelrc

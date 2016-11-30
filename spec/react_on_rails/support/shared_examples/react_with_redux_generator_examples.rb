@@ -5,10 +5,10 @@ shared_examples "react_with_redux_generator" do
 
   it "creates appropriate templates" do
     assert_file("client/app/bundles/HelloWorld/startup/registration.jsx") do |contents|
-      assert_match("./HelloWorldApp", contents)
+      assert_match("import HelloWorldApp from './HelloWorldApp';", contents)
     end
-    assert_file("client/app/bundles/HelloWorld/components/HelloWorld.jsx") do |contents|
-      assert_match("class HelloWorld extends", contents)
+    assert_file("app/views/hello_world/index.html.erb") do |contents|
+      assert_match(/"HelloWorldApp"/, contents)
     end
   end
 

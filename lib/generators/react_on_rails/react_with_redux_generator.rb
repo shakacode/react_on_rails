@@ -25,15 +25,14 @@ module ReactOnRails
 
       def create_appropriate_templates
         base_path = "base/base/"
-        destination = "client/app/bundles/HelloWorld/"
+        location = "client/app/bundles/HelloWorld/"
+        source = base_path + location
         config = {
-          class_name: "HelloWorld",
+          component_name: "HelloWorldApp",
           app_relative_path: "./HelloWorldApp"
         }
-        %w(/startup/registration.jsx
-           /components/HelloWorld.jsx).each do |file|
-             template(base_path + destination + file + ".tt", destination + file, config)
-           end
+        template("#{source}/startup/registration.jsx.tt", "#{location}/startup/registration.jsx", config)
+        template("#{base_path}app/views/hello_world/index.html.erb.tt", "app/views/hello_world/index.html.erb", config)
       end
     end
   end

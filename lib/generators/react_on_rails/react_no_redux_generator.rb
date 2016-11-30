@@ -13,11 +13,11 @@ module ReactOnRails
         location = "client/app/bundles/HelloWorld/"
         source = base_path + location
         config = {
-          class_name: "HelloWorldApp",
-          app_relative_path: "../components/HelloWorldApp"
+          component_name: "HelloWorld",
+          app_relative_path: "../components/HelloWorld"
         }
-        template(source + "/startup/registration.jsx" + ".tt", location + "/startup/registration.jsx", config)
-        template(source + "/components/HelloWorld.jsx" + ".tt", location + "/components/HelloWorldApp.jsx", config)
+        template("#{source}/startup/registration.jsx.tt", "#{location}/startup/registration.jsx", config)
+        template("#{base_path}app/views/hello_world/index.html.erb.tt", "app/views/hello_world/index.html.erb", config)
       end
     end
   end
