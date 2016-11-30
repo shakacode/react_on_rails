@@ -5,7 +5,6 @@ The generator has created the necessary files and gems for deployment to Heroku.
 + `12factor` gem: required by Heroku if using a version before Rails 5 (see their [README](https://github.com/heroku/rails_12factor#rails-5) for more information if upgrading from a lower version)
 + `'puma'` gem: recommended Heroku webserver
 + `config/puma.rb`: Puma webserver config file
-+ `lib/tasks/assets.rake`: This rake task file is provided by the generator regardless of whether the user chose Heroku Deployment as an option. It is highlighted here because it is helpful to understand that this task is what generates your JavaScript bundles in production. Previously, users of this gem had to create a file `lib/tasks/assets.rake` to modify the Rails precompile task to deploy assets for production. However, we add this automatically in newer versions of React on Rails. If you need to customize this file, see [lib/tasks/assets.rake from React on Rails](https://github.com/shakacode/react_on_rails/blob/master/lib/tasks/assets.rake) as an example.
 
 ## More details on precompilation using webpack to create JavaScript assets
 This is how the rake task gets modified. You should be able to call `clear_prerequisites` and setup your own custom precompile if needed.
