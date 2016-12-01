@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (6.2.1)
+    react_on_rails (6.3.0)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -209,6 +209,8 @@ GEM
       rspec-expectations (~> 3.4.0)
       rspec-mocks (~> 3.4.0)
       rspec-support (~> 3.4.0)
+    rspec-retry (0.5.2)
+      rspec-core (> 3.3, < 3.6)
     rspec-support (3.4.1)
     rubocop (0.42.0)
       parser (>= 2.3.1.0, < 3.0)
@@ -304,6 +306,7 @@ DEPENDENCIES
   rails (= 4.2.3)
   react_on_rails!
   rspec-rails
+  rspec-retry
   rubocop
   ruby-lint
   sass-rails (~> 5.0)
