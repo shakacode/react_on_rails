@@ -1,13 +1,19 @@
 # Change Log
-All notable changes to this project will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version.
+All notable changes to this project's source code will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version.
 
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
 
 ## [6.3.0]
-##### Added
-- Modify register API to allow registration of renderers, allowing a user to manually render their app to the DOM [#581](https://github.com/shakacode/react_on_rails/pull/581) by [jtibbertsma](https://github.com/jtibbertsma).
+##### Changed
+- Modified register API to allow registration of renderers, allowing a user to manually render their app to the DOM. This allows for code splitting and deferred loading. [#581](https://github.com/shakacode/react_on_rails/pull/581) by [jtibbertsma](https://github.com/jtibbertsma).
+
+- Updated Basic Generator & Linters. Examples are simpler. [#624](https://github.com/shakacode/react_on_rails/pull/624) by [Judahmeek](https://github.com/Judahmeek).
+
+- Slight improvement to the 'no hydrated stores' error. [#605](https://github.com/shakacode/react_on_rails/pull/605) by [cookiefission](https://github.com/cookiefission).
+
+- Don't assume ActionMailer is available. [#608](https://github.com/shakacode/react_on_rails/pull/608) by [tuzz](https://github.com/tuzz).
 
 ## [6.2.1] - 2016-11-19
 - Removed unnecesary passing of context in the HelloWorld Container example and basic generator. [#612](https://github.com/shakacode/react_on_rails/pull/612) by [justin808](https://github.com/justin808)
