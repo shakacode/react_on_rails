@@ -117,8 +117,10 @@ Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpa
           else
             GeneratorMessages.add_info(
               <<-MSG.strip_heredoc
-              Did not find spec/rails_helper.rb or spec/spec_helper.rb to add line
-              config.example_status_persistence_file_path = "spec/examples.txt"
+              Did not find spec/rails_helper.rb or spec/spec_helper.rb to add
+                # Ensure that if we are running js tests, we are using latest webpack assets
+                # This will use the defaults of :js and :server_rendering meta tags
+                ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
               MSG
             )
           end
@@ -141,9 +143,9 @@ Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpa
 
                 bundle && npm i
 
-            - Run the npm rails-server command to load the rails server.
+            - Run the foreman command to start the rails server and run webpack in watch mode.
 
-                npm run rails-server
+                foreman start -f Procfile.dev
 
             - Visit http://localhost:3000/hello_world and see your React On Rails app running!
         MSG
