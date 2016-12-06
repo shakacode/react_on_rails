@@ -8,7 +8,7 @@
 // To understand which one is used, see app/views/layouts/application.html.erb
 
 // These assets are located in app/assets/webpack directory
-// Its is CRITICAL for Turbolinks 2.x that webpack/vendor-bundle must be BEFORE turbolinks
+// It is CRITICAL for Turbolinks 2.x that webpack/vendor-bundle must be BEFORE turbolinks
 // since it is exposing jQuery and jQuery-ujs
 
 // NOTE: See config/initializers/assets.rb for some critical configuration regarding sprockets.
