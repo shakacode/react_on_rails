@@ -5,11 +5,15 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 
-## [6.3.1]
+## [6.3.2] - 2016-12-5
+##### Fixed
+- The `react_component` method was raising a `NameError` when `ReactOnRailsHelper` was included in a plain object. [#636](https://github.com/shakacode/react_on_rails/pull/636) by [jtibbertsma](https://github.com/jtibbertsma).
+
+## [6.3.1] - 2016-11-30
 ##### Changed
 - Improved generator post-install help messages. [#631](https://github.com/shakacode/react_on_rails/pull/631) by [justin808](https://github.com/justin808).
 
-## [6.3.0]
+## [6.3.0] - 2016-11-30
 ##### Changed
 - Modified register API to allow registration of renderers, allowing a user to manually render their app to the DOM. This allows for code splitting and deferred loading. [#581](https://github.com/shakacode/react_on_rails/pull/581) by [jtibbertsma](https://github.com/jtibbertsma).
 
@@ -397,7 +401,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.3.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.3.2...master
+[6.3.2]: https://github.com/shakacode/react_on_rails/compare/6.3.0...6.3.1
 [6.3.1]: https://github.com/shakacode/react_on_rails/compare/6.3.0...6.3.1
 [6.3.0]: https://github.com/shakacode/react_on_rails/compare/6.2.1...6.3.0
 [6.2.1]: https://github.com/shakacode/react_on_rails/compare/6.2.0...6.2.1

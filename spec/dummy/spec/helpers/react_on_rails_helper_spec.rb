@@ -183,4 +183,23 @@ describe ReactOnRailsHelper, type: :helper do
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
     it { is_expected.to eq hello_world }
   end
+
+  describe "#rails_context" do
+    before do
+      @rendering_extension = ReactOnRails.configuration.rendering_extension
+      ReactOnRails.configuration.rendering_extension = nil
+    end
+
+    it "should not throw an error if not in a view" do
+      class PlainClass
+        include ReactOnRailsHelper
+      end
+
+      ob = PlainClass.new
+      expect { ob.send(:rails_context, server_side: true) }.to_not raise_error
+      expect { ob.send(:rails_context, server_side: false) }.to_not raise_error
+    end
+
+    after { ReactOnRails.configuration.rendering_extension = @rendering_extension }
+  end
 end
