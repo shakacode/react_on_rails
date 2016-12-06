@@ -350,7 +350,7 @@ ReactOnRails.setStore('#{store_name}', store);
         i18nLocale: I18n.locale,
         i18nDefaultLocale: I18n.default_locale
       }
-      if request.present?
+      if defined?(request) && request.present?
         # Check for encoding of the request's original_url and try to force-encoding the
         # URLs as UTF-8. This situation can occur in browsers that do not encode the
         # entire URL as UTF-8 already, mostly on the Windows platform (IE11 and lower).
@@ -402,7 +402,7 @@ ReactOnRails.setStore('#{store_name}', store);
   end
 
   def in_mailer?
-    return false unless controller.present?
+    return false unless defined?(controller)
     return false unless defined?(ActionMailer::Base)
 
     controller.is_a?(ActionMailer::Base)
