@@ -11,7 +11,7 @@
 // 1. Update your application.html.erb or equivalent to use the env_javascript_include_tag
 //    and env_stylesheet_link_tag helpers.
 // 2. Make sure you have a hot-assets target in your client/package.json
-// 3. Start up `forman start -f Procfile.hot` to start both Rails and the hot reload server.
+// 3. Start up `foreman start -f Procfile.hot` to start both Rails and the hot reload server.
 
 import webpack from 'webpack';
 import WebpackDevServer from 'webpack-dev-server';
