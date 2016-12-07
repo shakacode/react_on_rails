@@ -4,6 +4,8 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+##### Fixed
+- "Node parse error" for node server rendering 
 
 ## [6.3.2] - 2016-12-5
 ##### Fixed
