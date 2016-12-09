@@ -4,10 +4,7 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
-##### Fixed
-
-##### Changed
-
+*Please add entries here for your pull requests.*
 
 ## [6.3.2] - 2016-12-5
 ##### Fixed
@@ -408,7 +405,7 @@ Best done with Object destructing:
 - Fix several generator related issues.
 
 [Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.3.2...master
-[6.3.2]: https://github.com/shakacode/react_on_rails/compare/6.3.0...6.3.1
+[6.3.2]: https://github.com/shakacode/react_on_rails/compare/6.3.1...6.3.2
 [6.3.1]: https://github.com/shakacode/react_on_rails/compare/6.3.0...6.3.1
 [6.3.0]: https://github.com/shakacode/react_on_rails/compare/6.2.1...6.3.0
 [6.2.1]: https://github.com/shakacode/react_on_rails/compare/6.2.0...6.2.1
