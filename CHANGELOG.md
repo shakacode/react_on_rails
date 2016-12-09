@@ -5,11 +5,15 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 ##### Fixed
-- "Node parse error" for node server rendering 
+
+##### Changed
+
 
 ## [6.3.2] - 2016-12-5
 ##### Fixed
 - The `react_component` method was raising a `NameError` when `ReactOnRailsHelper` was included in a plain object. [#636](https://github.com/shakacode/react_on_rails/pull/636) by [jtibbertsma](https://github.com/jtibbertsma).
+- "Node parse error" for node server rendering. [#641](https://github.com/shakacode/react_on_rails/pull/641) by [alleycat-at-git](https://github.com/alleycat-at-git) and [rocLv](https://github.com/rocLv)
+- Better error handling when the react-on-rails node package entry is missing.[#602](https://github.com/shakacode/react_on_rails/pull/602) by [benjiwheeler](https://github.com/benjiwheeler).
 
 ## [6.3.1] - 2016-11-30
 ##### Changed
