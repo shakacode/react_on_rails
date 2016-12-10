@@ -72,6 +72,13 @@ ReactOnRails.configure do |config|
   config.server_renderer_timeout = 20 # seconds
 
   ################################################################################
+  # I18N OPTIONS
+  ################################################################################
+  # Define the location of your translation.js
+  config.i18n_dir = nil
+  config.default_locale = "en"
+
+  ################################################################################
   # MISCELLANEOUS OPTIONS
   ################################################################################
   # Default is false, enable if your content security policy doesn't include `style-src: 'unsafe-inline'`
