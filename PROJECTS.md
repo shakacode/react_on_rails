@@ -13,13 +13,8 @@
 * **[Apprentus](https://www.apprentus.com/)**: A marketplace to find the best private teachers. Using react-on-rails from the homepage to infinity!
 * **[Confident Financial Solutions](https://www.mycfsapp.com/)**: Auto Repair Financing to help people get back on the road and back to life.
 * **[Flyhomes](https://www.flyhomes.com/)**: Real estate brokerage service that awards frequent flyer miles.
-* **[Undeveloped](https://undeveloped.com/)**: Buy and sell domain names.
-* **[Foxford.ru)(http://foxford.ru/)**: Online School
-
-## Screen Grabs
-![image](https://cloud.githubusercontent.com/assets/1118459/19623703/7c6d63d0-9870-11e6-83f2-8b83ca49daa9.png)
-
-![2016-12-17_13-23-21](https://cloud.githubusercontent.com/assets/1118459/21290377/1adacdf2-c45c-11e6-97c1-f726ab749b2d.png)
+* **[Undeveloped](https://undeveloped.com/)**: Buy and sell domain names. ![image](https://cloud.githubusercontent.com/assets/1118459/19623703/7c6d63d0-9870-11e6-83f2-8b83ca49daa9.png)
+* **[Foxford.ru](http://foxford.ru/)**: Online School ![2016-12-17_13-23-21](https://cloud.githubusercontent.com/assets/1118459/21290377/1adacdf2-c45c-11e6-97c1-f726ab749b2d.png)
 
  
 ## Commercial Products in Development
