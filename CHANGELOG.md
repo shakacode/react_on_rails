@@ -5,6 +5,8 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 *Please add entries here for your pull requests.*
+##### Fixed
+- Added support for Ruby 2.0.
 
 ## [6.3.2] - 2016-12-5
 ##### Fixed

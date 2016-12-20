@@ -4,7 +4,10 @@ module ReactOnRails
       NO_PROPS = {}.freeze
       HIDDEN = "display:none".freeze
 
-      def initialize(name:, options:)
+      def initialize(
+        name: raise(ArgumentError, "name is required"),
+        options: raise(ArgumentError, "options are required")
+      )
         @name = name
         @options = options
       end

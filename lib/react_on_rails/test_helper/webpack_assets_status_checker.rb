@@ -9,7 +9,11 @@ module ReactOnRails
       # client_dir is typically /client, where all client files go
       attr_reader :client_dir, :generated_assets_dir
 
-      def initialize(generated_assets_dir:, client_dir:, webpack_generated_files:)
+      def initialize(
+        generated_assets_dir: raise(ArgumentError, "generated_assets_dir is required"),
+        client_dir: raise(ArgumentError, "client_dir is required"),
+        webpack_generated_files: raise(ArgumentError, "webpack_generated_files is required")
+      )
         @generated_assets_dir = generated_assets_dir
         @client_dir = client_dir
         @webpack_generated_files = webpack_generated_files
