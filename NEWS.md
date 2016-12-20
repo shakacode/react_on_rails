@@ -3,6 +3,12 @@
 *We'll keep a history of the news. A few bullets at the top will also show on the [README.md](./README.md).*
 
 * Always see the [CHANGELOG.md](./CHANGELOG.md) for the latest project changes.
+* 2016-12-20: New Video on Egghead.io: [Creating a component with React on Rails](https://egghead.io/lessons/react-creating-a-component-with-react-on-rails)
+* 2016-11-03: Spoke at [LA Ruby, 7pm, Thursday, November 10 in Venice, CA: "React on Rails: Why, What, and How?"](http://www.meetup.com/laruby/events/234825187/). [Video and pictures in this article](https://blog.shakacode.com/my-react-on-rails-talk-at-the-la-ruby-rails-meetup-november-10-2016-eaaa83aff800#.ej6h4eglp).
+* 2016-08-27: We now have a [Documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) for improved readability & reference.
+* 2016-08-21: v6.1 ships with serveral new features and bug fixes. See the [Changelog](CHANGELOG.md).
+* 2016-07-28: If you're doing server rendering, be sure to use mini\_racer! See [issues/428](https://github.com/shakacode/react_on_rails/issues/428). It's supposedly much faster than `therubyracer`.
+
 * 2016-08-27: We now have a [Documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) for improved readability & reference.
 * 2016-08-21: v6.1 ships with serveral new features and bug fixes. See the [Changelog](CHANGELOG.md).
 * 2016-06-13: 6.0.4 shipped with a critical fix regarding a missing polyfill for `clearTimeout`, used by babel-polyfill.
