@@ -63,6 +63,10 @@ function turbolinksVersion5() {
   return (typeof Turbolinks.controller !== 'undefined');
 }
 
+function turbolinksSupported() {
+  return Turbolinks.supported;
+}
+
 function delegateToRenderer(componentObj, props, railsContext, domNodeId, trace) {
   const { name, component, isRenderer } = componentObj;
 
@@ -175,23 +179,25 @@ export function clientStartup(context) {
     // We must do this check for turbolinks AFTER the document is loaded because we load the
     // Webpack bundles first.
 
-    if (!turbolinksInstalled()) {
+    if (turbolinksInstalled() && turbolinksSupported()) {
+      if (turbolinksVersion5()) {
+        debugTurbolinks(
+          'USING TURBOLINKS 5: document added event listeners ' +
+          ' turbolinks:before-visit and turbolinks:load.');
+        document.addEventListener('turbolinks:before-visit', reactOnRailsPageUnloaded);
+        document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
+      } else {
+        debugTurbolinks(
+          'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +
+          'page:change.');
+        document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
+        document.addEventListener('page:change', reactOnRailsPageLoaded);
+      }
+    } else {
       debugTurbolinks(
         'NOT USING TURBOLINKS: DOMContentLoaded event, calling reactOnRailsPageLoaded',
       );
       reactOnRailsPageLoaded();
-    } else if (turbolinksVersion5()) {
-      debugTurbolinks(
-        'USING TURBOLINKS 5: document added event listeners ' +
-        ' turbolinks:before-visit and turbolinks:load.');
-      document.addEventListener('turbolinks:before-visit', reactOnRailsPageUnloaded);
-      document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
-    } else {
-      debugTurbolinks(
-        'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +
-        'page:change.');
-      document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
-      document.addEventListener('page:change', reactOnRailsPageLoaded);
     }
   });
 }
