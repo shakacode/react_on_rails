@@ -5,8 +5,11 @@
 # 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 require "react_on_rails/prerender_error"
 require "addressable/uri"
+require "react_on_rails/utils"
 
 module ReactOnRailsHelper
+  include ReactOnRails::Utils::Required
+
   # The env_javascript_include_tag and env_stylesheet_link_tag support the usage of a webpack
   # dev server for providing the JS and CSS assets during development mode. See
   # https://github.com/shakacode/react-webpack-rails-tutorial/ for a working example.
@@ -255,8 +258,12 @@ module ReactOnRailsHelper
 
   # Returns Array [0]: html, [1]: script to console log
   # NOTE, these are NOT html_safe!
-  def server_rendered_react_component_html(props, react_component_name, dom_id,
-                                           prerender:, trace:, raise_on_prerender_error:)
+  def server_rendered_react_component_html(
+    props, react_component_name, dom_id,
+    prerender: required("prerender"),
+    trace: required("trace"),
+    raise_on_prerender_error: required("raise_on_prerender_error")
+  )
     return { "html" => "", "consoleReplayScript" => "" } unless prerender
 
     # On server `location` option is added (`location = request.fullpath`)
@@ -342,7 +349,7 @@ ReactOnRails.setStore('#{store_name}', store);
   # This is the definitive list of the default values used for the rails_context, which is the
   # second parameter passed to both component and store generator functions.
   # rubocop:disable Metrics/AbcSize
-  def rails_context(server_side:)
+  def rails_context(server_side: required("server_side"))
     @rails_context ||= begin
       result = {
         inMailer: in_mailer?,

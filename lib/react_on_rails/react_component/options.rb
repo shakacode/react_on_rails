@@ -1,10 +1,14 @@
+require "react_on_rails/utils"
+
 module ReactOnRails
   module ReactComponent
     class Options
+      include Utils::Required
+
       NO_PROPS = {}.freeze
       HIDDEN = "display:none".freeze
 
-      def initialize(name:, options:)
+      def initialize(name: required("name"), options: required("options"))
         @name = name
         @options = options
       end
