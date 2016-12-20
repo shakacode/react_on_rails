@@ -45,9 +45,6 @@ gem "react_on_rails", path: "../.."
 
 gem "mini_racer"
 
-# Access an IRB console on exception pages or by using <%= console %> in views
-gem 'web-console', group: :development, require: false
-
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console
   gem "pry"

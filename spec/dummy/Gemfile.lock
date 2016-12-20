@@ -268,10 +268,6 @@ GEM
     uglifier (3.0.4)
       execjs (>= 0.3.0, < 3)
     unicode-display_width (1.1.2)
-    web-console (3.3.0)
-      activemodel (>= 4.2)
-      debug_inspector
-      railties (>= 4.2)
     websocket (1.2.3)
     websocket-driver (0.6.4)
       websocket-extensions (>= 0.1.0)
@@ -318,7 +314,6 @@ DEPENDENCIES
   sqlite3
   turbolinks (= 2.5.3)
   uglifier (>= 2.7.2)
-  web-console
 
 BUNDLED WITH
    1.13.6
