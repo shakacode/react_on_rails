@@ -17,23 +17,23 @@ Follow [@ShakaCode](https://twitter.com/shakacode) for notications of new releas
 # Articles, Videos, and Podcasts
 
 ### Articles
+
 * [React on Rails, 2000+ 🌟 Stars](https://medium.com/shakacode/react-on-rails-2000-stars-32ff5cfacfbf#.6gmfb2gpy)
 * [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 
-### [React On Rails Tutorial Series](https://www.youtube.com/playlist?list=PL5VAKH-U1M6dj84BApfUtvBjvF-0-JfEU)
+### Videos 
 
-1. [History and Motivation](https://youtu.be/F4oymbUHvoY)
-2. [Basic Tutorial Walkthrough](https://youtu.be/_bjScw60FBk)
-3. [Code Walkthrough](https://youtu.be/McQ9UM-_ocQ)
+1. [egghead.io: Creating a component with React on Rails](https://egghead.io/lessons/react-creating-a-component-with-react-on-rails)
+1. [React On Rails Tutorial Series](https://www.youtube.com/playlist?list=PL5VAKH-U1M6dj84BApfUtvBjvF-0-JfEU)
+  1. [History and Motivation](https://youtu.be/F4oymbUHvoY)
+  1. [Basic Tutorial Walkthrough](https://youtu.be/_bjScw60FBk)
+  1. [Code Walkthrough](https://youtu.be/McQ9UM-_ocQ)
 
 ### Podcasts
 * [284 Ruby Rogues: React on Rails with Justin Gordon and Rob Wise](https://devchat.tv/ruby-rogues/284-rr-react-on-rails-with-justin-gordon-and-rob-wise)
 
 # NEWS
-* 2016-11-03: Speaking at [LA Ruby, 7pm, Thursday, November 10 in Venice, CA: "React on Rails: Why, What, and How?"](http://www.meetup.com/laruby/events/234825187/)
-* 2016-08-27: We now have a [Documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) for improved readability & reference.
-* 2016-08-21: v6.1 ships with serveral new features and bug fixes. See the [Changelog](CHANGELOG.md).
-* 2016-07-28: If you're doing server rendering, be sure to use mini\_racer! See [issues/428](https://github.com/shakacode/react_on_rails/issues/428). It's supposedly much faster than `therubyracer`.
+* 2016-11-03: Spoke at [LA Ruby: "React on Rails: Why, What, and How?"](http://www.meetup.com/laruby/events/234825187/). [Video and pictures in this article](https://blog.shakacode.com/my-react-on-rails-talk-at-the-la-ruby-rails-meetup-november-10-2016-eaaa83aff800#.ej6h4eglp).
 * *See [NEWS.md](NEWS.md) for more notes over time.*
 
 # React on Rails
