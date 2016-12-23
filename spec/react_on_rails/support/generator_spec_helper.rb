@@ -23,11 +23,12 @@ def simulate_existing_rails_files(options)
   simulate_existing_file("config/routes.rb", "Rails.application.routes.draw do\nend\n")
   simulate_existing_file("config/application.rb",
                          "module Gentest\nclass Application < Rails::Application\nend\nend)")
-  if options.fetch(:spec, true)
-    simulate_existing_dir("spec")
-    simulate_existing_file("spec/rails_helper.rb",
-                           "RSpec.configure do |config|\nend\n")
-  end
+
+  return unless options.fetch(:spec, true)
+
+  simulate_existing_dir("spec")
+  simulate_existing_file("spec/rails_helper.rb",
+                         "RSpec.configure do |config|\nend\n")
 end
 
 def simulate_existing_assets_files(options)

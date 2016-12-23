@@ -183,7 +183,7 @@ shared_examples "React Component Shared Store" do |url|
     scenario "Type in one component changes the other component" do
       expect(current_path).to eq(url)
       new_text = "John Doe"
-      new_text_2 = "Jane Smith"
+      new_text2 = "Jane Smith"
       within("#ReduxSharedStoreApp-react-component-0") do
         find("input").set new_text
         within("h3") do
@@ -194,11 +194,11 @@ shared_examples "React Component Shared Store" do |url|
         within("h3") do
           is_expected.to have_content new_text
         end
-        find("input").set new_text_2
+        find("input").set new_text2
       end
       within("#ReduxSharedStoreApp-react-component-0") do
         within("h3") do
-          is_expected.to have_content new_text_2
+          is_expected.to have_content new_text2
         end
       end
     end

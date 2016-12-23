@@ -69,7 +69,8 @@ module ReactOnRails
       manifest_path = manifest_glob.first
       manifest_file = File.new(manifest_path)
       manifest_data = if File.extname(manifest_file) == ".json"
-                        JSON.load(manifest_file)["assets"]
+                        manifest_file_data = File.read(manifest_path)
+                        JSON.parse(manifest_file_data)["assets"]
                       else
                         YAML.load(manifest_file)
                       end
