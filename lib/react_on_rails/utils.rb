@@ -19,5 +19,11 @@ module ReactOnRails
       File.join(ReactOnRails.configuration.generated_assets_dir,
                 ReactOnRails.configuration.server_bundle_js_file)
     end
+
+    module Required
+      def required(arg_name)
+        raise ArgumentError, "#{arg_name} is required"
+      end
+    end
   end
 end
