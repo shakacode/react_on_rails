@@ -10,15 +10,18 @@ const DeferredRender = ({ children }) => (
       checksum mismatch error.
     </p>
     {
-      children ? children : (
-        <p>
-          <Link to="/deferred_render_with_server_rendering/async_page">
-            Test Async Route
-          </Link>
-        </p>
-      )
+      children ||
+      <p>
+        <Link to="/deferred_render_with_server_rendering/async_page">
+          Test Async Route
+        </Link>
+      </p>
     }
   </div>
 );
+
+DeferredRender.propTypes = {
+  children: React.PropTypes.object,
+};
 
 export default DeferredRender;

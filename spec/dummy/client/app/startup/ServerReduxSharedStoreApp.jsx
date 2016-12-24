@@ -20,5 +20,5 @@ export default () => {
     <Provider store={store}>
       <HelloWorldContainer />
     </Provider>
-    );
+  );
 };
