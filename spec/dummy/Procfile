@@ -1,1 +1,1 @@
-web: bundle exec puma -C config/puma.rb -b 0.0.0.0
+rails: REACT_ON_RAILS_ENV=HOT rails s -b 0.0.0.0

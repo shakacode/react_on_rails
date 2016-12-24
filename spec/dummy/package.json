@@ -37,9 +37,12 @@
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
   "devDependencies": {
-    "babel-eslint": "^5.0.0-beta6",
-    "eslint": "^1.10.3",
-    "eslint-config-airbnb": "^3.1.0",
-    "eslint-config-shakacode": "0.0.1"
+    "babel-eslint": "^7.1.1",
+    "eslint": "^3.12.2",
+    "eslint-config-airbnb": "^13.0.0",
+    "eslint-config-shakacode": "13.2.0"
+  },
+  "dependencies": {
+    "node-sass": "^4.1.1"
   }
 }
