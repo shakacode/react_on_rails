@@ -182,10 +182,9 @@ export function clientStartup(context) {
       reactOnRailsPageLoaded();
     } else if (turbolinksVersion5()) {
       debugTurbolinks(
-        'USING TURBOLINKS 5: document added event listeners turbolinks:before-cache and ' +
-        'turbolinks:load.',
-      );
-      document.addEventListener('turbolinks:before-cache', reactOnRailsPageUnloaded);
+        'USING TURBOLINKS 5: document added event listeners ' +
+        ' turbolinks:before-visit and turbolinks:load.');
+      document.addEventListener('turbolinks:before-visit', reactOnRailsPageUnloaded);
       document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
     } else {
       debugTurbolinks(
