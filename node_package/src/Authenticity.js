@@ -4,7 +4,7 @@ export default {
 
   authenticityToken() {
     const token: ?HTMLElement = document.querySelector('meta[name="csrf-token"]');
-    if (token && (token instanceof HTMLMetaElement)) {
+    if (token && (token instanceof window.HTMLMetaElement)) {
       return token.content;
     } else {
       return null;
