@@ -3,8 +3,12 @@
 export default {
 
   authenticityToken() {
-    const token: {content?: string} = document.querySelector('meta[name="csrf-token"]');
-    return token ? token.content : null;
+    const token: ?HTMLElement = document.querySelector('meta[name="csrf-token"]');
+    if (token && (token instanceof HTMLMetaElement)) {
+      return token.content;
+    } else {
+      return null;
+    }
   },
 
   authenticityHeaders(otherHeaders: {[id:string]: string} = {}) {
