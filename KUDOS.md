@@ -41,3 +41,6 @@ https://github.com/shakacode/react_on_rails/pull/591#issuecomment-258685925
 
 ### December 12, 2016
 ![2016-12-17_13-23-21](https://cloud.githubusercontent.com/assets/1118459/21290377/1adacdf2-c45c-11e6-97c1-f726ab749b2d.png)
+
+### December 20, 2016
+![2016-12-25_10-02-17](https://cloud.githubusercontent.com/assets/1118459/21472700/70242a1e-ca89-11e6-9522-fb45f7835bbb.png)
