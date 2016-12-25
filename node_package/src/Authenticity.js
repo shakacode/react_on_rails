@@ -6,9 +6,8 @@ export default {
     const token: ?HTMLElement = document.querySelector('meta[name="csrf-token"]');
     if (token && (token instanceof window.HTMLMetaElement)) {
       return token.content;
-    } else {
-      return null;
     }
+    return null;
   },
 
   authenticityHeaders(otherHeaders: {[id:string]: string} = {}) {
