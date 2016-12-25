@@ -2,6 +2,8 @@
 // cd client && npm run build:client
 // Note that Foreman (Procfile.dev) has also been configured to take care of this.
 
+/* eslint-disable comma-dangle */
+
 const webpack = require('webpack');
 const ExtractTextPlugin = require('extract-text-webpack-plugin');
 

@@ -9,6 +9,6 @@ import reducers from '../reducers/reducersIndex';
  */
 export default (props, railsContext) => {
   const combinedReducer = combineReducers(reducers);
-  props.railsContext = railsContext;
-  return applyMiddleware(middleware)(createStore)(combinedReducer, props);
+  const newProps = { ...props, railsContext };
+  return applyMiddleware(middleware)(createStore)(combinedReducer, newProps);
 };

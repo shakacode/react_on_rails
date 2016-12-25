@@ -3,7 +3,7 @@ import { match, RouterContext } from 'react-router';
 
 import routes from '../routes/routes';
 
-export default (props, railsContext) => {
+export default (_props, railsContext) => {
   let error;
   let redirectLocation;
   let routeProps;

@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 
-export default (props, railsContext, domNodeId) => {
+export default (_props, _railsContext, domNodeId) => {
   const reactElement = (
     <div>
       <h1>Manual Render Example</h1>

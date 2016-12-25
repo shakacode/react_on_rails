@@ -19,10 +19,6 @@ namespace :docker do
     sh "docker-compose run lint rake lint:eslint"
   end
 
-  desc "Run jscs linter from docker"
-  task :jscs do
-    sh "docker-compose run lint rake lint:jscs"
-  end
   desc "Run all linting from docker"
   task :lint do
     sh "docker-compose run lint rake lint"

@@ -17,13 +17,13 @@ export default class HelloWorldRedux extends React.Component {
     this.handleChange = this.handleChange.bind(this);
   }
 
+  setNameDomRef(nameDomNode) {
+    this.nameDomRef = nameDomNode;
+  }
+
   handleChange() {
     const name = this.nameDomRef.value;
     this.props.actions.updateName(name);
-  }
-
-  setNameDomRef(nameDomNode) {
-    this.nameDomRef = nameDomNode;
   }
 
   render() {

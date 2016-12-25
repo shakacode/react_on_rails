@@ -3,6 +3,7 @@
 /* eslint-disable react/prefer-stateless-function */
 /* eslint-disable react/jsx-filename-extension */
 /* eslint-disable no-unused-vars */
+/* eslint-disable import/extensions */
 
 import test from 'tape';
 import React from 'react';

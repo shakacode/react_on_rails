@@ -12,8 +12,6 @@ class HelloWorld extends React.Component {
       name: PropTypes.string,
     }).isRequired,
     railsContext: PropTypes.object,
-
-    error: PropTypes.any,
   };
 
   // Not necessary if we only call super, but we'll need to initialize state, etc.
@@ -24,13 +22,13 @@ class HelloWorld extends React.Component {
     this.handleChange = this.handleChange.bind(this);
   }
 
+  setNameDomRef(nameDomNode) {
+    this.nameDomRef = nameDomNode;
+  }
+
   handleChange() {
     const name = this.nameDomRef.value;
     this.setState({ name });
-  }
-
-  setNameDomRef(nameDomNode) {
-    this.nameDomRef = nameDomNode;
   }
 
   render() {

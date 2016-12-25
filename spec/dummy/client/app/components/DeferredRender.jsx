@@ -5,7 +5,7 @@ const DeferredRender = ({ children }) => (
   <div>
     <h1>Deferred Rendering</h1>
     <p>
-      Here, we're testing async routes with server rendering.
+      Here, we&apos;re testing async routes with server rendering.
       By deferring the initial render, we can prevent a client/server
       checksum mismatch error.
     </p>
@@ -21,7 +21,7 @@ const DeferredRender = ({ children }) => (
 );
 
 DeferredRender.propTypes = {
-  children: React.PropTypes.object,
+  children: React.PropTypes.node,
 };
 
 export default DeferredRender;

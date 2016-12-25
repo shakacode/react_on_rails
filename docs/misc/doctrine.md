@@ -44,7 +44,7 @@ Here's the chef's selection from the React on Rails community:
 
 ### JavaScript Tooling
 * [Babel](https://babeljs.io/): Transpiler for ES6 into ES5 and much more.
-* [EsLint](http://eslint.org/) and [Jsrc](http://jscs.info/): JavaScript linters.
+* [EsLint](http://eslint.org/)
 * [Webpack](http://webpack.github.io/): Generator of deployment assets and provider of hot module reloading.
 
 By having a common set of tools, we can discuss what we should or shouldn't be using. Thus, this takes out the "JavaScript Fatigue" from having too many unclear choices in the JavaScript world.
