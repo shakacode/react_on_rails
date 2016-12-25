@@ -1,4 +1,5 @@
 // Common webpack configuration for server bundle
+/* eslint-disable comma-dangle */
 
 const webpack = require('webpack');
 const path = require('path');

@@ -12,7 +12,7 @@ function renderContextRows(railsContext) {
             {key}:&nbsp;
           </strong></td>
           <td className={className}>{`${value}`}</td>
-        </tr>
+        </tr>,
       );
     }
   }, []);

@@ -12,13 +12,13 @@ const HelloWorldES5 = React.createClass({
     return this.props.helloWorldData;
   },
 
+  setNameDomRef(nameDomNode) {
+    this.nameDomRef = nameDomNode;
+  },
+
   handleChange() {
     const name = this.nameDomRef.value;
     this.setState({ name });
-  },
-
-  setNameDomRef(nameDomNode) {
-    this.nameDomRef = nameDomNode;
   },
 
   render() {

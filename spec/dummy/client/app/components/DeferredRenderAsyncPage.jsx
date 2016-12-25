@@ -5,7 +5,7 @@ const DeferredRenderAsyncPage = () => (
     <p>Noice! It works.</p>
     <p>
       Now, try reloading this page and looking at the developer console.
-      There shouldn't be any client/server mismatch error from React.
+      There shouldn&apos;t be any client/server mismatch error from React.
     </p>
   </div>
 );

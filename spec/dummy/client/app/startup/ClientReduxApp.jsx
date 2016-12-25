@@ -32,5 +32,5 @@ export default (props, railsContext) => {
     <Provider store={store}>
       <HelloWorldContainer />
     </Provider>
-    );
+  );
 };

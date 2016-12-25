@@ -4,7 +4,7 @@ import { match, RouterContext } from 'react-router';
 import DeferredRender from '../components/DeferredRender';
 import DeferredRenderAsyncPage from '../components/DeferredRenderAsyncPage';
 
-const DeferredRenderAppServer = (props, railsContext) => {
+const DeferredRenderAppServer = (_props, railsContext) => {
   let error;
   let redirectLocation;
   let routerProps;
