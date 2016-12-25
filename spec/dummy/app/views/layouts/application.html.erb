@@ -3,6 +3,8 @@
 <head>
   <title>Dummy</title>
 
+  <%= yield :head %>
+
   <%= env_stylesheet_link_tag(static: 'application_static',
                               hot: 'application_non_webpack',
                               media: 'all',

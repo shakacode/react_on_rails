@@ -6,6 +6,9 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 *Please add entries here for your pull requests.*
 
+## [6.3.3] - 2016-12-25
+- By using the hook on `turbolinks:before-visit` to unmount the components, we can ensure that components are unmounted even when Turbolinks cache is disabled. Previously, we used `turbolinks:before-cache` event hook. [#644](https://github.com/shakacode/react_on_rails/pull/644) by [volkanunsal](https://github.com/volkanunsal).
+
 ## [6.3.2] - 2016-12-5
 ##### Fixed
 - The `react_component` method was raising a `NameError` when `ReactOnRailsHelper` was included in a plain object. [#636](https://github.com/shakacode/react_on_rails/pull/636) by [jtibbertsma](https://github.com/jtibbertsma).
@@ -404,7 +407,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.3.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.3.3...master
+[6.3.3]: https://github.com/shakacode/react_on_rails/compare/6.3.2...6.3.3
 [6.3.2]: https://github.com/shakacode/react_on_rails/compare/6.3.1...6.3.2
 [6.3.1]: https://github.com/shakacode/react_on_rails/compare/6.3.0...6.3.1
 [6.3.0]: https://github.com/shakacode/react_on_rails/compare/6.2.1...6.3.0
