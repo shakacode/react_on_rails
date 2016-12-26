@@ -3,6 +3,9 @@ sudo: required
 language: ruby
 
 rvm:
+  - 2.0.0
+  - 2.1.10
+  - 2.2.6
   - 2.3.1
 
 services:
@@ -33,6 +36,7 @@ before_install:
 install:
   - nvm install node
   - node -v
+  - npm install -g npm@3.10.7
   - npm config set spin false
   - npm install
   - bundle install

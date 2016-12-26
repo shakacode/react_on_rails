@@ -7,7 +7,9 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 *Please add entries here for your pull requests.*
 
 ## [6.3.3] - 2016-12-25
+##### Changed
 - By using the hook on `turbolinks:before-visit` to unmount the components, we can ensure that components are unmounted even when Turbolinks cache is disabled. Previously, we used `turbolinks:before-cache` event hook. [#644](https://github.com/shakacode/react_on_rails/pull/644) by [volkanunsal](https://github.com/volkanunsal).
+- Added support for Ruby 2.0 [#651](https://github.com/shakacode/react_on_rails/pull/651) by [bbonamin](https://github.com/bbonamin).
 
 ## [6.3.2] - 2016-12-5
 ##### Fixed

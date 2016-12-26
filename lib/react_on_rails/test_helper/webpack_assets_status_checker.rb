@@ -1,15 +1,21 @@
 require "rake"
 require "fileutils"
+require "react_on_rails/utils"
 
 # You can replace this implementation with your own for use by the
 # ReactOnRails::TestHelper.ensure_assets_compiled helper
 module ReactOnRails
   module TestHelper
     class WebpackAssetsStatusChecker
+      include Utils::Required
       # client_dir is typically /client, where all client files go
       attr_reader :client_dir, :generated_assets_dir
 
-      def initialize(generated_assets_dir:, client_dir:, webpack_generated_files:)
+      def initialize(
+        generated_assets_dir: required("generated_assets_dir"),
+        client_dir: required("client_dir"),
+        webpack_generated_files: required("webpack_generated_files")
+      )
         @generated_assets_dir = generated_assets_dir
         @client_dir = client_dir
         @webpack_generated_files = webpack_generated_files
