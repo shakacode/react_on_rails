@@ -6,11 +6,14 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 *Please add entries here for your pull requests.*
 
+## [6.3.4] - 2016-12-25
+##### Fixed
+- Disable Turbolinks support when not supported. [#650](https://github.com/shakacode/react_on_rails/pull/650) by [ka2n](https://github.com/ka2n).
+
 ## [6.3.3] - 2016-12-25
-##### Changed
+##### Fixed
 - By using the hook on `turbolinks:before-visit` to unmount the components, we can ensure that components are unmounted even when Turbolinks cache is disabled. Previously, we used `turbolinks:before-cache` event hook. [#644](https://github.com/shakacode/react_on_rails/pull/644) by [volkanunsal](https://github.com/volkanunsal).
 - Added support for Ruby 2.0 [#651](https://github.com/shakacode/react_on_rails/pull/651) by [bbonamin](https://github.com/bbonamin).
-- Disable Turbolinks support when not supported. [#650](https://github.com/shakacode/react_on_rails/pull/650) by [ka2n](https://github.com/ka2n).
 
 ## [6.3.2] - 2016-12-5
 ##### Fixed
@@ -410,7 +413,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.3.3...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.3.4...master
+[6.3.4]: https://github.com/shakacode/react_on_rails/compare/6.3.3...6.3.4
 [6.3.3]: https://github.com/shakacode/react_on_rails/compare/6.3.2...6.3.3
 [6.3.2]: https://github.com/shakacode/react_on_rails/compare/6.3.1...6.3.2
 [6.3.1]: https://github.com/shakacode/react_on_rails/compare/6.3.0...6.3.1
