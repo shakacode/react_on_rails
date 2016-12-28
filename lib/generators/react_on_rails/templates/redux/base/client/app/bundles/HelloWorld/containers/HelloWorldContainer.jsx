@@ -1,3 +1,5 @@
+// Simple example of a React "smart" component
+
 import { connect } from 'react-redux';
 import HelloWorld from '../components/HelloWorld';
 import * as actions from '../actions/helloWorldActionCreators';
