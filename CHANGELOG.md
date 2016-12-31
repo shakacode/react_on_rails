@@ -6,6 +6,9 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 *Please add entries here for your pull requests.*
 
+##### Changed
+- Automatically generate __i18n__ javascript files for `react-intl` when the serve starts up. [#642](https://github.com/shakacode/react_on_rails/pull/642) by [JasonYCHuang](https://github.com/JasonYCHuang).
+
 ## [6.3.4] - 2016-12-25
 ##### Fixed
 - Disable Turbolinks support when not supported. [#650](https://github.com/shakacode/react_on_rails/pull/650) by [ka2n](https://github.com/ka2n).

@@ -50,6 +50,7 @@ React on Rails integrates Facebook's [React](https://github.com/facebook/react) 
     - [Installation Summary](#installation-summary)
     - [Initializer Configuration: config/initializers/react_on_rails.rb](#initializer-configuration)
     - [Including your React Component in your Rails Views](#including-your-react-component-in-your-rails-views)
+    - [I18n](#i18n)
 + [How it Works](#how-it-works)
     - [Client-Side Rendering vs. Server-Side Rendering](#client-side-rendering-vs-server-side-rendering)
     - [Building the Bundles](#building-the-bundles)
@@ -168,7 +169,104 @@ Configure the `config/initializers/react_on_rails.rb`. You can adjust some neces
     // inside your React component
     this.props.name // "Stranger"
   ```
-  
+
+### I18n
+
+You can enable the i18n functionality with [react-intl](https://github.com/yahoo/react-intl). ReactOnRails also converts traditional Rails locale files, `*.yml`, to required javascript files, `translations.js` & `default.js`, automatically.
+
+For more detail, you can refer to [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)
+
+1. Add `react-intl` to `client/package.json`, and remember to `bundle && npm install`
+
+  ```js
+  "dependencies": {
+    ...
+    "intl": "^1.2.5",
+    "react-intl": "^2.1.5",
+    ...
+  }
+  ```
+
+2. In `client/webpack.client.base.config.js`, set `react-intl` as an entry point.
+
+  ```js
+  module.exports = {
+    ...
+    entry: {
+      ...
+      vendor: [
+        ...
+        'react-intl',
+      ],
+      ...
+  ```
+
+3. ReactOnRails uses locale files as you did before in Rails: `config/locales/*.yml`. Therefore, you don't need to create additional local files.
+
+4. Update settings in `config/initializers/react_on_rails.rb` to what you need:
+
+  ```ruby
+  # Replace the following line to the location where you keep translation.js & default.js.
+  config.i18n_dir = Rails.root.join("PATH_TO", "YOUR_JS_I18N_FOLDER")
+  # Default locale
+  config.default_locale = "en"
+  # The location of rails locales
+  config.rails_locales_path = Rails.application.config.i18n.load_path
+  ```
+
+5. Add following lines to `config/application.rb`, this will help you to generate `translations.js` & `default.js` automatically when you starts the server.
+
+  ```js
+  module YourModule
+    class Application < Rails::Application
+      ...
+      config.after_initialize do
+        ReactOnRails::LocalesToJs.new.convert
+      end
+    end
+  end
+  ```
+
+6. In React, you need to initialize `react-intl`, and set parameters for it.
+
+  For more detail, you can refer to [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)
+
+  > `translations.js`: All your locales in json format.
+  >
+  > `default.js`: [1] `defaultLocale` is your default locale, like "en". [2] `defaultMessages` is the place where you can get your local values with localeKeyInCamelForm, and it also contains fallback when something went wrong.
+  >
+  > There is no need to track and lint `translations.js` & `default.js`, and you can add them to `.gitignore` and `.eslintignore`.
+
+  ```js
+  ...
+  import { addLocaleData } from 'react-intl';
+  import en from 'react-intl/locale-data/en';
+  import de from 'react-intl/locale-data/de';
+  import { translations } from 'path_to/i18n/translations';
+  import { defaultLocale } from 'path_to/i18n/default';
+  ...
+  // Initizalize all locales for react-intl.
+  addLocaleData([...en, ...de]);
+  ...
+  // set locale and messages for IntlProvider.
+  const locale = method_to_get_current_locale() || defaultLocale;
+  const messages = translations[locale];
+  ...
+  return (
+    <IntlProvider locale={locale} key={locale} messages={messages}>
+      <CommentScreen {...{ actions, data }} />
+    </IntlProvider>
+  )
+  ```
+  ```js
+  // In your component.
+  import { defaultMessages } from 'path_to/i18n/default';
+  ...
+  return (
+    { formatMessage(defaultMessages.yourLocaleKeyInCamelCase) }
+  )
+  ```
+
 ## NPM
 All JavaScript in React On Rails is loaded from npm: [react-on-rails](https://www.npmjs.com/package/react-on-rails). To manually install this (you did not use the generator), assuming you have a standard configuration, run this command:
 
@@ -241,11 +339,6 @@ The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](a
     pathname: uri.path, # /posts
     search: uri.query, # id=30&limit=5
 
-    # Locale settings
-    i18nLocale: I18n.locale,
-    i18nDefaultLocale: I18n.default_locale,
-    httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"],
-
     # Other
     serverSide: boolean # Are we being called on the server or client? NOTE, if you conditionally
      # render something different on the server than the client, then React will only show the
@@ -256,9 +349,6 @@ The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](a
 #### Use Cases
 ##### Needing the current url path for server rendering
 Suppose you want to display a nav bar with the current navigation link highlighted by the URL. When you server render the code, you will need to know the current URL/path if that is what you want your logic to be based on. The new `railsContext` has this information so the application of an "active" class can be done server side.
-
-##### Needing the I18n.locale
-Suppose you want to server render your react components with localization applied given the current Rails locale. The `railsContext` contains the I18n.locale.
 
 ##### Configuring different code for server side rendering
 Suppose you want to turn off animation when doing server side rendering. The `serverSide` value is just what you need.
