@@ -50,6 +50,7 @@ React on Rails integrates Facebook's [React](https://github.com/facebook/react) 
     - [Installation Summary](#installation-summary)
     - [Initializer Configuration: config/initializers/react_on_rails.rb](#initializer-configuration)
     - [Including your React Component in your Rails Views](#including-your-react-component-in-your-rails-views)
+    - [I18n](#i18n)
 + [How it Works](#how-it-works)
     - [Client-Side Rendering vs. Server-Side Rendering](#client-side-rendering-vs-server-side-rendering)
     - [Building the Bundles](#building-the-bundles)
@@ -170,7 +171,15 @@ Configure the `config/initializers/react_on_rails.rb`. You can adjust some neces
     // inside your React component
     this.props.name // "Stranger"
   ```
-  
+
+### I18n
+
+You can enable the i18n functionality with [react-intl](https://github.com/yahoo/react-intl).
+
+React on Rails provides an option for automatic conversions of Rails `*.yml` locale files into `*.js` files for `react-intl`.
+
+See the [How to add I18n](docs/basics/i18n.md) for a summary of adding I18n.
+
 ## NPM
 All JavaScript in React On Rails is loaded from npm: [react-on-rails](https://www.npmjs.com/package/react-on-rails). To manually install this (you did not use the generator), assuming you have a standard configuration, run this command:
 
@@ -245,11 +254,6 @@ The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](a
     pathname: uri.path, # /posts
     search: uri.query, # id=30&limit=5
 
-    # Locale settings
-    i18nLocale: I18n.locale,
-    i18nDefaultLocale: I18n.default_locale,
-    httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"],
-
     # Other
     serverSide: boolean # Are we being called on the server or client? NOTE, if you conditionally
      # render something different on the server than the client, then React will only show the
@@ -260,9 +264,6 @@ The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](a
 #### Use Cases
 ##### Needing the current url path for server rendering
 Suppose you want to display a nav bar with the current navigation link highlighted by the URL. When you server render the code, you will need to know the current URL/path if that is what you want your logic to be based on. The new `railsContext` has this information so the application of an "active" class can be done server side.
-
-##### Needing the I18n.locale
-Suppose you want to server render your react components with localization applied given the current Rails locale. The `railsContext` contains the I18n.locale.
 
 ##### Configuring different code for server side rendering
 Suppose you want to turn off animation when doing server side rendering. The `serverSide` value is just what you need.
