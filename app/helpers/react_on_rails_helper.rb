@@ -175,7 +175,7 @@ module ReactOnRailsHelper
   end
 
   def sanitized_props_string(props)
-    props.is_a?(String) ? json_escape(props) : props.to_json
+    props.is_a?(String) ? ERB::Util.json_escape(props) : props.to_json
   end
 
   # Helper method to take javascript expression and returns the output from evaluating it.
@@ -228,9 +228,9 @@ module ReactOnRailsHelper
 
   def json_safe_and_pretty(something)
     if defined?(Rails) && Rails.env.development?
-      json_escape(JSON.pretty_generate(something.as_json))
+      ERB::Util.json_escape(JSON.pretty_generate(something.as_json))
     else
-      json_escape(something.to_json)
+      ERB::Util.json_escape(something.to_json)
     end
   end
 
