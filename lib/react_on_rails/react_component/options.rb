@@ -48,6 +48,7 @@ module ReactOnRails
       def data
         {
           component_name: name,
+          props: props,
           trace: trace,
           dom_id: dom_id
         }
