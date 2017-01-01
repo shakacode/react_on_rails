@@ -161,7 +161,7 @@ spec/dummy.
 # Optionally change default selenium_firefox driver
 export DRIVER=poltergeist
 cd <top level>
-npm dummy:spec
+npm run dummy:spec
 ```
 
 ### Run NPM JS tests
