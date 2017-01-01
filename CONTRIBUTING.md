@@ -86,7 +86,7 @@ npm install --save "react-on-rails@../../react_on_rails"
 
 When you use a relative path, be sure to run the above `npm install` command whenever you change the node package for react-on-rails.
 
-Wihle we'd prefer to us `npm link`, we get errors. If you can figure out how to get `npm link react-on-rails` to work with this project, please file an issue or PR! This used to work with babel 5.
+While we'd prefer to use `npm link`, we get errors. If you can figure out how to get `npm link react-on-rails` to work with this project, please file an issue or PR! This used to work with babel 5.
 
 This is the error:
 
@@ -141,6 +141,7 @@ From now on, the example and dummy apps will use your local node_package folder 
   resolve: {
     alias: {
       react: path.resolve('./node_modules/react'),
+      'react-dom': path.resolve('./node_modules/react-dom'),
     },
   },
 ```
