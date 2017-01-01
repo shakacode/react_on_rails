@@ -9,6 +9,7 @@
 /tmp/
 *.gem
 /vendor/
+*~
 
 /spec/examples.txt
 /spec/dummy/client/node_modules
