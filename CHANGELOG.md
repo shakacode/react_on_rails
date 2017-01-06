@@ -6,6 +6,10 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 *Please add entries here for your pull requests.*
 
+## [6.3.5] - 2016-1-6
+### Fixed
+- The redux generator now creates a HelloWorld component that uses redux rather than local state. [#669](https://github.com/shakacode/react_on_rails/issues/669) by [justin808](https://github.com/justin808).
+
 ## [6.3.4] - 2016-12-25
 ##### Fixed
 - Disable Turbolinks support when not supported. [#650](https://github.com/shakacode/react_on_rails/pull/650) by [ka2n](https://github.com/ka2n).
@@ -413,7 +417,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.3.4...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.3.5...master
+[6.3.5]: https://github.com/shakacode/react_on_rails/compare/6.3.4...6.3.5
 [6.3.4]: https://github.com/shakacode/react_on_rails/compare/6.3.3...6.3.4
 [6.3.3]: https://github.com/shakacode/react_on_rails/compare/6.3.2...6.3.3
 [6.3.2]: https://github.com/shakacode/react_on_rails/compare/6.3.1...6.3.2

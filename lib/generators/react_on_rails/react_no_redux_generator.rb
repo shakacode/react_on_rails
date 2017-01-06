@@ -8,6 +8,12 @@ module ReactOnRails
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates", __FILE__))
 
+      def copy_base_files
+        base_path = "base/base/"
+        base_files = %w(client/app/bundles/HelloWorld/components/HelloWorld.jsx)
+        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
+      end
+
       def create_appropriate_templates
         base_path = "base/base/"
         location = "client/app/bundles/HelloWorld/"
