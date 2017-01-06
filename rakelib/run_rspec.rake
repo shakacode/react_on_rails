@@ -1,4 +1,7 @@
-require "coveralls/rake/task"
+if ENV["USE_COVERALLS"] == "TRUE"
+  require "coveralls/rake/task"
+end
+
 require "pathname"
 
 require_relative "task_helpers"
@@ -54,7 +57,9 @@ namespace :run_rspec do
     sh %(COVERAGE=true rspec spec/empty_spec.rb)
   end
 
-  Coveralls::RakeTask.new
+  if ENV["USE_COVERALLS"] == "TRUE"
+    Coveralls::RakeTask.new
+  end
 
   desc "run all tests no examples"
   task all_but_examples: [:gem, :dummy, :dummy_no_turbolinks, :dummy_turbolinks_5, :empty, :js_tests] do

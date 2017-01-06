@@ -13,7 +13,8 @@ module ReactOnRails
 
       def copy_base_redux_files
         base_path = "redux/base/"
-        %w(client/app/bundles/HelloWorld/actions/helloWorldActionCreators.jsx
+        %w(client/app/bundles/HelloWorld/components/HelloWorld.jsx
+           client/app/bundles/HelloWorld/actions/helloWorldActionCreators.jsx
            client/app/bundles/HelloWorld/containers/HelloWorldContainer.jsx
            client/app/bundles/HelloWorld/constants/helloWorldConstants.jsx
            client/app/bundles/HelloWorld/reducers/helloWorldReducer.jsx

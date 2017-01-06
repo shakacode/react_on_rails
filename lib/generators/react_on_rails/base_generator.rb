@@ -65,7 +65,6 @@ module ReactOnRails
       def copy_base_files
         base_path = "base/base/"
         base_files = %w(app/controllers/hello_world_controller.rb
-                        client/app/bundles/HelloWorld/components/HelloWorld.jsx
                         client/.babelrc
                         client/webpack.config.js
                         client/REACT_ON_RAILS_CLIENT_README.md)

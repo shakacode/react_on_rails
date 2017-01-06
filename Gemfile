@@ -25,7 +25,7 @@ gem "mini_racer"
 if ENV["ENABLE_TURBOLINKS_5"].nil? || ENV["ENABLE_TURBOLINKS_5"].strip.empty?
   gem "turbolinks", "2.5.3"
 else
-  gem "turbolinks", "~> 5.0.0.beta"
+  gem "turbolinks", "~> 5.0"
 end
 gem "uglifier", ">= 2.7.2"
 gem "web-console", "~> 2.0", group: :development

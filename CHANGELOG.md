@@ -4,7 +4,21 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+<<<<<<< HEAD
+##### Fixed
+- Added checking of OS and fixed generator for Windows.
+=======
 *Please add entries here for your pull requests.*
+### Fixed
+- Removed foreman as a dependency. [#678](https://github.com/shakacode/react_on_rails/pull/678) by [x2es](https://github.com/x2es).
+>>>>>>> a97e209... Update CHANGELOG.md
+
+### Added
+- Automatically generate __i18n__ javascript files for `react-intl` when the serve starts up. [#642](https://github.com/shakacode/react_on_rails/pull/642) by [JasonYCHuang](https://github.com/JasonYCHuang).
+
+## [6.3.5] - 2017-1-6
+### Fixed
+- The redux generator now creates a HelloWorld component that uses redux rather than local state. [#669](https://github.com/shakacode/react_on_rails/issues/669) by [justin808](https://github.com/justin808).
 
 ## [6.3.4] - 2016-12-25
 ##### Fixed
@@ -413,7 +427,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.3.4...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.3.5...master
+[6.3.5]: https://github.com/shakacode/react_on_rails/compare/6.3.4...6.3.5
 [6.3.4]: https://github.com/shakacode/react_on_rails/compare/6.3.3...6.3.4
 [6.3.3]: https://github.com/shakacode/react_on_rails/compare/6.3.2...6.3.3
 [6.3.2]: https://github.com/shakacode/react_on_rails/compare/6.3.1...6.3.2
