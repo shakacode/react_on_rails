@@ -25,6 +25,7 @@ env:
     - DRIVER=selenium_chrome
     - CHROME_BIN=/usr/bin/google-chrome
     - ENABLE_TURBOLINKS_5=TRUE
+    - USE_COVERALLS=TRUE
 
 before_install:
   - sudo apt-get update

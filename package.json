@@ -24,7 +24,7 @@
     "eslint": "^3.12.2",
     "eslint-config-shakacode": "^13.2.1",
     "eslint-plugin-import": "^2.2.0",
-    "eslint-plugin-jsx-a11y": "^2.2.3",
+    "eslint-plugin-jsx-a11y": "^3.0.2",
     "eslint-plugin-react": "^6.8.0",
     "flow-bin": "^0.37.4",
     "jsdom": "^9.9.1",
@@ -32,7 +32,7 @@
     "react-dom": "^15.4.1",
     "react-transform-hmr": "^1.0.4",
     "redux": "^3.6.0",
-    "release-it": "^2.5.2",
+    "release-it": "^2.5.3",
     "tap-spec": "^4.1.1",
     "tape": "^4.6.3",
     "webpack": "^1.14.0"
