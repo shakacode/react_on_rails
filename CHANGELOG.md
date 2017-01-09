@@ -3,8 +3,10 @@ All notable changes to this project's source code will be documented in this fil
 
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
-## [Unreleased]
-*Please add entries here for your pull requests.*
+## [6.3.3] - 2016-12-6
+### Fixed
+- The redux generator was creating a HelloWorld component that was not synced with 
+the redux state. [#653](https://github.com/shakacode/react_on_rails/issues/653)
 
 ## [6.3.5] - 2016-1-6
 ### Fixed
