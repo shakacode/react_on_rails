@@ -120,6 +120,12 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
 
 6. Start your Rails server:
 
+  Install foreman
+
+  ```bash
+  gem install foreman
+  ```
+
   ```bash
   foreman start -f Procfile.dev
   ```
