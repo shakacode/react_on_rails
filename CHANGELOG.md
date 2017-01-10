@@ -5,6 +5,8 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 *Please add entries here for your pull requests.*
+### Fixed
+- Removed foreman as a dependency. [#678](https://github.com/shakacode/react_on_rails/pull/678) by [x2es](https://github.com/x2es).
 
 ## [6.3.5] - 2017-1-6
 ### Fixed
