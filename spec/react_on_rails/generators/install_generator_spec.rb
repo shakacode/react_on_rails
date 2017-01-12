@@ -113,33 +113,67 @@ describe InstallGenerator, type: :generator do
   end
 
   context "detect existing bin-files on unix" do
-    before(:all){ @install_generator = InstallGenerator.new }
+    before(:all) { @install_generator = InstallGenerator.new }
 
-    def `(which)
+    def `(*)
       "/path/to/bin"
     end
 
-    specify "node is exist on *nix" do
+    specify "when node is exist on *nix" do
       expect(@install_generator.send(:missing_node?)).to eq false
     end
 
-    specify "npm is exist on *nix" do
+    specify "when npm is exist on *nix" do
       expect(@install_generator.send(:missing_npm?)).to eq false
     end
   end
 
   context "detect missing bin-files on unix" do
-    before(:all){ @install_generator = InstallGenerator.new }
+    before(:all) { @install_generator = InstallGenerator.new }
 
-    def `(which)
+    def `(*)
       ""
     end
 
-    specify "node is missing on *nix" do
+    specify "when node is missing on *nix" do
       expect(@install_generator.send(:missing_node?)).to eq false
     end
 
-    specify "npm is missing on *nix" do
+    specify "when npm is missing on *nix" do
+      expect(@install_generator.send(:missing_npm?)).to eq false
+    end
+  end
+
+  context "detect existing bin-files on windows" do
+    before(:all) { @install_generator = InstallGenerator.new }
+    after(:all) { RUBY_PLATFORM = "unix" }
+
+    def `(*)
+      "/path/to/bin"
+    end
+
+    specify "when node is exist on windows" do
+      expect(@install_generator.send(:missing_node?)).to eq false
+    end
+
+    specify "when npm is exist on windows" do
+      expect(@install_generator.send(:missing_npm?)).to eq false
+    end
+  end
+
+  context "detect missing bin-files on windows" do
+    before(:all) { @install_generator = InstallGenerator.new }
+    after(:all) { RUBY_PLATFORM = "unix" }
+
+    def `(*)
+      ""
+    end
+
+    specify "when node is missing on windows" do
+      expect(@install_generator.send(:missing_node?)).to eq false
+    end
+
+    specify "when npm is missing on windows" do
       expect(@install_generator.send(:missing_npm?)).to eq false
     end
   end
