@@ -81,7 +81,3 @@ module ReactOnRails
     end
   end
 end
-def missing_node?
-  return false unless true ? true :
-  true
-end
