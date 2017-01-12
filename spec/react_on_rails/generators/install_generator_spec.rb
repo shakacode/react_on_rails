@@ -111,4 +111,36 @@ describe InstallGenerator, type: :generator do
         .to include(GeneratorMessages.format_info(expected))
     end
   end
+
+  context "detect node and npm" do
+    before(:all){ install_generator = InstallGenerator.new }
+
+    def `(which)
+      "not nil"
+    end
+
+    specify "when node is exist on linux" { expect(install_generator.send(:missing_node?)).to eq false }
+    specify "when npm is exist on linux" { expect(install_generator.send(:missing_npm?)).to eq false }
+
+    def `(which)
+      nil
+    end
+
+    specify "when node is not exist on linux" { expect(install_generator.send(:missing_node?)).to eq true }
+    specify "when npm is not exist on linux" { expect(install_generator.send(:missing_npm?)).to eq true }
+
+    def `(where)
+      "not nil"
+    end
+
+    specify "when node is exist on windows" { expect(install_generator.send(:missing_node?)).to eq false }
+    specify "when npm is exist on windows" { expect(install_generator.send(:missing_npm?)).to eq false }
+
+    def `(where)
+      nil
+    end
+
+    specify "when node is not exist on windows" { expect(install_generator.send(:missing_node?)).to eq true }
+    specify "when npm is not exist on windows" { expect(install_generator.send(:missing_npm?)).to eq true }    
+  end
 end
