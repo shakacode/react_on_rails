@@ -64,7 +64,7 @@ module ReactOnRails
       end
 
       def missing_npm?
-        return false unless ReactOnRails::Utils::OS.windows? ? `where npm`.blank? : `which npm`.blank?
+        return false unless ReactOnRails::Utils::OS.windows? ? `where npm`.empty? : `which npm`.empty?
         error = "npm is required. Please install it before continuing. "
         error << "https://www.npmjs.com/"
         GeneratorMessages.add_error(error)
