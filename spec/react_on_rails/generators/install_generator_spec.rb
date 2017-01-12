@@ -115,7 +115,7 @@ describe InstallGenerator, type: :generator do
   context "detect existing bin-files on unix" do
     before(:all) { @install_generator = InstallGenerator.new }
 
-    def `(*)
+    def `(which)
       "/path/to/bin"
     end
 
@@ -131,7 +131,7 @@ describe InstallGenerator, type: :generator do
   context "detect missing bin-files on unix" do
     before(:all) { @install_generator = InstallGenerator.new }
 
-    def `(*)
+    def `(which)
       ""
     end
 
@@ -145,10 +145,12 @@ describe InstallGenerator, type: :generator do
   end
 
   context "detect existing bin-files on windows" do
-    before(:all) { @install_generator = InstallGenerator.new }
-    after(:all) { RUBY_PLATFORM = "unix" }
+    before(:all) do
+       @install_generator = InstallGenerator.new
+       stub_const("RUBY_PLATFORM", "mingw")
+    end
 
-    def `(*)
+    def `(where)
       "/path/to/bin"
     end
 
@@ -162,10 +164,12 @@ describe InstallGenerator, type: :generator do
   end
 
   context "detect missing bin-files on windows" do
-    before(:all) { @install_generator = InstallGenerator.new }
-    after(:all) { RUBY_PLATFORM = "unix" }
+    before(:all) do
+       @install_generator = InstallGenerator.new
+       stub_const("RUBY_PLATFORM", "mingw")
+    end
 
-    def `(*)
+    def `(where)
       ""
     end
 
