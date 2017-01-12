@@ -116,7 +116,7 @@ describe InstallGenerator, type: :generator do
     before(:all){ @install_generator = InstallGenerator.new }
 
     def `(which)
-      "not nil"
+      "Not empty string"
     end
 
     specify "when node is exist on *nix" do
@@ -128,7 +128,7 @@ describe InstallGenerator, type: :generator do
     end
 
     def `(which)
-      nil
+      ""
     end
 
     specify "when node is not exist on *nix" do
@@ -142,7 +142,7 @@ describe InstallGenerator, type: :generator do
     RUBY_PLATFORM = "mingw"
 
     def `(where)
-      "not nil"
+      "Not empty string"
     end
 
     specify "when node is exist on windows" do
@@ -154,7 +154,7 @@ describe InstallGenerator, type: :generator do
     end
 
     def `(where)
-      nil
+      ""
     end
 
     specify "when node is not exist on windows" do
