@@ -72,7 +72,7 @@ module ReactOnRails
       end
 
       def missing_node?
-        return false unless ReactOnRails::Utils::OS.windows? ? `where node`.blank? : `which node`.blank?
+        return false unless ReactOnRails::Utils::OS.windows? ? `where node`.empty? : `which node`.empty?
         error = "** nodejs is required. Please install it before continuing. "
         error << "https://nodejs.org/en/"
         GeneratorMessages.add_error(error)
@@ -80,4 +80,8 @@ module ReactOnRails
       end
     end
   end
+end
+def missing_node?
+  return false unless true ? true :
+  true
 end
