@@ -4,17 +4,27 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
-<<<<<<< HEAD
 ##### Fixed
 - Added checking of OS and fixed generator for Windows.
 =======
 *Please add entries here for your pull requests.*
 ### Fixed
 - Removed foreman as a dependency. [#678](https://github.com/shakacode/react_on_rails/pull/678) by [x2es](https://github.com/x2es).
->>>>>>> a97e209... Update CHANGELOG.md
+
+=======
+
+*Please add entries here for your pull requests.*
+### Fixed
+- Removed foreman as a dependency. [#678](https://github.com/shakacode/react_on_rails/pull/678) by [x2es](https://github.com/x2es).
+- Added checking of OS and fixed generator for Windows.
+
 
 ### Added
 - Automatically generate __i18n__ javascript files for `react-intl` when the serve starts up. [#642](https://github.com/shakacode/react_on_rails/pull/642) by [JasonYCHuang](https://github.com/JasonYCHuang).
+
+
+=======
+
 
 ## [6.3.5] - 2017-1-6
 ### Fixed
