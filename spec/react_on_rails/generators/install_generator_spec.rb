@@ -119,11 +119,11 @@ describe InstallGenerator, type: :generator do
       "not nil"
     end
 
-    specify "when node is exist on linux" do
+    specify "when node is exist on *nix" do
        expect(@install_generator.send(:missing_node?)).to eq false
     end
 
-    specify "when npm is exist on linux" do
+    specify "when npm is exist on *nix" do
       expect(@install_generator.send(:missing_npm?)).to eq false
     end
 
@@ -131,13 +131,15 @@ describe InstallGenerator, type: :generator do
       nil
     end
 
-    specify "when node is not exist on linux" do
+    specify "when node is not exist on *nix" do
       expect(@install_generator.send(:missing_node?)).to eq true
     end
 
-    specify "when npm is not exist on linux" do
+    specify "when npm is not exist on *nix" do
       expect(install_generator.send(:missing_npm?)).to eq true
     end
+
+    RUBY_PLATFORM = "mingw"
 
     def `(where)
       "not nil"
