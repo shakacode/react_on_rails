@@ -129,7 +129,7 @@ describe InstallGenerator, type: :generator do
     end
 
     def `(which)
-      "Not empty string"
+      "/path/to/bin"
     end
 
     specify "when node is exist on *nix" do
@@ -155,7 +155,7 @@ describe InstallGenerator, type: :generator do
     end
 
     def `(where)
-      "Not empty string"
+      "/path/to/bin"
     end
 
     specify "when node is exist on windows" do
