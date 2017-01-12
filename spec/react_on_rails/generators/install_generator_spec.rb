@@ -116,6 +116,18 @@ describe InstallGenerator, type: :generator do
     before(:all){ @install_generator = InstallGenerator.new }
 
     def `(which)
+      ""
+    end
+
+    specify "when node is not exist on *nix" do
+      expect(@install_generator.send(:missing_node?)).to eq true
+    end
+
+    specify "when npm is not exist on *nix" do
+      expect(@install_generator.send(:missing_npm?)).to eq true
+    end
+
+    def `(which)
       "Not empty string"
     end
 
@@ -127,31 +139,7 @@ describe InstallGenerator, type: :generator do
       expect(@install_generator.send(:missing_npm?)).to eq false
     end
 
-    def `(which)
-      ""
-    end
-
-    specify "when node is not exist on *nix" do
-      expect(@install_generator.send(:missing_node?)).to eq true
-    end
-
-    specify "when npm is not exist on *nix" do
-      expect(install_generator.send(:missing_npm?)).to eq true
-    end
-
     RUBY_PLATFORM = "mingw"
-
-    def `(where)
-      "Not empty string"
-    end
-
-    specify "when node is exist on windows" do
-      expect(@install_generator.send(:missing_node?)).to eq false
-    end
-
-    specify "when npm is exist on windows" do
-      expect(@install_generator.send(:missing_npm?)).to eq false
-    end
 
     def `(where)
       ""
@@ -163,6 +151,18 @@ describe InstallGenerator, type: :generator do
 
     specify "when npm is not exist on windows" do
       expect(@install_generator.send(:missing_npm?)).to eq true
+    end
+
+    def `(where)
+      "Not empty string"
+    end
+
+    specify "when node is exist on windows" do
+      expect(@install_generator.send(:missing_node?)).to eq false
+    end
+
+    specify "when npm is exist on windows" do
+      expect(@install_generator.send(:missing_npm?)).to eq false
     end
   end
 end
