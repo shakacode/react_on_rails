@@ -114,6 +114,7 @@ describe InstallGenerator, type: :generator do
 
   context "detect node and npm" do
     before(:all){ @install_generator = InstallGenerator.new }
+    after(:all){RUBY_PLATFORM = "unix"}
 
     def `(which)
       ""
