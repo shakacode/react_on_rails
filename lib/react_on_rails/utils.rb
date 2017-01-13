@@ -20,27 +20,13 @@ module ReactOnRails
                 ReactOnRails.configuration.server_bundle_js_file)
     end
 
+    def self.running_on_windows?
+      (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
+    end
+
     module Required
       def required(arg_name)
         raise ArgumentError, "#{arg_name} is required"
-      end
-    end
-
-    module OS
-      def self.windows?
-        (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
-      end
-
-      def self.mac?
-        (/darwin/ =~ RUBY_PLATFORM) != nil
-      end
-
-      def self.unix?
-        !OS.windows?
-      end
-
-      def self.linux?
-        OS.unix? && !OS.mac?
       end
     end
   end

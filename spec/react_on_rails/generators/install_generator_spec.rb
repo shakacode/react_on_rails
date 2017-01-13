@@ -155,10 +155,12 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "when node is exist on windows" do
+      stub_const("RUBY_PLATFORM", "mingw")
       expect(@install_generator.send(:missing_node?)).to eq false
     end
 
     specify "when npm is exist on windows" do
+      stub_const("RUBY_PLATFORM", "mingw")
       expect(@install_generator.send(:missing_npm?)).to eq false
     end
   end
@@ -166,7 +168,6 @@ describe InstallGenerator, type: :generator do
   context "detect missing bin-files on windows" do
     before(:all) do
        @install_generator = InstallGenerator.new
-       stub_const("RUBY_PLATFORM", "mingw")
     end
 
     def `(where)
@@ -174,10 +175,12 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "when node is missing on windows" do
+      stub_const("RUBY_PLATFORM", "mingw")
       expect(@install_generator.send(:missing_node?)).to eq false
     end
 
     specify "when npm is missing on windows" do
+      stub_const("RUBY_PLATFORM", "mingw")
       expect(@install_generator.send(:missing_npm?)).to eq false
     end
   end
