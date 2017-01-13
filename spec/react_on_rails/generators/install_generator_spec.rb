@@ -120,10 +120,12 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "when node is exist" do
+      stub_const("RUBY_PLATFORM", "linux")
       expect(@install_generator.send(:missing_node?)).to eq false
     end
 
     specify "when npm is exist" do
+      stub_const("RUBY_PLATFORM", "linux")
       expect(@install_generator.send(:missing_npm?)).to eq false
     end
   end
@@ -136,10 +138,12 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "when node is missing" do
+      stub_const("RUBY_PLATFORM", "linux")
       expect(@install_generator.send(:missing_node?)).to eq true
     end
 
     specify "when npm is missing" do
+      stub_const("RUBY_PLATFORM", "linux")
       expect(@install_generator.send(:missing_npm?)).to eq true
     end
   end
