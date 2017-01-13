@@ -136,11 +136,11 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "when node is missing on *nix" do
-      expect(@install_generator.send(:missing_node?)).to eq false
+      expect(@install_generator.send(:missing_node?)).to eq true
     end
 
     specify "when npm is missing on *nix" do
-      expect(@install_generator.send(:missing_npm?)).to eq false
+      expect(@install_generator.send(:missing_npm?)).to eq true
     end
   end
 
@@ -171,12 +171,12 @@ describe InstallGenerator, type: :generator do
 
     specify "when node is missing on windows" do
       stub_const("RUBY_PLATFORM", "win")
-      expect(@install_generator.send(:missing_node?)).to eq false
+      expect(@install_generator.send(:missing_node?)).to eq true
     end
 
     specify "when npm is missing on windows" do
       stub_const("RUBY_PLATFORM", "win")
-      expect(@install_generator.send(:missing_npm?)).to eq false
+      expect(@install_generator.send(:missing_npm?)).to eq true
     end
   end
 end
