@@ -112,34 +112,34 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "detect existing bin-files on unix" do
+  context "detect existing bin-files on *nix" do
     before(:all) { @install_generator = InstallGenerator.new }
 
     def `(which)
       "/path/to/bin"
     end
 
-    specify "when node is exist on *nix" do
+    specify "when node is exist" do
       expect(@install_generator.send(:missing_node?)).to eq false
     end
 
-    specify "when npm is exist on *nix" do
+    specify "when npm is exist" do
       expect(@install_generator.send(:missing_npm?)).to eq false
     end
   end
 
-  context "detect missing bin-files on unix" do
+  context "detect missing bin-files on *nix" do
     before(:all) { @install_generator = InstallGenerator.new }
 
     def `(which)
       ""
     end
 
-    specify "when node is missing on *nix" do
+    specify "when node is missing" do
       expect(@install_generator.send(:missing_node?)).to eq true
     end
 
-    specify "when npm is missing on *nix" do
+    specify "when npm is missing" do
       expect(@install_generator.send(:missing_npm?)).to eq true
     end
   end
@@ -151,12 +151,12 @@ describe InstallGenerator, type: :generator do
       "/path/to/bin"
     end
 
-    specify "when node is exist on windows" do
+    specify "when node is exist" do
       stub_const("RUBY_PLATFORM", "win")
       expect(@install_generator.send(:missing_node?)).to eq false
     end
 
-    specify "when npm is exist on windows" do
+    specify "when npm is exist" do
       stub_const("RUBY_PLATFORM", "win")
       expect(@install_generator.send(:missing_npm?)).to eq false
     end
@@ -169,13 +169,13 @@ describe InstallGenerator, type: :generator do
       ""
     end
 
-    specify "when node is missing on windows" do
-      stub_const("RUBY_PLATFORM", "win")
+    specify "when node is missing" do
+      stub_const("RUBY_PLATFORM", "mswin")
       expect(@install_generator.send(:missing_node?)).to eq true
     end
 
-    specify "when npm is missing on windows" do
-      stub_const("RUBY_PLATFORM", "win")
+    specify "when npm is missing" do
+      stub_const("RUBY_PLATFORM", "mswin")
       expect(@install_generator.send(:missing_npm?)).to eq true
     end
   end
