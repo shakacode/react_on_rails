@@ -5,6 +5,9 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 *Please add entries here for your pull requests.*
+
+## [6.4.0] - 2017-1-12
+
 ### Fixed
 - Removed foreman as a dependency. [#678](https://github.com/shakacode/react_on_rails/pull/678) by [x2es](https://github.com/x2es).
 
@@ -422,7 +425,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.3.5...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.4.0...master
+[6.4.0]: https://github.com/shakacode/react_on_rails/compare/6.3.5...6.4.0
 [6.3.5]: https://github.com/shakacode/react_on_rails/compare/6.3.4...6.3.5
 [6.3.4]: https://github.com/shakacode/react_on_rails/compare/6.3.3...6.3.4
 [6.3.3]: https://github.com/shakacode/react_on_rails/compare/6.3.2...6.3.3
