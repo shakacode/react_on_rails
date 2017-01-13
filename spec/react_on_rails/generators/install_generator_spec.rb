@@ -113,10 +113,9 @@ describe InstallGenerator, type: :generator do
   end
 
   context "detect existing bin-files on *nix" do
-    before(:all) { @install_generator = InstallGenerator.new }
-
-    def `(which)
-      "/path/to/bin"
+    before(:all) do
+      @install_generator = InstallGenerator.new
+      allow(described_class).to receive(:`which).and_return("/path/to/bin")
     end
 
     specify "when node is exist" do
@@ -131,10 +130,9 @@ describe InstallGenerator, type: :generator do
   end
 
   context "detect missing bin-files on *nix" do
-    before(:all) { @install_generator = InstallGenerator.new }
-
-    def `(which)
-      ""
+    before(:all) do
+      @install_generator = InstallGenerator.new
+      allow(described_class).to receive(:`which).and_return("")
     end
 
     specify "when node is missing" do
@@ -149,10 +147,9 @@ describe InstallGenerator, type: :generator do
   end
 
   context "detect existing bin-files on windows" do
-    before(:all) { @install_generator = InstallGenerator.new }
-
-    def `(where)
-      "/path/to/bin"
+    before(:all) do
+      @install_generator = InstallGenerator.new
+      allow(described_class).to receive(:`where).and_return("/path/to/bin")
     end
 
     specify "when node is exist" do
@@ -167,10 +164,9 @@ describe InstallGenerator, type: :generator do
   end
 
   context "detect missing bin-files on windows" do
-    before(:all) { @install_generator = InstallGenerator.new }
-
-    def `(where)
-      ""
+    before(:all) do
+      @install_generator = InstallGenerator.new
+      allow(described_class).to receive(:`where).and_return("")
     end
 
     specify "when node is missing" do
