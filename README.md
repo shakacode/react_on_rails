@@ -119,9 +119,9 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
   bundle && npm install
   ```
 
-6. Start your Rails server:
+6. Ensure that you have `foreman` installed: `gem install foreman`.
 
-  with foreman installed (`gem install foreman`)
+7. Start your Rails server:
 
   ```bash
   foreman start -f Procfile.dev
