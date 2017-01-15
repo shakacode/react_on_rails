@@ -5,6 +5,9 @@ The generator has created the necessary files and gems for deployment to Heroku.
 + `12factor` gem: required by Heroku if using a version before Rails 5 (see their [README](https://github.com/heroku/rails_12factor#rails-5) for more information if upgrading from a lower version)
 + `'puma'` gem: recommended Heroku webserver
 + `config/puma.rb`: Puma webserver config file
++ `/package.json`: Top level package.json which must contain `"scripts": { "postinstall": "cd client && npm install" }`
+
+If you want to see an updated example deployed to Heroku, please visit the [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial).
 
 ## More details on precompilation using webpack to create JavaScript assets
 This is how the rake task gets modified. You should be able to call `clear_prerequisites` and setup your own custom precompile if needed.
