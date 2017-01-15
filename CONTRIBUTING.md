@@ -176,6 +176,13 @@ npm test
 
 ```sh
 cd spec/dummy
+rspec
+```
+
+Eventually, we may have JS tests:
+
+```sh
+cd spec/dummy/client
 npm run test
 ```
 
