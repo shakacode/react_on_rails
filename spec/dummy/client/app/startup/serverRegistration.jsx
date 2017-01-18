@@ -29,6 +29,9 @@ import SharedReduxStore from '../stores/SharedReduxStore';
 // Deferred render on the client side w/ server render
 import DeferredRenderApp from './DeferredRenderAppServer';
 
+// Deferred render on the client side w/ server render
+import RenderedHtml from './ServerRenderedHtml';
+
 ReactOnRails.register({
   HelloWorld,
   HelloWorldWithLogAndThrow,
@@ -41,6 +44,7 @@ ReactOnRails.register({
   PureComponent,
   CssModulesImagesFontsExample,
   DeferredRenderApp,
+  RenderedHtml,
 });
 
 ReactOnRails.registerStore({

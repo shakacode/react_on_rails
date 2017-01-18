@@ -38,6 +38,23 @@ test('serverRenderReactComponent renders errors', (assert) => {
   assert.ok(hasErrors, 'serverRenderReactComponent should have errors if exception thrown');
 });
 
+test('serverRenderReactComponent renders html', (assert) => {
+  assert.plan(3);
+  const expectedHtml = '<div>Hello</div>';
+  const X3 = () => ({ renderedHtml: expectedHtml });
+
+  ComponentStore.register({ X3 });
+
+  assert.comment('Expect to see renderedHtml');
+
+  const { html, hasErrors, renderedHtml } =
+    JSON.parse(serverRenderReactComponent({ name: 'X3', domNodeId: 'myDomId', trace: false }));
+
+  assert.ok(html === expectedHtml, 'serverRenderReactComponent HTML should render renderedHtml value');
+  assert.ok(!hasErrors, 'serverRenderReactComponent should not have errors if no exception thrown');
+  assert.ok(!hasErrors, 'serverRenderReactComponent should have errors if exception thrown');
+});
+
 test('serverRenderReactComponent renders an error if attempting to render a renderer', (assert) => {
   assert.plan(1);
   const X3 = (a1, a2, a3) => null;

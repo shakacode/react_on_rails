@@ -28,4 +28,5 @@ Rails.application.routes.draw do
   get "pure_component" => "pages#pure_component"
   get "css_modules_images_fonts_example" => "pages#css_modules_images_fonts_example"
   get "turbolinks_cache_disabled" => "pages#turbolinks_cache_disabled"
+  get "rendered_html" => "pages#rendered_html"
 end

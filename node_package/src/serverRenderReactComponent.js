@@ -2,7 +2,8 @@ import ReactDOMServer from 'react-dom/server';
 
 import ComponentRegistry from './ComponentRegistry';
 import createReactElement from './createReactElement';
-import isRouterResult from './isRouterResult';
+import isCreateReactElementResultNonReactComponent from
+  './isCreateReactElementResultNonReactComponent';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 
@@ -28,20 +29,29 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
       railsContext,
     });
 
-    if (isRouterResult(reactElementOrRouterResult)) {
+    if (isCreateReactElementResultNonReactComponent(reactElementOrRouterResult)) {
       // We let the client side handle any redirect
       // Set hasErrors in case we want to throw a Rails exception
       hasErrors = !!reactElementOrRouterResult.routeError;
+
       if (hasErrors) {
         console.error(
           `React Router ERROR: ${JSON.stringify(reactElementOrRouterResult.routeError)}`,
         );
-      } else if (trace) {
-        const redirectLocation = reactElementOrRouterResult.redirectLocation;
-        const redirectPath = redirectLocation.pathname + redirectLocation.search;
-        console.log(`\
+      }
+
+      if (reactElementOrRouterResult.redirectLocation) {
+        if (trace) {
+          const redirectLocation = reactElementOrRouterResult.redirectLocation;
+          const redirectPath = redirectLocation.pathname + redirectLocation.search;
+          console.log(`\
 ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redirectPath}`,
-        );
+          );
+        }
+        // For redirects on server rendering, we can't stop Rails from returning the same result.
+        // Possibly, someday, we could have the rails server redirect.
+      } else {
+        htmlResult = reactElementOrRouterResult.renderedHtml;
       }
     } else {
       htmlResult = ReactDOMServer.renderToString(reactElementOrRouterResult);
