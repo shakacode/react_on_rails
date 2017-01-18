@@ -5,13 +5,18 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 *Please add entries here for your pull requests.*
+
+## [6.4.2] - 2017-1-17
 ### Fixed
 - Added OS detection for install generator, system call for Windows and unit-tests for it. [#666](https://github.com/shakacode/react_on_rails/pull/666) by [GeorgeGorbanev](https://github.com/GeorgeGorbanev).
+
+## [6.4.1] - 2017-1-17
+No changes.
 
 ## [6.4.0] - 2017-1-12
 
 ### Possible Breaking Change
-- Since foreman is no longer a dependency of the React on Rails gem, please run `gem install foreman`. If you are using rvm, you may wish to run `rvm @global do gem install foreman` to install foreman for all your gemsets. 
+- Since foreman is no longer a dependency of the React on Rails gem, please run `gem install foreman`. If you are using rvm, you may wish to run `rvm @global do gem install foreman` to install foreman for all your gemsets.
 
 ### Fixed
 - Removed foreman as a dependency. [#678](https://github.com/shakacode/react_on_rails/pull/678) by [x2es](https://github.com/x2es).
@@ -430,7 +435,9 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.4.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.4.2...master
+[6.4.2]: https://github.com/shakacode/react_on_rails/compare/6.4.1...6.4.2
+[6.4.1]: https://github.com/shakacode/react_on_rails/compare/6.4.0...6.4.1
 [6.4.0]: https://github.com/shakacode/react_on_rails/compare/6.3.5...6.4.0
 [6.3.5]: https://github.com/shakacode/react_on_rails/compare/6.3.4...6.3.5
 [6.3.4]: https://github.com/shakacode/react_on_rails/compare/6.3.3...6.3.4
