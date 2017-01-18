@@ -4,12 +4,13 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
-*Please add entries here for your pull requests.*
+### Fixed
+- Fix incorrect "this" references of Node.js SSR [#690] by [nostophilia](https://github.com/nostophilia)
 
 ## [6.4.0] - 2017-1-12
 
 ### Possible Breaking Change
-- Since foreman is no longer a dependency of the React on Rails gem, please run `gem install foreman`. If you are using rvm, you may wish to run `rvm @global do gem install foreman` to install foreman for all your gemsets. 
+- Since foreman is no longer a dependency of the React on Rails gem, please run `gem install foreman`. If you are using rvm, you may wish to run `rvm @global do gem install foreman` to install foreman for all your gemsets.
 
 ### Fixed
 - Removed foreman as a dependency. [#678](https://github.com/shakacode/react_on_rails/pull/678) by [x2es](https://github.com/x2es).
