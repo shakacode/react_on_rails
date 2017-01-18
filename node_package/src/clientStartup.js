@@ -3,7 +3,7 @@
 import ReactDOM from 'react-dom';
 
 import createReactElement from './createReactElement';
-import isRouterResult from './isRouterResult';
+import isRouterResult from './isCreateReactElementResultNonReactComponent';
 
 const REACT_ON_RAILS_COMPONENT_CLASS_NAME = 'js-react-on-rails-component';
 const REACT_ON_RAILS_STORE_CLASS_NAME = 'js-react-on-rails-store';
