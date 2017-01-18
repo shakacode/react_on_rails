@@ -64,7 +64,7 @@ module ReactOnRails
       end
 
       def missing_npm?
-        return false unless `which npm`.blank?
+        return false unless ReactOnRails::Utils.running_on_windows? ? `where npm`.blank? : `which npm`.blank?
         error = "npm is required. Please install it before continuing. "
         error << "https://www.npmjs.com/"
         GeneratorMessages.add_error(error)
@@ -72,7 +72,7 @@ module ReactOnRails
       end
 
       def missing_node?
-        return false unless `which node`.blank?
+        return false unless ReactOnRails::Utils.running_on_windows? ? `where node`.blank? : `which node`.blank?
         error = "** nodejs is required. Please install it before continuing. "
         error << "https://nodejs.org/en/"
         GeneratorMessages.add_error(error)
