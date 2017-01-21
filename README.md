@@ -24,6 +24,7 @@ Follow [@ShakaCode](https://twitter.com/shakacode) for notications of new releas
 ### Videos 
 
 1. [egghead.io: Creating a component with React on Rails](https://egghead.io/lessons/react-creating-a-component-with-react-on-rails)
+1. [egghead.io: Creating a redux component with React on Rails](https://egghead.io/lessons/react-add-redux-state-management-to-a-react-on-rails-project)
 1. [React On Rails Tutorial Series](https://www.youtube.com/playlist?list=PL5VAKH-U1M6dj84BApfUtvBjvF-0-JfEU)
   1. [History and Motivation](https://youtu.be/F4oymbUHvoY)
   1. [Basic Tutorial Walkthrough](https://youtu.be/_bjScw60FBk)
