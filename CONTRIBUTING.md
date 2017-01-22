@@ -29,6 +29,18 @@ From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/
 1. Use the body to explain what and why vs. how
 
 
+## Doc Changes
+
+When making doc changes, we want the change to work on both the gitbook and the regular github site. The issue is that non-doc files will not go to the gitbook site, so doc references to non doc files must use the github URL.
+
+### Links to other docs:
+* When making references to doc files, use a relative URL path like:
+`[Installation Overview](docs/basics/installation-overview.md)`
+
+* When making references to source code files, use a full url path like:
+`[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb)`
+
+
 ## To run tests:
 * After updating code via git, to prepare all examples and run all tests:
 

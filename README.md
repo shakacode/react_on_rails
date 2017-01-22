@@ -136,7 +136,7 @@ See the [Installation Overview](docs/basics/installation-overview.md) for a conc
 
 ### Initializer Configuration
 
-Configure the `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [spec/dummy/config/initializers/react_on_rails.rb](spec/dummy/config/initializers/react_on_rails.rb) for a detailed example of configuration, including comments on the different values to configure.
+Configure the `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb) for a detailed example of configuration, including comments on the different values to configure.
 
 ### Including your React Component in your Rails Views
 
@@ -193,7 +193,7 @@ That will install the latest version and update your package.json.
 ## How it Works
 The generator installs your webpack files in the `client` folder. Foreman uses webpack to compile your code and output the bundled results to `app/assets/webpack`, which are then loaded by sprockets. These generated bundle files have been added to your `.gitignore` for your convenience.
 
-Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the react component helper. You can also initialize a Redux store with view or controller helper `redux_store` so that the store can be shared amongst multiple React components. See the docs for `redux_store` below and scan the code inside of the [/spec/dummy](spec/dummy) sample app.
+Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the react component helper. You can also initialize a Redux store with view or controller helper `redux_store` so that the store can be shared amongst multiple React components. See the docs for `redux_store` below and scan the code inside of the [/spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) sample app.
 
 ### Client-Side Rendering vs. Server-Side Rendering
 In most cases, you should use the `prerender: false` (default behavior) with the provided helper method to render the React component from your Rails views. In some cases, such as when SEO is vital, or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
@@ -242,7 +242,7 @@ Note, you never make these calls. This is what React on Rails does when either s
 
 (Note, see below [section](#multiple-react-components-on-a-page-with-one-store) on how to setup redux stores that allow multiple components to talk to the same store.)
 
-The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](app/helpers/react_on_rails_helper.rb), method `rails_context` for the definitive list).
+The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](https://github.com/shakacode/react_on_rails/tree/master/app/helpers/react_on_rails_helper.rb), method `rails_context` for the definitive list).
 
 ```ruby
   {
@@ -280,7 +280,7 @@ Set the config value for the `rendering_extension`:
 
 Implement it like this above in the same file. Create a class method on the module called `custom_context` that takes the `view_context` for a param.
 
-See [spec/dummy/config/initializers/react_on_rails.rb](spec/dummy/config/initializers/react_on_rails.rb) for a detailed example.
+See [spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb) for a detailed example.
 
 ```ruby
 module RenderingExtension
@@ -362,7 +362,7 @@ Include the module ReactOnRails::Controller in your controller, probably in Appl
   2. In your component definition, you'll call `ReactOnRails.getStore('storeName')` to get the hydrated Redux store to attach to your components.
 + **props:**  Named parameter `props`. ReactOnRails takes care of setting up the hydration of your store with props from the view.
 
-For an example, see [spec/dummy/app/controllers/pages_controller.rb](spec/dummy/app/controllers/pages_controller.rb). Note, this is preferable to using the equivalent view_helper `redux_store` in that you can be assured that the store is initialized before your components.
+For an example, see [spec/dummy/app/controllers/pages_controller.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/controllers/pages_controller.rb). Note, this is preferable to using the equivalent view_helper `redux_store` in that you can be assured that the store is initialized before your components.
 
 #### View Helper
 `redux_store(store_name, props: {})`
@@ -371,7 +371,7 @@ Same API as the controller extension. **HOWEVER**, we recommend the controller e
 
 `redux_store_hydration_data`
 
-Place this view helper (no parameters) at the end of your shared layout. This tell ReactOnRails where to client render the redux store hydration data. Since we're going to be setting up the stores in the controllers, we need to know where on the view to put the client side rendering of this hydration data, which is a hidden div with a matching class that contains a data props. For an example, see [spec/dummy/app/views/layouts/application.html.erb](spec/dummy/app/views/layouts/application.html.erb).
+Place this view helper (no parameters) at the end of your shared layout. This tell ReactOnRails where to client render the redux store hydration data. Since we're going to be setting up the stores in the controllers, we need to know where on the view to put the client side rendering of this hydration data, which is a hidden div with a matching class that contains a data props. For an example, see [spec/dummy/app/views/layouts/application.html.erb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/layouts/application.html.erb).
 
 #### Redux Store Notes
 Note, you don't need to separately initialize your redux store. However, it's recommended for the two following use cases:
@@ -466,11 +466,11 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 [React Router](https://github.com/reactjs/react-router) is supported, including server side rendering! See:
 
 1. [React on Rails docs for react-router](docs/additional-reading/react-router.md)
-1. Examples in [spec/dummy/app/views/react_router](spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](spec/dummy/client/app/startup/ServerRouterApp.jsx).
+1. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/ServerRouterApp.jsx).
 1. [Code Splitting docs](docs/additional-reading/code-splitting.md) for information about how to set up code splitting for server rendered routes.
 
 ## Deployment
-* Version 6.0 puts the necessary precompile steps automatically in the rake precompile step. You can, however, disable this by setting certain values to nil in the [config/initializers/react_on_rails.rb](spec/dummy/config/initializers/react_on_rails.rb).
+* Version 6.0 puts the necessary precompile steps automatically in the rake precompile step. You can, however, disable this by setting certain values to nil in the [config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb).
   * `config.symlink_non_digested_assets_regex`: Set to nil to turn off the setup of non-js assets.
   * `npm_build_production_command`: Set to nil to turn off the precompilation of the js assets.
 * See the [Heroku Deployment](docs/additional-reading/heroku-deployment.md) doc for specifics regarding Heroku.
@@ -533,7 +533,7 @@ Node.js can be used as the backend for server-side rendering instead of [execJS]
 
 ## Demos
 + [www.reactrails.com](http://www.reactrails.com) with the source at [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/).
-+ [spec app](spec/dummy): Great simple examples used for our tests.
++ [spec app](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy): Great simple examples used for our tests.
   ```
   cd spec/dummy
   bundle && npm i
