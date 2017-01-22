@@ -40,7 +40,7 @@ If you want to speed up the re-compiling process, you can call `npm run build:de
   },
 ```
 
-[spec/dummy](../../spec/dummy) contains examples of how to set the proc files for this purpose.
+[spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) contains examples of how to set the proc files for this purpose.
 
 ## Hot Reloading
 If you're using the hot reloading setup, you'll be running a Webpack development server to provide the JavaScript and mabye CSS assets to your Rails app. If you're doing server rendering, you'll also have a webpack watch process to refresh the server rendering file. **If your server and client bundles are different**, and you run specs, the client bundle files will not be created until React on Rails detects it's out of date. Then your script to create all bundle files will redo the server bundle file. There's a few simple remedies for this situation:
