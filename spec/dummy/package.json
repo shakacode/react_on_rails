@@ -7,19 +7,19 @@
     "node": "4.2.0"
   },
   "scripts": {
-    "postinstall": "cd ./client && npm install",
-    "gulp": "cd ./client && npm run gulp",
-    "test": "npm run build:test && npm run lint && rspec",
-    "lint": "cd client && npm run lint",
-    "install-react-on-rails": "cd client && npm run install-react-on-rails",
+    "postinstall": "cd ./client && yarn install",
+    "gulp": "cd ./client && yarn run gulp",
+    "test": "yarn run build:test && yarn run lint && rspec",
+    "lint": "cd client && yarn run lint",
+    "install-react-on-rails": "cd client && yarn run install-react-on-rails",
     "build:clean": "rm -r app/assets/webpack/* || true",
-    "build:production:client": "(cd client && npm run build:production:client --silent)",
-    "build:production:server": "(cd client && npm run build:production:server --silent)",
-    "build:client": "(cd client && npm run build:client --silent",
-    "build:server": "(cd client && npm run build:server --silent)",
-    "build:dev:client": "(cd client && npm run build:dev:client --silent)",
-    "build:dev:server": "(cd client && npm run build:dev:server --silent)",
-    "hot-assets": "(cd client && npm run hot-assets)"
+    "build:production:client": "(cd client && yarn run build:production:client --silent)",
+    "build:production:server": "(cd client && yarn run build:production:server --silent)",
+    "build:client": "(cd client && yarn run build:client --silent",
+    "build:server": "(cd client && yarn run build:server --silent)",
+    "build:dev:client": "(cd client && yarn run build:dev:client --silent)",
+    "build:dev:server": "(cd client && yarn run build:dev:server --silent)",
+    "hot-assets": "(cd client && yarn run hot-assets)"
   },
   "repository": {
     "type": "git",
@@ -36,8 +36,9 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "devDependencies": {
-  },
+  "devDependencies": {},
   "dependencies": {
+    "babel-cli": ">= 6",
+    "babel-runtime": ">= 6"
   }
 }

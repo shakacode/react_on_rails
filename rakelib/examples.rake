@@ -43,7 +43,7 @@ namespace :examples do
     # NPM INSTALL
     task example_type.npm_install_task_name_short => example_type.package_json do
       unless uptodate?(example_type.node_modules_dir, [example_type.source_package_json])
-        sh_in_dir(example_type.client_dir, "npm install")
+        sh_in_dir(example_type.client_dir, "yarn install --mutex network")
       end
     end
 
@@ -71,7 +71,7 @@ namespace :examples do
     end
 
     # PREPARE
-    desc "Prepares #{example_type.name_pretty} (generates example, `npm install`s, and generates webpack bundles)"
+    desc "Prepares #{example_type.name_pretty} (generates example, `yarn`s, and generates webpack bundles)"
     multitask example_type.prepare_task_name_short => example_type.prepared_files do
       Rake::Task["node_package"].invoke
     end

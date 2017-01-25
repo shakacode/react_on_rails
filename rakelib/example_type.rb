@@ -115,7 +115,7 @@ module ReactOnRails
       end
 
       # generated files plus explicitly included files resulting from running
-      # bundle install, npm install, and generating the webpack bundles
+      # bundle install, yarn, and generating the webpack bundles
       def prepared_files
         generated_files
           .include(webpack_bundles)
@@ -129,7 +129,7 @@ module ReactOnRails
 
       # Assumes we are inside client folder
       def build_webpack_bundles_shell_commands
-        webpack_command = File.join("$(npm bin)", "webpack")
+        webpack_command = File.join("$(yarn bin)", "webpack")
         shell_commands = []
         shell_commands << "#{webpack_command} --config webpack.config.js"
       end
