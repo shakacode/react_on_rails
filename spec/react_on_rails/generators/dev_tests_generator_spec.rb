@@ -24,7 +24,7 @@ describe DevTestsGenerator, type: :generator do
 
     it "changes package.json to use local react-on-rails version of module" do
       assert_file("client/package.json") do |contents|
-        assert_match('"react-on-rails": "../../../.."', contents)
+        assert_match('"react-on-rails": "file:../../../.."', contents)
         refute_match('"react-on-rails": "ReactOnRails::VERSION"', contents)
       end
     end

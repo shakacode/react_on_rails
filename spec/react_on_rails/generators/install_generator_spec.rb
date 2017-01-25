@@ -87,9 +87,9 @@ describe InstallGenerator, type: :generator do
 
         What to do next:
 
-          - Ensure your bundle and npm are up to date.
+          - Ensure your bundle and yarn installs of dependencies are up to date.
 
-              bundle && npm i
+              bundle && yarn
 
           - Run the foreman command to start the rails server and run webpack in watch mode.
 
@@ -107,6 +107,20 @@ describe InstallGenerator, type: :generator do
 
     specify "react with redux generator contains a helpful message" do
       run_generator_test_with_args(%w(--redux))
+      expected = <<-MSG.strip_heredoc
+
+        What to do next:
+
+          - Ensure your bundle and yarn installs of dependencies are up to date.
+
+              bundle && yarn
+
+          - Run the foreman command to start the rails server and run webpack in watch mode.
+
+              foreman start -f Procfile.dev
+
+          - Visit http://localhost:3000/hello_world and see your React On Rails app running!
+        MSG
       expect(GeneratorMessages.output)
         .to include(GeneratorMessages.format_info(expected))
     end
@@ -123,7 +137,7 @@ describe InstallGenerator, type: :generator do
 
     specify "when npm is exist" do
       stub_const("RUBY_PLATFORM", "linux")
-      allow(@install_generator).to receive(:`).with("which npm").and_return("/path/to/bin")
+      allow(@install_generator).to receive(:`).with("which yarn").and_return("/path/to/bin")
       expect(@install_generator.send(:missing_npm?)).to eq false
     end
   end
@@ -139,7 +153,7 @@ describe InstallGenerator, type: :generator do
 
     specify "when npm is missing" do
       stub_const("RUBY_PLATFORM", "linux")
-      allow(@install_generator).to receive(:`).with("which npm").and_return("")
+      allow(@install_generator).to receive(:`).with("which yarn").and_return("")
       expect(@install_generator.send(:missing_npm?)).to eq true
     end
   end
@@ -155,7 +169,7 @@ describe InstallGenerator, type: :generator do
 
     specify "when npm is exist" do
       stub_const("RUBY_PLATFORM", "mswin")
-      allow(@install_generator).to receive(:`).with("where npm").and_return("/path/to/bin")
+      allow(@install_generator).to receive(:`).with("where yarn").and_return("/path/to/bin")
       expect(@install_generator.send(:missing_npm?)).to eq false
     end
   end
@@ -171,7 +185,7 @@ describe InstallGenerator, type: :generator do
 
     specify "when npm is missing" do
       stub_const("RUBY_PLATFORM", "mswin")
-      allow(@install_generator).to receive(:`).with("where npm").and_return("")
+      allow(@install_generator).to receive(:`).with("where yarn").and_return("")
       expect(@install_generator.send(:missing_npm?)).to eq true
     end
   end

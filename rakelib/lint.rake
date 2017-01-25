@@ -23,11 +23,6 @@ namespace :lint do
     sh_in_dir(gem_root, "yarn run eslint")
   end
 
-  desc "Run jscs from shell"
-  task :jscs do
-    sh_in_dir(gem_root, "yarn run jscs")
-  end
-
   desc "Run flow from shell"
   task :flow do
     sh_in_dir(gem_root, "yarn run flow")
