@@ -19,7 +19,7 @@ module ReactOnRails
     # once per test run.
     #
     # If you do not want to be slowed down by re-compiling webpack assets from scratch every test
-    # run, you can call `npm run build:client` (and `npm run build:server` if doing server
+    # run, you can call `yarn run build:client` (and `yarn run build:server` if doing server
     # rendering) to have webpack recompile these files in the background, which will be *much*
     # faster. The helper looks for these processes and will abort recompiling if it finds them
     # to be running.
