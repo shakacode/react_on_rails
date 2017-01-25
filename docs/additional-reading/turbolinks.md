@@ -2,7 +2,7 @@
 
 * See [Turbolinks on Github](https://github.com/rails/turbolinks)
 * Currently support 2.5.x of Turbolinks and 5.0.0 of Turbolinks 5.
-* You may include Turbolinks either via npm (recommended) or via the gem.
+* You may include Turbolinks either via yarn (recommended) or via the gem.
 
 ## Why Turbolinks?
 As you switch between Rails HTML controller requests, you will only load the HTML and you will
@@ -23,7 +23,7 @@ the JavaScript and stylesheets are cached by the browser, as they will still req
 * If you're using multiple Webpack bundles, be sure to ensure that there are no name conflicts between JS objects or redux store paths.
 
 ### Install Checklist
-1. Include turbolinks via npm as shown in the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/blob/8a6c8aa2e3b7ae5b08b0a9744fb3a63a2fe0f002/client/webpack.client.base.config.js#L22) or include the gem "turbolinks".
+1. Include turbolinks via yarn as shown in the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/blob/8a6c8aa2e3b7ae5b08b0a9744fb3a63a2fe0f002/client/webpack.client.base.config.js#L22) or include the gem "turbolinks".
 1. Included the proper "track" tags when you include the javascript and stylesheet:
   ```erb
     <%= stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track' => 'reload' %>

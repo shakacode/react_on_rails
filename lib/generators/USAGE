@@ -11,13 +11,13 @@ can pass the redux option if you'd like to have redux setup for you automaticall
 
 * Node
 
-    Passing the --node generator option sets up the necessary files for node to render the react_components. 
+    Passing the --node generator option sets up the necessary files for node to render the react_components.
 
 *******************************************************************************
 
 After running the generator, you will want to:
 
-    bundle && npm i
+    bundle && yarn
 
 Then you may run
 
