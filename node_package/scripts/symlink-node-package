@@ -1,21 +1,21 @@
 #!/bin/bash
 # Update the example rails node packages
 
-npm run clean
-npm run build
+yarn run clean
+yarn run build
 
 # Ensure the paths will work no matter where we run the script from
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 root_path=${DIR}/../..
 
 # Set up link
-(cd $root_path && npm link)
+(cd $root_path && yarn link)
 
 # Link the example apps to use react_on_rails node_package
 examplesDir=${root_path}/gen-examples/examples
 if [ -d $examplesDir ] ; then
   for type in $( ls $examplesDir ); do
     d=$examplesDir/${type}/client
-    (cd $d && npm link react-on-rails)
+    (cd $d && yarn link react-on-rails)
   done
 fi

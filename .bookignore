@@ -9,7 +9,6 @@ spec/*
 
 # files in repo root to ignore
 Gemfile
-npm-shrinkwrap.json
 package.json
 Rakefile
 react_on_rails.gemspec

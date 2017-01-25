@@ -1,6 +1,6 @@
 #!/bin/sh
 
-npm version $1 -m "Bump version to %s"
+yarn version $1 -m "Bump version to %s"
 git push -u origin master
 git push --tags
-npm publish
+yarn publish
