@@ -64,9 +64,9 @@ module ReactOnRails
       end
 
       def missing_npm?
-        return false unless ReactOnRails::Utils.running_on_windows? ? `where npm`.blank? : `which npm`.blank?
-        error = "npm is required. Please install it before continuing. "
-        error << "https://www.npmjs.com/"
+        return false unless ReactOnRails::Utils.running_on_windows? ? `where yarn`.blank? : `which yarn`.blank?
+        error = "yarn is required. Please install it before continuing. "
+        error << "https://yarnpkg.com/en/docs/install"
         GeneratorMessages.add_error(error)
         true
       end

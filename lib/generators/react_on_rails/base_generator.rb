@@ -138,9 +138,9 @@ Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpa
 
           What to do next:
 
-            - Ensure your bundle and npm are up to date.
+            - Ensure your bundle and yarn installs of dependencies are up to date.
 
-                bundle && npm i
+                bundle && yarn
 
             - Run the foreman command to start the rails server and run webpack in watch mode.
 
