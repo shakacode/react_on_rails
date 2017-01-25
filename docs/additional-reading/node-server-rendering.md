@@ -30,7 +30,7 @@ config.server_render_method = "NodeJS"
 
 You need to configure the name of the server bundle in two places:
 
-1. JavaScript: Change the name of server bundle adjust npm start script in `client/node/package.json`
+1. JavaScript: Change the name of server bundle and adjust yarn start script in `client/node/package.json`
 2. Ruby: The configured server bundle file is defined in `config/react_on_rails.rb`, and you'll have a webpack file that creates this. You maybe using the same file for client rendering.
 
 ```ruby

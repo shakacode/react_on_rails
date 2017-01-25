@@ -87,10 +87,10 @@ Rails.application.config.assets.precompile +=
   rails: REACT_ON_RAILS_ENV= rails s -b 0.0.0.0
   
   # Build client assets, watching for changes.
-  rails-client-assets: npm run build:dev:client
+  rails-client-assets: yarn run build:dev:client
   
   # Build server assets, watching for changes. Remove if not server rendering.
-  rails-server-assets: npm run build:dev:server
+  rails-server-assets: yarn run build:dev:server
 ```
 
 ### Procfile.hot
@@ -103,9 +103,9 @@ Rails.application.config.assets.precompile +=
 rails: REACT_ON_RAILS_ENV=HOT rails s -b 0.0.0.0
 
 # Run the hot reload server for client development
-hot-assets: HOT_RAILS_PORT=3500 npm run hot-assets
+hot-assets: HOT_RAILS_PORT=3500 yarn run hot-assets
 
 # Keep the JS fresh for server rendering. Remove if not server rendering
-rails-server-assets: npm run build:dev:server
+rails-server-assets: yarn run build:dev:server
 ```
 

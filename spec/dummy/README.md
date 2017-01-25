@@ -1,22 +1,22 @@
 Using NPM for react_on_rails
 
-* Use 'npm link' to hook up the spec/dummy/client/node_modules to the top level
-* Be sure to install npm dependencies in spec/dummy/client
+* Use 'yarn link' to hook up the spec/dummy/client/node_modules to the top level
+* Be sure to install yarn dependencies in spec/dummy/client
 
-## Setup npm link
+## Setup yarn link
 
 ```sh
 cd react_on_rails
-npm link
+yarn link
 cd spec/dummy/client
-npm link react_on_rails
+yarn link react_on_rails
 ```
 
-## Run npm i if not done yet
+## Run yarn if not done yet
 
 ```sh
 cd react_on_rails
-npm run dummy:install 
+yarn run dummy:install 
 ```
 
 # Starting the Sample App
