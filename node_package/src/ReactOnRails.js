@@ -84,6 +84,16 @@ ctx.ReactOnRails = {
     ClientStartup.reactOnRailsPageLoaded();
   },
 
+
+  /**
+   * Render react_components with option data-renderdeferred: true. These components are not
+   * loaded automatically on page load event in browser, so you have to trigger rendering
+   * manually with this function
+   */
+  renderDeferredComponents() {
+    ClientStartup.renderDeferredComponents();
+  },
+
   /**
    * Returns CSRF authenticity token inserted by Rails csrf_meta_tags
    * @returns String or null
