@@ -93,8 +93,8 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
  * with data-render-deferred=true. When set to true renders only deferred components.
  */
 function render(el, railsContext, renderDeferred) {
-  const isDeferred = el.getAttribute('data-render-deferred');
-  if (isDeferred != renderDeferred) return;
+  const isDeferred = el.getAttribute('data-render-deferred') === 'true';
+  if (!!isDeferred != !!renderDeferred) return;
 
   const context = findContext();
   const name = el.getAttribute('data-component-name');
