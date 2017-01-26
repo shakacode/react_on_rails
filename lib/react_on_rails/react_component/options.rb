@@ -33,6 +33,10 @@ module ReactOnRails
         retrieve_key(:prerender)
       end
 
+      def render_deferred
+        options[:render_deferred] || false
+      end
+
       def trace
         retrieve_key(:trace)
       end
@@ -50,7 +54,8 @@ module ReactOnRails
           component_name: name,
           props: props,
           trace: trace,
-          dom_id: dom_id
+          dom_id: dom_id,
+          render_deferred: render_deferred
         }
       end
 
