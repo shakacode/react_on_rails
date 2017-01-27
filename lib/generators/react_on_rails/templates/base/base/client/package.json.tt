@@ -14,7 +14,6 @@
   },
   "cacheDirectories": ["node_modules", "client/node_modules"],
   "dependencies": {
-    "babel": "^6.5.2",
     "babel-cli": "^6.18.0",
     "babel-core": "^6.21.0",
     "babel-loader": "^6.2.10",
