@@ -47,8 +47,6 @@ heroku buildpacks:add --index 1 heroku/nodejs
 
 For more information, see [Using Multiple Buildpacks for an App](https://devcenter.heroku.com/articles/using-multiple-buildpacks-for-an-app)
 
-If for some reason you need custom buildpacks that are not officially supported by Heroku ([see this page](https://devcenter.heroku.com/articles/buildpacks)), we recommend checking out [heroku-buildpack-multi](https://github.com/ddollar/heroku-buildpack-multi).
-
 ## Fresh Rails Install
 
 ### Swap out sqlite for postgres by doing the following:
