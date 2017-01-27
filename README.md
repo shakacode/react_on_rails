@@ -218,7 +218,7 @@ On production deployments that use asset precompilation, such as Heroku deployme
 If you have used the provided generator, these bundles will automatically be added to your `.gitignore` to prevent extraneous noise from re-generated code in your pull requests. You will want to do this manually if you do not use the provided generator.
 
 ### Rails Context
-When you use a "generator function" to create react components or you used shared redux stores, you get 2 params passed to your function:
+When you use a "generator function" to create react components (or renderedHtml on the server) or you used shared redux stores, you get 2 params passed to your function:
 
 1. Props that you pass in the view helper of either `react_component` or `redux_store`
 2. Rails contextual information, such as the current pathname. You can customize this in your config file.
@@ -319,6 +319,8 @@ If you do want different code to run, you'd setup a separate webpack compilation
 #### Generator Functions
 Why would you create a function that returns a React component? For example, you may want the ability to use the passed-in props to initialize a redux store or setup react-router. Or you may want to return different components depending on what's in the props. ReactOnRails will automatically detect a registered generator function.
 
+Another reason to user a generator function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }.
+
 #### Renderer Functions
 A renderer function is a generator function that accepts three arguments: `(props, railsContext, domNodeId) => { ... }`. Instead of returning a React component, a renderer is responsible for calling `ReactDOM.render` to manually render a React component into the dom. Why would you want to call `ReactDOM.render` yourself? One possible use case is [code splitting](docs/additional-reading/code-splitting.md).
 
@@ -341,7 +343,7 @@ react_component(component_name,
                 html_options: {})
 ```
 
-+ **component_name:** Can be a React component, created using a ES6 class, or `React.createClass`, a generator function that returns a React component, or a renderer function that manually renders a React component to the dom (client side only).
++ **component_name:** Can be a React component, created using a ES6 class, or `React.createClass`, a generator function that returns a React component (or only on the server side, an object with shape { redirectLocation, error, renderedHtml }), or a renderer function that manually renders a React component to the dom (client side only).
 + **options:**
   + **props:** Ruby Hash which contains the properties to pass to the react object, or a JSON string. If you pass a string, we'll escape it for you.
   + **prerender:** enable server-side rendering of component. Set to false when debugging!

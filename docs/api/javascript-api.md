@@ -4,7 +4,9 @@ The best source of docs is the main [ReactOnRails.js](../../node_package/src/Rea
 ```js
   /**
    * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
-   * find you components for rendering.
+   * find you components for rendering. Components get called with props, or you may use a
+   * "generator function" to return a React component or an object with the following shape:
+   * { renderedHtml, redirectLocation, error }. 
    * @param components (key is component name, value is component)
    */
   register(components)
