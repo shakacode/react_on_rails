@@ -8,11 +8,24 @@ I'm offering a free half-hour project consultation, on anything from React on Ra
 
 Whether you have a new project or need help on an existing project, feel free to contact me directly at [justin@shakacode.com](mailto:justin@shakacode.com) and thanks in advance for any referrals!
 
-Your support keeps this project going.
+Your support keeps this project going!
 
-(Want to become a contributor? [Contact us](mailto:contact@shakacode.com) for a Slack team invite! Also, see ["easy" issues](https://github.com/shakacode/react_on_rails/labels/easy) and [issues for the full tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/issues?q=is%3Aissue+is%3Aopen+label%3Aeasy
+(Want to become a contributor? [Contact us](mailto:contact@shakacode.com) for a Slack room invite and let us know that you want to contribute.)
 
-Follow [@ShakaCode](https://twitter.com/shakacode) for notications of new releases.
+# Community
+Please [Subscribe](https://app.mailerlite.com/webforms/landing/l1d9x5) to keep in touch with Justin Gordon and [ShakaCode](http://www.shakacode.com/). I intend to send a monthly summary including announcements of new releases of React on Rails and of our latest [blog articles](https://blog.shakacode.com) and tutorials. Subscribers will also have access to **exclusive content**, including tips and examples.
+
+[![2017-01-30_12-33-52](https://cloud.githubusercontent.com/assets/1118459/22444904/191f32b4-e6e9-11e6-9c52-ab7000529474.png)](https://app.mailerlite.com/webforms/landing/l1d9x5)
+
+* **Slack Room**: [Contact us](mailto:contact@shakacode.com) for an invite to the ShakaCode Slack room!
+* **[forum.shakacode.com](https://forum.shakacode.com): Post your questions
+* **[@ShakaCode on Twitter](https://twitter.com/shakacode)**
+
+# Testimonials
+From Joel Hooks, Co-Founder, Chief Nerd at [egghead.io](https://egghead.io/), January 30, 2017: 
+![2017-01-30_11-33-59](https://cloud.githubusercontent.com/assets/1118459/22443635/b3549fb4-e6e3-11e6-8ea2-6f589dc93ed3.png)
+
+For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 
 # Articles, Videos, and Podcasts
 
@@ -567,6 +580,9 @@ We owe much gratitude to the work of the [react-rails gem](https://github.com/re
 # FINAL NOTES
 * See [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
 * Follow [@railsonmaui](https://twitter.com/railsonmaui) and [@shakacode](https://twitter.com/shakacode) on Twitter for updates on releases. We've also got a forum category dedicated to [react_on_rails](https://forum.shakacode.com/c/rails/reactonrails).
+* Please [Subscribe](https://app.mailerlite.com/webforms/landing/l1d9x5) to keep in touch with Justin Gordon and [ShakaCode](http://www.shakacode.com/). I intend to send a monthly summary including announcements of new releases of React on Rails and of our latest [blog articles](https://blog.shakacode.com) and tutorials. Subscribers will also have access to **exclusive content**, including tips and examples.
+
+[![2017-01-30_12-33-52](https://cloud.githubusercontent.com/assets/1118459/22444904/191f32b4-e6e9-11e6-9c52-ab7000529474.png)](https://app.mailerlite.com/webforms/landing/l1d9x5)
 
 ---
 
