@@ -18,7 +18,7 @@ Please [Subscribe](https://app.mailerlite.com/webforms/landing/l1d9x5) to keep i
 [![2017-01-30_12-33-52](https://cloud.githubusercontent.com/assets/1118459/22444904/191f32b4-e6e9-11e6-9c52-ab7000529474.png)](https://app.mailerlite.com/webforms/landing/l1d9x5)
 
 * **Slack Room**: [Contact us](mailto:contact@shakacode.com) for an invite to the ShakaCode Slack room!
-* **[forum.shakacode.com](https://forum.shakacode.com): Post your questions
+* **[forum.shakacode.com](https://forum.shakacode.com)**: Post your questions
 * **[@ShakaCode on Twitter](https://twitter.com/shakacode)**
 
 # Testimonials
