@@ -4,10 +4,16 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
-### Fixed
-- Fix incorrect "this" references of Node.js SSR [#690] by [nostophilia](https://github.com/nostophilia)
+*Please add entries here for your pull requests.*
 
-## [6.4.2] - 2017-1-17
+## [6.5.0] - 2017-01-31
+### Added
+- Allow generator function to return Object with property `renderedHtml` (already could return Object with props `redirectLocation, error`) rather than a React component or a function that returns a React component. One reason to use a generator function is that sometimes in server rendering, specifically with React Router v4, you need to return the result of calling ReactDOMServer.renderToString(element). [#689](https://github.com/shakacode/react_on_rails/issues/689) by [justin808](https://github.com/justin808).
+
+### Fixed
+- Fix incorrect "this" references of Node.js SSR [#690](https://github.com/shakacode/react_on_rails/issues/689) by [nostophilia](https://github.com/nostophilia).
+
+## [6.4.2] - 2017-01-17
 ### Fixed
 - Added OS detection for install generator, system call for Windows and unit-tests for it. [#666](https://github.com/shakacode/react_on_rails/pull/666) by [GeorgeGorbanev](https://github.com/GeorgeGorbanev).
 
@@ -436,7 +442,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.4.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.5.0...master
+[6.5.0]: https://github.com/shakacode/react_on_rails/compare/6.4.2...6.5.0
 [6.4.2]: https://github.com/shakacode/react_on_rails/compare/6.4.1...6.4.2
 [6.4.1]: https://github.com/shakacode/react_on_rails/compare/6.4.0...6.4.1
 [6.4.0]: https://github.com/shakacode/react_on_rails/compare/6.3.5...6.4.0
