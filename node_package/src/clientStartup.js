@@ -121,7 +121,7 @@ You should return a React.Component always for the client side entry point.`);
       }
     }
   } catch (e) {
-    e.message = `ReactOnRails encountered an error while rendering component: ${name}.` +
+    e.message = `ReactOnRails encountered an error while rendering component: ${name}.\n` +
       `Original message: ${e.message}`;
     throw e;
   }
