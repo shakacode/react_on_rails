@@ -5,6 +5,8 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 *Please add entries here for your pull requests.*
+### Fixed
+- Fixes "flickering" components when they are unmounted too early [#709](https://github.com/shakacode/react_on_rails/pull/709) by [szyablitsky](https://github.com/szyablitsky)
 
 ## [6.5.0] - 2017-01-31
 ### Added
