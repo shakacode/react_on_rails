@@ -50,6 +50,30 @@ test('ReactOnRails not specified has traceTurbolinks as false', (assert) => {
   assert.equal(actual, false);
 });
 
+test('ReactOnRails accepts turbolinksUnmountOnBeforeRender as an option true', (assert) => {
+  ReactOnRails.resetOptions();
+  assert.plan(1);
+  ReactOnRails.setOptions({ turbolinksUnmountOnBeforeRender: true });
+  const actual = ReactOnRails.option('turbolinksUnmountOnBeforeRender');
+  assert.equal(actual, true);
+});
+
+test('ReactOnRails accepts turbolinksUnmountOnBeforeRender as an option false', (assert) => {
+  ReactOnRails.resetOptions();
+  assert.plan(1);
+  ReactOnRails.setOptions({ turbolinksUnmountOnBeforeRender: false });
+  const actual = ReactOnRails.option('turbolinksUnmountOnBeforeRender');
+  assert.equal(actual, false);
+});
+
+test('ReactOnRails not specified has turbolinksUnmountOnBeforeRender as false', (assert) => {
+  ReactOnRails.resetOptions();
+  assert.plan(1);
+  ReactOnRails.setOptions({ });
+  const actual = ReactOnRails.option('turbolinksUnmountOnBeforeRender');
+  assert.equal(actual, false);
+});
+
 test('serverRenderReactComponent throws error for invalid options', (assert) => {
   ReactOnRails.resetOptions();
   assert.plan(1);

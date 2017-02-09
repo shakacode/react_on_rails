@@ -94,8 +94,17 @@ TURBO: reactOnRailsPageLoaded
 
 Turbolinks 5:
 ```
-TURBO: WITH TURBOLINKS 5: document turbolinks:before-render and turbolinks:load handlers installed. (program)
+TURBO: WITH TURBOLINKS 5: document turbolinks:before-visit and turbolinks:load handlers installed. (program)
 TURBO: reactOnRailsPageLoaded
+```
+
+## Unmount event
+By default Turbolinks 5 will handle `turbolinks:before-visit` event. If you use the same component on different pages this can cause the temporary disappearance of component during page load and even moving parts of the page. To fix this issue switch unmount event to `turbolinks:before-render`.
+
+```js
+  ReactOnRails.setOptions({
+    turbolinksUnmountOnBeforeRender: true,
+  });
 ```
 
 We've noticed that Turbolinks doesn't work if you use the ruby gem version of jQuery and jQuery ujs. Therefore we recommend using the node packages instead. See the [tutorial app](https://github.com/shakacode/react-webpack-rails-tutorial) for how to accomplish this.

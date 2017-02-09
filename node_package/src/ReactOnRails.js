@@ -14,6 +14,7 @@ const ctx = context();
 
 const DEFAULT_OPTIONS = {
   traceTurbolinks: false,
+  turbolinksUnmountOnBeforeRender: false,
 };
 
 ctx.ReactOnRails = {
@@ -58,6 +59,7 @@ ctx.ReactOnRails = {
    * Set options for ReactOnRails, typically before you call ReactOnRails.register
    * Available Options:
    * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
+   * `turbolinksUnmountOnBeforeRender: true|false Binds unmount to before-render event
    */
   setOptions(newOptions) {
     if ('traceTurbolinks' in newOptions) {
@@ -65,6 +67,13 @@ ctx.ReactOnRails = {
 
       // eslint-disable-next-line no-param-reassign
       delete newOptions.traceTurbolinks;
+    }
+
+    if ('turbolinksUnmountOnBeforeRender' in newOptions) {
+      this.options.turbolinksUnmountOnBeforeRender = newOptions.turbolinksUnmountOnBeforeRender;
+
+      // eslint-disable-next-line no-param-reassign
+      delete newOptions.turbolinksUnmountOnBeforeRender;
     }
 
     if (Object.keys(newOptions).length > 0) {
