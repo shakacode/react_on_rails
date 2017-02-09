@@ -187,8 +187,7 @@ export function clientStartup(context) {
     if (turbolinksInstalled() && turbolinksSupported()) {
       if (turbolinksVersion5()) {
         debugTurbolinks(
-          'USING TURBOLINKS 5: document added event listeners ' +
-          unmountEvent + ' and turbolinks:load.');
+          `USING TURBOLINKS 5: document added event listeners ${unmountEvent} and turbolinks:load.`);
         document.addEventListener(unmountEvent, reactOnRailsPageUnloaded);
         document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
       } else {
