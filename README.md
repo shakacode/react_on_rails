@@ -113,7 +113,7 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
   gem "react_on_rails", "~> 6"
   ```
 
-2. Commit this to git (you cannot run the generator unless you do this).
+2. Commit this to git (you cannot run the generator unless you do this or pass the option `--ignore-warnings`).
 
 3. See help for the generator:
 
