@@ -34,7 +34,6 @@ The best source of docs is the main [ReactOnRails.js](../../node_package/src/Rea
    * Set options for ReactOnRails, typically before you call ReactOnRails.register
    * Available Options:
    * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
-   * `turbolinksUnmountOnBeforeRender: true|false Binds unmount to before-render event
    */
   setOptions(options)
 

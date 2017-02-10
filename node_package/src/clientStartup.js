@@ -179,16 +179,11 @@ export function clientStartup(context) {
     // We must do this check for turbolinks AFTER the document is loaded because we load the
     // Webpack bundles first.
 
-    let unmountEvent = 'turbolinks:before-visit';
-    if (context.ReactOnRails.option('turbolinksUnmountOnBeforeRender')) {
-      unmountEvent = 'turbolinks:before-render';
-    }
-
     if (turbolinksInstalled() && turbolinksSupported()) {
       if (turbolinksVersion5()) {
         debugTurbolinks(
-          `USING TURBOLINKS 5: document added event listeners ${unmountEvent} and turbolinks:load.`);
-        document.addEventListener(unmountEvent, reactOnRailsPageUnloaded);
+          `USING TURBOLINKS 5: document added event listeners turbolinks:before-render and turbolinks:load.`);
+        document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
         document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
       } else {
         debugTurbolinks(
