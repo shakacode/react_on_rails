@@ -1,7 +1,6 @@
 - [Generator](#generator)
   - [Understanding the Organization of the Generated Client Code](#understanding-the-organization-of-the-generated-client-code)
   - [Redux](#redux)
-    - [Multiple React Components on a Page with One Store](#multiple-react-components-on-a-page-with-one-store)
   - [Using Images and Fonts](#using-images-and-fonts)
 
 The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating Webpack with Rails. Defaults for options are such that the default is for the flag to be off. For example, the default for `-R` is that `redux` is off, and the default of `-b` is that `skip-bootstrap` is off.
@@ -13,7 +12,9 @@ Usage:
   rails generate react_on_rails:install [options]
 
 Options:
-  -R, [--redux], [--no-redux]                          # Install Redux gems and Redux version of Hello World Example
+  -R, [--redux], [--no-redux]                      # Install Redux gems and Redux version of Hello World Example. Default: false
+  -N, [--node], [--no-node]                        # Sets up node as a server rendering option. Default: false
+      [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
 
 Runtime options:
   -f, [--force]                    # Overwrite files that already exist
@@ -22,10 +23,36 @@ Runtime options:
   -s, [--skip], [--no-skip]        # Skip files that already exist
 
 Description:
-    Create react on rails files for install generator.
+
+The react_on_rails:install generator integrates webpack with rails with ease. You
+can pass the redux option if you'd like to have redux setup for you automatically.
+
+* Redux
+
+    Passing the --redux generator option causes the generated Hello World example
+    to integrate the Redux state container framework. The necessary node modules
+    will be automatically included for you.
+
+* Node
+
+    Passing the --node generator option sets up the necessary files for node to render the react_components.
+
+*******************************************************************************
+
+After running the generator, you will want to:
+
+    bundle && npm i
+
+Then you may run
+
+    foreman start -f Procfile.dev
+
+More Details:
+
+    `https://github.com/shakacode/react_on_rails/blob/master/docs/basics/generator.md`
 ```
 
-For a clear example of what each generator option will do, see our generator results repo: [Generator Results](https://github.com/shakacode/react_on_rails-generator-results/blob/master/README.md). Each pull request shows a git "diff" that highlights the changes that the generator has made. Another good option is to create a simple test app per the [Tutorial](docs/tutorial.md).
+Another good option is to create a simple test app per the [Tutorial](docs/tutorial.md).
 
 ### Understanding the Organization of the Generated Client Code
 The generated client code follows our organization scheme. Each unique set of functionality, is given its own folder inside of `client/app/bundles`. This encourages for modularity of *domains*.
