@@ -35,7 +35,7 @@ gem "rspec-rails"
 gem "rspec-retry"
 gem "capybara"
 gem "capybara-screenshot"
-gem "capybara-webkit"
+gem "capybara-webkit", git: 'git@github.com:thoughtbot/capybara-webkit.git', branch: 'qt-4.8-fix'
 gem "chromedriver-helper"
 gem "launchy"
 gem "poltergeist"
