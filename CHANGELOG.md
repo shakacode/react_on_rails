@@ -5,11 +5,12 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 *Please add entries here for your pull requests.*
-### Changed
-- Add ability use gem without sprockets. [#671](https://github.com/shakacode/react_on_rails/pull/671) by [fc-arny](https://github.com/fc-arny)
 
+## [6.5.1] - 2017-02-11
 ### Fixed
-- Fixed issue [#706](https://github.com/shakacode/react_on_rails/issues/706) with "flickering" components when they are unmounted too early [#709](https://github.com/shakacode/react_on_rails/pull/709) by [szyablitsky](https://github.com/szyablitsky)
+- Allow using gem without sprockets. [#671](https://github.com/shakacode/react_on_rails/pull/671) by [fc-arny](https://github.com/fc-arny).
+- Fixed issue [#706](https://github.com/shakacode/react_on_rails/issues/706) with "flickering" components when they are unmounted too early [#709](https://github.com/shakacode/react_on_rails/pull/709) by [szyablitsky](https://github.com/szyablitsky).
+- Small formatting fix for errors [#703](https://github.com/shakacode/react_on_rails/pull/703) by [justin808](https://github.com/justin808).
 
 ## [6.5.0] - 2017-01-31
 ### Added
@@ -447,7 +448,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.5.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.5.1...master
+[6.5.1]: https://github.com/shakacode/react_on_rails/compare/6.5.0...6.5.1
 [6.5.0]: https://github.com/shakacode/react_on_rails/compare/6.4.2...6.5.0
 [6.4.2]: https://github.com/shakacode/react_on_rails/compare/6.4.1...6.4.2
 [6.4.1]: https://github.com/shakacode/react_on_rails/compare/6.4.0...6.4.1
