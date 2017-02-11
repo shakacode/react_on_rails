@@ -111,12 +111,12 @@ There's an implemented example of code splitting in the `spec/dummy` folder of t
 
 See:
 
-- [spec/dummy/client/app/startup/clientRegistration.jsx](../../spec/dummy/client/app/startup/clientRegistration.jsx)
-- [spec/dummy/client/app/startup/serverRegistration.jsx](../../spec/dummy/client/app/startup/serverRegistration.jsx)
-- [spec/dummy/client/app/startup/DeferredRenderAppRenderer.jsx](../../spec/dummy/client/app/startup/DeferredRenderAppRenderer.jsx) <-- Code splitting implemented here
-- [spec/dummy/client/app/startup/DeferredRenderAppServer.jsx](../../spec/dummy/client/app/startup/DeferredRenderAppServer.jsx)
-- [spec/dummy/client/app/components/DeferredRender.jsx](../../spec/dummy/client/app/components/DeferredRender.jsx)
-- [spec/dummy/client/app/components/DeferredRenderAsyncPage.jsx](../../spec/dummy/client/app/components/DeferredRenderAsyncPage.jsx)
+- [spec/dummy/client/app/startup/clientRegistration.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/clientRegistration.jsx)
+- [spec/dummy/client/app/startup/serverRegistration.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/serverRegistration.jsx)
+- [spec/dummy/client/app/startup/DeferredRenderAppRenderer.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/DeferredRenderAppRenderer.jsx) <-- Code splitting implemented here
+- [spec/dummy/client/app/startup/DeferredRenderAppServer.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/DeferredRenderAppServer.jsx)
+- [spec/dummy/client/app/components/DeferredRender.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/components/DeferredRender.jsx)
+- [spec/dummy/client/app/components/DeferredRenderAsyncPage.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/components/DeferredRenderAsyncPage.jsx)
 
 ### Caveats
 

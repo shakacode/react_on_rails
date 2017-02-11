@@ -39,7 +39,7 @@ You need to configure the name of the server bundle in two places:
   # If you are using the same file for client and server rendering, having this set probably does
   # not affect performance.
   config.server_bundle_js_file = "webpack-bundle.js"
-``` 
+```
 
 And in `client/node/package.json`
 
@@ -61,79 +61,102 @@ And you'll need this file: `client/node/server.js`
 
 ```javascript
 // client/node/server.js
-var net = require('net');
-var fs = require('fs');
+const net = require('net');
+const fs = require('fs');
 
-var bundlePath = '../../app/assets/webpack/';
-var bundleFileName = 'webpack-bundle.js';
+const bundlePath = '../../app/assets/webpack/';
+let bundleFileName = 'server-bundle.js';
 
-var currentArg;
+let currentArg;
 
-function Handler() {
-  this.queue = [];
-  this.initialized = false;
+class Handler {
+  constructor() {
+    this.queue = [];
+    this.initialized = false;
+  }
+
+  initialize() {
+    console.log(`Processing ${this.queue.length} pending requests`);
+    let callback;
+
+    // eslint-disable-next-line no-cond-assign
+    while (callback = this.queue.pop()) {
+      callback();
+    }
+
+    this.initialized = true;
+  }
+
+  handle(connection) {
+    const callback = () => {
+      const terminator = '\r\n\0';
+      let request = '';
+      connection.setEncoding('utf8');
+      connection.on('data', (data) => {
+        console.log(`Processing chunk: ${data}`);
+        request += data;
+        if (data.slice(-terminator.length) === terminator) {
+          request = request.slice(0, -terminator.length);
+
+          // eslint-disable-next-line no-eval
+          const response = eval(request);
+          connection.write(`${response}${terminator}`);
+          request = '';
+        }
+      });
+    };
+
+    if (this.initialized) {
+      callback();
+    } else {
+      this.queue.push(callback);
+    }
+  }
 }
 
-Handler.prototype.handle = function (connection) {
-  var callback = function () {
-    connection.setEncoding('utf8');
-    connection.on('data', (data)=> {
-      console.log('Processing request: ' + data);
-      var result = eval(data);
-      connection.write(result);
-    });
-  };
-
-  if (this.initialized) {
-    callback();
-  } else {
-    this.queue.push(callback);
-  }
-};
-
-Handler.prototype.initialize = function () {
-  console.log('Processing ' + this.queue.length + ' pending requests');
-  var callback;
-  while (callback = this.queue.pop()) {
-    callback();
-  }
-
-  this.initialized = true;
-};
-
-var handler = new Handler();
+const handler = new Handler();
 
 process.argv.forEach((val) => {
-  if (val[0] == '-') {
+  if (val[0] === '-') {
     currentArg = val.slice(1);
     return;
   }
 
-  if (currentArg == 's') {
+  if (currentArg === 's') {
     bundleFileName = val;
   }
 });
 
+function loadBundle() {
+  if (handler.initialized) {
+    console.log('Reloading server bundle must be implemented by restarting the node process!');
+    return;
+  }
+
+  /* eslint-disable */
+  require(bundlePath + bundleFileName);
+  /* eslint-enable */
+  console.log(`Loaded server bundle: ${bundlePath}${bundleFileName}`);
+  handler.initialize();
+}
+
 try {
   fs.mkdirSync(bundlePath);
 } catch (e) {
-  if (e.code != 'EEXIST') throw e;
+  if (e.code !== 'EEXIST') {
+    throw e;
+  } else {
+    loadBundle();
+  }
 }
 
 fs.watchFile(bundlePath + bundleFileName, (curr) => {
   if (curr && curr.blocks && curr.blocks > 0) {
-    if (handler.initialized) {
-      console.log('Reloading server bundle must be implemented by restarting the node process!');
-      return;
-    }
-
-    require(bundlePath + bundleFileName);
-    console.log('Loaded server bundle: ' + bundlePath + bundleFileName);
-    handler.initialize();
+    loadBundle();
   }
 });
 
-var unixServer = net.createServer(function (connection) {
+const unixServer = net.createServer((connection) => {
   handler.handle(connection);
 });
 
@@ -143,6 +166,4 @@ process.on('SIGINT', () => {
   unixServer.close();
   process.exit();
 });
-
 ```
-

@@ -29,6 +29,18 @@ From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/
 1. Use the body to explain what and why vs. how
 
 
+## Doc Changes
+
+When making doc changes, we want the change to work on both the gitbook and the regular github site. The issue is that non-doc files will not go to the gitbook site, so doc references to non doc files must use the github URL.
+
+### Links to other docs:
+* When making references to doc files, use a relative URL path like:
+`[Installation Overview](docs/basics/installation-overview.md)`
+
+* When making references to source code files, use a full url path like:
+`[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb)`
+
+
 ## To run tests:
 * After updating code via git, to prepare all examples and run all tests:
 
@@ -86,7 +98,7 @@ npm install --save "react-on-rails@../../react_on_rails"
 
 When you use a relative path, be sure to run the above `npm install` command whenever you change the node package for react-on-rails.
 
-Wihle we'd prefer to us `npm link`, we get errors. If you can figure out how to get `npm link react-on-rails` to work with this project, please file an issue or PR! This used to work with babel 5.
+While we'd prefer to use `npm link`, we get errors. If you can figure out how to get `npm link react-on-rails` to work with this project, please file an issue or PR! This used to work with babel 5.
 
 This is the error:
 
@@ -126,11 +138,11 @@ npm install -g phantomjs
 
 Note this *must* be installed globally for the dummy test project rspec runner to see it properly.
 
-### NPM link
-Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the app's root directory and run:
+### Local Node Package
+Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the teat app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)
 
 ```sh
-npm run node_package
+npm run install-react-on-rails
 ```
 
 From now on, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:prepare_all` rake task.
@@ -141,6 +153,7 @@ From now on, the example and dummy apps will use your local node_package folder 
   resolve: {
     alias: {
       react: path.resolve('./node_modules/react'),
+      'react-dom': path.resolve('./node_modules/react-dom'),
     },
   },
 ```
@@ -161,7 +174,7 @@ spec/dummy.
 # Optionally change default selenium_firefox driver
 export DRIVER=poltergeist
 cd <top level>
-npm dummy:spec
+npm run dummy:spec
 ```
 
 ### Run NPM JS tests
@@ -175,6 +188,13 @@ npm test
 
 ```sh
 cd spec/dummy
+rspec
+```
+
+Eventually, we may have JS tests:
+
+```sh
+cd spec/dummy/client
 npm run test
 ```
 
@@ -182,11 +202,11 @@ npm run test
 
 ```sh
 cd <top level>
-node_package/scripts/ci
+npm run check
 ```
 
 ### Starting the Dummy App
-To run the test app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the webpack configs, then you need to restart foreman. If you change the JS code for react-on-rails, you need to run `node_package/scripts/build`. Since the react-on-rails package should be sym linked, you don't have to `npm i react-on-rails` after every change.
+To run the test app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the webpack configs, then you need to restart foreman. If you change the JS code for react-on-rails, you need to run `npm run build`. Since the react-on-rails package should be sym linked, you don't have to `npm i react-on-rails` after every change.
 
 ### RSpec Testing
 Run `rake` for testing the gem and `spec/dummy`. Otherwise, the `rspec` command only works for testing within the sample apps, like `spec/dummy`.
@@ -217,7 +237,7 @@ The main installer can be run with ```rails generate react_on_rails:install```
 The generators are covered by generator tests using Rails's generator testing helpers, but it never hurts to do a sanity check and explore the API. See [generator_testing_script.md](generator_testing_script.md) for a script on how to run the generator on a fresh project.
 
 ### Linting
-All linting is performed from the docker container for CI. You will need docker and docker-compose installed locally to lint code changes via the lint container. You can lint locally by running `node_package/scripts/lint`
+All linting is performed from the docker container for CI. You will need docker and docker-compose installed locally to lint code changes via the lint container. You can lint locally by running `npm run lint && npm run flow`
 
 * [Install Docker Toolbox for Mac](https://www.docker.com/toolbox)
 * [Install Docker Compose for Linux](https://docs.docker.com/compose/install/)

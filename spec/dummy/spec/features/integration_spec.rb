@@ -176,6 +176,15 @@ feature "Code Splitting w/ Server Rendering", :js do
   end
 end
 
+feature "renderedHtml from generator function", :js do
+  subject { page }
+  background { visit "/rendered_html" }
+  scenario "renderedHtml should not have any errors" do
+    expect(subject).to have_text "Props: {\"hello\":\"world\"}"
+    expect(subject.html).to include("[SERVER] RENDERED RenderedHtml to dom node with id")
+  end
+end
+
 shared_examples "React Component Shared Store" do |url|
   subject { page }
   background { visit url }

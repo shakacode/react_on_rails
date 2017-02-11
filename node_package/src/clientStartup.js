@@ -3,7 +3,7 @@
 import ReactDOM from 'react-dom';
 
 import createReactElement from './createReactElement';
-import isRouterResult from './isRouterResult';
+import isRouterResult from './isCreateReactElementResultNonReactComponent';
 
 const REACT_ON_RAILS_COMPONENT_CLASS_NAME = 'js-react-on-rails-component';
 const REACT_ON_RAILS_STORE_CLASS_NAME = 'js-react-on-rails-store';
@@ -121,7 +121,7 @@ You should return a React.Component always for the client side entry point.`);
       }
     }
   } catch (e) {
-    e.message = `ReactOnRails encountered an error while rendering component: ${name}.` +
+    e.message = `ReactOnRails encountered an error while rendering component: ${name}.\n` +
       `Original message: ${e.message}`;
     throw e;
   }
@@ -183,8 +183,8 @@ export function clientStartup(context) {
       if (turbolinksVersion5()) {
         debugTurbolinks(
           'USING TURBOLINKS 5: document added event listeners ' +
-          ' turbolinks:before-visit and turbolinks:load.');
-        document.addEventListener('turbolinks:before-visit', reactOnRailsPageUnloaded);
+          'turbolinks:before-render and turbolinks:load.');
+        document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
         document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
       } else {
         debugTurbolinks(

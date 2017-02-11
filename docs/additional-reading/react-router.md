@@ -46,3 +46,68 @@ For a fleshed out integration of react_on_rails with react-router, check out [Re
 * [react-webpack-rails-tutorial/client/app/bundles/comments/startup/ClientRouterApp.jsx](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/app/bundles/comments/startup/ClientRouterApp.jsx)
 
 * [react-webpack-rails-tutorial/client/app/bundles/comments/startup/ServerRouterApp.jsx](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/app/bundles/comments/startup/ServerRouterApp.jsx)
+
+
+# Server Rendering Using React Router V4
+
+Your generator function may not return an object with the property `renderedHtml`. Thus, you call 
+renderToString() and return an object with this property.
+
+This example **only applies to server rendering** and should be only used in the server side bundle.
+
+From the [original example in the ReactRouter docs](https://react-router.now.sh/ServerRouter)
+ 
+```javascript
+   import React from 'react'
+   import { renderToString } from 'react-dom/server'
+   import { ServerRouter, createServerRenderContext } from 'react-router'
+   
+   const ReactRouterComponent = (props, railsContext) => {
+   
+     // first create a context for <ServerRouter>, it's where we keep the
+     // results of rendering for the second pass if necessary
+     const context = createServerRenderContext()
+     const { location } = railsContext;
+
+     // render the first time
+     let markup = renderToString(
+       <ServerRouter
+         location={location}
+         context={context}
+       >
+         <App/>
+       </ServerRouter>
+     )
+   
+     // get the result
+     const result = context.getResult()
+   
+     // the result will tell you if it redirected, if so, we ignore
+     // the markup and send a proper redirect.
+     if (result.redirect) {
+       return { 
+         redirectLocation: result.redirect.pathname 
+       };
+     } else {
+   
+       // the result will tell you if there were any misses, if so
+       // we can send a 404 and then do a second render pass with
+       // the context to clue the <Miss> components into rendering
+       // this time (on the client they know from componentDidMount)
+       if (result.missed) {
+         // React on Rails does not support the 404 status code for the browser.  
+         // res.writeHead(404)
+         
+         markup = renderToString(
+           <ServerRouter
+             location={location}
+             context={context}
+           >
+             <App/>
+           </ServerRouter>
+         )
+       }
+       return { renderedHtml: markup };
+     }
+  }
+```
