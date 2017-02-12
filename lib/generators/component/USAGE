@@ -1,0 +1,8 @@
+Description:
+    The component generator creates a boilerplate dumb component inside of client section of a react_on_rails app
+
+Example:
+    rails generate component Thing
+
+    This will create:
+        what/will/it/create

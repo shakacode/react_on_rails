@@ -1,0 +1,8 @@
+Description:
+    hopefully creates a container inside of src with all template files
+
+Example:
+    rails generate container Thing
+
+    This will create:
+        what/will/it/create
