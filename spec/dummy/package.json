@@ -39,9 +39,6 @@
   "devDependencies": {},
   "dependencies": {
     "babel-cli": ">= 6",
-    "babel-runtime": ">= 6",
-    "react": ">= 0.14",
-    "react-dom": ">= 0.14",
-    "react-on-rails": "file:../.."
+    "babel-runtime": ">= 6"
   }
 }
