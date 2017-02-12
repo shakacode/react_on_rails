@@ -1034,8 +1034,8 @@ rc@~1.1.6:
     loose-envify "^1.1.0"
     object-assign "^4.1.0"
 
-"react-on-rails@file:../..":
-  version "6.3.4"
+"react-on-rails@file:../../react-on-rails":
+  version "6.5.1"
 
 "react@>= 0.14":
   version "15.4.2"
