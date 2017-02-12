@@ -13,14 +13,7 @@ can pass the redux option if you'd like to have redux setup for you automaticall
 
     Passing the --node generator option sets up the necessary files for node to render the react_components.
 
-		*******************************************************************************
-
-* Start
-
-		
-
-
-		*******************************************************************************
+*******************************************************************************
 
 After running the generator, you will want to:
 
@@ -33,3 +26,17 @@ Then you may run
 More Details:
 
     `https://github.com/shakacode/react_on_rails/blob/master/docs/basics/generator.md`
+
+*******************************************************************************
+
+* Start
+
+		Running the start generator will reset the client folder to client/app erasing the HelloWorld folder. Which will create the build path for the component and container generators and the file insertions.
+
+* Component #{name}
+
+		The component generator will generate an initial components folder inside of client/app with the #{name} component folder inside, passing the #{name} to the registration file and generating the rails views and routes.
+
+* Container #{name}
+
+		Creates an initial containers folder inside of the app folder. Also, creates a #{name} folder inside of containers with the necessary smart container files, passing the #{name} to the registration file and generating the rails views and routes.
