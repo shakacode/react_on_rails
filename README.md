@@ -141,7 +141,7 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
   foreman start -f Procfile.dev
   ```
 
-7. Visit [localhost:5000/hello_world](http://localhost:5000/hello_world)
+7. foreman defaults to any PORT value set in the environment. If you have ```bash export PORT=3000 ``` in your dot file or ```bash .envrc ```, so you can set whatever port you would like to use. Otherwise, foreman will use ```bash port 5000 ```, and you would visit [localhost:5000/hello_world](http://localhost:5000/hello_world)
 
 ### Installation Summary
 
