@@ -94,7 +94,7 @@ TURBO: reactOnRailsPageLoaded
 
 Turbolinks 5:
 ```
-TURBO: WITH TURBOLINKS 5: document turbolinks:before-cache and turbolinks:load handlers installed. (program)
+TURBO: WITH TURBOLINKS 5: document turbolinks:before-render and turbolinks:load handlers installed. (program)
 TURBO: reactOnRailsPageLoaded
 ```
 
