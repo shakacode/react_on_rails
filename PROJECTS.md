@@ -19,7 +19,7 @@
 * **[Foxford.ru](http://foxford.ru/)**: Online School ![2016-12-17_13-23-21](https://cloud.githubusercontent.com/assets/1118459/21290377/1adacdf2-c45c-11e6-97c1-f726ab749b2d.png)
 
 ## Open Source Projects Live
-* [github.com/empirical-org/Empirical-Core](https://github.com/empirical-org/Empirical-Core): Quill.org Provideds free tools to make your students better writers.
+* [github.com/empirical-org/Empirical-Core](https://github.com/empirical-org/Empirical-Core): [Quill.org](https://quill.org/) Provides free tools to make your students better writers.
 
 ## Demos and Tutorials
 * [reactrails.com](http://www.reactrails.com), source code [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/)
