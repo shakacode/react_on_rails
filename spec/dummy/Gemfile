@@ -2,6 +2,8 @@ source 'https://rubygems.org'
 
 eval_gemfile File.expand_path("../../../react_on_rails.gemspec", __FILE__)
 
+gem "json", "~> 1.8.6"
+
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
 gem 'rails', '4.2.5'
 # Use sqlite3 as the database for Active Record
