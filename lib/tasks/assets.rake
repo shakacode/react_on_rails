@@ -1,4 +1,5 @@
 require "react_on_rails/assets_precompile"
+require "react_on_rails/locales_to_js"
 
 if defined?(Sprockets)
   namespace :react_on_rails do
@@ -50,9 +51,20 @@ Compile assets with webpack
 Uses command defined with ReactOnRails.configuration.npm_build_production_command
 sh "cd client && `ReactOnRails.configuration.npm_build_production_command`"
     DESC
-    task webpack: :environment do
+    task webpack: :locale do
       if ReactOnRails.configuration.npm_build_production_command.present?
         sh "cd client && #{ReactOnRails.configuration.npm_build_production_command}"
+      end
+    end
+
+    desc <<-DESC
+When "ReactOnRails.configuration.i18n_dir" is set, it indeicates that javascript locale files are needed.
+This task generates javascript locale files: `translations.js` & `default.js`.
+    DESC
+    desc "Generate i18n javascript files"
+    task locale: :environment do
+      if ReactOnRails.configuration.i18n_dir.present?
+        ReactOnRails::LocalesToJs.new
       end
     end
   end
