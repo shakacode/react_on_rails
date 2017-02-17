@@ -139,7 +139,7 @@ npm install -g phantomjs
 Note this *must* be installed globally for the dummy test project rspec runner to see it properly.
 
 ### Local Node Package
-Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the teat app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)
+Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the test app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)
 
 ```sh
 npm run install-react-on-rails
