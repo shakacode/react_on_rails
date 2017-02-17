@@ -84,7 +84,7 @@ foreman start -f Procfile.dev
 ![04](https://cloud.githubusercontent.com/assets/20628911/17464921/3c2fdb40-5cf2-11e6-9343-6afa53593a70.png)
 
 
-Visit http://localhost:3000/hello_world and see your **React On Rails** app running!
+Visit http://localhost:5000/hello_world and see your **React On Rails** app running!
 
 ![05](https://cloud.githubusercontent.com/assets/20628911/17464920/3c2e8ae2-5cf2-11e6-9e30-5ec5f9e2cbc6.png)
 
