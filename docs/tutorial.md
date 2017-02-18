@@ -19,6 +19,8 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 * https://rubygems.org/gems/react_on_rails
 * https://www.npmjs.com/package/react-on-rails
 
+_Note: some of the screen images below show the "npm" command. react_on_rails 6.6.0 and greater uses `yarn`._
+
 ##Setting up the environment
 
 Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 4.x and node version 5+. I recommend `rvm` and `nvm` to install Ruby and Node. Rails can be installed as ordinary gem.
@@ -83,14 +85,13 @@ foreman start -f Procfile.dev
 
 ![04](https://cloud.githubusercontent.com/assets/20628911/17464921/3c2fdb40-5cf2-11e6-9343-6afa53593a70.png)
 
-
-Visit http://localhost:5000/hello_world and see your **React On Rails** app running!
+Visit http://localhost:3000/hello_world and see your **React On Rails** app running!
 
 ![05](https://cloud.githubusercontent.com/assets/20628911/17464920/3c2e8ae2-5cf2-11e6-9e30-5ec5f9e2cbc6.png)
 
 ### Custom IP & PORT setup (Cloud9 example)
 
-In case you are running some custom setup with different IP or PORT you should also edit Procfile.dev. For example to be able to run on free Cloud9 IDE we are putting IP 0.0.0.0 and PORT 8080
+In case you are running some custom setup with different IP or PORT you should also edit Procfile.dev. For example to be able to run on free Cloud9 IDE we are putting IP 0.0.0.0 and PORT 8080. The default generated file `Procfile.dev` uses `-p 3000`.
 
 ``` Procfile.dev
 web: rails s -p 8080 -b 0.0.0.0
@@ -193,4 +194,4 @@ Here it is:
 * [Source code for this sample app](https://github.com/dzirtusss/hello-react-on-rails)
 * [Live on Heroku](https://hello-react-on-rails.herokuapp.com/)
 
-Feedback is greatly appreciated! As are stars on github!
+Feedback is greatly appreciated! As are stars on github! If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com).
