@@ -6,6 +6,10 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 *Please add entries here for your pull requests.*
 
+## [6.6.0] - 2017-02-18
+### Added
+- Switched to yarn! [#715](https://github.com/shakacode/react_on_rails/pull/715) by [squadette](https://github.com/squadette).
+
 ## [6.5.1] - 2017-02-11
 ### Fixed
 - Allow using gem without sprockets. [#671](https://github.com/shakacode/react_on_rails/pull/671) by [fc-arny](https://github.com/fc-arny).
@@ -448,7 +452,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.5.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.6.0...master
+[6.6.0]: https://github.com/shakacode/react_on_rails/compare/6.5.1...6.6.0
 [6.5.1]: https://github.com/shakacode/react_on_rails/compare/6.5.0...6.5.1
 [6.5.0]: https://github.com/shakacode/react_on_rails/compare/6.4.2...6.5.0
 [6.4.2]: https://github.com/shakacode/react_on_rails/compare/6.4.1...6.4.2
