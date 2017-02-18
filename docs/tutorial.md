@@ -33,6 +33,7 @@ rvm use 2.3.1 --default         # use it and make it default
 rvm list                        # check
 
 gem install rails               # download and install latest stable Rails
+gem install foreman             # download and install Foreman
 ```
 
 Then we need to create a fresh Rails application as following:
