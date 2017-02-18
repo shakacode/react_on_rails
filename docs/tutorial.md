@@ -194,4 +194,4 @@ Here it is:
 * [Source code for this sample app](https://github.com/dzirtusss/hello-react-on-rails)
 * [Live on Heroku](https://hello-react-on-rails.herokuapp.com/)
 
-Feedback is greatly appreciated! As are stars on github!
+Feedback is greatly appreciated! As are stars on github! If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com).
