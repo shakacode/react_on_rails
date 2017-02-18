@@ -28,5 +28,5 @@ export function consoleReplay() {
 }
 
 export default function buildConsoleReplay() {
-  return RenderUtils.wrapInScriptTags(consoleReplay());
+  return RenderUtils.wrapInScriptTags('consoleReplayLog', consoleReplay());
 }
