@@ -7,7 +7,7 @@
  * [Turbolinks](docs/additional-reading/turbolinks.md)
 
 ### **Javascript**
- * [Node Dependencies and NPM](docs/additional-reading/node-dependencies-and-npm.md)
+ * [Node Dependencies, NPM, and Yarn](docs/additional-reading/node-dependencies-and-npm.md)
  * [Babel](docs/additional-reading/babel.md)
  * [React Router](docs/additional-reading/react-router.md)
  * [React & Redux](docs/additional-reading/react-and-redux.md)

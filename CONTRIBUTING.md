@@ -45,12 +45,12 @@ When making doc changes, we want the change to work on both the gitbook and the 
 * After updating code via git, to prepare all examples and run all tests:
 
 ```
-bundle && npm i && rake examples:prepare_all && rake node_package && rake
+bundle && yarn && rake examples:prepare_all && rake node_package && rake
 ```
 
 In order to run tests in browser
 ```
-npm i -g browserify babelify tape-run faucet
+yarn global add  browserify babelify tape-run faucet
 browserify -t babelify node_package/tests/*.js | tape-run | faucet
 ```
 
@@ -86,37 +86,17 @@ Note that you will need to bundle install after making this change, but also tha
 First, be **sure** to build the NPM package
 
 ```sh
-npm i
-npm run build
+yarn
+yarn run build
 ```
 
 Use a relative path in your `package.json`, like this:
 ```sh
 cd client
-npm install --save "react-on-rails@../../react_on_rails"
+yarn add "react-on-rails@../../react_on_rails"
 ```
 
-When you use a relative path, be sure to run the above `npm install` command whenever you change the node package for react-on-rails.
-
-While we'd prefer to use `npm link`, we get errors. If you can figure out how to get `npm link react-on-rails` to work with this project, please file an issue or PR! This used to work with babel 5.
-
-This is the error:
-
-```
-16:34:11 rails-client-assets.1 | ERROR in /react_on_rails/node_package/lib/ReactOnRails.js
-16:34:11 rails-client-assets.1 | Module build failed: ReferenceError: Unknown plugin "react-transform" specified in "base" at 0, attempted to resolve relative to "/react_on_rails/node_package/lib"
-16:34:11 rails-client-assets.1 |     at /react-webpack-rails-tutorial/client/node_modules/babel-core/lib/transformation/file/options/option-manager.js:193:17
-16:34:11 rails-client-assets.1 |     at Array.map (native)
-16:34:11 rails-client-assets.1 |     at Function.normalisePlugins (/react-webpack-rails-tutorial/client/node_modules/babel-core/lib/transformation/file/options/option-manager.js:173:20)
-16:34:11 rails-client-assets.1 |     at OptionManager.mergeOptions (/react-webpack-rails-tutorial/client/node_modules/babel-core/lib/transformation/file/options/option-manager.js:271:36)
-16:34:11 rails-client-assets.1 |     at OptionManager.init (/react-webpack-rails-tutorial/client/node_modules/babel-core/lib/transformation/file/options/option-manager.js:416:10)
-16:34:11 rails-client-assets.1 |     at File.initOptions (/react-webpack-rails-tutorial/client/node_modules/babel-core/lib/transformation/file/index.js:191:75)
-16:34:11 rails-client-assets.1 |     at new File (/react-webpack-rails-tutorial/client/node_modules/babel-core/lib/transformation/file/index.js:122:22)
-16:34:11 rails-client-assets.1 |     at Pipeline.transform (/react-webpack-rails-tutorial/client/node_modules/babel-core/lib/transformation/pipeline.js:42:16)
-16:34:11 rails-client-assets.1 |     at transpile (/react-webpack-rails-tutorial/client/node_modules/babel-loader/index.js:14:22)
-16:34:11 rails-client-assets.1 |     at Object.module.exports (/react-webpack-rails-tutorial/client/node_modules/babel-loader/index.js:88:12)
-16:34:11 rails-client-assets.1 |  @ ./app/bundles/comments/startup/clientRegistration.jsx 15:20-45
-```
+When you use a relative path, be sure to run the above `yarn` command whenever you change the node package for react-on-rails.
 
 # Development Setup for Gem and Node Package Contributors
 
@@ -133,7 +113,7 @@ After checking out the repo, making sure you have rvm and nvm setup (setup ruby 
 Additionally, our RSpec tests use the poltergeist web driver. You will need to install the phantomjs node module:
 
 ```sh
-npm install -g phantomjs
+yarn global add phantomjs
 ```
 
 Note this *must* be installed globally for the dummy test project rspec runner to see it properly.
@@ -142,7 +122,7 @@ Note this *must* be installed globally for the dummy test project rspec runner t
 Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the test app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)
 
 ```sh
-npm run install-react-on-rails
+yarn run install-react-on-rails
 ```
 
 From now on, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:prepare_all` rake task.
@@ -162,11 +142,11 @@ From now on, the example and dummy apps will use your local node_package folder 
 
 ```sh
 cd <top level>
-npm i
+yarn
 npm build
 ```
 
-Or run this which builds the npm package, then the webpack files for spec/dummy, and runs tests in
+Or run this which builds the yarn package, then the webpack files for spec/dummy, and runs tests in
 spec/dummy.
 
 
@@ -174,14 +154,14 @@ spec/dummy.
 # Optionally change default selenium_firefox driver
 export DRIVER=poltergeist
 cd <top level>
-npm run dummy:spec
+yarn run dummy:spec
 ```
 
 ### Run NPM JS tests
 
 ```sh
 cd <top level>
-npm test
+yarn test
 ```
 
 ### Run spec/dummy tests
@@ -195,7 +175,7 @@ Eventually, we may have JS tests:
 
 ```sh
 cd spec/dummy/client
-npm run test
+yarn run test
 ```
 
 ### Run most tests and linting
@@ -206,7 +186,7 @@ npm run check
 ```
 
 ### Starting the Dummy App
-To run the test app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the webpack configs, then you need to restart foreman. If you change the JS code for react-on-rails, you need to run `npm run build`. Since the react-on-rails package should be sym linked, you don't have to `npm i react-on-rails` after every change.
+To run the test app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the webpack configs, then you need to restart foreman. If you change the JS code for react-on-rails, you need to run `yarn run build`. Since the react-on-rails package should be sym linked, you don't have to `yarn react-on-rails` after every change.
 
 ### RSpec Testing
 Run `rake` for testing the gem and `spec/dummy`. Otherwise, the `rspec` command only works for testing within the sample apps, like `spec/dummy`.

@@ -21,11 +21,11 @@
     "babel-types": "^6.21.0",
     "babelify": "^7.3.0",
     "blue-tape": "^1.0.0",
-    "eslint": "^3.12.2",
+    "eslint": "^3.9.1",
     "eslint-config-shakacode": "^13.2.1",
-    "eslint-plugin-import": "^2.2.0",
-    "eslint-plugin-jsx-a11y": "^3.0.2",
-    "eslint-plugin-react": "^6.8.0",
+    "eslint-plugin-import": "^2.1.0",
+    "eslint-plugin-jsx-a11y": "^2.2.3",
+    "eslint-plugin-react": "^6.6.0",
     "flow-bin": "^0.37.4",
     "jsdom": "^9.9.1",
     "react": "^15.4.1",
@@ -38,9 +38,9 @@
     "webpack": "^1.14.0"
   },
   "peerDependencies": {
+    "babel-runtime": ">= 6",
     "react": ">= 0.14",
-    "react-dom": ">= 0.14",
-    "babel-runtime": ">= 6"
+    "react-dom": ">= 0.14"
   },
   "files": [
     "node_package/lib"
@@ -48,21 +48,21 @@
   "scripts": {
     "test": "babel-tape-runner -r node_package/tests/helpers/test_helper.js node_package/tests/*.js | tap-spec",
     "clean": "rm -rf node_package/lib",
-    "prepublish": "npm run build",
+    "prepublish": "yarn run build",
     "babel": "babel --out-dir node_package/lib node_package/src",
-    "build": "npm run clean && npm run babel",
+    "build": "yarn run clean && yarn run babel",
     "build-watch": "babel --watch --out-dir node_package/lib node_package/src",
     "eslint": "eslint .",
     "flow": "flow check node_package",
-    "lint": "npm run eslint",
-    "check": "npm run lint && npm run flow && npm run test",
-    "prerelease": "npm run check && npm run clean && npm run build",
+    "lint": "yarn run eslint && yarn run flow",
+    "check": "yarn run lint && yarn run flow && yarn run test",
+    "prerelease": "yarn run check && yarn run clean && yarn run build",
     "release:patch": "node_package/scripts/release patch",
     "release:minor": "node_package/scripts/release minor",
     "release:major": "node_package/scripts/release major",
     "dummy:install": "rake dummy_apps",
     "dummy:spec": "rake run_rspec:dummy",
-    "local": "echo 'Be sure to run npm run dummy:install' && npm run build && cd spec/dummy && foreman start"
+    "local": "echo 'Be sure to run yarn run dummy:install' && yarn run build && cd spec/dummy && foreman start"
   },
   "repository": {
     "type": "git",

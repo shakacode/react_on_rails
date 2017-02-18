@@ -70,7 +70,7 @@ update dependencies and generate empty app via `react_on_rails:install`. If you 
 ```
 bundle
 rails generate react_on_rails:install
-bundle && npm install
+bundle && yarn
 ```
 
 ![03](https://cloud.githubusercontent.com/assets/20628911/17464918/3c2c1f00-5cf2-11e6-9525-7b2e15659e01.png)

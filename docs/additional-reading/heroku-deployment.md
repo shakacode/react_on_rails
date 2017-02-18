@@ -24,7 +24,7 @@ Rake::Task["assets:precompile"]
 ```    
 
 ## Caching Node Modules
-By default Heroku will cache the root `node_modules` directory between deploys but since we're installing in `client/node_modules` you'll need to add the following line to the `package.json` in your root directory (otherwise you'll have to sit through a full `npm install` on each deploy):
+By default Heroku will cache the root `node_modules` directory between deploys but since we're installing in `client/node_modules` you'll need to add the following line to the `package.json` in your root directory (otherwise you'll have to sit through a full `yarn` on each deploy):
 
 ```js
 "cacheDirectories": [

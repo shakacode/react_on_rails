@@ -3,7 +3,7 @@ include ReactOnRails::TaskHelpers
 
 namespace :node_package do
   task :build do
-    sh "npm run build"
+    sh "yarn run build"
   end
 end
 

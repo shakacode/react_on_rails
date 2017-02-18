@@ -130,7 +130,7 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
 5. Bundle and NPM install. Make sure you are on a recent version of node. Please use at least Node v5. Bundle is for adding execJs. You can remove that if you are sure you will not server render.
 
   ```bash
-  bundle && npm install
+  bundle && yarn
   ```
 
 6. Ensure that you have `foreman` installed: `gem install foreman`.
@@ -198,7 +198,7 @@ See the [How to add I18n](docs/basics/i18n.md) for a summary of adding I18n.
 All JavaScript in React On Rails is loaded from npm: [react-on-rails](https://www.npmjs.com/package/react-on-rails). To manually install this (you did not use the generator), assuming you have a standard configuration, run this command:
 
 ```
-cd client && npm i --saveDev react-on-rails
+cd client && yarn add react-on-rails
 ```
 
 That will install the latest version and update your package.json.
@@ -504,7 +504,7 @@ Node.js can be used as the backend for server-side rendering instead of [execJS]
   + [Turbolinks](docs/additional-reading/turbolinks.md)
 
 + **Javascript**
-  + [Node Dependencies and NPM](docs/additional-reading/node-dependencies-and-npm.md)
+  + [Node Dependencies, NPM, and Yarn](docs/additional-reading/node-dependencies-and-npm.md)
   + [Babel](docs/additional-reading/babel.md)
   + [React Router](docs/additional-reading/react-router.md)
   + [React & Redux](docs/additional-reading/react-and-redux.md)
@@ -551,7 +551,7 @@ Node.js can be used as the backend for server-side rendering instead of [execJS]
 + [spec app](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy): Great simple examples used for our tests.
   ```
   cd spec/dummy
-  bundle && npm i
+  bundle && yarn
   foreman start
   ```
 

@@ -9,39 +9,32 @@ It also includes many eslint defaults that the AirBnb eslint does not include.
 Running linter:
 ===========================
 
-Soon to be in gulpfile....but gulp-eslint depends on eslint depends on 
+Running the linter:
 
-```
-    "eslint-plugin-react": "^2.0.2",
-```
+    yarn run lint
 
-So don't use `npm run gulp lint` yet. 
-
-For now: 
-
-    bin/lint
+or to autofix
+    
+    yarn run lint -- --fix
     
     
 Updating Node Dependenencies
 ===========================
 
 ```
-npm install -g npm-check-updates
+yarn global add npm-check-updates
 ```
  
   
 ```
 # Make sure you are in the `client` directory, then run:
 cd client 
-rm npm-shrinkwrap.json
-npm-check-updates -u
-npm install
-npm shrinkwrap
+npm-check-updates -u -a
+yarn
 ```
 
 Then confirm that the hot reload server and the rails server both work fine. You
-may have to delete `node_modules` and `npm-shrinkwrap.json` and then run `npm
-shrinkwrap`.
+may have to delete `node_modules`. 
 
 Adding Node Modules
 =====================================
@@ -54,9 +47,7 @@ Before you do so, consider:
 
 ```bash
 cd client
-npm install --save module_name@version
+yarn add module_name@version
 # or 
-# npm install --save_dev module_name@version
-rm npm-shrinkwrap.json
-npm shrinkwrap
+# yarn add --dev module_name@version
 ```
