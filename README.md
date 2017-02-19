@@ -226,7 +226,7 @@ In the following screenshot you can see the 3 parts of React on Rails rendering:
 ### Building the Bundles
 Each time you change your client code, you will need to re-generate the bundles (the webpack-created JavaScript files included in application.js). The included Foreman `Procfile.dev` will take care of this for you by watching your JavaScript code files for changes. Simply run `foreman start -f Procfile.dev`.
 
-On production deployments that use asset precompilation, such as Heroku deployments, React on Rails, by default, will automatically run webpack to build your JavaScript bundles. You can see the source code for what gets added to your precompilation [here](https://github.com/shakacode/react_on_rails/tree/master/lib/tasks/assets.rake). For more information on this topic, see [the doc on Heroku deployment](https://github.com/shakacode/react_on_rails/tree/master/docs/additional-reading/heroku-deployment.md#more-details-on-precompilation-using-webpack-to-create-javascript-assets).
+On production deployments that use asset precompilation, such as Heroku deployments, React on Rails, by default, will automatically run webpack to build your JavaScript bundles. You can see the source code for what gets added to your precompilation [here](https://github.com/shakacode/react_on_rails/tree/master/lib/tasks/assets.rake). For more information on this topic, see [the doc on Heroku deployment](./docs/additional-reading/heroku-deployment.md#more-details-on-precompilation-using-webpack-to-create-javascript-assets).
 
 If you have used the provided generator, these bundles will automatically be added to your `.gitignore` to prevent extraneous noise from re-generated code in your pull requests. You will want to do this manually if you do not use the provided generator.
 
@@ -335,7 +335,7 @@ Why would you create a function that returns a React component? For example, you
 Another reason to user a generator function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }.
 
 #### Renderer Functions
-A renderer function is a generator function that accepts three arguments: `(props, railsContext, domNodeId) => { ... }`. Instead of returning a React component, a renderer is responsible for calling `ReactDOM.render` to manually render a React component into the dom. Why would you want to call `ReactDOM.render` yourself? One possible use case is [code splitting](/docs/additional-reading/code-splitting.md).
+A renderer function is a generator function that accepts three arguments: `(props, railsContext, domNodeId) => { ... }`. Instead of returning a React component, a renderer is responsible for calling `ReactDOM.render` to manually render a React component into the dom. Why would you want to call `ReactDOM.render` yourself? One possible use case is [code splitting](./docs/additional-reading/code-splitting.md).
 
 Renderer functions are not meant to be used on the server, since there's no DOM on the server. Instead, use a generator function. Attempting to server render with a renderer function will cause an error.
 
@@ -480,70 +480,70 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 ## React Router
 [React Router](https://github.com/reactjs/react-router) is supported, including server side rendering! See:
 
-1. [React on Rails docs for react-router](/docs/additional-reading/react-router.md)
+1. [React on Rails docs for react-router](./docs/additional-reading/react-router.md)
 1. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/ServerRouterApp.jsx).
-1. [Code Splitting docs](/docs/additional-reading/code-splitting.md) for information about how to set up code splitting for server rendered routes.
+1. [Code Splitting docs](./docs/additional-reading/code-splitting.md) for information about how to set up code splitting for server rendered routes.
 
 ## Deployment
 * Version 6.0 puts the necessary precompile steps automatically in the rake precompile step. You can, however, disable this by setting certain values to nil in the [config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb).
   * `config.symlink_non_digested_assets_regex`: Set to nil to turn off the setup of non-js assets.
   * `npm_build_production_command`: Set to nil to turn off the precompilation of the js assets.
-* See the [Heroku Deployment](/docs/additional-reading/heroku-deployment.md) doc for specifics regarding Heroku. The information here should apply to other deployments.
+* See the [Heroku Deployment](./docs/additional-reading/heroku-deployment.md) doc for specifics regarding Heroku. The information here should apply to other deployments.
 * If you're using the node server for server rendering, you may want to do your own AWS install. We'll have more docs on this in the future. [Get in touch](mailto:justin@shakacode.com) if you're keenly interested in this feature.
 
 ## Integration with Node
-Node.js can be used as the backend for server-side rendering instead of [execJS](https://github.com/rails/execjs). Before you try this, consider the tradeoff of extra complexity with your deployments versus *potential* performance gains. We've found that using ExecJS with [mini_racer](https://github.com/discourse/mini_racer) to be "fast enough" so far. That being said, we've heard of other large websites using Node.js for better server rendering performance. See [Node.js for Server Rendering](/docs/additional-reading/node-server-rendering.md) for more information.
+Node.js can be used as the backend for server-side rendering instead of [execJS](https://github.com/rails/execjs). Before you try this, consider the tradeoff of extra complexity with your deployments versus *potential* performance gains. We've found that using ExecJS with [mini_racer](https://github.com/discourse/mini_racer) to be "fast enough" so far. That being said, we've heard of other large websites using Node.js for better server rendering performance. See [Node.js for Server Rendering](./docs/additional-reading/node-server-rendering.md) for more information.
 
 ## Additional Documentation
 **Try out our new [Documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) for improved readability & reference!**
 + **Rails**
-  + [Rails Assets](/docs/additional-reading/rails-assets.md)
-  + [Rails Engine Integration](/docs/additional-reading/rails-engine-integration.md)
-  + [Rails View Rendering from Inline JavaScript](/docs/additional-reading/rails_view_rendering_from_inline_javascript.md)
-  + [RSpec Configuration](/docs/additional-reading/rspec-configuration.md)
-  + [Turbolinks](/docs/additional-reading/turbolinks.md)
+  + [Rails Assets](./docs/additional-reading/rails-assets.md)
+  + [Rails Engine Integration](./docs/additional-reading/rails-engine-integration.md)
+  + [Rails View Rendering from Inline JavaScript](./docs/additional-reading/rails_view_rendering_from_inline_javascript.md)
+  + [RSpec Configuration](./docs/additional-reading/rspec-configuration.md)
+  + [Turbolinks](./docs/additional-reading/turbolinks.md)
 
 + **Javascript**
-  + [Node Dependencies, NPM, and Yarn](/docs/additional-reading/node-dependencies-and-npm.md)
-  + [Babel](/docs/additional-reading/babel.md)
-  + [React Router](/docs/additional-reading/react-router.md)
-  + [React & Redux](/docs/additional-reading/react-and-redux.md)
-  + [Webpack](/docs/additional-reading/webpack.md)
-  + [Webpack Configuration](/docs/additional-reading/webpack.md)
+  + [Node Dependencies, NPM, and Yarn](./docs/additional-reading/node-dependencies-and-npm.md)
+  + [Babel](./docs/additional-reading/babel.md)
+  + [React Router](./docs/additional-reading/react-router.md)
+  + [React & Redux](./docs/additional-reading/react-and-redux.md)
+  + [Webpack](./docs/additional-reading/webpack.md)
+  + [Webpack Configuration](./docs/additional-reading/webpack.md)
   + [Webpack Cookbook](https://christianalfoni.github.io/react-webpack-cookbook/index.html)
   + [Developing with the Webpack Dev Server](docs/additional-reading/webpack-dev-server.md)
-  + [Node Server Rendering](/docs/additional-reading/node-server-rendering.md)
-  + [Server Rendering Tips](/docs/additional-reading/server-rendering-tips.md)
-  + [Code Splitting](/docs/additional-reading/code-splitting.md)
-  + [AngularJS Integration and Migration to React on Rails](/docs/additional-reading/angular-js-integration-migration.md)
+  + [Node Server Rendering](./docs/additional-reading/node-server-rendering.md)
+  + [Server Rendering Tips](./docs/additional-reading/server-rendering-tips.md)
+  + [Code Splitting](./docs/additional-reading/code-splitting.md)
+  + [AngularJS Integration and Migration to React on Rails](./docs/additional-reading/angular-js-integration-migration.md)
 
 + **Development**
-  + [React on Rails Basic Installation Tutorial](/docs/tutorial.md) ([live demo](https://hello-react-on-rails.herokuapp.com))
-  + [Installation Overview](/docs/basics/installation-overview.md)
-  + [Migration from react-rails](/docs/basics/migrating-from-react-rails.md)
-  + [Recommended Project Structure](/docs/additional-reading/recommended-project-structure.md)
-  + [Generator Tips](/docs/basics/generator.md)
-  + [Hot Reloading of Assets For Rails Development](/docs/additional-reading/hot-reloading-rails-development.md)
-  + [Heroku Deployment](/docs/additional-reading/heroku-deployment.md)
-  + [Updating Dependencies](/docs/additional-reading/updating-dependencies.md)
+  + [React on Rails Basic Installation Tutorial](./docs/tutorial.md) ([live demo](https://hello-react-on-rails.herokuapp.com))
+  + [Installation Overview](./docs/basics/installation-overview.md)
+  + [Migration from react-rails](./docs/basics/migrating-from-react-rails.md)
+  + [Recommended Project Structure](./docs/additional-reading/recommended-project-structure.md)
+  + [Generator Tips](./docs/basics/generator.md)
+  + [Hot Reloading of Assets For Rails Development](./docs/additional-reading/hot-reloading-rails-development.md)
+  + [Heroku Deployment](./docs/additional-reading/heroku-deployment.md)
+  + [Updating Dependencies](./docs/additional-reading/updating-dependencies.md)
 
 + **API**
-  + [JavaScript API](/docs/api/javascript-api.md)
-  + [Ruby API](/docs/api/ruby-api.md)
-  + [Setting up Hot Reloading during Rails Development, API docs](/docs/api/ruby-api-hot-reload-view-helpers.md)
+  + [JavaScript API](./docs/api/javascript-api.md)
+  + [Ruby API](./docs/api/ruby-api.md)
+  + [Setting up Hot Reloading during Rails Development, API docs](./docs/api/ruby-api-hot-reload-view-helpers.md)
 
 + **[CONTRIBUTING](CONTRIBUTING.md)**
-  + [Generator Testing](/docs/contributor-info/generator-testing.md)
-  + [Linting](/docs/contributor-info/linters.md)
-  + [Releasing](/docs/contributor-info/releasing.md)
+  + [Generator Testing](./docs/contributor-info/generator-testing.md)
+  + [Linting](./docs/contributor-info/linters.md)
+  + [Releasing](./docs/contributor-info/releasing.md)
 
 + **Misc**
-  + [Tips](/docs/additional-reading/tips.md)
-  + [Changelog](/CHANGELOG.md)
-  + [Projects](/PROJECTS.md)
-  + [Shaka Code Style](/docs/coding-style/style.md)
+  + [Tips](./docs/additional-reading/tips.md)
+  + [Changelog](./CHANGELOG.md)
+  + [Projects](./PROJECTS.md)
+  + [Shaka Code Style](./docs/coding-style/style.md)
   + [React on Rails, Slides](http://www.slideshare.net/justingordon/react-on-rails-v61)
-  + [Code of Conduct](/docs/misc/code_of_conduct.md)
+  + [Code of Conduct](./docs/misc/code_of_conduct.md)
   + [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
   + [React on Rails, 2000+ 🌟 Stars](https://medium.com/shakacode/react-on-rails-2000-stars-32ff5cfacfbf#.6gmfb2gpy)
 
@@ -567,7 +567,7 @@ Bug reports and pull requests are welcome. This project is intended to be a safe
 See [Contributing](CONTRIBUTING.md) to get started.
 
 ## License
-The gem is available as open source under the terms of the [MIT License](docs/LICENSE).
+The gem is available as open source under the terms of the [MIT License](./docs/LICENSE).
 
 ## Authors
 [The Shaka Code team!](http://www.shakacode.com/about/)
