@@ -578,6 +578,12 @@ The gem project started with [Justin Gordon](https://github.com/justin808/) pair
 
 We owe much gratitude to the work of the [react-rails gem](https://github.com/reactjs/react-rails).
 
+# Thanks!
+The following companies support open source, and ShakaCode uses their products!
+
+* [JetBrains](https://www.jetbrains.com/)
+* [![2017-02-21_22-35-32](https://cloud.githubusercontent.com/assets/1118459/23203304/1261e468-f886-11e6-819e-93b1a3f17da4.png)](https://www.browserstack.com)
+
 # FINAL NOTES
 * See [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
 * Follow [@railsonmaui](https://twitter.com/railsonmaui) and [@shakacode](https://twitter.com/shakacode) on Twitter for updates on releases. We've also got a forum category dedicated to [react_on_rails](https://forum.shakacode.com/c/rails/reactonrails).
