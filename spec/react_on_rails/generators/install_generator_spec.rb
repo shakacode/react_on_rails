@@ -138,7 +138,7 @@ describe InstallGenerator, type: :generator do
     specify "when npm is exist" do
       stub_const("RUBY_PLATFORM", "linux")
       allow(@install_generator).to receive(:`).with("which yarn").and_return("/path/to/bin")
-      expect(@install_generator.send(:missing_npm?)).to eq false
+      expect(@install_generator.send(:missing_yarn?)).to eq false
     end
   end
 
@@ -154,7 +154,7 @@ describe InstallGenerator, type: :generator do
     specify "when npm is missing" do
       stub_const("RUBY_PLATFORM", "linux")
       allow(@install_generator).to receive(:`).with("which yarn").and_return("")
-      expect(@install_generator.send(:missing_npm?)).to eq true
+      expect(@install_generator.send(:missing_yarn?)).to eq true
     end
   end
 
@@ -170,7 +170,7 @@ describe InstallGenerator, type: :generator do
     specify "when npm is exist" do
       stub_const("RUBY_PLATFORM", "mswin")
       allow(@install_generator).to receive(:`).with("where yarn").and_return("/path/to/bin")
-      expect(@install_generator.send(:missing_npm?)).to eq false
+      expect(@install_generator.send(:missing_yarn?)).to eq false
     end
   end
 
@@ -186,7 +186,7 @@ describe InstallGenerator, type: :generator do
     specify "when npm is missing" do
       stub_const("RUBY_PLATFORM", "mswin")
       allow(@install_generator).to receive(:`).with("where yarn").and_return("")
-      expect(@install_generator.send(:missing_npm?)).to eq true
+      expect(@install_generator.send(:missing_yarn?)).to eq true
     end
   end
 end
