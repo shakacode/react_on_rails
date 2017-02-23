@@ -9,6 +9,8 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ### Fixed
 - Upgrade Rails to 4.2.8 to fix security vulnerabilities in 4.2.5. [#735](https://github.com/shakacode/react_on_rails/pull/735) by [hrishimittal](https://github.com/hrishimittal).
 
+### Fixed
+- Fix spec failing due to duplicate component. [#734](https://github.com/shakacode/react_on_rails/pull/734) by [hrishimittal](https://github.com/hrishimittal).
 
 ## [6.6.0] - 2017-02-18
 ### Added
