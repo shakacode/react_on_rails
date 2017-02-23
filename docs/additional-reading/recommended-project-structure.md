@@ -10,7 +10,7 @@ The best way to understand these standards is to follow this example: [github.co
 1. `/client/app/bundles`: Top level of different app domains. Use a name within this directory for you app domains. For example, if you had a domain called `widget-editing`, then you would have: `/client/app/bundles/widget-editing`
 1. `/client/app/lib`: Common code for bundles
 1. Within each bundle directory (or the lib directory), such as a domain named "comments"
-`/client/app/bundle/comments`, use following directory structure:
+`/client/app/bundles/comments`, use following directory structure:
 
   * `/actions`: Redux actions.
   * `/components`: "dumb" components (no connections to Redux or Ajax). These get props and can render themselves and children.
