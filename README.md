@@ -567,7 +567,7 @@ Bug reports and pull requests are welcome. This project is intended to be a safe
 See [Contributing](CONTRIBUTING.md) to get started.
 
 ## License
-The gem is available as open source under the terms of the [MIT License](./docs/LICENSE).
+The gem is available as open source under the terms of the [MIT License](./docs/LICENSE.md).
 
 ## Authors
 [The Shaka Code team!](http://www.shakacode.com/about/)
