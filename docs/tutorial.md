@@ -23,12 +23,14 @@ _Note: some of the screen images below show the "npm" command. react_on_rails 6.
 
 ##Setting up the environment
 
-Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 4.x and node version 5+. I recommend `rvm` and `nvm` to install Ruby and Node. Rails can be installed as ordinary gem.
+Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 4.x and node version 6+. I recommend `rvm` and `nvm` to install Ruby and Node, and [brew](https://brew.sh/) to install [yarn](https://yarnpkg.com/en/docs/install#mac-tab). Rails can be installed as ordinary gem.
 
 ```
 nvm install node                # download and install latest stable Node
 nvm alias default node          # make it default version
 nvm list                        # check
+
+brew install yarn               # you can use other installer if desired
 
 rvm install 2.3.1               # download and install latest stable Ruby (update to exact version)
 rvm use 2.3.1 --default         # use it and make it default
