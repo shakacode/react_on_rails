@@ -44,3 +44,9 @@ https://github.com/shakacode/react_on_rails/pull/591#issuecomment-258685925
 
 ### December 20, 2016
 ![2016-12-25_10-02-17](https://cloud.githubusercontent.com/assets/1118459/21472700/70242a1e-ca89-11e6-9522-fb45f7835bbb.png)
+
+### February 24, 2017
+"I ❤️ React on Rails because it's easy to drop into a Rails project and still get all the power of native JavaScript tooling. The generators are great and the community is so awesome and welcoming. In fact, I love it so much I made a [course for learning React with Rails](https://goo.gl/uzu36X) using the react_on_rails gem!"
+![The Complete React on Rails course](https://raw.githubusercontent.com/learnetto/calreact/whyror/public/why_react_on_rails_gem.png)
+
+
