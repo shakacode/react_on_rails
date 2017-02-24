@@ -26,6 +26,7 @@
 ## Demos and Tutorials
 * [reactrails.com](http://www.reactrails.com), source code [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/)
 * [Relay Rails Blog](https://github.com/gauravtiwari/relay-rails-blog): Tutorial to learn Relay with Rails.
+* [Hot Module Replacement with react_on_rails](https://medium.com/@hrishio/lesson-5-hot-module-replacement-for-react-in-rails-using-the-react-on-rails-gem-643c5b01f3d7#.ehevxok16) : Step-by-step tutorial for a quick basic set up of hot asset reloading with HMR in a Rails 5 app. [Code on Github](https://github.com/learnetto/calreact-hmr)
 
 --------
 
