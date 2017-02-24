@@ -6,6 +6,10 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 *Please add entries here for your pull requests.*
 
+### Fixed
+- Upgrade Rails to 4.2.8 to fix security vulnerabilities in 4.2.5. [#735](https://github.com/shakacode/react_on_rails/pull/735) by [hrishimittal](https://github.com/hrishimittal).
+
+
 ## [6.6.0] - 2017-02-18
 ### Added
 - Switched to yarn! [#715](https://github.com/shakacode/react_on_rails/pull/715) by [squadette](https://github.com/squadette).
