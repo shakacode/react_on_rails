@@ -44,7 +44,7 @@ feature "Pages/Index", :js do
     end
 
     context "Simple Component Without Redux" do
-      include_examples "React Component", "div#HelloWorld-react-component-4"
+      include_examples "React Component", "div#HelloWorld-react-component-5"
       include_examples "React Component", "div#HelloWorldES5-react-component-5"
     end
 
