@@ -47,6 +47,7 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 * [284 Ruby Rogues: React on Rails with Justin Gordon and Rob Wise](https://devchat.tv/ruby-rogues/284-rr-react-on-rails-with-justin-gordon-and-rob-wise)
 
 # NEWS
+* 2017-02-28: See [discussions here on Webpacker](https://github.com/rails/webpacker/issues/139) regarding how Webpacker will allow React on Rails to avoid using the asset pipeline in the near future.
 * 2017-02-28: Upgrade to Webpack v2 or use the `--bail` option in your webpack script for test and production builds. See the discussion on [PR #730](https://github.com/shakacode/react_on_rails/pull/730).
 * 2016-11-03: Spoke at [LA Ruby: "React on Rails: Why, What, and How?"](http://www.meetup.com/laruby/events/234825187/). [Video and pictures in this article](https://blog.shakacode.com/my-react-on-rails-talk-at-the-la-ruby-rails-meetup-november-10-2016-eaaa83aff800#.ej6h4eglp).
 * *See [NEWS.md](NEWS.md) for more notes over time.*
