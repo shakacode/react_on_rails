@@ -5,6 +5,9 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 *Please add entries here for your pull requests.*
+## [6.7.1] - 2017-02-28
+### Fixed
+- Fixed broken CI issue.
 
 ## [6.7.0] - 2017-02-28
 
@@ -461,7 +464,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.7.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.7.1...master
+[6.7.1]: https://github.com/shakacode/react_on_rails/compare/6.7.0...6.7.1
 [6.7.0]: https://github.com/shakacode/react_on_rails/compare/6.6.0...6.7.0
 [6.6.0]: https://github.com/shakacode/react_on_rails/compare/6.5.1...6.6.0
 [6.5.1]: https://github.com/shakacode/react_on_rails/compare/6.5.0...6.5.1
