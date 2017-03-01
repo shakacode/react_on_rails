@@ -27,7 +27,9 @@ module ReactOnRails
         # Be sure we don't do this again.
         self.class.has_been_run = true
 
-        ReactOnRails::LocalesToJs.new if ReactOnRails.configuration.i18n_dir.present?
+        if ReactOnRails.configuration.i18n_dir.present? && Rails.application.present?
+          ReactOnRails::LocalesToJs.new
+        end
 
         stale_gen_files = webpack_assets_status_checker.stale_generated_webpack_files
 
