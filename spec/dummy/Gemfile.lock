@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (6.6.0)
+    react_on_rails (6.7.0)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -312,4 +312,4 @@ DEPENDENCIES
   uglifier (>= 2.7.2)
 
 BUNDLED WITH
-   1.13.7
+   1.14.5
