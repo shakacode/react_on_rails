@@ -11,16 +11,16 @@ module.exports = {
   ],
   output: {
     path: '../app/assets/webpack',
+    // Implement chunkhash and bypass the asset pipeline
+    // TODO: https://webpack.js.org/guides/code-splitting-libraries/#manifest-file
     filename: 'client.js',
   },
   resolve: {
-    root: [path.join(__dirname, 'app')],
-    extensions: ['', '.js', '.jsx'],
-    fallback: [path.join(__dirname, 'node_modules')],
-    alias: {
-      react: path.resolve('./node_modules/react'),
-      'react-dom': path.resolve('./node_modules/react-dom'),
-    },
+    modules: [
+      path.join(__dirname, 'app'),
+      'node_modules',
+    ],
+    extensions: ['.js', '.jsx'],
   },
 
   // same issue, for loaders like babel
@@ -28,10 +28,29 @@ module.exports = {
     fallback: [path.join(__dirname, 'node_modules')],
   },
   module: {
-    loaders: [
-      { test: /\.jsx?$/, loader: 'babel-loader', exclude: /node_modules/ },
-      { test: require.resolve('jquery'), loader: 'expose?jQuery' },
-      { test: require.resolve('jquery'), loader: 'expose?$' },
+    rules: [
+      {
+        test: /\.jsx?$/,
+        use: 'babel-loader',
+        exclude: /node_modules/,
+      },
+      {
+        test: require.resolve('jquery'),
+        use: [
+          {
+            loader: 'expose-loader',
+            options: {
+              jQuery: true,
+            },
+          },
+          {
+            loader: 'expose-loader',
+            options: {
+              $: true,
+            },
+          },
+        ],
+      },
     ],
   },
 };

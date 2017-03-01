@@ -33,6 +33,12 @@ npm-check-updates -u -a
 yarn
 ```
 
+Another option for upgrading:
+
+```
+yarn upgrade
+```
+
 Then confirm that the hot reload server and the rails server both work fine. You
 may have to delete `node_modules`. 
 

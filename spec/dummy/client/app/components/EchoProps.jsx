@@ -6,4 +6,4 @@ const EchoProps = (props) => (
   </div>
 );
 
-export default EchoProps
+export default EchoProps;
