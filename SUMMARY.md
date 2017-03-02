@@ -6,6 +6,7 @@
   + [Rails View Rendering from Inline JavaScript](./docs/additional-reading/rails_view_rendering_from_inline_javascript.md)
   + [RSpec Configuration](./docs/additional-reading/rspec-configuration.md)
   + [Turbolinks](./docs/additional-reading/turbolinks.md)
+  + [React on Rails Internationalization (I18n)](https://github.com/shakacode/react_on_rails/blob/master/docs/basics/i18n.md)
 
 ### **Javascript**
   + [Node Dependencies, NPM, and Yarn](./docs/additional-reading/node-dependencies-and-npm.md)
