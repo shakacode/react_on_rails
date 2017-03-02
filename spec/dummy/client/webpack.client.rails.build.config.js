@@ -26,10 +26,10 @@ config.module.rules.push(
     test: /\.css$/,
     loader: ExtractTextPlugin.extract({
       fallback: 'style-loader',
-      loader: [
+      use: [
         {
           loader: 'css-loader',
-          query: {
+          options: {
             minimize: true,
             modules: true,
             importLoaders: 1,
@@ -42,12 +42,12 @@ config.module.rules.push(
   },
   {
     test: /\.scss$/,
-    loader: ExtractTextPlugin.extract({
+    use: ExtractTextPlugin.extract({
       fallback: 'style-loader',
       loader: [
         {
           loader: 'css-loader',
-          query: {
+          options: {
             minimize: true,
             modules: true,
             importLoaders: 3,
