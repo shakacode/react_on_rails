@@ -22,11 +22,15 @@
 
 ## Open Source Projects Live
 * [github.com/empirical-org/Empirical-Core](https://github.com/empirical-org/Empirical-Core): [Quill.org](https://quill.org/) Provides free tools to make your students better writers.
+* **[Coderwall](https://coderwall.com/)**: The latest development and design tips, tools, and projects from our developer community. Source at [github.com/coderwall/coderwall-next](https://github.com/coderwall/coderwall-next)
+* [department-of-veterans-affairs/caseflow](https://github.com/department-of-veterans-affairs/caseflow): Caseflow is a web application that enables the tracking and processing of appealed claims at the Board of Veterans' Appeals.
 
 ## Demos and Tutorials
 * [reactrails.com](http://www.reactrails.com), source code [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/)
 * [Relay Rails Blog](https://github.com/gauravtiwari/relay-rails-blog): Tutorial to learn Relay with Rails.
-* [Hot Module Replacement with react_on_rails](https://medium.com/@hrishio/lesson-5-hot-module-replacement-for-react-in-rails-using-the-react-on-rails-gem-643c5b01f3d7#.ehevxok16) : Step-by-step tutorial for a quick basic set up of hot asset reloading with HMR in a Rails 5 app. [Code on Github](https://github.com/learnetto/calreact-hmr)
+* [Hot Module Replacement with react_on_rails](https://medium.com/@hrishio/lesson-5-hot-module-replacement-for-react-in-rails-using-the-react-on-rails-gem-643c5b01f3d7#.ehevxok16) : Step-by-step tutorial for a quick basic set up of hot asset reloading with HMR in a Rails 5 app. [Code on Github](https://github.com/learnetto/calreact-hmr).....
+
+## Per Github.
 
 --------
 
