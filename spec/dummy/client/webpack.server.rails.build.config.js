@@ -12,7 +12,6 @@ module.exports = {
   // the project dir
   context: __dirname,
   entry: [
-    'babel-polyfill',
     './app/startup/serverRegistration',
   ],
   output: {

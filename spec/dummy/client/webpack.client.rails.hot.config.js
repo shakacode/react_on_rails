@@ -22,7 +22,7 @@ config.output = {
   publicPath: `http://localhost:${hotRailsPort}/`,
 };
 
-config.module.loaders.push(
+config.module.rules.push(
   {
     test: /\.jsx?$/,
     loader: 'babel',

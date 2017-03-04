@@ -25,7 +25,7 @@ module.exports = {
   },
 
   plugins: [
-    new webpack.EnvironmentPlugin({NODE_ENV: 'development'}),
+    new webpack.EnvironmentPlugin({ NODE_ENV: 'development' }),
     new webpack.DefinePlugin({
       TRACE_TURBOLINKS: devBuild,
     }),
