@@ -16,6 +16,12 @@ module ReactOnRails
       end
     end
 
+    after do
+      ReactOnRails.configure do |config|
+        config.i18n_dir = nil
+      end
+    end
+
     context "with obsolete js files" do
       before do
         FileUtils.touch(translations_path, mtime: Time.now - 1.year)

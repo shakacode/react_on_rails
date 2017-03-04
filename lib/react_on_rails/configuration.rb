@@ -11,6 +11,16 @@ module ReactOnRails
     configure_generated_assets_dirs_deprecation
     ensure_generated_assets_dir_present
     ensure_server_bundle_js_file_has_no_path
+    check_i18n_directory_exists
+  end
+
+  def self.check_i18n_directory_exists
+    return unless @configuration.i18n_dir.present?
+    return if Dir.exist?(@configuration.i18n_dir)
+
+    raise "Error configuring /config/react_on_rails.rb: invalid value for `config.i18n_dir`. "\
+        "Directory does not exist: #{@configuration.i18n_dir}. Set to value to nil or comment it "\
+        "out if not using this i18n with React on Rails."
   end
 
   def self.ensure_generated_assets_dir_present

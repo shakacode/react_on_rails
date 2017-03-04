@@ -3,6 +3,7 @@ require "erb"
 module ReactOnRails
   class LocalesToJs
     def initialize
+      return unless i18n_dir.present?
       return unless obsolete?
       @translations, @defaults = generate_translations
       convert
@@ -38,7 +39,8 @@ module ReactOnRails
     end
 
     def locale_files
-      @locale_files ||= Rails.application.config.i18n.load_path
+      @locale_files ||=
+        (Rails.application && Rails.application.config.i18n.load_path).presence
     end
 
     def i18n_dir
