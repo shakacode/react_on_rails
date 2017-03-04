@@ -1,6 +1,6 @@
 # React on Rails Basic Tutorial
 
-This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
+This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering. It is updated to 6.7.1.
 
 After finishing this tutorial you will get application that can do the following (live on Heroku):
 
@@ -194,9 +194,11 @@ git push heroku master
 
 ![10](https://cloud.githubusercontent.com/assets/20628911/17465017/1f38fbaa-5cf4-11e6-8d86-a3d91e3878e0.png)
 
-Here it is:
+## Links
+These are updated for 6.7.1:
 
-* [Source code for this sample app](https://github.com/dzirtusss/hello-react-on-rails)
+* [PR for using the generator with the Redux option](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/15)
+* [PR showing the changes to deploy to Heroku](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/16)
 * [Live on Heroku](https://hello-react-on-rails.herokuapp.com/)
 
 Feedback is greatly appreciated! As are stars on github! If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com).
