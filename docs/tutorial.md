@@ -181,6 +181,9 @@ root "hello_world#index"
 
 ![09](https://cloud.githubusercontent.com/assets/20628911/17465018/1f3b685e-5cf4-11e6-93f8-105fc48517d0.png)
 
+
+Next, configure your app for Puma, per the [instructions on Heroku](https://devcenter.heroku.com/articles/deploying-rails-applications-with-the-puma-web-server).
+
 Then after all changes are done don't forget to commit them with git and finally you can push your app to Heroku!
 
 ```
