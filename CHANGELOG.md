@@ -5,13 +5,17 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 *Please add entries here for your pull requests.*
+## [6.7.2] - 2017-03-05
+### Improved
+- Improve i18n Integration with a better error message if the value of the i18n directory is invalid. [#748](https://github.com/shakacode/react_on_rails/pull/748) by [justin808](https://github.com/justin808).
+
 ## [6.7.1] - 2017-02-28
 No changes other than a test fix.
 
 ## [6.7.0] - 2017-02-28
 
 ### IMPORTANT
-- If you installed 6.6.0, you will to comment out the line matching i18n_dir unless you are using this feature. 6.7.1 will give you an error like: 
+- If you installed 6.6.0, you will need to comment out the line matching i18n_dir unless you are using this feature. 6.7.1 will give you an error like:
 
 ```
 Errno::ENOENT: No such file or directory @ rb_sysopen - /tmp/build_1444a5bb9dd16ddb2561c7aff40f0fc7/my-app-816d31e9896edd90cecf1402acd002c724269333/client/app/libs/i18n/translations.js
@@ -476,7 +480,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.7.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.7.2...master
+[6.7.2]: https://github.com/shakacode/react_on_rails/compare/6.7.1...6.7.2
 [6.7.1]: https://github.com/shakacode/react_on_rails/compare/6.7.0...6.7.1
 [6.7.0]: https://github.com/shakacode/react_on_rails/compare/6.6.0...6.7.0
 [6.6.0]: https://github.com/shakacode/react_on_rails/compare/6.5.1...6.6.0
