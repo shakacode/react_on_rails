@@ -48,7 +48,7 @@ describe DevTestsGenerator, type: :generator do
   // This fixes an issue with resolving 'react' when using a local symlinked version
   // of the node_package folder
   resolveLoader: {
-    fallback: [path.join(__dirname, 'node_modules')],
+    fallback: [require('path').join(__dirname, 'node_modules')],
   },
   plugins: [
     ...
