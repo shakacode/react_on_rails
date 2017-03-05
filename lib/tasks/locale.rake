@@ -7,8 +7,6 @@ This task generates javascript locale files: `translations.js` & `default.js` an
 the "ReactOnRails.configuration.i18n_dir".
   DESC
   task locale: :environment do
-    if ReactOnRails.configuration.i18n_dir.present?
-      ReactOnRails::LocalesToJs.new
-    end
+    ReactOnRails::LocalesToJs.new
   end
 end

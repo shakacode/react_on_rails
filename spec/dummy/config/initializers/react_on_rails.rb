@@ -74,7 +74,8 @@ ReactOnRails.configure do |config|
   ################################################################################
   # I18N OPTIONS
   ################################################################################
-  # Replace the following line to the location where you keep translation.js & default.js.
+  # Replace the following line to the location where you keep translation.js & default.js for use
+  # by the npm packages react-intl. Be sure this directory exists!
   # config.i18n_dir = Rails.root.join("client", "app", "libs", "i18n")
 
   ################################################################################
