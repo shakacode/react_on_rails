@@ -6,7 +6,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 *Please add entries here for your pull requests.*
 ## [6.7.1] - 2017-02-28
-No changes.
+No changes other than a test fix.
 
 ## [6.7.0] - 2017-02-28
 
