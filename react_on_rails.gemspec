@@ -26,6 +26,7 @@ Gem::Specification.new do |s|
   s.add_dependency "rainbow", "~> 2.1"
   s.add_dependency "rails", ">= 3.2"
   s.add_dependency "addressable"
+  s.add_dependency "yajl-ruby"
 
   s.add_development_dependency "bundler", "~> 1.10"
   s.add_development_dependency "rake", "~> 10.0"
@@ -42,4 +43,5 @@ Gem::Specification.new do |s|
   s.add_development_dependency "binding_of_caller"
   s.add_development_dependency "awesome_print"
   s.add_development_dependency "gem-release"
+
 end
