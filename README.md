@@ -47,6 +47,7 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 * [284 Ruby Rogues: React on Rails with Justin Gordon and Rob Wise](https://devchat.tv/ruby-rogues/284-rr-react-on-rails-with-justin-gordon-and-rob-wise)
 
 # NEWS
+* 2017-03-06: Updated to Webpack v2!
 * 2017-03-02: Demo of internationalization (i18n) is live at [reactrails.com](https://www.reactrails.com/). Docs [here](docs/basics/i18n.md).
 * 2017-02-28: See [discussions here on Webpacker](https://github.com/rails/webpacker/issues/139) regarding how Webpacker will allow React on Rails to avoid using the asset pipeline in the near future.
 * 2017-02-28: Upgrade to Webpack v2 or use the `--bail` option in your webpack script for test and production builds. See the discussion on [PR #730](https://github.com/shakacode/react_on_rails/pull/730).
@@ -576,7 +577,7 @@ The gem is available as open source under the terms of the [MIT License](./docs/
 ## Authors
 [The Shaka Code team!](http://www.shakacode.com/about/)
 
-The origins of the project began with the need to do a rich JavaScript interface for ShakaCode's client [Madrone](http://madroneco.com/) and the choice to use Webapck and Rails, as described in [Fast Rich Client Rails Development With Webpack and the ES6 Transpiler](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/).
+The origins of the project began with the need to do a rich JavaScript interface for ShakaCode's client [Madrone](http://madroneco.com/) and the choice to use Webpack and Rails, as described in [Fast Rich Client Rails Development With Webpack and the ES6 Transpiler](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/).
 
 The gem project started with [Justin Gordon](https://github.com/justin808/) pairing with [Samnang Chhun](https://github.com/samnang) to figure out how to do server rendering with Webpack plus Rails. [Alex Fedoseev](https://github.com/alexfedoseev) then joined in. [Rob Wise](https://github.com/robwise), [Aaron Van Bokhoven](https://github.com/aaronvb), and [Andy Wang](https://github.com/yorzi) did the bulk of the generators. Many others have [contributed](https://github.com/shakacode/react_on_rails/graphs/contributors).
 
