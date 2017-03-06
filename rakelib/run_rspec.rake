@@ -77,7 +77,11 @@ task :js_tests do
   sh "yarn run test"
 end
 
-desc "Runs all tests. Run `rake -D run_rspec` to see all available test options"
+msg = <<-DESC
+Runs all tests, run `rake -D run_rspec` to see all available test options.
+"rake run_rspec:example_basic" is a good way to run only one generator test.
+DESC
+desc msg
 task run_rspec: ["run_rspec:run_rspec"]
 
 private

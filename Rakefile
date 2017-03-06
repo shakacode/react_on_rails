@@ -10,5 +10,5 @@ end
 desc "Run all tests and linting"
 task default: tasks
 
-desc "All actions but no examples. Good for local developer run."
+desc "All actions but no examples, good for local developer run."
 task all_but_examples: ["run_rspec:all_but_examples", "lint"]
