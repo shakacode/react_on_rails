@@ -3,15 +3,15 @@ source 'https://rubygems.org'
 eval_gemfile File.expand_path("../../../react_on_rails.gemspec", __FILE__)
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
-gem 'rails', '4.2.8'
+gem 'rails'
 # Use sqlite3 as the database for Active Record
 gem 'sqlite3'
 # Use SCSS for stylesheets
-gem 'sass-rails', '~> 5.0'
+gem 'sass-rails'
 # Use Uglifier as compressor for JavaScript assets
-gem 'uglifier', '>= 2.7.2'
+gem 'uglifier'
 # Use CoffeeScript for .coffee assets and views
-gem 'coffee-rails', '~> 4.1.0'
+gem 'coffee-rails'
 
 # Use jquery as the JavaScript library
 gem 'jquery-rails'
@@ -20,10 +20,10 @@ gem 'puma'
 
 # Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
 if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
-  if ENV["ENABLE_TURBOLINKS_5"].nil? || ENV["ENABLE_TURBOLINKS_5"].strip.empty?
-    gem 'turbolinks', '2.5.3'
-  else
+  if ENV["ENABLE_TURBOLINKS_2"].nil? || ENV["ENABLE_TURBOLINKS_2"].strip.empty?
     gem 'turbolinks', '~> 5.0'
+  else
+    gem 'turbolinks', '2.5.3'
   end
 end
 
@@ -66,7 +66,9 @@ group :test do
   gem "coveralls", require: false
   gem "capybara"
   gem "capybara-screenshot"
-  gem "capybara-webkit"
+  gem "rails-controller-testing"
+  # install trouble with updated
+  # gem "capybara-webkit"
   gem "chromedriver-helper"
   gem "generator_spec"
   gem "launchy"

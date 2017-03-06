@@ -5,7 +5,8 @@ language: ruby
 rvm:
   # Ruby 2.0.0 fails due to newer Nokogir
   # nokogiri-1.7.0.1 requires ruby version >= 2.1.0, which is incompatible with the current version, ruby 2.0.0p648
-  - 2.1.10
+  # Rails 5 requires 2.2
+  # - 2.1.10
   - 2.2.6
   - 2.3.1
 services:
@@ -25,7 +26,6 @@ env:
     - RAILS_ENV=test
     - DRIVER=selenium_chrome
     - CHROME_BIN=/usr/bin/google-chrome
-    - ENABLE_TURBOLINKS_5=TRUE
     - USE_COVERALLS=TRUE
 
 before_install:

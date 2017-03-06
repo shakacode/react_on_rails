@@ -10,3 +10,4 @@ node_package/webpack.config.js
 **/generated/**
 **/app/assets/javascripts/application.js
 **/coverage/**
+**/cable.js
