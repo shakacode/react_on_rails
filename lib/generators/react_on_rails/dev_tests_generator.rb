@@ -3,13 +3,14 @@ require_relative "generator_helper"
 
 module ReactOnRails
   module Generators
-    FALLBACK_OPTION_FOR_NODE_MODULES = <<-TEXT
+    FALLBACK_OPTION_FOR_NODE_MODULES = <<-TEXT.freeze
     // This fixes an issue with resolving 'react' when using a local symlinked version
     // of the node_package folder
     modules: [
+      /* eslint-disable-next-line global-require */
       require('path').join(__dirname, 'node_modules'),
       'node_modules',
-    ],  
+    ],
   },
   plugins: [
     TEXT
