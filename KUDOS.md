@@ -2,10 +2,31 @@ This is a sibling file to [PROJECTS.md](./PROJECTS.md).
 
 I'm looking for quotes on why you like using React on Rails. You might mention any benefits you particularly like and if you've migrated from react-rails. Just click to edit and github will automatically open up a PR. Thanks to everybody that contributes!
 
-> Gone are the days of using bower or rails gems to manage front end dependencies! React on Rails provides webpack integration to give us a modern build process, es6 syntax and the entire npm ecosystem of libraries to use, along with view helpers to make React integration with Rails feel better than a cool summer breeze. - [@kalamyty](https://twitter.com/kalamyty) 
+### March 2, 2017
+![2017-03-05_21-34-34](https://cloud.githubusercontent.com/assets/1118459/23600716/0d8c40d6-01ec-11e7-998d-4ce9e6abcacb.png)
 
-### August 9, 2016
-![2016-08-09_13-39-08](https://cloud.githubusercontent.com/assets/1118459/17543077/bf7c2c6a-5e69-11e6-8370-d714015c0296.png)
+### February 24, 2017
+"I ❤️ React on Rails because it's easy to drop into a Rails project and still get all the power of native JavaScript tooling. The generators are great and the community is so awesome and welcoming. In fact, I love it so much I made a [course for learning React with Rails](https://goo.gl/uzu36X) using the react_on_rails gem!"
+![The Complete React on Rails course](https://raw.githubusercontent.com/learnetto/calreact/whyror/public/why_react_on_rails_gem.png)
+
+### December 20, 2016
+![2016-12-25_10-02-17](https://cloud.githubusercontent.com/assets/1118459/21472700/70242a1e-ca89-11e6-9522-fb45f7835bbb.png)
+
+### December 12, 2016
+![2016-12-17_13-23-21](https://cloud.githubusercontent.com/assets/1118459/21290377/1adacdf2-c45c-11e6-97c1-f726ab749b2d.png)
+
+### November 15, 2016
+![2016-11-15_18-15-31](https://cloud.githubusercontent.com/assets/1118459/20334680/23eaab0c-ab60-11e6-8830-8528c2f829a3.png)
+
+### November 9, 2016, in our Slack Room for ShakaCode
+![2016-11-09_19-28-32](https://cloud.githubusercontent.com/assets/1118459/20163679/405229ca-a6b3-11e6-8dff-6dc3f59bf341.png)
+
+### November 6, 2016
+https://github.com/shakacode/react_on_rails/pull/591#issuecomment-258685925
+![2016-11-15_08-36-29](https://cloud.githubusercontent.com/assets/1118459/20318599/ec4882b0-ab0e-11e6-83e2-7f398e2cdf5b.png)
+
+### October 29, 2016 by Email
+![2016-10-29_17-10-25](https://cloud.githubusercontent.com/assets/1118459/20163712/72307a82-a6b3-11e6-9c46-aee526192b23.png)
 
 ### Compared to Browserify
 See comments [here](https://lorefnon.me/2015/11/15/a-minimal-setup-for-using-es6-modules-in-rails.html)
@@ -26,27 +47,8 @@ https://twitter.com/ollieglass/status/713372606804729856
 
 ![2016-09-11_17-55-46](https://cloud.githubusercontent.com/assets/1118459/18424209/0c8bdade-7849-11e6-96a7-3b58b26308ce.png)
 
-### October 29, 2016 by Email
-![2016-10-29_17-10-25](https://cloud.githubusercontent.com/assets/1118459/20163712/72307a82-a6b3-11e6-9c46-aee526192b23.png)
+### August 9, 2016
+![2016-08-09_13-39-08](https://cloud.githubusercontent.com/assets/1118459/17543077/bf7c2c6a-5e69-11e6-8370-d714015c0296.png)
 
-### November 6, 2016
-https://github.com/shakacode/react_on_rails/pull/591#issuecomment-258685925
-![2016-11-15_08-36-29](https://cloud.githubusercontent.com/assets/1118459/20318599/ec4882b0-ab0e-11e6-83e2-7f398e2cdf5b.png)
-
-### November 9, 2016, in our Slack Room for ShakaCode
-![2016-11-09_19-28-32](https://cloud.githubusercontent.com/assets/1118459/20163679/405229ca-a6b3-11e6-8dff-6dc3f59bf341.png)
-
-### November 15, 2016
-![2016-11-15_18-15-31](https://cloud.githubusercontent.com/assets/1118459/20334680/23eaab0c-ab60-11e6-8830-8528c2f829a3.png)
-
-### December 12, 2016
-![2016-12-17_13-23-21](https://cloud.githubusercontent.com/assets/1118459/21290377/1adacdf2-c45c-11e6-97c1-f726ab749b2d.png)
-
-### December 20, 2016
-![2016-12-25_10-02-17](https://cloud.githubusercontent.com/assets/1118459/21472700/70242a1e-ca89-11e6-9522-fb45f7835bbb.png)
-
-### February 24, 2017
-"I ❤️ React on Rails because it's easy to drop into a Rails project and still get all the power of native JavaScript tooling. The generators are great and the community is so awesome and welcoming. In fact, I love it so much I made a [course for learning React with Rails](https://goo.gl/uzu36X) using the react_on_rails gem!"
-![The Complete React on Rails course](https://raw.githubusercontent.com/learnetto/calreact/whyror/public/why_react_on_rails_gem.png)
-
-
+### March 30, 2016
+"Gone are the days of using bower or rails gems to manage front end dependencies! React on Rails provides webpack integration to give us a modern build process, es6 syntax and the entire npm ecosystem of libraries to use, along with view helpers to make React integration with Rails feel better than a cool summer breeze." - [@kalamyty](https://twitter.com/kalamyty), [flynfish](https://github.com/flynfish).
