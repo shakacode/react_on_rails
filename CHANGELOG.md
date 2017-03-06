@@ -5,6 +5,10 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 *Please add entries here for your pull requests.*
+## [6.8.0] - 2017-03-06
+## Added
+- Converted to Webpack v2 for generators, tests, and all example code. [#742](https://github.com/shakacode/react_on_rails/pull/742) by [justin808](https://github.com/justin808).
+
 ## [6.7.2] - 2017-03-05
 ### Improved
 - Improve i18n Integration with a better error message if the value of the i18n directory is invalid. [#748](https://github.com/shakacode/react_on_rails/pull/748) by [justin808](https://github.com/justin808).
@@ -480,7 +484,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.7.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.8.0...master
+[6.8.0]: https://github.com/shakacode/react_on_rails/compare/6.7.2...6.8.0
 [6.7.2]: https://github.com/shakacode/react_on_rails/compare/6.7.1...6.7.2
 [6.7.1]: https://github.com/shakacode/react_on_rails/compare/6.7.0...6.7.1
 [6.7.0]: https://github.com/shakacode/react_on_rails/compare/6.6.0...6.7.0
