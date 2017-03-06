@@ -70,7 +70,7 @@ module ReactOnRails
       translations = {}
       defaults = {}
       locale_files.each do |f|
-        translation = YAML.load(File.open(f))
+        translation = YAML.safe_load(File.open(f))
         key = translation.keys[0]
         val = flatten(translation[key])
         translations = translations.deep_merge(key => val)

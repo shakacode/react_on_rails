@@ -180,7 +180,7 @@ feature "renderedHtml from generator function", :js do
   subject { page }
   background { visit "/rendered_html" }
   scenario "renderedHtml should not have any errors" do
-    expect(subject).to have_text "Props: {\"hello\":\"world\"}"
+    expect(subject).to have_text 'Props: {"hello":"world"}'
     expect(subject.html).to include("[SERVER] RENDERED RenderedHtml to dom node with id")
   end
 end

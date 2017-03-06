@@ -72,7 +72,7 @@ module ReactOnRails
                         manifest_file_data = File.read(manifest_path)
                         JSON.parse(manifest_file_data)["assets"]
                       else
-                        YAML.load(manifest_file)
+                        YAML.safe_load(manifest_file)
                       end
 
       # We realize that we're copying other Rails assets that match the regexp, but this just
