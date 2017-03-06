@@ -50,7 +50,7 @@ module ReactOnRails
         config = File.join(destination_root, "client", "webpack.config.js")
         old_contents = File.read(config)
         new_contents = "const path = require('path');\n" +
-          old_contents.gsub(sentinel, FALLBACK_OPTION_FOR_NODE_MODULES)
+                       old_contents.gsub(sentinel, FALLBACK_OPTION_FOR_NODE_MODULES)
         File.open(config, "w+") { |f| f.puts new_contents }
       end
 
