@@ -74,4 +74,4 @@ Style/GlobalVars:
     - 'spec/dummy/config/environments/development.rb'
 
 Style/FrozenStringLiteralComment:
-  EnforcedStyle: never
+  EnforcedStyle: when_needed
