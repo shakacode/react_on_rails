@@ -32,6 +32,7 @@ class HelloWorld extends React.Component {
   }
 
   render() {
+    // eslint-disable-next-line no-console
     console.log('HelloWorld demonstrating a call to console.log in ' +
       'spec/dummy/client/app/components/HelloWorld.jsx:18');
 

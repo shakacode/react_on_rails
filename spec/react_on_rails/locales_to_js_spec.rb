@@ -33,10 +33,10 @@ module ReactOnRails
 
         translations = File.read(translations_path)
         default = File.read(default_path)
-        expect(translations).to include("{\"hello\":\"Hello world\"")
-        expect(translations).to include("{\"hello\":\"Hallo welt\"")
+        expect(translations).to include('{"hello":"Hello world"')
+        expect(translations).to include('{"hello":"Hallo welt"')
         expect(default).to include("const defaultLocale = 'en';")
-        expect(default).to include("{\"hello\":{\"id\":\"hello\",\"defaultMessage\":\"Hello world\"}}")
+        expect(default).to include('{"hello":{"id":"hello","defaultMessage":"Hello world"}}')
 
         expect(File.mtime(translations_path)).to be >= File.mtime(en_path)
       end

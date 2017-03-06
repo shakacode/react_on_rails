@@ -1,4 +1,3 @@
 {
-  "presets": ["es2015", "stage-0", "react"],
-  "plugins": ["syntax-decorators"]
+  "presets": ["es2015", "stage-2", "react"]
 }

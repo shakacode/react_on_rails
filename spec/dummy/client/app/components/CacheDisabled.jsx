@@ -3,7 +3,8 @@ import React from 'react';
 export default class CacheDisabled extends React.Component {
 
   componentWillUnmount() {
-    console.log('CacheDisabled#componentWillUnmount')
+    // eslint-disable-next-line no-console
+    console.log('CacheDisabled#componentWillUnmount');
   }
 
   render() {

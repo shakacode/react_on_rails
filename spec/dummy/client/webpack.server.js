@@ -10,17 +10,19 @@ module.exports = {
     filename: 'server.js',
   },
   resolve: {
-    root: [path.join(__dirname, 'app')],
-    extensions: ['', '.js', '.jsx'],
-    fallback: [path.join(__dirname, 'node_modules')],
-    alias: {
-      react: path.resolve('./node_modules/react'),
-      'react-dom': path.resolve('./node_modules/react-dom'),
-    },
+    modules: [
+      path.join(__dirname, 'app'),
+      'node_modules',
+    ],
+    extensions: ['.js', '.jsx'],
   },
   module: {
-    loaders: [
-      { test: /\.jsx?$/, loader: 'babel-loader', exclude: /node_modules/ },
+    rules: [
+      {
+        test: /\.jsx?$/,
+        use: 'babel-loader',
+        exclude: /node_modules/,
+      },
     ],
   },
 };

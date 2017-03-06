@@ -40,21 +40,7 @@ describe DevTestsGenerator, type: :generator do
     end
 
     it "changes the webpack.config.js to use a resolveLoader" do
-      expected = <<-TEXT
-  resolve: {
-    ...
-  },
-
-  // This fixes an issue with resolving 'react' when using a local symlinked version
-  // of the node_package folder
-  resolveLoader: {
-    fallback: [path.join(__dirname, 'node_modules')],
-  },
-  plugins: [
-    ...
-  ]
-TEXT
-
+      expected = ReactOnRails::Generators::FALLBACK_OPTION_FOR_NODE_MODULES
       assert_file("client/webpack.config.js") do |contents|
         assert_match(expected, contents)
       end

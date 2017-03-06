@@ -20,7 +20,7 @@ describe ReactOnRailsHelper, type: :helper do
     end
 
     let(:hash_sanitized) do
-      "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"\\u003c/script\\u003e\\u003cscrip"\
+      '{"hello":"world","free":"of charge","x":"\\u003c/script\\u003e\\u003cscrip'\
       "t\\u003ealert('foo')\\u003c/script\\u003e\"}"
     end
 
@@ -54,7 +54,7 @@ describe ReactOnRailsHelper, type: :helper do
     end
 
     let(:react_component_div) do
-      "<div id=\"App-react-component-0\"></div>"
+      '<div id="App-react-component-0"></div>'
     end
 
     let(:id) { "App-react-component-0" }

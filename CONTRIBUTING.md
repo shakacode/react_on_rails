@@ -197,6 +197,12 @@ After running a test, you can view the coverage results SimpleCov reports by ope
 
 To test `spec/dummy` against Turbolinks 5, install the gem by running `ENABLE_TURBOLINKS_5=TRUE bundle install` in the `spec/dummy` directory before running `rake`.
 
+Run `rake -T` or `rake -D` to see testing options.
+
+`rake all_but_examples` is typically best for developers, except if any generators changed.
+
+See below for verifying changes to the generators.
+
 ### Debugging
 Start the sample app like this for some debug printing:
 
@@ -215,6 +221,8 @@ The main installer can be run with ```rails generate react_on_rails:install```
 
 ### Testing the Generator
 The generators are covered by generator tests using Rails's generator testing helpers, but it never hurts to do a sanity check and explore the API. See [generator_testing_script.md](generator_testing_script.md) for a script on how to run the generator on a fresh project.
+
+`rake run_rspec:example_basic` is a great way to run tests on one generator. Once that works, you should run `rake run_rspec:examples`. Be aware that this will create a hug number of files under a `/gen-examples` directory. You should be sure to exclude this directory from your IDE and delete it once your testing is done.
 
 ### Linting
 All linting is performed from the docker container for CI. You will need docker and docker-compose installed locally to lint code changes via the lint container. You can lint locally by running `npm run lint && npm run flow`

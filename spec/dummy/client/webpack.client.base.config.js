@@ -3,26 +3,14 @@
 
 const webpack = require('webpack');
 const path = require('path');
-const autoprefixer = require('autoprefixer');
 
 const devBuild = process.env.NODE_ENV !== 'production';
-const nodeEnv = devBuild ? 'development' : 'production';
 
 module.exports = {
 
   // the project dir
   context: __dirname,
   entry: {
-
-    // See use of 'vendor' in the CommonsChunkPlugin inclusion below.
-    vendor: [
-      'babel-polyfill',
-      'es5-shim/es5-shim',
-      'es5-shim/es5-sham',
-      'jquery-ujs',
-      'jquery',
-    ],
-
     // This will contain the app entry points defined by
     // webpack.client.rails.hot.config and webpack.client.rails.build.config
     app: [
@@ -30,57 +18,55 @@ module.exports = {
     ],
   },
   resolve: {
-    extensions: ['', '.js', '.jsx'],
+    extensions: ['.js', '.jsx'],
     alias: {
       libs: path.join(process.cwd(), 'app', 'libs'),
-      react: path.resolve('./node_modules/react'),
-      'react-dom': path.resolve('./node_modules/react-dom'),
     },
   },
 
   plugins: [
+    new webpack.EnvironmentPlugin({ NODE_ENV: 'development' }),
     new webpack.DefinePlugin({
-      'process.env': {
-        NODE_ENV: JSON.stringify(nodeEnv),
-      },
       TRACE_TURBOLINKS: devBuild,
     }),
 
-    // https://webpack.github.io/docs/list-of-plugins.html#2-explicit-vendor-chunk
+    // https://webpack.js.org/guides/code-splitting-libraries/#implicit-common-vendor-chunk
     new webpack.optimize.CommonsChunkPlugin({
-
-      // This name 'vendor' ties into the entry definition
       name: 'vendor',
-
-      // We don't want the default vendor.js name
-      filename: 'vendor-bundle.js',
-
-      // Passing Infinity just creates the commons chunk, but moves no modules into it.
-      // In other words, we only put what's in the vendor entry definition in vendor-bundle.js
-      minChunks: Infinity,
+      minChunks(module) {
+        // this assumes your vendor imports exist in the node_modules directory
+        return module.context && module.context.indexOf('node_modules') !== -1;
+      },
     }),
   ],
+
   module: {
-    loaders: [
-      { test: /\.(ttf|eot)$/, loader: 'file' },
+    rules: [
+      {
+        test: /\.(ttf|eot)$/,
+        use: 'file-loader',
+      },
 
       // Example to confirm that subdirectories work
       {
         test: /\.(jpe?g|png|gif|svg|ico|woff2?)$/,
-        loader: 'url?limit=10000&name=images/[hash].[ext]',
+        use: {
+          loader: 'url-loader',
+          options: {
+            limit: 10000,
+            name: 'images/[hash].[ext]',
+          },
+        },
       },
-      { test: require.resolve('jquery'), loader: 'expose?jQuery' },
-      { test: require.resolve('jquery'), loader: 'expose?$' },
+      {
+        test: require.resolve('jquery'),
+        use: {
+          loader: 'expose-loader',
+          options: {
+            jQuery: true,
+          },
+        },
+      },
     ],
   },
-
-  // Place here all postCSS plugins here, so postcss-loader will apply them
-  postcss: [autoprefixer],
-
-  // Place here all SASS files with variables, mixins etc.
-  // And sass-resources-loader will load them in every CSS Module (SASS file) for you
-  // (so don't need to @import them explicitly)
-  // https://github.com/shakacode/sass-resources-loader
-  sassResources: ['./app/assets/styles/app-variables.scss'],
-
 };

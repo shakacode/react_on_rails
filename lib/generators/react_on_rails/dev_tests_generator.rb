@@ -3,6 +3,17 @@ require_relative "generator_helper"
 
 module ReactOnRails
   module Generators
+    FALLBACK_OPTION_FOR_NODE_MODULES = <<-TEXT.freeze
+    // This fixes an issue with resolving 'react' when using a local symlinked version
+    // of the node_package folder
+    modules: [
+      path.join(__dirname, 'node_modules'),
+      'node_modules',
+    ],
+  },
+  plugins: [
+    TEXT
+
     class DevTestsGenerator < Rails::Generators::Base
       include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
@@ -35,20 +46,11 @@ module ReactOnRails
       end
 
       def change_webpack_client_base_config_to_include_fallback
-        text = <<-TEXT
-  },
-
-  // This fixes an issue with resolving 'react' when using a local symlinked version
-  // of the node_package folder
-  resolveLoader: {
-    fallback: [path.join(__dirname, 'node_modules')],
-  },
-  plugins: [
-TEXT
         sentinel = /^\s\s},\n\s\splugins: \[\n/
         config = File.join(destination_root, "client", "webpack.config.js")
         old_contents = File.read(config)
-        new_contents = old_contents.gsub(sentinel, text)
+        new_contents = "const path = require('path');\n" +
+                       old_contents.gsub(sentinel, FALLBACK_OPTION_FOR_NODE_MODULES)
         File.open(config, "w+") { |f| f.puts new_contents }
       end
 
