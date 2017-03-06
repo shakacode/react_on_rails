@@ -519,6 +519,7 @@ Node.js can be used as the backend for server-side rendering instead of [execJS]
   + [Server Rendering Tips](./docs/additional-reading/server-rendering-tips.md)
   + [Code Splitting](./docs/additional-reading/code-splitting.md)
   + [AngularJS Integration and Migration to React on Rails](./docs/additional-reading/angular-js-integration-migration.md)
+  + [Webpack, the Asset Pipeline, and Using Assets w/ React](./docs/additional-reading/rails-assets-relative-paths.md)
 
 + **Development**
   + [React on Rails Basic Installation Tutorial](./docs/tutorial.md) ([live demo](https://hello-react-on-rails.herokuapp.com))
