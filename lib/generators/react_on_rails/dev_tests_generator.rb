@@ -7,8 +7,7 @@ module ReactOnRails
     // This fixes an issue with resolving 'react' when using a local symlinked version
     // of the node_package folder
     modules: [
-      /* eslint-disable-next-line global-require */
-      require('path').join(__dirname, 'node_modules'),
+      path.join(__dirname, 'node_modules'),
       'node_modules',
     ],
   },
@@ -50,7 +49,8 @@ module ReactOnRails
         sentinel = /^\s\s},\n\s\splugins: \[\n/
         config = File.join(destination_root, "client", "webpack.config.js")
         old_contents = File.read(config)
-        new_contents = old_contents.gsub(sentinel, FALLBACK_OPTION_FOR_NODE_MODULES)
+        new_contents = "const path = require('path');\n" +
+          old_contents.gsub(sentinel, FALLBACK_OPTION_FOR_NODE_MODULES)
         File.open(config, "w+") { |f| f.puts new_contents }
       end
 
