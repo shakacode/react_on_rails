@@ -73,7 +73,7 @@
     "build:dev:server": "webpack -w --config webpack.server.rails.build.config.js",
     "build:server": "webpack --config webpack.server.rails.build.config.js",
     "hot-assets": "babel-node server-rails-hot.js",
-    "install-react-on-rails": "yarn add 'file:../../..'"
+    "install-react-on-rails": "npm i --save 'file:../../..'"
   },
   "author": "",
   "license": "ISC"
