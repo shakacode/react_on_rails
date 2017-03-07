@@ -5,9 +5,10 @@ module CapybaraUtils
     case Capybara.javascript_driver
     when :poltergeist, :poltergeist_errors_ok
       page.driver.headers = { key => value }
-    when :webkit
-      page.driver.header(key, value)
-      # else no possibe action for selenium
+      # Skip webkit for now due to install trouble on Sierra
+      # when :webkit
+      #   page.driver.header(key, value)
+      #   # else no possibe action for selenium
     end
   end
 end

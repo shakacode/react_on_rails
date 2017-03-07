@@ -22,10 +22,10 @@ gem "sdoc", "~> 0.4.0", group: :doc
 gem "spring"
 gem "sqlite3"
 gem "mini_racer"
-if ENV["ENABLE_TURBOLINKS_5"].nil? || ENV["ENABLE_TURBOLINKS_5"].strip.empty?
-  gem "turbolinks", "2.5.3"
-else
+if ENV["ENABLE_TURBOLINKS_2"].nil? || ENV["ENABLE_TURBOLINKS_2"].strip.empty?
   gem "turbolinks", "~> 5.0"
+else
+  gem "turbolinks", "2.5.3"
 end
 gem "uglifier", ">= 2.7.2"
 gem "web-console", "~> 2.0", group: :development
@@ -35,7 +35,8 @@ gem "rspec-rails"
 gem "rspec-retry"
 gem "capybara"
 gem "capybara-screenshot"
-gem "capybara-webkit"
+# Trouble installing on Sierra
+# gem "capybara-webkit"
 gem "chromedriver-helper"
 gem "launchy"
 gem "poltergeist"

@@ -32,11 +32,11 @@ namespace :run_rspec do
     bundle_install_in(dummy_app_dir)
   end
 
-  desc "Runs dummy respec with turbolinks 5"
-  task dummy_turbolinks_5: ["dummy_apps:dummy_app_with_turbolinks_5"] do
+  desc "Runs dummy respec with turbolinks 2"
+  task dummy_turbolinks_2: ["dummy_apps:dummy_app_with_turbolinks_2"] do
     clean_gen_assets(spec_dummy_dir)
     run_tests_in(spec_dummy_dir, env_vars:
-      "ENABLE_TURBOLINKS_5=TRUE BUNDLE_GEMFILE=#{dummy_app_dir}/Gemfile")
+      "ENABLE_TURBOLINKS_2=TRUE BUNDLE_GEMFILE=#{dummy_app_dir}/Gemfile")
   end
 
   # Dynamically define Rake tasks for each example app found in the examples directory
@@ -62,7 +62,7 @@ namespace :run_rspec do
   end
 
   desc "run all tests no examples"
-  task all_but_examples: [:gem, :dummy, :dummy_no_turbolinks, :dummy_turbolinks_5, :empty, :js_tests] do
+  task all_but_examples: [:gem, :dummy, :dummy_no_turbolinks, :dummy_turbolinks_2, :empty, :js_tests] do
     puts "Completed all RSpec tests"
   end
 
