@@ -157,7 +157,7 @@ module.exports = {
     })
   ],
   module: {
-    loaders: [
+    rules: [
       {
         test: /\.jsx?$/,
         loader: 'babel-loader',
@@ -171,6 +171,7 @@ module.exports = {
             shim: 'es5-shim/es5-shim',
             sham: 'es5-shim/es5-sham',
           },
+        }
       },
       {
         // The important stuff
