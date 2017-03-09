@@ -36,11 +36,11 @@ before_install:
   - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen scn 1600x1200x16"
 
 install:
-  - nvm install node
+  - travis_retry nvm install node
   - node -v
-  - npm i -g yarn@0.20.3
-  - yarn
-  - bundle install
+  - travis_retry npm i -g yarn@0.20.3
+  - travis_retry yarn
+  - travis_retry bundle install
   - rake dummy_apps
   - rake examples
   - rake node_package
