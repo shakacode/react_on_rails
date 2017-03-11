@@ -55,7 +55,6 @@ module ReactOnRails
       end
 
       def style
-        return nil if ReactOnRails.configuration.skip_display_none
         HIDDEN
       end
 

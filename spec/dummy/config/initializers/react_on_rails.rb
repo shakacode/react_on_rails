@@ -81,8 +81,6 @@ ReactOnRails.configure do |config|
   ################################################################################
   # MISCELLANEOUS OPTIONS
   ################################################################################
-  # Default is false, enable if your content security policy doesn't include `style-src: 'unsafe-inline'`
-  config.skip_display_none = false
 
   # This allows you to add additional values to the Rails Context. Implement one static method
   # called `custom_context(view_context)` and return a Hash.
