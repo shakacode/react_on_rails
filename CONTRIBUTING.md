@@ -44,7 +44,8 @@ When making doc changes, we want the change to work on both the gitbook and the 
 ## To run tests:
 * After updating code via git, to prepare all examples and run all tests:
 
-```
+```sh
+cd react_on_rails/
 bundle && yarn && rake examples:prepare_all && rake node_package && rake
 ```
 
@@ -72,9 +73,17 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 * /spec/react_on_rails/dummy-for-generators
 
 # Configuring your test app to use your local fork
+You can test the `react-on-rails` gem using your own external test app or the gem's internal `spec/dummy` app. The `spec/dummy` app is an example of the various setup techniques you can use with the gem.
+```
+├── test
+|    └── client
+└── react_on_rails
+    └── spec
+        └── dummy
+```
 
-## Ruby Gem
-If you want to test the gem with an application before you release a new version of the gem, you can specify the path to your local version via your test app's Gemfile:
+## Testing the Ruby Gem
+If you want to test the ruby parts of the gem with an application before you release a new version of the gem, you can specify the path to your local version via your test app's Gemfile:
 
 ```ruby
 gem "react_on_rails", path: "../path-to-react-on-rails"
@@ -82,21 +91,30 @@ gem "react_on_rails", path: "../path-to-react-on-rails"
 
 Note that you will need to bundle install after making this change, but also that **you will need to restart your Rails application if you make any changes to the gem**.
 
-## NPM for react-on-rails
-First, be **sure** to build the NPM package
+## Testing the Node package for react-on-rails
+In addition to testing the Ruby parts out, you can also test the node package parts of the gem with an external application. First, be **sure** to build the NPM package:
 
 ```sh
+cd react_on_rails/
 yarn
 yarn run build
 ```
 
-Use a relative path in your `package.json`, like this:
+Install the local package by using a relative path in your test/client app's `package.json`, like this:
 ```sh
-cd client
-yarn add "react-on-rails@../../react_on_rails"
+cd test/client
+npm i --save 'react-on-rails@../path-to-react-on-rails'
 ```
+_Note: You must use npm here till yarn stops preferring cached packages over local. see [issue #2649](https://github.com/yarnpkg/yarn/issues/2649)_
 
 When you use a relative path, be sure to run the above `yarn` command whenever you change the node package for react-on-rails.
+
+#### Example: Testing NPM changes with the dummy app
+1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/clientStartup.js#L181) in `react_on_rails/node_package/src/clientStartup.js`. This is our desired change.
+2. Run the install script `npm run install-react-on-rails` in `react_on_rails/spec/dummy` to copy over our changes to the dummy app. Alternatively, you can run `npm i --save 'file:../../../'` in `react_on_rails/spec/dummy/client`. Our NPM changes are now available in the dummy app.
+3. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console.
+
+_Note: running `npm i` automatically builds the npm package before installing. However, when using yarn you will need to run `yarn run build` in the root directory before the install script. This will be updated when yarn issue #2649 (above) is resolved._
 
 # Development Setup for Gem and Node Package Contributors
 
@@ -119,11 +137,13 @@ yarn global add phantomjs
 Note this *must* be installed globally for the dummy test project rspec runner to see it properly.
 
 ### Local Node Package
-Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the test app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)
+Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the dummy app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)
 
 ```sh
+cd react_on_rails/spec/dummy
 yarn run install-react-on-rails
 ```
+_Note: this runs npm under the hood as explained in **Test NPM for react-on-rails** section above_
 
 From now on, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:prepare_all` rake task.
 
@@ -141,9 +161,9 @@ From now on, the example and dummy apps will use your local node_package folder 
 ### Install NPM dependencies and build the NPM package for react-on-rails
 
 ```sh
-cd <top level>
+cd react_on_rails/
 yarn
-npm build
+yarn build
 ```
 
 Or run this which builds the yarn package, then the webpack files for spec/dummy, and runs tests in
@@ -153,40 +173,40 @@ spec/dummy.
 ```sh
 # Optionally change default selenium_firefox driver
 export DRIVER=poltergeist
-cd <top level>
+cd react_on_rails/
 yarn run dummy:spec
 ```
 
 ### Run NPM JS tests
 
 ```sh
-cd <top level>
+cd react_on_rails/
 yarn test
 ```
 
 ### Run spec/dummy tests
 
 ```sh
-cd spec/dummy
+cd react_on_rails/spec/dummy
 rspec
 ```
 
 Eventually, we may have JS tests:
 
 ```sh
-cd spec/dummy/client
+cd react_on_rails/spec/dummy/client
 yarn run test
 ```
 
 ### Run most tests and linting
 
 ```sh
-cd <top level>
-npm run check
+cd react_on_rails/
+yarn run check
 ```
 
 ### Starting the Dummy App
-To run the test app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the webpack configs, then you need to restart foreman. If you change the JS code for react-on-rails, you need to run `yarn run build`. Since the react-on-rails package should be sym linked, you don't have to `yarn react-on-rails` after every change.
+To run the dummy app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the webpack configs, then you need to restart foreman. If you change the JS code for react-on-rails, you need to run `yarn run build`. Since the react-on-rails package should be sym linked, you don't have to `yarn react-on-rails` after every change.
 
 ### RSpec Testing
 Run `rake` for testing the gem and `spec/dummy`. Otherwise, the `rspec` command only works for testing within the sample apps, like `spec/dummy`.
