@@ -116,6 +116,10 @@ GEM
     launchy (2.4.3)
       addressable (~> 2.3)
     libv8 (5.3.332.38.3)
+    listen (3.1.5)
+      rb-fsevent (~> 0.9, >= 0.9.4)
+      rb-inotify (~> 0.9, >= 0.9.7)
+      ruby_dep (~> 1.2)
     loofah (2.0.3)
       nokogiri (>= 1.5.9)
     mail (2.6.4)
@@ -191,6 +195,9 @@ GEM
       thor (>= 0.18.1, < 2.0)
     rainbow (2.2.1)
     rake (12.0.0)
+    rb-fsevent (0.9.8)
+    rb-inotify (0.9.8)
+      ffi (>= 0.5.0)
     rdoc (4.3.0)
     rspec-core (3.5.4)
       rspec-support (~> 3.5.0)
@@ -221,6 +228,7 @@ GEM
       parser (~> 2.2)
       slop (~> 3.4, >= 3.4.7)
     ruby-progressbar (1.8.1)
+    ruby_dep (1.5.0)
     rubyzip (1.2.1)
     sass (3.4.23)
     sass-rails (5.0.6)
@@ -291,6 +299,7 @@ DEPENDENCIES
   jbuilder (~> 2.0)
   jquery-rails
   launchy
+  listen
   mini_racer
   poltergeist
   pry
@@ -317,4 +326,4 @@ DEPENDENCIES
   uglifier
 
 BUNDLED WITH
-   1.14.5
+   1.14.6

@@ -57,6 +57,7 @@ group :development, :test do
   gem "rubocop", require: false
   gem "ruby-lint", require: false
   gem "scss_lint", require: false
+  gem "listen"
 
   # Spring speeds up development by keeping your application running in the background. Read more: https://github.com/rails/spring
   gem 'spring'
