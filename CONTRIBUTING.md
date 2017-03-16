@@ -110,7 +110,7 @@ _Note: You must use npm here till yarn stops preferring cached packages over loc
 When you use a relative path, be sure to run the above `yarn` command whenever you change the node package for react-on-rails.
 
 #### Example: Testing NPM changes with the dummy app
-1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/clientStartup.js#L181) in `react_on_rails/node_package/src/clientStartup.js`. This is our desired change.
+1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/clientStartup.js#L181) in `react_on_rails/node_package/src/clientStartup.js` to confirm we're getting an update to the node package.
 2. Run the install script `npm run install-react-on-rails` in `react_on_rails/spec/dummy` to copy over our changes to the dummy app. Alternatively, you can run `npm i --save 'file:../../../'` in `react_on_rails/spec/dummy/client`. Our NPM changes are now available in the dummy app.
 3. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console.
 
