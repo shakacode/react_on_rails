@@ -223,10 +223,10 @@ module ReactOnRailsHelper
   private
 
   def json_safe_and_pretty(something)
-    if Rails.env.development?
-      ERB::Util.json_escape(JSON.pretty_generate(something.as_json))
-    else
+    if Rails.env.production?
       ERB::Util.json_escape(something.to_json)
+    else
+      ERB::Util.json_escape(JSON.pretty_generate(something.as_json))
     end
   end
 
