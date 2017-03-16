@@ -52,7 +52,7 @@ function forEachComponent(fn, railsContext) {
 
 function initializeStore(el, railsContext) {
   const context = findContext();
-  const name = el.attributes['data-js-react-on-rails-store'].value;
+  const name = el.getAttribute('data-js-react-on-rails-store');
   const props = JSON.parse(el.textContent);
   const storeGenerator = context.ReactOnRails.getStoreGenerator(name);
   const store = storeGenerator(props, railsContext);
