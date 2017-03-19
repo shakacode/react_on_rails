@@ -186,6 +186,7 @@ export function clientStartup(context) {
           'turbolinks:before-render and turbolinks:render.');
         document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
         document.addEventListener('turbolinks:render', reactOnRailsPageLoaded);
+        reactOnRailsPageLoaded();
       } else {
         debugTurbolinks(
           'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +
@@ -197,7 +198,7 @@ export function clientStartup(context) {
       debugTurbolinks(
         'NOT USING TURBOLINKS: DOMContentLoaded event, calling reactOnRailsPageLoaded',
       );
+      reactOnRailsPageLoaded();
     }
-    reactOnRailsPageLoaded();
   });
 }
