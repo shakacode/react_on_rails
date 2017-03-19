@@ -185,6 +185,15 @@ feature "renderedHtml from generator function", :js do
   end
 end
 
+feature "display images", :js do
+  subject { page }
+  background { visit "/image_example" }
+  scenario "image_example should not have any errors" do
+    expect(subject).to have_text "Here is a label with a background-image from the CSS modules imported"
+    expect(subject.html).to include("[SERVER] RENDERED ImageExample to dom node with id")
+  end
+end
+
 shared_examples "React Component Shared Store" do |url|
   subject { page }
   background { visit url }
