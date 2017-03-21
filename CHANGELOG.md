@@ -6,6 +6,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 *Please add entries here for your pull requests.*
 
+## [6.8.1] - 2017-03-21
 ### Fixed
 - Fixed error "The node you're attempting to unmount was rendered by another copy of React." [#706](https://github.com/shakacode/react_on_rails/issues/706) when navigating to cached page using Turbolinks  [#763](https://github.com/shakacode/react_on_rails/pull/763) by [szyablitsky](https://github.com/szyablitsky).
 
@@ -488,7 +489,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.8.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.8.1...master
+[6.8.1]: https://github.com/shakacode/react_on_rails/compare/6.8.0...6.8.1
 [6.8.0]: https://github.com/shakacode/react_on_rails/compare/6.7.2...6.8.0
 [6.7.2]: https://github.com/shakacode/react_on_rails/compare/6.7.1...6.7.2
 [6.7.1]: https://github.com/shakacode/react_on_rails/compare/6.7.0...6.7.1
