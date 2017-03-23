@@ -183,9 +183,10 @@ export function clientStartup(context) {
       if (turbolinksVersion5()) {
         debugTurbolinks(
           'USING TURBOLINKS 5: document added event listeners ' +
-          'turbolinks:before-render and turbolinks:load.');
+          'turbolinks:before-render and turbolinks:render.');
         document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
-        document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
+        document.addEventListener('turbolinks:render', reactOnRailsPageLoaded);
+        reactOnRailsPageLoaded();
       } else {
         debugTurbolinks(
           'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +

@@ -10,6 +10,10 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 - Locked Webpack version in generators to 2.2.1
 - Added style-loaders to webpack config
 
+## [6.8.1] - 2017-03-21
+### Fixed
+- Fixed error "The node you're attempting to unmount was rendered by another copy of React." [#706](https://github.com/shakacode/react_on_rails/issues/706) when navigating to cached page using Turbolinks  [#763](https://github.com/shakacode/react_on_rails/pull/763) by [szyablitsky](https://github.com/szyablitsky).
+
 ## [6.8.0] - 2017-03-06
 ## Added
 - Converted to Webpack v2 for generators, tests, and all example code. [#742](https://github.com/shakacode/react_on_rails/pull/742) by [justin808](https://github.com/justin808).
@@ -34,7 +38,7 @@ Commenting out this line addresses the issue:
 
 ```
 config.i18n_dir = Rails.root.join("client", "app", "libs", "i18n")
-``` 
+```
 
 ### Added
 - Allow using rake task to generate javascript locale files. The test helper automatically creates the localization files when needed. [#717](https://github.com/shakacode/react_on_rails/pull/717) by [JasonYCHuang](https://github.com/JasonYCHuang).
@@ -489,7 +493,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.8.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.8.1...master
+[6.8.1]: https://github.com/shakacode/react_on_rails/compare/6.8.0...6.8.1
 [6.8.0]: https://github.com/shakacode/react_on_rails/compare/6.7.2...6.8.0
 [6.7.2]: https://github.com/shakacode/react_on_rails/compare/6.7.1...6.7.2
 [6.7.1]: https://github.com/shakacode/react_on_rails/compare/6.7.0...6.7.1
