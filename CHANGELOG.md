@@ -5,6 +5,11 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 *Please add entries here for your pull requests.*
+
+## Fixed
+- Locked Webpack version in generators to 2.2.1
+- Added style-loaders to webpack config
+
 ## [6.8.0] - 2017-03-06
 ## Added
 - Converted to Webpack v2 for generators, tests, and all example code. [#742](https://github.com/shakacode/react_on_rails/pull/742) by [justin808](https://github.com/justin808).
