@@ -4,6 +4,7 @@
 
 ## Commercial Products Live
 * **[Friends and Guests](https://www.friendsandguests.com/)**, the signature product of [ShakaCode](http://www.shakacode.com), which is a "Network Connecting Hosts and Guests".
+* **[KissKissBankBank](https://www.kisskissbankbank.com/)**, large French crowdfunding platform.
 * **[Nootrobox](https://nootrobox.com)**: Web ecommerce site for "biohacking" products.
 * **[GuavaPass](https://guavapass.com/)**: Coaching client of [ShakaCode](http://www.shakacode.com) and React on Rails fan!
 * **[Pivotal Tracker](http://www.pivotaltracker.com/)**: The first (and most-loved) agile project management tool built on Rails.  React on Rails has greatly simplified integration and workflow for our React components in Rails!
@@ -38,3 +39,4 @@
 
 * [github.com/Limenius/symfony-react-sandbox](https://github.com/Limenius/symfony-react-sandbox)
 * [github.com/tswayne/react-helper](https://github.com/tswayne/react-helper)
+* [github.com/KissKissBankBank/kitten](https://github.com/KissKissBankBank/kitten)
