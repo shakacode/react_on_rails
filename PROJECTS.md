@@ -1,4 +1,4 @@
-#Projects using React on Rails
+# Projects using React on Rails
 
 *Please add your project to this list.*
 
