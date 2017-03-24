@@ -1,9 +1,14 @@
 # Hot Reloading of Assets For Rails Development
 
-This document outlines the steps to setup your React On Rails Environment so that you can experience the pleasure of hot reloading of JavaScript and Sass during your Rails development work. There are 2 examples of this setup:
+This document outlines the steps to setup your React On Rails Environment so that you can experience the pleasure of hot reloading of JavaScript and Sass during your Rails development work. See [Issue 332](https://github.com/shakacode/react_on_rails/issues/332) for troubleshooting. There are 3 examples of this setup:
 
+1. [minimal demo here](https://github.com/retroalgic/react-on-rails-hot-minimal): The most simple and updated hot reloading setup.
 1. [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy): Simpler setup used for integration testing this gem.
 1. [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/). Full featured setup using Twitter bootstrap.
+
+## Help Wanted
+
+This doc might be outdated. PRs welcome!
 
 ## High Level Strategy
 
