@@ -32,7 +32,7 @@
     "react-redux": "^5.0.3",
     "redux": "^3.6.0",
     <%- end -%>
-    "webpack": "^2.2.1"
+    "webpack": "^2.3.1"
   },
   "devDependencies": {
   }
