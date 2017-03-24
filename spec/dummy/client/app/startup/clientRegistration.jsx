@@ -22,6 +22,9 @@ import SharedReduxStore from '../stores/SharedReduxStore';
 // Deferred render on the client side w/ server render
 import RenderedHtml from './ClientRenderedHtml';
 
+// Demonstrate using Images
+import ImageExample from '../components/ImageExample';
+
 ReactOnRails.setOptions({
   traceTurbolinks: true,
 });
@@ -40,6 +43,7 @@ ReactOnRails.register({
   DeferredRenderApp,
   CacheDisabled,
   RenderedHtml,
+  ImageExample,
 });
 
 ReactOnRails.registerStore({

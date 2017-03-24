@@ -3,6 +3,9 @@
 
 const webpack = require('webpack');
 const path = require('path');
+const { imageLoaderRules } = require('./webpack.common');
+const webpackCommon = require('./webpack.common');
+const { assetLoaderRules } = webpackCommon;
 
 const devBuild = process.env.NODE_ENV !== 'production';
 const nodeEnv = devBuild ? 'development' : 'production';
@@ -21,7 +24,7 @@ module.exports = {
   resolve: {
     extensions: ['.js', '.jsx'],
     alias: {
-      libs: path.join(process.cwd(), 'app', 'libs'),
+      images: path.join(process.cwd(), 'app', 'assets', 'images'),
     },
   },
   plugins: [
@@ -33,6 +36,7 @@ module.exports = {
   ],
   module: {
     rules: [
+      ...assetLoaderRules,
       {
         test: /\.jsx?$/,
         use: 'babel-loader',

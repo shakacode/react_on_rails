@@ -35,6 +35,9 @@ import DeferredRenderApp from './DeferredRenderAppServer';
 // Deferred render on the client side w/ server render
 import RenderedHtml from './ServerRenderedHtml';
 
+// Demonstrate using Images
+import ImageExample from '../components/ImageExample';
+
 ReactOnRails.register({
   HelloWorld,
   HelloWorldWithLogAndThrow,
@@ -48,6 +51,7 @@ ReactOnRails.register({
   CssModulesImagesFontsExample,
   DeferredRenderApp,
   RenderedHtml,
+  ImageExample,
 });
 
 ReactOnRails.registerStore({

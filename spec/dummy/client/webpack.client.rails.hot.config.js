@@ -25,7 +25,7 @@ config.output = {
 config.module.rules.push(
   {
     test: /\.jsx?$/,
-    loader: 'babel',
+    loader: 'babel-loader',
     exclude: /node_modules/,
     query: {
       plugins: [
@@ -47,6 +47,7 @@ config.module.rules.push(
   {
     test: /\.css$/,
     use: [
+      'style-loader',
       {
         loader: 'css-loader',
         options: {
@@ -66,6 +67,7 @@ config.module.rules.push(
   {
     test: /\.scss$/,
     use: [
+      'style-loader',
       {
         loader: 'css-loader',
         options: {

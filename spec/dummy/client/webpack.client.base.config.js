@@ -3,6 +3,8 @@
 
 const webpack = require('webpack');
 const path = require('path');
+const webpackCommon = require('./webpack.common');
+const { assetLoaderRules } = webpackCommon;
 
 const devBuild = process.env.NODE_ENV !== 'production';
 
@@ -20,7 +22,7 @@ module.exports = {
   resolve: {
     extensions: ['.js', '.jsx'],
     alias: {
-      libs: path.join(process.cwd(), 'app', 'libs'),
+      images: path.join(process.cwd(), 'app', 'assets', 'images'),
     },
   },
 
@@ -42,22 +44,8 @@ module.exports = {
 
   module: {
     rules: [
-      {
-        test: /\.(ttf|eot)$/,
-        use: 'file-loader',
-      },
+      ...assetLoaderRules,
 
-      // Example to confirm that subdirectories work
-      {
-        test: /\.(jpe?g|png|gif|svg|ico|woff2?)$/,
-        use: {
-          loader: 'url-loader',
-          options: {
-            limit: 10000,
-            name: 'images/[hash].[ext]',
-          },
-        },
-      },
       {
         test: require.resolve('jquery'),
         use: {

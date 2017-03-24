@@ -4115,7 +4115,7 @@ react-dom@^15.4.2:
     object-assign "^4.1.0"
 
 "react-on-rails@file:../../..":
-  version "6.7.2"
+  version "6.8.0"
 
 react-proxy@^1.1.7:
   version "1.1.8"
