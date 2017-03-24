@@ -16,7 +16,7 @@ module.exports = {
   ],
   output: {
     filename: 'server-bundle.js',
-    path: '../app/assets/webpack',
+    path: path.resolve(__dirname, '../app/assets/webpack'),
   },
   resolve: {
     extensions: ['.js', '.jsx'],
