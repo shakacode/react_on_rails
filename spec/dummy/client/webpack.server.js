@@ -6,7 +6,7 @@ module.exports = {
     'startup/serverRegistration',
   ],
   output: {
-    path: '../app/assets/webpack',
+    path: path.resolve(__dirname, '../app/assets/webpack'),
     filename: 'server.js',
   },
   resolve: {
