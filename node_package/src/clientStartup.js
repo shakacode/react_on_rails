@@ -35,15 +35,15 @@ function turbolinksInstalled() {
   return (typeof Turbolinks !== 'undefined');
 }
 
-function forEach(fn, className, railsContext) {
+function forEach(fn, className, railsContext, ...args) {
   const els = document.getElementsByClassName(className);
   for (let i = 0; i < els.length; i += 1) {
-    fn(els[i], railsContext);
+    fn(els[i], railsContext, ...args);
   }
 }
 
-function forEachComponent(fn, railsContext) {
-  forEach(fn, REACT_ON_RAILS_COMPONENT_CLASS_NAME, railsContext);
+function forEachComponent(fn, railsContext, ...args) {
+  forEach(fn, REACT_ON_RAILS_COMPONENT_CLASS_NAME, railsContext, ...args);
 }
 
 function initializeStore(el, railsContext) {
@@ -88,8 +88,14 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
  * Used for client rendering by ReactOnRails. Either calls ReactDOM.render or delegates
  * to a renderer registered by the user.
  * @param el
+ * @param railsContext
+ * @param renderDeferred - when set to false or undefined (default) skips rendering of el marked
+ * with data-render-deferred=true. When set to true renders only deferred components.
  */
-function render(el, railsContext) {
+function render(el, railsContext, renderDeferred) {
+  const isDeferred = el.getAttribute('data-render-deferred') === 'true';
+  if (!!isDeferred != !!renderDeferred) return;
+
   const context = findContext();
   const name = el.getAttribute('data-component-name');
   const domNodeId = el.getAttribute('data-dom-id');
@@ -142,6 +148,11 @@ export function reactOnRailsPageLoaded() {
   const railsContext = parseRailsContext();
   forEachStore(railsContext);
   forEachComponent(render, railsContext);
+}
+
+export function renderDeferredComponents() {
+  const railsContext = parseRailsContext();
+  forEachComponent(render, railsContext, true);
 }
 
 function unmount(el) {
