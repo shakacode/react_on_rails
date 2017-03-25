@@ -63,14 +63,14 @@ describe "Server Rendering", :server_rendering do
       mail = DummyMailer.hello_email
       expect(mail.subject).to match "mail"
       expect(mail.body).to match "Mr. Mailing Server Side Rendering"
-      expect(mail.body).to match "inMailer&quot;:true"
+      expect(mail.body).to match "\"inMailer\":true"
     end
 
     it "sets inMailer properly" do
       get client_side_hello_world_path
       html_nodes = Nokogiri::HTML(response.body)
-      expect(html_nodes.css("div#js-react-on-rails-context").attr("data-rails-context").value)
-        .to match('inMailer\":false')
+      expect(html_nodes.at_css("script#js-react-on-rails-context").content)
+        .to match("\"inMailer\":false")
     end
   end
 

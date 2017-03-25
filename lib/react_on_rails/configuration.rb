@@ -76,7 +76,6 @@ module ReactOnRails
       development_mode: Rails.env.development?,
       server_renderer_pool_size: 1,
       server_renderer_timeout: 20,
-      skip_display_none: false,
       webpack_generated_files: [],
       rendering_extension: nil,
       server_render_method: "",
@@ -92,7 +91,7 @@ module ReactOnRails
                   :trace, :development_mode,
                   :logging_on_server, :server_renderer_pool_size,
                   :server_renderer_timeout, :raise_on_prerender_error,
-                  :skip_display_none, :generated_assets_dirs, :generated_assets_dir,
+                  :generated_assets_dirs, :generated_assets_dir,
                   :webpack_generated_files, :rendering_extension, :npm_build_test_command,
                   :npm_build_production_command,
                   :i18n_dir,
@@ -102,7 +101,7 @@ module ReactOnRails
                    trace: nil, development_mode: nil,
                    logging_on_server: nil, server_renderer_pool_size: nil,
                    server_renderer_timeout: nil, raise_on_prerender_error: nil,
-                   skip_display_none: nil, generated_assets_dirs: nil,
+                   generated_assets_dirs: nil,
                    generated_assets_dir: nil, webpack_generated_files: nil,
                    rendering_extension: nil, npm_build_test_command: nil,
                    npm_build_production_command: nil,
@@ -125,7 +124,6 @@ module ReactOnRails
                               end
       self.trace = trace.nil? ? Rails.env.development? : trace
       self.raise_on_prerender_error = raise_on_prerender_error
-      self.skip_display_none = skip_display_none
 
       # Server rendering:
       self.server_renderer_pool_size = self.development_mode ? 1 : server_renderer_pool_size

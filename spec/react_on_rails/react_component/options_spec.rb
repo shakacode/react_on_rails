@@ -137,30 +137,6 @@ describe ReactOnRails::ReactComponent::Options do
     end
   end
 
-  describe "#style" do
-    context "skipped display none" do
-      it "returns nil" do
-        ReactOnRails.configuration.skip_display_none = true
-        attrs = the_attrs
-
-        opts = described_class.new(attrs)
-
-        expect(opts.style).to eq nil
-      end
-    end
-
-    context "not skipped display none" do
-      it "returns value" do
-        ReactOnRails.configuration.skip_display_none = false
-        attrs = the_attrs
-
-        opts = described_class.new(attrs)
-
-        expect(opts.style).to eq "display:none"
-      end
-    end
-  end
-
   CONFIGURABLE_OPTIONS.each do |option|
     describe "##{option}" do
       context "with #{option} option" do

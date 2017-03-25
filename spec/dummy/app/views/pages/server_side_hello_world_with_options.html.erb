@@ -1,7 +1,7 @@
 <%= render "header" %>
 
 <%= react_component("HelloWorld",
-                    props: @app_props_server_render.to_json,
+                    props: @app_props_server_render,
                     prerender: true,
                     trace: true,
                     id: "my-hello-world-id",
@@ -27,7 +27,7 @@
 </ul>
 <pre>
 <%%= react_component("HelloWorld",
-                    props: @app_props_server_render.to_json,
+                    props: @app_props_server_render,
                     prerender: true,
                     trace: true,
                     id: "my-hello-world-id",

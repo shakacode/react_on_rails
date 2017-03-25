@@ -18,10 +18,10 @@ console.error.apply(console, ["[SERVER] stack: Error: throw in HelloWorldContain
 
     expected_lines = expected.split("\n")
 
-    script_node = html_nodes.css("script")[1]
+    script_node = html_nodes.css("script#consoleReplayLog")
 
     expected_lines.each do |line|
-      expect(script_node.inner_text).to include(line)
+      expect(script_node.text).to include(line)
     end
   end
 end
