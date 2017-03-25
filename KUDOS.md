@@ -6,6 +6,10 @@ I'm looking for quotes on why you like using React on Rails. You might mention a
 Github issue [#766](https://github.com/shakacode/react_on_rails/issues/766).
 ![2017-03-23_17-43-17](https://cloud.githubusercontent.com/assets/1118459/24279884/badab166-0ff0-11e7-87ab-94253f55a3d9.png)
 
+## March 21, 2017
+Twitter from [@rfc2616](https://twitter.com/rfc2616)
+![2017-03-24_20-20-20](https://cloud.githubusercontent.com/assets/1118459/24319983/7adfd57a-10cf-11e7-9a50-5c23d5d5bcab.png)
+
 ### March 2, 2017
 ![2017-03-05_21-34-34](https://cloud.githubusercontent.com/assets/1118459/23600716/0d8c40d6-01ec-11e7-998d-4ce9e6abcacb.png)
 
