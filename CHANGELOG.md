@@ -5,7 +5,9 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 *Please add entries here for your pull requests.*
-## Changed
+
+## [6.8.2] - 2017-03-24
+## Fixed
 - Change webpack output path to absolute and update webpack to version ^2.3.1. [#771](https://github.com/shakacode/react_on_rails/pull/771) by [cheremukhin23](https://github.com/cheremukhin23).
 
 ## [6.8.1] - 2017-03-21
@@ -491,7 +493,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.8.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.8.2...master
+[6.8.2]: https://github.com/shakacode/react_on_rails/compare/6.8.1...6.8.2
 [6.8.1]: https://github.com/shakacode/react_on_rails/compare/6.8.0...6.8.1
 [6.8.0]: https://github.com/shakacode/react_on_rails/compare/6.7.2...6.8.0
 [6.7.2]: https://github.com/shakacode/react_on_rails/compare/6.7.1...6.7.2
