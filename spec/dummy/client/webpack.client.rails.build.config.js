@@ -6,12 +6,13 @@
 
 const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const config = require('./webpack.client.base.config');
+const path = require('path');
 
 const devBuild = process.env.NODE_ENV !== 'production';
 
 config.output = {
   filename: '[name]-bundle.js',
-  path: '../app/assets/webpack',
+  path: path.resolve(__dirname, '../app/assets/webpack'),
   publicPath: '/assets/',
 };
 

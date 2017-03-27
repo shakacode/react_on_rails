@@ -4,7 +4,7 @@
 You can try out example app, [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial). We're building comprehensive production examples in our new, premium product, [**React on Rails Pro**](https://forum.shakacode.com/t/introducing-react-on-rails-pro-subscriptions/785). If you're interested, please see the details in [this forum post](https://forum.shakacode.com/t/introducing-react-on-rails-pro-subscriptions/785).
 
 ## Webpack v1 or v2?
-We recommend using Webpack version 2.2.1 or greater.
+We recommend using Webpack version 2.3.1 or greater.
 
 ## yarn or npm?
 Yarn is the current recommendation!

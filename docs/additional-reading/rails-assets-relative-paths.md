@@ -157,7 +157,7 @@ module.exports = {
     })
   ],
   module: {
-    loaders: [
+    rules: [
       {
         test: /\.jsx?$/,
         loader: 'babel-loader',
@@ -165,16 +165,24 @@ module.exports = {
       },
       {
         test: require.resolve('react'),
-        loader: 'imports?shim=es5-shim/es5-shim&sham=es5-shim/es5-sham',
+        use: {
+          loader: 'imports-loader',
+          options: {
+            shim: 'es5-shim/es5-shim',
+            sham: 'es5-shim/es5-sham',
+          },
+        }
       },
       {
         // The important stuff
         test: /\.(jpg|jpeg|png)(\?.*)?$/, // Load only .jpg .jpeg, and .png files
-        loader: 'file-loader', 
-        query: {
-          name: '[name][md5:hash].[ext]', // Name of bundled asset
-          outputPath: 'webpack-assets/', // Output location for assets. Final: `app/assets/webpack/webpack-assets/`
-          publicPath: '/assets/webpack-assets/' // Endpoint asset can be found at on Rails server
+        use: {
+          loader: 'file-loader', 
+          options: {
+            name: '[name][md5:hash].[ext]', // Name of bundled asset
+            outputPath: 'webpack-assets/', // Output location for assets. Final: `app/assets/webpack/webpack-assets/`
+            publicPath: '/assets/webpack-assets/' // Endpoint asset can be found at on Rails server
+          }
         }
       }
     ]

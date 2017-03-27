@@ -10,7 +10,7 @@ module.exports = {
     'startup/clientRegistration',
   ],
   output: {
-    path: '../app/assets/webpack',
+    path: path.resolve(__dirname, '../app/assets/webpack'),
     // Implement chunkhash and bypass the asset pipeline
     // TODO: https://webpack.js.org/guides/code-splitting-libraries/#manifest-file
     filename: 'client.js',
