@@ -97,7 +97,11 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
  */
 function render(el, railsContext) {
   const context = findContext();
-  const jsonEl = JSON.parse(el.textContent);
+  var jsonEl = JSON.parse(el.textContent, (key, value) =>
+    key === 'props' && typeof(value) === 'string'
+      ? JSON.parse(value)
+      : value
+  );
   const name = jsonEl.component_name;
   const domNodeId = jsonEl.dom_id;
   const props = jsonEl.props;
