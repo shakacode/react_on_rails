@@ -6,7 +6,6 @@ module ReactOnRails
       include Utils::Required
 
       NO_PROPS = {}.freeze
-      HIDDEN = "display:none".freeze
 
       def initialize(name: required("name"), options: required("options"))
         @name = name
@@ -53,11 +52,7 @@ module ReactOnRails
           dom_id: dom_id
         }
       end
-
-      def style
-        HIDDEN
-      end
-
+      
       private
 
       attr_reader :options
