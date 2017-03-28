@@ -63,8 +63,8 @@ module ReactOnRails
   end
 
   def self.configure_skip_display_none_deprecation
-      return if @configuration.skip_display_none.nil?
-      puts "[DEPRECATION] ReactOnRails: remove skip_display_none from configuration."
+    return if @configuration.skip_display_none.nil?
+    puts "[DEPRECATION] ReactOnRails: remove skip_display_none from configuration."
   end
 
   def self.configuration

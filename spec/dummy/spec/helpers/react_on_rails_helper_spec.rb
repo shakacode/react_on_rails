@@ -62,13 +62,13 @@ describe ReactOnRailsHelper, type: :helper do
     let(:react_definition_script) do
       '<script type="application/json" class="js-react-on-rails-component">'\
         '{"component_name":"App","props":{"name":"My Test Name"},"trace":false,"dom_id":"App-react-component-0"}'\
-      '</script>'
+      "</script>"
     end
 
     let(:react_definition_script_no_params) do
       '<script type="application/json" class="js-react-on-rails-component">'\
         '{"component_name":"App","props":{},"trace":false,"dom_id":"App-react-component-0"}'\
-      '</script>'
+      "</script>"
     end
 
     describe "API with component name only" do
@@ -94,7 +94,7 @@ describe ReactOnRailsHelper, type: :helper do
       let(:react_definition_script) do
         '<script type="application/json" class="js-react-on-rails-component">'\
           '{"component_name":"App","props":{"name":"My Test Name"},"trace":false,"dom_id":"shaka_div"}'\
-        '</script>'
+        "</script>"
       end
 
       it { is_expected.to include id }
@@ -113,7 +113,7 @@ describe ReactOnRailsHelper, type: :helper do
     let(:react_store_script) do
       '<script type="application/json" data-js-react-on-rails-store="reduxStore">'\
         '{"name":"My Test Name"}'\
-      '</script>'
+      "</script>"
     end
 
     it { expect(self).to respond_to :redux_store }

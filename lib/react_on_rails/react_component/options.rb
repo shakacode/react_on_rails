@@ -52,7 +52,7 @@ module ReactOnRails
           dom_id: dom_id
         }
       end
-      
+
       private
 
       attr_reader :options
