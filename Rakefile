@@ -12,3 +12,6 @@ task default: tasks
 
 desc "All actions but no examples, good for local developer run."
 task all_but_examples: ["run_rspec:all_but_examples", "lint"]
+
+require "bundler/gem_tasks"
+Rake::Task["release"].clear
