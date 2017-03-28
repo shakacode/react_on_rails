@@ -61,5 +61,8 @@ task :release, [:gem_version, :dry_run, :tools_install] do |_t, args|
   sh_in_dir(gem_root, release_it_command)
 
   # Release the new gem version
-  sh_in_dir(gem_root, "gem release") unless is_dry_run
+  unless is_dry_run
+    Rake::Task["build"].invoke
+    Rake::Task["release:rubygem_push"].invoke
+  end
 end
