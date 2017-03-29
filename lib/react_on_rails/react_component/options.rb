@@ -13,7 +13,8 @@ module ReactOnRails
       end
 
       def props
-        options.fetch(:props) { NO_PROPS }
+        props = options.fetch(:props) { NO_PROPS }
+        props.is_a?(String) ? JSON.parse(props) : props
       end
 
       def name
