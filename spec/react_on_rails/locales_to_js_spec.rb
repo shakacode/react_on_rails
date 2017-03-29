@@ -62,7 +62,6 @@ module ReactOnRails
       end
 
       it_behaves_like "locale to js"
-
     end
 
     describe "with i18n_yml_dir" do
@@ -84,8 +83,6 @@ module ReactOnRails
       end
 
       it_behaves_like "locale to js"
-
     end
-
   end
 end
