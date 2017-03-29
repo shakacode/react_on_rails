@@ -71,6 +71,20 @@ describe ReactOnRailsHelper, type: :helper do
       "</script>"
     end
 
+    context "with json string props" do
+      let(:json_props) do
+        "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"</script><script>alert('foo')</script>\"}"
+      end
+
+      let(:props_sanitized) do
+        '{"hello":"world","free":"of charge","x":"\\u003c/script\\u003e\\u003cscrip'\
+          "t\\u003ealert('foo')\\u003c/script\\u003e\"}"
+      end
+
+      subject { react_component("App", props: json_props) }
+      it { is_expected.to include props_sanitized }
+    end
+
     describe "API with component name only" do
       subject { react_component("App") }
       it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
