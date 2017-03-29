@@ -44,17 +44,6 @@ describe ReactOnRails::ReactComponent::Options do
         expect(opts.props).to eq(props)
       end
     end
-
-    context "as JSON" do
-      it "returns props" do
-        json_props = { a_prop: 2 }.to_json
-        attrs = the_attrs(options: { props: json_props })
-
-        opts = described_class.new(attrs)
-
-        expect(opts.props).to eq(json_props)
-      end
-    end
   end
 
   describe "#name" do
