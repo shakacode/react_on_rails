@@ -4,6 +4,7 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+*Please add entries here for your pull requests.*
 Add option to specify i18n_yml_dir in order to include only subset of locale files when generating translations.js & default.js for react-intl
 
 ## [6.8.2] - 2017-03-24
