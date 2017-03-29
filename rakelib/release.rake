@@ -43,6 +43,8 @@ task :release, [:gem_version, :dry_run, :tools_install] do |_t, args|
 
   # Having the examples prevents publishing
   Rake::Task["examples:clobber"].invoke
+  # Delete any react_on_rails.gemspec except the root one
+  sh_in_dir(gem_root, "find . -mindepth 2 -name 'react_on_rails.gemspec' -delete")
 
   # See https://github.com/svenfuchs/gem-release
   sh_in_dir(gem_root, "git pull --rebase")
