@@ -4,14 +4,17 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+
+## [6.9.0] - 2017-03-29
+
 ## Fixed
-- Fixed error in the release script [#767](https://github.com/shakacode/react_on_rails/issues/767) by [isolo](https://github.com/isolo).
+- Fixed error in the release script. [#767](https://github.com/shakacode/react_on_rails/issues/767) by [isolo](https://github.com/isolo).
 
-## Improved
-- Use <script type="application/json"> for props and store instead of hidden div [#775] (https://github.com/shakacode/react_on_rails/pull/775) by [cheremukhin23](https://github.com/cheremukhin23).
+## Changed
+- Use <script type="application/json"> for props and store instead of hidden div. [#775] (https://github.com/shakacode/react_on_rails/pull/775) by [cheremukhin23](https://github.com/cheremukhin23).
 
-### Added
-- Add option to specify i18n_yml_dir in order to include only subset of locale files when generating translations.js & default.js for react-intl
+## Added
+- Add option to specify i18n_yml_dir in order to include only subset of locale files when generating translations.js & default.js for react-intl.
 [#777](https://github.com/shakacode/react_on_rails/pull/777) by [danijel](https://github.com/danijel).
 
 ## [6.8.2] - 2017-03-24
@@ -501,7 +504,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.8.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.9.0...master
+[6.9.0]: https://github.com/shakacode/react_on_rails/compare/6.8.2...6.9.0
 [6.8.2]: https://github.com/shakacode/react_on_rails/compare/6.8.1...6.8.2
 [6.8.1]: https://github.com/shakacode/react_on_rails/compare/6.8.0...6.8.1
 [6.8.0]: https://github.com/shakacode/react_on_rails/compare/6.7.2...6.8.0
