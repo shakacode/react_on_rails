@@ -6,7 +6,6 @@ module ReactOnRails
       include Utils::Required
 
       NO_PROPS = {}.freeze
-      HIDDEN = "display:none".freeze
 
       def initialize(name: required("name"), options: required("options"))
         @name = name
@@ -14,7 +13,8 @@ module ReactOnRails
       end
 
       def props
-        options.fetch(:props) { NO_PROPS }
+        props = options.fetch(:props) { NO_PROPS }
+        props.is_a?(String) ? JSON.parse(ERB::Util.json_escape(props)) : props
       end
 
       def name
@@ -52,11 +52,6 @@ module ReactOnRails
           trace: trace,
           dom_id: dom_id
         }
-      end
-
-      def style
-        return nil if ReactOnRails.configuration.skip_display_none
-        HIDDEN
       end
 
       private

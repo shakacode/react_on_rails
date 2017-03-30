@@ -5,8 +5,7 @@ import ReactDOM from 'react-dom';
 import createReactElement from './createReactElement';
 import isRouterResult from './isCreateReactElementResultNonReactComponent';
 
-const REACT_ON_RAILS_COMPONENT_CLASS_NAME = 'js-react-on-rails-component';
-const REACT_ON_RAILS_STORE_CLASS_NAME = 'js-react-on-rails-store';
+const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
 function findContext() {
   if (typeof window.ReactOnRails !== 'undefined') {
@@ -42,21 +41,28 @@ function forEach(fn, className, railsContext) {
   }
 }
 
+function forEachByAttribute(fn, attributeName, railsContext) {
+  const els = document.querySelectorAll(`[${attributeName}]`);
+  for (let i = 0; i < els.length; i += 1) {
+    fn(els[i], railsContext);
+  }
+}
+
 function forEachComponent(fn, railsContext) {
-  forEach(fn, REACT_ON_RAILS_COMPONENT_CLASS_NAME, railsContext);
+  forEach(fn, 'js-react-on-rails-component', railsContext);
 }
 
 function initializeStore(el, railsContext) {
   const context = findContext();
-  const name = el.getAttribute('data-store-name');
-  const props = JSON.parse(el.getAttribute('data-props'));
+  const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE);
+  const props = JSON.parse(el.textContent);
   const storeGenerator = context.ReactOnRails.getStoreGenerator(name);
   const store = storeGenerator(props, railsContext);
   context.ReactOnRails.setStore(name, store);
 }
 
 function forEachStore(railsContext) {
-  forEach(initializeStore, REACT_ON_RAILS_STORE_CLASS_NAME, railsContext);
+  forEachByAttribute(initializeStore, REACT_ON_RAILS_STORE_ATTRIBUTE, railsContext);
 }
 
 function turbolinksVersion5() {
@@ -91,10 +97,11 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
  */
 function render(el, railsContext) {
   const context = findContext();
-  const name = el.getAttribute('data-component-name');
-  const domNodeId = el.getAttribute('data-dom-id');
-  const props = JSON.parse(el.getAttribute('data-props'));
-  const trace = JSON.parse(el.getAttribute('data-trace'));
+  const jsonEl = JSON.parse(el.textContent);
+  const name = jsonEl.component_name;
+  const domNodeId = jsonEl.dom_id;
+  const props = jsonEl.props;
+  const trace = jsonEl.trace;
 
   try {
     const domNode = document.getElementById(domNodeId);
@@ -130,7 +137,7 @@ You should return a React.Component always for the client side entry point.`);
 function parseRailsContext() {
   const el = document.getElementById('js-react-on-rails-context');
   if (el) {
-    return JSON.parse(el.getAttribute('data-rails-context'));
+    return JSON.parse(el.textContent);
   }
 
   return null;
@@ -145,7 +152,8 @@ export function reactOnRailsPageLoaded() {
 }
 
 function unmount(el) {
-  const domNodeId = el.getAttribute('data-dom-id');
+  const elData = JSON.parse(el.textContent);
+  const domNodeId = elData.dom_id;
   const domNode = document.getElementById(domNodeId);
   ReactDOM.unmountComponentAtNode(domNode);
 }

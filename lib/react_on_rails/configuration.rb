@@ -9,6 +9,7 @@ module ReactOnRails
   def self.setup_config_values
     ensure_webpack_generated_files_exists
     configure_generated_assets_dirs_deprecation
+    configure_skip_display_none_deprecation
     ensure_generated_assets_dir_present
     ensure_server_bundle_js_file_has_no_path
     check_i18n_directory_exists
@@ -61,6 +62,11 @@ module ReactOnRails
     @configuration.server_bundle_js_file = File.basename(@configuration.server_bundle_js_file)
   end
 
+  def self.configure_skip_display_none_deprecation
+    return if @configuration.skip_display_none.nil?
+    puts "[DEPRECATION] ReactOnRails: remove skip_display_none from configuration."
+  end
+
   def self.configuration
     @configuration ||= Configuration.new(
       generated_assets_dirs: nil,
@@ -76,7 +82,9 @@ module ReactOnRails
       development_mode: Rails.env.development?,
       server_renderer_pool_size: 1,
       server_renderer_timeout: 20,
-      skip_display_none: false,
+      skip_display_none: nil,
+
+      # skip_display_none is deprecated
       webpack_generated_files: [],
       rendering_extension: nil,
       server_render_method: "",
@@ -91,8 +99,8 @@ module ReactOnRails
     attr_accessor :server_bundle_js_file, :prerender, :replay_console,
                   :trace, :development_mode,
                   :logging_on_server, :server_renderer_pool_size,
-                  :server_renderer_timeout, :raise_on_prerender_error,
-                  :skip_display_none, :generated_assets_dirs, :generated_assets_dir,
+                  :server_renderer_timeout, :skip_display_none, :raise_on_prerender_error,
+                  :generated_assets_dirs, :generated_assets_dir,
                   :webpack_generated_files, :rendering_extension, :npm_build_test_command,
                   :npm_build_production_command,
                   :i18n_dir,

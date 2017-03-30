@@ -6,6 +6,9 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 *Please add entries here for your pull requests.*
 
+## Improved
+- Use <script type="application/json"> for props and store instead of hidden div [#775] (https://github.com/shakacode/react_on_rails/pull/775) by [cheremukhin23](https://github.com/cheremukhin23).
+
 ## [6.8.2] - 2017-03-24
 ## Fixed
 - Change webpack output path to absolute and update webpack to version ^2.3.1. [#771](https://github.com/shakacode/react_on_rails/pull/771) by [cheremukhin23](https://github.com/cheremukhin23).

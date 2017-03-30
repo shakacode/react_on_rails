@@ -85,7 +85,7 @@ test('buildConsoleReplay wraps console replay in a script tag', (assert) => {
   const actual = buildConsoleReplay();
 
   const expected = `
-<script>
+<script id="consoleReplayLog">
 console.log.apply(console, ["some message","{\\"a\\":1,\\"b\\":2}"]);
 console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);
 </script>`;

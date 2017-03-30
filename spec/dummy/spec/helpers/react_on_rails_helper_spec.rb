@@ -59,76 +59,61 @@ describe ReactOnRailsHelper, type: :helper do
 
     let(:id) { "App-react-component-0" }
 
-    let(:react_definition_div) do
-      %(<div class="js-react-on-rails-component"
-            style="display:none"
-            data-component-name="App"
-            data-props="{&quot;name&quot;:&quot;My Test Name&quot;}"
-            data-trace="false"
-            data-dom-id="#{id}"></div>).squish
+    let(:react_definition_script) do
+      '<script type="application/json" class="js-react-on-rails-component">'\
+        '{"component_name":"App","props":{"name":"My Test Name"},"trace":false,"dom_id":"App-react-component-0"}'\
+      "</script>"
     end
 
-    let(:react_definition_div_no_params) do
-      %(<div class="js-react-on-rails-component"
-            style="display:none"
-            data-component-name="App"
-            data-props="{}"
-            data-trace="false"
-            data-dom-id="#{id}"></div>).squish
+    let(:react_definition_script_no_params) do
+      '<script type="application/json" class="js-react-on-rails-component">'\
+        '{"component_name":"App","props":{},"trace":false,"dom_id":"App-react-component-0"}'\
+      "</script>"
+    end
+
+    context "with json string props" do
+      let(:json_props) do
+        "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"</script><script>alert('foo')</script>\"}"
+      end
+
+      let(:props_sanitized) do
+        '{"hello":"world","free":"of charge","x":"\\u003c/script\\u003e\\u003cscrip'\
+          "t\\u003ealert('foo')\\u003c/script\\u003e\"}"
+      end
+
+      subject { react_component("App", props: json_props) }
+      it { is_expected.to include props_sanitized }
     end
 
     describe "API with component name only" do
       subject { react_component("App") }
       it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
       it { is_expected.to include react_component_div }
-      it { is_expected.to include react_definition_div_no_params }
+      it { is_expected.to include react_definition_script_no_params }
     end
 
     it { expect(self).to respond_to :react_component }
 
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
-    it { is_expected.to start_with "<div" }
-    it { is_expected.to match %r{</div>\s*$} }
+    it { is_expected.to start_with "<script" }
+    it { is_expected.to match %r{</script>\s*$} }
     it { is_expected.to include react_component_div }
-    it { is_expected.to include react_definition_div }
+    it { is_expected.to include react_definition_script }
 
     context "with 'id' option" do
       subject { react_component("App", props: props, id: id) }
 
       let(:id) { "shaka_div" }
 
+      let(:react_definition_script) do
+        '<script type="application/json" class="js-react-on-rails-component">'\
+          '{"component_name":"App","props":{"name":"My Test Name"},"trace":false,"dom_id":"shaka_div"}'\
+        "</script>"
+      end
+
       it { is_expected.to include id }
       it { is_expected.not_to include react_component_div }
-      it { is_expected.to include react_definition_div }
-    end
-
-    context "with skip_display_none option true" do
-      before { ReactOnRails.configuration.skip_display_none = true }
-
-      let(:react_definition_div_skip_display_none_true) do
-        "<div class=\"js-react-on-rails-component\"
-              data-component-name=\"App\"
-              data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
-              data-trace=\"false\"
-              data-dom-id=\"#{id}\"></div>".squish
-      end
-
-      it { is_expected.to include react_definition_div_skip_display_none_true }
-    end
-
-    context "with skip_display_none option false" do
-      before { ReactOnRails.configuration.skip_display_none = false }
-
-      let(:react_definition_div_skip_display_none_false) do
-        "<div class=\"js-react-on-rails-component\"
-              style=\"display:none\"
-              data-component-name=\"App\"
-              data-props=\"{&quot;name&quot;:&quot;My Test Name&quot;}\"
-              data-trace=\"false\"
-              data-dom-id=\"#{id}\"></div>".squish
-      end
-
-      it { is_expected.to include react_definition_div_skip_display_none_false }
+      it { is_expected.to include react_definition_script }
     end
   end
 
@@ -139,36 +124,18 @@ describe ReactOnRailsHelper, type: :helper do
       { name: "My Test Name" }
     end
 
-    let(:react_store_div) do
-      %(<div class="js-react-on-rails-store"
-            style="display:none"
-            data-store-name="reduxStore"
-            data-props="{&quot;name&quot;:&quot;My Test Name&quot;}"></div>).squish
+    let(:react_store_script) do
+      '<script type="application/json" data-js-react-on-rails-store="reduxStore">'\
+        '{"name":"My Test Name"}'\
+      "</script>"
     end
 
     it { expect(self).to respond_to :redux_store }
 
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
-    it { is_expected.to start_with "<div" }
-    it { is_expected.to end_with "</div>" }
-    it { is_expected.to include react_store_div }
-
-    context "with skip_display_none option true" do
-      before { ReactOnRails.configuration.skip_display_none = true }
-
-      let(:react_store_definition_div_skip_display_none_true) do
-        %(<div class="js-react-on-rails-store"
-            data-store-name="reduxStore"
-            data-props="{&quot;name&quot;:&quot;My Test Name&quot;}"></div>).squish
-      end
-
-      it { is_expected.to include react_store_definition_div_skip_display_none_true }
-    end
-
-    context "with skip_display_none option false" do
-      before { ReactOnRails.configuration.skip_display_none = false }
-      it { is_expected.to include react_store_div }
-    end
+    it { is_expected.to start_with "<script" }
+    it { is_expected.to end_with "</script>" }
+    it { is_expected.to include react_store_script }
   end
 
   describe "#server_render_js" do
