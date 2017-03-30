@@ -8,7 +8,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ### Added
 - Add option to specify i18n_yml_dir in order to include only subset of locale files when generating translations.js & default.js for react-intl
-[#777](https://github.com/shakacode/react_on_rails/pull/777) by [danijel](https://github.com/danijel)
+[#777](https://github.com/shakacode/react_on_rails/pull/777) by [danijel](https://github.com/danijel).
 
 ## [6.8.2] - 2017-03-24
 ## Fixed
