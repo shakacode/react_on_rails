@@ -39,12 +39,21 @@ module ReactOnRails
     end
 
     def locale_files
-      @locale_files ||=
-        (Rails.application && Rails.application.config.i18n.load_path).presence
+      @locale_files ||= begin
+        if i18n_yml_dir.present?
+          Dir["#{i18n_yml_dir}/**/*.yml"]
+        else
+          (Rails.application && Rails.application.config.i18n.load_path).presence
+        end
+      end
     end
 
     def i18n_dir
       @i18n_dir ||= ReactOnRails.configuration.i18n_dir
+    end
+
+    def i18n_yml_dir
+      @i18n_yml_dir ||= ReactOnRails.configuration.i18n_yml_dir
     end
 
     def default_locale

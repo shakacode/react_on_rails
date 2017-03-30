@@ -13,6 +13,7 @@ module ReactOnRails
     ensure_generated_assets_dir_present
     ensure_server_bundle_js_file_has_no_path
     check_i18n_directory_exists
+    check_i18n_yml_directory_exists
   end
 
   def self.check_i18n_directory_exists
@@ -22,6 +23,15 @@ module ReactOnRails
     raise "Error configuring /config/react_on_rails.rb: invalid value for `config.i18n_dir`. "\
         "Directory does not exist: #{@configuration.i18n_dir}. Set to value to nil or comment it "\
         "out if not using this i18n with React on Rails."
+  end
+
+  def self.check_i18n_yml_directory_exists
+    return unless @configuration.i18n_yml_dir.present?
+    return if Dir.exist?(@configuration.i18n_yml_dir)
+
+    raise "Error configuring /config/react_on_rails.rb: invalid value for `config.i18n_yml_dir`. "\
+        "Directory does not exist: #{@configuration.i18n_yml_dir}. Set to value to nil or comment it "\
+        "out if not using this i18n with React on Rails, or if you want to use all translation files."
   end
 
   def self.ensure_generated_assets_dir_present
@@ -91,6 +101,7 @@ module ReactOnRails
       symlink_non_digested_assets_regex: /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/,
       npm_build_test_command: "",
       i18n_dir: "",
+      i18n_yml_dir: "",
       npm_build_production_command: ""
     )
   end
@@ -103,7 +114,7 @@ module ReactOnRails
                   :generated_assets_dirs, :generated_assets_dir,
                   :webpack_generated_files, :rendering_extension, :npm_build_test_command,
                   :npm_build_production_command,
-                  :i18n_dir,
+                  :i18n_dir, :i18n_yml_dir,
                   :server_render_method, :symlink_non_digested_assets_regex
 
     def initialize(server_bundle_js_file: nil, prerender: nil, replay_console: nil,
@@ -114,7 +125,7 @@ module ReactOnRails
                    generated_assets_dir: nil, webpack_generated_files: nil,
                    rendering_extension: nil, npm_build_test_command: nil,
                    npm_build_production_command: nil,
-                   i18n_dir: nil,
+                   i18n_dir: nil, i18n_yml_dir: nil,
                    server_render_method: nil, symlink_non_digested_assets_regex: nil)
       self.server_bundle_js_file = server_bundle_js_file
       self.generated_assets_dirs = generated_assets_dirs
@@ -122,6 +133,7 @@ module ReactOnRails
       self.npm_build_test_command = npm_build_test_command
       self.npm_build_production_command = npm_build_production_command
       self.i18n_dir = i18n_dir
+      self.i18n_yml_dir = i18n_yml_dir
 
       self.prerender = prerender
       self.replay_console = replay_console
