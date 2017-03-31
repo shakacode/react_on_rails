@@ -563,7 +563,8 @@ Node.js can be used as the backend for server-side rendering instead of [execJS]
 
 ## Dependencies
 + Ruby 2.1 or greater
-+ Rails 3.2 or greater
++ Rails 4.2 or greater
+  + Rails 3.2 will work and is tested up to 6.8.x. We are not testing it for new releases. If you find an issue, you will have to submit a PR to get it fixed.
 + Node 5.5 or greater
 
 ## Contributing
