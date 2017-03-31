@@ -220,20 +220,19 @@ module ReactOnRailsHelper
     # rubocop:enable Style/RaiseArgs
   end
 
-  private
-
   def json_safe_and_pretty(hash_or_string)
+    hash_value = hash_or_string.is_a?(String) ? JSON.parse(hash_or_string) : hash_or_string
+
     if Rails.env.development?
-      # TODO: for json_safe_and_pretty
-      # 1. Add test
-      # 2. Add error handler if cannot parse the string with nice message
-      # 3. Consider checking that if not a string then a Hash
-      hash_value = hash_or_string.is_a?(String) ? JSON.parse(hash_or_string) : hash_or_string
       ERB::Util.json_escape(JSON.pretty_generate(hash_value))
     else
-      ERB::Util.json_escape(hash_or_string.to_json)
+      ERB::Util.json_escape(hash_value.to_json)
     end
+  rescue JSON::ParserError => e
+    raise e, %(Cannot parse #{hash_or_string} \n Backtrace: #{e.backtrace.join("\n")})
   end
+
+  private
 
   # prepend the rails_context if not yet applied
   def prepend_render_rails_context(render_value)
