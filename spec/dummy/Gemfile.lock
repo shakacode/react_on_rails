@@ -269,9 +269,8 @@ GEM
     thread_safe (0.3.6)
     tilt (2.0.6)
     tins (1.13.2)
-    turbolinks (5.0.1)
-      turbolinks-source (~> 5)
-    turbolinks-source (5.0.0)
+    turbolinks (2.5.3)
+      coffee-rails
     tzinfo (1.2.2)
       thread_safe (~> 0.1)
     uglifier (3.1.4)
@@ -322,7 +321,7 @@ DEPENDENCIES
   selenium-webdriver
   spring
   sqlite3
-  turbolinks (~> 5.0)
+  turbolinks (= 2.5.3)
   uglifier
 
 BUNDLED WITH

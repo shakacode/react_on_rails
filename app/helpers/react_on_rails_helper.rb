@@ -222,11 +222,9 @@ module ReactOnRailsHelper
 
   private
 
-
-
   def json_safe_and_pretty(hash_or_string)
     if Rails.env.development?
-      # TODO:
+      # TODO: for json_safe_and_pretty
       # 1. Add test
       # 2. Add error handler if cannot parse the string with nice message
       # 3. Consider checking that if not a string then a Hash
