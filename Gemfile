@@ -14,7 +14,7 @@ gem "jquery-rails"
 gem "puma"
 gem "rails", "4.2.8"
 gem "rails_12factor"
-gem "rubocop", require: false
+gem "rubocop", "0.47.1", require: false
 gem "ruby-lint", require: false
 gem "sass-rails", "~> 5.0"
 gem "scss_lint", require: false
