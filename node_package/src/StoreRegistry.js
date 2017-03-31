@@ -85,7 +85,6 @@ This can happen if you are server rendering and either:
    * Internally used function to completely clear hydratedStores Map.
    */
   clearHydratedStores() {
-    console.log('clear!!!');
     hydratedStores.clear();
   },
 
