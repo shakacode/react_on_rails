@@ -222,9 +222,16 @@ module ReactOnRailsHelper
 
   private
 
+
+
   def json_safe_and_pretty(something)
     if Rails.env.development?
-      ERB::Util.json_escape(JSON.pretty_generate(something.as_json))
+      # TODO:
+      # 1. Add test
+      # 2. Add error handler if cannot parse the string with nice message
+      # 3. Consider checking that if not a string then a Hash
+      something_as_hash = something.is_a?(String) ? JSON.parse(something) : something
+      ERB::Util.json_escape(JSON.pretty_generate(something_as_hash))
     else
       ERB::Util.json_escape(something.to_json)
     end
