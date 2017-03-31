@@ -42,6 +42,14 @@ ctx.ReactOnRails = {
   },
 
   /**
+   * Clears hydratedStores to avoid accidental usage of wrong store hydrated in previous/parallel
+   * request.
+   */
+  clearHydratedStores() {
+    StoreRegistry.clearHydratedStores();
+  },
+
+  /**
    * Allows retrieval of the store by name. This store will be hydrated by any Rails form props.
    * Pass optional param throwIfMissing = false if you want to use this call to get back null if the
    * store with name is not registered.
