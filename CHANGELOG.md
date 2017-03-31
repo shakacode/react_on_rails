@@ -5,6 +5,9 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 
+### Fixed
+- Clear hydrated stores with each server rendered block. [#785](https://github.com/shakacode/react_on_rails/pull/785) by [udovenko](https://github.com/udovenko)
+
 ## [6.9.1] - 2017-03-30
 
 ### Fixed
