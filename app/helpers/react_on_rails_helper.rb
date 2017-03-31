@@ -341,7 +341,11 @@ module ReactOnRailsHelper
 
     all_stores = (@registered_stores || []) + (@registered_stores_defer_render || [])
 
-    result = all_stores.each_with_object(declarations) do |redux_store_data, memo|
+    result = <<-JS
+      ReactOnRails.clearHydratedStores();
+    JS
+
+    result << all_stores.each_with_object(declarations) do |redux_store_data, memo|
       store_name = redux_store_data[:store_name]
       props = props_string(redux_store_data[:props])
       memo << <<-JS

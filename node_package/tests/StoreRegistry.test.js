@@ -87,3 +87,17 @@ test('StoreRegistry throws error for retrieving unregistered hydrated store', (a
     'Expected an exception for calling StoreRegistry.getStore with an invalid name.',
   );
 });
+
+test('StoreRegistry clearHydratedStores', (assert) => {
+  assert.plan(2);
+  StoreRegistry.stores().clear();
+
+  StoreRegistry.setStore('storeGenerator', storeGenerator);
+  const actual = new Map();
+  actual.set(storeGenerator);
+  assert.deepEqual(actual, StoreRegistry.stores());
+
+  StoreRegistry.clearHydratedStores();
+  const expected = new Map();
+  assert.deepEqual(StoreRegistry.stores(), expected);
+});

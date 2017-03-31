@@ -124,3 +124,24 @@ test('setStore and getStore', (assert) => {
 
   assert.deepEqual(ReactOnRails.stores(), expected);
 });
+
+test('clearHydratedStores', (assert) => {
+  assert.plan(2);
+  function reducer() {
+    return {};
+  }
+
+  function storeGenerator(props) {
+    return createStore(reducer, props);
+  }
+
+  ReactOnRails.setStore('storeGenerator', storeGenerator);
+  const actual = new Map();
+  actual.set(storeGenerator);
+  assert.deepEqual(actual, ReactOnRails.stores());
+
+  ReactOnRails.clearHydratedStores();
+  const expected = new Map();
+  assert.deepEqual(ReactOnRails.stores(), expected,
+    'clearHydratedStores should clear hydratedStores map');
+});

@@ -136,6 +136,14 @@ ctx.ReactOnRails = {
   },
 
   /**
+   * Clears hydratedStores to avoid accidental usage of wrong store hydrated in previous/parallel
+   * request.
+   */
+  clearHydratedStores() {
+    StoreRegistry.clearHydratedStores();
+  },
+
+  /**
    * ReactOnRails.render("HelloWorldApp", {name: "Stranger"}, 'app');
    *
    * Does this:
