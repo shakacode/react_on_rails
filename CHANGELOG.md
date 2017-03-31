@@ -5,20 +5,25 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 
+## [6.9.1] - 2017-03-30
+
+### Fixed
+- Fixes Crash in Development for String Props. [#784](https://github.com/shakacode/react_on_rails/issues/784) by [justin808](https://github.com/justin808).
+
 ## [6.9.0] - 2017-03-29
 
-## Fixed
+### Fixed
 - Fixed error in the release script. [#767](https://github.com/shakacode/react_on_rails/issues/767) by [isolo](https://github.com/isolo).
 
-## Changed
+### Changed
 - Use <script type="application/json"> for props and store instead of hidden div. [#775] (https://github.com/shakacode/react_on_rails/pull/775) by [cheremukhin23](https://github.com/cheremukhin23).
 
-## Added
+### Added
 - Add option to specify i18n_yml_dir in order to include only subset of locale files when generating translations.js & default.js for react-intl.
 [#777](https://github.com/shakacode/react_on_rails/pull/777) by [danijel](https://github.com/danijel).
 
 ## [6.8.2] - 2017-03-24
-## Fixed
+### Fixed
 - Change webpack output path to absolute and update webpack to version ^2.3.1. [#771](https://github.com/shakacode/react_on_rails/pull/771) by [cheremukhin23](https://github.com/cheremukhin23).
 
 ## [6.8.1] - 2017-03-21
@@ -504,7 +509,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.9.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.9.1...master
+[6.9.1]: https://github.com/shakacode/react_on_rails/compare/6.8.2...6.9.1
 [6.9.0]: https://github.com/shakacode/react_on_rails/compare/6.8.2...6.9.0
 [6.8.2]: https://github.com/shakacode/react_on_rails/compare/6.8.1...6.8.2
 [6.8.1]: https://github.com/shakacode/react_on_rails/compare/6.8.0...6.8.1
