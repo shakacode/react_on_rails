@@ -240,7 +240,7 @@ module ReactOnRailsHelper
   end
 
   def old_json_escape(json)
-    json_escape = { '&' => '\u0026', '>' => '\u003e', '<' => '\u003c', "\u2028" => '\u2028', "\u2029" => '\u2029' }
+    json_escape = { "&" => '\u0026', ">" => '\u003e', "<" => '\u003c', "\u2028" => '\u2028', "\u2029" => '\u2029' }
     json_escape_regexp = /[\u2028\u2029&><]/u
     json.to_s.gsub(json_escape_regexp, json_escape)
   end
