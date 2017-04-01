@@ -224,15 +224,26 @@ module ReactOnRailsHelper
     hash_value = hash_or_string.is_a?(String) ? JSON.parse(hash_or_string) : hash_or_string
 
     if Rails.env.development?
-      ERB::Util.json_escape(JSON.pretty_generate(hash_value))
+      escape_json(JSON.pretty_generate(hash_value))
     else
-      ERB::Util.json_escape(hash_value.to_json)
+      escape_json(hash_value.to_json)
     end
   rescue JSON::ParserError => e
     raise e, %(Cannot parse #{hash_or_string} \n Backtrace: #{e.backtrace.join("\n")})
   end
 
   private
+
+  def escape_json(json)
+    return old_json_escape(json) unless Rails::VERSION::STRING >= "4"
+    ERB::Util.json_escape(json)
+  end
+
+  def old_json_escape(json)
+    json_escape = { '&' => '\u0026', '>' => '\u003e', '<' => '\u003c', "\u2028" => '\u2028', "\u2029" => '\u2029' }
+    json_escape_regexp = /[\u2028\u2029&><]/u
+    json.to_s.gsub(json_escape_regexp, json_escape)
+  end
 
   # prepend the rails_context if not yet applied
   def prepend_render_rails_context(render_value)
