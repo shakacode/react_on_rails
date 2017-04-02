@@ -47,6 +47,7 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 * [284 Ruby Rogues: React on Rails with Justin Gordon and Rob Wise](https://devchat.tv/ruby-rogues/284-rr-react-on-rails-with-justin-gordon-and-rob-wise)
 
 # NEWS
+* 2017-04-02: 6.9.2 Released! Props rendered in JSON script tag. Page size is smaller now due to less escaping!
 * 2017-03-06: Updated to Webpack v2!
 * 2017-03-02: Demo of internationalization (i18n) is live at [reactrails.com](https://www.reactrails.com/). Docs [here](docs/basics/i18n.md).
 * 2017-02-28: See [discussions here on Webpacker](https://github.com/rails/webpacker/issues/139) regarding how Webpacker will allow React on Rails to avoid using the asset pipeline in the near future.
