@@ -4,7 +4,7 @@ require_relative "support/version_test_helpers"
 class FakeLogger
   attr_accessor :message
 
-  def warn(message)
+  def error(message)
     self.message = message
   end
 end

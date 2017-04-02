@@ -31,7 +31,7 @@ module ReactOnRails
             "            node package: #{node_package_version.raw}\n" \
             "Ensure the installed MAJOR version of the gem is the same as the MAJOR version of \n"\
             "your installed node package."
-      logger.warn(msg)
+      logger.error(msg)
     end
 
     def gem_version
