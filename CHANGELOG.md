@@ -4,6 +4,10 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+## [6.9.3] - 2017-04-03
+
+### Fixed
+- Removed call of to_json on strings when formatting props. [#791](https://github.com/shakacode/react_on_rails/pull/791) by [justin808](https://github.com/justin808)
 
 ## [6.9.2] - 2017-04-02
 
@@ -518,7 +522,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.9.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.9.3...master
+[6.9.3]: https://github.com/shakacode/react_on_rails/compare/6.9.1...6.9.3
 [6.9.2]: https://github.com/shakacode/react_on_rails/compare/6.9.1...6.9.2
 [6.9.1]: https://github.com/shakacode/react_on_rails/compare/6.8.2...6.9.1
 [6.9.0]: https://github.com/shakacode/react_on_rails/compare/6.8.2...6.9.0
