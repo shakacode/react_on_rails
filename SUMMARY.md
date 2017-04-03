@@ -31,6 +31,7 @@
   + [Generator Tips](./docs/basics/generator.md)
   + [Hot Reloading of Assets For Rails Development](./docs/additional-reading/hot-reloading-rails-development.md)
   + [Heroku Deployment](./docs/additional-reading/heroku-deployment.md)
+  + [Elastic Beanstalk Deployment](./docs/additional-reading/elastic-beanstalk.md)
   + [Updating Dependencies](./docs/additional-reading/updating-dependencies.md)
 
 ### **API**
