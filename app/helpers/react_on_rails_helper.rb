@@ -234,7 +234,11 @@ module ReactOnRailsHelper
     #
     # Temp fix given that a hash may contain active record objects and that crashed with the new
     # code to JSON.pretty_generate
-    ERB::Util.json_escape(hash_or_string.to_json)
+
+    # If to_json is called on a String, then the quotes are escaped.
+    json_value = hash_or_string.is_a?(String) ? hash_or_string : hash_or_string.to_json
+
+    ERB::Util.json_escape(json_value)
     # end
   end
 
