@@ -1,7 +1,7 @@
 # Turbolinks
 
 * See [Turbolinks on Github](https://github.com/rails/turbolinks)
-* Currently support 2.5.x of Turbolinks and 5.0.0 of Turbolinks 5.
+* React on Rails currently supports 2.5.x of Turbolinks and 5.0.0 of Turbolinks 5.
 * You may include Turbolinks either via yarn (recommended) or via the gem.
 
 ## Why Turbolinks?
@@ -39,6 +39,15 @@ the JavaScript and stylesheets are cached by the browser, as they will still req
 Turbolinks 5 is now being supported. React on Rails will automatically detect which version of Turbolinks you are using and use the correct event handlers.
 
 For more information on Turbolinks 5: [https://github.com/turbolinks/turbolinks](https://github.com/turbolinks/turbolinks)
+
+## Turbolinks from NPM
+
+See the [instructions on installing from NPM](https://github.com/turbolinks/turbolinks#installation-using-npm).
+
+```js
+import Turbolinks from "turbolinks";
+Turbolinks.start();
+```
 
 ### async script loading
 Generally async script loading can be done like:
