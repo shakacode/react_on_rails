@@ -26,6 +26,18 @@ commands:
     cwd: /tmp
     test: '[ ! -f /usr/bin/yarn ] && echo "yarn not installed"'
     command: 'sudo yum -y install yarn'
+    
+  05_mkdir_webapp_dir:
+    command: mkdir /home/webapp
+    ignoreErrors: true
+    
+  06_chown_webapp_dir:
+    command: chown webapp:webapp /home/webapp
+    ignoreErrors: true
+    
+  07_chmod_webapp_dir:
+    command: chmod 700 /home/webapp
+    ignoreErrors: true
 
 ```
 
