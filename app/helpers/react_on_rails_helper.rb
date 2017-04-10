@@ -121,35 +121,11 @@ module ReactOnRailsHelper
     content_tag_options[:id] = options.dom_id
 
     if server_rendered_html.is_a?(String)
-      rendered_output = content_tag(:div,
-                                    server_rendered_html.html_safe,
-                                    content_tag_options)
-
-      # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
-      result = <<-HTML.html_safe
-  #{component_specification_tag}
-      #{rendered_output}
-      #{options.replay_console ? console_script : ''}
-      HTML
-
-      return prepend_render_rails_context(result)
+      build_react_component_result_for_server_rendered_string(
+        server_rendered_html, component_specification_tag, console_script, options)
     elsif server_rendered_html.is_a?(Hash)
-      # We expect uncapitalized component_name to be a key for rendered component HTML string:
-      uncatalized_component_name = component_name.clone
-      uncatalized_component_name[0] = uncatalized_component_name[0].downcase
-
-      rendered_output = content_tag(:div,
-                                    server_rendered_html[uncatalized_component_name].html_safe,
-                                    content_tag_options)
-      result = <<-HTML.html_safe
-  #{component_specification_tag}
-      #{rendered_output}
-      #{options.replay_console ? console_script : ''}
-      HTML
-
-      return {
-        uncatalized_component_name => result
-      }.merge(server_rendered_html.except(uncatalized_component_name))
+      build_react_component_result_for_server_rendered_hash(
+        component_name, server_rendered_html, component_specification_tag, console_script, options)
     else
       fail "server_rendered_html expected to be a String or a Hash."
     end
@@ -242,6 +218,56 @@ module ReactOnRailsHelper
   end
 
   private
+
+  def build_react_component_result_for_server_rendered_string(
+    server_rendered_html, component_specification_tag, console_script, options)
+
+    content_tag_options = options.html_options
+    content_tag_options[:id] = options.dom_id
+
+    rendered_output = content_tag(:div,
+                                  server_rendered_html.html_safe,
+                                  content_tag_options)
+
+    result = compose_react_component_html_with_spec_and_console(
+      component_specification_tag, rendered_output, options.replay_console ? console_script : "")
+
+    prepend_render_rails_context(result)
+  end
+
+  def build_react_component_result_for_server_rendered_hash(
+    component_name, server_rendered_html, component_specification_tag, console_script, options)
+
+    content_tag_options = options.html_options
+    content_tag_options[:id] = options.dom_id
+
+    # We expect uncapitalized component_name to be a key for rendered component HTML string:
+    uncapitalized_component_name = component_name.clone
+    uncapitalized_component_name[0] = uncapitalized_component_name[0].downcase
+    unless server_rendered_html[uncapitalized_component_name]
+      fail "server_rendered_html expected to contain uncapitalized component_name."
+    end
+
+    rendered_output = content_tag(:div,
+                                  server_rendered_html[uncapitalized_component_name].html_safe,
+                                  content_tag_options)
+
+    result = compose_react_component_html_with_spec_and_console(
+      component_specification_tag, rendered_output, options.replay_console ? console_script : "")
+
+    {
+      uncapitalized_component_name => prepend_render_rails_context(result)
+    }.merge(server_rendered_html.except(uncapitalized_component_name))
+  end
+
+  def compose_react_component_html_with_spec_and_console(component_specification_tag, rendered_output, console_script)
+    # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
+    <<-HTML.html_safe
+#{component_specification_tag}
+    #{rendered_output}
+    #{console_script}
+    HTML
+  end
 
   def json_safe_and_pretty(hash_or_string)
     # if Rails.env.development?
