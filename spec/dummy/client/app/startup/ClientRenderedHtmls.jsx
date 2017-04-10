@@ -1,7 +1,6 @@
 // Top level component for simple client side only rendering
 import React from 'react';
-
-import EchoProps from '../components/EchoProps';
+import ReactHelmet from '../components/ReactHelmet';
 
 /*
  *  Export a function that takes the props and returns a ReactComponent.
@@ -13,5 +12,5 @@ import EchoProps from '../components/EchoProps';
  *  some extra code, such as setting up Redux and React-Router.
  */
 export default (props, _railsContext) => (
-  <EchoProps {...props} />
+  <ReactHelmet {...props} />
 );

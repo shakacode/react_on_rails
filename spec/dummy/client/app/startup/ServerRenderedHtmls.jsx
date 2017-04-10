@@ -1,7 +1,8 @@
 // Top level component for simple client side only rendering
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import EchoProps from '../components/EchoProps';
+import { Helmet } from 'react-helmet';
+import ReactHelmet from '../components/ReactHelmet';
 
 /*
  *  Export a function that takes the props and returns an object with { renderedHtml }
@@ -14,11 +15,12 @@ import EchoProps from '../components/EchoProps';
  *
  */
 export default (props, _railsContext) => {
+  const componentHtml = renderToString(<ReactHelmet {...props} />);
+  const helmet = Helmet.renderStatic();
+
   const renderedHtml = {
-    renderedHtmls: renderToString(
-      <EchoProps {...props} />,
-    ),
-    title: 'Custom page title',
+    renderedHtmls: componentHtml,
+    title: helmet.title.toString(),
   };
   return { renderedHtml };
 };
