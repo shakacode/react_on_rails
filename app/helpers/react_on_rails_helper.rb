@@ -117,9 +117,6 @@ module ReactOnRailsHelper
     server_rendered_html = result["html"]
     console_script = result["consoleReplayScript"]
 
-    content_tag_options = options.html_options
-    content_tag_options[:id] = options.dom_id
-
     if server_rendered_html.is_a?(String)
       build_react_component_result_for_server_rendered_string(
         server_rendered_html, component_specification_tag, console_script, options)
@@ -255,9 +252,14 @@ module ReactOnRailsHelper
     result = compose_react_component_html_with_spec_and_console(
       component_specification_tag, rendered_output, options.replay_console ? console_script : "")
 
-    {
-      uncapitalized_component_name => prepend_render_rails_context(result)
-    }.merge(server_rendered_html.except(uncapitalized_component_name))
+    # Other HTML strings need to be marked as html_safe too:
+    server_rendered_hash_except_component = server_rendered_html.except(uncapitalized_component_name)
+    server_rendered_hash_except_component.each do |key, html_string|
+      server_rendered_hash_except_component[key] = html_string.html_safe
+    end
+
+    { uncapitalized_component_name => prepend_render_rails_context(result) }.merge(
+      server_rendered_hash_except_component)
   end
 
   def compose_react_component_html_with_spec_and_console(component_specification_tag, rendered_output, console_script)
