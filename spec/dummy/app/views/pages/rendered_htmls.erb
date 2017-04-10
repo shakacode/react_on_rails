@@ -1,8 +1,15 @@
 <%= render "header" %>
 
 <% render_hash = react_component("RenderedHtmls", prerender: true, props: { hello: "world" }, trace: true) %>
+
+<% content_for :title do %>
+  <%= render_hash['title'] %>
+<% end %>
+
 <%= render_hash["renderedHtmls"] %>
 
 <hr/>
 
-This page demonstrates a component that returns renderToString on the server side.
+This page demonstrates a generator function that returns htmlResult as an object
+with HTML strings on the server side.
+Check out the page title.
