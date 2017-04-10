@@ -1,0 +1,8 @@
+<%= render "header" %>
+
+<% render_hash = react_component("RenderedHtmls", prerender: true, props: { hello: "world" }, trace: true) %>
+<%= render_hash["renderedHtmls"] %>
+
+<hr/>
+
+This page demonstrates a component that returns renderToString on the server side.
