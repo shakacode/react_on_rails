@@ -120,18 +120,39 @@ module ReactOnRailsHelper
     content_tag_options = options.html_options
     content_tag_options[:id] = options.dom_id
 
-    rendered_output = content_tag(:div,
-                                  server_rendered_html.html_safe,
-                                  content_tag_options)
+    if server_rendered_html.is_a?(String)
+      rendered_output = content_tag(:div,
+                                    server_rendered_html.html_safe,
+                                    content_tag_options)
 
-    # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
-    result = <<-HTML.html_safe
-#{component_specification_tag}
-    #{rendered_output}
-    #{options.replay_console ? console_script : ''}
-    HTML
+      # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
+      result = <<-HTML.html_safe
+  #{component_specification_tag}
+      #{rendered_output}
+      #{options.replay_console ? console_script : ''}
+      HTML
 
-    prepend_render_rails_context(result)
+      return prepend_render_rails_context(result)
+    elsif server_rendered_html.is_a?(Hash)
+      # We expect uncapitalized component_name to be a key for rendered component HTML string:
+      uncatalized_component_name = component_name.clone
+      uncatalized_component_name[0] = uncatalized_component_name[0].downcase
+
+      rendered_output = content_tag(:div,
+                                    server_rendered_html[uncatalized_component_name].html_safe,
+                                    content_tag_options)
+      result = <<-HTML.html_safe
+  #{component_specification_tag}
+      #{rendered_output}
+      #{options.replay_console ? console_script : ''}
+      HTML
+
+      return {
+        uncatalized_component_name => result
+      }.merge(server_rendered_html.except(uncatalized_component_name))
+    else
+      fail "server_rendered_html expected to be a String or a Hash."
+    end
   end
 
   # Separate initialization of store from react_component allows multiple react_component calls to
