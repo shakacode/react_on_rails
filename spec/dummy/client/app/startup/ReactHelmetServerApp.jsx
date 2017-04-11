@@ -15,11 +15,11 @@ import ReactHelmet from '../components/ReactHelmet';
  *
  */
 export default (props, _railsContext) => {
-  const componentHtml = renderToString(<ReactHelmet {...props} />);
+  const ReactHelmetApp = renderToString(<ReactHelmet {...props} />);
   const helmet = Helmet.renderStatic();
 
   const renderedHtml = {
-    RenderedHtmls: componentHtml,
+    ReactHelmetApp,
     title: helmet.title.toString(),
   };
   return { renderedHtml };

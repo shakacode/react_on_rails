@@ -273,7 +273,8 @@ module ReactOnRailsHelper
       server_rendered_hash_except_component[key] = html_string.html_safe
     end
 
-    { params[:component_name] => prepend_render_rails_context(result) }.merge(
+    result_with_rails_context = prepend_render_rails_context(result)
+    { params[:component_name] => result_with_rails_context }.merge(
       server_rendered_hash_except_component)
   end
 
