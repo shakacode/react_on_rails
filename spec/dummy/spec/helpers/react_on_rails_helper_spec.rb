@@ -28,6 +28,10 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#json_safe_and_pretty(hash_or_string)" do
+    it "should raise an error if not hash nor string passed" do
+      expect { helper.json_safe_and_pretty(false) }.to raise_error
+    end
+
     it "converts a hash to escaped JSON" do
       escaped_json = helper.json_safe_and_pretty(hash)
       expect(escaped_json).to eq(hash_sanitized)
