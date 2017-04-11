@@ -7,6 +7,9 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ### Fixed
 - Fix PropTypes, createClass deprecation warnings for React 15.5.x. [#804](https://github.com/shakacode/react_on_rails/pull/804) by [udovenko ](https://github.com/udovenko).
 
+- Add possibility to return multiple HTML strings in a ```Hash``` as a result of ```react_component``` method call. Allows to build ```<head>``` contents with [React Helmet](https://github.com/nfl/react-helmet).
+[#800](https://github.com/shakacode/react_on_rails/pull/800) by [udovenko](https://github.com/udovenko).
+
 ## [6.9.3] - 2017-04-03
 
 ### Fixed
