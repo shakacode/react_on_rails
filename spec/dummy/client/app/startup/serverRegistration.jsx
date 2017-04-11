@@ -36,7 +36,7 @@ import DeferredRenderApp from './DeferredRenderAppServer';
 import RenderedHtml from './ServerRenderedHtml';
 
 // Deferred render on the client side w/ server render with additional HTML strings:
-import RenderedHtmls from './ServerRenderedHtmls';
+import ReactHelmetApp from './ReactHelmetServerApp';
 
 // Demonstrate using Images
 import ImageExample from '../components/ImageExample';
@@ -54,7 +54,7 @@ ReactOnRails.register({
   CssModulesImagesFontsExample,
   DeferredRenderApp,
   RenderedHtml,
-  RenderedHtmls,
+  ReactHelmetApp,
   ImageExample,
 });
 
