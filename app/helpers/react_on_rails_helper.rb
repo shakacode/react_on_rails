@@ -119,10 +119,17 @@ module ReactOnRailsHelper
 
     if server_rendered_html.is_a?(String)
       build_react_component_result_for_server_rendered_string(
-        server_rendered_html, component_specification_tag, console_script, options)
+        server_rendered_html: server_rendered_html,
+        component_specification_tag: component_specification_tag,
+        console_script: console_script,
+        options: options)
     elsif server_rendered_html.is_a?(Hash)
       build_react_component_result_for_server_rendered_hash(
-        component_name, server_rendered_html, component_specification_tag, console_script, options)
+        component_name: component_name,
+        server_rendered_html: server_rendered_html,
+        component_specification_tag: component_specification_tag,
+        console_script: console_script,
+        options: options)
     else
       fail "server_rendered_html expected to be a String or a Hash."
     end
@@ -216,44 +223,54 @@ module ReactOnRailsHelper
 
   private
 
-  def build_react_component_result_for_server_rendered_string(
-    server_rendered_html, component_specification_tag, console_script, options)
+  def build_react_component_result_for_server_rendered_string(params)
+    unless params[:server_rendered_html] && params[:component_specification_tag] &&
+           params[:console_script] && params[:options]
+      fail "At least one of params :server_rendered_html, :component_specification_tag, :console_script or :options " \
+           "is missing."
+    end
 
-    content_tag_options = options.html_options
-    content_tag_options[:id] = options.dom_id
+    content_tag_options = params[:options].html_options
+    content_tag_options[:id] = params[:options].dom_id
 
     rendered_output = content_tag(:div,
-                                  server_rendered_html.html_safe,
+                                  params[:server_rendered_html].html_safe,
                                   content_tag_options)
 
+    result_console_script = params[:options].replay_console ? params[:console_script] : ""
     result = compose_react_component_html_with_spec_and_console(
-      component_specification_tag, rendered_output, options.replay_console ? console_script : "")
+      params[:component_specification_tag], rendered_output, result_console_script)
 
     prepend_render_rails_context(result)
   end
 
-  def build_react_component_result_for_server_rendered_hash(
-    component_name, server_rendered_html, component_specification_tag, console_script, options)
+  def build_react_component_result_for_server_rendered_hash(params)
+    unless params[:component_name] && params[:server_rendered_html] && params[:component_specification_tag] &&
+           params[:console_script] && params[:options]
+      fail "At least one of params :component_name, :server_rendered_html, :component_specification_tag, " \
+           ":console_script or :options is missing."
+    end
 
-    content_tag_options = options.html_options
-    content_tag_options[:id] = options.dom_id
+    content_tag_options = params[:options].html_options
+    content_tag_options[:id] = params[:options].dom_id
 
     # We expect uncapitalized component_name to be a key for rendered component HTML string:
-    uncapitalized_component_name = component_name.clone
+    uncapitalized_component_name = params[:component_name].clone
     uncapitalized_component_name[0] = uncapitalized_component_name[0].downcase
-    unless server_rendered_html[uncapitalized_component_name]
+    unless params[:server_rendered_html][uncapitalized_component_name]
       fail "server_rendered_html expected to contain uncapitalized component_name."
     end
 
     rendered_output = content_tag(:div,
-                                  server_rendered_html[uncapitalized_component_name].html_safe,
+                                  params[:server_rendered_html][uncapitalized_component_name].html_safe,
                                   content_tag_options)
 
+    result_console_script = params[:options].replay_console ? params[:console_script] : ""
     result = compose_react_component_html_with_spec_and_console(
-      component_specification_tag, rendered_output, options.replay_console ? console_script : "")
+      params[:component_specification_tag], rendered_output, result_console_script)
 
     # Other HTML strings need to be marked as html_safe too:
-    server_rendered_hash_except_component = server_rendered_html.except(uncapitalized_component_name)
+    server_rendered_hash_except_component = params[:server_rendered_html].except(uncapitalized_component_name)
     server_rendered_hash_except_component.each do |key, html_string|
       server_rendered_hash_except_component[key] = html_string.html_safe
     end
