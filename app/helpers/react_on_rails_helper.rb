@@ -254,15 +254,13 @@ module ReactOnRailsHelper
     content_tag_options = params[:options].html_options
     content_tag_options[:id] = params[:options].dom_id
 
-    # We expect uncapitalized component_name to be a key for rendered component HTML string:
-    uncapitalized_component_name = params[:component_name].clone
-    uncapitalized_component_name[0] = uncapitalized_component_name[0].downcase
-    unless params[:server_rendered_html][uncapitalized_component_name]
-      fail "server_rendered_html expected to contain uncapitalized component_name."
+    # We expect component_name to be a key for rendered component HTML string:
+    unless params[:server_rendered_html][params[:component_name]]
+      fail "server_rendered_html expected to contain component_name #{params[:component_name]}."
     end
 
     rendered_output = content_tag(:div,
-                                  params[:server_rendered_html][uncapitalized_component_name].html_safe,
+                                  params[:server_rendered_html][params[:component_name]].html_safe,
                                   content_tag_options)
 
     result_console_script = params[:options].replay_console ? params[:console_script] : ""
@@ -270,12 +268,12 @@ module ReactOnRailsHelper
       params[:component_specification_tag], rendered_output, result_console_script)
 
     # Other HTML strings need to be marked as html_safe too:
-    server_rendered_hash_except_component = params[:server_rendered_html].except(uncapitalized_component_name)
+    server_rendered_hash_except_component = params[:server_rendered_html].except(params[:component_name])
     server_rendered_hash_except_component.each do |key, html_string|
       server_rendered_hash_except_component[key] = html_string.html_safe
     end
 
-    { uncapitalized_component_name => prepend_render_rails_context(result) }.merge(
+    { params[:component_name] => prepend_render_rails_context(result) }.merge(
       server_rendered_hash_except_component)
   end
 
