@@ -221,7 +221,9 @@ module ReactOnRailsHelper
   end
 
   def json_safe_and_pretty(hash_or_string)
-    raise "#{hash_or_string.class} is unsupported argument class for this method" unless hash_or_string.class.in?([Hash, String])
+    unless hash_or_string.class.in?([Hash, String])
+      raise "#{hash_or_string.class} is unsupported argument class for this method"
+    end
     json_value = hash_or_string.is_a?(String) ? hash_or_string : hash_or_string.to_json
     escape_json(json_value)
   end
