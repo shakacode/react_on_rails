@@ -135,7 +135,7 @@ test('clearHydratedStores', (assert) => {
     return createStore(reducer, props);
   }
 
-  ReactOnRails.setStore('storeGenerator', storeGenerator);
+  ReactOnRails.setStore('storeGenerator', storeGenerator({}));
   const actual = new Map();
   actual.set(storeGenerator);
   assert.deepEqual(actual, ReactOnRails.stores());
