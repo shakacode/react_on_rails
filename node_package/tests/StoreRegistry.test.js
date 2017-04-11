@@ -92,7 +92,7 @@ test('StoreRegistry clearHydratedStores', (assert) => {
   assert.plan(2);
   StoreRegistry.stores().clear();
 
-  StoreRegistry.setStore('storeGenerator', storeGenerator);
+  StoreRegistry.setStore('storeGenerator', storeGenerator({}));
   const actual = new Map();
   actual.set(storeGenerator);
   assert.deepEqual(actual, StoreRegistry.stores());
