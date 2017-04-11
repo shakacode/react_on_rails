@@ -6,13 +6,11 @@ import ReactHelmet from '../components/ReactHelmet';
 
 /*
  *  Export a function that takes the props and returns an object with { renderedHtml }
- *  Note, this is imported as "RenderedHtml" by "serverRegistration.jsx"
+ *  This example shows returning renderedHtml as an object itself that contains rendered
+ *  component markup and additional HTML strings.
  *
- *  Note, this is a fictional example, as you'd only use a generator function if you wanted to run
- *  some extra code, such as setting up Redux and React-Router.
- *
- *  And the use of renderToString would probably be done with react-router v4
- *
+ *  This is imported as "ReactHelmetApp" by "serverRegistration.jsx". Note that rendered
+ *  component markup must go under the same key as used for component registration.
  */
 export default (props, _railsContext) => {
   const ReactHelmetApp = renderToString(<ReactHelmet {...props} />);
