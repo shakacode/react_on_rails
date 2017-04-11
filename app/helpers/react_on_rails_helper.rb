@@ -221,15 +221,9 @@ module ReactOnRailsHelper
   end
 
   def json_safe_and_pretty(hash_or_string)
-    hash_value = hash_or_string.is_a?(String) ? JSON.parse(hash_or_string) : hash_or_string
-
-    if Rails.env.development?
-      escape_json(JSON.pretty_generate(hash_value))
-    else
-      escape_json(hash_value.to_json)
-    end
-  rescue JSON::ParserError => e
-    raise e, %(Cannot parse #{hash_or_string} \n Backtrace: #{e.backtrace.join("\n")})
+    raise "#{hash_or_string.class} is unsupported argument class for this method" unless hash_or_string.class.in?([Hash, String])
+    json_value = hash_or_string.is_a?(String) ? hash_or_string : hash_or_string.to_json
+    escape_json(json_value)
   end
 
   private
@@ -240,6 +234,8 @@ module ReactOnRailsHelper
   end
 
   def old_json_escape(json)
+    # https://github.com/rails/rails/blob/60257141462137331387d0e34931555cf0720886/activesupport/lib/active_support/core_ext/string/output_safety.rb#L113
+
     json_escape = { "&" => '\u0026', ">" => '\u003e', "<" => '\u003c', "\u2028" => '\u2028', "\u2029" => '\u2029' }
     json_escape_regexp = /[\u2028\u2029&><]/u
     json.to_s.gsub(json_escape_regexp, json_escape)

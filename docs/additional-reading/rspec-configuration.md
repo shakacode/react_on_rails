@@ -9,7 +9,19 @@ RSpec.configure do |config|
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
 ```
 
-You can pass an RSpec metatag as an optional second parameter to this helper method if you want this helper to run on examples other than where `js: true` (default). The helper will compile webpack files at most once per test run. The helper will not compile the webpack files unless they are out of date (stale). The helper is configurable in terms of what command is used to prepare the files.
+You can pass one or more RSpec metatags as an optional second parameter to this helper method if you want this helper to run on examples other than where `:js` or `:server_rendering` (those are the defaults). The helper will compile webpack files at most once per test run. The helper will not compile the webpack files unless they are out of date (stale). The helper is configurable in terms of what command is used to prepare the files.
+
+If you are using Webpack to build CSS assets, you should do something like this to ensure that you assets are built for any specs under `specs/requests` or `specs/features`:
+
+```ruby
+  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :requires_webpack_assets)
+
+  # Because we're using some CSS Webpack files, we need to ensure the webpack files are generated
+  # for all feature specs. https://github.com/shakacode/react_on_rails/issues/792
+  config.define_derived_metadata(file_path: %r{spec/(features|requests)}) do |metadata|
+    metadata[:requires_webpack_assets] = true
+  end
+```
 
 Please take note of the following:
 - This utility uses your `npm_build_test_command` to build the static generated files. This command **must** not include the `--watch` option. If you have different server and client bundle files, this command **must** create all the bundles.
