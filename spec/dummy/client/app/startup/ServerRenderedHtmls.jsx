@@ -19,7 +19,7 @@ export default (props, _railsContext) => {
   const helmet = Helmet.renderStatic();
 
   const renderedHtml = {
-    renderedHtmls: componentHtml,
+    RenderedHtmls: componentHtml,
     title: helmet.title.toString(),
   };
   return { renderedHtml };
