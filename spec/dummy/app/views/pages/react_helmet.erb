@@ -1,12 +1,12 @@
 <%= render "header" %>
 
-<% render_hash = react_component("ReactHelmetApp", prerender: true, props: { hello: "world" }, trace: true) %>
+<% react_helmet_app = react_component("ReactHelmetApp", prerender: true, props: { hello: "world" }, trace: true) %>
 
 <% content_for :title do %>
-  <%= render_hash['title'] %>
+  <%= react_helmet_app['title'] %>
 <% end %>
 
-<%= render_hash["componentHtml"] %>
+<%= react_helmet_app["componentHtml"] %>
 
 <hr/>
 

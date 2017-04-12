@@ -1,7 +1,7 @@
-# Using React Helmet to build ```<head>``` content
+# Using React Helmet to build `<head>` content
 
 ## Installation and general usage
-See https://github.com/nfl/react-helmet for details. Run ```yarn add react-helmet``` in your ```client``` directory to add this package to your application.
+See https://github.com/nfl/react-helmet for details. Run `yarn add react-helmet` in your `client` directory to add this package to your application.
 
 ## Example
 Here is what you need to do in order to configure your Rails application to work with **ReactHelmet**.
@@ -10,11 +10,11 @@ Here is what you need to do in order to configure your Rails application to work
 
 ```javascript
 export default (props, _railsContext) => {
-  const YourAppRegistrationKey = renderToString(<App {...props} />);
+  const componentHtml = renderToString(<App {...props} />);
   const helmet = Helmet.renderStatic();
 
   const renderedHtml = {
-    YourAppRegistrationKey,
+    componentHtml,
     title: helmet.title.toString(),
   };
   return { renderedHtml };
@@ -30,7 +30,7 @@ export default (props, _railsContext) => (
 );
 ```
 
-Put **ReactHelmet** component somewhere in your ```<App>```:
+Put **ReactHelmet** component somewhere in your `<App>`:
 ```javascript
 import { Helmet } from 'react-helmet';
 
@@ -48,28 +48,28 @@ export default App;
 Register your generators for client and server sides:
 
 ```javascript
-import YourAppRegistrationKey from '../ClientApp';
+import ReactHelmetApp from '../ReactHelmetClientApp';
 
 ReactOnRails.register({
-  YourAppRegistrationKey
+  ReactHelmetApp
 });
 ```
 ```javascript
-import YourAppRegistrationKey from '../ServerApp';
+import ReactHelmetApp from '../ReactHelmetServerApp';
 
 ReactOnRails.register({
-  YourAppRegistrationKey
+  ReactHelmetApp
 });
 ```
-Now when ```react_component``` helper will be called with **"YourAppRegistrationKey"** as a first argument it will return a hash instead of HTML string:
+Now when `react_component` helper will be called with **"ReactHelmetApp"** as a first argument it will return a hash instead of HTML string:
 ```ruby
-<% render_hash = react_component("ReactHelmetApp", prerender: true, props: { hello: "world" }, trace: true) %>
+<% react_helmet_app = react_component("ReactHelmetApp", prerender: true, props: { hello: "world" }, trace: true) %>
 
 <% content_for :title do %>
-  <%= render_hash['title'] %>
+  <%= react_helmet_app['title'] %>
 <% end %>
 
-<%= render_hash["ReactHelmetApp"] %>
+<%= react_helmet_app["componentHtml"] %>
 ```
 
 So now we're able to insert received title tag to our application layout:
