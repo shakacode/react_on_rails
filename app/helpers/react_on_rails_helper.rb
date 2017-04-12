@@ -10,6 +10,8 @@ require "react_on_rails/utils"
 module ReactOnRailsHelper
   include ReactOnRails::Utils::Required
 
+  COMPONENT_HTML_KEY = "componentHtml"
+
   # The env_javascript_include_tag and env_stylesheet_link_tag support the usage of a webpack
   # dev server for providing the JS and CSS assets during development mode. See
   # https://github.com/shakacode/react-webpack-rails-tutorial/ for a working example.
@@ -222,16 +224,12 @@ module ReactOnRailsHelper
 
   private
 
-  def build_react_component_result_for_server_rendered_string(params)
-    # Destructure params to local variables:
-    server_rendered_html, component_specification_tag, console_script, options =
-      params.values_at(:server_rendered_html, :component_specification_tag, :console_script, :options)
-
-    unless server_rendered_html && component_specification_tag && console_script && options
-      fail "At least one of params :server_rendered_html, :component_specification_tag, :console_script or :options " \
-           "is missing."
-    end
-
+  def build_react_component_result_for_server_rendered_string(
+    server_rendered_html: required("server_rendered_html"),
+    component_specification_tag: required("component_specification_tag"),
+    console_script: required("console_script"),
+    options: required("options")
+  )
     content_tag_options = options.html_options
     content_tag_options[:id] = options.dom_id
 
@@ -246,26 +244,17 @@ module ReactOnRailsHelper
     prepend_render_rails_context(result)
   end
 
-  def build_react_component_result_for_server_rendered_hash(params)
-    server_rendered_html, component_specification_tag, console_script, options =
-      params.values_at(:server_rendered_html, :component_specification_tag, :console_script, :options)
-
-    unless server_rendered_html && component_specification_tag && console_script && options
-      fail "At least one of params :server_rendered_html, :component_specification_tag, :console_script or :options " \
-           "is missing."
-    end
-
+  def build_react_component_result_for_server_rendered_hash(
+    server_rendered_html: required("server_rendered_html"),
+    component_specification_tag: required("component_specification_tag"),
+    console_script: required("console_script"),
+    options: required("options")
+  )
     content_tag_options = options.html_options
     content_tag_options[:id] = options.dom_id
 
-    component_html_key = "componentHtml"
-
-    unless params[:server_rendered_html][component_html_key]
-      fail "server_rendered_html hash expected to contain \"#{component_html_key}\" key."
-    end
-
     rendered_output = content_tag(:div,
-                                  server_rendered_html[component_html_key].html_safe,
+                                  server_rendered_html[COMPONENT_HTML_KEY].html_safe,
                                   content_tag_options)
 
     result_console_script = options.replay_console ? console_script : ""
@@ -273,13 +262,13 @@ module ReactOnRailsHelper
       component_specification_tag, rendered_output, result_console_script)
 
     # Other HTML strings need to be marked as html_safe too:
-    server_rendered_hash_except_component = server_rendered_html.except(component_html_key)
+    server_rendered_hash_except_component = server_rendered_html.except(COMPONENT_HTML_KEY)
     server_rendered_hash_except_component.each do |key, html_string|
       server_rendered_hash_except_component[key] = html_string.html_safe
     end
 
     result_with_rails_context = prepend_render_rails_context(result)
-    { component_html_key => result_with_rails_context }.merge(
+    { COMPONENT_HTML_KEY => result_with_rails_context }.merge(
       server_rendered_hash_except_component)
   end
 
