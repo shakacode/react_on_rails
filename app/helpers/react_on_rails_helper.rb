@@ -231,8 +231,12 @@ module ReactOnRailsHelper
   private
 
   def escape_json(json)
-    return old_json_escape(json) unless Rails::VERSION::STRING >= "4"
+    return old_json_escape(json) if rails_version_less_than("4")
     ERB::Util.json_escape(json)
+  end
+
+  def rails_version_less_than(version)
+    Gem::Version.new(Rails.version) <= Gem::Version.new(version)
   end
 
   def old_json_escape(json)
