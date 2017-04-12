@@ -125,7 +125,6 @@ module ReactOnRailsHelper
         options: options)
     elsif server_rendered_html.is_a?(Hash)
       build_react_component_result_for_server_rendered_hash(
-        component_name: component_name,
         server_rendered_html: server_rendered_html,
         component_specification_tag: component_specification_tag,
         console_script: console_script,
@@ -248,24 +247,25 @@ module ReactOnRailsHelper
   end
 
   def build_react_component_result_for_server_rendered_hash(params)
-    component_name, server_rendered_html, component_specification_tag, console_script, options =
-      params.values_at(:component_name, :server_rendered_html, :component_specification_tag, :console_script, :options)
+    server_rendered_html, component_specification_tag, console_script, options =
+      params.values_at(:server_rendered_html, :component_specification_tag, :console_script, :options)
 
-    unless component_name && server_rendered_html && component_specification_tag && console_script && options
-      fail "At least one of params :component_name, :server_rendered_html, :component_specification_tag, " \
-           ":console_script or :options is missing."
+    unless server_rendered_html && component_specification_tag && console_script && options
+      fail "At least one of params :server_rendered_html, :component_specification_tag, :console_script or :options " \
+           "is missing."
     end
 
     content_tag_options = options.html_options
     content_tag_options[:id] = options.dom_id
 
-    # We expect component_name to be a key for rendered component HTML string:
-    unless params[:server_rendered_html][component_name]
-      fail "server_rendered_html expected to contain component_name #{component_name}."
+    component_html_key = "componentHtml"
+
+    unless params[:server_rendered_html][component_html_key]
+      fail "server_rendered_html hash expected to contain \"#{component_html_key}\" key."
     end
 
     rendered_output = content_tag(:div,
-                                  server_rendered_html[component_name].html_safe,
+                                  server_rendered_html[component_html_key].html_safe,
                                   content_tag_options)
 
     result_console_script = options.replay_console ? console_script : ""
@@ -273,13 +273,13 @@ module ReactOnRailsHelper
       component_specification_tag, rendered_output, result_console_script)
 
     # Other HTML strings need to be marked as html_safe too:
-    server_rendered_hash_except_component = server_rendered_html.except(component_name)
+    server_rendered_hash_except_component = server_rendered_html.except(component_html_key)
     server_rendered_hash_except_component.each do |key, html_string|
       server_rendered_hash_except_component[key] = html_string.html_safe
     end
 
     result_with_rails_context = prepend_render_rails_context(result)
-    { component_name => result_with_rails_context }.merge(
+    { component_html_key => result_with_rails_context }.merge(
       server_rendered_hash_except_component)
   end
 

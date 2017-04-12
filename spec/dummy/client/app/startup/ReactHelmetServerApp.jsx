@@ -10,14 +10,14 @@ import ReactHelmet from '../components/ReactHelmet';
  *  component markup and additional HTML strings.
  *
  *  This is imported as "ReactHelmetApp" by "serverRegistration.jsx". Note that rendered
- *  component markup must go under the same key as used for component registration.
+ *  component markup must go under "componentHtml" key.
  */
 export default (props, _railsContext) => {
-  const ReactHelmetApp = renderToString(<ReactHelmet {...props} />);
+  const componentHtml = renderToString(<ReactHelmet {...props} />);
   const helmet = Helmet.renderStatic();
 
   const renderedHtml = {
-    ReactHelmetApp,
+    componentHtml,
     title: helmet.title.toString(),
   };
   return { renderedHtml };
