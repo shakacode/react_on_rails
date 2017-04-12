@@ -4111,7 +4111,11 @@ react-dom@^15.4.2:
     object-assign "^4.1.0"
 
 "react-on-rails@file:../../..":
-  version "6.9.0"
+  version "6.9.3"
+
+react-proptypes@^0.0.1:
+  version "0.0.1"
+  resolved "https://registry.yarnpkg.com/react-proptypes/-/react-proptypes-0.0.1.tgz#1f9daee864874336b6cdcef8ea1c59bf11cd2b73"
 
 react-proxy@^1.1.7:
   version "1.1.8"
