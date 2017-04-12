@@ -224,57 +224,62 @@ module ReactOnRailsHelper
   private
 
   def build_react_component_result_for_server_rendered_string(params)
-    unless params[:server_rendered_html] && params[:component_specification_tag] &&
-           params[:console_script] && params[:options]
+    # Destructure params to local variables:
+    server_rendered_html, component_specification_tag, console_script, options =
+      params.values_at(:server_rendered_html, :component_specification_tag, :console_script, :options)
+
+    unless server_rendered_html && component_specification_tag && console_script && options
       fail "At least one of params :server_rendered_html, :component_specification_tag, :console_script or :options " \
            "is missing."
     end
 
-    content_tag_options = params[:options].html_options
-    content_tag_options[:id] = params[:options].dom_id
+    content_tag_options = options.html_options
+    content_tag_options[:id] = options.dom_id
 
     rendered_output = content_tag(:div,
-                                  params[:server_rendered_html].html_safe,
+                                  server_rendered_html.html_safe,
                                   content_tag_options)
 
-    result_console_script = params[:options].replay_console ? params[:console_script] : ""
+    result_console_script = options.replay_console ? console_script : ""
     result = compose_react_component_html_with_spec_and_console(
-      params[:component_specification_tag], rendered_output, result_console_script)
+      component_specification_tag, rendered_output, result_console_script)
 
     prepend_render_rails_context(result)
   end
 
   def build_react_component_result_for_server_rendered_hash(params)
-    unless params[:component_name] && params[:server_rendered_html] && params[:component_specification_tag] &&
-           params[:console_script] && params[:options]
+    component_name, server_rendered_html, component_specification_tag, console_script, options =
+      params.values_at(:component_name, :server_rendered_html, :component_specification_tag, :console_script, :options)
+
+    unless component_name && server_rendered_html && component_specification_tag && console_script && options
       fail "At least one of params :component_name, :server_rendered_html, :component_specification_tag, " \
            ":console_script or :options is missing."
     end
 
-    content_tag_options = params[:options].html_options
-    content_tag_options[:id] = params[:options].dom_id
+    content_tag_options = options.html_options
+    content_tag_options[:id] = options.dom_id
 
     # We expect component_name to be a key for rendered component HTML string:
-    unless params[:server_rendered_html][params[:component_name]]
-      fail "server_rendered_html expected to contain component_name #{params[:component_name]}."
+    unless params[:server_rendered_html][component_name]
+      fail "server_rendered_html expected to contain component_name #{component_name}."
     end
 
     rendered_output = content_tag(:div,
-                                  params[:server_rendered_html][params[:component_name]].html_safe,
+                                  server_rendered_html[component_name].html_safe,
                                   content_tag_options)
 
-    result_console_script = params[:options].replay_console ? params[:console_script] : ""
+    result_console_script = options.replay_console ? console_script : ""
     result = compose_react_component_html_with_spec_and_console(
-      params[:component_specification_tag], rendered_output, result_console_script)
+      component_specification_tag, rendered_output, result_console_script)
 
     # Other HTML strings need to be marked as html_safe too:
-    server_rendered_hash_except_component = params[:server_rendered_html].except(params[:component_name])
+    server_rendered_hash_except_component = server_rendered_html.except(component_name)
     server_rendered_hash_except_component.each do |key, html_string|
       server_rendered_hash_except_component[key] = html_string.html_safe
     end
 
     result_with_rails_context = prepend_render_rails_context(result)
-    { params[:component_name] => result_with_rails_context }.merge(
+    { component_name => result_with_rails_context }.merge(
       server_rendered_hash_except_component)
   end
 
