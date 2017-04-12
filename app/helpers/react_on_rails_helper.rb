@@ -253,6 +253,10 @@ module ReactOnRailsHelper
     content_tag_options = options.html_options
     content_tag_options[:id] = options.dom_id
 
+    unless server_rendered_html[COMPONENT_HTML_KEY]
+      fail "server_rendered_html hash expected to contain \"#{COMPONENT_HTML_KEY}\" key."
+    end
+
     rendered_output = content_tag(:div,
                                   server_rendered_html[COMPONENT_HTML_KEY].html_safe,
                                   content_tag_options)
