@@ -1,11 +1,13 @@
 /* eslint-disable react/prefer-es6-class */
 
+import PropTypes from 'prop-types';
 import React from 'react';
+import createReactClass from 'create-react-class';
 
 // Super simple example of React component using React.createClass
-const HelloWorldES5 = React.createClass({
+const HelloWorldES5 = createReactClass({
   propTypes: {
-    helloWorldData: React.PropTypes.object,
+    helloWorldData: PropTypes.object,
   },
 
   getInitialState() {

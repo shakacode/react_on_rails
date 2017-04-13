@@ -185,6 +185,26 @@ feature "renderedHtml from generator function", :js do
   end
 end
 
+feature "generator function returns renderedHtml as an object with additional HTML markups" do
+  shared_examples "renderedHtmls should not have any errors and set correct page title" do
+    subject { page }
+    background { visit react_helmet_path }
+    scenario "renderedHtmls should not have any errors" do
+      expect(subject).to have_text 'Props: {"hello":"world"}'
+      expect(subject).to have_css "title", text: /\ACustom page title\z/, visible: false
+      expect(subject.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
+    end
+  end
+
+  describe "with disabled JS" do
+    include_examples "renderedHtmls should not have any errors and set correct page title"
+  end
+
+  describe "with enabled JS", :js do
+    include_examples "renderedHtmls should not have any errors and set correct page title"
+  end
+end
+
 feature "display images", :js do
   subject { page }
   background { visit "/image_example" }

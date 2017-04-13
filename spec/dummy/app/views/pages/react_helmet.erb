@@ -1,0 +1,15 @@
+<%= render "header" %>
+
+<% react_helmet_app = react_component("ReactHelmetApp", prerender: true, props: { hello: "world" }, trace: true) %>
+
+<% content_for :title do %>
+  <%= react_helmet_app['title'] %>
+<% end %>
+
+<%= react_helmet_app["componentHtml"] %>
+
+<hr/>
+
+This page demonstrates a generator function that returns htmlResult as an object
+with HTML strings on the server side. It is useful to manipulating &lt;head&gt;
+content. Check out the page title!

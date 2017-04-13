@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Dummy</title>
+  <% if content_for?(:title) %>
+    <%= yield(:title) %>
+  <% else %>
+    <title>Dummy</title>
+  <% end %>
 
   <%= yield :head %>
 
