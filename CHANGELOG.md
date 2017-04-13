@@ -4,9 +4,11 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+
+## [6.10.0] - 2017-04-13
 ### Added
-- Add an ability to return multiple HTML strings in a `Hash` as a result of `react_component` method call. Allows to build `<head>` contents with [React Helmet](https://github.com/nfl/react-helmet).
-[#800](https://github.com/shakacode/react_on_rails/pull/800) by [udovenko](https://github.com/udovenko).
+- Add an ability to return multiple HTML strings in a `Hash` as a result of `react_component` method call. Allows to build `<head>` contents with [React Helmet](https://github.com/nfl/react-helmet). [#800](https://github.com/shakacode/react_on_rails/pull/800) by [udovenko](https://github.com/udovenko).
+
 ### Fixed
 - Fix PropTypes, createClass deprecation warnings for React 15.5.x. [#804](https://github.com/shakacode/react_on_rails/pull/804) by [udovenko ](https://github.com/udovenko).
 
@@ -528,7 +530,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.9.3...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.10.0...master
+[6.10.0]: https://github.com/shakacode/react_on_rails/compare/6.9.3...6.10.0
 [6.9.3]: https://github.com/shakacode/react_on_rails/compare/6.9.1...6.9.3
 [6.9.2]: https://github.com/shakacode/react_on_rails/compare/6.9.1...6.9.2
 [6.9.1]: https://github.com/shakacode/react_on_rails/compare/6.8.2...6.9.1
