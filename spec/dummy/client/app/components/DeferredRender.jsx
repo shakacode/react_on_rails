@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import React from 'react';
 import { Link } from 'react-router';
 
@@ -21,7 +22,7 @@ const DeferredRender = ({ children }) => (
 );
 
 DeferredRender.propTypes = {
-  children: React.PropTypes.node,
+  children: PropTypes.node,
 };
 
 export default DeferredRender;

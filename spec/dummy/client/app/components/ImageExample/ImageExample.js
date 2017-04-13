@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import css from './ImageExample.scss';
 
 // Note the global alias for images
@@ -33,7 +34,7 @@ const TestComponent = (props) => (
 );
 
 TestComponent.propTypes = {
-  message: React.PropTypes.string,
+  message: PropTypes.string,
 };
 
 export default TestComponent;

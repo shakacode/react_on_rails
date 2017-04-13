@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import React from 'react';
 import { Link } from 'react-router';
 
@@ -30,7 +31,7 @@ const RouterLayout = ({ children }) => (
 );
 
 RouterLayout.propTypes = {
-  children: React.PropTypes.object,
+  children: PropTypes.object,
 };
 
 export default RouterLayout;
