@@ -22,6 +22,9 @@ import SharedReduxStore from '../stores/SharedReduxStore';
 // Deferred render on the client side w/ server render
 import RenderedHtml from './ClientRenderedHtml';
 
+// Deferred render on the client side w/ server render with additional HTML strings:
+import ReactHelmetApp from './ReactHelmetClientApp';
+
 // Demonstrate using Images
 import ImageExample from '../components/ImageExample';
 
@@ -43,6 +46,7 @@ ReactOnRails.register({
   DeferredRenderApp,
   CacheDisabled,
   RenderedHtml,
+  ReactHelmetApp,
   ImageExample,
 });
 

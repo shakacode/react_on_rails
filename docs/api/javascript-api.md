@@ -7,6 +7,14 @@ The best source of docs is the main [ReactOnRails.js](../../node_package/src/Rea
    * find you components for rendering. Components get called with props, or you may use a
    * "generator function" to return a React component or an object with the following shape:
    * { renderedHtml, redirectLocation, error }.
+   * For server rendering, if you wish to return multiple HTML strings from a generator function,
+   * you may return an Object from your generator function with a single top level property of
+   * renderedHtml. Inside this Object, place a key called componentHtml, along with any other
+   * needed keys. This is useful when you using side effects libraries like react helmet.
+   * Your Ruby code with get this Object as a Hash containing keys componentHtml and any other
+   * custom keys that you added:
+   * { renderedHtml: { componentHtml, customKey1, customKey2 } }
+   * See the example in /docs/additional-reading/react-helmet.md
    * @param components (key is component name, value is component)
    */
   register(components)

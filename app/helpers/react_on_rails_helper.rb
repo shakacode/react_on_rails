@@ -10,6 +10,8 @@ require "react_on_rails/utils"
 module ReactOnRailsHelper
   include ReactOnRails::Utils::Required
 
+  COMPONENT_HTML_KEY = "componentHtml".freeze
+
   # The env_javascript_include_tag and env_stylesheet_link_tag support the usage of a webpack
   # dev server for providing the JS and CSS assets during development mode. See
   # https://github.com/shakacode/react-webpack-rails-tutorial/ for a working example.
@@ -117,21 +119,23 @@ module ReactOnRailsHelper
     server_rendered_html = result["html"]
     console_script = result["consoleReplayScript"]
 
-    content_tag_options = options.html_options
-    content_tag_options[:id] = options.dom_id
-
-    rendered_output = content_tag(:div,
-                                  server_rendered_html.html_safe,
-                                  content_tag_options)
-
-    # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
-    result = <<-HTML.html_safe
-#{component_specification_tag}
-    #{rendered_output}
-    #{options.replay_console ? console_script : ''}
-    HTML
-
-    prepend_render_rails_context(result)
+    if server_rendered_html.is_a?(String)
+      build_react_component_result_for_server_rendered_string(
+        server_rendered_html: server_rendered_html,
+        component_specification_tag: component_specification_tag,
+        console_script: console_script,
+        options: options
+      )
+    elsif server_rendered_html.is_a?(Hash)
+      build_react_component_result_for_server_rendered_hash(
+        server_rendered_html: server_rendered_html,
+        component_specification_tag: component_specification_tag,
+        console_script: console_script,
+        options: options
+      )
+    else
+      raise "server_rendered_html expected to be a String or a Hash."
+    end
   end
 
   # Separate initialization of store from react_component allows multiple react_component calls to
@@ -221,6 +225,70 @@ module ReactOnRailsHelper
   end
 
   private
+
+  def build_react_component_result_for_server_rendered_string(
+    server_rendered_html: required("server_rendered_html"),
+    component_specification_tag: required("component_specification_tag"),
+    console_script: required("console_script"),
+    options: required("options")
+  )
+    content_tag_options = options.html_options
+    content_tag_options[:id] = options.dom_id
+
+    rendered_output = content_tag(:div,
+                                  server_rendered_html.html_safe,
+                                  content_tag_options)
+
+    result_console_script = options.replay_console ? console_script : ""
+    result = compose_react_component_html_with_spec_and_console(
+      component_specification_tag, rendered_output, result_console_script
+    )
+
+    prepend_render_rails_context(result)
+  end
+
+  def build_react_component_result_for_server_rendered_hash(
+    server_rendered_html: required("server_rendered_html"),
+    component_specification_tag: required("component_specification_tag"),
+    console_script: required("console_script"),
+    options: required("options")
+  )
+    content_tag_options = options.html_options
+    content_tag_options[:id] = options.dom_id
+
+    unless server_rendered_html[COMPONENT_HTML_KEY]
+      raise "server_rendered_html hash expected to contain \"#{COMPONENT_HTML_KEY}\" key."
+    end
+
+    rendered_output = content_tag(:div,
+                                  server_rendered_html[COMPONENT_HTML_KEY].html_safe,
+                                  content_tag_options)
+
+    result_console_script = options.replay_console ? console_script : ""
+    result = compose_react_component_html_with_spec_and_console(
+      component_specification_tag, rendered_output, result_console_script
+    )
+
+    # Other HTML strings need to be marked as html_safe too:
+    server_rendered_hash_except_component = server_rendered_html.except(COMPONENT_HTML_KEY)
+    server_rendered_hash_except_component.each do |key, html_string|
+      server_rendered_hash_except_component[key] = html_string.html_safe
+    end
+
+    result_with_rails_context = prepend_render_rails_context(result)
+    { COMPONENT_HTML_KEY => result_with_rails_context }.merge(
+      server_rendered_hash_except_component
+    )
+  end
+
+  def compose_react_component_html_with_spec_and_console(component_specification_tag, rendered_output, console_script)
+    # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
+    <<-HTML.html_safe
+#{component_specification_tag}
+    #{rendered_output}
+    #{console_script}
+    HTML
+  end
 
   def json_safe_and_pretty(hash_or_string)
     # if Rails.env.development?

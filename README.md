@@ -340,6 +340,9 @@ Why would you create a function that returns a React component? For example, you
 
 Another reason to use a generator function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }.
 
+For server rendering, if you wish to return multiple HTML strings from a generator function, you may return an Object from your generator function with a single top level property of renderedHtml. Inside this Object, place a key called componentHtml, along with any other needed keys. This is useful when you using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
+{ renderedHtml: { componentHtml, customKey1, customKey2} }
+
 #### Renderer Functions
 A renderer function is a generator function that accepts three arguments: `(props, railsContext, domNodeId) => { ... }`. Instead of returning a React component, a renderer is responsible for calling `ReactDOM.render` to manually render a React component into the dom. Why would you want to call `ReactDOM.render` yourself? One possible use case is [code splitting](./docs/additional-reading/code-splitting.md).
 
