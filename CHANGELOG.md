@@ -5,12 +5,12 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 ### Fixed
-- Fix PropTypes, createClass deprecation warnings for React 15.5.x. [#804](https://github.com/shakacode/react_on_rails/pull/804) by [udovenko ](https://github.com/udovenko)
+- Fix PropTypes, createClass deprecation warnings for React 15.5.x. [#804](https://github.com/shakacode/react_on_rails/pull/804) by [udovenko ](https://github.com/udovenko).
 
 ## [6.9.3] - 2017-04-03
 
 ### Fixed
-- Removed call of to_json on strings when formatting props. [#791](https://github.com/shakacode/react_on_rails/pull/791) by [justin808](https://github.com/justin808)
+- Removed call of to_json on strings when formatting props. [#791](https://github.com/shakacode/react_on_rails/pull/791) by [justin808](https://github.com/justin808).
 
 ## [6.9.2] - 2017-04-02
 
