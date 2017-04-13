@@ -224,7 +224,32 @@ module ReactOnRailsHelper
     # rubocop:enable Style/RaiseArgs
   end
 
+  def json_safe_and_pretty(hash_or_string)
+    unless hash_or_string.class.in?([Hash, String])
+      raise "#{hash_or_string.class} is unsupported argument class for this method"
+    end
+    json_value = hash_or_string.is_a?(String) ? hash_or_string : hash_or_string.to_json
+    escape_json(json_value)
+  end
+
   private
+
+  def escape_json(json)
+    return old_json_escape(json) if rails_version_less_than("4")
+    ERB::Util.json_escape(json)
+  end
+
+  def rails_version_less_than(version)
+    Gem::Version.new(Rails.version) <= Gem::Version.new(version)
+  end
+
+  def old_json_escape(json)
+    # https://github.com/rails/rails/blob/60257141462137331387d0e34931555cf0720886/activesupport/lib/active_support/core_ext/string/output_safety.rb#L113
+
+    json_escape = { "&" => '\u0026', ">" => '\u003e', "<" => '\u003c', "\u2028" => '\u2028', "\u2029" => '\u2029' }
+    json_escape_regexp = /[\u2028\u2029&><]/u
+    json.to_s.gsub(json_escape_regexp, json_escape)
+  end
 
   def build_react_component_result_for_server_rendered_string(
     server_rendered_html: required("server_rendered_html"),
@@ -288,26 +313,6 @@ module ReactOnRailsHelper
     #{rendered_output}
     #{console_script}
     HTML
-  end
-
-  def json_safe_and_pretty(hash_or_string)
-    # if Rails.env.development?
-    #   # TODO: for json_safe_and_pretty
-    #   # 1. Add test
-    #   # 2. Add error handler if cannot parse the string with nice message
-    #   # 3. Consider checking that if not a string then a Hash
-    #   hash_value = hash_or_string.is_a?(String) ? JSON.parse(hash_or_string) : hash_or_string
-    #   ERB::Util.json_escape(JSON.pretty_generate(hash_value))
-    # else
-    #
-    # Temp fix given that a hash may contain active record objects and that crashed with the new
-    # code to JSON.pretty_generate
-
-    # If to_json is called on a String, then the quotes are escaped.
-    json_value = hash_or_string.is_a?(String) ? hash_or_string : hash_or_string.to_json
-
-    ERB::Util.json_escape(json_value)
-    # end
   end
 
   # prepend the rails_context if not yet applied
