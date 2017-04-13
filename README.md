@@ -338,7 +338,7 @@ If you do want different code to run, you'd setup a separate webpack compilation
 #### Generator Functions
 Why would you create a function that returns a React component? For example, you may want the ability to use the passed-in props to initialize a redux store or setup react-router. Or you may want to return different components depending on what's in the props. ReactOnRails will automatically detect a registered generator function.
 
-Another reason to user a generator function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }.
+Another reason to use a generator function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }.
 
 #### Renderer Functions
 A renderer function is a generator function that accepts three arguments: `(props, railsContext, domNodeId) => { ... }`. Instead of returning a React component, a renderer is responsible for calling `ReactDOM.render` to manually render a React component into the dom. Why would you want to call `ReactDOM.render` yourself? One possible use case is [code splitting](./docs/additional-reading/code-splitting.md).
