@@ -7,6 +7,7 @@
 
 import test from 'tape';
 import React from 'react';
+import createReactClass from 'create-react-class';
 
 import ComponentRegistry from '../src/ComponentRegistry';
 
@@ -22,7 +23,7 @@ test('ComponentRegistry registers and retrieves generator function components', 
 
 test('ComponentRegistry registers and retrieves ES5 class components', (assert) => {
   assert.plan(1);
-  const C2 = React.createClass({
+  const C2 = createReactClass({
     render() {
       return <div> WORLD </div>;
     },
