@@ -1,4 +1,5 @@
-import React, { PropTypes } from 'react';
+import PropTypes from 'prop-types';
+import React from 'react';
 import RailsContext from './RailsContext';
 
 // Super simple example of the simplest possible React component

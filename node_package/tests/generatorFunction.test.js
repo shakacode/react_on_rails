@@ -11,7 +11,7 @@ import generatorFunction from '../src/generatorFunction';
 test('generatorFunction: ES5 Component recognized as React.Component', (assert) => {
   assert.plan(1);
 
-  const es5Component = React.createClass({
+  const es5Component = createReactClass({
     render() {
       return (<div>ES5 React Component</div>);
     },
@@ -67,7 +67,7 @@ test('generatorFunction: pure component recognized as React.Component', (assert)
 test('generatorFunction: Generator function recognized as such', (assert) => {
   assert.plan(1);
 
-  const foobarComponent = React.createClass({
+  const foobarComponent = createReactClass({
     render() {
       return (<div>Component for Generator Function</div>);
     },

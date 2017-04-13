@@ -6,12 +6,12 @@
 import test from 'tape';
 import { createStore } from 'redux';
 import React from 'react';
-
+import createReactClass from 'create-react-class';
 import ReactOnRails from '../src/ReactOnRails';
 
 test('ReactOnRails render returns a virtual DOM element for component', (assert) => {
   assert.plan(1);
-  const R1 = React.createClass({
+  const R1 = createReactClass({
     render() {
       return (
         <div> WORLD </div>
