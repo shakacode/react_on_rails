@@ -5,6 +5,7 @@
 
 import test from 'tape';
 import React from 'react';
+import createReactClass from 'create-react-class';
 
 import generatorFunction from '../src/generatorFunction';
 
