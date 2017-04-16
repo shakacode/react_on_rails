@@ -4,22 +4,21 @@
 // Note that Foreman (Procfile.dev) has also been configured to take care of this.
 /* eslint-disable comma-dangle */
 
-const path = require('path');
+const { resolve } = require('path');
 const webpack = require('webpack');
 
 const config = require('./webpack.client.base.config');
-
-const hotRailsPort = process.env.HOT_RAILS_PORT || 3500;
+const { devServer, paths, publicPath } = require('./webpackConfigLoader.js');
 
 config.entry.app.push(
-  `webpack-dev-server/client?http://localhost:${hotRailsPort}`,
+  `webpack-dev-server/client?${devServer.host}:${devServer.port}`,
   'webpack/hot/only-dev-server'
 );
 
 config.output = {
   filename: '[name]-bundle.js',
-  path: path.join(__dirname, 'public'),
-  publicPath: `http://localhost:${hotRailsPort}/`,
+  path: resolve('..', paths.output, paths.assets),
+  publicPath,
 };
 
 config.module.rules.push(
@@ -106,7 +105,7 @@ config.module.rules.push(
 
 config.plugins.push(
   new webpack.HotModuleReplacementPlugin(),
-  new webpack.NoErrorsPlugin()
+  new webpack.NoEmitOnErrorsPlugin()
 );
 
 config.devtool = 'eval-source-map';

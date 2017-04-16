@@ -6,15 +6,16 @@
 
 const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const config = require('./webpack.client.base.config');
-const path = require('path');
+const { resolve } = require('path');
+const { paths, publicPath } = require('./webpackConfigLoader.js');
 
 const devBuild = process.env.NODE_ENV !== 'production';
 
 config.output = {
   filename: '[name]-bundle.js',
-  path: path.resolve(__dirname, '../app/assets/webpack'),
-  publicPath: '/assets/',
-};
+  path: resolve('..', paths.output, paths.assets),
+  publicPath,
+},
 
 // See webpack.client.base.config for adding modules common to both the webpack dev server and rails
 
