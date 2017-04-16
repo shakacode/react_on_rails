@@ -27,7 +27,7 @@ module ReactOnRails
           node_modules
 
           # Generated js bundles
-          /app/assets/webpack/*
+          /public/webpack/*
         DATA
 
         if dest_file_exists?(".gitignore")
@@ -37,25 +37,7 @@ module ReactOnRails
         end
       end
 
-      def update_application_js
-        data = <<-DATA.strip_heredoc
-          //= require webpack-bundle
-
-        DATA
-
-        app_js_path = "app/assets/javascripts/application.js"
-        found_app_js = dest_file_exists?(app_js_path) || dest_file_exists?("#{app_js_path}.coffee")
-        if found_app_js
-          prepend_to_file(found_app_js, data)
-        else
-          create_file(app_js_path, data)
-        end
-      end
-
-      def strip_application_js_of_double_blank_lines
-        application_js = File.join(destination_root, "app/assets/javascripts/application.js")
-        gsub_file(application_js, /^\n^\n/, "\n")
-      end
+      # TODO: prepend javacript_pack_tag to application layout
 
       def create_react_directories
         dirs = %w(components containers startup)
@@ -65,8 +47,10 @@ module ReactOnRails
       def copy_base_files
         base_path = "base/base/"
         base_files = %w(app/controllers/hello_world_controller.rb
+                        config/webpack/paths.yml
                         client/.babelrc
                         client/webpack.config.js
+                        client/webpackConfigLoader.js
                         client/REACT_ON_RAILS_CLIENT_README.md)
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
@@ -80,7 +64,7 @@ module ReactOnRails
       end
 
       def add_base_gems_to_gemfile
-        append_to_file("Gemfile", "\ngem 'mini_racer', platforms: :ruby\n")
+        append_to_file("Gemfile", "\ngem 'mini_racer', platforms: :ruby\ngem 'webpacker_lite'\n")
       end
 
       ASSETS_RB_APPEND = <<-DATA.strip_heredoc
@@ -93,7 +77,7 @@ module ReactOnRails
 # Rails.application.config.assets.precompile += %w( server-bundle.js )
 
 # Add folder with webpack generated assets to assets.paths
-Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpack")
+Rails.application.config.assets.paths << Rails.root.join("public", "webpack")
       DATA
 
       def append_to_assets_initializer
