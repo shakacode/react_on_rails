@@ -228,4 +228,4 @@ ctx.ReactOnRails.resetOptions();
 
 ClientStartup.clientStartup(ctx);
 
-export default ctx.ReactOnRails;
+module.exports = ctx.ReactOnRails;
