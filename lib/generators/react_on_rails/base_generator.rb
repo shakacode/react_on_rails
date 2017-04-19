@@ -122,6 +122,10 @@ Rails.application.config.assets.paths << Rails.root.join("public", "webpack")
 
           What to do next:
 
+            - Include your webpack assets to your application layout.
+
+              <%= javascript_pack_tag 'main' %>
+
             - Ensure your bundle and yarn installs of dependencies are up to date.
 
                 bundle && yarn
