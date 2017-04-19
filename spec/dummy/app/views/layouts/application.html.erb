@@ -9,18 +9,21 @@
 
   <%= yield :head %>
 
-  <%= stylesheet_pack_tag(static: ['vendor, app'],
+  <%= stylesheet_pack_tag(static: 'app',
                           media: 'all',
-                          'data-turbolinks-track' => true)) %>
+                          'data-turbolinks-track': true) %>
 
 
   <!-- These do not use turbolinks, so no data-turbolinks-track -->
   <!-- This is to load the hot assets. -->
-  <%= javascript_pack_tag hot: ['vendor', 'app'] %>
+  <%= env_javascript_include_tag(hot: ['http://localhost:3500/vendor-bundle.js',
+                                       'http://localhost:3500/app-bundle.js']) %>
 
   <!-- These do use turbolinks -->
-  <%= javascript_pack_tag(static: ['vendor', 'app'],
-                          'data-turbolinks-track' => true) %>
+  <%= javascript_pack_tag('vendor',
+                          'data-turbolinks-track': true) %>
+  <%= javascript_pack_tag('app',
+                          'data-turbolinks-track': true) %>
 
   <%= csrf_meta_tags %>
 </head>
