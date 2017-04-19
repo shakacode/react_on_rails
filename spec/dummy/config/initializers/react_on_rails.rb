@@ -97,5 +97,5 @@ ReactOnRails.configure do |config|
   # Client js uses assets not digested by rails.
   # For any asset matching this regex, a file is copied to the correct path to have a digest.
   # To disable creating digested assets, set this parameter to nil.
-  config.symlink_non_digested_assets_regex = /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/
+  config.symlink_non_digested_assets_regex = nil
 end

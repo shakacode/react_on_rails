@@ -73,7 +73,7 @@ describe InstallGenerator, type: :generator do
         node_modules
 
         # Generated js bundles
-        /app/assets/webpack/*
+        /public/webpack/*
 
         MSG
       expect(GeneratorMessages.output)
@@ -86,6 +86,10 @@ describe InstallGenerator, type: :generator do
       <<-MSG.strip_heredoc
 
         What to do next:
+
+          - Include your webpack assets to your application layout.
+
+            <%= javascript_pack_tag 'main' %>
 
           - Ensure your bundle and yarn installs of dependencies are up to date.
 
@@ -111,6 +115,10 @@ describe InstallGenerator, type: :generator do
 
         What to do next:
 
+          - Include your webpack assets to your application layout.
+
+            <%= javascript_pack_tag 'main' %>
+
           - Ensure your bundle and yarn installs of dependencies are up to date.
 
               bundle && yarn
@@ -120,7 +128,7 @@ describe InstallGenerator, type: :generator do
               foreman start -f Procfile.dev
 
           - Visit http://localhost:3000/hello_world and see your React On Rails app running!
-        MSG
+      MSG
       expect(GeneratorMessages.output)
         .to include(GeneratorMessages.format_info(expected))
     end
