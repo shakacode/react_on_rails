@@ -6,7 +6,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 
 ### Improved
-- Improve json conversion with tests and support for older Rails 3.x. [#787](https://github.com/shakacode/react_on_rails/pull/787) by [cheremukhin23](https://github.com/cheremukhin23).
+- Improve json conversion with tests and support for older Rails 3.x. [#787](https://github.com/shakacode/react_on_rails/pull/787) by [cheremukhin23](https://github.com/cheremukhin23) and [Ynote](https://github.com/Ynote).
 
 ## [6.10.0] - 2017-04-13
 
