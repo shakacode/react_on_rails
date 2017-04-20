@@ -28,12 +28,6 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#json_safe_and_pretty(hash_or_string)" do
-    let(:special_characters_hash) { { tested_characters: '<>&\u2028\u2029' } }
-
-    let(:special_characters_sanitized_hash) do
-      %({"tested_characters":"\\u003c\\u003e\\u0026\\\\u2028\\\\u2029"})
-    end
-
     it "should raise an error if not hash nor string passed" do
       expect { helper.json_safe_and_pretty(false) }.to raise_error
     end
@@ -46,31 +40,6 @@ describe ReactOnRailsHelper, type: :helper do
     it "converts a string to escaped JSON" do
       escaped_json = helper.json_safe_and_pretty(hash_unsanitized)
       expect(escaped_json).to eq(hash_sanitized)
-    end
-
-    shared_examples :escaped_json do
-      it "returns a well-formatted json with escaped characters" do
-        expect(helper.json_safe_and_pretty(special_characters_hash))
-          .to eq(special_characters_sanitized_hash)
-      end
-    end
-
-    context 'with Rails 3' do
-      before { allow(Rails).to receive(:version).and_return(3) }
-
-      it_behaves_like :escaped_json
-    end
-
-    context 'with Rails 3.2' do
-      before { allow(Rails).to receive(:version).and_return(3.2) }
-
-      it_behaves_like :escaped_json
-    end
-
-    context 'with Rails 4.2' do
-      before { allow(Rails).to receive(:version).and_return(4.2) }
-
-      it_behaves_like :escaped_json
     end
   end
 
