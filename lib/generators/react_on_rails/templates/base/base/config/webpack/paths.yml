@@ -1,5 +1,4 @@
 default: &default
-  config: client/webpack
   output: public
   assets: webpack
   manifest: manifest.json

@@ -16,8 +16,7 @@ let sharedManifest = {};
 try {
   sharedManifest = require(manifestPath);
 } catch (ex) {
-  console.error(ex);
-  console.log('Make sure the client build (client.base.build or client.rails.build) creates a manifest in:', manifestPath);
+  console.log('No manifest found. It will be created at:', manifestPath);
 }
 
 module.exports = {
@@ -33,10 +32,6 @@ module.exports = {
   },
   resolve: {
     extensions: ['.js', '.jsx'],
-    // modules: [
-    //   paths.source,
-    //   paths.node_modules,
-    // ],
     alias: {
       images: join(process.cwd(), 'app', 'assets', 'images'),
     },
