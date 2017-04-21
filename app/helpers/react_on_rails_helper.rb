@@ -306,7 +306,7 @@ module ReactOnRailsHelper
     # If to_json is called on a String, then the quotes are escaped.
     json_value = hash_or_string.is_a?(String) ? hash_or_string : hash_or_string.to_json
 
-    ERB::Util.json_escape(json_value)
+    # ERB::Util.json_escape(json_value)
     # end
   end
 
