@@ -1,6 +1,6 @@
 # Projects using React on Rails
 
-*Please add your project to this list.*
+*Please support the project by [emailing Justin Gordon](mailto:justin@shakacode.com) of any projects, yours or others, that use React on Rails. You can confirm a project uses React on Rails as the source will contain **`js-react-on-rails`**.*
 
 ## Commercial Products Live
 * **[Friends and Guests](https://www.friendsandguests.com/)**, the signature product of [ShakaCode](http://www.shakacode.com), which is a "Network Connecting Hosts and Guests".
