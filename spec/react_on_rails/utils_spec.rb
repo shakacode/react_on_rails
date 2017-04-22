@@ -17,6 +17,12 @@ module ReactOnRails
         it { expect(subject).to eq(true) }
       end
 
+      context 'with Rails 4' do
+        before { allow(Rails).to receive(:version).and_return('4') }
+
+        it { expect(subject).to eq(false) }
+      end
+
       context 'with Rails 4.2' do
         before { allow(Rails).to receive(:version).and_return('4.2') }
 

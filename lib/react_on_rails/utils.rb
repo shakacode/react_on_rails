@@ -25,7 +25,7 @@ module ReactOnRails
     end
 
     def self.rails_version_less_than(version)
-      Gem::Version.new(Rails.version) <= Gem::Version.new(version)
+      Gem::Version.new(Rails.version) < Gem::Version.new(version)
     end
 
     module Required
