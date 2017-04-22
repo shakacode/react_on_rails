@@ -15,7 +15,7 @@ end
 ReactOnRails.configure do |config|
   # Directory where your generated assets go. All generated assets must go to the same directory.
   # Configure this in your webpack config files. This relative to your Rails root directory.
-  config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
+  config.generated_assets_dir = File.join(%w(public webpack), Rails.env)
 
   # Define the files we need to check for webpack compilation when running tests.
   config.webpack_generated_files = %w(app-bundle.js vendor-bundle.js server-bundle.js

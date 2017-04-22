@@ -5,4 +5,4 @@ default: &default
 
 development:
   <<: *default
-  # enabled: true
+  enabled: false
