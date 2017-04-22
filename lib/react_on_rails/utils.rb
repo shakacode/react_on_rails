@@ -25,7 +25,14 @@ module ReactOnRails
     end
 
     def self.rails_version_less_than(version)
-      Gem::Version.new(Rails.version) < Gem::Version.new(version)
+      @rails_version_less_than ||= {}
+      @rails_version_less_than[version] = begin
+        Gem::Version.new(Rails.version) < Gem::Version.new(version)
+      end
+    end
+
+    def self.rails_version_less_than_4_1_1
+      rails_version_less_than("4.1.1")
     end
 
     module Required

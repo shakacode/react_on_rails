@@ -34,6 +34,34 @@ module ReactOnRails
 
         it { expect(subject).to eq(false) }
       end
+
+      context "called twice" do
+        before do
+          allow(Rails).to receive(:version).and_return("4.2")
+        end
+
+        it "should memoize the result" do
+          2.times { subject }
+
+          expect(Rails).to have_received(:version).once
+        end
+      end
+    end
+
+    describe ".rails_version_less_than_4_1_1" do
+      subject { Utils.rails_version_less_than_4_1_1 }
+
+      context "with Rails 4.1.0" do
+        before { allow(Rails).to receive(:version).and_return("4.1.0") }
+
+        it { expect(subject).to eq(true) }
+      end
+
+      context "with Rails 4.1.1" do
+        before { allow(Rails).to receive(:version).and_return("4.1.1") }
+
+        it { expect(subject).to eq(false) }
+      end
     end
   end
 end
