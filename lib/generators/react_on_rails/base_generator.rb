@@ -37,8 +37,6 @@ module ReactOnRails
         end
       end
 
-      # TODO: prepend javacript_pack_tag to application layout
-
       def create_react_directories
         dirs = %w(components containers startup)
         dirs.each { |name| empty_directory("client/app/bundles/HelloWorld/#{name}") }
@@ -77,7 +75,7 @@ module ReactOnRails
 # Rails.application.config.assets.precompile += %w( server-bundle.js )
 
 # Add folder with webpack generated assets to assets.paths
-Rails.application.config.assets.paths << Rails.root.join("public", "webpack")
+Rails.application.config.assets.paths << Rails.root.join("public", "webpack", Rails.env)
       DATA
 
       def append_to_assets_initializer
