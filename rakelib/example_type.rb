@@ -49,7 +49,7 @@ module ReactOnRails
       end
 
       def webpack_bundles_dir
-        File.join(dir, "app", "assets", "javascripts", "webpack")
+        File.join(dir, "public", "webpack", "test")
       end
 
       def webpack_bundles
@@ -131,7 +131,7 @@ module ReactOnRails
       def build_webpack_bundles_shell_commands
         webpack_command = File.join("$(yarn bin)", "webpack")
         shell_commands = []
-        shell_commands << "#{webpack_command} --config webpack.config.js"
+        shell_commands << "NODE_ENV=test #{webpack_command} --config webpack.config.js"
       end
 
       # Assumes we are inside a rails app's folder and necessary gems have been installed

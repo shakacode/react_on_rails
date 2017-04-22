@@ -13,13 +13,8 @@
                           media: 'all',
                           'data-turbolinks-track': true) %>
 
-
-  <!-- These do not use turbolinks, so no data-turbolinks-track -->
-  <!-- This is to load the hot assets. -->
-
-  <!-- These do use turbolinks -->
-  <%= javascript_pack_tag('vendor') %>
-  <%= javascript_pack_tag('app') %>
+  <%= javascript_pack_tag('vendor', 'data-turbolinks-track': true) %>)
+  <%= javascript_pack_tag('app', 'data-turbolinks-track': true) %>)
 
   <%= csrf_meta_tags %>
 </head>
