@@ -10,7 +10,7 @@ module ReactOnRails
     end
 
     def escaped
-      return escaped_without_erb_utils if Utils::rails_version_less_than("4")
+      return escaped_without_erb_utils if Utils::rails_version_less_than("4.2")
 
       ERB::Util.json_escape(@json)
     end

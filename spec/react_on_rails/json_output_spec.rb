@@ -23,7 +23,7 @@ module ReactOnRails
     end
 
     describe '#escaped' do
-      context 'with Rails version 4 and higher' do
+      context 'with Rails version 4.2 and higher' do
         before { allow(Rails).to receive(:version).and_return('4.2') }
 
         it_behaves_like :escaped_json
