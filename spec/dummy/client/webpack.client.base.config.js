@@ -16,7 +16,7 @@ let sharedManifest = {};
 try {
   sharedManifest = require(manifestPath);
 } catch (ex) {
-  console.log('No manifest found. It will be created at:', manifestPath);
+  console.info('No manifest found. It will be created at:', manifestPath);
 }
 
 module.exports = {
@@ -34,11 +34,8 @@ module.exports = {
     extensions: ['.js', '.jsx'],
     alias: {
       images: join(process.cwd(), 'app', 'assets', 'images'),
+      'react-on-rails': resolve(__dirname, '..', '..', '..'),
     },
-  },
-
-  resolveLoader: {
-    modules: [paths.node_modules],
   },
 
   plugins: [
