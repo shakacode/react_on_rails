@@ -1,8 +1,14 @@
-require 'active_support/core_ext/string/output_safety'
+require "active_support/core_ext/string/output_safety"
 
 module ReactOnRails
   class JsonOutput
-    ESCAPE_REPLACEMENT = { "&" => '\u0026', ">" => '\u003e', "<" => '\u003c', "\u2028" => '\u2028', "\u2029" => '\u2029' }
+    ESCAPE_REPLACEMENT = {
+      "&" => '\u0026',
+      ">" => '\u003e',
+      "<" => '\u003c',
+      "\u2028" => '\u2028',
+      "\u2029" => '\u2029'
+    }.freeze
     ESCAPE_REGEXP = /[\u2028\u2029&><]/u
 
     def initialize(json)
@@ -10,7 +16,7 @@ module ReactOnRails
     end
 
     def escaped
-      return escaped_without_erb_utils if Utils::rails_version_less_than("4.2")
+      return escaped_without_erb_utils if Utils.rails_version_less_than("4.2")
 
       ERB::Util.json_escape(@json)
     end

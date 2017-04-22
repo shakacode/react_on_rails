@@ -3,12 +3,12 @@ require "react_on_rails/json_output"
 
 module ReactOnRails
   describe JsonOutput do
-    subject{ described_class.new(hash_value.to_json) }
+    subject { described_class.new(hash_value.to_json) }
 
     let(:hash_value) do
       {
-        simple: 'hello world',
-        special: '<>&\u2028\u2029',
+        simple: "hello world",
+        special: '<>&\u2028\u2029'
       }
     end
 
@@ -17,26 +17,26 @@ module ReactOnRails
     end
 
     shared_examples :escaped_json do
-      it 'returns a well-formatted json with escaped characters' do
+      it "returns a well-formatted json with escaped characters" do
         expect(subject.escaped).to eq(escaped_json)
       end
     end
 
-    describe '#escaped' do
-      context 'with Rails version 4.2 and higher' do
-        before { allow(Rails).to receive(:version).and_return('4.2') }
+    describe "#escaped" do
+      context "with Rails version 4.2 and higher" do
+        before { allow(Rails).to receive(:version).and_return("4.2") }
 
         it_behaves_like :escaped_json
       end
 
-      context 'with Rails version lower than 4' do
-        before { allow(Rails).to receive(:version).and_return('3.2') }
+      context "with Rails version lower than 4" do
+        before { allow(Rails).to receive(:version).and_return("3.2") }
 
         it_behaves_like :escaped_json
       end
     end
 
-    describe '#escaped_without_erb_utils' do
+    describe "#escaped_without_erb_utils" do
       it_behaves_like :escaped_json
     end
   end
