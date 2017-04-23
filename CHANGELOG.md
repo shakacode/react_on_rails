@@ -4,8 +4,8 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
-
-### Improved
+## [6.10.1] - 2017-04-23
+### Fixed
 - Improve json conversion with tests and support for older Rails 3.x. [#787](https://github.com/shakacode/react_on_rails/pull/787) by [cheremukhin23](https://github.com/cheremukhin23) and [Ynote](https://github.com/Ynote).
 
 ## [6.10.0] - 2017-04-13
@@ -534,7 +534,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.10.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.10.1...master
+[6.10.1]: https://github.com/shakacode/react_on_rails/compare/6.10.0...6.10.1
 [6.10.0]: https://github.com/shakacode/react_on_rails/compare/6.9.3...6.10.0
 [6.9.3]: https://github.com/shakacode/react_on_rails/compare/6.9.1...6.9.3
 [6.9.2]: https://github.com/shakacode/react_on_rails/compare/6.9.1...6.9.2
