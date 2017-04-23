@@ -7,7 +7,9 @@ node_package/tests/node_modules
 node_package/webpack.config.js
 **/node_modules/**
 **/assets/webpack/**
+**/public/webpack/**
 **/generated/**
 **/app/assets/javascripts/application.js
 **/coverage/**
 **/cable.js
+gen-examples/**/webpack.config.js
