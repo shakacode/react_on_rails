@@ -55,10 +55,11 @@ module ReactOnRails
 
       def template_base_files
         base_path = "base/base/"
-        %w(config/initializers/react_on_rails.rb
+        %w(app/views/layouts/application.html.erb
+           config/initializers/react_on_rails.rb
            Procfile.dev
            package.json
-           client/package.json).each { |file| template("#{base_path}#{file}.tt", file) }
+           client/package.json).each { |file| template("#{base_path}#{file}.tt", file, force: true) }
       end
 
       def add_base_gems_to_gemfile

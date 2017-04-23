@@ -45,6 +45,20 @@ module ReactOnRails
         File.open(package_json, "w+") { |f| f.puts new_contents }
       end
 
+      # Since we use the local react-on-rails package, we need an alias for it
+      def add_alias_for_react_on_rails
+        config = File.join(destination_root, "client", "webpack.config.js")
+        old_contents = File.read(config)
+        new_contents = old_contents.gsub(
+          /extensions: \['\.js', '\.jsx'\],/,
+          'extensions: [\'.js\', \'.jsx\'],
+            alias: {
+              \'react-on-rails\': resolve(__dirname, \'..\', \'..\', \'..\', \'..\'),
+            },'
+        )
+        File.open(config, "w+") { |f| f.puts new_contents }
+      end
+
       def change_webpack_client_base_config_to_include_fallback
         sentinel = /^\s\s},\n\s\splugins: \[\n/
         config = File.join(destination_root, "client", "webpack.config.js")
