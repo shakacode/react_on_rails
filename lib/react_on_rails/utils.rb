@@ -26,6 +26,11 @@ module ReactOnRails
 
     def self.rails_version_less_than(version)
       @rails_version_less_than ||= {}
+
+      if @rails_version_less_than.key?(version)
+        return @rails_version_less_than[version]
+      end
+
       @rails_version_less_than[version] = begin
         Gem::Version.new(Rails.version) < Gem::Version.new(version)
       end
