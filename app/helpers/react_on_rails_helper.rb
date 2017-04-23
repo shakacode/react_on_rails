@@ -233,7 +233,7 @@ module ReactOnRailsHelper
 
     json_value = hash_or_string.is_a?(String) ? hash_or_string : hash_or_string.to_json
 
-    ReactOnRails::JsonOutput.new(json_value).escaped
+    ReactOnRails::JsonOutput.escape(json_value)
   end
 
   private
