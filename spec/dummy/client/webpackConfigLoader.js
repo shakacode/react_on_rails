@@ -9,6 +9,9 @@ const paths = safeLoad(readFileSync(join(configPath, 'paths.yml'), 'utf8'))[env.
 const devServerConfig = join(configPath, 'development.server.yml');
 const devServer = safeLoad(readFileSync(devServerConfig, 'utf8')).development;
 
+if (env.REACT_ON_RAILS_ENV == "HOT") {
+  devServer.enabled = true
+}
 const productionBuild = env.NODE_ENV === 'production';
 
 const publicPath = !productionBuild && devServer.enabled ?
