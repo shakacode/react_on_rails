@@ -24,6 +24,22 @@ module ReactOnRails
       (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
     end
 
+    def self.rails_version_less_than(version)
+      @rails_version_less_than ||= {}
+
+      if @rails_version_less_than.key?(version)
+        return @rails_version_less_than[version]
+      end
+
+      @rails_version_less_than[version] = begin
+        Gem::Version.new(Rails.version) < Gem::Version.new(version)
+      end
+    end
+
+    def self.rails_version_less_than_4_1_1
+      rails_version_less_than("4.1.1")
+    end
+
     module Required
       def required(arg_name)
         raise ArgumentError, "#{arg_name} is required"

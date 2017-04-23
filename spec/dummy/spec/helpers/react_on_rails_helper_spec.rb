@@ -10,24 +10,40 @@ describe ReactOnRailsHelper, type: :helper do
     }
   end
 
-  describe "#sanitized_props_string(props)" do
-    let(:hash) do
-      {
-        hello: "world",
-        free: "of charge",
-        x: "</script><script>alert('foo')</script>"
-      }
-    end
+  let(:hash) do
+    {
+      hello: "world",
+      free: "of charge",
+      x: "</script><script>alert('foo')</script>"
+    }
+  end
 
-    let(:hash_sanitized) do
-      '{"hello":"world","free":"of charge","x":"\\u003c/script\\u003e\\u003cscrip'\
+  let(:hash_sanitized) do
+    '{"hello":"world","free":"of charge","x":"\\u003c/script\\u003e\\u003cscrip'\
       "t\\u003ealert('foo')\\u003c/script\\u003e\"}"
+  end
+
+  let(:hash_unsanitized) do
+    "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"</script><script>alert('foo')</script>\"}"
+  end
+
+  describe "#json_safe_and_pretty(hash_or_string)" do
+    it "should raise an error if not hash nor string passed" do
+      expect { helper.json_safe_and_pretty(false) }.to raise_error
     end
 
-    let(:hash_unsanitized) do
-      "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"</script><script>alert('foo')</script>\"}"
+    it "converts a hash to escaped JSON" do
+      escaped_json = helper.json_safe_and_pretty(hash)
+      expect(escaped_json).to eq(hash_sanitized)
     end
 
+    it "converts a string to escaped JSON" do
+      escaped_json = helper.json_safe_and_pretty(hash_unsanitized)
+      expect(escaped_json).to eq(hash_sanitized)
+    end
+  end
+
+  describe "#sanitized_props_string(props)" do
     it "converts a hash to JSON and escapes </script>" do
       sanitized = helper.sanitized_props_string(hash)
       expect(sanitized).to eq(hash_sanitized)
