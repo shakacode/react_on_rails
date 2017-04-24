@@ -4177,7 +4177,7 @@ react-helmet@^5.0.3:
     prop-types "^15.5.4"
     react-side-effect "^1.1.0"
 
-"react-on-rails@file:../../..":
+"react-on-rails@file:../../../":
   version "6.10.1"
 
 react-proptypes@^0.0.1:
