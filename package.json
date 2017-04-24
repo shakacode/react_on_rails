@@ -37,7 +37,11 @@
     "release-it": "^2.7.1",
     "tap-spec": "^4.1.1",
     "tape": "^4.6.3",
-    "webpack": "^2.3.3"
+    "webpack": "^2.3.3",
+    "webpack-manifest-plugin": "^1.1.0"
+  },
+  "browser": {
+    "fs": false
   },
   "peerDependencies": {
     "babel-runtime": ">= 6",

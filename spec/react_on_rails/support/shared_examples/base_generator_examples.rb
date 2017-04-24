@@ -33,7 +33,6 @@ shared_examples "base_generator" do
        client/webpack.config.js
        client/.babelrc
        client/package.json
-       client/webpackConfigLoader.js
        config/initializers/react_on_rails.rb
        config/webpack/paths.yml
        package.json

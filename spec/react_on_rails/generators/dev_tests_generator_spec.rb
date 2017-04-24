@@ -39,12 +39,12 @@ describe DevTestsGenerator, type: :generator do
       end
     end
 
-    it "changes the webpack.config.js to use a resolveLoader" do
-      expected = ReactOnRails::Generators::FALLBACK_OPTION_FOR_NODE_MODULES
-      assert_file("client/webpack.config.js") do |contents|
-        assert_match(expected, contents)
-      end
-    end
+    # it "changes the webpack.config.js to use a resolveLoader" do
+    #   expected = ReactOnRails::Generators::FALLBACK_OPTION_FOR_NODE_MODULES
+    #   assert_file("client/webpack.config.js") do |contents|
+    #     assert_match(expected, contents)
+    #   end
+    # end
   end
 
   context "with server-rendering" do

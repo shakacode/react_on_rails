@@ -7,7 +7,8 @@
 const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const config = require('./webpack.client.base.config');
 const { resolve } = require('path');
-const { paths, publicPath } = require('./webpackConfigLoader.js');
+const webpackConfigLoader = require('react-on-rails').default.webpackConfigLoader;
+const { env, paths, publicPath } = webpackConfigLoader(resolve('..', 'config', 'webpack'));
 
 const devBuild = process.env.NODE_ENV !== 'production';
 

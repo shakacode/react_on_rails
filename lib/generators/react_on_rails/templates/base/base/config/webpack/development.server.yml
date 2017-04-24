@@ -1,0 +1,8 @@
+default: &default
+  enabled: false
+  host: localhost
+  port: 3500
+
+development:
+  <<: *default
+  enabled: false
