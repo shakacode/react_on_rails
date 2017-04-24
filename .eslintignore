@@ -12,4 +12,3 @@ node_package/webpack.config.js
 **/app/assets/javascripts/application.js
 **/coverage/**
 **/cable.js
-gen-examples/**/webpack.config.js

@@ -46,9 +46,9 @@ module ReactOnRails
         base_path = "base/base/"
         base_files = %w(app/controllers/hello_world_controller.rb
                         config/webpack/paths.yml
+                        config/webpack/development.server.yml
                         client/.babelrc
                         client/webpack.config.js
-                        client/webpackConfigLoader.js
                         client/REACT_ON_RAILS_CLIENT_README.md)
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end

@@ -8,7 +8,8 @@ const { resolve } = require('path');
 const webpack = require('webpack');
 
 const config = require('./webpack.client.base.config');
-const { devServer, paths, publicPath } = require('./webpackConfigLoader.js');
+const webpackConfigLoader = require('react-on-rails').default.webpackConfigLoader;
+const { devServer, paths, publicPath } = webpackConfigLoader(resolve('..', 'config', 'webpack'));
 
 config.entry.app.push(
   `webpack-dev-server/client?${devServer.host}:${devServer.port}`,

@@ -7,11 +7,14 @@ const webpackCommon = require('./webpack.common');
 const { assetLoaderRules } = webpackCommon;
 
 const ManifestPlugin = require('webpack-manifest-plugin');
-const { env, paths, publicPath } = require('./webpackConfigLoader.js');
+const webpackConfigLoader = require('react-on-rails').default.webpackConfigLoader;
+const { env, paths, publicPath } = webpackConfigLoader(resolve('..', 'config', 'webpack'));
+
 const manifestPath = resolve('..', paths.output, paths.assets, paths.manifest);
 
 const devBuild = process.env.NODE_ENV !== 'production';
 
+// console.log("COOONFIIGGG", config);
 let sharedManifest = {};
 try {
   sharedManifest = require(manifestPath);
@@ -34,7 +37,7 @@ module.exports = {
     extensions: ['.js', '.jsx'],
     alias: {
       images: join(process.cwd(), 'app', 'assets', 'images'),
-      'react-on-rails': resolve(__dirname, '..', '..', '..'),
+      // 'react-on-rails': resolve(__dirname, '..', '..', '..'),
     },
   },
 
