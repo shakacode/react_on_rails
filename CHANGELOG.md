@@ -1,9 +1,16 @@
 # Change Log
-All notable changes to this project's source code will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version.
+All notable changes to this project's source code will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version. NOTE: major versions of the npm module and the gem must be kept in sync.
 
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+## [7.0.0] - 2017-04-25
+### Changed
+- Any version differences in gem and node package for React on Rails throw an error [#821](https://github.com/shakacode/react_on_rails/pull/821) by [justin808](https://github.com/justin808)
+
+### Fixed
+- Fixes serious performance regression when using String props for rendering. [#821](https://github.com/shakacode/react_on_rails/pull/821) by [justin808](https://github.com/justin808)
+
 ## [6.10.1] - 2017-04-23
 ### Fixed
 - Improve json conversion with tests and support for older Rails 3.x. [#787](https://github.com/shakacode/react_on_rails/pull/787) by [cheremukhin23](https://github.com/cheremukhin23) and [Ynote](https://github.com/Ynote).
@@ -534,7 +541,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.10.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/7.0.0...master
+[7.0.0]: https://github.com/shakacode/react_on_rails/compare/6.10.1...7.0.0
 [6.10.1]: https://github.com/shakacode/react_on_rails/compare/6.10.0...6.10.1
 [6.10.0]: https://github.com/shakacode/react_on_rails/compare/6.9.3...6.10.0
 [6.9.3]: https://github.com/shakacode/react_on_rails/compare/6.9.1...6.9.3
