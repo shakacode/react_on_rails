@@ -13,8 +13,7 @@ module ReactOnRails
       end
 
       def props
-        props = options.fetch(:props) { NO_PROPS }
-        props.is_a?(String) ? JSON.parse(ERB::Util.json_escape(props)) : props
+        options.fetch(:props) { NO_PROPS }
       end
 
       def name
@@ -43,15 +42,6 @@ module ReactOnRails
 
       def raise_on_prerender_error
         retrieve_key(:raise_on_prerender_error)
-      end
-
-      def data
-        {
-          component_name: name,
-          props: props,
-          trace: trace,
-          dom_id: dom_id
-        }
       end
 
       private

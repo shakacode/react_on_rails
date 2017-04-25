@@ -14,69 +14,75 @@ module ReactOnRails
     describe "#warn_if_gem_and_node_package_versions_differ" do
       let(:logger) { FakeLogger.new }
 
-      context "when gem and node package major versions are equal" do
-        let(:node_package_version) { double_package_version(raw: "^2.2.5", major: "2") }
-        before { stub_gem_version("2.0.0.beta.2") }
+      context "when gem and node package major and minor versions are equal" do
+        let(:node_package_version) do
+          double_package_version(raw: "^2.2.5-beta.2", major_minor_patch: %w(2 2 5))
+        end
+        before { stub_gem_version("2.2.5.beta.2") }
 
-        it "does not log a warning" do
-          check_version(node_package_version, logger)
-          expect(logger.message).to be_nil
+        it "does not raise" do
+          expect { check_version(node_package_version) }.not_to raise_error
         end
       end
 
       context "when gem and node package major versions differ" do
         let(:node_package_version) do
-          double_package_version(raw: "13.0.0.beta-2", major: "13")
+          double_package_version(raw: "13.0.0.beta-2", major_minor_patch: %w(13 0 0))
         end
         before { stub_gem_version("12.0.0.beta.1") }
 
-        it "logs a warning" do
-          check_version(node_package_version, logger)
-          expect(logger.message).to be_present
+        it "raises" do
+          error = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          expect { check_version(node_package_version) }.to raise_error(error)
+        end
+      end
+
+      context "when gem and node package major versions match and minor differs" do
+        let(:node_package_version) do
+          double_package_version(raw: "13.0.0.beta-2", major_minor_patch: %w(13 0 0))
+        end
+        before { stub_gem_version("13.1.0") }
+
+        it "raises" do
+          error = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          expect { check_version(node_package_version) }.to raise_error(error)
+        end
+      end
+
+      context "when gem and node package major, minor versions match and patch differs" do
+        let(:node_package_version) do
+          double_package_version(raw: "13.0.1", major_minor_patch: %w(13 0 1))
+        end
+        before { stub_gem_version("13.0.0") }
+
+        it "raises" do
+          error = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          expect { check_version(node_package_version) }.to raise_error(error)
         end
       end
 
       context "when package json uses a relative path with dots" do
         let(:node_package_version) do
-          double_package_version(raw: "../../..", major: "", relative_path: true)
+          double_package_version(raw: "../../..", major_minor_patch: "", relative_path: true)
         end
         before { stub_gem_version("2.0.0.beta.1") }
 
-        it "does not log a warning" do
-          check_version(node_package_version, logger)
-          expect(logger.message).to be_nil
-        end
-      end
-
-      context "when package json uses a one-digit version string" do
-        let(:node_package_version) do
-          double_package_version(raw: "^6", major: "6")
-        end
-
-        it "does not log a warning" do
-          stub_gem_version("6")
-          check_version(node_package_version, logger)
-          expect(logger.message).to be_nil
-        end
-
-        it "logs a warning" do
-          stub_gem_version("5")
-          check_version(node_package_version, logger)
-          expect(logger.message).to be_present
+        it "does not raise" do
+          expect { check_version(node_package_version) }.not_to raise_error
         end
       end
     end
 
-    def double_package_version(raw: nil, major: nil, relative_path: false)
+    def double_package_version(raw: nil, major_minor_patch: nil, relative_path: false)
       instance_double(VersionChecker::NodePackageVersion,
                       raw: raw,
-                      major: major,
+                      major_minor_patch: major_minor_patch,
                       relative_path?: relative_path)
     end
 
-    def check_version(node_package_version, logger)
-      version_checker = VersionChecker.new(node_package_version, logger)
-      version_checker.warn_if_gem_and_node_package_versions_differ
+    def check_version(node_package_version)
+      version_checker = VersionChecker.new(node_package_version)
+      version_checker.raise_if_gem_and_node_package_versions_differ
     end
 
     describe VersionChecker::NodePackageVersion do
@@ -94,7 +100,7 @@ module ReactOnRails
         end
 
         describe "#major" do
-          specify { expect(node_package_version.major).to eq("0") }
+          specify { expect(node_package_version.major_minor_patch).to eq(%w(0 0 2)) }
         end
       end
 
@@ -109,8 +115,8 @@ module ReactOnRails
           specify { expect(node_package_version.relative_path?).to be false }
         end
 
-        describe "#major" do
-          specify { expect(node_package_version.major).to eq("14") }
+        describe "#major_minor_patch" do
+          specify { expect(node_package_version.major_minor_patch).to eq(%w(14 0 0)) }
         end
       end
 
@@ -126,7 +132,7 @@ module ReactOnRails
         end
 
         describe "#major" do
-          specify { expect(node_package_version.major).to be_nil }
+          specify { expect(node_package_version.major_minor_patch).to be_nil }
         end
       end
 
@@ -142,7 +148,7 @@ module ReactOnRails
         end
 
         describe "#major" do
-          specify { expect(node_package_version.major).to be_nil }
+          specify { expect(node_package_version.major_minor_patch).to be_nil }
         end
       end
     end

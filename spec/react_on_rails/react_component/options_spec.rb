@@ -110,22 +110,6 @@ describe ReactOnRails::ReactComponent::Options do
     end
   end
 
-  describe "#data" do
-    it "returns data for component" do
-      attrs = the_attrs(name: "app", options: { trace: false, id: 2 })
-      expected_data = {
-        component_name: "App",
-        props: {},
-        trace: false,
-        dom_id: 2
-      }
-
-      opts = described_class.new(attrs)
-
-      expect(opts.data).to eq expected_data
-    end
-  end
-
   CONFIGURABLE_OPTIONS.each do |option|
     describe "##{option}" do
       context "with #{option} option" do

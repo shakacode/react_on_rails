@@ -90,6 +90,10 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
   return false;
 }
 
+function domNodeIdForEl(el) {
+  return el.getAttribute('data-dom-id');
+}
+
 /**
  * Used for client rendering by ReactOnRails. Either calls ReactDOM.render or delegates
  * to a renderer registered by the user.
@@ -97,11 +101,11 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
  */
 function render(el, railsContext) {
   const context = findContext();
-  const jsonEl = JSON.parse(el.textContent);
-  const name = jsonEl.component_name;
-  const domNodeId = jsonEl.dom_id;
-  const props = jsonEl.props;
-  const trace = jsonEl.trace;
+  // This must match app/helpers/react_on_rails_helper.rb:113
+  const name = el.getAttribute('data-component-name');
+  const domNodeId = domNodeIdForEl(el);
+  const props = JSON.parse(el.textContent);
+  const trace = el.getAttribute('data-trace');
 
   try {
     const domNode = document.getElementById(domNodeId);
@@ -152,10 +156,14 @@ export function reactOnRailsPageLoaded() {
 }
 
 function unmount(el) {
-  const elData = JSON.parse(el.textContent);
-  const domNodeId = elData.dom_id;
+  const domNodeId = domNodeIdForEl(el);
   const domNode = document.getElementById(domNodeId);
-  ReactDOM.unmountComponentAtNode(domNode);
+  try {
+    ReactDOM.unmountComponentAtNode(domNode);
+  } catch (e) {
+    console.info(`Caught error calling unmountComponentAtNode: ${e.message} for domNode`,
+      domNode, e);
+  }
 }
 
 function reactOnRailsPageUnloaded() {
