@@ -16,10 +16,11 @@
 
 import webpack from 'webpack';
 import WebpackDevServer from 'webpack-dev-server';
-
+const { resolve } = require('path');
 import webpackConfig from './webpack.client.rails.hot.config';
 
-const { devServer: devServerConfig, publicPath } = require('./webpackConfigLoader.js');
+const webpackConfigLoader = require('react-on-rails').default.webpackConfigLoader;
+const { devServer: devServerConfig, publicPath } = webpackConfigLoader(resolve('..', 'config', 'webpack'));
 
 const compiler = webpack(webpackConfig);
 
