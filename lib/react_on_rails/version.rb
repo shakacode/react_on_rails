@@ -1,3 +1,3 @@
 module ReactOnRails
-  VERSION = "6.10.1".freeze
+  VERSION = "7.0.0".freeze
 end
