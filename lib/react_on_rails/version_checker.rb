@@ -2,44 +2,49 @@ module ReactOnRails
   # Responsible for checking versions of rubygem versus yarn node package
   # against each otherat runtime.
   class VersionChecker
-    attr_reader :node_package_version, :logger
-    MAJOR_VERSION_REGEX = /(\d+)\.?/
+    attr_reader :node_package_version
+    MAJOR_MINOR_PATCH_VERSION_REGEX = /(\d+)\.(\d+)\.(\d+)/
 
     def self.build
-      new(NodePackageVersion.build, Rails.logger)
+      new(NodePackageVersion.build)
     end
 
-    def initialize(node_package_version, logger)
-      @logger = logger
+    def initialize(node_package_version)
       @node_package_version = node_package_version
     end
 
     # For compatibility, the gem and the node package versions should always match,
     # unless the user really knows what they're doing. So we will give a
     # warning if they do not.
-    def warn_if_gem_and_node_package_versions_differ
+    def raise_if_gem_and_node_package_versions_differ
       return if node_package_version.relative_path?
-      return if node_package_version.major == gem_major_version
-      log_differing_versions_warning
+      node_major_minor_patch = node_package_version.major_minor_patch
+      gem_major_minor_patch = gem_major_minor_patch_version
+      return if node_major_minor_patch[0] == gem_major_minor_patch[0] &&
+                node_major_minor_patch[1] == gem_major_minor_patch[1] &&
+                node_major_minor_patch[2] == gem_major_minor_patch[2]
+
+      raise_differing_versions_warning
     end
 
     private
 
-    def log_differing_versions_warning
-      msg = "**WARNING** ReactOnRails: ReactOnRails gem and node package MAJOR versions do not match\n" \
+    def raise_differing_versions_warning
+      msg = "**ERROR** ReactOnRails: ReactOnRails gem and node package versions do not match\n" \
             "                     gem: #{gem_version}\n" \
             "            node package: #{node_package_version.raw}\n" \
-            "Ensure the installed MAJOR version of the gem is the same as the MAJOR version of \n"\
+            "Ensure the installed version of the gem is the same as the version of \n"\
             "your installed node package."
-      logger.error(msg)
+      raise msg
     end
 
     def gem_version
       ReactOnRails::VERSION
     end
 
-    def gem_major_version
-      gem_version.match(MAJOR_VERSION_REGEX)[1]
+    def gem_major_minor_patch_version
+      match = gem_version.match(MAJOR_MINOR_PATCH_VERSION_REGEX)
+      [match[1], match[2], match[3]]
     end
 
     class NodePackageVersion
@@ -71,9 +76,10 @@ module ReactOnRails
         raw.match(%r{(\.\.|\Afile:///)}).present?
       end
 
-      def major
+      def major_minor_patch
         return if relative_path?
-        raw.match(MAJOR_VERSION_REGEX)[1]
+        match = raw.match(MAJOR_MINOR_PATCH_VERSION_REGEX)
+        [match[1], match[2], match[3]]
       end
 
       private

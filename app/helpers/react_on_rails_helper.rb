@@ -107,12 +107,17 @@ module ReactOnRailsHelper
     # Setup the page_loaded_js, which is the same regardless of prerendering or not!
     # The reason is that React is smart about not doing extra work if the server rendering did its job.
     component_specification_tag = content_tag(:script,
-                                              json_safe_and_pretty(options.data).html_safe,
+                                              json_safe_and_pretty(options.props).html_safe,
                                               type: "application/json",
-                                              class: "js-react-on-rails-component")
+                                              class: "js-react-on-rails-component",
+                                              "data-component-name" => options.name,
+                                              "data-trace" => options.trace,
+                                              "data-dom-id" => options.dom_id)
 
     # Create the HTML rendering part
-    result = server_rendered_react_component_html(options.props, options.name, options.dom_id,
+    result = server_rendered_react_component_html(options.props,
+                                                  options.name,
+                                                  options.dom_id,
                                                   prerender: options.prerender,
                                                   trace: options.trace,
                                                   raise_on_prerender_error: options.raise_on_prerender_error)
