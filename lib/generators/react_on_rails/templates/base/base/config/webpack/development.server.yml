@@ -5,4 +5,5 @@ default: &default
 
 development:
   <<: *default
+  # set to true of you want hot loading as default
   enabled: false

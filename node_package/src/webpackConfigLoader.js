@@ -5,7 +5,6 @@ const { readFileSync } = require('fs');
 
 export default {
   configLoader(configPath) {
-    // const configPath = resolve('..', 'config', 'webpack');
     const paths = safeLoad(readFileSync(join(configPath, 'paths.yml'), 'utf8'))[env.NODE_ENV];
 
     const devServerConfig = join(configPath, 'development.server.yml');
