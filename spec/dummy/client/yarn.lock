@@ -4146,7 +4146,7 @@ react-dom@^15.5.4:
     object-assign "^4.1.0"
     prop-types "~15.5.7"
 
-react-helmet@5.0.3:
+react-helmet@^5.0.3:
   version "5.0.3"
   resolved "https://registry.yarnpkg.com/react-helmet/-/react-helmet-5.0.3.tgz#c6da63ee96e83aa7c8fe6d041f28dd288b1b006d"
   dependencies:
@@ -4156,7 +4156,7 @@ react-helmet@5.0.3:
     react-side-effect "^1.1.0"
 
 "react-on-rails@file:../../..":
-  version "6.9.3"
+  version "6.10.1"
 
 react-proptypes@^0.0.1:
   version "0.0.1"
