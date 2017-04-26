@@ -3,12 +3,12 @@
 
 const webpack = require('webpack');
 const { resolve, join } = require('path');
-const { imageLoaderRules } = require('./webpack.common');
 const webpackCommon = require('./webpack.common');
 const { assetLoaderRules } = webpackCommon;
 
-const webpackConfigLoader = require('react-on-rails').default.webpackConfigLoader;
-const { env, paths, publicPath } = webpackConfigLoader(resolve('..', 'config', 'webpack'));
+const webpackConfigLoader = require('react-on-rails/node_package/lib/webpackConfigLoader').default;
+const configPath = resolve('..', 'config', 'webpack');
+const { paths } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
 const nodeEnv = devBuild ? 'development' : 'production';
