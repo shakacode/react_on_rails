@@ -7,8 +7,9 @@ const webpackCommon = require('./webpack.common');
 const { assetLoaderRules } = webpackCommon;
 
 const ManifestPlugin = require('webpack-manifest-plugin');
-const webpackConfigLoader = require('react-on-rails').default.webpackConfigLoader;
-const { env, paths, publicPath } = webpackConfigLoader(resolve('..', 'config', 'webpack'));
+const webpackConfigLoader = require('react-on-rails/node_package/lib/webpackConfigLoader').default;
+const configPath = resolve('..', 'config', 'webpack');
+const { paths, publicPath } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
 
