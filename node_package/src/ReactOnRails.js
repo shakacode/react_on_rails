@@ -8,7 +8,6 @@ import serverRenderReactComponent from './serverRenderReactComponent';
 import buildConsoleReplay from './buildConsoleReplay';
 import createReactElement from './createReactElement';
 import Authenticity from './Authenticity';
-import webpackConfigLoader from './webpackConfigLoader';
 import context from './context';
 
 const ctx = context();
@@ -222,10 +221,6 @@ ctx.ReactOnRails = {
 
   resetOptions() {
     this.options = Object.assign({}, DEFAULT_OPTIONS);
-  },
-
-  webpackConfigLoader(configPath) {
-    return webpackConfigLoader.configLoader(configPath);
   },
 };
 
