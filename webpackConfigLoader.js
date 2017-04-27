@@ -25,4 +25,4 @@ const configLoader = (configPath) => {
   };
 };
 
-export default configLoader;
+module.exports = configLoader;

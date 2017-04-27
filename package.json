@@ -40,16 +40,14 @@
     "webpack": "^2.3.3",
     "webpack-manifest-plugin": "^1.1.0"
   },
-  "browser": {
-    "fs": false
-  },
   "peerDependencies": {
     "babel-runtime": ">= 6",
     "react": ">= 0.14",
     "react-dom": ">= 0.14"
   },
   "files": [
-    "node_package/lib"
+    "node_package/lib",
+    "webpackConfigLoader.js"
   ],
   "scripts": {
     "test": "babel-tape-runner -r node_package/tests/helpers/test_helper.js node_package/tests/*.js | tap-spec",
