@@ -6,7 +6,7 @@ const { resolve, join } = require('path');
 const webpackCommon = require('./webpack.common');
 const { assetLoaderRules } = webpackCommon;
 
-const webpackConfigLoader = require('react-on-rails/node_package/lib/webpackConfigLoader').default;
+const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config', 'webpack');
 const { paths } = webpackConfigLoader(configPath);
 
