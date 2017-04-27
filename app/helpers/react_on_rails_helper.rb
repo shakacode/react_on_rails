@@ -231,7 +231,7 @@ module ReactOnRailsHelper
   end
 
   def json_safe_and_pretty(hash_or_string)
-    return if hash_or_string.nil?
+    return "{}" if hash_or_string.nil?
     unless hash_or_string.class.in?([Hash, String])
       raise "#{__method__} only accepts String or Hash as argument "\
             "(#{hash_or_string.class} given)."
