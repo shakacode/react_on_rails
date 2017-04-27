@@ -4,6 +4,12 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+ *Please add entries here for your pull requests.*
+
+## [7.0.1] - 2017-04-27
+### Fixed
+- Fix to handle nil values in json_safe_and_pretty [#823](https://github.com/shakacode/react_on_rails/pull/823) by [dzirtusss](https://github.com/dzirtusss)
+
 ## [7.0.0] - 2017-04-25
 ### Changed
 - Any version differences in gem and node package for React on Rails throw an error [#821](https://github.com/shakacode/react_on_rails/pull/821) by [justin808](https://github.com/justin808)
@@ -541,7 +547,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/7.0.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/7.0.1...master
+[7.0.1]: https://github.com/shakacode/react_on_rails/compare/7.0.0...7.0.1
 [7.0.0]: https://github.com/shakacode/react_on_rails/compare/6.10.1...7.0.0
 [6.10.1]: https://github.com/shakacode/react_on_rails/compare/6.10.0...6.10.1
 [6.10.0]: https://github.com/shakacode/react_on_rails/compare/6.9.3...6.10.0
