@@ -4,7 +4,13 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
- *Please add entries here for your pull requests.*
+*Please add entries here for your pull requests.*
+
+## [7.0.3] - 2017-04-27
+Same as 7.0.1.
+
+## 7.0.2 - 2017-04-27
+*Accidental release of beta gem here*
 
 ## [7.0.1] - 2017-04-27
 ### Fixed
@@ -547,7 +553,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/7.0.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/7.0.3...master
+[7.0.3]: https://github.com/shakacode/react_on_rails/compare/7.0.1...7.0.3
 [7.0.1]: https://github.com/shakacode/react_on_rails/compare/7.0.0...7.0.1
 [7.0.0]: https://github.com/shakacode/react_on_rails/compare/6.10.1...7.0.0
 [6.10.1]: https://github.com/shakacode/react_on_rails/compare/6.10.0...6.10.1
