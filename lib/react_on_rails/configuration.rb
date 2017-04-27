@@ -4,7 +4,7 @@ module ReactOnRails
     setup_config_values
   end
 
-  DEFAULT_GENERATED_ASSETS_DIR = File.join(%w(app assets webpack)).freeze
+  DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
 
   def self.setup_config_values
     ensure_webpack_generated_files_exists
