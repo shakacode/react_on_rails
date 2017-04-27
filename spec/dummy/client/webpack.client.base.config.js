@@ -7,7 +7,7 @@ const webpackCommon = require('./webpack.common');
 const { assetLoaderRules } = webpackCommon;
 
 const ManifestPlugin = require('webpack-manifest-plugin');
-const webpackConfigLoader = require('react-on-rails/node_package/lib/webpackConfigLoader').default;
+const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config', 'webpack');
 const { paths, publicPath } = webpackConfigLoader(configPath);
 
