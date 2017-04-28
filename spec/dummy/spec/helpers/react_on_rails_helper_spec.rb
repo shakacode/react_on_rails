@@ -32,9 +32,9 @@ describe ReactOnRailsHelper, type: :helper do
       expect { helper.json_safe_and_pretty(false) }.to raise_error
     end
 
-    it "should allow nil values" do
+    it "should return empty json when nil" do
       escaped_json = helper.json_safe_and_pretty(nil)
-      expect(escaped_json).to eq(nil)
+      expect(escaped_json).to eq("{}")
     end
 
     it "converts a hash to escaped JSON" do
