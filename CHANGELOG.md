@@ -5,6 +5,8 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 ## [Unreleased]
 *Please add entries here for your pull requests.*
+
+## [7.0.4] - 2017-04-27
 - Return empty json when nil in json_safe_and_pretty [#824](https://github.com/shakacode/react_on_rails/pull/824) by [dzirtusss](https://github.com/dzirtusss)
 
 ## [7.0.3] - 2017-04-27
@@ -554,7 +556,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/7.0.3...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/7.0.4...master
+[7.0.4]: https://github.com/shakacode/react_on_rails/compare/7.0.3...7.0.4
 [7.0.3]: https://github.com/shakacode/react_on_rails/compare/7.0.1...7.0.3
 [7.0.1]: https://github.com/shakacode/react_on_rails/compare/7.0.0...7.0.1
 [7.0.0]: https://github.com/shakacode/react_on_rails/compare/6.10.1...7.0.0
