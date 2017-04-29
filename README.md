@@ -113,7 +113,7 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
 1. Add the following to your Gemfile and `bundle install`.
 
   ```ruby
-  gem "react_on_rails", "~> 6"
+  gem "react_on_rails", "~> 7"
   ```
 
 2. Commit this to git (you cannot run the generator unless you do this or pass the option `--ignore-warnings`).
@@ -159,20 +159,20 @@ Configure the `config/initializers/react_on_rails.rb`. You can adjust some neces
 + *Normal Mode (React component will be rendered on client):*
 
   ```erb
-  <%= react_component("HelloWorldApp", props: @some_props) %>
+  <%= react_component("HelloWorld", props: @some_props) %>
   ```
 + *Server-Side Rendering (React component is first rendered into HTML on the server):*
 
   ```erb
-  <%= react_component("HelloWorldApp", props: @some_props, prerender: true) %>
+  <%= react_component("HelloWorld", props: @some_props, prerender: true) %>
   ```
 
-+ The `component_name` parameter is a string matching the name you used to expose your React component globally. So, in the above examples, if you had a React component named "HelloWorldApp," you would register it with the following lines:
++ The `component_name` parameter is a string matching the name you used to expose your React component globally. So, in the above examples, if you had a React component named "HelloWorld," you would register it with the following lines:
 
   ```js
   import ReactOnRails from 'react-on-rails';
-  import HelloWorldApp from './HelloWorldApp';
-  ReactOnRails.register({ HelloWorldApp });
+  import HelloWorld from './HelloWorld';
+  ReactOnRails.register({ HelloWorld });
   ```
 
   Exposing your component in this way is how React on Rails is able to reference your component from a Rails view. You can expose as many components as you like, as long as their names do not collide. See below for the details of how you expose your components via the react_on_rails webpack configuration.
@@ -181,7 +181,7 @@ Configure the `config/initializers/react_on_rails.rb`. You can adjust some neces
 
   ```ruby
     # Rails View
-    <%= react_component("HelloWorldApp", props: { name: "Stranger" }) %>
+    <%= react_component("HelloWorld", props: { name: "Stranger" }) %>
   ```
 
   ```javascript
@@ -323,7 +323,7 @@ Place your JavaScript code inside of the provided `client/app` folder. Use modul
 This is an example of how to expose a component to the `react_component` view helper.
 
   ```javascript
-  // client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx
+  // client/app/bundles/HelloWorld/startup/HelloWorld.jsx
   import HelloWorld from '../components/HelloWorld';
   import ReactOnRails from 'react-on-rails';
   ReactOnRails.register({ HelloWorld });
@@ -333,7 +333,7 @@ This is an example of how to expose a component to the `react_component` view he
 
 You may want different initialization for your server rendered components. For example, if you have animation that runs when a component is displayed, you might need to turn that off when server rendering. However, the `railsContext` will tell you if your JavaScript code is running client side or server side. So code that required a different server bundle previously may no longer require this!
 
-If you do want different code to run, you'd setup a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverHelloWorldApp.jsx'. Note, you might be initializing HelloWorld with version specialized for server rendering.
+If you do want different code to run, you'd setup a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverHelloWorld.jsx'. Note, you might be initializing HelloWorld with version specialized for server rendering.
 
 #### Generator Functions
 Why would you create a function that returns a React component? For example, you may want the ability to use the passed-in props to initialize a redux store or setup react-router. Or you may want to return different components depending on what's in the props. ReactOnRails will automatically detect a registered generator function.
