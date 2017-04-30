@@ -1,0 +1,25 @@
+# Not currently using ruby-lint
+---
+presenter: syntastic
+
+# Be sure to edit this per your project!
+directories:
+  - app
+  - lib
+  - spec
+
+ignore_paths:
+  - client
+  - node_modules
+  - coverage
+  - examples
+
+analysis_classes:
+  #  - argument_amount
+  - pedantics
+  - shadowing_variables
+  # Too many false positives for these
+  #  - undefined_methods
+  #  - undefined_variables
+  #  - unused_variables
+  - useless_equality_checks

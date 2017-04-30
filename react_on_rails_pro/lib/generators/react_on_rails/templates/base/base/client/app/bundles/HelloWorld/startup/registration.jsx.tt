@@ -1,0 +1,8 @@
+import ReactOnRails from 'react-on-rails';
+
+import <%= config[:component_name] %> from '<%= config[:app_relative_path] %>';
+
+// This is how react_on_rails can see the HelloWorld in the browser.
+ReactOnRails.register({
+  <%= config[:component_name] %>,
+});

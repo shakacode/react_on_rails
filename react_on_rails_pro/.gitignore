@@ -1,0 +1,37 @@
+/.bundle/
+/.yardoc
+/Gemfile.lock
+/_yardoc/
+/coverage/
+/doc/
+/pkg/
+/spec/reports/
+/tmp/
+*.gem
+/vendor/
+
+/spec/examples.txt
+/spec/dummy/client/node_modules
+/spec/dummy/app/assets/webpack/
+/spec/dummy/coverage/
+/spec/react_on_rails/dummy-for-generators/
+
+# RVM
+.ruby-version
+.ruby-gemset
+
+# NVM
+.nvmrc
+
+node_modules
+
+/node_package/lib
+
+yarn-debug.*
+spec/dummy/client/yarn-debug.log*
+npm-debug.*
+spec/dummy/client/npm-debug.log*
+
+/gen-examples
+
+.DS_Store

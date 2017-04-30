@@ -1,0 +1,15 @@
+# Directories to ignore
+app/*
+gen-examples/*
+lib/*
+node_package/"
+rakelib/*
+script/*
+spec/*
+
+# files in repo root to ignore
+Gemfile
+package.json
+Rakefile
+react_on_rails.gemspec
+ruby-lint.yml

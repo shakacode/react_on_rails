@@ -1,0 +1,73 @@
+<%= render "header" %>
+
+<%= react_component("HelloWorld", props: @app_props_server_render, prerender: true, trace: true, id: "HelloWorld-react-component-0") %>
+<hr/>
+
+<h1>React Rails Server Rendering</h1>
+<p>
+  This example demonstrates server side rendering. The only difference from client rendering is that
+  the <code>prerender</code> option is true.<br/><br/>
+  The source HTML of this page will only show a DIV with an ID matching HelloWorld.<br/>
+  <pre>
+    <%= '<div id="HelloWorld-react-component-0"><div data-reactid=".uwwa3eq70g" data-react-checksum="-1318287018">' %>
+    <%= '<h3 data-reactid=".uwwa3eq70g.0"><span data-reactid=".uwwa3eq70g.0.0">Hello, </span><span data-reactid=".uwwa3eq70g.0.1">' %>
+    <%= 'Mr. Server Side Rendering</span><span data-reactid=".uwwa3eq70g.0.2">!</span></h3><p data-reactid=".uwwa3eq70g.1">' %>
+    <%= '<span data-reactid=".uwwa3eq70g.1.0">Say hello to:</span>' %>
+    <%= '<input type="text" value="Mr. Server Side Rendering" data-reactid=".uwwa3eq70g.1.1"></p></div></div>' %>
+    <%= '<script>' %>
+    <%= 'console.log.apply(console, ["[SERVER] RENDERED HelloWorld with data_variable __helloWorldData0__ to dom node with id: HelloWorld-react-component-0"]);' %>
+    <%= 'console.log.apply(console, ["[SERVER] HelloWorld demonstrating a call to console.log in spec/dummy/client/app/components/HelloWorld.jsx:18"]);' %>
+    <%= '/script>' %>
+  </pre>
+  Compare this to the HTML created for client-only
+  rendering: <%= link_to "Hello World Component Client Rendered", client_side_hello_world_path %>
+  <br/>
+  Be sure to open up your browser console. You'll see something like:
+  <pre>
+    [SERVER] RENDERED HelloWorld with data_variable __helloWorldData0__ to dom node with id: HelloWorld-react-component-0
+    [SERVER] HelloWorld demonstrating a call to console.log in spec/dummy/client/app/components/HelloWorld.jsx:18
+    RENDERED HelloWorld with data_variable __helloWorldData0__ to dom node with id: HelloWorld-react-component-0
+    HelloWorld demonstrating a call to console.log in spec/dummy/client/app/components/HelloWorld.jsx:18
+  </pre>
+  Notice how any console essages on the server are prefixed with [SERVER].<br/>
+  Also note on your server console, you'll see messages like this:
+  <pre>
+    [react_on_rails] RENDERED HelloWorld with data_variable __helloWorldData0__ to dom node with id: HelloWorld-react-component-0
+    [react_on_rails] HelloWorld demonstrating a call to console.log in spec/dummy/client/app/components/HelloWorld.jsx:18
+  </pre>
+</p>
+
+<hr/>
+<h2>Setup</h2>
+<ol>
+  <li>
+    Create component source: spec/dummy/client/app/components/HelloWorld.jsx
+  </li>
+  <li>
+    Expose the HelloWorld Component on the client side:
+    spec/dummy/client/app/startup/clientRegistration.jsx
+    <br/>
+    <pre>
+      import HelloWorld from '../components/HelloWorld';
+      import ReactOnRails from 'react-on-rails';
+      ReactOnRails.register({ HelloWorld });
+    </pre>
+  </li>
+  <li>
+    Expose the HelloWorld Component on the server side:
+    spec/dummy/client/app/startup/serverRegistration.jsx
+    <br/>
+    <pre>
+    import HelloWorld from '../components/HelloWorld';
+    global.HelloWorld = HelloWorld;
+    </pre>
+  </li>
+  <li>
+    Place the component on the view: spec/dummy/app/views/pages/client_side_hello_world.html.erb
+    <br/>
+    <pre>
+    <%%= react_component("HelloWorld", props: @app_props_server_render, prerender: true, trace: true, id: "HelloWorld-react-component-0") %>
+    </pre>
+  </li>
+</ol>
+<hr/>

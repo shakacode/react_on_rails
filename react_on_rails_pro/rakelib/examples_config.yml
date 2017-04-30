@@ -1,0 +1,14 @@
+example_type_data:
+  -
+    name: basic
+    generator_options: ""
+  -
+    name: basic-server-rendering
+    generator_options: --example-server-rendering
+  -
+    name: redux
+    generator_options: --redux
+  -
+    name: redux-server-rendering
+    generator_options: --redux --example-server-rendering
+
