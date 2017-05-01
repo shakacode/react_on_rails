@@ -6,3 +6,6 @@ rails-client-assets: sh -c 'yarn run build:dev:client'
 
 # Build server assets, watching for changes. Remove if not server rendering.
 rails-server-assets: sh -c 'yarn run build:dev:server'
+
+# Start Node server for server rendering.
+node-renderer: yarn run node-renderer

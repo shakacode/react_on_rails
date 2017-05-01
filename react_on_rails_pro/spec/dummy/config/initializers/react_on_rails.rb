@@ -41,7 +41,7 @@ ReactOnRails.configure do |config|
   # `render_component` view helper method.
   ################################################################################
   # default is false
-  config.prerender = false
+  config.prerender = true
 
   # default is true for development, off otherwise
   config.trace = Rails.env.development?
