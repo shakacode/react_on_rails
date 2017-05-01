@@ -1,0 +1,10 @@
+{
+    "name": "react-on-rails-renderer",
+    "version": "0.0.0",
+    "private": true,
+    "scripts": {
+        "start": "node ./server.js -s server-bundle.js"
+    },
+    "dependencies": {
+    }
+}

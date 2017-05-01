@@ -91,7 +91,7 @@ ReactOnRails.configure do |config|
   config.rendering_extension = RenderingExtension
 
   # The server render method - either ExecJS or NodeJS
-  config.server_render_method = "ExecJS"
+  config.server_render_method = "NodeJS"
 
   # Client js uses assets not digested by rails.
   # For any asset matching this regex, a file is copied to the correct path to have a digest.
