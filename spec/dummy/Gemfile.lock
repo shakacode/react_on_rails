@@ -1,3 +1,13 @@
+PATH
+  remote: ../..
+  specs:
+    react_on_rails_renderer (0.0.1)
+      addressable
+      connection_pool
+      execjs (~> 2.5)
+      rails (>= 3.2)
+      rainbow (~> 2.1)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -304,6 +314,7 @@ DEPENDENCIES
   rails
   rails-controller-testing
   react_on_rails
+  react_on_rails_renderer!
   rspec-rails
   rspec-retry
   rubocop

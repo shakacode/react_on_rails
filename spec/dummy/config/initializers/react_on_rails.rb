@@ -90,11 +90,33 @@ ReactOnRails.configure do |config|
   # called `custom_context(view_context)` and return a Hash.
   config.rendering_extension = RenderingExtension
 
-  # The server render method - either ExecJS or NodeJS
-  config.server_render_method = "NodeJS"
+  # The server render method - either ExecJS or NodeJS or NodeJSHttp
+  config.server_render_method = "NodeJSHttp"
 
   # Client js uses assets not digested by rails.
   # For any asset matching this regex, a file is copied to the correct path to have a digest.
   # To disable creating digested assets, set this parameter to nil.
   config.symlink_non_digested_assets_regex = /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/
+end
+
+# TODO: It is better to add additional condition to react_on_rails gem instead of this monkey patch:
+module ReactOnRails
+  module ServerRenderingPool
+    class << self
+      def pool
+        if ReactOnRails.configuration.server_render_method == "NodeJS"
+          ServerRenderingPool::Node
+        elsif ReactOnRails.configuration.server_render_method == "NodeJSHttp"
+          ReactOnRailsRenderer::RenderingPool
+        else
+          ServerRenderingPool::Exec
+        end
+      end
+
+      # rubocop:disable Style/MethodMissing
+      def method_missing(sym, *args, &block)
+        pool.send sym, *args, &block
+      end
+    end
+  end
 end
