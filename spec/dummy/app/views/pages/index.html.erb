@@ -1,1 +1,2 @@
-<%= react_component("HelloWorld", props: @app_props_server_render, trace: true, id: "HelloWorld-react-component-1") %>
+<%= redux_store("SharedReduxStore", props: @app_props_server_render) %>
+<%= react_component("ReduxSharedStoreApp", props: @app_props_server_render, prerender: true, trace: true, id: "ReduxApp-react-component-0") %>

@@ -1,7 +1,7 @@
 import 'babel-polyfill';
 import 'es5-shim';
 import ReactOnRails from 'react-on-rails';
-import HelloWorld from '../components/HelloWorld';
+import ReduxSharedStoreApp from './ClientReduxSharedStoreApp';
 import SharedReduxStore from '../stores/SharedReduxStore';
 
 ReactOnRails.setOptions({
@@ -9,7 +9,7 @@ ReactOnRails.setOptions({
 });
 
 ReactOnRails.register({
-  HelloWorld,
+  ReduxSharedStoreApp,
 });
 
 ReactOnRails.registerStore({
