@@ -5,11 +5,7 @@ module ReactOnRailsRenderer
   class RenderingPool
     # This implementation of the rendering pool uses NodeJS to execute javasript code
     def self.reset_pool
-      options = {
-        size: ReactOnRails.configuration.server_renderer_pool_size,
-        timeout: ReactOnRails.configuration.server_renderer_timeout
-      }
-      @js_context_pool = ConnectionPool.new(options) { create_js_context }
+      # TODO: We should be able to reload bundle on Express server here.
     end
 
     def self.reset_pool_if_server_bundle_was_modified
@@ -56,26 +52,14 @@ module ReactOnRailsRenderer
         uri = URI.parse("http://localhost:3000")
         header = {'Content-Type': 'application/json'}
         request = Net::HTTP::Post.new(uri.request_uri, header)
-        p '!!!!!!!!!!!!!!!!!!!!!!!!'
-        p js_code
+
         request.body = {code: js_code}.to_json
+
         response = Net::HTTP.start(uri.hostname, uri.port) do |http|
           http.request(request)
         end
-        response.body
-      end
 
-      def create_js_context
-        begin
-          client = UNIXSocket.new("client/node/node.sock")
-          client.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
-        rescue StandardError => e
-          Rails.logger.error("Unable to connect to socket: client/node/node.sock. \
-            Make sure node server is up and running.")
-          Rails.logger.error(e)
-          raise e
-        end
-        client
+        response.body
       end
     end
   end
