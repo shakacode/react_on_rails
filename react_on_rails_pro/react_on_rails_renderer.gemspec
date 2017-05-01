@@ -1,11 +1,11 @@
 # coding: utf-8
 lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'react_on_rails/version'
+require 'react_on_rails_renderer/version'
 
 Gem::Specification.new do |s|
-  s.name          = "react_on_rails"
-  s.version       = ReactOnRails::VERSION
+  s.name          = "react_on_rails_renderer"
+  s.version       = ReactOnRailsRenderer::VERSION
   s.authors       = ["Justin Gordon"]
   s.email         = ["justin@shakacode.com"]
 
