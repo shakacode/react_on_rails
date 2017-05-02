@@ -6,6 +6,10 @@
   "directories": {
     "doc": "docs"
   },
+  "dependencies": {
+    "body-parser": "^1.17.1",
+    "express": "^4.15.2"
+  },
   "devDependencies": {
     "babel-cli": "^6.24.1",
     "babel-core": "^6.24.1",
@@ -21,28 +25,18 @@
     "babel-types": "^6.24.1",
     "babelify": "^7.3.0",
     "blue-tape": "^1.0.0",
-    "create-react-class": "^15.5.2",
     "eslint": "^3.19.0",
     "eslint-config-shakacode": "^14.1.1",
     "eslint-plugin-import": "^2.2.0",
     "eslint-plugin-jsx-a11y": "^4.0.0",
-    "eslint-plugin-react": "^6.10.3",
     "flow-bin": "^0.43.1",
     "jsdom": "^9.12.0",
-    "prop-types": "^15.5.7",
-    "react": "^15.5.4",
-    "react-dom": "^15.5.4",
-    "react-transform-hmr": "^1.0.4",
-    "redux": "^3.6.0",
     "release-it": "^2.7.1",
     "tap-spec": "^4.1.1",
-    "tape": "^4.6.3",
-    "webpack": "^2.3.3"
+    "tape": "^4.6.3"
   },
   "peerDependencies": {
-    "babel-runtime": ">= 6",
-    "react": ">= 0.14",
-    "react-dom": ">= 0.14"
+    "babel-runtime": ">= 6"
   },
   "files": [
     "node_package/src"
@@ -84,9 +78,5 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails#readme",
-  "dependencies": {
-    "body-parser": "^1.17.1",
-    "express": "^4.15.2"
-  }
+  "homepage": "https://github.com/shakacode/react_on_rails#readme"
 }
