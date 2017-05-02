@@ -1,8 +1,8 @@
 {
-  "name": "react-on-rails",
-  "version": "7.0.4",
-  "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
-  "main": "node_package/lib/ReactOnRails.js",
+  "name": "react-on-rails-renderer",
+  "version": "0.0.1",
+  "description": "react-on-rails-renderer JavaScript for react_on_rails_renderer Ruby gem",
+  "main": "node_package/src/ReactOnRailsRenderer.js",
   "directories": {
     "doc": "docs"
   },
@@ -45,7 +45,7 @@
     "react-dom": ">= 0.14"
   },
   "files": [
-    "node_package/lib"
+    "node_package/src"
   ],
   "scripts": {
     "test": "babel-tape-runner -r node_package/tests/helpers/test_helper.js node_package/tests/*.js | tap-spec",
@@ -58,6 +58,7 @@
     "flow": "flow check node_package",
     "lint": "yarn run eslint && yarn run flow",
     "check": "yarn run lint && yarn run flow && yarn run test",
+    "start": "node node_package/src/ReactOnRailsRenderer.js -s server-bundle.js",
     "prerelease": "yarn run check && yarn run clean && yarn run build",
     "release:patch": "node_package/scripts/release patch",
     "release:minor": "node_package/scripts/release minor",
@@ -83,5 +84,9 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails#readme"
+  "homepage": "https://github.com/shakacode/react_on_rails#readme",
+  "dependencies": {
+    "body-parser": "^1.17.1",
+    "express": "^4.15.2"
+  }
 }
