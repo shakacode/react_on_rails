@@ -1,41 +1,52 @@
-const fs = require('fs');
-var bodyParser = require('body-parser');
-var express = require('express');
-var path = require('path');
+const bodyParser = require('body-parser');
+const express = require('express');
+const path = require('path');
+const cluster = require('cluster');
 const bundleWatcher = require('./bundleWatcher');
 
+if (cluster.isMaster) {
+  // Count the machine's CPUs:
+  const cpuCount = require('os').cpus().length;
 
-const bundlePath = path.resolve(__dirname, '../../spec/dummy/app/assets/webpack/');
-let bundleFileName = 'server-bundle.js';
-let currentArg;
-
-process.argv.forEach((val) => {
-  if (val[0] === '-') {
-    currentArg = val.slice(1);
-    return;
+  // Create a worker for each CPU except one that used for master process:
+  for (let i = 0; i < cpuCount; i += 1) {
+    cluster.fork();
   }
 
-  if (currentArg === 's') {
-    bundleFileName = val;
-  }
-});
+  // Listen for dying workers:
+  cluster.on('exit', (worker) => {
+    // Replace the dead worker:
+    console.log('Worker %d died :(', worker.id);
+    cluster.fork();
+  });
+} else {
+  const bundlePath = path.resolve(__dirname, '../../spec/dummy/app/assets/webpack/');
+  let bundleFileName = 'server-bundle.js';
+  let currentArg;
 
-bundleWatcher(bundlePath, bundleFileName);
+  process.argv.forEach((val) => {
+    if (val[0] === '-') {
+      currentArg = val.slice(1);
+      return;
+    }
 
-var app = express();
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+    if (currentArg === 's') {
+      bundleFileName = val;
+    }
+  });
 
-app.post('/', function (req, res) {
-  const result = eval(req.body.code);
-  res.send(result);
-})
+  bundleWatcher(bundlePath, bundleFileName);
 
-app.listen(3000, function () {
-  console.log('Node renderer listening on port 3000!')
-})
+  const app = express();
+  app.use(bodyParser.urlencoded({ extended: true }));
+  app.use(bodyParser.json());
 
-process.on('SIGINT', () => {
-  unixServer.close();
-  process.exit();
-});
+  app.post('/', function (req, res) {
+    const result = eval(req.body.code);
+    res.send(result);
+  })
+
+  app.listen(3000, function () {
+    console.log('Node renderer listening on port 3000!')
+  })
+}
