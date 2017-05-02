@@ -1,7 +1,7 @@
 const bodyParser = require('body-parser');
 const express = require('express');
-const path = require('path');
 const cluster = require('cluster');
+const configBuilder = require('./configBuilder');
 const bundleWatcher = require('./bundleWatcher');
 
 if (cluster.isMaster) {
@@ -20,21 +20,7 @@ if (cluster.isMaster) {
     cluster.fork();
   });
 } else {
-  const bundlePath = path.resolve(__dirname, '../../spec/dummy/app/assets/webpack/');
-  let bundleFileName = 'server-bundle.js';
-  let currentArg;
-
-  process.argv.forEach((val) => {
-    if (val[0] === '-') {
-      currentArg = val.slice(1);
-      return;
-    }
-
-    if (currentArg === 's') {
-      bundleFileName = val;
-    }
-  });
-
+  const { bundlePath, bundleFileName, port } = configBuilder();
   bundleWatcher(bundlePath, bundleFileName);
 
   const app = express();
@@ -44,9 +30,9 @@ if (cluster.isMaster) {
   app.post('/', (req, res) => {
     const result = eval(req.body.code);
     res.send(result);
-  })
+  });
 
-  app.listen(3000, function () {
-    console.log(`Node renderer worker #${cluster.worker.id} listening on port 3000!`);
-  })
+  app.listen(port, () => {
+    console.log(`Node renderer worker #${cluster.worker.id} listening on port ${port}!`);
+  });
 }
