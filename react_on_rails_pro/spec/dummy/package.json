@@ -19,7 +19,7 @@
     "build:server": "(cd client && yarn run build:server --silent)",
     "build:dev:client": "(cd client && yarn run build:dev:client --silent)",
     "build:dev:server": "(cd client && yarn run build:dev:server --silent)",
-    "node-renderer": "(cd client/node && yarn run start)",
+    "node-renderer": "(cd ../../ && yarn run start)",
     "hot-assets": "(cd client && yarn run hot-assets)"
   },
   "repository": {

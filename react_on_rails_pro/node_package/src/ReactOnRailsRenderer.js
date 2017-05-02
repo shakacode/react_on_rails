@@ -1,10 +1,11 @@
 const fs = require('fs');
 var bodyParser = require('body-parser');
 var express = require('express');
+var path = require('path');
 
-const bundlePath = '../../app/assets/webpack/';
+
+const bundlePath = path.resolve(__dirname, '../../spec/dummy/app/assets/webpack/');
 let bundleFileName = 'server-bundle.js';
-
 let currentArg;
 
 process.argv.forEach((val) => {
@@ -20,7 +21,7 @@ process.argv.forEach((val) => {
 
 function loadBundle() {
   /* eslint-disable */
-  require(bundlePath + bundleFileName);
+  require(bundlePath + '/' + bundleFileName);
   /* eslint-enable */
   console.log(`Loaded server bundle: ${bundlePath}${bundleFileName}`);
 }
