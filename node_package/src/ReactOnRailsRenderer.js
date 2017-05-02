@@ -2,6 +2,7 @@ const fs = require('fs');
 var bodyParser = require('body-parser');
 var express = require('express');
 var path = require('path');
+const bundleWatcher = require('./bundleWatcher');
 
 
 const bundlePath = path.resolve(__dirname, '../../spec/dummy/app/assets/webpack/');
@@ -19,28 +20,7 @@ process.argv.forEach((val) => {
   }
 });
 
-function loadBundle() {
-  /* eslint-disable */
-  require(bundlePath + '/' + bundleFileName);
-  /* eslint-enable */
-  console.log(`Loaded server bundle: ${bundlePath}${bundleFileName}`);
-}
-
-try {
-  fs.mkdirSync(bundlePath);
-} catch (e) {
-  if (e.code !== 'EEXIST') {
-    throw e;
-  } else {
-    loadBundle();
-  }
-}
-
-fs.watchFile(bundlePath + bundleFileName, (curr) => {
-  if (curr && curr.blocks && curr.blocks > 0) {
-    loadBundle();
-  }
-});
+bundleWatcher(bundlePath, bundleFileName);
 
 var app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
