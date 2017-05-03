@@ -20,7 +20,7 @@ module.exports = {
   entry: {
     // This will contain the app entry points defined by
     // webpack.client.rails.hot.config and webpack.client.rails.build.config
-    app: [
+    'app-bundle': [
       './app/startup/clientRegistration',
     ],
   },
@@ -40,7 +40,7 @@ module.exports = {
 
     // https://webpack.js.org/guides/code-splitting-libraries/#implicit-common-vendor-chunk
     new webpack.optimize.CommonsChunkPlugin({
-      name: 'vendor',
+      name: 'vendor-bundle',
       minChunks(module) {
         // this assumes your vendor imports exist in the node_modules directory
         return module.context && module.context.indexOf('node_modules') !== -1;

@@ -11,7 +11,6 @@ include ReactOnRails::TaskHelpers
 
 namespace :run_rspec do
   spec_dummy_dir = File.join("spec", "dummy")
-  spec_dummy_client_dir = File.join("spec", "dummy", "client")
 
   desc "Run RSpec for top level only"
   task :gem do
@@ -21,14 +20,12 @@ namespace :run_rspec do
   desc "Runs dummy rspec with turbolinks"
   task dummy: ["dummy_apps:dummy_app"] do
     clean_gen_assets(spec_dummy_dir)
-    gen_assets(spec_dummy_client_dir)
     run_tests_in(spec_dummy_dir)
   end
 
   desc "Runs dummy rspec without turbolinks"
   task dummy_no_turbolinks: ["dummy_apps:dummy_app"] do
     clean_gen_assets(spec_dummy_dir)
-    gen_assets(spec_dummy_client_dir)
     run_tests_in(spec_dummy_dir,
                  env_vars: "DISABLE_TURBOLINKS=TRUE",
                  command_name: "dummy_no_turbolinks")
@@ -38,7 +35,6 @@ namespace :run_rspec do
   desc "Runs dummy respec with turbolinks 2"
   task dummy_turbolinks_2: ["dummy_apps:dummy_app_with_turbolinks_2"] do
     clean_gen_assets(spec_dummy_dir)
-    gen_assets(spec_dummy_client_dir)
     run_tests_in(spec_dummy_dir, env_vars:
       "ENABLE_TURBOLINKS_2=TRUE BUNDLE_GEMFILE=#{dummy_app_dir}/Gemfile")
   end
@@ -118,9 +114,4 @@ end
 def clean_gen_assets(dir)
   path = calc_path(dir)
   sh_in_dir(path.realpath, "yarn run build:clean")
-end
-
-def gen_assets(dir)
-  path = calc_path(dir)
-  sh_in_dir(path.realpath, "yarn run build:test")
 end

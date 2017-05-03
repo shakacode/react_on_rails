@@ -18,7 +18,7 @@ config.entry.app.push(
 );
 
 config.output = {
-  filename: '[name]-bundle.js',
+  filename: '[name].js',
   path: resolve('..', paths.output, paths.assets),
   publicPath,
 };

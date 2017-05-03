@@ -9,12 +9,12 @@
 
   <%= yield :head %>
 
-  <%= stylesheet_pack_tag(static: 'app',
+  <%= stylesheet_pack_tag(static: 'app-bundle',
                           media: 'all',
                           'data-turbolinks-track': true) %>
 
-  <%= javascript_pack_tag('vendor', 'data-turbolinks-track': true) %>)
-  <%= javascript_pack_tag('app', 'data-turbolinks-track': true) %>)
+  <%= javascript_pack_tag('vendor-bundle', 'data-turbolinks-track': true) %>
+  <%= javascript_pack_tag('app-bundle', 'data-turbolinks-track': true) %>
 
   <%= csrf_meta_tags %>
 </head>

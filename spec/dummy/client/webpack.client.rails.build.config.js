@@ -14,7 +14,7 @@ const { paths, publicPath } = webpackConfigLoader(configPath);
 const devBuild = process.env.NODE_ENV !== 'production';
 
 config.output = {
-  filename: '[name]-bundle.js',
+  filename: '[name].js',
   path: resolve('..', paths.output, paths.assets),
   publicPath,
 },
@@ -98,7 +98,7 @@ config.module.rules.push(
 
 config.plugins.push(
   new ExtractTextPlugin({
-    filename: '[name]-bundle.css',
+    filename: '[name].css',
     allChunks: true
   })
 );

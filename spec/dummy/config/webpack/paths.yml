@@ -3,7 +3,6 @@ default: &default
   output: public
   assets: webpack
   manifest: manifest.json
-  node_modules: client/node_modules
   source: client/app
 
 development:
