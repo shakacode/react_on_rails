@@ -98,7 +98,7 @@ module ReactOnRails
       webpack_generated_files: [],
       rendering_extension: nil,
       server_render_method: "",
-      symlink_non_digested_assets_regex: /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/,
+      symlink_non_digested_assets_regex: nil,
       npm_build_test_command: "",
       i18n_dir: "",
       i18n_yml_dir: "",
