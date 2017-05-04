@@ -14,6 +14,7 @@ exports.run = function run() {
   app.use(bodyParser.json());
 
   app.post('/', (req, res) => {
+    console.log(`worker #${cluster.worker.id} received render request with with code ${req.body.code}`);
     const result = runInVM(req.body.code);
     res.send(result);
   });
@@ -21,4 +22,4 @@ exports.run = function run() {
   app.listen(port, () => {
     console.log(`Node renderer worker #${cluster.worker.id} listening on port ${port}!`);
   });
-}
+};
