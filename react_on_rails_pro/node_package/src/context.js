@@ -1,3 +1,8 @@
+/**
+ * Hold VM2 virtual machine for rendering code in isolated context.
+ * @module vm
+ */
+
 const { NodeVM } = require('vm2');
 const path = require('path');
 
@@ -13,9 +18,6 @@ exports.buildVM = function(bundlePath, bundleFileName) {
   });
 
   console.log('BUILD VM')
-  //const bundleFullPath = path.join(bundlePath, bundleFileName);
-  //vm.run(`require("${bundleFullPath}");`);
-  //console.log(vm.run(`console.log(global)`));
   return vm;
 }
 

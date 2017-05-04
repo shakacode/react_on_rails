@@ -5,12 +5,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const { buildVM } = require('./context');
 
 function loadBundle(bundlePath, bundleFileName) {
-  /* eslint-disable */
-  // delete require.cache[path.join(bundlePath, bundleFileName)];
-  require(path.join(bundlePath, bundleFileName));
-  /* eslint-enable */
+  buildVM(bundlePath, bundleFileName);
   console.log(`Loaded server bundle: ${bundlePath}${bundleFileName}`);
 }
 

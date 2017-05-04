@@ -24,15 +24,12 @@ if (cluster.isMaster) {
 
   const { bundlePath, bundleFileName, port } = configBuilder();
   bundleWatcher(bundlePath, bundleFileName);
-  buildVM(bundlePath, bundleFileName);
 
   const app = express();
   app.use(bodyParser.urlencoded({ extended: true }));
   app.use(bodyParser.json());
 
   app.post('/', (req, res) => {
-    //console.log(req.body.code)
-    //console.log('zzzzzzzzzzzzzz', vm.run('module.exports = 1'));
     const result = runInVM(req.body.code);
     res.send(result);
   });
