@@ -1,6 +1,6 @@
 /**
  * Hold vm2 virtual machine for rendering code in isolated context.
- * @module vm
+ * @module worker/vm
  */
 
 const { NodeVM } = require('vm2');

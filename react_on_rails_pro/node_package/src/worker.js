@@ -1,3 +1,8 @@
+/**
+ * Entry point for worker process that handles requests.
+ * @module worker
+ */
+
 const cluster = require('cluster');
 const express = require('express');
 const bodyParser = require('body-parser');

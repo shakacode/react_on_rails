@@ -1,6 +1,6 @@
 /**
  * Reads CLI arguments and build the config.
- * @module configBuilder
+ * @module worker/configBuilder
  */
 
 const path = require('path');
