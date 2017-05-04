@@ -20,7 +20,7 @@ if (cluster.isMaster) {
     cluster.fork();
   });
 } else {
-  const { buildVM, runInVM } = require('./context');
+  const { runInVM } = require('./vm');
 
   const { bundlePath, bundleFileName, port } = configBuilder();
   bundleWatcher(bundlePath, bundleFileName);
