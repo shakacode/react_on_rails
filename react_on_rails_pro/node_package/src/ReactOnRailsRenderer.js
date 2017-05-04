@@ -1,61 +1,38 @@
-const fs = require('fs');
-var bodyParser = require('body-parser');
-var express = require('express');
-var path = require('path');
+const bodyParser = require('body-parser');
+const express = require('express');
+const cluster = require('cluster');
+const configBuilder = require('./configBuilder');
+const bundleWatcher = require('./bundleWatcher');
 
+if (cluster.isMaster) {
+  // Count available CPUs for worker processes:
+  const workerCpuCount = require('os').cpus().length - 1 || 1;
 
-const bundlePath = path.resolve(__dirname, '../../spec/dummy/app/assets/webpack/');
-let bundleFileName = 'server-bundle.js';
-let currentArg;
-
-process.argv.forEach((val) => {
-  if (val[0] === '-') {
-    currentArg = val.slice(1);
-    return;
+  // Create a worker for each CPU except one that used for master process:
+  for (let i = 0; i < workerCpuCount; i += 1) {
+    cluster.fork();
   }
 
-  if (currentArg === 's') {
-    bundleFileName = val;
-  }
-});
+  // Listen for dying workers:
+  cluster.on('exit', (worker) => {
+    // Replace the dead worker:
+    console.log('Worker %d died :(', worker.id);
+    cluster.fork();
+  });
+} else {
+  const { bundlePath, bundleFileName, port } = configBuilder();
+  bundleWatcher(bundlePath, bundleFileName);
 
-function loadBundle() {
-  /* eslint-disable */
-  require(bundlePath + '/' + bundleFileName);
-  /* eslint-enable */
-  console.log(`Loaded server bundle: ${bundlePath}${bundleFileName}`);
+  const app = express();
+  app.use(bodyParser.urlencoded({ extended: true }));
+  app.use(bodyParser.json());
+
+  app.post('/', (req, res) => {
+    const result = eval(req.body.code);
+    res.send(result);
+  });
+
+  app.listen(port, () => {
+    console.log(`Node renderer worker #${cluster.worker.id} listening on port ${port}!`);
+  });
 }
-
-try {
-  fs.mkdirSync(bundlePath);
-} catch (e) {
-  if (e.code !== 'EEXIST') {
-    throw e;
-  } else {
-    loadBundle();
-  }
-}
-
-fs.watchFile(bundlePath + bundleFileName, (curr) => {
-  if (curr && curr.blocks && curr.blocks > 0) {
-    loadBundle();
-  }
-});
-
-var app = express();
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
-
-app.post('/', function (req, res) {
-  const result = eval(req.body.code);
-  res.send(result);
-})
-
-app.listen(3000, function () {
-  console.log('Node renderer listening on port 3000!')
-})
-
-process.on('SIGINT', () => {
-  unixServer.close();
-  process.exit();
-});
