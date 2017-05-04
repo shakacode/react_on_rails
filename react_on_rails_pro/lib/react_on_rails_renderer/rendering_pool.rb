@@ -72,8 +72,8 @@ module ReactOnRailsRenderer
 
       def update_bundle
         RestClient.post(
-          'http://localhost:3000/bundle',
-          :name_of_file_param => File.new(ReactOnRails::Utils.default_server_bundle_js_file_path))
+          "http://localhost:3000/bundle",
+          bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path))
       end
     end
   end

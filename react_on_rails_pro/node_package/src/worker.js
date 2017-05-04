@@ -5,8 +5,7 @@
 
 const cluster = require('cluster');
 const express = require('express');
-const bodyParser = require('body-parser');
-var bb = require('express-busboy');
+var busBoy = require('express-busboy');
 const { runInVM } = require('./worker/vm');
 const configBuilder = require('./worker/configBuilder');
 const bundleWatcher = require('./worker/bundleWatcher');
@@ -16,12 +15,10 @@ exports.run = function run() {
   bundleWatcher(bundlePath, bundleFileName);
 
   const app = express();
-  //app.use(bodyParser.urlencoded({ extended: true }));
-  //app.use(bodyParser.json());
-  bb.extend(app, {
+  busBoy.extend(app, {
     upload: true,
+    path: 'tmp/uploads',
   });
-
 
   app.post('/bundle', (req, res) => {
     console.log(`worker #${cluster.worker.id} received bundle update request`);
