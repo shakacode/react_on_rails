@@ -20,15 +20,20 @@ if (cluster.isMaster) {
     cluster.fork();
   });
 } else {
+  const { buildVM, runInVM } = require('./context');
+
   const { bundlePath, bundleFileName, port } = configBuilder();
   bundleWatcher(bundlePath, bundleFileName);
+  buildVM(bundlePath, bundleFileName);
 
   const app = express();
   app.use(bodyParser.urlencoded({ extended: true }));
   app.use(bodyParser.json());
 
   app.post('/', (req, res) => {
-    const result = eval(req.body.code);
+    //console.log(req.body.code)
+    //console.log('zzzzzzzzzzzzzz', vm.run('module.exports = 1'));
+    const result = runInVM(req.body.code);
     res.send(result);
   });
 
