@@ -50,16 +50,17 @@ module ReactOnRailsRenderer
 
       def eval_js(js_code)
         uri = URI.parse("http://localhost:3000")
-        header = {'Content-Type': 'application/json'}
+        header = { 'Content-Type': 'application/json' }
         request = Net::HTTP::Post.new(uri.request_uri, header)
 
-        request.body = {code: js_code}.to_json
+        request.body = {renderingRequest: js_code}.to_json
 
         response = Net::HTTP.start(uri.hostname, uri.port) do |http|
           http.request(request)
         end
 
-        response.body
+        parsed_response = JSON.parse(response.body)
+        parsed_response["renderedHtml"]
       end
     end
   end
