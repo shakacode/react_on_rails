@@ -51,7 +51,7 @@ cd test-react-on-rails
 Add **React On Rails** gem to your Gemfile (`vim Gemfile` or `nano Gemfile` or in IDE):
 
 ```
-gem 'react_on_rails', '~>6'         # use latest gem version > 6
+gem 'react_on_rails', '~>7'         # use latest gem version > 7
 ```
 
 ![02](https://cloud.githubusercontent.com/assets/20628911/17464919/3c2d74c2-5cf2-11e6-8704-a84958832fbb.png)
@@ -83,7 +83,8 @@ foreman start -f Procfile.dev
 
 ![04](https://cloud.githubusercontent.com/assets/20628911/17464921/3c2fdb40-5cf2-11e6-9343-6afa53593a70.png)
 
-Visit http://localhost:3000/hello_world and see your **React On Rails** app running!
+Visit http://localhost:5000/hello_world and see your **React On Rails** app running!
+Note, foreman defaults to PORT 5000 unless you set the value of PORT in your environment.
 
 ![05](https://cloud.githubusercontent.com/assets/20628911/17464920/3c2e8ae2-5cf2-11e6-9e30-5ec5f9e2cbc6.png)
 
