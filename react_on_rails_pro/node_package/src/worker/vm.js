@@ -24,6 +24,21 @@ exports.buildVM = function buildVM(bundlePath, bundleFileName) {
   return vm;
 };
 
+exports.buildVMNew = function buildVMNew(filepath) {
+  vm = new NodeVM({
+    require: {
+      external: true,
+      import: [path.resolve(__dirname, '../../../', filepath)],
+      context: 'sandbox',
+    },
+  });
+
+  console.log(`Built VM for worker #${cluster.worker.id}`);
+  console.log('Required objects now in VM sandbox context:', vm.run('module.exports = ReactOnRails'));
+  console.log('Required objects should not leak to the global context:', global.ReactOnRails);
+  return vm;
+};
+
 exports.runInVM = function runInVM(code) {
   return vm.run(`module.exports = ${code}`);
 };
