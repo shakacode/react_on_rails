@@ -21,16 +21,27 @@ exports.run = function run() {
     path: 'tmp/uploads',
   });
 
+  // Listen for master's messages:
+  process.on('message', function(msg) {
+    switch (msg.command) {
+    case 'update_bundle':
+      console.log(`worker #${cluster.worker.id} received bundle update message from master`);
+      buildVMNew(msg.file);
+    }
+  });
+
   app.post('/bundle', (req, res) => {
     console.log(`worker #${cluster.worker.id} received bundle update request`);
-    console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!', req.files)
 
-    /*fs.readFile(req.files.bundle.file, 'utf8', function (err,data) {
-      if (err) {
-        return console.log(err);
-      }
-    });*/
+    // Update VM for current worker:
     buildVMNew(req.files.bundle.file);
+
+    // Tell master to broadcast VM update for other workers:
+    process.send({
+      command: 'update_bundle',
+      file: req.files.bundle.file,
+      from: process.pid,
+    });
 
     res.send('blah');
   });
