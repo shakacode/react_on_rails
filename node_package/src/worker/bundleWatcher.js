@@ -1,6 +1,6 @@
 /**
  * Loads app server bundle and watches for updates.
- * @module bundleWatcher
+ * @module worker/bundleWatcher
  */
 
 const fs = require('fs');

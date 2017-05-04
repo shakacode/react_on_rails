@@ -1,3 +1,8 @@
+/**
+ * Entry point for master process that forks workers.
+ * @module master
+ */
+
 const os = require('os');
 const cluster = require('cluster');
 
