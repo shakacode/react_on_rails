@@ -7,7 +7,6 @@ module ReactOnRailsRenderer
     # This implementation of the rendering pool uses NodeJS to execute javasript code
     def self.reset_pool
       # No need for this method
-      update_bundle
     end
 
     def self.reset_pool_if_server_bundle_was_modified
@@ -17,6 +16,7 @@ module ReactOnRailsRenderer
       return if @server_bundle_timestamp == file_mtime
       #ReactOnRails::ServerRenderingPool.reset_pool
       p '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Gem want to reset the pool'
+      update_bundle
       @server_bundle_timestamp = file_mtime
     end
 
