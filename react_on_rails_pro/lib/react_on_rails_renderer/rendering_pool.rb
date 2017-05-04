@@ -1,16 +1,23 @@
 require 'net/http'
 require 'uri'
+require 'rest_client'
 
 module ReactOnRailsRenderer
   class RenderingPool
     # This implementation of the rendering pool uses NodeJS to execute javasript code
     def self.reset_pool
-      # TODO: We should be able to reload bundle on Express server here.
+      # No need for this method
+      update_bundle
     end
 
     def self.reset_pool_if_server_bundle_was_modified
-      # No need for this method, the server bundle is automatically reset by node when changes
-      # Empty implementation to conform to ServerRenderingPool interface
+      return unless ReactOnRails.configuration.development_mode
+      file_mtime = File.mtime(ReactOnRails::Utils.default_server_bundle_js_file_path)
+      @server_bundle_timestamp ||= file_mtime
+      return if @server_bundle_timestamp == file_mtime
+      #ReactOnRails::ServerRenderingPool.reset_pool
+      p '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Gem want to reset the pool'
+      @server_bundle_timestamp = file_mtime
     end
 
     # js_code: JavaScript expression that returns a string.
@@ -49,7 +56,7 @@ module ReactOnRailsRenderer
       end
 
       def eval_js(js_code)
-        uri = URI.parse("http://localhost:3000")
+        uri = URI.parse("http://localhost:3000/render")
         header = { 'Content-Type': 'application/json' }
         request = Net::HTTP::Post.new(uri.request_uri, header)
 
@@ -61,6 +68,12 @@ module ReactOnRailsRenderer
 
         parsed_response = JSON.parse(response.body)
         parsed_response["renderedHtml"]
+      end
+
+      def update_bundle
+        RestClient.post(
+          'http://localhost:3000/bundle',
+          :name_of_file_param => File.new(ReactOnRails::Utils.default_server_bundle_js_file_path))
       end
     end
   end

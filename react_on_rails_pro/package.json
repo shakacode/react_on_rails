@@ -9,6 +9,7 @@
   "dependencies": {
     "body-parser": "^1.17.1",
     "express": "^4.15.2",
+    "express-busboy": "^6.0.1",
     "vm2": "^3.4.6"
   },
   "devDependencies": {
