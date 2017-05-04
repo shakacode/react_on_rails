@@ -5,7 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { buildVM } = require('./context');
+const { buildVM } = require('./vm');
 
 function loadBundle(bundlePath, bundleFileName) {
   buildVM(bundlePath, bundleFileName);
