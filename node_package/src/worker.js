@@ -3,10 +3,11 @@
  * @module worker
  */
 
+const fs = require('fs');
 const cluster = require('cluster');
 const express = require('express');
-var busBoy = require('express-busboy');
-const { runInVM } = require('./worker/vm');
+const busBoy = require('express-busboy');
+const { buildVMNew, runInVM } = require('./worker/vm');
 const configBuilder = require('./worker/configBuilder');
 const bundleWatcher = require('./worker/bundleWatcher');
 
@@ -23,6 +24,14 @@ exports.run = function run() {
   app.post('/bundle', (req, res) => {
     console.log(`worker #${cluster.worker.id} received bundle update request`);
     console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!', req.files)
+
+    /*fs.readFile(req.files.bundle.file, 'utf8', function (err,data) {
+      if (err) {
+        return console.log(err);
+      }
+    });*/
+    buildVMNew(req.files.bundle.file);
+
     res.send('blah');
   });
 

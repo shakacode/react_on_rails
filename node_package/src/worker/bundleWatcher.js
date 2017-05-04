@@ -23,9 +23,9 @@ module.exports = function bundleWatcher(bundlePath, bundleFileName) {
     }
   }
 
-  fs.watchFile(path.join(bundlePath, bundleFileName), (curr) => {
+  /*fs.watchFile(path.join(bundlePath, bundleFileName), (curr) => {
     if (curr && curr.blocks && curr.blocks > 0) {
       loadBundle(bundlePath, bundleFileName);
     }
-  });
+  });*/
 };
