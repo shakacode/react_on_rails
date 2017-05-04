@@ -1,8 +1,5 @@
-const bodyParser = require('body-parser');
-const express = require('express');
 const cluster = require('cluster');
-const configBuilder = require('./configBuilder');
-const bundleWatcher = require('./bundleWatcher');
+const worker = require('./worker');
 
 if (cluster.isMaster) {
   // Count available CPUs for worker processes:
@@ -20,21 +17,5 @@ if (cluster.isMaster) {
     cluster.fork();
   });
 } else {
-  const { runInVM } = require('./vm');
-
-  const { bundlePath, bundleFileName, port } = configBuilder();
-  bundleWatcher(bundlePath, bundleFileName);
-
-  const app = express();
-  app.use(bodyParser.urlencoded({ extended: true }));
-  app.use(bodyParser.json());
-
-  app.post('/', (req, res) => {
-    const result = runInVM(req.body.code);
-    res.send(result);
-  });
-
-  app.listen(port, () => {
-    console.log(`Node renderer worker #${cluster.worker.id} listening on port ${port}!`);
-  });
+  worker.run();
 }
