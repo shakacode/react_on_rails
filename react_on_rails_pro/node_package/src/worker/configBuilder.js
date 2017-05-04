@@ -5,7 +5,7 @@
 
 const path = require('path');
 
-const bundlePath = path.resolve(__dirname, '../../spec/dummy/app/assets/webpack/');
+const bundlePath = path.resolve(__dirname, '../../../spec/dummy/app/assets/webpack/');
 let bundleFileName = 'server-bundle.js';
 let port = 3000;
 
