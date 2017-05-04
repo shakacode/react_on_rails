@@ -1,16 +1,14 @@
 /**
  * Loads app server bundle and watches for updates.
- * @module bundleWatcher
+ * @module worker/bundleWatcher
  */
 
 const fs = require('fs');
 const path = require('path');
+const { buildVM } = require('./vm');
 
 function loadBundle(bundlePath, bundleFileName) {
-  /* eslint-disable */
-  // delete require.cache[path.join(bundlePath, bundleFileName)];
-  require(path.join(bundlePath, bundleFileName));
-  /* eslint-enable */
+  buildVM(bundlePath, bundleFileName);
   console.log(`Loaded server bundle: ${bundlePath}${bundleFileName}`);
 }
 
