@@ -1,9 +1,6 @@
 ---
 extends: eslint-config-shakacode
 
-plugins:
-  - react
-
 globals:
   __DEBUG_SERVER_ERRORS__: true
   __SERVER_ERRORS__: true
