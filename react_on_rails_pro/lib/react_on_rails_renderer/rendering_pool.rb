@@ -65,23 +65,28 @@ p bundle_update_utc_timestamp
           "http://localhost:3000/render",
           renderingRequest: js_code,
           bundleUpdateTimeUtc: bundle_update_utc_timestamp,
-          bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path)
         )
 
         parsed_response = JSON.parse(response.body)
         parsed_response["renderedHtml"]
+
+      rescue RestClient::ExceptionWithResponse => e
+        p e.response.code
+        update_bundle_and_eval_js(js_code)
       end
 
-      def update_bundle_and_eval_js
+      def update_bundle_and_eval_js(js_code)
         bundle_update_time = File.mtime(ReactOnRails::Utils.default_server_bundle_js_file_path)
         bundle_update_utc_timestamp = bundle_update_time.utc.to_i
 
         response = RestClient.post(
           "http://localhost:3000/render",
           renderingRequest: js_code,
-          bundleUpdateTimeUtc: bundle_update_utc_timestamp,
           bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path)
         )
+
+        parsed_response = JSON.parse(response.body)
+        parsed_response["renderedHtml"]
       end
     end
   end
