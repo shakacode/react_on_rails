@@ -2,10 +2,13 @@
 /* eslint-disable comma-dangle */
 
 const webpack = require('webpack');
-const path = require('path');
-const { imageLoaderRules } = require('./webpack.common');
+const { resolve, join } = require('path');
 const webpackCommon = require('./webpack.common');
 const { assetLoaderRules } = webpackCommon;
+
+const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
+const configPath = resolve('..', 'config', 'webpack');
+const { paths } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
 const nodeEnv = devBuild ? 'development' : 'production';
@@ -19,14 +22,15 @@ module.exports = {
   ],
   output: {
     filename: 'server-bundle.js',
-    path: path.resolve(__dirname, '../app/assets/webpack'),
+    path: resolve('..', paths.output, paths.assets),
   },
   resolve: {
     extensions: ['.js', '.jsx'],
     alias: {
-      images: path.join(process.cwd(), 'app', 'assets', 'images'),
+      images: join(process.cwd(), 'app', 'assets', 'images'),
     },
   },
+
   plugins: [
     new webpack.DefinePlugin({
       'process.env': {

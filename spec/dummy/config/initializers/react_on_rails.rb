@@ -15,7 +15,7 @@ end
 ReactOnRails.configure do |config|
   # Directory where your generated assets go. All generated assets must go to the same directory.
   # Configure this in your webpack config files. This relative to your Rails root directory.
-  config.generated_assets_dir = File.join(%w(app assets webpack))
+  config.generated_assets_dir = File.join(%w(public webpack), Rails.env)
 
   # Define the files we need to check for webpack compilation when running tests.
   config.webpack_generated_files = %w(app-bundle.js vendor-bundle.js server-bundle.js)
@@ -93,8 +93,8 @@ ReactOnRails.configure do |config|
   # The server render method - either ExecJS or NodeJS
   config.server_render_method = "ExecJS"
 
-  # Client js uses assets not digested by rails.
-  # For any asset matching this regex, a file is copied to the correct path to have a digest.
-  # To disable creating digested assets, set this parameter to nil.
-  config.symlink_non_digested_assets_regex = /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/
+  # If you want to use webpack for CSS and images, and still use the asset pipeline,
+  # see https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/rails-assets.md
+  # And you will use a setting like this.
+  # config.symlink_non_digested_assets_regex = /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/
 end

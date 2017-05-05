@@ -1,1 +1,1 @@
-web: bundle exec puma -C config/puma.rb
+run: echo "Run Procfile.static or Procfile.hot"

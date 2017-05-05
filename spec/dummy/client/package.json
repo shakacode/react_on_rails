@@ -34,7 +34,7 @@
     "react": "^15.5.4",
     "react-dom": "^15.5.4",
     "react-helmet": "^5.0.3",
-    "react-on-rails": "file:../../..",
+    "react-on-rails": "file:../../../",
     "react-proptypes": "^0.0.1",
     "react-redux": "^5.0.4",
     "react-router": "3.0.5",
@@ -45,7 +45,8 @@
     "sass-resources-loader": "1.2.1",
     "style-loader": "^0.16.1",
     "url-loader": "^0.5.8",
-    "webpack": "^2.3.3"
+    "webpack": "^2.3.3",
+    "webpack-manifest-plugin": "^1.1.0"
   },
   "devDependencies": {
     "babel-plugin-react-transform": "^2.0.2",
@@ -67,14 +68,14 @@
   "scripts": {
     "lint": "eslint --ext .js,.jsx .",
     "test": "yarn run build:test && rspec",
-    "build:test": "yarn run build:client && yarn run build:server",
+    "build:test": "NODE_ENV=test yarn run build:client && NODE_ENV=test yarn run build:server",
     "build:production:client": "NODE_ENV=production webpack --config webpack.client.rails.build.config.js",
     "build:production:server": "NODE_ENV=production webpack --config webpack.server.rails.build.config.js",
     "build:client": "webpack --config webpack.client.rails.build.config.js",
-    "build:dev:client": "webpack -w --config webpack.client.rails.build.config.js",
-    "build:dev:server": "webpack -w --config webpack.server.rails.build.config.js",
+    "build:dev:client": "NODE_ENV=development webpack -w --config webpack.client.rails.build.config.js",
+    "build:dev:server": "NODE_ENV=development webpack -w --config webpack.server.rails.build.config.js",
     "build:server": "webpack --config webpack.server.rails.build.config.js",
-    "hot-assets": "babel-node server-rails-hot.js",
+    "hot-assets": "NODE_ENV=development babel-node server-rails-hot.js",
     "install-react-on-rails": "rm -rf node_modules/react-on-rails && npm i 'file:../../..'"
   },
   "author": "",

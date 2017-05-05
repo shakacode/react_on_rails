@@ -1,0 +1,18 @@
+default: &default
+  config: client/webpack
+  output: public
+  assets: webpack
+  manifest: manifest.json
+  source: client/app
+
+development:
+  <<: *default
+  assets: webpack/development
+
+test:
+  <<: *default
+  assets: webpack/test
+
+production:
+  <<: *default
+  assets: webpack/production

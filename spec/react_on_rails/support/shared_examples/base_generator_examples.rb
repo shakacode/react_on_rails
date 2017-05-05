@@ -16,19 +16,9 @@ shared_examples "base_generator" do
       node_modules
 
       # Generated js bundles
-      /app/assets/webpack/*
+      /public/webpack/*
     MATCH
     assert_file ".gitignore", match
-  end
-
-  it "updates application.js" do
-    match = <<-MATCH.strip_heredoc
-      //= require webpack-bundle
-
-    MATCH
-    assert_file("app/assets/javascripts/application.js") do |contents|
-      assert_match(match, contents)
-    end
   end
 
   it "creates react directories" do
@@ -44,6 +34,7 @@ shared_examples "base_generator" do
        client/.babelrc
        client/package.json
        config/initializers/react_on_rails.rb
+       config/webpack/paths.yml
        package.json
        Procfile.dev).each { |file| assert_file(file) }
   end

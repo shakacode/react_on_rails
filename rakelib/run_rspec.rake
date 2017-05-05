@@ -62,7 +62,7 @@ namespace :run_rspec do
   end
 
   desc "run all tests no examples"
-  task all_but_examples: [:gem, :dummy, :dummy_no_turbolinks, :dummy_turbolinks_2, :empty, :js_tests] do
+  task all_but_examples: [:gem, :dummy_no_turbolinks, :dummy_turbolinks_2, :dummy, :empty, :js_tests] do
     puts "Completed all RSpec tests"
   end
 
