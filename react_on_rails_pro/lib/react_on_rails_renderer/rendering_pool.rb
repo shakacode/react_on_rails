@@ -1,16 +1,18 @@
-require 'net/http'
-require 'uri'
+require "net/http"
+require "uri"
+require "rest_client"
 
 module ReactOnRailsRenderer
   class RenderingPool
+    RENDERER_URL = "http://localhost:3700/render"
+
     # This implementation of the rendering pool uses NodeJS to execute javasript code
     def self.reset_pool
-      # TODO: We should be able to reload bundle on Express server here.
+      # No need for this method
     end
 
     def self.reset_pool_if_server_bundle_was_modified
-      # No need for this method, the server bundle is automatically reset by node when changes
-      # Empty implementation to conform to ServerRenderingPool interface
+      # No need for this method
     end
 
     # js_code: JavaScript expression that returns a string.
@@ -49,15 +51,29 @@ module ReactOnRailsRenderer
       end
 
       def eval_js(js_code)
-        uri = URI.parse("http://localhost:3000")
-        header = { 'Content-Type': 'application/json' }
-        request = Net::HTTP::Post.new(uri.request_uri, header)
+        bundle_update_time = File.mtime(ReactOnRails::Utils.default_server_bundle_js_file_path)
+        bundle_update_utc_timestamp = (bundle_update_time.utc.to_f * 1000).to_i
 
-        request.body = {renderingRequest: js_code}.to_json
+        response = RestClient.post(
+          RENDERER_URL,
+          renderingRequest: js_code,
+          bundleUpdateTimeUtc: bundle_update_utc_timestamp
+        )
 
-        response = Net::HTTP.start(uri.hostname, uri.port) do |http|
-          http.request(request)
-        end
+        parsed_response = JSON.parse(response.body)
+        parsed_response["renderedHtml"]
+
+      rescue RestClient::ExceptionWithResponse => e
+        p e.response.code
+        update_bundle_and_eval_js(js_code)
+      end
+
+      def update_bundle_and_eval_js(js_code)
+        response = RestClient.post(
+          RENDERER_URL,
+          renderingRequest: js_code,
+          bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path)
+        )
 
         parsed_response = JSON.parse(response.body)
         parsed_response["renderedHtml"]

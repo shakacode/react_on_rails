@@ -7,6 +7,7 @@ PATH
       execjs (~> 2.5)
       rails (>= 3.2)
       rainbow (~> 2.1)
+      rest_client
 
 GEM
   remote: https://rubygems.org/
@@ -130,6 +131,7 @@ GEM
     mini_portile2 (2.1.0)
     minitest (5.10.1)
     multi_json (1.12.1)
+    netrc (0.7.9)
     nio4r (2.0.0)
     nokogiri (1.7.0.1)
       mini_portile2 (~> 2.1.0)
@@ -202,6 +204,8 @@ GEM
       execjs (~> 2.5)
       rails (>= 3.2)
       rainbow (~> 2.1)
+    rest_client (1.8.3)
+      netrc (~> 0.7.7)
     rspec-core (3.5.4)
       rspec-support (~> 3.5.0)
     rspec-expectations (3.5.0)
