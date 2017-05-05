@@ -10,6 +10,7 @@ module ReactOnRailsRenderer
     end
 
     def self.reset_pool_if_server_bundle_was_modified
+=begin
       return unless ReactOnRails.configuration.development_mode
       file_mtime = File.mtime(ReactOnRails::Utils.default_server_bundle_js_file_path)
       @server_bundle_timestamp ||= file_mtime
@@ -18,6 +19,7 @@ module ReactOnRailsRenderer
       p '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Gem want to reset the pool'
       update_bundle
       @server_bundle_timestamp = file_mtime
+=end
     end
 
     # js_code: JavaScript expression that returns a string.
@@ -56,24 +58,30 @@ module ReactOnRailsRenderer
       end
 
       def eval_js(js_code)
-        uri = URI.parse("http://localhost:3000/render")
-        header = { 'Content-Type': 'application/json' }
-        request = Net::HTTP::Post.new(uri.request_uri, header)
-
-        request.body = {renderingRequest: js_code}.to_json
-
-        response = Net::HTTP.start(uri.hostname, uri.port) do |http|
-          http.request(request)
-        end
+        bundle_update_time = File.mtime(ReactOnRails::Utils.default_server_bundle_js_file_path)
+        bundle_update_utc_timestamp = (bundle_update_time.utc.to_f * 1000).to_i
+p bundle_update_utc_timestamp
+        response = RestClient.post(
+          "http://localhost:3000/render",
+          renderingRequest: js_code,
+          bundleUpdateTimeUtc: bundle_update_utc_timestamp,
+          bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path)
+        )
 
         parsed_response = JSON.parse(response.body)
         parsed_response["renderedHtml"]
       end
 
-      def update_bundle
-        RestClient.post(
-          "http://localhost:3000/bundle",
-          bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path))
+      def update_bundle_and_eval_js
+        bundle_update_time = File.mtime(ReactOnRails::Utils.default_server_bundle_js_file_path)
+        bundle_update_utc_timestamp = bundle_update_time.utc.to_i
+
+        response = RestClient.post(
+          "http://localhost:3000/render",
+          renderingRequest: js_code,
+          bundleUpdateTimeUtc: bundle_update_utc_timestamp,
+          bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path)
+        )
       end
     end
   end
