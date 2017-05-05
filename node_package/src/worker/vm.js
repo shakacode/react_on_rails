@@ -11,7 +11,7 @@ const path = require('path');
 let vm;
 let bundleUpdateTimeUtc;
 
-exports.buildVM = function buildVM(bundlePath, bundleFileName) {
+/*exports.buildVM = function buildVM(bundlePath, bundleFileName) {
   vm = new NodeVM({
     require: {
       external: true,
@@ -24,20 +24,18 @@ exports.buildVM = function buildVM(bundlePath, bundleFileName) {
   console.log('Required objects now in VM sandbox context:', vm.run('module.exports = ReactOnRails'));
   console.log('Required objects should not leak to the global context:', global.ReactOnRails);
   return vm;
-};
+};*/
 
-exports.buildVMNew = function buildVMNew(filepath) {
-  const bundlePath = path.resolve(__dirname, '../../../', filepath);
-
+exports.buildVMNew = function buildVMNew(filePath) {
   vm = new NodeVM({
     require: {
       external: true,
-      import: [bundlePath],
+      import: [filePath],
       context: 'sandbox',
     },
   });
 
-  bundleUpdateTimeUtc = +(fs.statSync(bundlePath).mtime);
+  bundleUpdateTimeUtc = +(fs.statSync(filePath).mtime);
 
   console.log(`Built VM for worker #${cluster.worker.id}`);
   console.log('Required objects now in VM sandbox context:', vm.run('module.exports = ReactOnRails') !== undefined);
