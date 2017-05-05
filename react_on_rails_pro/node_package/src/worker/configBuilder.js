@@ -3,7 +3,7 @@
  * @module worker/configBuilder
  */
 
-let port = 3700;
+let port = process.env.PORT || 3700;
 
 module.exports = function configBuilder() {
   let currentArg;

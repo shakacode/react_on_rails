@@ -55,7 +55,7 @@
     "flow": "flow check node_package",
     "lint": "yarn run eslint && yarn run flow",
     "check": "yarn run lint && yarn run flow && yarn run test",
-    "start": "node node_package/src/ReactOnRailsRenderer.js -s server-bundle.js",
+    "start": "node node_package/src/ReactOnRailsRenderer.js -p 3800",
     "prerelease": "yarn run check && yarn run clean && yarn run build",
     "release:patch": "node_package/scripts/release patch",
     "release:minor": "node_package/scripts/release minor",

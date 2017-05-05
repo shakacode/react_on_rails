@@ -4,8 +4,6 @@ require "rest_client"
 
 module ReactOnRailsRenderer
   class RenderingPool
-    RENDERER_URL = "http://localhost:3700/render"
-
     # This implementation of the rendering pool uses NodeJS to execute javasript code
     def self.reset_pool
       # No need for this method
@@ -50,12 +48,18 @@ module ReactOnRailsRenderer
         ENV["TRACE_REACT_ON_RAILS"].present?
       end
 
+      def renderer_url
+        "http://#{ReactOnRailsRenderer.configuration.renderer_host}" \
+        ":#{ReactOnRailsRenderer.configuration.renderer_port}" \
+        "/render"
+      end
+
       def eval_js(js_code)
         bundle_update_time = File.mtime(ReactOnRails::Utils.default_server_bundle_js_file_path)
         bundle_update_utc_timestamp = (bundle_update_time.utc.to_f * 1000).to_i
 
         response = RestClient.post(
-          RENDERER_URL,
+          renderer_url,
           renderingRequest: js_code,
           bundleUpdateTimeUtc: bundle_update_utc_timestamp
         )
@@ -64,13 +68,14 @@ module ReactOnRailsRenderer
         parsed_response["renderedHtml"]
 
       rescue RestClient::ExceptionWithResponse => e
+        p 'zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz'
         p e.response.code
         update_bundle_and_eval_js(js_code)
       end
 
       def update_bundle_and_eval_js(js_code)
         response = RestClient.post(
-          RENDERER_URL,
+          renderer_url,
           renderingRequest: js_code,
           bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path)
         )
