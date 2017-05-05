@@ -3,11 +3,7 @@
  * @module worker/configBuilder
  */
 
-const path = require('path');
-
-const bundlePath = path.resolve(__dirname, '../../../spec/dummy/app/assets/webpack/');
-let bundleFileName = 'server-bundle.js';
-let port = 3000;
+let port = 3700;
 
 module.exports = function configBuilder() {
   let currentArg;
@@ -18,10 +14,10 @@ module.exports = function configBuilder() {
       return;
     }
 
-    if (currentArg === 's') {
-      bundleFileName = val;
+    if (currentArg === 'p') {
+      port = val;
     }
   });
 
-  return { bundlePath, bundleFileName, port };
+  return { port };
 };

@@ -12,7 +12,25 @@ exports.run = function run() {
 
   // Create a worker for each CPU except one that used for master process:
   for (let i = 0; i < workerCpuCount; i += 1) {
-    cluster.fork();
+    const worker = cluster.fork();
+
+    // Listen for worker messages:
+    worker.on('message', function(msg) {
+      switch (msg.command) {
+      case 'update_bundle':
+        for (let id in cluster.workers) {
+          if (cluster.workers[id].process.pid !== msg.from) {
+            cluster.workers[id].send({
+              command: msg.command,
+              file: msg.file,
+              from: process.pid
+            });
+          }
+        }
+
+        break;
+      }
+    });
   }
 
   // Listen for dying workers:
