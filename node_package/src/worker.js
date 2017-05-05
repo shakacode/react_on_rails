@@ -4,10 +4,12 @@
  */
 
 const fs = require('fs');
+const mv = require('mv');
+const path = require('path');
 const cluster = require('cluster');
 const express = require('express');
 const busBoy = require('express-busboy');
-const { buildVMNew, runInVM } = require('./worker/vm');
+const { buildVMNew, getBundleUpdateTimeUtc, runInVM } = require('./worker/vm');
 const configBuilder = require('./worker/configBuilder');
 const bundleWatcher = require('./worker/bundleWatcher');
 
@@ -21,33 +23,35 @@ exports.run = function run() {
     path: 'tmp/uploads',
   });
 
-  // Listen for master's messages:
-  process.on('message', function(msg) {
-    switch (msg.command) {
-    case 'update_bundle':
-      console.log(`worker #${cluster.worker.id} received bundle update message from master`);
-      buildVMNew(msg.file);
-    }
-  });
-
-  app.post('/bundle', (req, res) => {
-    console.log(`worker #${cluster.worker.id} received bundle update request`);
-
-    // Update VM for current worker:
-    buildVMNew(req.files.bundle.file);
-
-    // Tell master to broadcast VM update for other workers:
-    process.send({
-      command: 'update_bundle',
-      file: req.files.bundle.file,
-      from: process.pid,
-    });
-
-    res.send('blah');
-  });
-
   app.post('/render', (req, res) => {
     console.log(`worker #${cluster.worker.id} received render request with with code ${req.body.renderingRequest}`);
+    const bundlePath = path.resolve(__dirname, '../../tmp/bundle.js');
+
+    // If gem has posted updated bundle:
+    if (req.files.bundle) {
+      mv(req.files.bundle.file, bundlePath, {mkdirp: true}, (err) => {});
+      buildVMNew(bundlePath);
+    }
+
+    // If bundle was updated:
+    if (getBundleUpdateTimeUtc() < Number(req.bundleUpdateTimeUtc)) {
+      // Check if bundle was uploaded:
+      if (!fs.existsSync(bundlePath)) {
+        res.status(410);
+        res.send('No bundle uploaded');
+      }
+
+      // Check if another thread has already updated bundle and we don't need to request it form the gem:
+      const bundleUpdateTime = +(fs.statSync(bundlePath).mtime);
+      if (bundleUpdateTime < Number(req.bundleUpdateTimeUtc)) {
+        res.status(410);
+        res.send('Bundle is outdated');
+      }
+
+      // If there is a fresh bundle, simply update VM:
+      buildVMNew(bundlePath);
+    }
+
     const result = runInVM(req.body.renderingRequest);
 
     res.send({
