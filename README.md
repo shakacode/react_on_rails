@@ -108,7 +108,7 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
 
 ## Upgrade
 
-To upgrade existing apps to react on rails 7 see the [Installation Overview](docs/basics/installation-overview.md)
+To upgrade existing apps to react on rails 7 see the [Migrating to webpacker](docs/basics/migrating-to-webpacker.md)
 
 ## Getting Started
 
