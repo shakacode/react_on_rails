@@ -49,8 +49,12 @@ module ReactOnRailsRenderer
       end
 
       def renderer_url
-        "http://#{ReactOnRailsRenderer.configuration.renderer_host}" \
-        ":#{ReactOnRailsRenderer.configuration.renderer_port}" \
+        port = ReactOnRailsRenderer.configuration.renderer_port ?
+                 ":#{ReactOnRailsRenderer.configuration.renderer_port}" : ""
+
+        "#{ReactOnRailsRenderer.configuration.renderer_protocol}://"
+        "#{ReactOnRailsRenderer.configuration.renderer_host}" \
+        "#{port}" \
         "/render"
       end
 
