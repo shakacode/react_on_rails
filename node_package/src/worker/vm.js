@@ -40,14 +40,14 @@ exports.buildVMNew = function buildVMNew(filepath) {
   bundleUpdateTimeUtc = +(fs.statSync(bundlePath).mtime);
 
   console.log(`Built VM for worker #${cluster.worker.id}`);
-  console.log('Required objects now in VM sandbox context:', vm.run('module.exports = ReactOnRails'));
+  console.log('Required objects now in VM sandbox context:', vm.run('module.exports = ReactOnRails') !== undefined);
   console.log('Required objects should not leak to the global context:', global.ReactOnRails);
   return vm;
 };
 
 exports.getBundleUpdateTimeUtc = function getBundleUpdateTimeUtc() {
   return bundleUpdateTimeUtc;
-}
+};
 
 exports.runInVM = function runInVM(code) {
   return vm.run(`module.exports = ${code}`);

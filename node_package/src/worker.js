@@ -4,19 +4,16 @@
  */
 
 const fs = require('fs');
-const fsExtra = require('fs-extra')
-const mv = require('mv');
+const fsExtra = require('fs-extra');
 const path = require('path');
 const cluster = require('cluster');
 const express = require('express');
 const busBoy = require('express-busboy');
 const { buildVMNew, getBundleUpdateTimeUtc, runInVM } = require('./worker/vm');
 const configBuilder = require('./worker/configBuilder');
-const bundleWatcher = require('./worker/bundleWatcher');
 
 exports.run = function run() {
-  const { bundlePath, bundleFileName, port } = configBuilder();
-  bundleWatcher(bundlePath, bundleFileName);
+  const { port } = configBuilder();
 
   const app = express();
   busBoy.extend(app, {
@@ -42,10 +39,11 @@ exports.run = function run() {
       return;
     }
 
-      console.log(getBundleUpdateTimeUtc(), Number(req.body.bundleUpdateTimeUtc), getBundleUpdateTimeUtc() < Number(req.body.bundleUpdateTimeUtc));
     // If bundle was updated:
-    if (!getBundleUpdateTimeUtc() || (getBundleUpdateTimeUtc() < Number(req.body.bundleUpdateTimeUtc))) {
+    if (!getBundleUpdateTimeUtc() ||
+        (getBundleUpdateTimeUtc() < Number(req.body.bundleUpdateTimeUtc))) {
       console.log('Bundle was updated');
+
       // Check if bundle was uploaded:
       if (!fs.existsSync(bundlePath)) {
         res.status(410);
@@ -53,10 +51,12 @@ exports.run = function run() {
         return;
       }
 
-      // Check if another thread has already updated bundle and we don't need to request it form the gem:
+      // Check if another thread has already updated bundle and we don't need
+      // to request it form the gem:
       const bundleUpdateTime = +(fs.statSync(bundlePath).mtime);
-      console.log(bundleUpdateTime, Number(req.body.bundleUpdateTimeUtc))
       if (bundleUpdateTime < Number(req.body.bundleUpdateTimeUtc)) {
+        console.log('Bundle is outated');
+
         res.status(410);
         res.send('Bundle is outdated');
         return;
