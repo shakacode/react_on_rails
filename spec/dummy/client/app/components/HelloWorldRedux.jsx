@@ -54,7 +54,7 @@ export default class HelloWorldRedux extends React.Component {
             value={name}
             onChange={this.handleChange}
           />
-      </p>zzz11
+      </p>
         <RailsContext {...{ railsContext }} />
       </div>
     );

@@ -37,8 +37,7 @@ exports.buildVMNew = function buildVMNew(filepath) {
     },
   });
 
-  const bundleUpdateTime = +(fs.statSync(bundlePath).mtime);
-  console.log(bundleUpdateTime);
+  bundleUpdateTimeUtc = +(fs.statSync(bundlePath).mtime);
 
   console.log(`Built VM for worker #${cluster.worker.id}`);
   console.log('Required objects now in VM sandbox context:', vm.run('module.exports = ReactOnRails'));

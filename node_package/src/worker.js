@@ -4,6 +4,7 @@
  */
 
 const fs = require('fs');
+const fsExtra = require('fs-extra')
 const mv = require('mv');
 const path = require('path');
 const cluster = require('cluster');
@@ -29,23 +30,36 @@ exports.run = function run() {
 
     // If gem has posted updated bundle:
     if (req.files.bundle) {
-      mv(req.files.bundle.file, bundlePath, {mkdirp: true}, (err) => {});
+      console.log('Worker received new bundle');
+      fsExtra.copySync(req.files.bundle.file, bundlePath);
       buildVMNew(bundlePath);
+      const result = runInVM(req.body.renderingRequest);
+
+      res.send({
+        renderedHtml: result,
+      });
+
+      return;
     }
 
+      console.log(getBundleUpdateTimeUtc(), Number(req.body.bundleUpdateTimeUtc), getBundleUpdateTimeUtc() < Number(req.body.bundleUpdateTimeUtc));
     // If bundle was updated:
-    if (getBundleUpdateTimeUtc() < Number(req.bundleUpdateTimeUtc)) {
+    if (!getBundleUpdateTimeUtc() || (getBundleUpdateTimeUtc() < Number(req.body.bundleUpdateTimeUtc))) {
+      console.log('Bundle was updated');
       // Check if bundle was uploaded:
       if (!fs.existsSync(bundlePath)) {
         res.status(410);
         res.send('No bundle uploaded');
+        return;
       }
 
       // Check if another thread has already updated bundle and we don't need to request it form the gem:
       const bundleUpdateTime = +(fs.statSync(bundlePath).mtime);
-      if (bundleUpdateTime < Number(req.bundleUpdateTimeUtc)) {
+      console.log(bundleUpdateTime, Number(req.body.bundleUpdateTimeUtc))
+      if (bundleUpdateTime < Number(req.body.bundleUpdateTimeUtc)) {
         res.status(410);
         res.send('Bundle is outdated');
+        return;
       }
 
       // If there is a fresh bundle, simply update VM:

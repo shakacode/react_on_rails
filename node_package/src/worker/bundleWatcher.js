@@ -13,7 +13,7 @@ function loadBundle(bundlePath, bundleFileName) {
 }
 
 module.exports = function bundleWatcher(bundlePath, bundleFileName) {
-  try {
+  /*try {
     fs.mkdirSync(bundlePath);
   } catch (e) {
     if (e.code !== 'EEXIST') {
@@ -21,7 +21,7 @@ module.exports = function bundleWatcher(bundlePath, bundleFileName) {
     } else {
       loadBundle(bundlePath, bundleFileName);
     }
-  }
+  }*/
 
   /*fs.watchFile(path.join(bundlePath, bundleFileName), (curr) => {
     if (curr && curr.blocks && curr.blocks > 0) {
