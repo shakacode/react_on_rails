@@ -8,8 +8,8 @@
     "npm": "4.1.1"
   },
   "scripts": {
-    "build:test": "webpack --config webpack.config.js",
-    "build:production": "NODE_ENV=production webpack --config webpack.config.js",
+    "build:test": "webpack --bail --config webpack.config.js",
+    "build:production": "NODE_ENV=production webpack --bail --config webpack.config.js",
     "build:development": "webpack -w --config webpack.config.js"
   },
   "cacheDirectories": ["node_modules", "client/node_modules"],
