@@ -10,26 +10,27 @@ const cluster = require('cluster');
 const express = require('express');
 const busBoy = require('express-busboy');
 const { buildVMNew, getBundleUpdateTimeUtc, runInVM } = require('./worker/vm');
-const configBuilder = require('./worker/configBuilder');
+const { buildConfig, getConfig } = require('./worker/configBuilder');
 
-exports.run = function run() {
-  const { port } = configBuilder();
+exports.run = function run(config) {
+  buildConfig(config);
+  const { bundlePath, port } = getConfig();
 
   const app = express();
   busBoy.extend(app, {
     upload: true,
-    path: 'tmp/uploads',
+    path: path.join(bundlePath, 'uploads'),
   });
 
   app.post('/render', (req, res) => {
     console.log(`worker #${cluster.worker.id} received render request with with code ${req.body.renderingRequest}`);
-    const bundlePath = path.resolve(__dirname, '../../tmp/bundle.js');
+    const bundleFilePath = path.join(bundlePath, 'bundle.js');
 
     // If gem has posted updated bundle:
     if (req.files.bundle) {
       console.log('Worker received new bundle');
-      fsExtra.copySync(req.files.bundle.file, bundlePath);
-      buildVMNew(bundlePath);
+      fsExtra.copySync(req.files.bundle.file, bundleFilePath);
+      buildVMNew(bundleFilePath);
       const result = runInVM(req.body.renderingRequest);
 
       res.send({
@@ -45,7 +46,7 @@ exports.run = function run() {
       console.log('Bundle was updated');
 
       // Check if bundle was uploaded:
-      if (!fs.existsSync(bundlePath)) {
+      if (!fs.existsSync(bundleFilePath)) {
         res.status(410);
         res.send('No bundle uploaded');
         return;
@@ -53,7 +54,7 @@ exports.run = function run() {
 
       // Check if another thread has already updated bundle and we don't need
       // to request it form the gem:
-      const bundleUpdateTime = +(fs.statSync(bundlePath).mtime);
+      const bundleUpdateTime = +(fs.statSync(bundleFilePath).mtime);
       if (bundleUpdateTime < Number(req.body.bundleUpdateTimeUtc)) {
         console.log('Bundle is outated');
 
@@ -63,7 +64,7 @@ exports.run = function run() {
       }
 
       // If there is a fresh bundle, simply update VM:
-      buildVMNew(bundlePath);
+      buildVMNew(bundleFilePathyarn);
     }
 
     const result = runInVM(req.body.renderingRequest);
