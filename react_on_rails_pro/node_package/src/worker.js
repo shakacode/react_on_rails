@@ -9,7 +9,7 @@ const path = require('path');
 const cluster = require('cluster');
 const express = require('express');
 const busBoy = require('express-busboy');
-const { buildVMNew, getBundleUpdateTimeUtc, runInVM } = require('./worker/vm');
+const { buildVM, runInVM, getBundleUpdateTimeUtc } = require('./worker/vm');
 const { buildConfig, getConfig } = require('./worker/configBuilder');
 
 exports.run = function run(config) {
@@ -30,7 +30,7 @@ exports.run = function run(config) {
     if (req.files.bundle) {
       console.log('Worker received new bundle');
       fsExtra.copySync(req.files.bundle.file, bundleFilePath);
-      buildVMNew(bundleFilePath);
+      buildVM(bundleFilePath);
       const result = runInVM(req.body.renderingRequest);
 
       res.send({
@@ -64,7 +64,7 @@ exports.run = function run(config) {
       }
 
       // If there is a fresh bundle, simply update VM:
-      buildVMNew(bundleFilePathyarn);
+      buildVM(bundleFilePath);
     }
 
     const result = runInVM(req.body.renderingRequest);
