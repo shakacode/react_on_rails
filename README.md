@@ -4,7 +4,7 @@
 
 **For a complete example of this gem, see our live demo at [www.reactrails.com](http://www.reactrails.com). ([Source Code](https://github.com/shakacode/react-webpack-rails-tutorial))**
 
-**Speaking!**: Justin is speaking [GORUCO](http://goruco.com/#speakers) on Saturday, June 24, 2017 in NYC: "Front-End Sadness to Happiness: The React on Rails Story". [Email Justin](mailto:justin@shakacode.com) to give this talk at your local meetup or company. [Subscribe](https://app.mailerlite.com/webforms/landing/l1d9x5) to be notified of local and *online* presentations of this talk. 
+**Speaking!**: Justin is speaking [GORUCO](http://goruco.com/#speakers) on Saturday, June 24, 2017 in NYC: "Front-End Sadness to Happiness: The React on Rails Story". [Email Justin](mailto:justin@shakacode.com) to give this talk at your local meetup or company. [Subscribe](https://app.mailerlite.com/webforms/landing/l1d9x5) to be notified of local and *online* presentations of this talk.
 
 **Aloha from Justin Gordon** ([bio](http://www.railsonmaui.com/about)) and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects involving React, React-Native, and Rails, including conversion of AngularJs to React. Please [contact me](mailto:justin@shakacode.com) if we could potentially help you in any way. Besides consulting on bigger projects, [ShakaCode](http://www.shakacode.com) is doing ScreenHero plus Slack/Github based [coaching](http://www.shakacode.com/work/shakacode-coaching-plan.pdf) for React on Rails. See our blog post [Can ShakaCode Help You?](https://blog.shakacode.com/can-shakacode-help-you-4a5b1e5a8a63#.jex6tg9w9) for more information.
 
@@ -51,7 +51,7 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 * [284 Ruby Rogues: React on Rails with Justin Gordon and Rob Wise](https://devchat.tv/ruby-rogues/284-rr-react-on-rails-with-justin-gordon-and-rob-wise)
 
 # NEWS
-* 2017-04-25: 7.0.0 Shipped! Performance improvements! Please upgrade! Only "breaking" change is that you have to update both the node module and the Ruby gem. 
+* 2017-04-25: 7.0.0 Shipped! Performance improvements! Please upgrade! Only "breaking" change is that you have to update both the node module and the Ruby gem.
 * 2017-04-09: 8.0.0 beta work to include webpacker_lite gem has begun. See [#786](https://github.com/shakacode/react_on_rails/issues/786).
 * *See [NEWS.md](NEWS.md) for more notes over time.*
 
@@ -108,6 +108,10 @@ Universal React with Rails: Part I](https://medium.com/@alexfedoseev/isomorphic-
 
 We're definitely not doing that. With react_on_rails, webpack is mainly generating a nice JavaScript file for inclusion into `application.js`. We're going to KISS. And that's all relative given how much there is to get right in an enterprise class web application.
 
+## Upgrade
+
+To upgrade existing apps to react on rails 7 see the [Installation Overview](docs/basics/installation-overview.md)
+
 ## Getting Started
 
 **For more detailed instructions**, see the [React on Rails Basic Tutorial](docs/tutorial.md).
@@ -146,9 +150,9 @@ We're definitely not doing that. With react_on_rails, webpack is mainly generati
   foreman start -f Procfile.dev
   ```
 
-8. Visit [localhost:5000/hello_world](http://localhost:5000/hello_world). Note, `foreman` defaults to PORT 5000 unless you set the value of PORT in your environment. For example, you can `export PORT=3000` to use the Rails default port of 3000.
+8. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world). Note, `foreman` defaults to PORT 5000 unless you set the value of PORT in your environment. For example, you can `export PORT=3000` to use the Rails default port of 3000. For the hello_world example this is already set.
 
-### Installation Summary
+### Installation Overview
 
 See the [Installation Overview](docs/basics/installation-overview.md) for a concise set summary of what's in a React on Rails installation.
 
@@ -224,7 +228,7 @@ In the following screenshot you can see the 3 parts of React on Rails rendering:
 2. The wrapper div `<div id="HelloWorld-react-component-0">` specifies the div where to place the React rendering. It encloses the server-rendered HTML for the React component
 3. Additional JavaScript is placed to console log any messages, such as server rendering errors. Note, these server side logs can be configured to only be sent to the server logs.
 
-**Note**: 
+**Note**:
 
 * If server rendering is not used (prerender: false), then the major difference is that the HTML rendered for the React component only contains the outer div: `<div id="HelloWorld-react-component-0"/>`. The first specification of the React component is just the same.
 * The below image is not yet updated for version 7.0.0 which uses a `<script>` tag for the props. Instead of a hidden div, we have the props inside of the a `<script>` tag.

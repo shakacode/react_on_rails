@@ -1,0 +1,9 @@
+default: &default
+  enabled: false
+  host: localhost
+  port: 3500
+
+development:
+  <<: *default
+  # set to true of you want hot loading as default
+  enabled: false

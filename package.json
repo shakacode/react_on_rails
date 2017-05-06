@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails",
-  "version": "7.0.4",
+  "version": "8.0.0-beta.1",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "node_package/lib/ReactOnRails.js",
   "directories": {
@@ -37,7 +37,8 @@
     "release-it": "^2.7.1",
     "tap-spec": "^4.1.1",
     "tape": "^4.6.3",
-    "webpack": "^2.3.3"
+    "webpack": "^2.3.3",
+    "webpack-manifest-plugin": "^1.1.0"
   },
   "peerDependencies": {
     "babel-runtime": ">= 6",
@@ -45,7 +46,8 @@
     "react-dom": ">= 0.14"
   },
   "files": [
-    "node_package/lib"
+    "node_package/lib",
+    "webpackConfigLoader.js"
   ],
   "scripts": {
     "test": "babel-tape-runner -r node_package/tests/helpers/test_helper.js node_package/tests/*.js | tap-spec",

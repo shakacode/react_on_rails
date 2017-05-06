@@ -45,15 +45,6 @@ module ReactOnRails
         File.open(package_json, "w+") { |f| f.puts new_contents }
       end
 
-      def change_webpack_client_base_config_to_include_fallback
-        sentinel = /^\s\s},\n\s\splugins: \[\n/
-        config = File.join(destination_root, "client", "webpack.config.js")
-        old_contents = File.read(config)
-        new_contents = "const path = require('path');\n" +
-                       old_contents.gsub(sentinel, FALLBACK_OPTION_FOR_NODE_MODULES)
-        File.open(config, "w+") { |f| f.puts new_contents }
-      end
-
       def add_test_related_gems_to_gemfile
         gem("rspec-rails", group: :test)
         gem("capybara", group: :test)

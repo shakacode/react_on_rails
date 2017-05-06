@@ -6,6 +6,25 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 *Please add entries here for your pull requests.*
 
+## [8.0.0] - 2017-05-03
+
+### Added
+Support for WebpackerLite in the generators. [#822](https://github.com/shakacode/react_on_rails/pull/822) by [kaizencodes](https://github.com/kaizencodes) and [justin808](https://github.com/justin808).
+
+1. You do not need to switch to WebpackerLite to use 8.0.0.
+2. You can find an upgrade example in [react-webpack-rails-tutorial PR #387](https://github.com/shakacode/react-webpack-rails-tutorial/pull/387).
+
+### Changed
+Breaking change is that the default value of symlink_non_digested_assets_regex has changed from this
+old value to nil. This is a breaking change if you didn't have this value set in your
+config/initializers/react_on_rails.rb file and you need this because you're using webpack's CSS
+features and you have not switched to webpacker lite.
+
+```
+symlink_non_digested_assets_regex: /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/,
+```
+
+
 ## [7.0.4] - 2017-04-27
 - Return empty json when nil in json_safe_and_pretty [#824](https://github.com/shakacode/react_on_rails/pull/824) by [dzirtusss](https://github.com/dzirtusss)
 

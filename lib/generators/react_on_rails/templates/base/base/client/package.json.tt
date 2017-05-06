@@ -8,9 +8,9 @@
     "npm": "4.1.1"
   },
   "scripts": {
-    "build:test": "webpack --config webpack.config.js",
+    "build:test": "NODE_ENV=test webpack --config webpack.config.js",
     "build:production": "NODE_ENV=production webpack --config webpack.config.js",
-    "build:development": "webpack -w --config webpack.config.js"
+    "build:development": "NODE_ENV=development webpack -w --config webpack.config.js"
   },
   "cacheDirectories": ["node_modules", "client/node_modules"],
   "dependencies": {
@@ -25,6 +25,7 @@
     "es5-shim": "^4.5.9",
     "expose-loader": "^0.7.3",
     "imports-loader": "^0.7.1",
+    "js-yaml": "^3.8.2",
     "react": "^15.5.4",
     "react-dom": "^15.5.4",
     "react-on-rails": "<%= VersionSyntaxConverter.new.rubygem_to_npm %>",
@@ -32,7 +33,8 @@
     "react-redux": "^5.0.4",
     "redux": "^3.6.0",
     <%- end -%>
-    "webpack": "^2.3.3"
+    "webpack": "^2.3.3",
+    "webpack-manifest-plugin": "^1.1.0"
   },
   "devDependencies": {
   }

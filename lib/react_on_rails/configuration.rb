@@ -4,7 +4,7 @@ module ReactOnRails
     setup_config_values
   end
 
-  DEFAULT_GENERATED_ASSETS_DIR = File.join(%w(app assets webpack)).freeze
+  DEFAULT_GENERATED_ASSETS_DIR = File.join(%w(public webpack), Rails.env).freeze
 
   def self.setup_config_values
     ensure_webpack_generated_files_exists
@@ -98,7 +98,7 @@ module ReactOnRails
       webpack_generated_files: [],
       rendering_extension: nil,
       server_render_method: "",
-      symlink_non_digested_assets_regex: /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/,
+      symlink_non_digested_assets_regex: nil,
       npm_build_test_command: "",
       i18n_dir: "",
       i18n_yml_dir: "",

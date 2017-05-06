@@ -43,6 +43,8 @@ gem 'sdoc', '~> 0.4.0', group: :doc
 
 gem "react_on_rails", path: "../.."
 
+gem "webpacker_lite"
+
 gem "mini_racer"
 
 group :development, :test do
