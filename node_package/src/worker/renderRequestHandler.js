@@ -14,7 +14,7 @@ const { buildVM, runInVM, getBundleUpdateTimeUtc } = require('./vm');
 
 // TODO: Split this function in smaller methods.
 module.exports = function handleRenderRequest(req) {
-  console.log(`worker #${cluster.worker.id} received render request with with code ${req.body.renderingRequest}`);
+  if (!cluster.isMaster) console.log(`worker #${cluster.worker.id} received render request with with code ${req.body.renderingRequest}`);
   const { bundlePath } = getConfig();
   const bundleFilePath = path.join(bundlePath, 'bundle.js');
 
