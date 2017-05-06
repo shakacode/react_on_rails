@@ -49,8 +49,15 @@ module ReactOnRailsRenderer
       end
 
       def renderer_url
-        "http://#{ReactOnRailsRenderer.configuration.renderer_host}" \
-        ":#{ReactOnRailsRenderer.configuration.renderer_port}" \
+        port = if ReactOnRailsRenderer.configuration.renderer_port
+                 ":#{ReactOnRailsRenderer.configuration.renderer_port}"
+               else
+                 ""
+               end
+
+        "#{ReactOnRailsRenderer.configuration.renderer_protocol}://" \
+        "#{ReactOnRailsRenderer.configuration.renderer_host}" \
+        "#{port}" \
         "/render"
       end
 
@@ -68,7 +75,7 @@ module ReactOnRailsRenderer
         parsed_response["renderedHtml"]
 
       rescue RestClient::ExceptionWithResponse => e
-        p 'zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz'
+        p "zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz"
         p e.response.code
         update_bundle_and_eval_js(js_code)
       end
