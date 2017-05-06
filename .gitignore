@@ -26,6 +26,7 @@
 node_modules
 
 /node_package/lib
+/node_package/tests/tmp
 
 yarn-debug.*
 spec/dummy/client/yarn-debug.log*

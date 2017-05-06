@@ -20,5 +20,5 @@ test('getBundleUpdateTimeUtc', (assert) => {
   assert.equal(
     getBundleUpdateTimeUtc(),
     +(fs.statSync(getBundlePath()).mtime),
-    'getBundleUpdateTimeUtc() should return lasty modification time of bundle loaded to VM');
+    'getBundleUpdateTimeUtc() should return last modification time of bundle loaded to VM');
 });
