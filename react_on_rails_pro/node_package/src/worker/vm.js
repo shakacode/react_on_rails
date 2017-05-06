@@ -21,7 +21,7 @@ exports.buildVM = function buildVMNew(filePath) {
 
   bundleUpdateTimeUtc = +(fs.statSync(filePath).mtime);
 
-  //console.log(`Built VM for worker #${cluster.worker.id}`);
+  if (!cluster.isMaster) console.log(`Built VM for worker #${cluster.worker.id}`);
   console.log('Required objects now in VM sandbox context:', vm.run('module.exports = ReactOnRails') !== undefined);
   console.log('Required objects should not leak to the global context:', global.ReactOnRails);
   return vm;
