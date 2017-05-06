@@ -10,7 +10,7 @@ const defaultConfig = {
   port: process.env.PORT || 3700,  // Use env port if we run on Heroku
 };
 
-exports.buildConfig = function buildConfig (userConfig) {
+exports.buildConfig = function buildConfig(userConfig) {
   config = Object.assign({}, defaultConfig, userConfig);
 
   let currentArg;
@@ -29,4 +29,4 @@ exports.buildConfig = function buildConfig (userConfig) {
 
 exports.getConfig = function getConfig() {
   return config;
-}
+};
