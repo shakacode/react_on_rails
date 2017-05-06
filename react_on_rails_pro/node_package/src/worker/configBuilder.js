@@ -3,9 +3,16 @@
  * @module worker/configBuilder
  */
 
-let port = process.env.PORT || 3700;
+let config;
 
-module.exports = function configBuilder() {
+const defaultConfig = {
+  bundlePath: undefined,           // No defaults for bundlePath
+  port: process.env.PORT || 3700,  // Use env port if we run on Heroku
+};
+
+exports.buildConfig = function buildConfig (userConfig) {
+  config = Object.assign({}, defaultConfig, userConfig);
+
   let currentArg;
 
   process.argv.forEach((val) => {
@@ -15,9 +22,11 @@ module.exports = function configBuilder() {
     }
 
     if (currentArg === 'p') {
-      port = val;
+      config.port = val;
     }
   });
-
-  return { port };
 };
+
+exports.getConfig = function getConfig() {
+  return config;
+}
