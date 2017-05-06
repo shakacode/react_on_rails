@@ -5,7 +5,7 @@ const renderRequestHandler = require('../src/worker/renderRequestHandler');
 
 function setConfig() {
   buildConfig({
-    bundlePath: path.resolve(__dirname, './tmp')
+    bundlePath: path.resolve(__dirname, './tmp'),
   });
 }
 
@@ -24,10 +24,10 @@ test('If gem has posted updated bundle', (assert) => {
     },
     files: {
       bundle: {
-        file: getUploadedBundlePath()
-      }
-    }
-  }
+        file: getUploadedBundlePath(),
+      },
+    },
+  };
 
   assert.deepEqual(renderRequestHandler(req), { status: 200, data: { renderedHtml: 'Dummy Object' } });
 });
