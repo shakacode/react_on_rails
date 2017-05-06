@@ -6,7 +6,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 *Please add entries here for your pull requests.*
 
-## [8.0.0] - 2017-05-03
+## [8.0.0-beta.1] - 2017-05-03
 
 ### Added
 Support for WebpackerLite in the generators. [#822](https://github.com/shakacode/react_on_rails/pull/822) by [kaizencodes](https://github.com/kaizencodes) and [justin808](https://github.com/justin808).
@@ -575,7 +575,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/7.0.4...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.1...master
+[8.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/7.0.4...8.0.0-beta.1
 [7.0.4]: https://github.com/shakacode/react_on_rails/compare/7.0.3...7.0.4
 [7.0.3]: https://github.com/shakacode/react_on_rails/compare/7.0.1...7.0.3
 [7.0.1]: https://github.com/shakacode/react_on_rails/compare/7.0.0...7.0.1
