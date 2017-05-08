@@ -1,9 +1,8 @@
+# Used by webpacker_lite to configure the helpers and by webpack from the
+# client/webpack.client.base.config.js and other sibling config files, using variable `paths`.
 default: &default
-  config: client/webpack
   output: public
-  assets: webpack
   manifest: manifest.json
-  source: client/app
 
 development:
   <<: *default

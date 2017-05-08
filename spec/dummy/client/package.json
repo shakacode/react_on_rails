@@ -68,13 +68,13 @@
   "scripts": {
     "lint": "eslint --ext .js,.jsx .",
     "test": "yarn run build:test && rspec",
-    "build:test": "NODE_ENV=test yarn run build:client && NODE_ENV=test yarn run build:server",
-    "build:production:client": "NODE_ENV=production webpack --config webpack.client.rails.build.config.js",
-    "build:production:server": "NODE_ENV=production webpack --config webpack.server.rails.build.config.js",
-    "build:client": "webpack --config webpack.client.rails.build.config.js",
+    "build:test": "yarn run build:test:client && yarn run build:test:server",
+    "build:test:client": "NODE_ENV=test webpack --config webpack.client.rails.build.config.js",
+    "build:test:server": "NODE_ENV=test webpack --config webpack.server.rails.build.config.js",
     "build:dev:client": "NODE_ENV=development webpack -w --config webpack.client.rails.build.config.js",
     "build:dev:server": "NODE_ENV=development webpack -w --config webpack.server.rails.build.config.js",
-    "build:server": "webpack --config webpack.server.rails.build.config.js",
+    "build:production:client": "NODE_ENV=production webpack --config webpack.client.rails.build.config.js",
+    "build:production:server": "NODE_ENV=production webpack --config webpack.server.rails.build.config.js",
     "hot-assets": "NODE_ENV=development babel-node server-rails-hot.js",
     "install-react-on-rails": "rm -rf node_modules/react-on-rails && npm i 'file:../../..'"
   },
