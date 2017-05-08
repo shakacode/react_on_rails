@@ -6,6 +6,11 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 *Please add entries here for your pull requests.*
 
+## [8.0.0-beta.2] - 2017-05-08
+
+### Changed
+Removed unnecessary values in default paths.yml files for generators. [#834](https://github.com/shakacode/react_on_rails/pull/834) by [justin808](https://github.com/justin808).
+
 ## [8.0.0-beta.1] - 2017-05-03
 
 ### Added
@@ -575,7 +580,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.2...master
+[8.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.1...8.0.0-beta.2
 [8.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/7.0.4...8.0.0-beta.1
 [7.0.4]: https://github.com/shakacode/react_on_rails/compare/7.0.3...7.0.4
 [7.0.3]: https://github.com/shakacode/react_on_rails/compare/7.0.1...7.0.3
