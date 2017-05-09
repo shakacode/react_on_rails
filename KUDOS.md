@@ -8,7 +8,7 @@ By Email
 ![image](https://cloud.githubusercontent.com/assets/1118459/25869348/b1bd27ce-349b-11e7-912c-11d05ab2bf4d.png)
 
 ### April 6, 2017
-On Medium: [Adding react to your node app](https://medium.com/@Tswaynee/adding-react-to-your-node-app-8707c5464b3)
+Tyler Swayne on Medium: [Adding react to your node app](https://medium.com/@Tswaynee/adding-react-to-your-node-app-8707c5464b3)
 
 ![2017-04-06_16-11-51](https://cloud.githubusercontent.com/assets/1118459/24786595/75bb2b9c-1afe-11e7-8051-8c9046c4e007.png)
 
