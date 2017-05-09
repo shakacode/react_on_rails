@@ -7,7 +7,7 @@ By Email
 
 ![image](https://cloud.githubusercontent.com/assets/1118459/25869348/b1bd27ce-349b-11e7-912c-11d05ab2bf4d.png)
 
-## April 6, 2017
+### April 6, 2017
 On Medium: [Adding react to your node app](https://medium.com/@Tswaynee/adding-react-to-your-node-app-8707c5464b3)
 
 ![2017-04-06_16-11-51](https://cloud.githubusercontent.com/assets/1118459/24786595/75bb2b9c-1afe-11e7-8051-8c9046c4e007.png)
@@ -17,7 +17,7 @@ Github issue [#766](https://github.com/shakacode/react_on_rails/issues/766).
 
 ![2017-03-23_17-43-17](https://cloud.githubusercontent.com/assets/1118459/24279884/badab166-0ff0-11e7-87ab-94253f55a3d9.png)
 
-## March 21, 2017
+### March 21, 2017
 Twitter from [@rfc2616](https://twitter.com/rfc2616)
 
 ![2017-03-24_20-20-20](https://cloud.githubusercontent.com/assets/1118459/24319983/7adfd57a-10cf-11e7-9a50-5c23d5d5bcab.png)
@@ -45,7 +45,8 @@ Twitter from [@rfc2616](https://twitter.com/rfc2616)
 https://github.com/shakacode/react_on_rails/pull/591#issuecomment-258685925
 ![2016-11-15_08-36-29](https://cloud.githubusercontent.com/assets/1118459/20318599/ec4882b0-ab0e-11e6-83e2-7f398e2cdf5b.png)
 
-### October 29, 2016 by Email
+### October 29, 2016
+by Email
 ![2016-10-29_17-10-25](https://cloud.githubusercontent.com/assets/1118459/20163712/72307a82-a6b3-11e6-9c46-aee526192b23.png)
 
 ### September 11, 2016
