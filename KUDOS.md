@@ -2,17 +2,24 @@ This is a sibling file to [PROJECTS.md](./PROJECTS.md).
 
 I'm looking for quotes on why you like using React on Rails. You might mention any benefits you particularly like and if you've migrated from react-rails. Just click to edit and github will automatically open up a PR. Thanks to everybody that contributes!
 
-## April 6, 2017 on Medium
-[Adding react to your node app](https://medium.com/@Tswaynee/adding-react-to-your-node-app-8707c5464b3)
+## May 9, 2017
+By Email
+
+![image](https://cloud.githubusercontent.com/assets/1118459/25869348/b1bd27ce-349b-11e7-912c-11d05ab2bf4d.png)
+
+## April 6, 2017
+On Medium: [Adding react to your node app](https://medium.com/@Tswaynee/adding-react-to-your-node-app-8707c5464b3)
 
 ![2017-04-06_16-11-51](https://cloud.githubusercontent.com/assets/1118459/24786595/75bb2b9c-1afe-11e7-8051-8c9046c4e007.png)
 
 ### March 23, 2017
 Github issue [#766](https://github.com/shakacode/react_on_rails/issues/766).
+
 ![2017-03-23_17-43-17](https://cloud.githubusercontent.com/assets/1118459/24279884/badab166-0ff0-11e7-87ab-94253f55a3d9.png)
 
 ## March 21, 2017
 Twitter from [@rfc2616](https://twitter.com/rfc2616)
+
 ![2017-03-24_20-20-20](https://cloud.githubusercontent.com/assets/1118459/24319983/7adfd57a-10cf-11e7-9a50-5c23d5d5bcab.png)
 
 ### March 2, 2017
