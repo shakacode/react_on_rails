@@ -2,7 +2,7 @@ This is a sibling file to [PROJECTS.md](./PROJECTS.md).
 
 I'm looking for quotes on why you like using React on Rails. You might mention any benefits you particularly like and if you've migrated from react-rails. Just click to edit and github will automatically open up a PR. Thanks to everybody that contributes!
 
-## May 6, 2017
+### May 6, 2017
 By Email
 
 ![image](https://cloud.githubusercontent.com/assets/1118459/25869348/b1bd27ce-349b-11e7-912c-11d05ab2bf4d.png)
