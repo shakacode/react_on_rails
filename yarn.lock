@@ -1051,6 +1051,10 @@ console-control-strings@^1.0.0, console-control-strings@~1.1.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/console-control-strings/-/console-control-strings-1.1.0.tgz#3d7cf4464db6446ea644bf4b39507f9851008e8e"
 
+console.history@^1.5.0:
+  version "1.5.0"
+  resolved "https://registry.yarnpkg.com/console.history/-/console.history-1.5.0.tgz#dfa37fd60dc34a7aaacf1468b547e1886104dac9"
+
 contains-path@^0.1.0:
   version "0.1.0"
   resolved "https://registry.yarnpkg.com/contains-path/-/contains-path-0.1.0.tgz#fe8cf184ff6670b6baef01a9d4861a5cbec4120a"
