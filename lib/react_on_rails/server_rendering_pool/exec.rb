@@ -136,6 +136,9 @@ function setTimeout() {
 function clearTimeout() {
   #{undefined_for_exec_js_logging('clearTimeout')}
 }
+
+navigator = {};
+
           JS
         end
 
