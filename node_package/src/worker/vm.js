@@ -68,3 +68,11 @@ exports.runInVM = function runInVM(code) {
   const result = vm.run(`return ${code}`);
   return result;
 };
+
+/**
+ *
+ */
+exports.resetVM = function resetVM() {
+  vm = undefined;
+  bundleUpdateTimeUtc = undefined;
+};
