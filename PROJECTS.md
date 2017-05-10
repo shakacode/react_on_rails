@@ -41,3 +41,4 @@
 * [github.com/Limenius/symfony-react-sandbox](https://github.com/Limenius/symfony-react-sandbox)
 * [github.com/tswayne/react-helper](https://github.com/tswayne/react-helper)
 * [github.com/KissKissBankBank/kitten](https://github.com/KissKissBankBank/kitten)
+* [github.com/sharetribe/sharetribe](https://github.com/sharetribe/sharetribe): Open source marketplace platform.
