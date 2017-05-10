@@ -4,7 +4,7 @@
  */
 
 const fs = require('fs');
-const { NodeVM, VMScript } = require('vm2');
+const { NodeVM } = require('vm2');
 const cluster = require('cluster');
 
 // Add history to console:
@@ -14,18 +14,18 @@ require('console.history');
  * Overrirde _collect method of console.history.
  * See https://github.com/lesander/console.history/blob/master/console-history.js for details.
  */
-console._collect = function (type, args) {
+console._collect = (type, args) => {
   // Act normal, and just pass all original arguments to the origial console function:
-  console['_' + type].apply(console, args);
+  console[`_${type}`].apply(console, args);
 
   // Build console history entry in react_on_rails format:
-  var argArray = Array(Array.prototype.slice.call(args));
+  const argArray = Array(Array.prototype.slice.call(args));
   if (argArray.length > 0) {
-    argArray[0] = '[SERVER] ' + argArray[0];
+    argArray[0] = `[SERVER] ${argArray[0]}`;
   }
 
-  console.history.push({level: 'log', arguments: argArray});
-}
+  console.history.push({ level: 'log', arguments: argArray });
+};
 
 let vm;
 let bundleUpdateTimeUtc;
