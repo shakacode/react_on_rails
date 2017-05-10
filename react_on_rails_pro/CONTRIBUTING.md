@@ -8,19 +8,13 @@
 
 ```
 cd react-on-rails-renderer
-bundle && yarn
+yarn
 cd spec/dummy
 bundle && yarn
 
 ```
 
-* See [docs/contributor-info/Releasing](./docs/contributor-info/releasing.md) for instructions on releasing.
-* See other docs in [docs/contributor-info](./docs/contributor-info)
-
 ## Summary
-
-
-
 
 For non-doc fixes:
 
@@ -62,16 +56,9 @@ When making doc changes, we want the change to work on both the gitbook and the 
 * After updating code via git, to prepare all examples and run all tests:
 
 ```sh
-cd react_on_rails/
-bundle && yarn && rake examples:prepare_all && rake node_package && rake
+cd react-on-rails-renderer/
+yarn run test
 ```
-
-In order to run tests in browser
-```
-yarn global add  browserify babelify tape-run faucet
-browserify -t babelify node_package/tests/*.js | tape-run | faucet
-```
-
 See Dev Initial Setup, below for, well... initial setup.
 
 # IDE/IDE SETUP
@@ -79,22 +66,20 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 
 * /coverage
 * /tmp
-* /gen-examples
-* /node_package/lib
 * /node_modules
 * /spec/dummy/app/assets/webpack
 * /spec/dummy/log
 * /spec/dummy/node_modules
 * /spec/dummy/client/node_modules
 * /spec/dummy/tmp
-* /spec/react_on_rails/dummy-for-generators
+
 
 # Configuring your test app to use your local fork
-You can test the `react-on-rails` gem using your own external test app or the gem's internal `spec/dummy` app. The `spec/dummy` app is an example of the various setup techniques you can use with the gem.
+You can test the `react-on-rails-renderer` gem using your own external test app or the gem's internal `spec/dummy` app. The `spec/dummy` app is an example of the various setup techniques you can use with the gem.
 ```
 ├── test
 |    └── client
-└── react_on_rails
+└── react-on-rails-renderer
     └── spec
         └── dummy
 ```
@@ -103,8 +88,36 @@ You can test the `react-on-rails` gem using your own external test app or the ge
 If you want to test the ruby parts of the gem with an application before you release a new version of the gem, you can specify the path to your local version via your test app's Gemfile:
 
 ```ruby
-gem "react_on_rails", path: "../path-to-react-on-rails"
+gem "react_on_rails_renderer", path: "../path-to-react-on-rails-renderer"
+gem "react_on_rails"
 ```
+
+Currently you also need to monkeypatch `ReactOnRails::ServerRenderingPool` module at the end of `initializers/react_on_rails`:
+
+```ruby
+module ReactOnRails
+  module ServerRenderingPool
+    class << self
+      def pool
+        if ReactOnRails.configuration.server_render_method == "NodeJS"
+          ServerRenderingPool::Node
+        elsif ReactOnRails.configuration.server_render_method == "NodeJSHttp"
+          ReactOnRailsRenderer::RenderingPool
+        else
+          ServerRenderingPool::Exec
+        end
+      end
+
+      # rubocop:disable Style/MethodMissing
+      def method_missing(sym, *args, &block)
+        pool.send sym, *args, &block
+      end
+    end
+  end
+end
+```
+
+Then set `config.server_render_method = "NodeJSHttp"` in your  `ReactOnRails.configure` block.
 
 Note that you will need to bundle install after making this change, but also that **you will need to restart your Rails application if you make any changes to the gem**.
 
