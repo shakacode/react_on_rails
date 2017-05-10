@@ -8,11 +8,16 @@ function getBundlePath() {
 }
 
 test('buildVM and runInVM', (assert) => {
-  assert.plan(5);
+  assert.plan(2);
   buildVM(getBundlePath());
 
   assert.deepEqual(runInVM('ReactOnRails'), { dummy: 'Dummy Object' }, 'ReactOnRails object is availble is sandbox');
   assert.ok(global.ReactOnRails === undefined, 'ReactOnRails object did not leak to global context');
+});
+
+test('VM security', (assert) => {
+  assert.plan(3);
+  buildVM(getBundlePath());
 
   // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
   assert.throws(
@@ -31,9 +36,28 @@ test('buildVM and runInVM', (assert) => {
     'VM prevents global attack');
 });
 
+test('VM console history', (assert) => {
+  assert.plan(2);
+  buildVM(getBundlePath());
+
+  let vmResult = runInVM('console.log("Console message inside of VM") || console.history;');
+  const consoleHistory = [{ level: 'log', arguments: ['[SERVER] Console message inside of VM'] }];
+  assert.deepEqual(
+    vmResult,
+    consoleHistory,
+    'Console logging from VM changes history for console inside VM');
+
+  console.history = [];
+  vmResult = runInVM('console.log("Console message inside of VM") || console.history;');
+  assert.deepEqual(
+    console.history,
+    consoleHistory,
+    'Console logging from VM changes history for console outside of VM');
+});
+
 test('getBundleUpdateTimeUtc', (assert) => {
   assert.plan(1);
-  buildVM(path.resolve(__dirname, './fixtures/bundle.js'));
+  buildVM(getBundlePath());
   assert.equal(
     getBundleUpdateTimeUtc(),
     +(fs.statSync(getBundlePath()).mtime),
