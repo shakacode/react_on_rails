@@ -7,25 +7,28 @@ const fs = require('fs');
 const { NodeVM, VMScript } = require('vm2');
 const cluster = require('cluster');
 
+// Add history to console:
+require('console.history');
+
+/**
+ * Overrirde _collect method of console.history.
+ * See https://github.com/lesander/console.history/blob/master/console-history.js for details.
+ */
+console._collect = function (type, args) {
+  // Act normal, and just pass all original arguments to the origial console function:
+  console['_' + type].apply(console, args);
+
+  // Build console history entry in react_on_rails format:
+  var argArray = Array(Array.prototype.slice.call(args));
+  if (argArray.length > 0) {
+    argArray[0] = '[SERVER] ' + argArray[0];
+  }
+
+  console.history.push({level: 'log', arguments: argArray});
+}
+
 let vm;
 let bundleUpdateTimeUtc;
-
-// Prepare console polyfill script:
-// See https://github.com/patriksimek/vm2#vmscript for details:
-const consolePolyfillScript = new VMScript(
-  `console = { history: [] };
-  ['error', 'log', 'info', 'warn'].forEach(function (level) {
-    console[level] = function () {
-      var argArray = Array.prototype.slice.call(arguments);
-      if (argArray.length > 0) {
-        argArray[0] = '[SERVER] ' + argArray[0];
-      }
-      console.history.push({level: level, arguments: argArray});
-    };
-  });`);
-
-// Prepare console history clearing script:
-const clearConsoleHistoryScript = new VMScript('console.history = [];');
 
 /**
  *
@@ -33,7 +36,7 @@ const clearConsoleHistoryScript = new VMScript('console.history = [];');
 exports.buildVM = function buildVMNew(filePath) {
   // See https://github.com/patriksimek/vm2#nodevm for details:
   vm = new NodeVM({
-    console: 'off',
+    console: 'inherit',
     wrapper: 'none',
     require: {
       external: true,
@@ -41,8 +44,6 @@ exports.buildVM = function buildVMNew(filePath) {
       context: 'sandbox',
     },
   });
-
-  vm.run(consolePolyfillScript);
 
   bundleUpdateTimeUtc = +(fs.statSync(filePath).mtime);
 
@@ -63,7 +64,7 @@ exports.getBundleUpdateTimeUtc = function getBundleUpdateTimeUtc() {
  *
  */
 exports.runInVM = function runInVM(code) {
+  console.history = [];
   const result = vm.run(`return ${code}`);
-  vm.run(clearConsoleHistoryScript);
   return result;
 };

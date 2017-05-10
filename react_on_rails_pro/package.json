@@ -7,6 +7,7 @@
     "doc": "docs"
   },
   "dependencies": {
+    "console.history": "^1.5.0",
     "express": "^4.15.2",
     "express-busboy": "^6.0.1",
     "fs-extra": "^3.0.1",
