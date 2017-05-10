@@ -33,7 +33,7 @@ module ReactOnRails
       end
 
       def copy_tests
-        %w(spec/features/hello_world_spec.rb).each { |file| copy_file(file) }
+        %w(spec/features/main_page_spec.rb).each { |file| copy_file(file) }
       end
 
       # We want to use the node module in the local build, not the one published to NPM
@@ -53,12 +53,12 @@ module ReactOnRails
 
       def replace_prerender_if_server_rendering
         return unless options.example_server_rendering
-        hello_world_index = File.join(destination_root, "app", "views", "hello_world", "index.html.erb")
-        hello_world_contents = File.read(hello_world_index)
-        new_hello_world_contents = hello_world_contents.gsub(/prerender: false/,
+        main_page_index = File.join(destination_root, "app", "views", "main_page", "index.html.erb")
+        main_page_contents = File.read(main_page_index)
+        new_main_page_contents = main_page_contents.gsub(/prerender: false/,
                                                              "prerender: true")
 
-        File.open(hello_world_index, "w+") { |f| f.puts new_hello_world_contents }
+        File.open(main_page_index, "w+") { |f| f.puts new_main_page_contents }
       end
 
       def add_yarn_relative_install_script_in_client_package_json

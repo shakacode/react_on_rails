@@ -5,7 +5,7 @@ import React from 'react';
 import { Provider } from 'react-redux';
 import ReactOnRails from 'react-on-rails';
 
-import HelloWorldContainer from '../components/HelloWorldContainer';
+import MainPageContainer from '../components/MainPageContainer';
 
 /*
  *  Export a function that returns a ReactComponent, depending on a store named SharedReduxStore.
@@ -18,7 +18,7 @@ export default () => {
 
   return (
     <Provider store={store}>
-      <HelloWorldContainer />
+      <MainPageContainer />
     </Provider>
   );
 };

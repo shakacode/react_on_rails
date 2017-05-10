@@ -3,10 +3,10 @@ import 'es5-shim';
 
 import ReactOnRails from 'react-on-rails';
 
-import HelloWorld from '../components/HelloWorld';
-import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
-import HelloWorldES5 from '../components/HelloWorldES5';
-import HelloWorldApp from './HelloWorldApp';
+import MainPage from '../components/MainPage';
+import MainPageWithLogAndThrow from '../components/MainPageWithLogAndThrow';
+import MainPageES5 from '../components/MainPageES5';
+import MainPageApp from './MainPageApp';
 
 import ReduxApp from './ClientReduxApp';
 import ReduxSharedStoreApp from './ClientReduxSharedStoreApp';
@@ -33,12 +33,12 @@ ReactOnRails.setOptions({
 });
 
 ReactOnRails.register({
-  HelloWorld,
-  HelloWorldWithLogAndThrow,
-  HelloWorldES5,
+  MainPage,
+  MainPageWithLogAndThrow,
+  MainPageES5,
   ReduxApp,
   ReduxSharedStoreApp,
-  HelloWorldApp,
+  MainPageApp,
   RouterApp,
   PureComponent,
   CssModulesImagesFontsExample,

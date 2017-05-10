@@ -100,7 +100,7 @@ describe InstallGenerator, type: :generator do
 
               foreman start -f Procfile.dev
 
-          - Visit http://localhost:3000/hello_world and see your React On Rails app running!
+          - Visit http://localhost:3000/main_page and see your React On Rails app running!
       MSG
     end
 
@@ -128,7 +128,7 @@ describe InstallGenerator, type: :generator do
 
               foreman start -f Procfile.dev
 
-          - Visit http://localhost:3000/hello_world and see your React On Rails app running!
+          - Visit http://localhost:3000/main_page and see your React On Rails app running!
       MSG
       expect(GeneratorMessages.output)
         .to include(GeneratorMessages.format_info(expected))

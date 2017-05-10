@@ -1,8 +1,8 @@
 shared_examples "base_generator" do
-  it "adds a route for get 'hello_world' to 'hello_world#index'" do
+  it "adds a route for get 'main_page' to 'main_page#index'" do
     match = <<-MATCH.strip_heredoc
       Rails.application.routes.draw do
-        get 'hello_world', to: 'hello_world#index'
+        get 'main_page', to: 'main_page#index'
       end
     MATCH
     assert_file "config/routes.rb", match
@@ -23,12 +23,12 @@ shared_examples "base_generator" do
 
   it "creates react directories" do
     dirs = %w(components containers startup)
-    dirs.each { |dirname| assert_directory "client/app/bundles/HelloWorld/#{dirname}" }
+    dirs.each { |dirname| assert_directory "client/app/bundles/MainPage/#{dirname}" }
   end
 
   it "copies react files" do
-    %w(app/controllers/hello_world_controller.rb
-       client/app/bundles/HelloWorld/components/HelloWorld.jsx
+    %w(app/controllers/main_page_controller.rb
+       client/app/bundles/MainPage/components/MainPage.jsx
        client/REACT_ON_RAILS_CLIENT_README.md
        client/webpack.config.js
        client/.babelrc
@@ -44,7 +44,7 @@ shared_examples "base_generator" do
     assert_file("config/initializers/assets.rb") { |contents| assert_match(expected, contents) }
   end
 
-  it "templates HelloWorldApp into webpack.config.js" do
+  it "templates MainPageApp into webpack.config.js" do
     assert_file("client/webpack.config.js") do |contents|
       assert_match("registration", contents)
     end

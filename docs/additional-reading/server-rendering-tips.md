@@ -27,7 +27,7 @@ Here's an example of this which shows the line numbers that end up calling setTi
 ```
 ➜  ~/shakacode/react_on_rails/gen-examples/examples/basic-server-rendering (add-rails-helper-to-generator u=) ✗ export TRACE_REACT_ON_RAILS=TRUE
 ➜  ~/shakacode/react_on_rails/gen-examples/examples/basic-server-rendering (add-rails-helper-to-generator u=) ✗ rspec 
-Hello World
+Main Page
 Building Webpack client-rendering assets...
 Completed building Webpack client-rendering assets.
 ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ
@@ -48,5 +48,5 @@ at notify (<eval>:4081:4)
 at Promise.$resolve (<eval>:4189:8)
 at <eval>:793:18
 at Function.resolve (<eval>:4265:6)
-  the hello world example works
+  the main page example works
 ```

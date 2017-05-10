@@ -1,0 +1,3 @@
+<h1>Main Page</h1>
+<%%= react_component("<%= config[:component_name] %>", props: @main_page_props, prerender: false) %>
+

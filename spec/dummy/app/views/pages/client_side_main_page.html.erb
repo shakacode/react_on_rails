@@ -1,0 +1,37 @@
+<%= render "header" %>
+<%= react_component("MainPage", props: @app_props_server_render, prerender: false, trace: true, id: "MainPage-react-component-0") %>
+<hr/>
+
+<h1>React Rails Client Side Only Rendering</h1>
+<p>
+  This example demonstrates client side only rendering.<br/><br/>
+  The source HTML of this page will only show a DIV with an ID matching MainPage.<br/>
+  <pre>
+    <%= "<div id=\"MainPage-react-component-0\"></div>" %>
+  </pre><br/><br/>
+  Compare this to the HTML created for server rendering.<br/>
+</p>
+
+<hr/>
+<h2>Setup</h2>
+<ol>
+  <li>
+    Create component source: spec/dummy/client/app/components/MainPage.jsx
+  </li>
+  <li>
+    Expose the MainPage Component: spec/dummy/client/app/startup/clientRegistration.jsx
+    <br/>
+    <pre>
+      import MainPage from '../components/MainPage';
+      import ReactOnRails from 'react-on-rails';
+      ReactOnRails.register({ MainPage });
+    </pre>
+  </li>
+  <li>
+    Place the component on the view: spec/dummy/app/views/pages/client_side_main_page.html.erb
+    <br/>
+    <pre>
+      <%%= react_component("MainPage", props: @app_props_server_render, prerender: false, trace: true, id: "MainPage-react-component-0") %>
+    </pre>
+  </li>
+</ol>

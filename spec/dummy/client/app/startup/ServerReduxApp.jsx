@@ -12,7 +12,7 @@ import middleware from 'redux-thunk';
 import reducers from '../reducers/reducersIndex';
 import composeInitialState from '../store/composeInitialState';
 
-import HelloWorldContainer from '../components/HelloWorldContainer';
+import MainPageContainer from '../components/MainPageContainer';
 
 /*
  *  Export a function that takes the props and returns a ReactComponent.
@@ -24,14 +24,14 @@ export default (props, railsContext) => {
   const combinedProps = composeInitialState(props, railsContext);
 
   // This is where we'll put in the middleware for the async function. Placeholder.
-  // store will have helloWorldData as a top level property
+  // store will have mainPageData as a top level property
   const store = applyMiddleware(middleware)(createStore)(combinedReducer, combinedProps);
 
   // Provider uses the this.props.children, so we're not typical React syntax.
-  // This allows redux to add additional props to the HelloWorldContainer.
+  // This allows redux to add additional props to the MainPageContainer.
   return (
     <Provider store={store}>
-      <HelloWorldContainer />
+      <MainPageContainer />
     </Provider>
   );
 };

@@ -132,7 +132,7 @@ To upgrade existing apps to react on rails 7 see the [Installation Overview](doc
   rails generate react_on_rails:install --help
   ```
 
-4. Run the generator with a simple "Hello World" example (more options below):
+4. Run the generator with a simple "MainPage" bundle (more options below):
 
   ```bash
   rails generate react_on_rails:install
@@ -152,7 +152,7 @@ To upgrade existing apps to react on rails 7 see the [Installation Overview](doc
   foreman start -f Procfile.dev
   ```
 
-8. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world). Note, `foreman` defaults to PORT 5000 unless you set the value of PORT in your environment. For example, you can `export PORT=3000` to use the Rails default port of 3000. For the hello_world example this is already set.
+8. Visit [localhost:3000/main_page](http://localhost:3000/main_page). Note, `foreman` defaults to PORT 5000 unless you set the value of PORT in your environment. For example, you can `export PORT=3000` to use the Rails default port of 3000. For the main_page example this is already set.
 
 ### Installation Overview
 
@@ -167,20 +167,20 @@ Configure the `config/initializers/react_on_rails.rb`. You can adjust some neces
 + *Normal Mode (React component will be rendered on client):*
 
   ```erb
-  <%= react_component("HelloWorld", props: @some_props) %>
+  <%= react_component("MainPage", props: @some_props) %>
   ```
 + *Server-Side Rendering (React component is first rendered into HTML on the server):*
 
   ```erb
-  <%= react_component("HelloWorld", props: @some_props, prerender: true) %>
+  <%= react_component("MainPage", props: @some_props, prerender: true) %>
   ```
 
-+ The `component_name` parameter is a string matching the name you used to expose your React component globally. So, in the above examples, if you had a React component named "HelloWorld," you would register it with the following lines:
++ The `component_name` parameter is a string matching the name you used to expose your React component globally. So, in the above examples, if you had a React component named "MainPage," you would register it with the following lines:
 
   ```js
   import ReactOnRails from 'react-on-rails';
-  import HelloWorld from './HelloWorld';
-  ReactOnRails.register({ HelloWorld });
+  import MainPage from './MainPage';
+  ReactOnRails.register({ MainPage });
   ```
 
   Exposing your component in this way is how React on Rails is able to reference your component from a Rails view. You can expose as many components as you like, as long as their names do not collide. See below for the details of how you expose your components via the react_on_rails webpack configuration.
@@ -189,7 +189,7 @@ Configure the `config/initializers/react_on_rails.rb`. You can adjust some neces
 
   ```ruby
     # Rails View
-    <%= react_component("HelloWorld", props: { name: "Stranger" }) %>
+    <%= react_component("MainPage", props: { name: "Stranger" }) %>
   ```
 
   ```javascript
@@ -227,12 +227,12 @@ Now the server will interpret your JavaScript using [ExecJS](https://github.com/
 In the following screenshot you can see the 3 parts of React on Rails rendering:
 
 1. A hidden HTML div that contains the properties of the React component, such as the registered name and any props. A JavaScript function runs after the page loads to convert take this data and build initialize React components.
-2. The wrapper div `<div id="HelloWorld-react-component-0">` specifies the div where to place the React rendering. It encloses the server-rendered HTML for the React component
+2. The wrapper div `<div id="MainPage-react-component-0">` specifies the div where to place the React rendering. It encloses the server-rendered HTML for the React component
 3. Additional JavaScript is placed to console log any messages, such as server rendering errors. Note, these server side logs can be configured to only be sent to the server logs.
 
 **Note**:
 
-* If server rendering is not used (prerender: false), then the major difference is that the HTML rendered for the React component only contains the outer div: `<div id="HelloWorld-react-component-0"/>`. The first specification of the React component is just the same.
+* If server rendering is not used (prerender: false), then the major difference is that the HTML rendered for the React component only contains the outer div: `<div id="MainPage-react-component-0"/>`. The first specification of the React component is just the same.
 * The below image is not yet updated for version 7.0.0 which uses a `<script>` tag for the props. Instead of a hidden div, we have the props inside of the a `<script>` tag.
 
 ![Comparison of a normal React Component with its server-rendered version](https://cloud.githubusercontent.com/assets/1118459/12607542/a959d5c8-c48a-11e5-8187-2433d543ccaa.png)
@@ -331,17 +331,17 @@ Place your JavaScript code inside of the provided `client/app` folder. Use modul
 This is an example of how to expose a component to the `react_component` view helper.
 
   ```javascript
-  // client/app/bundles/HelloWorld/startup/HelloWorld.jsx
-  import HelloWorld from '../components/HelloWorld';
+  // client/app/bundles/MainPage/startup/MainPage.jsx
+  import MainPage from '../components/MainPage';
   import ReactOnRails from 'react-on-rails';
-  ReactOnRails.register({ HelloWorld });
+  ReactOnRails.register({ MainPage });
   ```
 
 #### Different Server-Side Rendering Code (and a Server Specific Bundle)
 
 You may want different initialization for your server rendered components. For example, if you have animation that runs when a component is displayed, you might need to turn that off when server rendering. However, the `railsContext` will tell you if your JavaScript code is running client side or server side. So code that required a different server bundle previously may no longer require this!
 
-If you do want different code to run, you'd setup a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverHelloWorld.jsx'. Note, you might be initializing HelloWorld with version specialized for server rendering.
+If you do want different code to run, you'd setup a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverMainPage.jsx'. Note, you might be initializing MainPage with version specialized for server rendering.
 
 #### Generator Functions
 Why would you create a function that returns a React component? For example, you may want the ability to use the passed-in props to initialize a redux store or setup react-router. Or you may want to return different components depending on what's in the props. ReactOnRails will automatically detect a registered generator function.

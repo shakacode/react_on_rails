@@ -15,11 +15,11 @@ module ReactOnRails
       class_option :redux,
                    type: :boolean,
                    default: false,
-                   desc: "Install Redux gems and Redux version of Hello World Example",
+                   desc: "Install Redux gems and Redux version of Main Page Example",
                    aliases: "-R"
 
-      def add_hello_world_route
-        route "get 'hello_world', to: 'hello_world#index'"
+      def add_main_page_route
+        route "get 'main_page', to: 'main_page#index'"
       end
 
       def update_git_ignore
@@ -41,12 +41,12 @@ module ReactOnRails
 
       def create_react_directories
         dirs = %w(components containers startup)
-        dirs.each { |name| empty_directory("client/app/bundles/HelloWorld/#{name}") }
+        dirs.each { |name| empty_directory("client/app/bundles/MainPage/#{name}") }
       end
 
       def copy_base_files
         base_path = "base/base/"
-        base_files = %w(app/controllers/hello_world_controller.rb
+        base_files = %w(app/controllers/main_page_controller.rb
                         config/webpacker_lite.yml
                         client/.babelrc
                         client/webpack.config.js
@@ -56,7 +56,7 @@ module ReactOnRails
 
       def template_base_files
         base_path = "base/base/"
-        %w(app/views/layouts/hello_world.html.erb
+        %w(app/views/layouts/main_page.html.erb
            config/initializers/react_on_rails.rb
            Procfile.dev
            client/package.json).each { |file| template("#{base_path}#{file}.tt", file) }
@@ -141,7 +141,7 @@ Rails.application.config.assets.paths << Rails.root.join("public", "webpack", Ra
 
                 foreman start -f Procfile.dev
 
-            - Visit http://localhost:3000/hello_world and see your React On Rails app running!
+            - Visit http://localhost:3000/main_page and see your React On Rails app running!
         MSG
         GeneratorMessages.add_info(message)
       end

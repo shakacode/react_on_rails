@@ -7,13 +7,13 @@ class PagesController < ApplicationController
 
   before_action :data
 
-  before_action :initialize_shared_store, only: %i(client_side_hello_world_shared_store_controller
-                                                   server_side_hello_world_shared_store_controller)
+  before_action :initialize_shared_store, only: %i(client_side_main_page_shared_store_controller
+                                                   server_side_main_page_shared_store_controller)
 
   rescue_from ReactOnRails::PrerenderError do |err|
     Rails.logger.error(err.message)
     Rails.logger.error(err.backtrace.join("\n"))
-    redirect_to client_side_hello_world_path,
+    redirect_to client_side_main_page_path,
                 flash: { error: "Error prerendering in react_on_rails. See server logs." }
   end
 
@@ -29,19 +29,19 @@ class PagesController < ApplicationController
     xss_payload = { "<script>window.alert('xss1');</script>" => '<script>window.alert("xss2");</script>' }
     # This is the props used by the React component.
     @app_props_server_render = {
-      helloWorldData: {
+      mainPageData: {
         name: "Mr. Server Side Rendering"
       }.merge(xss_payload)
     }
 
     @app_props_hello = {
-      helloWorldData: {
+      mainPageData: {
         name: "Mrs. Client Side Rendering"
       }.merge(xss_payload)
     }
 
     @app_props_hello_again = {
-      helloWorldData: {
+      mainPageData: {
         name: "Mrs. Client Side Hello Again"
       }.merge(xss_payload)
     }
