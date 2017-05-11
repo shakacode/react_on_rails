@@ -85,3 +85,18 @@ Assuming you did not revoke your  **GitHub OAuth token** so you don't need to up
 2. Change port in your `renderer.js` config to `process.env.PORT` so it will use port number provided by **Heroku** environment.
 3. Run deployment process (usually by pushing changes to **Git** repo associated with created **Heroku** app).
 4. Once deployment process is finshed, renderer should start listening at `renderer-test.herokuapp.com` host.
+
+# Deploy react_on_rails application to Heroku
+Assuming you did not revoke your  **GitHub OAuth token** so you don't need to update your `Gemfile`:
+1. Create your **Heroku** app for `react_on_rails`, see [the doc on Heroku deployment](https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/heroku-deployment.md#more-details-on-precompilation-using-webpack-to-create-javascript-assets).
+2. Configure your app to communicate with renderer app you've created above. Put the following to your `initializers/react_on_rails_renderer` (assuming you have **SSL** sertificate uploaded to your renderer **Heroku** app or you use **Heroku** wildcard sertificate under `*.herokuapp.com`):
+```ruby
+  ReactOnRailsRenderer.configure do |config|
+    config.renderer_protocol = "https"
+    config.renderer_host = "renderer-test.herokuapp.com"
+    config.renderer_port = 443
+  end
+```
+3. Run deployment process (usually by pushing changes to **Git** repo associated with created **Heroku** app).
+4. Once deployment process is finshed, all rendering requests form your `react_on_rails` app should be served by `renderer-test.herokuapp.com` app via **HTTPS**.
+5. **Don't forget to revoke your GitHub OAuth tokens!**
