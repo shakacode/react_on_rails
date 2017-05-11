@@ -4,7 +4,7 @@ feature "Shared Redux store example" do
   subject { page }
   background { visit root_path }
 
-  shared_examples_for 'page in initial state' do
+  shared_examples_for "page in initial state" do
     it "Has correct heading and text inside the text input" do
       expect(page).to have_selector("h3", text: /\ARedux Hello, Mr. Server Side Rendering!\z/)
       expect(page).to have_selector("input[type='text'][value='Mr. Server Side Rendering']")
