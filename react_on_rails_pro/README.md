@@ -30,11 +30,11 @@ const config = {
 reactOnRailsRenderer(config);
 ```
 5. Now you can launch your renderer server with `node renderer.js`.
-6. If you do not plan to deploy renderer to **Heroku** or other hosting platforms, **do not forger to revoke your GitHub OAuth token!**.
+6. If you do not plan to deploy renderer to **Heroku** or other hosting platforms, **do not forger to revoke your GitHub OAuth token!**
 
 ## Setup react_on_rails application
 
-To configure existing `react_on_rails` application to use **Node rendering**, do the following:
+Assuming you already have your **Rails** app running on **react_on_rails** gem. To configure it to use **Node rendering**, do the following:
 
 1. Add ruby gem to your **Gemfile**. Since the repository is private, you can generate and use **GitHub OAuth** token:
 ```ruby
@@ -69,8 +69,12 @@ gem "react_on_rails_renderer", git: "https://[your-github-token]:x-oauth-basic@g
 5. Create `initializers/react_on_rails_renderer` initializer and configure connection to **renderer server**:
 ```ruby
 ReactOnRailsRenderer.configure do |config|
-  config.renderer_protocol = "https"
-  config.renderer_host = "[your-renderer-host-without-protocol-and-port]"
-  config.renderer_port = 443
+  config.renderer_host = "localhost"
+  config.renderer_port = 3800
 end
 ```
+6. Now you should be able to run your app normally with one of **procfiles**:
+```sh
+foreman start -f Procfile.hot
+```
+7. If you do not plan to deploy your changes to **Heroku** or other hosting platforms, **do not forger to revoke your GitHub OAuth token!**
