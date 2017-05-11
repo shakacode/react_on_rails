@@ -21,7 +21,7 @@ console._collect = (type, args) => {
   console[`_${type}`].apply(console, args);
 
   // Build console history entry in react_on_rails format:
-  const argArray = Array(Array.prototype.slice.call(args));
+  const argArray = Array.prototype.slice.call(args);
   if (argArray.length > 0) {
     argArray[0] = `[SERVER] ${argArray[0]}`;
   }

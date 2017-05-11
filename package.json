@@ -39,34 +39,20 @@
     "tap-spec": "^4.1.1",
     "tape": "^4.6.3"
   },
-  "peerDependencies": {
-    "babel-runtime": ">= 6"
-  },
   "files": [
     "node_package/src"
   ],
   "scripts": {
     "test": "babel-tape-runner node_package/tests/*.js | tap-spec",
-    "clean": "rm -rf node_package/lib",
-    "prepublish": "yarn run build",
-    "babel": "babel --out-dir node_package/lib node_package/src",
-    "build": "yarn run clean && yarn run babel",
-    "build-watch": "babel --watch --out-dir node_package/lib node_package/src",
     "eslint": "eslint .",
     "flow": "flow check node_package",
     "lint": "yarn run eslint && yarn run flow",
     "check": "yarn run lint && yarn run flow && yarn run test",
-    "prerelease": "yarn run check && yarn run clean && yarn run build",
-    "release:patch": "node_package/scripts/release patch",
-    "release:minor": "node_package/scripts/release minor",
-    "release:major": "node_package/scripts/release major",
-    "dummy:install": "rake dummy_apps",
-    "dummy:spec": "rake run_rspec:dummy",
     "local": "echo 'Be sure to run yarn run dummy:install' && yarn run build && cd spec/dummy && foreman start"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shakacode/react_on_rails.git"
+    "url": "git+https://github.com/shakacode/react-on-rails-renderer.git"
   },
   "keywords": [
     "react",

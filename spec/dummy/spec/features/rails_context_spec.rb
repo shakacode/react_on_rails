@@ -48,23 +48,13 @@ end
 feature "rails_context" do
   context "client rendering" do
     context "shared store" do
-      include_examples("railsContext",
-                       "client_side_hello_world_shared_store",
-                       "ReduxSharedStoreApp")
+      include_examples("railsContext", "", "ReduxSharedStoreApp")
     end
   end
 
   context "server rendering" do
     context "shared store" do
-      include_examples("railsContext",
-                       "server_side_hello_world_shared_store",
-                       "ReduxSharedStoreApp")
-    end
-
-    context "generator function for component" do
-      include_examples("railsContext",
-                       "server_side_redux_app",
-                       "ReduxApp")
+      include_examples("railsContext", "", "ReduxSharedStoreApp")
     end
   end
 end
