@@ -53,12 +53,23 @@ When making doc changes, we want the change to work on both the gitbook and the 
 
 
 ## To run tests:
-* After updating code via git, to prepare all examples and run all tests:
-
+* After updating code via git, to run all **JS** tests for Node package:
 ```sh
-cd react-on-rails-renderer/
+cd react-on-rails-renderer
 yarn run test
 ```
+
+* To run **RSpec** tests on dummy app, first launch renderer server:
+```sh
+  cd react-on-rails-renderer/spec/dummy
+  yarn run node-renderer
+```
+and then run **RSpec** in another console  window/tab:
+```sh
+  cd react-on-rails-renderer/spec/dummy
+  rspec
+```
+
 See Dev Initial Setup, below for, well... initial setup.
 
 # IDE/IDE SETUP
