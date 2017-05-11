@@ -100,3 +100,6 @@ Assuming you did not revoke your  **GitHub OAuth token** so you don't need to up
 3. Run deployment process (usually by pushing changes to **Git** repo associated with created **Heroku** app).
 4. Once deployment process is finshed, all rendering requests form your `react_on_rails` app should be served by `renderer-test.herokuapp.com` app via **HTTPS**.
 5. **Don't forget to revoke your GitHub OAuth tokens!**
+
+## Local deploy
+Please see [CONTRIBUTING](CONTRIBUTING.md) if you want to deploy and test this project locally.
