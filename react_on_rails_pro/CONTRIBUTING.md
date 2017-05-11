@@ -8,19 +8,13 @@
 
 ```
 cd react-on-rails-renderer
-bundle && yarn
+yarn
 cd spec/dummy
 bundle && yarn
 
 ```
 
-* See [docs/contributor-info/Releasing](./docs/contributor-info/releasing.md) for instructions on releasing.
-* See other docs in [docs/contributor-info](./docs/contributor-info)
-
 ## Summary
-
-
-
 
 For non-doc fixes:
 
@@ -59,17 +53,21 @@ When making doc changes, we want the change to work on both the gitbook and the 
 
 
 ## To run tests:
-* After updating code via git, to prepare all examples and run all tests:
-
+* After updating code via git, to run all **JS** tests for Node package:
 ```sh
-cd react_on_rails/
-bundle && yarn && rake examples:prepare_all && rake node_package && rake
+cd react-on-rails-renderer
+yarn run test
 ```
 
-In order to run tests in browser
+* To run **RSpec** tests on dummy app, first launch renderer server:
+```sh
+  cd react-on-rails-renderer/spec/dummy
+  yarn run node-renderer
 ```
-yarn global add  browserify babelify tape-run faucet
-browserify -t babelify node_package/tests/*.js | tape-run | faucet
+and then run **RSpec** in another console  window/tab:
+```sh
+  cd react-on-rails-renderer/spec/dummy
+  rspec
 ```
 
 See Dev Initial Setup, below for, well... initial setup.
@@ -79,22 +77,20 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 
 * /coverage
 * /tmp
-* /gen-examples
-* /node_package/lib
 * /node_modules
 * /spec/dummy/app/assets/webpack
 * /spec/dummy/log
 * /spec/dummy/node_modules
 * /spec/dummy/client/node_modules
 * /spec/dummy/tmp
-* /spec/react_on_rails/dummy-for-generators
+
 
 # Configuring your test app to use your local fork
-You can test the `react-on-rails` gem using your own external test app or the gem's internal `spec/dummy` app. The `spec/dummy` app is an example of the various setup techniques you can use with the gem.
+You can test the `react-on-rails-renderer` gem using your own external test app or the gem's internal `spec/dummy` app. The `spec/dummy` app is an example of the various setup techniques you can use with the gem.
 ```
 ├── test
 |    └── client
-└── react_on_rails
+└── react-on-rails-renderer
     └── spec
         └── dummy
 ```
@@ -103,21 +99,41 @@ You can test the `react-on-rails` gem using your own external test app or the ge
 If you want to test the ruby parts of the gem with an application before you release a new version of the gem, you can specify the path to your local version via your test app's Gemfile:
 
 ```ruby
-gem "react_on_rails", path: "../path-to-react-on-rails"
+gem "react_on_rails_renderer", path: "../path-to-react-on-rails-renderer"
+gem "react_on_rails"
 ```
+
+Currently you also need to monkeypatch `ReactOnRails::ServerRenderingPool` module at the end of `initializers/react_on_rails`:
+
+```ruby
+module ReactOnRails
+  module ServerRenderingPool
+    class << self
+      def pool
+        if ReactOnRails.configuration.server_render_method == "NodeJS"
+          ServerRenderingPool::Node
+        elsif ReactOnRails.configuration.server_render_method == "NodeJSHttp"
+          ReactOnRailsRenderer::RenderingPool
+        else
+          ServerRenderingPool::Exec
+        end
+      end
+
+      # rubocop:disable Style/MethodMissing
+      def method_missing(sym, *args, &block)
+        pool.send sym, *args, &block
+      end
+    end
+  end
+end
+```
+
+Then set `config.server_render_method = "NodeJSHttp"` in your  `ReactOnRails.configure` block.
 
 Note that you will need to bundle install after making this change, but also that **you will need to restart your Rails application if you make any changes to the gem**.
 
-## Testing the Node package for react-on-rails
-In addition to testing the Ruby parts out, you can also test the node package parts of the gem with an external application. First, be **sure** to build the NPM package:
-
-```sh
-cd react_on_rails/
-yarn
-yarn run build
-```
-
-Install the local package by using a relative path in your test/client app's `package.json`, like this:
+## Testing the Node package for react-on-rails-renderer
+In addition to testing the Ruby parts out, you can also test the node package parts of the gem with an external application. Install the local package by using a relative path in your test/client app's `package.json`, like this:
 ```sh
 cd test/client
 rm -rf node_modules/react-on-rails && npm i 'file:../path-to-react-on-rails-top-package.json'
@@ -127,16 +143,16 @@ _Note: You must use npm here till yarn stops preferring cached packages over loc
 When you use a relative path, be sure to run the above `yarn` command whenever you change the node package for react-on-rails.
 
 #### Example: Testing NPM changes with the dummy app
-1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/clientStartup.js#L181) in `react_on_rails/node_package/src/clientStartup.js` to confirm we're getting an update to the node package.
-2. Run the install script `npm run install-react-on-rails` in `react_on_rails/spec/dummy` to copy over our changes to the dummy app. Alternatively, you can run `rm -rf node_modules/react-on-rails && npm i 'file:../../../'` in `react_on_rails/spec/dummy/client`. Our NPM changes are now available in the dummy app.
+1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react-on-rails-renderer/blob/more_test_and_docs/node_package/src/ReactOnRailsRenderer.js#L6) in `react_on_rails/node_package/src/ReactOnRailsRenderer.js` to confirm we're getting an update to the node package.
+2. Run the install script `npm run install-react-on-rails` in `react_on_rails_renderer/spec/dummy` to copy over our changes to the dummy app. Alternatively, you can run `rm -rf node_modules/react-on-rails && npm i 'file:../../../'` in `react_on_rails/spec/dummy/client`. Our NPM changes are now available in the dummy app.
 3. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console.
 
-_Note: running `npm i` automatically builds the npm package before installing. However, when using yarn you will need to run `yarn run build` in the root directory before the install script. This will be updated when [yarn issue #2649](https://github.com/yarnpkg/yarn/issues/2649) (above) is resolved._
+_Note: you don't have to build the NPM package since it is used only with node runtime and its source code is exactly what is executed when you run it._
 
 # Development Setup for Gem and Node Package Contributors
 
 ## Checklist before Committing
-1. `rake`: runs all linters and specs (you need Docker setup, see below)
+1. Run all JS tests, dummy app tests and linters.
 2. Did you need any more tests for your change?
 3. Did you document your change? Update the README.md?
 
@@ -154,33 +170,21 @@ yarn global add phantomjs
 Note this *must* be installed globally for the dummy test project rspec runner to see it properly.
 
 ### Local Node Package
-Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the dummy app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)
+Because the example and dummy apps rely on the `react-on-rails-renderer` node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the dummy app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)
 
 ```sh
 cd react_on_rails/spec/dummy
-yarn run install-react-on-rails
+yarn run install-react-on-rails-renderer
 ```
-_Note: this runs npm under the hood as explained in **Test NPM for react-on-rails** section above_
+_Note: this runs npm under the hood as explained in **Test NPM for react-on-rails-renderer** section above_
 
-From now on, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:prepare_all` rake task.
+From now on, the example and dummy apps will use your local node_package folder as the `react-on-rails-renderer` node package.
 
-*Side note: It's critical to use the alias section of the webpack config to avoid a double inclusion error. This has already been done for you in the example and dummy apps, but for reference:*
-
-```js
-  resolve: {
-    alias: {
-      react: path.resolve('./node_modules/react'),
-      'react-dom': path.resolve('./node_modules/react-dom'),
-    },
-  },
-```
-
-### Install NPM dependencies and build the NPM package for react-on-rails
+### Install NPM dependencies and build the NPM package for react-on-rails-renderer
 
 ```sh
-cd react_on_rails/
-yarn
-yarn build
+cd react-on-rails-renderer
+yarn install
 ```
 
 Or run this which builds the yarn package, then the webpack files for spec/dummy, and runs tests in
@@ -190,55 +194,46 @@ spec/dummy.
 ```sh
 # Optionally change default selenium_firefox driver
 export DRIVER=poltergeist
-cd react_on_rails/
+cd react-on-rails-renderer
 yarn run dummy:spec
 ```
 
 ### Run NPM JS tests
 
 ```sh
-cd react_on_rails/
+cd react-on-rails-renderer
 yarn test
 ```
 
 ### Run spec/dummy tests
 
 ```sh
-cd react_on_rails/spec/dummy
-rspec
+cd react-on-rails-renderer/spec/dummy
+yarn run node-renderer
 ```
-
-Eventually, we may have JS tests:
+and in another console window/tab:
 
 ```sh
-cd react_on_rails/spec/dummy/client
-yarn run test
+cd react-on-rails-renderer/spec/dummy
+rspec
 ```
 
 ### Run most tests and linting
 
 ```sh
-cd react_on_rails/
+cd react-on-rails-renderer
 yarn run check
 ```
 
 ### Starting the Dummy App
-To run the dummy app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the webpack configs, then you need to restart foreman. If you change the JS code for react-on-rails, you need to run `yarn run build`. Since the react-on-rails package should be sym linked, you don't have to `yarn react-on-rails` after every change.
+To run the dummy app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the webpack configs, then you need to restart foreman.
 
 ### RSpec Testing
-Run `rake` for testing the gem and `spec/dummy`. Otherwise, the `rspec` command only works for testing within the sample apps, like `spec/dummy`.
+Run `rspec` command for testing within the sample apps, like `spec/dummy`.
 
 If you run `rspec` at the top level, you'll see this message: `require': cannot load such file -- rails_helper (LoadError)`
 
 After running a test, you can view the coverage results SimpleCov reports by opening `coverage/index.html`.
-
-To test `spec/dummy` against Turbolinks 2, install the gem by running `ENABLE_TURBOLINKS_2=TRUE bundle install` in the `spec/dummy` directory before running `rake`. Turbolinks 5 is the default.
-
-Run `rake -T` or `rake -D` to see testing options.
-
-`rake all_but_examples` is typically best for developers, except if any generators changed.
-
-See below for verifying changes to the generators.
 
 ### Debugging
 Start the sample app like this for some debug printing:
@@ -246,49 +241,3 @@ Start the sample app like this for some debug printing:
 ```sh
 TRACE_REACT_ON_RAILS=true && foreman start
 ```
-
-### Install Generator
-In your Rails app add this gem with a path to your fork.
-
-```ruby
-gem 'react_on_rails', path: '../relative/path/to/react_on_rails'
-```
-
-The main installer can be run with ```rails generate react_on_rails:install```
-
-### Testing the Generator
-The generators are covered by generator tests using Rails's generator testing helpers, but it never hurts to do a sanity check and explore the API. See [generator_testing_script.md](generator_testing_script.md) for a script on how to run the generator on a fresh project.
-
-`rake run_rspec:example_basic` is a great way to run tests on one generator. Once that works, you should run `rake run_rspec:examples`. Be aware that this will create a hug number of files under a `/gen-examples` directory. You should be sure to exclude this directory from your IDE and delete it once your testing is done.
-
-### Linting
-All linting is performed from the docker container for CI. You will need docker and docker-compose installed locally to lint code changes via the lint container. You can lint locally by running `npm run lint && npm run flow`
-
-* [Install Docker Toolbox for Mac](https://www.docker.com/toolbox)
-* [Install Docker Compose for Linux](https://docs.docker.com/compose/install/)
-
-Once you have docker and docker-compose running locally, run `docker-compose build lint`. This will build the `reactonrails_lint` docker image and docker-compose `lint` container. The initial build is slow, but after the install, startup is very quick.
-
-### Linting Commands
-Run `rake lint`.
-
-Alternately with Docker:
-
-Run `rake -D docker` to see all docker linting commands for rake. `rake docker:lint` will run all linters. For individual rake linting commands please refer to `rake -D docker` for the list.
-
-You can run specific linting for directories or files by using `docker-compose run lint rubocop (file path or directory)`, etc.
-
-`docker-compose run lint bash` sets you up to run from the container command line.
-
-### Docker CI - Test and Linting
-Docker CI and Tests containers have a xvfd server automatically started for headless browser testing with selenium and Firefox.
-
-Run `docker-compose build ci` to build the CI container. Run `docker-compose run ci` to start all rspec tests and linting. `docker-compose run --entrypoint=/bin/bash` will override the default CI action and place you inside the CI container in a bash session. This is what is run on Travis-CI.
-
-Run `docker-compose build tests` to build the tests container. Run `docker-compose run tests` to start all RSpec tests.
-
-# Advice for Project Maintainers and Contributors
-
-What do project maintainers do? What sort of work is involved? [sstephenson](https://github.com/sstephenson) wrote in the [turbolinks](https://github.com/turbolinks/turbolinks) repo:
-
-> [Why this is not still fully merged?](https://github.com/turbolinks/turbolinks/pull/124#issuecomment-239826060)
