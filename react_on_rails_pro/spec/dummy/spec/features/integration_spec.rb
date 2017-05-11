@@ -11,11 +11,17 @@ feature "Shared Redux store example" do
     end
   end
 
-  context "With disabled JS" do
+  context "with disabled JS" do
     it_behaves_like "page in initial state"
   end
 
-  context "With enabled JS", :js do
+  context "with enabled JS", :js do
     it_behaves_like "page in initial state"
+
+    it "updates header in reaction to text input changes" do
+      new_value = "new value"
+      find("input[type='text']").set(new_value)
+      expect(page).to have_selector("h3", text: /\ARedux Hello, #{new_value}!\z/)
+    end
   end
 end
