@@ -27,12 +27,10 @@ const config = {
   port: 3800,
 };
 
+reactOnRailsRenderer(config);
 ```
 5. Now you can launch your renderer server with `node renderer.js`.
 6. If you do not plan to deploy renderer to **Heroku** or other hosting platforms, **do not forger to revoke your GitHub OAuth token!**.
-
-reactOnRailsRenderer(config);
-```
 
 ## Setup react_on_rails application
 
