@@ -73,8 +73,15 @@ ReactOnRailsRenderer.configure do |config|
   config.renderer_port = 3800
 end
 ```
-6. Now you should be able to run your app normally with one of **procfiles**:
+6. Now, if renderer server already started on port `3800` (see instructions above) you should be able to run your app normally with one of **procfiles**:
 ```sh
 foreman start -f Procfile.hot
 ```
 7. If you do not plan to deploy your changes to **Heroku** or other hosting platforms, **do not forger to revoke your GitHub OAuth token!**
+
+## Deploy Node renderer to Heroku
+Assuming you did not revoke your  **GitHub OAuth token** so you don't need to update your `package.json`:
+1. Create your **Heroku** app with **Node.js** buildpack, say `renderer-test.herokuapp.com`.
+2. Change port in your `renderer.js` config to `process.env.PORT` so it will use port number provided by **Heroku** environment.
+3. Run deployment process (usually by pushing changes to **Git** repo associated with created **Heroku** app).
+4. Once deployment process is finshed, renderer should start listening at `renderer-test.herokuapp.com` host.
