@@ -1,7 +1,7 @@
 const test = require('tape');
 const path = require('path');
 const fs = require('fs');
-const { buildVM, runInVM, getBundleUpdateTimeUtc } = require('../src/worker/vm');
+const { buildVM, runInVM, getBundleUpdateTimeUtc } = require('../src/worker/sandbox');
 const { initiConsoleHistory } = require('../src/worker/consoleHistory');
 
 function getBundlePath() {
@@ -18,44 +18,43 @@ test('buildVM and runInVM', (assert) => {
   assert.ok(global.ReactOnRails === undefined, 'ReactOnRails object did not leak to global context');
 });
 
-test('VM security', (assert) => {
+test('Sandbox security', (assert) => {
   assert.plan(3);
   buildVM(getBundlePath());
 
-  // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
-  assert.throws(
-    () => runInVM('process.exit()'),
-    /(undefined is not a function|process.exit is not a function)/,
-    'VM prevents global access');
+  assert.equal(
+    runInVM('process.exit'),
+    process.exit,
+    'Sandbox has access to process globals and able to stop the process');
 
   assert.strictEqual(
     runInVM('(function() { return arguments.callee.caller.constructor === Function; })()'),
-    true,
-    'VM prevents arguments attack');
+    false,
+    'Sandbox does not prevent arguments attack');
 
   assert.throws(
     () => runInVM('(function() { return arguments.callee.caller.caller.toString(); })()'),
     /Cannot read property 'toString' of null/,
-    'VM prevents global attack');
+    'Sandbox prevents global attack');
 });
 
-test('VM console history', (assert) => {
+test('Sandbox console history', (assert) => {
   assert.plan(2);
   buildVM(getBundlePath());
 
-  let vmResult = runInVM('console.log("Console message inside of VM") || console.history;');
-  const consoleHistory = [{ level: 'log', arguments: ['[SERVER] Console message inside of VM'] }];
+  let vmResult = runInVM('console.log("Console message inside of Sandbox") || console.history;');
+  const consoleHistory = [{ level: 'log', arguments: ['[SERVER] Console message inside of Sandbox'] }];
   assert.deepEqual(
     vmResult,
     consoleHistory,
-    'Console logging from VM changes history for console inside VM');
+    'Console logging from Sandbox changes history for console inside Sandbox');
 
   console.history = [];
-  vmResult = runInVM('console.log("Console message inside of VM") || console.history;');
+  vmResult = runInVM('console.log("Console message inside of Sandbox") || console.history;');
   assert.deepEqual(
     console.history,
     consoleHistory,
-    'Console logging from VM changes history for console outside of VM');
+    'Console logging from Sandbox changes history for console outside of Sandbox');
 });
 
 test('getBundleUpdateTimeUtc', (assert) => {
@@ -64,5 +63,5 @@ test('getBundleUpdateTimeUtc', (assert) => {
   assert.equal(
     getBundleUpdateTimeUtc(),
     +(fs.statSync(getBundlePath()).mtime),
-    'getBundleUpdateTimeUtc() should return last modification time of bundle loaded to VM');
+    'getBundleUpdateTimeUtc() should return last modification time of bundle loaded to Sandbox');
 });
