@@ -10,10 +10,32 @@ const path = require('path');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
 const { getConfig } = require('./configBuilder');
-const { buildVM, runInVM, getBundleUpdateTimeUtc } = require('./vm');
 
+/**
+ *
+ */
+function requireVM() {
+  const vmType = getConfig().vm;
+
+  /* eslint-disable global-require */
+  switch (vmType) {
+    case 'vm2':
+      return require('./vm');
+    case 'sandbox':
+      return require('./sandbox');
+    default:
+      throw new Error(`Unknown VM type ${vmType}`);
+  }
+  /* eslint-enable global-require */
+}
+
+/**
+ *
+ */
 // TODO: Split this function in smaller methods.
 module.exports = function handleRenderRequest(req) {
+  const { buildVM, runInVM, getBundleUpdateTimeUtc } = requireVM();
+
   if (!cluster.isMaster) console.log(`worker #${cluster.worker.id} received render request with with code ${req.body.renderingRequest}`);
   const { bundlePath } = getConfig();
   const bundleFilePath = path.join(bundlePath, 'bundle.js');
