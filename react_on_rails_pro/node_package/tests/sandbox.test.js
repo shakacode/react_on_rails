@@ -1,18 +1,15 @@
 const test = require('tape');
-const path = require('path');
 const fs = require('fs');
+const { getUploadedBundlePath, createUploadedBundle } = require('./helper');
 const { buildVM, runInVM, getBundleUpdateTimeUtc } = require('../src/worker/sandbox');
 const { initiConsoleHistory } = require('../src/worker/consoleHistory');
-
-function getBundlePath() {
-  return path.resolve(__dirname, './fixtures/bundle.js');
-}
 
 if (!console.history) initiConsoleHistory();
 
 test('buildVM and runInVM', (assert) => {
   assert.plan(2);
-  buildVM(getBundlePath());
+  createUploadedBundle();
+  buildVM(getUploadedBundlePath());
 
   assert.deepEqual(runInVM('ReactOnRails'), { dummy: 'Dummy Object' }, 'ReactOnRails object is availble is sandbox');
   assert.ok(global.ReactOnRails === undefined, 'ReactOnRails object did not leak to global context');
@@ -20,7 +17,8 @@ test('buildVM and runInVM', (assert) => {
 
 test('Sandbox security', (assert) => {
   assert.plan(3);
-  buildVM(getBundlePath());
+  createUploadedBundle();
+  buildVM(getUploadedBundlePath());
 
   assert.equal(
     runInVM('process.exit'),
@@ -40,7 +38,8 @@ test('Sandbox security', (assert) => {
 
 test('Sandbox console history', (assert) => {
   assert.plan(2);
-  buildVM(getBundlePath());
+  createUploadedBundle();
+  buildVM(getUploadedBundlePath());
 
   let vmResult = runInVM('console.log("Console message inside of Sandbox") || console.history;');
   const consoleHistory = [{ level: 'log', arguments: ['[SERVER] Console message inside of Sandbox'] }];
@@ -59,9 +58,11 @@ test('Sandbox console history', (assert) => {
 
 test('getBundleUpdateTimeUtc', (assert) => {
   assert.plan(1);
-  buildVM(getBundlePath());
+  createUploadedBundle();
+  buildVM(getUploadedBundlePath());
+
   assert.equal(
     getBundleUpdateTimeUtc(),
-    +(fs.statSync(getBundlePath()).mtime),
+    +(fs.statSync(getUploadedBundlePath()).mtime),
     'getBundleUpdateTimeUtc() should return last modification time of bundle loaded to Sandbox');
 });
