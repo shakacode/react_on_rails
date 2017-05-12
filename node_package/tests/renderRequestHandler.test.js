@@ -1,38 +1,11 @@
 const test = require('tape');
 const path = require('path');
 const fs = require('fs');
-const fsExtra = require('fs-extra');
-const { buildConfig } = require('../src/worker/configBuilder');
+const { setConfig, getTmpUploadedBundlePath, getUploadedBundlePath, createTmpUploadedBundle,
+        createUploadedBundle, cleanUploadedBundles } = require('./helper');
 const { getBundleUpdateTimeUtc } = require('../src/worker/vm');
 const renderRequestHandler = require('../src/worker/renderRequestHandler');
 const { resetVM } = require('../src/worker/vm');
-
-function setConfig() {
-  buildConfig({
-    bundlePath: path.resolve(__dirname, './tmp'),
-  });
-}
-
-function getTmpUploadedBundlePath() {
-  return path.resolve(__dirname, './tmp/uploads/bundle.js');
-}
-
-function getUploadedBundlePath() {
-  return path.resolve(__dirname, './tmp/bundle.js');
-}
-
-function createTmpUploadedBundle() {
-  fsExtra.copySync(path.resolve(__dirname, './fixtures/bundle.js'), getTmpUploadedBundlePath());
-}
-
-function createUploadedBundle() {
-  fsExtra.copySync(path.resolve(__dirname, './fixtures/bundle.js'), getUploadedBundlePath());
-}
-
-function cleanUploadedBundles() {
-  if (fs.existsSync(getUploadedBundlePath())) fs.unlink(getUploadedBundlePath());
-  if (fs.existsSync(getTmpUploadedBundlePath())) fs.unlink(getTmpUploadedBundlePath());
-}
 
 test('If gem has posted updated bundle', (assert) => {
   assert.plan(2);
