@@ -16,7 +16,7 @@ let bundleUpdateTimeUtc;
  */
 exports.buildVM = function buildVMNew(filePath) {
   fs.appendFileSync(filePath, '; exports.run = function(code) { return eval(code) };');
-  vm = SandboxedModule.load(filePath);
+  vm = SandboxedModule.load(filePath, { globals: { Math } });
 
   bundleUpdateTimeUtc = +(fs.statSync(filePath).mtime);
 
