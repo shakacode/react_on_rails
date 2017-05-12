@@ -10,7 +10,7 @@ const path = require('path');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
 const { getConfig } = require('./configBuilder');
-const { buildVM, runInVM, getBundleUpdateTimeUtc } = require('./vm');
+const { buildVM, runInVM, getBundleUpdateTimeUtc } = require('./sandbox');
 
 // TODO: Split this function in smaller methods.
 module.exports = function handleRenderRequest(req) {
