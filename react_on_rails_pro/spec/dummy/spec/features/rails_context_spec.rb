@@ -48,13 +48,13 @@ end
 feature "rails_context" do
   context "client rendering" do
     context "shared store" do
-      include_examples("railsContext", "", "ReduxSharedStoreApp")
+      include_examples("railsContext", "shared_redux_store", "ReduxSharedStoreApp")
     end
   end
 
   context "server rendering" do
     context "shared store" do
-      include_examples("railsContext", "", "ReduxSharedStoreApp")
+      include_examples("railsContext", "shared_redux_store", "ReduxSharedStoreApp")
     end
   end
 end
