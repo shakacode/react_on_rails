@@ -8,6 +8,7 @@ let config;
 const defaultConfig = {
   bundlePath: undefined,           // No defaults for bundlePath
   port: process.env.PORT || 3700,  // Use env port if we run on Heroku
+  vm: 'vm2',                       // Switch to 'sandbox' if you have TypeError on Proxy
 };
 
 exports.buildConfig = function buildConfig(userConfig) {
