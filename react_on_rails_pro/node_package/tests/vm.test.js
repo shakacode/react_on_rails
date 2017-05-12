@@ -2,10 +2,13 @@ const test = require('tape');
 const path = require('path');
 const fs = require('fs');
 const { buildVM, runInVM, getBundleUpdateTimeUtc } = require('../src/worker/vm');
+const { initiConsoleHistory } = require('../src/worker/consoleHistory');
 
 function getBundlePath() {
   return path.resolve(__dirname, './fixtures/bundle.js');
 }
+
+if (!console._log) initiConsoleHistory();
 
 test('buildVM and runInVM', (assert) => {
   assert.plan(2);
