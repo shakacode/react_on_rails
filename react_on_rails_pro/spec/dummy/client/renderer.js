@@ -9,6 +9,7 @@ const reactOnRailsRenderer = require('../../../node_package/src/ReactOnRailsRend
 const config = {
   bundlePath: path.resolve(__dirname, '../tmp'),  // Save bundle to "tmp/" dir of our dummy app
   port: 3800,                                     // Listen at port 3800
+  vm: 'sandbox',                                  // Switch to 'sandbox' if you have TypeError on Proxy
 };
 
 reactOnRailsRenderer(config);
