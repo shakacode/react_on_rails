@@ -283,8 +283,9 @@ The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](h
 
     # Other
     serverSide: boolean # Are we being called on the server or client? NOTE, if you conditionally
-     # render something different on the server than the client, then React will only show the
-     # server version!
+      # render something different on the server than the client, then React will only show the
+      # server version!
+    railsEnv: boolean # Typically test, development, or production per Rails.env
   }
 ```
 
