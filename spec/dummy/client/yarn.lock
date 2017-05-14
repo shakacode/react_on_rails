@@ -4178,7 +4178,7 @@ react-helmet@^5.0.3:
     react-side-effect "^1.1.0"
 
 "react-on-rails@file:../../../":
-  version "7.0.0"
+  version "8.0.0-beta.2"
 
 react-proptypes@^0.0.1:
   version "0.0.1"
@@ -5250,6 +5250,12 @@ webpack-manifest-plugin@^1.1.0:
   dependencies:
     fs-extra "^0.30.0"
     lodash ">=3.5 <5"
+
+webpack-merge@^4.1.0:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/webpack-merge/-/webpack-merge-4.1.0.tgz#6ad72223b3e0b837e531e4597c199f909361511e"
+  dependencies:
+    lodash "^4.17.4"
 
 webpack-sources@^0.1.0:
   version "0.1.4"
