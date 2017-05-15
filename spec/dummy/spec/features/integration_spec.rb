@@ -2,7 +2,7 @@ require "rails_helper"
 
 feature "Shared Redux store example" do
   subject { page }
-  background { visit root_path }
+  background { visit shared_redux_store_path }
 
   shared_examples_for "page in initial state" do
     it "Has correct heading and text inside the text input" do
