@@ -1,14 +1,14 @@
 # React on Rails Basic Tutorial
 
-This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering. It is updated to 6.7.1.
+This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering. It is updated to 8.0.0.
 
-After finishing this tutorial you will get application that can do the following (live on Heroku):
+After finishing this tutorial you will get an application that can do the following (live on Heroku):
 
 ![example](https://cloud.githubusercontent.com/assets/371302/17368567/111cc722-596b-11e6-9b72-ac5967a60e42.gif)
 
 You can find here:
-* [Source code for this app in PR, using the --redux option](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/15) and [for Heroku](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/16).
-* [Live on Heroku](https://react-on-rails-redux-generator.herokuapp.com/)
+* [Source code for this app in PR, using the --redux option](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/17) and [for Heroku](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/18).
+* [Live on Heroku](https://react-on-rails-redux-gen-8-0-0.herokuapp.com/)
 
 By the time you read this, the latest may have changed. Be sure to check the versions here:
 
@@ -17,9 +17,9 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 
 _Note: some of the screen images below show the "npm" command. react_on_rails 6.6.0 and greater uses `yarn`._
 
-##Setting up the environment
+## Setting up the environment
 
-Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 4.x and node version 6+. I recommend `rvm` and `nvm` to install Ruby and Node, and [brew](https://brew.sh/) to install [yarn](https://yarnpkg.com/en/docs/install#mac-tab). Rails can be installed as ordinary gem.
+Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 4.x and node version 6+. I recommend `rvm` and `nvm` to install Ruby and Node, and [brew](https://brew.sh/) to install [yarn](https://yarnpkg.com/en/docs/install#mac-tab). Rails can be installed as an ordinary gem.
 
 ```
 nvm install node                # download and install latest stable Node
@@ -98,11 +98,12 @@ web: rails s -p 8080 -b 0.0.0.0
 
 Then visit https://your-shared-addr.c9users.io:8080/hello_world 
 
+
 ## RubyMine
 
 It's super important to exclude certain directories from RubyMine or else it will slow to a crawl as it tries to parse all the npm files.
 
-* `app/assets/webpack`
+* `public/webpack` (or `app/assets/webpack` on older versions of react_on_rails)
 * `client/node_modules`
 
 ## Deploying to Heroku
@@ -215,10 +216,10 @@ git push heroku master
 ![10](https://cloud.githubusercontent.com/assets/20628911/17465017/1f38fbaa-5cf4-11e6-8d86-a3d91e3878e0.png)
 
 ## Links
-These are updated for 6.7.1:
+These are updated for 8.0.0:
 
-* [PR for using the generator with the Redux option](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/15)
-* [PR showing the changes to deploy to Heroku](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/16)
-* [Live on Heroku](https://hello-react-on-rails.herokuapp.com/)
+* [PR for using the generator with the Redux option](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/17)
+* [PR showing the changes to deploy to Heroku](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/18)
+* [Live on Heroku](https://hello-react-on-rails-8-0-0.herokuapp.com/)
 
 Feedback is greatly appreciated! As are stars on github! If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com).
