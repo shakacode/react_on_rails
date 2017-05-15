@@ -435,7 +435,6 @@ ReactOnRails.setStore('#{store_name}', store);
   # second parameter passed to both component and store generator functions.
   # rubocop:disable Metrics/AbcSize
   def rails_context(server_side: required("server_side"))
-    binding.pry
     @rails_context ||= begin
       result = {
         inMailer: in_mailer?,
@@ -444,12 +443,6 @@ ReactOnRails.setStore('#{store_name}', store);
         i18nDefaultLocale: I18n.default_locale,
         railsEnv: Rails.env
       }
-
-
-      puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
-      puts "result is #{result.ai}"
-      puts ""
-      puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
 
       if defined?(request) && request.present?
         # Check for encoding of the request's original_url and try to force-encoding the
