@@ -10,60 +10,27 @@ const path = require('path');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
 const { getConfig } = require('./configBuilder');
-
-/**
- *
- */
-function requireVM() {
-  const vmType = getConfig().vm;
-
-  /* eslint-disable global-require */
-  switch (vmType) {
-    case 'vm2':
-      return require('./vm');
-    case 'sandbox':
-      return require('./sandbox');
-    default:
-      throw new Error(`Unknown VM type ${vmType}`);
-  }
-  /* eslint-enable global-require */
-}
+const { clearConsoleHistory } = require('./consoleHistory');
 
 /**
  *
  */
 // TODO: Split this function in smaller methods.
 module.exports = function handleRenderRequest(req) {
-  const { buildVM, runInVM, getBundleUpdateTimeUtc } = requireVM();
-
   if (!cluster.isMaster) console.log(`worker #${cluster.worker.id} received render request with with code ${req.body.renderingRequest}`);
   const { bundlePath } = getConfig();
   const bundleFilePath = path.join(bundlePath, 'bundle.js');
 
-  // If gem has posted updated bundle:
-  if (req.files.bundle) {
-    console.log('Worker received new bundle');
-    fsExtra.copySync(req.files.bundle.file, bundleFilePath);
-    require(bundleFilePath);
-    const result = eval(req.body.renderingRequest);
-
-    return {
-      status: 200,
-      data: { renderedHtml: result },
-    };
-  }
-
-  // If bundle was updated:
+  // If bundle was not evaluated yet:
   if (!global.ReactOnRails) {
-    console.log('Bundle was updated');
+    // If gem has posted updated bundle:
+    if (req.files.bundle) {
+      saveAndEvalBundle(req, bundleFilePath);
+      return processRenderingRequest(req);
+    }
 
     // Check if bundle was uploaded:
-    if (!fs.existsSync(bundleFilePath)) {
-      return {
-        status: 410,
-        data: 'No bundle uploaded',
-      };
-    }
+    if (!fs.existsSync(bundleFilePath)) return reportNoBundle();
 
     // Check if another thread has already updated bundle and we don't need
     // to request it form the gem:
@@ -81,10 +48,44 @@ module.exports = function handleRenderRequest(req) {
     require(bundleFilePath);
   }
 
-  const result = eval(req.body.renderingRequest);
+  return processRenderingRequest(req);
+};
+
+/**
+ *
+ */
+function saveAndEvalBundle(req, bundleFilePath) {
+  console.log('Worker has no bundle evaluated received new bundle');
+  fsExtra.copySync(req.files.bundle.file, bundleFilePath);
+  const bundleContents = fs.readFileSync(bundleFilePath, 'utf8');
+
+  // (1, eval) is a small trick to evaluate code in the global scope (not in current function scope):
+  (1, eval)(bundleContents);
+}
+
+/**
+ *
+ */
+function processRenderingRequest(req) {
+  clearConsoleHistory();
+  const result = (1, eval)(req.body.renderingRequest);
 
   return {
     status: 200,
     data: { renderedHtml: result },
+    die: false,
   };
-};
+}
+
+/**
+ *
+ */
+function reportNoBundle() {
+  console.log('Worker has no bundle evaluated and found no bundle file');
+
+  return {
+    status: 410,
+    data: 'No bundle uploaded',
+    die: false,
+  };
+}
