@@ -16,7 +16,7 @@ Whether you have a new project or need help on an existing project, feel free to
 
 Your support keeps this project going!
 
-(Want to become a contributor? Want to join a 100% remote-first team? [Contact us](mailto:contact@shakacode.com) for a Slack room invite and let us know that you want to contribute.)
+(Want to become a contributor? We're hiring! Want to join a 100% remote-first team? [Contact us](mailto:contact@shakacode.com) for a Slack room invite and let us know that you want to contribute.)
 
 # Community
 Please [Subscribe](https://app.mailerlite.com/webforms/landing/l1d9x5) to keep in touch with Justin Gordon and [ShakaCode](http://www.shakacode.com/). I intend to send a monthly summary including announcements of new releases of React on Rails and of our latest [blog articles](https://blog.shakacode.com) and tutorials. Subscribers will also have access to **exclusive content**, including tips and examples.
