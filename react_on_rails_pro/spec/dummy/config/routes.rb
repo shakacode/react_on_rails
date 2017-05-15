@@ -4,6 +4,6 @@ Rails.application.routes.draw do
 
   # You can have the root of your site routed with "root"
   root "pages#index"
-
-  # get "client_side_hello_world" => "pages#client_side_hello_world"
+  get "shared_redux_store" => "pages#shared_redux_store"
+  get "component_with_lodash" => "pages#component_with_lodash"
 end

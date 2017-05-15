@@ -2,6 +2,7 @@ import 'babel-polyfill';
 import 'es5-shim';
 import ReactOnRails from 'react-on-rails';
 import ReduxSharedStoreApp from './ClientReduxSharedStoreApp';
+import ComponentWithLodashApp from './ComponentWithLodashApp';
 import SharedReduxStore from '../stores/SharedReduxStore';
 
 ReactOnRails.setOptions({
@@ -10,6 +11,7 @@ ReactOnRails.setOptions({
 
 ReactOnRails.register({
   ReduxSharedStoreApp,
+  ComponentWithLodashApp,
 });
 
 ReactOnRails.registerStore({
