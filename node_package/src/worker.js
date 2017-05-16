@@ -31,9 +31,11 @@ exports.run = function run(config) {
   });
 
   app.post('/render', (req, res) => {
-    const { status, data } = handleRenderRequestNew(req);
+    const { status, data, die } = handleRenderRequestNew(req);
     res.status(status);
     res.send(data);
+
+    if (die) process.exit();
   });
 
   app.listen(port, () => {
