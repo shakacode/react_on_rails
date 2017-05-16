@@ -10,23 +10,83 @@ const path = require('path');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
 const { getConfig } = require('./configBuilder');
+const { clearConsoleHistory } = require('./consoleHistory');
+
+let evaluatedBundleFilePath;
 
 /**
  *
  */
-function requireVM() {
-  const vmType = getConfig().vm;
+function saveBundle(req, bundleFilePath) {
+  console.log('Worker has no bundle evaluated received new bundle');
+  fsExtra.copySync(req.files.bundle.file, bundleFilePath);
+}
 
-  /* eslint-disable global-require */
-  switch (vmType) {
-    case 'vm2':
-      return require('./vm');
-    case 'sandbox':
-      return require('./sandbox');
-    default:
-      throw new Error(`Unknown VM type ${vmType}`);
-  }
-  /* eslint-enable global-require */
+/**
+ *
+ */
+function evalBundle(bundleFilePath) {
+  const bundleContents = fs.readFileSync(bundleFilePath, 'utf8');
+
+  // (1, eval) is a small trick to evaluate code in the global scope (not in current
+  // function scope).
+  // See http://stackoverflow.com/questions/9107240/1-evalthis-vs-evalthis-in-javascript
+  // eslint-disable-next-line no-eval
+  (1, eval)(bundleContents);
+  evaluatedBundleFilePath = bundleFilePath;
+}
+
+/**
+ *
+ */
+function processRenderingRequest(req) {
+  clearConsoleHistory();
+
+  // eslint-disable-next-line no-eval
+  const result = (1, eval)(req.body.renderingRequest);
+
+  return {
+    status: 200,
+    data: { renderedHtml: result },
+    die: false,
+  };
+}
+
+/**
+ *
+ */
+function reportNoBundle() {
+  console.log('Worker has no bundle evaluated and found no bundle file');
+
+  return {
+    status: 410,
+    data: 'No bundle uploaded',
+    die: false,
+  };
+}
+
+/**
+ *
+ */
+function reportNeedRetryAndAskForDying() {
+  return {
+    status: 307,
+    data: 'Worker process invalidated, dying',
+    die: true,
+  };
+}
+
+/**
+ *
+ */
+function reportNoBundleAndAskForDying() {
+  console.log('Worker already has evaluated bundle and found no bundle file');
+
+  return {
+    status: 410,
+    data: 'No bundle uploaded',
+    die: true,
+  };
 }
 
 /**
@@ -34,58 +94,39 @@ function requireVM() {
  */
 // TODO: Split this function in smaller methods.
 module.exports = function handleRenderRequest(req) {
-  const { buildVM, runInVM, getBundleUpdateTimeUtc } = requireVM();
-
   if (!cluster.isMaster) console.log(`worker #${cluster.worker.id} received render request with with code ${req.body.renderingRequest}`);
   const { bundlePath } = getConfig();
-  const bundleFilePath = path.join(bundlePath, 'bundle.js');
+  const bundleFilePath = path.join(bundlePath, `${req.body.bundleUpdateTimeUtc}.js`);
 
-  // If gem has posted updated bundle:
-  if (req.files.bundle) {
-    console.log('Worker received new bundle');
-    fsExtra.copySync(req.files.bundle.file, bundleFilePath);
-    buildVM(bundleFilePath);
-    const result = runInVM(req.body.renderingRequest);
-
-    return {
-      status: 200,
-      data: { renderedHtml: result },
-    };
-  }
-
-  // If bundle was updated:
-  if (!getBundleUpdateTimeUtc() ||
-      (getBundleUpdateTimeUtc() < Number(req.body.bundleUpdateTimeUtc))) {
-    console.log('Bundle was updated');
+  // ======= If bundle was not evaluated yet: =======
+  if (!evaluatedBundleFilePath) {
+    // If gem has posted updated bundle:
+    if (req.files.bundle) {
+      saveBundle(req, bundleFilePath);
+      evalBundle(bundleFilePath);
+      return processRenderingRequest(req);
+    }
 
     // Check if bundle was uploaded:
-    if (!fs.existsSync(bundleFilePath)) {
-      return {
-        status: 410,
-        data: 'No bundle uploaded',
-      };
-    }
+    if (!fs.existsSync(bundleFilePath)) return reportNoBundle();
 
-    // Check if another thread has already updated bundle and we don't need
-    // to request it form the gem:
-    const bundleUpdateTime = +(fs.statSync(bundleFilePath).mtime);
-    if (bundleUpdateTime < Number(req.body.bundleUpdateTimeUtc)) {
-      console.log('Bundle is outated');
-
-      return {
-        status: 410,
-        data: 'Bundle is outdated',
-      };
-    }
-
-    // If there is a fresh bundle, simply update VM:
-    buildVM(bundleFilePath);
+    // If bundle was already uploaded by another process:
+    evalBundle(bundleFilePath);
+    return processRenderingRequest(req);
   }
 
-  const result = runInVM(req.body.renderingRequest);
+  // ======= If bundle was already evaluated: =======
+  // If gem has posted updated bundle:
+  if (req.files.bundle) {
+    saveBundle(req, bundleFilePath);
+    return reportNeedRetryAndAskForDying();
+  }
 
-  return {
-    status: 200,
-    data: { renderedHtml: result },
-  };
+  // If gem sent new bujndle update timestamp:
+  if (bundleFilePath !== evaluatedBundleFilePath) {
+    if (!fs.existsSync(bundleFilePath)) return reportNoBundleAndAskForDying();
+    return reportNeedRetryAndAskForDying();
+  }
+
+  return processRenderingRequest(req);
 };
