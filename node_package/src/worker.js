@@ -10,7 +10,6 @@ const busBoy = require('express-busboy');
 const { buildConfig, getConfig } = require('./worker/configBuilder');
 const { initiConsoleHistory } = require('./worker/consoleHistory');
 const handleRenderRequest = require('./worker/renderRequestHandler');
-const handleRenderRequestNew = require('./worker/renderRequestHandlerNew');
 
 /**
  *
@@ -31,7 +30,7 @@ exports.run = function run(config) {
   });
 
   app.post('/render', (req, res) => {
-    const { status, data, die } = handleRenderRequestNew(req);
+    const { status, data, die } = handleRenderRequest(req);
     res.status(status);
     res.send(data);
 

@@ -83,7 +83,7 @@ module ReactOnRailsRenderer
         when 307
           eval_js(js_code)
         else
-          fail "Unknown response code."
+          raise "Unknown response code."
         end
       end
 
@@ -110,7 +110,7 @@ module ReactOnRailsRenderer
         when 307
           eval_js(js_code)
         else
-          fail "Unknown response code."
+          raise "Unknown response code."
         end
       end
     end
