@@ -29,6 +29,7 @@ const config = {
 
 reactOnRailsRenderer(config);
 ```
+You can also manually set worker processes count by adding `workersCount: [count]` to config, where `[count]` is a **Number** and `>= 1`.
 5. Now you can launch your renderer server with `node renderer.js`.
 6. If you do not plan to deploy renderer to **Heroku** or other hosting platforms, **do not forger to revoke your GitHub OAuth token!**
 
