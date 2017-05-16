@@ -16,7 +16,7 @@ cd renderer-app
 yarn init
 yarn add https://[your-github-token]:x-oauth-basic@github.com/shakacode/react-on-rails-renderer.git
 ```
-4. Create entry point to config and launch renderer server, say `renderer.js` with the following content:
+4. Create entry point to config and launch renderer server, say `renderer.js` with the following content. You can also manually set worker processes count by adding `workersCount: [count]` to config, where `[count]` is a **Number** and `>= 1`.
 ```javascript
 
 const path = require('path');
@@ -29,7 +29,6 @@ const config = {
 
 reactOnRailsRenderer(config);
 ```
-You can also manually set worker processes count by adding `workersCount: [count]` to config, where `[count]` is a **Number** and `>= 1`.
 5. Now you can launch your renderer server with `node renderer.js`.
 6. If you do not plan to deploy renderer to **Heroku** or other hosting platforms, **do not forger to revoke your GitHub OAuth token!**
 
