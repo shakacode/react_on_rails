@@ -6,8 +6,3 @@ rails-client-assets: sh -c 'yarn run build:dev:client'
 
 # Build server assets, watching for changes. Remove if not server rendering.
 rails-server-assets: sh -c 'yarn run build:dev:server'
-
-# If you want to use binding.pry, use "rails server webrick":
-# Comment out line 2, then run this procfile in your terminal like normal,
-# then, open up a new tab run "rails server webrick"
-# you'll be able to connect on localhost:3000
