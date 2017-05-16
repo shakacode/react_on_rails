@@ -6,6 +6,10 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 *Please add entries here for your pull requests.*
 
+### Added
+The railsContext now includes the Rails.env by default. [#842](https://github.com/shakacode/react_on_rails/pull/842) by [conturbo](https://github.com/Conturbo). 
+
+                               
 ## [8.0.0-beta.2] - 2017-05-08
 
 ### Changed
