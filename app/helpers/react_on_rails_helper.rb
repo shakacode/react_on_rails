@@ -154,7 +154,7 @@ module ReactOnRailsHelper
   #    defer: false -- pass as true if you wish to render this below your component.
   def redux_store(store_name, props: {}, defer: false)
     redux_store_data = { store_name: store_name,
-                        props: props }
+                         props: props }
     if defer
       @registered_stores_defer_render ||= []
       @registered_stores_defer_render << redux_store_data
