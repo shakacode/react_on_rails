@@ -9,7 +9,7 @@ const express = require('express');
 const busBoy = require('express-busboy');
 const { buildConfig, getConfig } = require('./worker/configBuilder');
 const { initiConsoleHistory } = require('./worker/consoleHistory');
-const handleRenderRequest = require('./worker/renderRequestHandler');
+const handleRenderRequest = require('./worker/renderRequestHandlerVm');
 
 /**
  *
