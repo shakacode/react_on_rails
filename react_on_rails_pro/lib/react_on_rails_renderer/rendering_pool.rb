@@ -74,10 +74,11 @@ module ReactOnRailsRenderer
         parsed_response = JSON.parse(response.body)
         parsed_response["renderedHtml"]
 
-      rescue RestClient::ExceptionWithResponse => e
+      # rest_client treats non 2xx HTTP status for POST requests as an exception:
+      rescue RestClient::ExceptionWithResponse => status_exception
         p "zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz"
 
-        case e.response.code
+        case status_exception.response.code
         when 410
           update_bundle_and_eval_js(js_code)
         when 307
@@ -85,6 +86,10 @@ module ReactOnRailsRenderer
         else
           raise "Unknown response code."
         end
+
+      # Retry if connection refused, for example one worker died but new one was not forked yet:
+      rescue Errno::ECONNREFUSED
+        eval_js(js_code)
       end
 
       def update_bundle_and_eval_js(js_code)
@@ -101,10 +106,10 @@ module ReactOnRailsRenderer
         parsed_response = JSON.parse(response.body)
         parsed_response["renderedHtml"]
 
-      rescue RestClient::ExceptionWithResponse => e
+      rescue RestClient::ExceptionWithResponse => status_exception
         p "zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz"
 
-        case e.response.code
+        case status_exception.response.code
         when 410
           update_bundle_and_eval_js(js_code)
         when 307
@@ -112,6 +117,8 @@ module ReactOnRailsRenderer
         else
           raise "Unknown response code."
         end
+      rescue Errno::ECONNREFUSED
+        update_bundle_and_eval_js(js_code)
       end
     end
   end
