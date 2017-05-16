@@ -23,19 +23,11 @@ const path = require('path');
 const reactOnRailsRenderer = require('react-on-rails-renderer');
 
 const config = {
-  bundlePath: path.resolve(__dirname, '../tmp'),
+  bundlePath: path.resolve(__dirname, '../tmp/bundles'),
   port: 3800,
 };
 
 reactOnRailsRenderer(config);
-```
-If you'll find that renderer throws an error like `TypeError: 'set' on proxy: trap returned falsish for property` trying to build VM form your bundle, add `vm: 'sandbox'` to renderer config:
-```javascript
-const config = {
-  bundlePath: path.resolve(__dirname, '../tmp'),
-  port: 3800,
-  vm: 'sandbox',
-};
 ```
 5. Now you can launch your renderer server with `node renderer.js`.
 6. If you do not plan to deploy renderer to **Heroku** or other hosting platforms, **do not forger to revoke your GitHub OAuth token!**
