@@ -118,7 +118,7 @@ module ReactOnRailsRenderer
           raise "Unknown response code."
         end
       rescue Errno::ECONNREFUSED
-        eval_js(js_code)
+        update_bundle_and_eval_js(js_code)
       end
     end
   end
