@@ -153,8 +153,8 @@ module ReactOnRailsHelper
   # Options
   #    defer: false -- pass as true if you wish to render this below your component.
   def redux_store(store_name, props: {}, defer: false)
-    redux_store_data = {store_name: store_name,
-                        props: props}
+    redux_store_data = { store_name: store_name,
+                        props: props }
     if defer
       @registered_stores_defer_render ||= []
       @registered_stores_defer_render << redux_store_data
@@ -294,7 +294,7 @@ module ReactOnRailsHelper
     end
 
     result_with_rails_context = prepend_render_rails_context(result)
-    {COMPONENT_HTML_KEY => result_with_rails_context}.merge(
+    { COMPONENT_HTML_KEY => result_with_rails_context }.merge(
       server_rendered_hash_except_component
     )
   end
@@ -345,7 +345,7 @@ module ReactOnRailsHelper
     trace: required("trace"),
     raise_on_prerender_error: required("raise_on_prerender_error")
   )
-    return {"html" => "", "consoleReplayScript" => ""} unless prerender
+    return { "html" => "", "consoleReplayScript" => "" } unless prerender
 
     # On server `location` option is added (`location = request.fullpath`)
     # React Router needs this to match the current route
