@@ -34,7 +34,9 @@ exports.run = function run(config) {
     res.status(status);
     res.send(data);
 
-    if (die) process.exit();
+    if (die) {
+      cluster.worker.disconnect();
+    }
   });
 
   app.listen(port, () => {

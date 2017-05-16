@@ -6,9 +6,9 @@
 const os = require('os');
 const cluster = require('cluster');
 
-exports.run = function run() {
+exports.run = function run(config) {
   // Count available CPUs for worker processes:
-  const workerCpuCount = os.cpus().length - 1 || 1;
+  const workerCpuCount = config.workersCount || os.cpus().length - 1 || 1;
 
   // Create a worker for each CPU except one that used for master process:
   for (let i = 0; i < workerCpuCount; i += 1) {
