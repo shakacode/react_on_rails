@@ -4,9 +4,9 @@ const worker = require('./worker');
 
 module.exports = function reactOnRailsRenderer(config) {
   if (cluster.isMaster) {
-    master.run();
+    master.run(config);
   } else {
-    console.log(config)
+    console.log(config);
     worker.run(config);
   }
 };
