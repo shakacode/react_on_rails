@@ -44,8 +44,8 @@ module.exports = function handleRenderRequest(req) {
   if (req.files.bundle) {
     console.log('Worker received new bundle');
     fsExtra.copySync(req.files.bundle.file, bundleFilePath);
-    require(bundleFilePath);
-    const result = eval(req.body.renderingRequest);
+    buildVM(bundleFilePath);
+    const result = runInVM(req.body.renderingRequest);
 
     return {
       status: 200,
@@ -54,7 +54,8 @@ module.exports = function handleRenderRequest(req) {
   }
 
   // If bundle was updated:
-  if (!global.ReactOnRails) {
+  if (!getBundleUpdateTimeUtc() ||
+      (getBundleUpdateTimeUtc() < Number(req.body.bundleUpdateTimeUtc))) {
     console.log('Bundle was updated');
 
     // Check if bundle was uploaded:
@@ -67,7 +68,7 @@ module.exports = function handleRenderRequest(req) {
 
     // Check if another thread has already updated bundle and we don't need
     // to request it form the gem:
-    /*const bundleUpdateTime = +(fs.statSync(bundleFilePath).mtime);
+    const bundleUpdateTime = +(fs.statSync(bundleFilePath).mtime);
     if (bundleUpdateTime < Number(req.body.bundleUpdateTimeUtc)) {
       console.log('Bundle is outated');
 
@@ -75,13 +76,13 @@ module.exports = function handleRenderRequest(req) {
         status: 410,
         data: 'Bundle is outdated',
       };
-    }*/
+    }
 
     // If there is a fresh bundle, simply update VM:
-    require(bundleFilePath);
+    buildVM(bundleFilePath);
   }
 
-  const result = eval(req.body.renderingRequest);
+  const result = runInVM(req.body.renderingRequest);
 
   return {
     status: 200,

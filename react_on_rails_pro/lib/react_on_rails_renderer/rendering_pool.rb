@@ -76,19 +76,42 @@ module ReactOnRailsRenderer
 
       rescue RestClient::ExceptionWithResponse => e
         p "zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz"
-        p e.response.code
-        update_bundle_and_eval_js(js_code)
+
+        case e.response.code
+        when 410
+          update_bundle_and_eval_js(js_code)
+        when 307
+          eval_js(js_code)
+        else
+          raise "Unknown response code."
+        end
       end
 
       def update_bundle_and_eval_js(js_code)
+        bundle_update_time = File.mtime(ReactOnRails::Utils.default_server_bundle_js_file_path)
+        bundle_update_utc_timestamp = (bundle_update_time.utc.to_f * 1000).to_i
+
         response = RestClient.post(
           renderer_url,
           renderingRequest: js_code,
-          bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path)
+          bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path),
+          bundleUpdateTimeUtc: bundle_update_utc_timestamp
         )
 
         parsed_response = JSON.parse(response.body)
         parsed_response["renderedHtml"]
+
+      rescue RestClient::ExceptionWithResponse => e
+        p "zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz"
+
+        case e.response.code
+        when 410
+          update_bundle_and_eval_js(js_code)
+        when 307
+          eval_js(js_code)
+        else
+          raise "Unknown response code."
+        end
       end
     end
   end
