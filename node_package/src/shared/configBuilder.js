@@ -8,7 +8,9 @@ let config;
 const defaultConfig = {
   bundlePath: undefined,           // No defaults for bundlePath
   port: process.env.PORT || 3700,  // Use env port if we run on Heroku
-  vm: 'vm2',                       // Switch to 'sandbox' if you have TypeError on Proxy
+
+  // Show only important messages by default, https://github.com/winstonjs/winston#logging-levels:
+  logLevel: 'info',
 };
 
 exports.buildConfig = function buildConfig(userConfig) {

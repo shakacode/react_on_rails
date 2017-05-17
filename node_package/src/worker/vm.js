@@ -7,6 +7,7 @@ const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
 const cluster = require('cluster');
+const log = require('winston');
 const Console = require('console').Console;
 
 let context;
@@ -48,9 +49,9 @@ exports.buildVM = function buildVMNew(filePath) {
   // Save bundle file path for further checkings for bundle updates:
   bundleFilePath = filePath;
 
-  if (!cluster.isMaster) console.log(`Built VM for worker #${cluster.worker.id}`);
-  console.log('Required objects now in VM sandbox context:', vm.runInContext('ReactOnRails', context) !== undefined);
-  console.log('Required objects should not leak to the global context:', global.ReactOnRails);
+  if (!cluster.isMaster) log.debug(`Built VM for worker #${cluster.worker.id}`);
+  log.debug('Required objects now in VM sandbox context:', vm.runInContext('ReactOnRails', context) !== undefined);
+  log.debug('Required objects should not leak to the global context:', global.ReactOnRails);
   return vm;
 };
 

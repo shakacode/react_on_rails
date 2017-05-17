@@ -7,8 +7,13 @@ const path = require('path');
 const cluster = require('cluster');
 const express = require('express');
 const busBoy = require('express-busboy');
-const { buildConfig, getConfig } = require('./worker/configBuilder');
+const log = require('winston');
+const { buildConfig, getConfig } = require('./shared/configBuilder');
 const handleRenderRequest = require('./worker/renderRequestHandlerVm');
+
+// Turn on colorized log:
+log.remove(log.transports.Console);
+log.add(log.transports.Console, {colorize: true});
 
 /**
  *
@@ -17,7 +22,14 @@ exports.run = function run(config) {
   // Store config in app state. From now it can be loaded by any module using getConfig():
   buildConfig(config);
 
-  const { bundlePath, port } = getConfig();
+  const { bundlePath, port, logLevel } = getConfig();
+
+  // Turn on colorized log:
+  log.remove(log.transports.Console);
+  log.add(log.transports.Console, { colorize: true });
+
+  // Set log level from config:
+  log.level = logLevel;
 
   const app = express();
   busBoy.extend(app, {
@@ -36,6 +48,6 @@ exports.run = function run(config) {
   });
 
   app.listen(port, () => {
-    console.log(`Node renderer worker #${cluster.worker.id} listening on port ${port}!`);
+    log.info(`Node renderer worker #${cluster.worker.id} listening on port ${port}!`);
   });
 };
