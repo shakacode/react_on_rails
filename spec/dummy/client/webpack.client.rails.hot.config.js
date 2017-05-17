@@ -10,23 +10,22 @@ const merge = require('webpack-merge');
 const config = require('./webpack.client.base.config');
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config', 'webpack');
-const { devServer, paths, publicPath } = webpackConfigLoader(configPath);
+const { hotReloadingServer, webpackOutputPath } = webpackConfigLoader(configPath);
 
 module.exports = merge(config, {
 
-  config.devtool: 'eval-source-map',
+  [config.devtool]: 'eval-source-map',
 
   entry: {
     'app-bundle': [
-      `webpack-dev-server/client?${devServer.host}:${devServer.port}`,
+      `webpack-dev-server/client?${hotReloadingServer}`,
       'webpack/hot/only-dev-server'
     ],
   },
 
   output: {
     filename: '[name].js',
-    path: resolve('..', paths.output, paths.assets),
-    publicPath,
+    path: webpackOutputPath,
   },
 
   module: {
