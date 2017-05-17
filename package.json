@@ -12,7 +12,8 @@
     "express-busboy": "^6.0.1",
     "fs-extra": "^3.0.1",
     "sandboxed-module": "^2.0.3",
-    "vm2": "^3.4.6"
+    "vm2": "^3.4.6",
+    "winston": "^2.3.1"
   },
   "devDependencies": {
     "babel-cli": "^6.24.1",

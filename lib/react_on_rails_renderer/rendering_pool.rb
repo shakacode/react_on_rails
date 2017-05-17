@@ -4,13 +4,16 @@ require "rest_client"
 
 module ReactOnRailsRenderer
   class RenderingPool
+    RENDERED_HTML_KEY = "renderedHtml".freeze
+
     # This implementation of the rendering pool uses NodeJS to execute javasript code
     def self.reset_pool
       # No need for this method
     end
 
     def self.reset_pool_if_server_bundle_was_modified
-      # No need for this method
+      bundle_update_time = File.mtime(ReactOnRails::Utils.default_server_bundle_js_file_path)
+      @bundle_update_utc_timestamp = (bundle_update_time.utc.to_f * 1000).to_i
     end
 
     # js_code: JavaScript expression that returns a string.
@@ -62,17 +65,14 @@ module ReactOnRailsRenderer
       end
 
       def eval_js(js_code)
-        bundle_update_time = File.mtime(ReactOnRails::Utils.default_server_bundle_js_file_path)
-        bundle_update_utc_timestamp = (bundle_update_time.utc.to_f * 1000).to_i
-
         response = RestClient.post(
           renderer_url,
           renderingRequest: js_code,
-          bundleUpdateTimeUtc: bundle_update_utc_timestamp
+          bundleUpdateTimeUtc: @bundle_update_utc_timestamp
         )
 
         parsed_response = JSON.parse(response.body)
-        parsed_response["renderedHtml"]
+        parsed_response[RENDERED_HTML_KEY]
 
       # rest_client treats non 2xx HTTP status for POST requests as an exception:
       rescue RestClient::ExceptionWithResponse => status_exception
@@ -81,44 +81,42 @@ module ReactOnRailsRenderer
         case status_exception.response.code
         when 410
           update_bundle_and_eval_js(js_code)
-        when 307
-          eval_js(js_code)
+        #when 307
+        #  eval_js(js_code)
         else
-          raise "Unknown response code."
+          raise "Unknown response code #{status_exception.response.code}."
         end
 
       # Retry if connection refused, for example one worker died but new one was not forked yet:
-      rescue Errno::ECONNREFUSED
-        eval_js(js_code)
+      #rescue Errno::ECONNREFUSED
+      #  eval_js(js_code)
       end
 
       def update_bundle_and_eval_js(js_code)
-        bundle_update_time = File.mtime(ReactOnRails::Utils.default_server_bundle_js_file_path)
-        bundle_update_utc_timestamp = (bundle_update_time.utc.to_f * 1000).to_i
-
         response = RestClient.post(
           renderer_url,
           renderingRequest: js_code,
           bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path),
-          bundleUpdateTimeUtc: bundle_update_utc_timestamp
+          bundleUpdateTimeUtc: @bundle_update_utc_timestamp
         )
 
         parsed_response = JSON.parse(response.body)
-        parsed_response["renderedHtml"]
-
+        parsed_response[RENDERED_HTML_KEY]
+=begin
       rescue RestClient::ExceptionWithResponse => status_exception
         p "zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz"
 
         case status_exception.response.code
         when 410
           update_bundle_and_eval_js(js_code)
-        when 307
-          eval_js(js_code)
+        #when 307
+        #  eval_js(js_code)
         else
-          raise "Unknown response code."
+          raise "Unknown response code #{status_exception.response.code}."
         end
-      rescue Errno::ECONNREFUSED
-        update_bundle_and_eval_js(js_code)
+      #rescue Errno::ECONNREFUSED
+      #  update_bundle_and_eval_js(js_code)
+=end      
       end
     end
   end

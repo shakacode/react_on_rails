@@ -45,7 +45,7 @@ shared_examples "railsContext" do |pathname, id_base|
   end
 end
 
-feature "rails_context" do
+feature "rails_context", :server_rendering do
   context "client rendering" do
     context "shared store" do
       include_examples("railsContext", "shared_redux_store", "ReduxSharedStoreApp")
