@@ -16,7 +16,7 @@ cd renderer-app
 yarn init
 yarn add https://[your-github-token]:x-oauth-basic@github.com/shakacode/react-on-rails-renderer.git
 ```
-4. Create entry point to config and launch renderer server, say `renderer.js` with the following content. You can also manually set worker processes count by adding `workersCount: [count]` to config, where `[count]` is a **Number** and `>= 1`.
+4. Create entry point to config and launch renderer server, say `renderer.js` with the following content. See **Renderer config** section below for available options.
 ```javascript
 
 const path = require('path');
@@ -100,6 +100,13 @@ Assuming you did not revoke your  **GitHub OAuth token** so you don't need to up
 3. Run deployment process (usually by pushing changes to **Git** repo associated with created **Heroku** app).
 4. Once deployment process is finshed, all rendering requests form your `react_on_rails` app should be served by `renderer-test.herokuapp.com` app via **HTTPS**.
 5. **Don't forget to revoke your GitHub OAuth tokens!**
+
+## Renderer config
+Here are the options available for renderer configuration object:
+1. **bundlePath** (default: `undefined`) - relative path to temp directory where uploaded bundle files will be stored. For example you can set it to `path.resolve(__dirname, '../tmp/bundles')` if you configured renderer form `app/client` directory. Note: you **must** pass this parameter to configuration.
+2. **port** (default: `process.env.PORT || 3700`) - The port renderer should listen to.
+3. **logLevel** (default: `'info'`) - Log lever for renderer. Set it to `'error'` to turn logging off. Available levels are: `{ error: 0, warn: 1, info: 2, verbose: 3, debug: 4, silly: 5 }`
+4. **workersCount** (default: your CPUs number - 1) - Number of workers that will be forked to serve rendering requests. If you set this manually make sure that value is a **Number** and is `>= 1`.
 
 ## Local deploy
 Please see [CONTRIBUTING](CONTRIBUTING.md) if you want to deploy and test this project locally.
