@@ -11,6 +11,7 @@ const defaultConfig = {
 
   // Show only important messages by default, https://github.com/winstonjs/winston#logging-levels:
   logLevel: 'info',
+  workersCount: undefined,
 };
 
 exports.buildConfig = function buildConfig(userConfig) {
