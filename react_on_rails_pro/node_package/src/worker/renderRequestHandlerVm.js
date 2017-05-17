@@ -10,35 +10,16 @@ const path = require('path');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
 const { getConfig } = require('./configBuilder');
-
-/**
- *
- */
-function requireVM() {
-  const vmType = getConfig().vm;
-
-  /* eslint-disable global-require */
-  switch (vmType) {
-    case 'vm2':
-      return require('./vm');
-    case 'sandbox':
-      return require('./sandbox');
-    default:
-      throw new Error(`Unknown VM type ${vmType}`);
-  }
-  /* eslint-enable global-require */
-}
+const { buildVM, runInVM, getBundleFilePath } = require('./vm');
 
 /**
  *
  */
 // TODO: Split this function in smaller methods.
 module.exports = function handleRenderRequest(req) {
-  const { buildVM, runInVM, getBundleUpdateTimeUtc } = requireVM();
-
   if (!cluster.isMaster) console.log(`worker #${cluster.worker.id} received render request with with code ${req.body.renderingRequest}`);
   const { bundlePath } = getConfig();
-  const bundleFilePath = path.join(bundlePath, 'bundle.js');
+  const bundleFilePath = path.join(bundlePath, `${req.body.bundleUpdateTimeUtc}.js`);
 
   // If gem has posted updated bundle:
   if (req.files.bundle) {
@@ -54,8 +35,7 @@ module.exports = function handleRenderRequest(req) {
   }
 
   // If bundle was updated:
-  if (!getBundleUpdateTimeUtc() ||
-      (getBundleUpdateTimeUtc() < Number(req.body.bundleUpdateTimeUtc))) {
+  if (!getBundleFilePath() || (getBundleFilePath() !== bundleFilePath)) {
     console.log('Bundle was updated');
 
     // Check if bundle was uploaded:
@@ -63,18 +43,6 @@ module.exports = function handleRenderRequest(req) {
       return {
         status: 410,
         data: 'No bundle uploaded',
-      };
-    }
-
-    // Check if another thread has already updated bundle and we don't need
-    // to request it form the gem:
-    const bundleUpdateTime = +(fs.statSync(bundleFilePath).mtime);
-    if (bundleUpdateTime < Number(req.body.bundleUpdateTimeUtc)) {
-      console.log('Bundle is outated');
-
-      return {
-        status: 410,
-        data: 'Bundle is outdated',
       };
     }
 

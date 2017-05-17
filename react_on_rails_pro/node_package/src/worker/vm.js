@@ -10,7 +10,7 @@ const cluster = require('cluster');
 const Console = require('console').Console;
 
 let context;
-let bundleUpdateTimeUtc;
+let bundleFilePath;
 
 /**
  *
@@ -45,7 +45,8 @@ exports.buildVM = function buildVMNew(filePath) {
   const bundleContents = fs.readFileSync(filePath, 'utf8');
   vm.runInContext(bundleContents, context);
 
-  bundleUpdateTimeUtc = +(fs.statSync(filePath).mtime);
+  // Save bundle file path for further checkings for bundle updates:
+  bundleFilePath = filePath;
 
   if (!cluster.isMaster) console.log(`Built VM for worker #${cluster.worker.id}`);
   console.log('Required objects now in VM sandbox context:', vm.runInContext('ReactOnRails', context) !== undefined);
@@ -56,8 +57,8 @@ exports.buildVM = function buildVMNew(filePath) {
 /**
  *
  */
-exports.getBundleUpdateTimeUtc = function getBundleUpdateTimeUtc() {
-  return bundleUpdateTimeUtc;
+exports.getBundleFilePath = function getBundleFilePath() {
+  return bundleFilePath;
 };
 
 /**
@@ -74,5 +75,5 @@ exports.runInVM = function runInVM(code) {
  */
 exports.resetVM = function resetVM() {
   context = undefined;
-  bundleUpdateTimeUtc = undefined;
+  bundleFilePath = undefined;
 };
