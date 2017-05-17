@@ -2,7 +2,7 @@
  * Isolates logic for handling render request. We don't want this module to know about
  * Express server and its req and res objects. This allows to test module in isolation
  * and without async calls.
- * @module worker/renderRequestHandler
+ * @module worker/renderRequestHandlerVm
  */
 
 const cluster = require('cluster');
