@@ -8,16 +8,12 @@ const cluster = require('cluster');
 const express = require('express');
 const busBoy = require('express-busboy');
 const { buildConfig, getConfig } = require('./worker/configBuilder');
-const { initiConsoleHistory } = require('./worker/consoleHistory');
 const handleRenderRequest = require('./worker/renderRequestHandlerVm');
 
 /**
  *
  */
 exports.run = function run(config) {
-  // Patch console to store the history in react_on_rails compartibe format:
-  initiConsoleHistory();
-
   // Store config in app state. From now it can be loaded by any module using getConfig():
   buildConfig(config);
 

@@ -1,6 +1,6 @@
 require "rails_helper"
 
-feature "Shared Redux store example" do
+feature "Shared Redux store example", :server_rendering do
   subject { page }
   background { visit shared_redux_store_path }
 
