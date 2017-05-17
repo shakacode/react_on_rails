@@ -43,6 +43,7 @@ gem 'sdoc', '~> 0.4.0', group: :doc
 
 gem "react_on_rails_renderer", path: "../.."
 gem "react_on_rails"
+gem "mini_racer"
 
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console
