@@ -21,13 +21,12 @@ import webpackConfig from './webpack.client.rails.hot.config';
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config', 'webpack');
-const { devServer: devServerConfig, publicPath } = webpackConfigLoader(configPath);
+const { hotReloadingServer } = webpackConfigLoader(configPath);
 
 const compiler = webpack(webpackConfig);
 
 const devServer = new WebpackDevServer(compiler, {
-  contentBase: `http://lvh.me:${devServerConfig.port}`,
-  publicPath,
+  contentBase: hotReloadingServer,
   hot: true,
   inline: true,
   historyApiFallback: true,

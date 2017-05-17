@@ -1,27 +1,32 @@
-const { join } = require('path');
+const { join, resolve } = require('path');
 const { env } = require('process');
 const { safeLoad } = require('js-yaml');
 const { readFileSync } = require('fs');
 
 const configLoader = (configPath) => {
-  const paths = safeLoad(readFileSync(join(configPath, 'paths.yml'), 'utf8'))[env.NODE_ENV];
+  const configuration = safeLoad(readFileSync(join(configPath, 'webpacker_lite.yml'), 'utf8'))[env.NODE_ENV];
+  const devBuild = env !== 'production';
+  const hotReloadingServer = configuration.hotReloadingServer;
 
-  const devServerConfig = join(configPath, 'development.server.yml');
-  const devServer = safeLoad(readFileSync(devServerConfig, 'utf8')).development;
+  // NOTE: Rails path is hard coded to `/public`
+  const webpackOutputPath = resolve(configPath, '..', 'public',
+    configuration.webpack_public_output_dir);
 
-  if (env.REACT_ON_RAILS_ENV === 'HOT') {
-    devServer.enabled = true;
+  const manifest = webpackOutputPath.manifest;
+  let hotReloadingServerEnabled = false;
+  if (env.HOT_RELOADING === 'TRUE' || env.HOT_RELOADING === 'YES' ||
+    configuration.hot_reloading_enabled_by_default) {
+    hotReloadingServerEnabled = true;
   }
-  const productionBuild = env.NODE_ENV === 'production';
-
-  const publicPath = !productionBuild && devServer.enabled ?
-    `http://${devServer.host}:${devServer.port}/` : `/${paths.assets}/`;
 
   return {
-    devServer,
+    configuration,
+    devBuild,
     env,
-    paths,
-    publicPath,
+    hotReloadingServerEnabled,
+    hotReloadingServer,
+    manifest,
+    webpackOutputPath,
   };
 };
 
