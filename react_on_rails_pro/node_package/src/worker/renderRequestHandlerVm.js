@@ -9,7 +9,8 @@ const cluster = require('cluster');
 const path = require('path');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
-const { getConfig } = require('./configBuilder');
+const log = require('winston');
+const { getConfig } = require('../shared/configBuilder');
 const { buildVM, runInVM, getBundleFilePath } = require('./vm');
 
 /**
@@ -17,13 +18,13 @@ const { buildVM, runInVM, getBundleFilePath } = require('./vm');
  */
 // TODO: Split this function in smaller methods.
 module.exports = function handleRenderRequest(req) {
-  if (!cluster.isMaster) console.log(`worker #${cluster.worker.id} received render request with with code ${req.body.renderingRequest}`);
+  if (!cluster.isMaster) log.debug(`worker #${cluster.worker.id} received render request with with code ${req.body.renderingRequest}`);
   const { bundlePath } = getConfig();
   const bundleFilePath = path.join(bundlePath, `${req.body.bundleUpdateTimeUtc}.js`);
 
   // If gem has posted updated bundle:
   if (req.files.bundle) {
-    console.log('Worker received new bundle');
+    log.debug('Worker received new bundle');
     fsExtra.copySync(req.files.bundle.file, bundleFilePath);
     buildVM(bundleFilePath);
     const result = runInVM(req.body.renderingRequest);
@@ -36,7 +37,7 @@ module.exports = function handleRenderRequest(req) {
 
   // If bundle was updated:
   if (!getBundleFilePath() || (getBundleFilePath() !== bundleFilePath)) {
-    console.log('Bundle was updated');
+    log.debug('Bundle was updated');
 
     // Check if bundle was uploaded:
     if (!fs.existsSync(bundleFilePath)) {

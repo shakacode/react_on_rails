@@ -5,8 +5,21 @@
 
 const os = require('os');
 const cluster = require('cluster');
+const log = require('winston');
+const { buildConfig, getConfig } = require('./shared/configBuilder');
 
 exports.run = function run(config) {
+  // Store config in app state. From now it can be loaded by any module using getConfig():
+  buildConfig(config);
+  const { logLevel } = getConfig();
+
+  // Turn on colorized log:
+  log.remove(log.transports.Console);
+  log.add(log.transports.Console, { colorize: true });
+
+  // Set log level from config:
+  log.level = logLevel;
+
   // Count available CPUs for worker processes:
   const workerCpuCount = config.workersCount || os.cpus().length - 1 || 1;
 
@@ -18,7 +31,7 @@ exports.run = function run(config) {
   // Listen for dying workers:
   cluster.on('exit', (worker) => {
     // Replace the dead worker:
-    console.log('Worker %d died :(', worker.id);
+    log.debug('Worker %d died :(', worker.id);
     cluster.fork();
   });
 };

@@ -9,6 +9,7 @@ const reactOnRailsRenderer = require('../../../node_package/src/ReactOnRailsRend
 const config = {
   bundlePath: path.resolve(__dirname, '../tmp/bundles'),  // Save bundle to "tmp/" dir of our dummy app
   port: 3800,                                             // Listen at port 3800
+  logLevel: 'debug',                                      // Show all logs
 };
 
 reactOnRailsRenderer(config);

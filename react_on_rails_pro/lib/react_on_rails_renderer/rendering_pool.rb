@@ -102,7 +102,7 @@ module ReactOnRailsRenderer
 
         parsed_response = JSON.parse(response.body)
         parsed_response[RENDERED_HTML_KEY]
-
+=begin
       rescue RestClient::ExceptionWithResponse => status_exception
         p "zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz"
 
@@ -116,6 +116,7 @@ module ReactOnRailsRenderer
         end
       #rescue Errno::ECONNREFUSED
       #  update_bundle_and_eval_js(js_code)
+=end      
       end
     end
   end
