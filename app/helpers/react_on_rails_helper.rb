@@ -111,7 +111,7 @@ module ReactOnRailsHelper
                                               type: "application/json",
                                               class: "js-react-on-rails-component",
                                               "data-component-name" => options.name,
-                                              "data-trace" => options.trace,
+                                              "data-trace" => (options.trace ? true : nil),
                                               "data-dom-id" => options.dom_id)
 
     # Create the HTML rendering part

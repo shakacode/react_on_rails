@@ -83,14 +83,14 @@ describe ReactOnRailsHelper, type: :helper do
     let(:react_definition_script) do
       <<-SCRIPT
 <script type="application/json" class="js-react-on-rails-component" data-component-name="App" \
-data-trace="false" data-dom-id="App-react-component-0">{"name":"My Test Name"}</script>
+data-dom-id="App-react-component-0">{"name":"My Test Name"}</script>
       SCRIPT
     end
 
     let(:react_definition_script_no_params) do
       <<-SCRIPT
 <script type="application/json" class="js-react-on-rails-component" data-component-name="App" \
-data-trace="false" data-dom-id="App-react-component-0">{}</script>
+data-dom-id="App-react-component-0">{}</script>
       SCRIPT
     end
 
@@ -131,13 +131,29 @@ data-trace="false" data-dom-id="App-react-component-0">{}</script>
       let(:react_definition_script) do
         <<-SCRIPT
 <script type="application/json" class="js-react-on-rails-component" data-component-name="App" \
-data-trace="false" data-dom-id="shaka_div">{"name":"My Test Name"}</script>
+data-dom-id="shaka_div">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
       it { is_expected.to include id }
       it { is_expected.not_to include react_component_div }
       it { is_expected.to include react_definition_script }
+    end
+
+    context "with 'trace' == true" do
+      it "adds the data-trace tag to the component_specification_tag" do
+        result = react_component("App", trace: true)
+
+        expect(result).to match(/data-trace="true"/)
+      end
+    end
+
+    context "with 'trace' == false" do
+      it "does not add the data-trace tag" do
+        result = react_component("App", trace: false)
+
+        expect(result).not_to match(/data-trace=/)
+      end
     end
   end
 
