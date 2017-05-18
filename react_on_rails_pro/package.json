@@ -45,7 +45,7 @@
     "node_package/src"
   ],
   "scripts": {
-    "start": "cd spec/dummy/client && yarn run node-renderer",
+    "start": "node renderer.js",
     "test": "babel-tape-runner node_package/tests/*.js | tap-spec",
     "eslint": "eslint .",
     "flow": "flow check node_package",
