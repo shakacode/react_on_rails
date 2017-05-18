@@ -11,5 +11,13 @@ const { getConfig } = require('../shared/configBuilder');
  *
  */
 module.exports = function authenticate(req) {
+  const { password } = getConfig();
+  if (password && password !== req.body.password) {
+    return {
+      status: 401,
+      data: 'Wrong password',
+    };
+  }
 
+  return false;
 };

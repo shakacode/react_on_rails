@@ -56,5 +56,6 @@ module.exports = function handleRenderRequest(req) {
   return {
     status: 200,
     data: { renderedHtml: result },
+    // data: { renderedHtml: '{ "html": "FAKE" }' },
   };
 };
