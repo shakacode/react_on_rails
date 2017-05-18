@@ -21,6 +21,9 @@ exports.buildVM = function buildVMNew(filePath) {
   const sandbox = { console: new Console(process.stdout, process.stderr) };
   context = vm.createContext(sandbox);
 
+  // Create explicit reference to global context, just in case (some libs can use it):
+  vm.runInContext('global = this', context);
+
   // Run console.history script in created context to patch its console instance:
   const consoleHistoryModuleDir = path.dirname(require.resolve('console.history'));
   const pathToConsoleHistory = path.join(consoleHistoryModuleDir, 'console-history.js');
@@ -29,10 +32,6 @@ exports.buildVM = function buildVMNew(filePath) {
 
   // Override console._collect method to comply with ReactOnRails console replay script:
   vm.runInContext(`console._collect = (type, args) => {
-    // Act normal, and just pass all original arguments to the origial console function:
-    // eslint-disable-next-line prefer-spread
-    console[\`_\${type}\`].apply(console, args);
-
     // Build console history entry in react_on_rails format:
     const argArray = Array.prototype.slice.call(args);
     if (argArray.length > 0) {
@@ -50,7 +49,7 @@ exports.buildVM = function buildVMNew(filePath) {
   bundleFilePath = filePath;
 
   if (!cluster.isMaster) log.debug(`Built VM for worker #${cluster.worker.id}`);
-  log.debug('Required objects now in VM sandbox context:', vm.runInContext('ReactOnRails', context) !== undefined);
+  log.debug('Required objects now in VM sandbox context:', vm.runInContext('global.ReactOnRails', context) !== undefined);
   log.debug('Required objects should not leak to the global context:', global.ReactOnRails);
   return vm;
 };

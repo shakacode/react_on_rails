@@ -1,69 +1,44 @@
 const test = require('tape');
 const fs = require('fs');
 const { getUploadedBundlePath, createUploadedBundle } = require('./helper');
-const { buildVM, runInVM, getBundleUpdateTimeUtc } = require('../src/worker/vm');
-const { initiConsoleHistory } = require('../src/worker/consoleHistory');
-
-if (!console.history) initiConsoleHistory();
+const { buildVM, runInVM, getBundleFilePath } = require('../src/worker/vm');
 
 test('buildVM and runInVM', (assert) => {
-  assert.plan(2);
+  assert.plan(8);
+
   createUploadedBundle();
   buildVM(getUploadedBundlePath());
 
-  assert.deepEqual(runInVM('ReactOnRails'), { dummy: 'Dummy Object' }, 'ReactOnRails object is availble is sandbox');
-  assert.ok(global.ReactOnRails === undefined, 'ReactOnRails object did not leak to global context');
-});
-
-test('VM security', (assert) => {
-  assert.plan(3);
-  createUploadedBundle();
-  buildVM(getUploadedBundlePath());
-
-  // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
-  assert.throws(
-    () => runInVM('process.exit()'),
-    /(undefined is not a function|process.exit is not a function)/,
-    'VM prevents global access');
-
-  assert.strictEqual(
-    runInVM('(function() { return arguments.callee.caller.constructor === Function; })()'),
-    true,
-    'VM prevents arguments attack');
-
-  assert.throws(
-    () => runInVM('(function() { return arguments.callee.caller.caller.toString(); })()'),
-    /Cannot read property 'toString' of null/,
-    'VM prevents global attack');
-});
-
-test('VM console history', (assert) => {
-  assert.plan(2);
-  createUploadedBundle();
-  buildVM(getUploadedBundlePath());
-
-  let vmResult = runInVM('console.log("Console message inside of VM") || console.history;');
-  const consoleHistory = [{ level: 'log', arguments: ['[SERVER] Console message inside of VM'] }];
   assert.deepEqual(
-    vmResult,
-    consoleHistory,
-    'Console logging from VM changes history for console inside VM');
+    runInVM('ReactOnRails'),
+    { dummy: 'Dummy Object' },
+    'ReactOnRails object is availble is sandbox');
 
-  console.history = [];
-  vmResult = runInVM('console.log("Console message inside of VM") || console.history;');
-  assert.deepEqual(
-    console.history,
-    consoleHistory,
-    'Console logging from VM changes history for console outside of VM');
-});
+  assert.ok(
+    global.ReactOnRails === undefined,
+    'ReactOnRails object did not leak to global context');
 
-test('getBundleUpdateTimeUtc', (assert) => {
-  assert.plan(1);
-  createUploadedBundle();
-  buildVM(getUploadedBundlePath());
+  assert.ok(
+    runInVM('typeof global !== undefined'),
+    'global object is defined in VM context');
 
-  assert.equal(
-    getBundleUpdateTimeUtc(),
-    +(fs.statSync(getUploadedBundlePath()).mtime),
-    'getBundleUpdateTimeUtc() should return last modification time of bundle loaded to VM');
+  assert.ok(
+    runInVM('Math === global.Math'),
+    'global object points to global VM context');
+
+  assert.ok(
+    runInVM('ReactOnRails === global.ReactOnRails'),
+    'New objects added to global context are accessible by global reference');
+
+  assert.ok(
+    runInVM('console') !== console,
+    'VM context has its own console');
+
+  assert.ok(
+    console.history === undefined,
+    'Building VM does not mutate console in master code');
+
+  assert.ok(
+    runInVM('console.history !== undefined'),
+    'VM has patched console with history');
 });
