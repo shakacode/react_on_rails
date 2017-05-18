@@ -1,7 +1,7 @@
 const test = require('tape');
 const path = require('path');
 const { getUploadedBundlePath, createUploadedBundle } = require('./helper');
-const { buildVM, runInVM, getBundleFilePath } = require('../src/worker/vm');
+const { buildVM, runInVM, getBundleFilePath, resetVM } = require('../src/worker/vm');
 
 test('buildVM and runInVM', (assert) => {
   assert.plan(10);
@@ -52,6 +52,35 @@ test('buildVM and runInVM', (assert) => {
     'VM has patched console with history');
 });
 
+test('VM security', (assert) => {
+  assert.plan(1);
+  createUploadedBundle();
+  buildVM(getUploadedBundlePath());
+
+  // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
+  assert.throws(
+    () => runInVM('process.exit()'),
+    'process is not defined',
+    'VM prevents global access');
+});
+
+test('resetVM', (assert) => {
+  assert.plan(2);
+  createUploadedBundle();
+  buildVM(getUploadedBundlePath());
+
+  assert.deepEqual(
+    runInVM('ReactOnRails'),
+    { dummy: 'Dummy Object' },
+    'VM context is created');
+
+  resetVM();
+
+  assert.ok(
+    getBundleFilePath() === undefined,
+    'resetVM() drops file path of the bundle loaded to VM');
+});
+
 test('VM console history', (assert) => {
   assert.plan(1);
   createUploadedBundle();
@@ -74,5 +103,5 @@ test('getBundleFilePath', (assert) => {
   assert.equal(
     getBundleFilePath(),
     path.resolve(__dirname, './tmp/1495063024898.js'),
-    'getBundleUpdateTimeUtc() should return last modification time of bundle loaded to VM');
+    'getBundleFilePath() should return file path of the bundle loaded to VM');
 });

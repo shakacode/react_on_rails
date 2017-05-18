@@ -1,10 +1,9 @@
-/*const test = require('tape');
+const test = require('tape');
 const path = require('path');
-const fs = require('fs');
-const { setConfig, getTmpUploadedBundlePath, getUploadedBundlePath, createTmpUploadedBundle,
+const { setConfig, getTmpUploadedBundlePath, createTmpUploadedBundle,
         createUploadedBundle, cleanUploadedBundles } = require('./helper');
-const { getBundleUpdateTimeUtc } = require('../src/worker/vm');
-const renderRequestHandler = require('../src/worker/renderRequestHandler');
+const { getBundleFilePath } = require('../src/worker/vm');
+const renderRequestHandler = require('../src/worker/renderRequestHandlerVm');
 const { resetVM } = require('../src/worker/vm');
 
 test('If gem has posted updated bundle', (assert) => {
@@ -15,6 +14,7 @@ test('If gem has posted updated bundle', (assert) => {
   const req = {
     body: {
       renderingRequest: 'ReactOnRails.dummy',
+      bundleUpdateTimeUtc: 1495063024898,
     },
     files: {
       bundle: {
@@ -30,9 +30,9 @@ test('If gem has posted updated bundle', (assert) => {
     { status: 200, data: { renderedHtml: 'Dummy Object' } },
     'renderRequestHandler returns status 200 and correct rendered renderedHtmls');
   assert.equal(
-    getBundleUpdateTimeUtc(),
-    +(fs.statSync(path.resolve(__dirname, './tmp/bundle.js')).mtime),
-    'getBundleUpdateTimeUtc() should return last modification time of bundle loaded to VM');
+    getBundleFilePath(),
+    path.resolve(__dirname, './tmp/1495063024898.js'),
+    'getBundleFilePath() should return file path of the bundle loaded to VM');
 
   cleanUploadedBundles();
 });
@@ -42,7 +42,7 @@ test('If bundle was not uploaded yet', (assert) => {
 
   resetVM();
   createUploadedBundle();
-  const updateBundleTimestamp = +(fs.statSync(getUploadedBundlePath()).mtime) + 1;
+  const updateBundleTimestamp = 1495063024899;
   cleanUploadedBundles();
 
   setConfig();
@@ -63,37 +63,12 @@ test('If bundle was not uploaded yet', (assert) => {
     'renderRequestHandler returns status 410 with "No bundle uploaded"');
 });
 
-test('If bundle is outdated', (assert) => {
-  assert.plan(1);
-
-  resetVM();
-  createUploadedBundle();
-  const updateBundleTimestamp = +(fs.statSync(getUploadedBundlePath()).mtime) + 1;
-
-  setConfig();
-
-  const req = {
-    files: {},
-    body: {
-      renderingRequest: 'ReactOnRails.dummy',
-      bundleUpdateTimeUtc: updateBundleTimestamp,
-    },
-  };
-
-  const result = renderRequestHandler(req);
-
-  assert.deepEqual(
-    result,
-    { status: 410, data: 'Bundle is outdated' },
-    'renderRequestHandler returns status 410 with "Bundle is outdated"');
-});
-
 test('If bundle was already uppdated by another thread', (assert) => {
   assert.plan(1);
 
   resetVM();
   createUploadedBundle();
-  const updateBundleTimestamp = +(fs.statSync(getUploadedBundlePath()).mtime);
+  const updateBundleTimestamp = 1495063024898;
 
   setConfig();
 
@@ -112,4 +87,3 @@ test('If bundle was already uppdated by another thread', (assert) => {
     { status: 200, data: { renderedHtml: 'Dummy Object' } },
     'renderRequestHandler returns status 200 and correct rendered renderedHtmls');
 });
-*/
