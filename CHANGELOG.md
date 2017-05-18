@@ -7,7 +7,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 *Please add entries here for your pull requests.*
 
 ## Changed
-- Logging no longer occurs in Production or Testing. [#000](https://github.com/shakacode/react_on_rails/pull/000) by [conturbo](https://github.com/Conturbo)
+- Logging no longer occurs in Production or Testing. [#845](https://github.com/shakacode/react_on_rails/pull/845) by [conturbo](https://github.com/Conturbo)
 
 ### Added
 The railsContext now includes the Rails.env by default. [#842](https://github.com/shakacode/react_on_rails/pull/842) by [conturbo](https://github.com/Conturbo). 
