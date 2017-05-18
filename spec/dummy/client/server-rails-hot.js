@@ -20,7 +20,7 @@ const { resolve } = require('path');
 import webpackConfig from './webpack.client.rails.hot.config';
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
-const configPath = resolve('..', 'config', 'webpack');
+const configPath = resolve('..', 'config');
 const { hotReloadingServer } = webpackConfigLoader(configPath);
 
 const compiler = webpack(webpackConfig);

@@ -9,7 +9,7 @@ const webpack = require('webpack');
 const merge = require('webpack-merge');
 const config = require('./webpack.client.base.config');
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
-const configPath = resolve('..', 'config', 'webpack');
+const configPath = resolve('..', 'config');
 const { hotReloadingServer, webpackOutputPath } = webpackConfigLoader(configPath);
 
 module.exports = merge(config, {
