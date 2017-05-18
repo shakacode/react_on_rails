@@ -42,3 +42,17 @@ test('buildVM and runInVM', (assert) => {
     runInVM('console.history !== undefined'),
     'VM has patched console with history');
 });
+
+test('VM console history', (assert) => {
+  assert.plan(1);
+  createUploadedBundle();
+  buildVM(getUploadedBundlePath());
+
+  let vmResult = runInVM('console.log("Console message inside of VM") || console.history;');
+  const consoleHistory = [{ level: 'log', arguments: ['[SERVER] Console message inside of VM'] }];
+
+  assert.deepEqual(
+    vmResult,
+    consoleHistory,
+    'Console logging from VM changes history for console inside VM');
+});

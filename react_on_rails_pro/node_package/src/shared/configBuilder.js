@@ -11,7 +11,9 @@ const defaultConfig = {
 
   // Show only important messages by default, https://github.com/winstonjs/winston#logging-levels:
   logLevel: 'info',
-  workersCount: undefined,
+
+  workersCount: undefined,         // Let master detect workers count automaticaly
+  password: undefined,             // No default for password, means no auth
 };
 
 exports.buildConfig = function buildConfig(userConfig) {
