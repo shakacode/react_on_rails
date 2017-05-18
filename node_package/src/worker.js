@@ -10,6 +10,7 @@ const busBoy = require('express-busboy');
 const log = require('winston');
 const { buildConfig, getConfig } = require('./shared/configBuilder');
 const handleRenderRequest = require('./worker/renderRequestHandlerVm');
+const packageJson = require(__dirname + '/../../package.json');
 
 // Turn on colorized log:
 log.remove(log.transports.Console);
@@ -46,6 +47,13 @@ exports.run = function run(config) {
       cluster.worker.disconnect();
     }
   });
+
+  app.get('/', (req, res) => {
+    res.send({
+      node_version: process.version,
+      renderer_version: packageJson.version,
+    });
+  })
 
   app.listen(port, () => {
     log.info(`Node renderer worker #${cluster.worker.id} listening on port ${port}!`);
