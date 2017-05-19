@@ -3,6 +3,8 @@
  * @module master
  */
 
+'use strict';
+
 const os = require('os');
 const cluster = require('cluster');
 const log = require('winston');

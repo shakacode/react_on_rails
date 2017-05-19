@@ -3,12 +3,15 @@
  * @module worker
  */
 
+'use strict';
+
 const path = require('path');
 const cluster = require('cluster');
 const express = require('express');
 const busBoy = require('express-busboy');
 const log = require('winston');
 const { buildConfig, getConfig } = require('./shared/configBuilder');
+const authenticate = require('./worker/authHandler');
 const handleRenderRequest = require('./worker/renderRequestHandlerVm');
 
 // eslint-disable-next-line import/no-dynamic-require
@@ -40,7 +43,19 @@ exports.run = function run(config) {
     path: path.join(bundlePath, 'uploads'),
   });
 
+  //
   app.post('/render', (req, res) => {
+    // Authenticate Ruby client:
+    const authResult = authenticate(req);
+
+    if (typeof authResult === 'object') {
+      const { status, data } = authResult;
+      res.status(status);
+      res.send(data);
+      return;
+    }
+
+    // Hahdle rendering request:
     const { status, data, die } = handleRenderRequest(req);
     res.status(status);
     res.send(data);
@@ -50,6 +65,7 @@ exports.run = function run(config) {
     }
   });
 
+  //
   app.get('/info', (_req, res) => {
     res.send({
       node_version: process.version,
@@ -57,7 +73,12 @@ exports.run = function run(config) {
     });
   });
 
-  app.listen(port, () => {
-    log.info(`Node renderer worker #${cluster.worker.id} listening on port ${port}!`);
-  });
+  // In tests we will run worker in master thread, so we need to ensure server will not listen:
+  if (!cluster.isMaster) {
+    app.listen(port, () => {
+      log.info(`Node renderer worker #${cluster.worker.id} listening on port ${port}!`);
+    });
+  }
+
+  return app;
 };
