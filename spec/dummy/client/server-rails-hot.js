@@ -21,12 +21,12 @@ import webpackConfig from './webpack.client.rails.hot.config';
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
-const { hotReloadingServer } = webpackConfigLoader(configPath);
+const { hotReloadingUrl, hotReloadingPort, hotReloadingHostname } = webpackConfigLoader(configPath);
 
 const compiler = webpack(webpackConfig);
 
 const devServer = new WebpackDevServer(compiler, {
-  contentBase: hotReloadingServer,
+  contentBase: hotReloadingUrl,
   hot: true,
   inline: true,
   historyApiFallback: true,
@@ -42,9 +42,9 @@ const devServer = new WebpackDevServer(compiler, {
   },
 });
 
-devServer.listen(devServerConfig.port, 'localhost', err => {
+devServer.listen(hotReloadingPort, hotReloadingHostname, err => {
   if (err) console.error(err);
   console.log(
-    `=> 🔥  Webpack development server is running on port ${devServerConfig.port}`
+    `=> 🔥  Webpack development server is running on ${hotReloadingUrl}`
   );
 });
