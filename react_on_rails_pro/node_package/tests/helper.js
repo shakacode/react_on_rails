@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
-const { buildConfig } = require('../src/worker/configBuilder');
+const { buildConfig } = require('../src/shared/configBuilder');
 
 /**
  *
@@ -23,7 +23,7 @@ function getTmpUploadedBundlePath() {
  *
  */
 function getUploadedBundlePath() {
-  return path.resolve(__dirname, './tmp/bundle.js');
+  return path.resolve(__dirname, './tmp/1495063024898.js');
 }
 
 /**

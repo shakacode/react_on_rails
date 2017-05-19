@@ -12,6 +12,7 @@
     "express-busboy": "^6.0.1",
     "fs-extra": "^3.0.1",
     "sandboxed-module": "^2.0.3",
+    "supertest": "^3.0.0",
     "vm2": "^3.4.6",
     "winston": "^2.3.1"
   },
@@ -45,6 +46,7 @@
     "node_package/src"
   ],
   "scripts": {
+    "start": "node renderer.js",
     "test": "babel-tape-runner node_package/tests/*.js | tap-spec",
     "eslint": "eslint .",
     "flow": "flow check node_package",
