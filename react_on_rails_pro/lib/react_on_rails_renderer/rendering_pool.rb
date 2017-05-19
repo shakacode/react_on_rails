@@ -68,7 +68,8 @@ module ReactOnRailsRenderer
         response = RestClient.post(
           renderer_url,
           renderingRequest: js_code,
-          bundleUpdateTimeUtc: @bundle_update_utc_timestamp
+          bundleUpdateTimeUtc: @bundle_update_utc_timestamp,
+          password: ReactOnRailsRenderer.configuration.password
         )
 
         parsed_response = JSON.parse(response.body)
@@ -97,7 +98,8 @@ module ReactOnRailsRenderer
           renderer_url,
           renderingRequest: js_code,
           bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path),
-          bundleUpdateTimeUtc: @bundle_update_utc_timestamp
+          bundleUpdateTimeUtc: @bundle_update_utc_timestamp,
+          password: ReactOnRailsRenderer.configuration.password
         )
 
         parsed_response = JSON.parse(response.body)
@@ -116,7 +118,7 @@ module ReactOnRailsRenderer
         end
       #rescue Errno::ECONNREFUSED
       #  update_bundle_and_eval_js(js_code)
-=end      
+=end
       end
     end
   end
