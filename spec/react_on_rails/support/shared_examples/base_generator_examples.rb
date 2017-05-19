@@ -34,7 +34,7 @@ shared_examples "base_generator" do
        client/.babelrc
        client/package.json
        config/initializers/react_on_rails.rb
-       config/webpack/paths.yml
+       config/webpacker_lite.yml
        package.json
        Procfile.dev).each { |file| assert_file(file) }
   end
