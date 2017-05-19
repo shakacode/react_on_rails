@@ -5,6 +5,8 @@
  * @module worker/authHandler
  */
 
+'use strict';
+
 const { getConfig } = require('../shared/configBuilder');
 
 /**
@@ -12,6 +14,7 @@ const { getConfig } = require('../shared/configBuilder');
  */
 module.exports = function authenticate(req) {
   const { password } = getConfig();
+
   if (password && password !== req.body.password) {
     return {
       status: 401,
@@ -19,5 +22,5 @@ module.exports = function authenticate(req) {
     };
   }
 
-  return false;
+  return undefined;
 };
