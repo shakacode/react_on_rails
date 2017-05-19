@@ -5,6 +5,8 @@
  * @module worker/renderRequestHandlerVm
  */
 
+'use strict';
+
 const cluster = require('cluster');
 const path = require('path');
 const fs = require('fs');
@@ -56,5 +58,6 @@ module.exports = function handleRenderRequest(req) {
   return {
     status: 200,
     data: { renderedHtml: result },
+    // data: { renderedHtml: '{ "html": "FAKE" }' },
   };
 };

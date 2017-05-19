@@ -4,6 +4,8 @@
  * @module worker/consoleHistory
  */
 
+'use strict';
+
 /**
  *
  */
