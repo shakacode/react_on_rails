@@ -108,7 +108,7 @@ test('getBundleFilePath', (assert) => {
 });
 
 test('FriendsAndGuestst bundle for commit 1a7fe417', (assert) => {
-  assert.plan(3);
+  assert.plan(5);
   buildVM(path.resolve(__dirname, './fixtures/projects/friendsandguests/1a7fe417/server-bundle.js'));
 
   // WelcomePage component:
@@ -134,4 +134,20 @@ test('FriendsAndGuestst bundle for commit 1a7fe417', (assert) => {
   assert.ok(
     listingIndexRenderingResult.includes("data-react-checksum=\\\"452252439\\\"",
     'ListingIndex component has correct checksum'));
+
+  // ListingShow component:
+  const listingShowComponentRenderingRequest = fs.readFileSync(
+    path.resolve(__dirname, './fixtures/projects/friendsandguests/1a7fe417/listingsShowRenderingRequest.js'), 'utf8');
+  const listingShowRenderingResult = runInVM(listingShowComponentRenderingRequest);
+  assert.ok(
+    listingShowRenderingResult.includes("data-react-checksum=\\\"-324043796\\\"",
+    'ListingShow component has correct checksum'));
+
+  // UserShow component:
+  const userShowComponentRenderingRequest = fs.readFileSync(
+    path.resolve(__dirname, './fixtures/projects/friendsandguests/1a7fe417/userShowRenderingRequest.js'), 'utf8');
+  const userShowRenderingResult = runInVM(userShowComponentRenderingRequest);
+  assert.ok(
+    userShowRenderingResult.includes("data-react-checksum=\\\"-1039690194\\\"",
+    'UserShow component has correct checksum'));
 });
