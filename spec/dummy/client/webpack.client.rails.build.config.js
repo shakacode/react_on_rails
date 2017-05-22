@@ -2,8 +2,6 @@
 // cd client && yarn run build:client
 // Note that Foreman (Procfile.dev) has also been configured to take care of this.
 
-/* eslint-disable comma-dangle */
-
 const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const merge = require('webpack-merge');
 const config = require('./webpack.client.base.config');

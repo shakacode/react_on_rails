@@ -1,5 +1,4 @@
 /* eslint no-var: 0, no-console: 0, import/no-extraneous-dependencies: 0 */
-/* eslint-disable comma-dangle */
 
 // This file is used by the yarn script:
 // "hot-assets": "babel-node server-rails-hot.js"

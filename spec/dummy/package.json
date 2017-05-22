@@ -8,11 +8,13 @@
   },
   "scripts": {
     "postinstall": "cd ./client && yarn install",
-    "gulp": "cd ./client && yarn run gulp",
     "test": "yarn run build:test && yarn run lint && rspec",
     "lint": "cd client && yarn run lint",
     "install-react-on-rails": "cd client && yarn run install-react-on-rails",
     "build:clean": "rm -rf public/webpack || true",
+
+    "comment": "talk to rob about cleaning up",
+
     "build:production:client": "(cd client && yarn run build:production:client --silent)",
     "build:production:server": "(cd client && yarn run build:production:server --silent)",
     "build:client": "(cd client && yarn run build:client --silent",
