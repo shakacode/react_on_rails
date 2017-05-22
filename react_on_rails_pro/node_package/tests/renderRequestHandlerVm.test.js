@@ -55,7 +55,9 @@ test('If bundle was not uploaded yet', (assert) => {
 
   assert.deepEqual(
     result,
-    { status: 410, data: 'No bundle uploaded' },
+    { status: 410,
+      headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+      data: 'No bundle uploaded' },
     'renderRequestHandler returns status 410 with "No bundle uploaded"');
 });
 

@@ -5,7 +5,7 @@ const worker = require('../src/worker');
 const { getUploadedBundlePath, createUploadedBundle } = require('./helper');
 const { buildVM } = require('../src/worker/vm');
 
-test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
+test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
      'when password is required but no password was provided', (assert) => {
   assert.plan(2);
 
@@ -18,7 +18,7 @@ test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
   });
 
   request(app)
-    .post('/render/bundles/1495063024898/requests/d41d8cd98f00b204e9800998ecf8427e')
+    .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
@@ -31,7 +31,7 @@ test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
     });
 });
 
-test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
+test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
      'when password is required but wrong password was provided', (assert) => {
   assert.plan(2);
 
@@ -44,7 +44,7 @@ test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
   });
 
   request(app)
-    .post('/render/bundles/1495063024898/requests/d41d8cd98f00b204e9800998ecf8427e')
+    .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
@@ -57,7 +57,7 @@ test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
     });
 });
 
-test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
+test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
      'when password is required and correct password was provided', (assert) => {
   assert.plan(3);
 
@@ -70,7 +70,7 @@ test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
   });
 
   request(app)
-    .post('/render/bundles/1495063024898/requests/d41d8cd98f00b204e9800998ecf8427e')
+    .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
@@ -84,7 +84,7 @@ test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
     });
 });
 
-test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
+test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
      'when password is not required and no password was provided', (assert) => {
   assert.plan(3);
 
@@ -96,7 +96,7 @@ test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
   });
 
   request(app)
-    .post('/render/bundles/1495063024898/requests/d41d8cd98f00b204e9800998ecf8427e')
+    .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',

@@ -45,7 +45,7 @@ exports.run = function run(config) {
   });
 
   //
-  app.route('/render/bundles/:bundleTimestamp/requests/:renderRequestDigest').post((req, res) => {
+  app.route('/bundles/:bundleTimestamp/render/:renderRequestDigest').post((req, res) => {
     // Authenticate Ruby client:
     const authResult = authenticate(req);
 
