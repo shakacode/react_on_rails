@@ -38,13 +38,14 @@ exports.run = function run(config) {
   log.level = logLevel;
 
   const app = express();
+
   busBoy.extend(app, {
     upload: true,
     path: path.join(bundlePath, 'uploads'),
   });
 
   //
-  app.post('/render', (req, res) => {
+  app.route('/render/bundles/:bundleTimestamp/requests/:renderRequestDigest').post((req, res) => {
     // Authenticate Ruby client:
     const authResult = authenticate(req);
 
