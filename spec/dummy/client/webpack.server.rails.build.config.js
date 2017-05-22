@@ -3,12 +3,12 @@
 
 const webpack = require('webpack');
 const { resolve, join } = require('path');
-const webpackCommon = require('./webpack.common');
+const webpackCommon = require('./webpack.common.config');
 const { assetLoaderRules } = webpackCommon;
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
-const { webpackOutputPath } = webpackConfigLoader(configPath);
+const { webpackOutputPath, webpackPublicOutputDir } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
 const nodeEnv = devBuild ? 'development' : 'production';
@@ -22,6 +22,9 @@ module.exports = {
   ],
   output: {
     filename: 'server-bundle.js',
+
+    // This needs a leading slash.
+    publicPath: '/' + webpackPublicOutputDir,
     path: webpackOutputPath,
   },
   resolve: {

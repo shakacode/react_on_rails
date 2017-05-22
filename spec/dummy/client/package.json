@@ -69,6 +69,7 @@
   "scripts": {
     "lint": "eslint --ext .js,.jsx .",
     "test": "yarn run build:test && rspec",
+    "postinstall": "yarn run install-react-on-rails",
     "build:test": "yarn run build:test:client && yarn run build:test:server",
     "build:test:client": "NODE_ENV=test webpack --config webpack.client.rails.build.config.js",
     "build:test:server": "NODE_ENV=test webpack --config webpack.server.rails.build.config.js",
