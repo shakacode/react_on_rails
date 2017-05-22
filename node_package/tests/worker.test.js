@@ -5,7 +5,8 @@ const worker = require('../src/worker');
 const { getUploadedBundlePath, createUploadedBundle } = require('./helper');
 const { buildVM } = require('../src/worker/vm');
 
-test('POST /render when password is required but no password was provided', (assert) => {
+test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
+     'when password is required but no password was provided', (assert) => {
   assert.plan(2);
 
   createUploadedBundle();
@@ -30,7 +31,8 @@ test('POST /render when password is required but no password was provided', (ass
     });
 });
 
-test('POST /render when password is required but wrong password was provided', (assert) => {
+test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
+     'when password is required but wrong password was provided', (assert) => {
   assert.plan(2);
 
   createUploadedBundle();
@@ -55,8 +57,9 @@ test('POST /render when password is required but wrong password was provided', (
     });
 });
 
-test('POST /render when password is required and correct password was provided', (assert) => {
-  assert.plan(2);
+test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
+     'when password is required and correct password was provided', (assert) => {
+  assert.plan(3);
 
   createUploadedBundle();
   buildVM(getUploadedBundlePath());
@@ -74,14 +77,16 @@ test('POST /render when password is required and correct password was provided',
       password: 'password',
     })
     .end((_err, res) => {
+      assert.ok(res.headers['cache-control'] === 'public, max-age=31536000');
       assert.ok(res.status === 200);
       assert.deepEqual(res.body, { renderedHtml: 'Dummy Object' });
       assert.end();
     });
 });
 
-test('POST /render when password is not required and no password was provided', (assert) => {
-  assert.plan(2);
+test('POST /render/bundles/:bundleTimestamp/requests/:renderRequestDigest ' +
+     'when password is not required and no password was provided', (assert) => {
+  assert.plan(3);
 
   createUploadedBundle();
   buildVM(getUploadedBundlePath());
@@ -98,6 +103,7 @@ test('POST /render when password is not required and no password was provided', 
       password: undefined,
     })
     .end((_err, res) => {
+      assert.ok(res.headers['cache-control'] === 'public, max-age=31536000');
       assert.ok(res.status === 200);
       assert.deepEqual(res.body, { renderedHtml: 'Dummy Object' });
       assert.end();

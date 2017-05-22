@@ -25,7 +25,7 @@ test('If gem has posted updated bundle', (assert) => {
 
   assert.deepEqual(
     result,
-    { status: 200,  headers: { 'Cache-Control': 'public, max-age=31536000' }, data: { renderedHtml: 'Dummy Object' } },
+    { status: 200, headers: { 'Cache-Control': 'public, max-age=31536000' }, data: { renderedHtml: 'Dummy Object' } },
     'renderRequestHandler returns status 200 and correct rendered renderedHtmls');
   assert.equal(
     getBundleFilePath(),

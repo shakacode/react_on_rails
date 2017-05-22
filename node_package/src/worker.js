@@ -58,7 +58,9 @@ exports.run = function run(config) {
 
     // Hahdle rendering request:
     const { status, data, headers, die } = handleRenderRequest(req);
-    for (var key in headers) res.set(key, headers[key]);
+
+    // eslint-disable-next-line guard-for-in, no-restricted-syntax
+    for (const key in headers) res.set(key, headers[key]);
     res.status(status);
     res.send(data);
 
