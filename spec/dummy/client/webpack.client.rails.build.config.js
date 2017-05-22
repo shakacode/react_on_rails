@@ -25,7 +25,7 @@ module.exports = merge(config, {
     filename: '[name]-[hash].js',
 
     // Leading slash is necessary
-    publicPath: '/' + webpackPublicOutputDir,
+    publicPath: '/' + webpackPublicOutputDir + '/',
     path: webpackOutputPath,
   },
 

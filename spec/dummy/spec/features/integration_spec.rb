@@ -158,6 +158,7 @@ feature "Code Splitting", :js do
   background { visit "/deferred_render_with_server_rendering" }
   scenario "clicking on async route causes async component to be fetched" do
     header_text = page.find(:css, "h1").text
+
     expect(header_text).to eq("Deferred Rendering")
     expect(subject).to_not have_text "Noice!"
 
