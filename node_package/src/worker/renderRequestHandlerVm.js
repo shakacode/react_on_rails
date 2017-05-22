@@ -45,6 +45,7 @@ module.exports = function handleRenderRequest(req) {
     // Check if bundle was uploaded:
     if (!fs.existsSync(bundleFilePath)) {
       return {
+        headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
         status: 410,
         data: 'No bundle uploaded',
       };
