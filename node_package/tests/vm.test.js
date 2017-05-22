@@ -151,3 +151,33 @@ test('FriendsAndGuestst bundle for commit 1a7fe417', (assert) => {
     userShowRenderingResult.includes("data-react-checksum=\\\"-1039690194\\\"",
     'UserShow component has correct checksum'));
 });
+
+test('ReactWebpackRailsTutorial bundle for commit ec974491', (assert) => {
+  assert.plan(3);
+  buildVM(path.resolve(__dirname, './fixtures/projects/react-webpack-rails-tutorial/ec974491/server-bundle.js'));
+
+  // NavigationBar component:
+  const navigationBarComponentRenderingRequest = fs.readFileSync(
+    path.resolve(__dirname, './fixtures/projects/react-webpack-rails-tutorial/ec974491/navigationBarAppRenderingRequest.js'), 'utf8');
+  const navigationBarRenderingResult = runInVM(navigationBarComponentRenderingRequest);
+  assert.ok(
+    navigationBarRenderingResult.includes("data-react-checksum=\\\"-472831860\\\"",
+    'NavigationBar component has correct checksum'));
+
+  // RouterApp component:
+  const routerAppComponentRenderingRequest = fs.readFileSync(
+    path.resolve(__dirname, './fixtures/projects/react-webpack-rails-tutorial/ec974491/routerAppRenderingRequest.js'), 'utf8');
+  const routerAppRenderingResult = runInVM(routerAppComponentRenderingRequest);
+  assert.ok(
+    routerAppRenderingResult.includes("data-react-checksum=\\\"-1777286250\\\"",
+    'RouterApp component has correct checksum'));
+
+
+  // App component:
+  const appComponentRenderingRequest = fs.readFileSync(
+    path.resolve(__dirname, './fixtures/projects/react-webpack-rails-tutorial/ec974491/appRenderingRequest.js'), 'utf8');
+  const appRenderingResult = runInVM(appComponentRenderingRequest);
+  assert.ok(
+    appRenderingResult.includes("data-react-checksum=\\\"-490396040\\\"",
+    'App component has correct checksum'));
+});
