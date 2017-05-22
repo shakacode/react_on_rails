@@ -1,16 +1,24 @@
 /**
- * Setup default for the config/webpacker_lite.yml
+ * Allow defaults for the config/webpacker_lite.yml. Thee values in this file MUST match values
+ * in README for https://github.com/shakacode/webpacker_lite
  *
  * webpack_public_output_dir: 'webpack'
  * manifest: 'manifest.json'
  *
  * hot_reloading_enabled_by_default: false
  * hot_reloading_host: localhost:3500
+ *
+ * NOTE: for hot reloading, env.HOT_RELOADING value will override any config value. This env value
+ * should be set to TRUE to turn this on.
  */
 const { join, resolve } = require('path');
-const { env } = require('process');
 const { safeLoad } = require('js-yaml');
 const { readFileSync } = require('fs');
+
+const DEFAULT_WEBPACK_PUBLIC_OUTPUT_DIR = 'webpack';
+const DEFAULT_MANIFEST = 'manifest.json';
+const DEFAULT_HOT_RELOADING_HOST = 'localhost:3500';
+const HOT_RELOADING_ENABLED_BY_DEFAULT = false;
 
 function getLocation(href) {
   const match = href.match(/^(https?\:)\/\/(([^:\/?#]*)(?:\:([0-9]+))?)([\/]{0,1}[^?#]*)(\?[^#]*|)(#.*|)$/);
@@ -23,7 +31,7 @@ function getLocation(href) {
       pathname: match[5],
       search: match[6],
       hash: match[7],
-    };
+   };
 }
 
 /**
@@ -35,26 +43,26 @@ function getLocation(href) {
  * hotReloadingPort,
  * hotReloadingUrl,
  * manifest,
- * webpackOutputPath
+ * webpackOutputPath,
+ * webpackPublicOutputDir
  * }}
  */
 const configLoader = (configPath) => {
-  const configuration = safeLoad(readFileSync(join(configPath, 'webpacker_lite.yml'), 'utf8'))[env.NODE_ENV];
+  const env = process.env;
+  const configuration = safeLoad(readFileSync(join(configPath, 'webpacker_lite.yml'), 'utf8'))[process.env.NODE_ENV];
 
   const devBuild = env !== 'production';
-  const hotReloadingHost = configuration.hot_reloading_host || 'localhost:3500';
+  const hotReloadingHost = configuration.hot_reloading_host || DEFAULT_HOT_RELOADING_HOST;
 
   // NOTE: Rails path is hard coded to `/public`
-  const webpackPublicOutputDir = configuration.webpack_public_output_dir || 'webpack';
-  const webpackOutputPath = resolve(configPath, '..', 'public',
-    webpackPublicOutputDir);
+  const webpackPublicOutputDir = configuration.webpack_public_output_dir ||
+    DEFAULT_WEBPACK_PUBLIC_OUTPUT_DIR;
+  const webpackOutputPath = resolve(configPath, '..', 'public', webpackPublicOutputDir);
 
-  const manifest = configuration.manifest;
-  let hotReloadingEnabled = false;
-  if (env.HOT_RELOADING === 'TRUE' || env.HOT_RELOADING === 'YES' ||
-    configuration.hot_reloading_enabled_by_default) {
-    hotReloadingEnabled = true;
-  }
+  const manifest = configuration.manifest || DEFAULT_MANIFEST;
+
+  const hotReloadingEnabled = (env.HOT_RELOADING === 'TRUE' || env.HOT_RELOADING === 'YES' ||
+    configuration.hot_reloading_enabled_by_default || HOT_RELOADING_ENABLED_BY_DEFAULT);
 
   let hotReloadingUrl = hotReloadingHost;
   if (!hotReloadingUrl.match(/^http/)) {
@@ -70,17 +78,6 @@ const configLoader = (configPath) => {
     );
   }
 
-  let xx = {
-    devBuild,
-    hotReloadingEnabled,
-    hotReloadingHost,
-    hotReloadingHostname,
-    hotReloadingPort,
-    hotReloadingUrl,
-    manifest,
-    webpackOutputPath,
-  };
-
   return {
     devBuild,
     hotReloadingEnabled,
@@ -90,6 +87,7 @@ const configLoader = (configPath) => {
     hotReloadingUrl,
     manifest,
     webpackOutputPath,
+    webpackPublicOutputDir,
   };
 };
 

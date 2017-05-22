@@ -10,7 +10,7 @@ const config = require('./webpack.client.base.config');
 const { resolve } = require('path');
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
-const { webpackOutputPath } = webpackConfigLoader(configPath);
+const { webpackOutputPath, webpackPublicOutputDir } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
 
@@ -24,8 +24,10 @@ if (devBuild) {
 module.exports = merge(config, {
 
   output: {
-    filename: '[name].js',
-    // This is based on the config being in /client
+    filename: '[name]-[hash].js',
+
+    // Leading slash is necessary
+    publicPath: '/' + webpackPublicOutputDir,
     path: webpackOutputPath,
   },
 
