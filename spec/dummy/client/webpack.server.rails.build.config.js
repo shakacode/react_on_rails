@@ -1,5 +1,6 @@
 // Common webpack configuration for server bundle
 const { resolve, join } = require('path');
+const webpack = require('webpack');
 const webpackCommon = require('./webpack.common.config');
 const { assetLoaderRules } = webpackCommon;
 
