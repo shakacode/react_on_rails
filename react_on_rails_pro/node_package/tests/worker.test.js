@@ -17,11 +17,10 @@ test('POST /render when password is required but no password was provided', (ass
   });
 
   request(app)
-    .post('/render')
+    .post('/render/bundles/1495063024898/requests/d41d8cd98f00b204e9800998ecf8427e')
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
-      bundleUpdateTimeUtc: 1495063024898,
       password: undefined,
     })
     .end((_err, res) => {
@@ -43,11 +42,10 @@ test('POST /render when password is required but wrong password was provided', (
   });
 
   request(app)
-    .post('/render')
+    .post('/render/bundles/1495063024898/requests/d41d8cd98f00b204e9800998ecf8427e')
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
-      bundleUpdateTimeUtc: 1495063024898,
       password: 'wrong',
     })
     .end((_err, res) => {
@@ -69,11 +67,10 @@ test('POST /render when password is required and correct password was provided',
   });
 
   request(app)
-    .post('/render')
+    .post('/render/bundles/1495063024898/requests/d41d8cd98f00b204e9800998ecf8427e')
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
-      bundleUpdateTimeUtc: 1495063024898,
       password: 'password',
     })
     .end((_err, res) => {
@@ -94,11 +91,10 @@ test('POST /render when password is not required and no password was provided', 
   });
 
   request(app)
-    .post('/render')
+    .post('/render/bundles/1495063024898/requests/d41d8cd98f00b204e9800998ecf8427e')
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
-      bundleUpdateTimeUtc: 1495063024898,
       password: undefined,
     })
     .end((_err, res) => {
