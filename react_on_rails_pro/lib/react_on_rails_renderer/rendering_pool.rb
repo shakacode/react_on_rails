@@ -51,7 +51,7 @@ module ReactOnRailsRenderer
         ENV["TRACE_REACT_ON_RAILS"].present?
       end
 
-      def renderer_url
+      def renderer_url(rendering_request_digest)
         port = if ReactOnRailsRenderer.configuration.renderer_port
                  ":#{ReactOnRailsRenderer.configuration.renderer_port}"
                else
@@ -61,14 +61,15 @@ module ReactOnRailsRenderer
         "#{ReactOnRailsRenderer.configuration.renderer_protocol}://" \
         "#{ReactOnRailsRenderer.configuration.renderer_host}" \
         "#{port}" \
-        "/render"
+        "/render/bundles/#{@bundle_update_utc_timestamp}/requests/#{rendering_request_digest}"
       end
 
       def eval_js(js_code)
+        rendering_request_digest = Digest::MD5.hexdigest(js_code)
+
         response = RestClient.post(
-          renderer_url,
+          renderer_url(rendering_request_digest),
           renderingRequest: js_code,
-          bundleUpdateTimeUtc: @bundle_update_utc_timestamp,
           password: ReactOnRailsRenderer.configuration.password
         )
 
@@ -94,11 +95,12 @@ module ReactOnRailsRenderer
       end
 
       def update_bundle_and_eval_js(js_code)
+        rendering_request_digest = Digest::MD5.hexdigest(js_code)
+
         response = RestClient.post(
-          renderer_url,
+          renderer_url(rendering_request_digest),
           renderingRequest: js_code,
           bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path),
-          bundleUpdateTimeUtc: @bundle_update_utc_timestamp,
           password: ReactOnRailsRenderer.configuration.password
         )
 

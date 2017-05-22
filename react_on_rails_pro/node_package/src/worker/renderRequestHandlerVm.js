@@ -22,7 +22,7 @@ const { buildVM, runInVM, getBundleFilePath } = require('./vm');
 module.exports = function handleRenderRequest(req) {
   if (!cluster.isMaster) log.debug(`worker #${cluster.worker.id} received render request with with code ${req.body.renderingRequest}`);
   const { bundlePath } = getConfig();
-  const bundleFilePath = path.join(bundlePath, `${req.body.bundleUpdateTimeUtc}.js`);
+  const bundleFilePath = path.join(bundlePath, `${req.params.bundleTimestamp}.js`);
 
   // If gem has posted updated bundle:
   if (req.files.bundle) {
