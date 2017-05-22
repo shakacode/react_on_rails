@@ -1,5 +1,6 @@
 const test = require('tape');
 const path = require('path');
+const fs = require('fs');
 const { getUploadedBundlePath, createUploadedBundle } = require('./helper');
 const { buildVM, runInVM, getBundleFilePath, resetVM } = require('../src/worker/vm');
 
@@ -104,4 +105,33 @@ test('getBundleFilePath', (assert) => {
     getBundleFilePath(),
     path.resolve(__dirname, './tmp/1495063024898.js'),
     'getBundleFilePath() should return file path of the bundle loaded to VM');
+});
+
+test('FriendsAndGuestst bundle for commit 1a7fe417', (assert) => {
+  assert.plan(3);
+  buildVM(path.resolve(__dirname, './fixtures/projects/friendsandguests/1a7fe417/server-bundle.js'));
+
+  // WelcomePage component:
+  const welcomePageComponentRenderingRequest = fs.readFileSync(
+    path.resolve(__dirname, './fixtures/projects/friendsandguests/1a7fe417/welcomePageRenderingRequest.js'), 'utf8');
+  const welcomePageRenderingResult = runInVM(welcomePageComponentRenderingRequest);
+  assert.ok(
+    welcomePageRenderingResult.includes("data-react-checksum=\\\"800299790\\\""),
+    'WelcomePage component has correct checksum');
+
+  // LayoutNavbar component:
+  const layoutNavbarComponentRenderingRequest = fs.readFileSync(
+    path.resolve(__dirname, './fixtures/projects/friendsandguests/1a7fe417/layoutNavbarRenderingRequest.js'), 'utf8');
+  const layoutNavbarRenderingResult = runInVM(layoutNavbarComponentRenderingRequest);
+  assert.ok(
+    layoutNavbarRenderingResult.includes("data-react-checksum=\\\"-667058792\\\"",
+    'LayoutNavbar component has correct checksum'));
+
+  // ListingIndex component:
+  const listingIndexComponentRenderingRequest = fs.readFileSync(
+    path.resolve(__dirname, './fixtures/projects/friendsandguests/1a7fe417/listingIndexRenderingRequest.js'), 'utf8');
+  const listingIndexRenderingResult = runInVM(listingIndexComponentRenderingRequest);
+  assert.ok(
+    listingIndexRenderingResult.includes("data-react-checksum=\\\"452252439\\\"",
+    'ListingIndex component has correct checksum'));
 });
