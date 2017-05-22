@@ -61,7 +61,7 @@ module ReactOnRailsRenderer
         "#{ReactOnRailsRenderer.configuration.renderer_protocol}://" \
         "#{ReactOnRailsRenderer.configuration.renderer_host}" \
         "#{port}" \
-        "/render/bundles/#{@bundle_update_utc_timestamp}/requests/#{rendering_request_digest}"
+        "/bundles/#{@bundle_update_utc_timestamp}/render/#{rendering_request_digest}"
       end
 
       def eval_js(js_code)
