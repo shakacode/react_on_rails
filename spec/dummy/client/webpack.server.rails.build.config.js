@@ -22,7 +22,7 @@ module.exports = {
     filename: 'server-bundle.js',
 
     // This needs a leading slash.
-    publicPath: '/' + webpackPublicOutputDir,
+    publicPath: '/' + webpackPublicOutputDir + '/',
     path: webpackOutputPath,
   },
   resolve: {

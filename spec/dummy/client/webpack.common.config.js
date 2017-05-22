@@ -8,9 +8,7 @@ const assetLoaderRules = [
       loader: 'url-loader',
       options: {
         limit: urlFileSizeCutover,
-
-        // Leading slash is needed
-        name: '/images/[name]-[hash].[ext]',
+        name: 'images/[name]-[hash].[ext]',
       },
     },
   },
@@ -19,8 +17,7 @@ const assetLoaderRules = [
     use: {
       loader: 'file-loader',
       options: {
-        // Leading slash is 100% needed
-        name: '/images/[name]-[hash].[ext]',
+        name: 'images/[name]-[hash].[ext]',
       }
     },
   },
