@@ -2,7 +2,6 @@
 // rails s
 // cd client && babel-node server-rails-hot.js
 // Note that Foreman (Procfile.dev) has also been configured to take care of this.
-/* eslint-disable comma-dangle */
 
 const { resolve } = require('path');
 const webpack = require('webpack');

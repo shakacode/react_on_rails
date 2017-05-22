@@ -21,17 +21,18 @@ const DEFAULT_HOT_RELOADING_HOST = 'localhost:3500';
 const HOT_RELOADING_ENABLED_BY_DEFAULT = false;
 
 function getLocation(href) {
-  const match = href.match(/^(https?\:)\/\/(([^:\/?#]*)(?:\:([0-9]+))?)([\/]{0,1}[^?#]*)(\?[^#]*|)(#.*|)$/);
+  const match = href.match(/^(https?:)\/\/(([^:/?#]*)(?::([0-9]+))?)([/]?[^?#]*)(\?[^#]*|)(#.*|)$/);
+
   return match && {
-      href: href,
-      protocol: match[1],
-      host: match[2],
-      hostname: match[3],
-      port: match[4],
-      pathname: match[5],
-      search: match[6],
-      hash: match[7],
-   };
+    href,
+    protocol: match[1],
+    host: match[2],
+    hostname: match[3],
+    port: match[4],
+    pathname: match[5],
+    search: match[6],
+    hash: match[7],
+  };
 }
 
 /**
@@ -64,18 +65,16 @@ const configLoader = (configPath) => {
   const hotReloadingEnabled = (env.HOT_RELOADING === 'TRUE' || env.HOT_RELOADING === 'YES' ||
     configuration.hot_reloading_enabled_by_default || HOT_RELOADING_ENABLED_BY_DEFAULT);
 
-  let hotReloadingUrl = hotReloadingHost;
-  if (!hotReloadingUrl.match(/^http/)) {
-    hotReloadingUrl = `http://${hotReloadingUrl}`;
-  }
+  const hotReloadingUrl = hotReloadingHost.match(/^http/)
+    ? hotReloadingHost
+    : `http://${hotReloadingHost}`;
 
   const url = getLocation(hotReloadingUrl);
   const hotReloadingPort = url.port;
   const hotReloadingHostname = url.hostname;
   if (hotReloadingPort === '' || hotReloadingHostname === '') {
-    throw new Error(
-      'Missing port number. Please specify the `hot_reloading_host` like `localhost:3500`'
-    );
+    const msg = 'Missing port number. Please specify the `hot_reloading_host` like `localhost:3500`';
+    throw new Error(msg);
   }
 
   return {

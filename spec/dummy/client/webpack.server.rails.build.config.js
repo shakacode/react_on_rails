@@ -1,7 +1,4 @@
 // Common webpack configuration for server bundle
-/* eslint-disable comma-dangle */
-
-const webpack = require('webpack');
 const { resolve, join } = require('path');
 const webpackCommon = require('./webpack.common.config');
 const { assetLoaderRules } = webpackCommon;
