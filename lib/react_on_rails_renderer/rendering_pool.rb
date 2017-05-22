@@ -73,13 +73,15 @@ module ReactOnRailsRenderer
           password: ReactOnRailsRenderer.configuration.password
         )
 
+        p response.headers
         parsed_response = JSON.parse(response.body)
         parsed_response[RENDERED_HTML_KEY]
 
       # rest_client treats non 2xx HTTP status for POST requests as an exception:
       rescue RestClient::ExceptionWithResponse => status_exception
         p "zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz"
-
+        p status_exception.http_headers
+        p status_exception.response
         case status_exception.response.code
         when 410
           update_bundle_and_eval_js(js_code)
