@@ -57,7 +57,8 @@ exports.run = function run(config) {
     }
 
     // Hahdle rendering request:
-    const { status, data, die } = handleRenderRequest(req);
+    const { status, data, headers, die } = handleRenderRequest(req);
+    for (var key in headers) res.set(key, headers[key]);
     res.status(status);
     res.send(data);
 

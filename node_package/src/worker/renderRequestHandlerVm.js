@@ -32,6 +32,7 @@ module.exports = function handleRenderRequest(req) {
     const result = runInVM(req.body.renderingRequest);
 
     return {
+      headers: { 'Cache-Control': 'public, max-age=31536000' },
       status: 200,
       data: { renderedHtml: result },
     };
@@ -56,6 +57,7 @@ module.exports = function handleRenderRequest(req) {
   const result = runInVM(req.body.renderingRequest);
 
   return {
+    headers: { 'Cache-Control': 'public, max-age=31536000' },
     status: 200,
     data: { renderedHtml: result },
     // data: { renderedHtml: '{ "html": "FAKE" }' },

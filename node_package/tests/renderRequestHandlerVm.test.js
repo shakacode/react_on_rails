@@ -12,10 +12,8 @@ test('If gem has posted updated bundle', (assert) => {
   createTmpUploadedBundle();
 
   const req = {
-    body: {
-      renderingRequest: 'ReactOnRails.dummy',
-      bundleUpdateTimeUtc: 1495063024898,
-    },
+    params: { bundleTimestamp: 1495063024898 },
+    body: { renderingRequest: 'ReactOnRails.dummy' },
     files: {
       bundle: {
         file: getTmpUploadedBundlePath(),
@@ -27,7 +25,7 @@ test('If gem has posted updated bundle', (assert) => {
 
   assert.deepEqual(
     result,
-    { status: 200, data: { renderedHtml: 'Dummy Object' } },
+    { status: 200,  headers: { 'Cache-Control': 'public, max-age=31536000' }, data: { renderedHtml: 'Dummy Object' } },
     'renderRequestHandler returns status 200 and correct rendered renderedHtmls');
   assert.equal(
     getBundleFilePath(),
@@ -49,10 +47,8 @@ test('If bundle was not uploaded yet', (assert) => {
 
   const req = {
     files: {},
-    body: {
-      renderingRequest: 'ReactOnRails.dummy',
-      bundleUpdateTimeUtc: updateBundleTimestamp,
-    },
+    params: { bundleTimestamp: updateBundleTimestamp },
+    body: { renderingRequest: 'ReactOnRails.dummy' },
   };
 
   const result = renderRequestHandler(req);
@@ -74,16 +70,14 @@ test('If bundle was already uppdated by another thread', (assert) => {
 
   const req = {
     files: {},
-    body: {
-      renderingRequest: 'ReactOnRails.dummy',
-      bundleUpdateTimeUtc: updateBundleTimestamp,
-    },
+    params: { bundleTimestamp: updateBundleTimestamp },
+    body: { renderingRequest: 'ReactOnRails.dummy' },
   };
 
   const result = renderRequestHandler(req);
 
   assert.deepEqual(
     result,
-    { status: 200, data: { renderedHtml: 'Dummy Object' } },
+    { status: 200, headers: { 'Cache-Control': 'public, max-age=31536000' }, data: { renderedHtml: 'Dummy Object' } },
     'renderRequestHandler returns status 200 and correct rendered renderedHtmls');
 });
