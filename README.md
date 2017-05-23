@@ -143,6 +143,8 @@ ReactOnRailsRenderer.configure do |config|
 end
 ```
 
+Currently Rails client prints response headers to console so you should be able to check if **Varnish** caches Reails client requests by inspecting printed `x-varnish` header. For example `:x_varnish=>"37719 37717"` means that **Varnish** returned response from cache (result to your request `#37719` returned from cache creaded on request `#37717`) and `:x_varnish=>"37721"` (with single id) means request hit Node server. If everything set up correctly you shoud see cached requestst starting form second render of the same page.
+
 ## Deploy Node renderer to Heroku
 Assuming you did not revoke your  **GitHub OAuth token** so you don't need to update your `package.json`:
 1. Create your **Heroku** app with **Node.js** buildpack, say `renderer-test.herokuapp.com`.
