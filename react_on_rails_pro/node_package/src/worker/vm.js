@@ -18,6 +18,15 @@ let bundleFilePath;
 /**
  *
  */
+function undefinedForExecLogging(functionName) {
+  return `
+    console.error('${functionName} is not defined for renderer VM. Note babel-polyfill may call this.');
+    console.error(getStackTrace().join('\\n'));`;
+}
+
+/**
+ *
+ */
 exports.buildVM = function buildVMNew(filePath) {
   // Create sandbox with new console instance:
   const sandbox = { console: new Console(process.stdout, process.stderr) };
@@ -42,6 +51,25 @@ exports.buildVM = function buildVMNew(filePath) {
 
     console.history.push({ level: 'log', arguments: argArray });
   };`, context);
+
+  // Define global getStackTrace() function:
+  vm.runInContext(`
+  function getStackTrace() {
+    var stack;
+    try {
+      throw new Error('');
+    }
+    catch (error) {
+      stack = error.stack || '';
+    }
+    stack = stack.split('\\n').map(function (line) { return line.trim(); });
+    return stack.splice(stack[0] == 'Error' ? 2 : 1);
+  }`, context);
+
+  // Define timer polyfills:
+  vm.runInContext(`function setInterval() { ${undefinedForExecLogging('setInterval')} }`, context);
+  vm.runInContext(`function setTimeout() { ${undefinedForExecLogging('setTimeout')} }`, context);
+  vm.runInContext(`function clearTimeout() { ${undefinedForExecLogging('clearTimeout')} }`, context);
 
   // Run bundle code in created context:
   const bundleContents = fs.readFileSync(filePath, 'utf8');
