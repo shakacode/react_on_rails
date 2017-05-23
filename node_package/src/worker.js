@@ -38,13 +38,14 @@ exports.run = function run(config) {
   log.level = logLevel;
 
   const app = express();
+
   busBoy.extend(app, {
     upload: true,
     path: path.join(bundlePath, 'uploads'),
   });
 
   //
-  app.post('/render', (req, res) => {
+  app.route('/bundles/:bundleTimestamp/render/:renderRequestDigest').post((req, res) => {
     // Authenticate Ruby client:
     const authResult = authenticate(req);
 
@@ -56,7 +57,10 @@ exports.run = function run(config) {
     }
 
     // Hahdle rendering request:
-    const { status, data, die } = handleRenderRequest(req);
+    const { status, data, headers, die } = handleRenderRequest(req);
+
+    // eslint-disable-next-line guard-for-in, no-restricted-syntax
+    for (const key in headers) res.set(key, headers[key]);
     res.status(status);
     res.send(data);
 

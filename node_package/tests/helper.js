@@ -48,9 +48,18 @@ function cleanUploadedBundles() {
   if (fs.existsSync(getTmpUploadedBundlePath())) fs.unlink(getTmpUploadedBundlePath());
 }
 
+/**
+ *
+ */
+function readRenderingRequest(projectName, commit, requestDumpFileName) {
+  const renderingRequestRelativePath = path.join('./fixtures/projects/', projectName, commit, requestDumpFileName);
+  return fs.readFileSync(path.resolve(__dirname, renderingRequestRelativePath), 'utf8');
+}
+
 exports.setConfig = setConfig;
 exports.getTmpUploadedBundlePath = getTmpUploadedBundlePath;
 exports.getUploadedBundlePath = getUploadedBundlePath;
 exports.createTmpUploadedBundle = createTmpUploadedBundle;
 exports.createUploadedBundle = createUploadedBundle;
 exports.cleanUploadedBundles = cleanUploadedBundles;
+exports.readRenderingRequest = readRenderingRequest;

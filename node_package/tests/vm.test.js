@@ -1,6 +1,6 @@
 const test = require('tape');
 const path = require('path');
-const { getUploadedBundlePath, createUploadedBundle } = require('./helper');
+const { getUploadedBundlePath, createUploadedBundle, readRenderingRequest } = require('./helper');
 const { buildVM, runInVM, getBundleFilePath, resetVM } = require('../src/worker/vm');
 
 test('buildVM and runInVM', (assert) => {
@@ -104,4 +104,82 @@ test('getBundleFilePath', (assert) => {
     getBundleFilePath(),
     path.resolve(__dirname, './tmp/1495063024898.js'),
     'getBundleFilePath() should return file path of the bundle loaded to VM');
+});
+
+test('FriendsAndGuestst bundle for commit 1a7fe417', (assert) => {
+  assert.plan(5);
+
+  const project = 'friendsandguests';
+  const commit = '1a7fe417';
+
+  buildVM(path.resolve(__dirname, './fixtures/projects/friendsandguests/1a7fe417/server-bundle.js'));
+
+  // WelcomePage component:
+  const welcomePageComponentRenderingRequest = readRenderingRequest(project, commit, 'welcomePageRenderingRequest.js');
+  const welcomePageRenderingResult = runInVM(welcomePageComponentRenderingRequest);
+  assert.ok(
+    welcomePageRenderingResult.includes('data-react-checksum=\\"800299790\\"'),
+    'WelcomePage component has correct checksum');
+
+  // LayoutNavbar component:
+  const layoutNavbarComponentRenderingRequest =
+    readRenderingRequest(project, commit, 'layoutNavbarRenderingRequest.js');
+  const layoutNavbarRenderingResult = runInVM(layoutNavbarComponentRenderingRequest);
+  assert.ok(
+    layoutNavbarRenderingResult.includes('data-react-checksum=\\"-667058792\\"',
+    'LayoutNavbar component has correct checksum'));
+
+  // ListingIndex component:
+  const listingIndexComponentRenderingRequest =
+    readRenderingRequest(project, commit, 'listingIndexRenderingRequest.js');
+  const listingIndexRenderingResult = runInVM(listingIndexComponentRenderingRequest);
+  assert.ok(
+    listingIndexRenderingResult.includes('data-react-checksum=\\"452252439\\"',
+    'ListingIndex component has correct checksum'));
+
+  // ListingShow component:
+  const listingShowComponentRenderingRequest = readRenderingRequest(project, commit, 'listingsShowRenderingRequest.js');
+  const listingShowRenderingResult = runInVM(listingShowComponentRenderingRequest);
+  assert.ok(
+    listingShowRenderingResult.includes('data-react-checksum=\\"-324043796\\"',
+    'ListingShow component has correct checksum'));
+
+  // UserShow component:
+  const userShowComponentRenderingRequest = readRenderingRequest(project, commit, 'userShowRenderingRequest.js');
+  const userShowRenderingResult = runInVM(userShowComponentRenderingRequest);
+  assert.ok(
+    userShowRenderingResult.includes('data-react-checksum=\\"-1039690194\\"',
+    'UserShow component has correct checksum'));
+});
+
+test('ReactWebpackRailsTutorial bundle for commit ec974491', (assert) => {
+  assert.plan(3);
+
+  const project = 'react-webpack-rails-tutorial';
+  const commit = 'ec974491';
+
+  buildVM(path.resolve(__dirname, './fixtures/projects/react-webpack-rails-tutorial/ec974491/server-bundle.js'));
+
+  // NavigationBar component:
+  const navigationBarComponentRenderingRequest =
+    readRenderingRequest(project, commit, 'navigationBarAppRenderingRequest.js');
+  const navigationBarRenderingResult = runInVM(navigationBarComponentRenderingRequest);
+  assert.ok(
+    navigationBarRenderingResult.includes('data-react-checksum=\\"-472831860\\"',
+    'NavigationBar component has correct checksum'));
+
+  // RouterApp component:
+  const routerAppComponentRenderingRequest = readRenderingRequest(project, commit, 'routerAppRenderingRequest.js');
+  const routerAppRenderingResult = runInVM(routerAppComponentRenderingRequest);
+  assert.ok(
+    routerAppRenderingResult.includes('data-react-checksum=\\"-1777286250\\"',
+    'RouterApp component has correct checksum'));
+
+
+  // App component:
+  const appComponentRenderingRequest = readRenderingRequest(project, commit, 'appRenderingRequest.js');
+  const appRenderingResult = runInVM(appComponentRenderingRequest);
+  assert.ok(
+    appRenderingResult.includes('data-react-checksum=\\"-490396040\\"',
+    'App component has correct checksum'));
 });
