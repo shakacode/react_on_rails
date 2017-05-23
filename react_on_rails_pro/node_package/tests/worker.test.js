@@ -5,7 +5,8 @@ const worker = require('../src/worker');
 const { getUploadedBundlePath, createUploadedBundle } = require('./helper');
 const { buildVM } = require('../src/worker/vm');
 
-test('POST /render when password is required but no password was provided', (assert) => {
+test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
+     'when password is required but no password was provided', (assert) => {
   assert.plan(2);
 
   createUploadedBundle();
@@ -17,11 +18,10 @@ test('POST /render when password is required but no password was provided', (ass
   });
 
   request(app)
-    .post('/render')
+    .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
-      bundleUpdateTimeUtc: 1495063024898,
       password: undefined,
     })
     .end((_err, res) => {
@@ -31,7 +31,8 @@ test('POST /render when password is required but no password was provided', (ass
     });
 });
 
-test('POST /render when password is required but wrong password was provided', (assert) => {
+test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
+     'when password is required but wrong password was provided', (assert) => {
   assert.plan(2);
 
   createUploadedBundle();
@@ -43,11 +44,10 @@ test('POST /render when password is required but wrong password was provided', (
   });
 
   request(app)
-    .post('/render')
+    .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
-      bundleUpdateTimeUtc: 1495063024898,
       password: 'wrong',
     })
     .end((_err, res) => {
@@ -57,8 +57,9 @@ test('POST /render when password is required but wrong password was provided', (
     });
 });
 
-test('POST /render when password is required and correct password was provided', (assert) => {
-  assert.plan(2);
+test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
+     'when password is required and correct password was provided', (assert) => {
+  assert.plan(3);
 
   createUploadedBundle();
   buildVM(getUploadedBundlePath());
@@ -69,22 +70,23 @@ test('POST /render when password is required and correct password was provided',
   });
 
   request(app)
-    .post('/render')
+    .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
-      bundleUpdateTimeUtc: 1495063024898,
       password: 'password',
     })
     .end((_err, res) => {
+      assert.ok(res.headers['cache-control'] === 'public, max-age=31536000');
       assert.ok(res.status === 200);
       assert.deepEqual(res.body, { renderedHtml: 'Dummy Object' });
       assert.end();
     });
 });
 
-test('POST /render when password is not required and no password was provided', (assert) => {
-  assert.plan(2);
+test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
+     'when password is not required and no password was provided', (assert) => {
+  assert.plan(3);
 
   createUploadedBundle();
   buildVM(getUploadedBundlePath());
@@ -94,14 +96,14 @@ test('POST /render when password is not required and no password was provided', 
   });
 
   request(app)
-    .post('/render')
+    .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
-      bundleUpdateTimeUtc: 1495063024898,
       password: undefined,
     })
     .end((_err, res) => {
+      assert.ok(res.headers['cache-control'] === 'public, max-age=31536000');
       assert.ok(res.status === 200);
       assert.deepEqual(res.body, { renderedHtml: 'Dummy Object' });
       assert.end();
