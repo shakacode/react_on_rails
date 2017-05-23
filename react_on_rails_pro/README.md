@@ -79,6 +79,62 @@ foreman start -f Procfile.hot
 ```
 7. If you do not plan to deploy your changes to **Heroku** or other hosting platforms, **do not forger to revoke your GitHub OAuth token!**
 
+## Using Varnish HTTP cache locally
+It is possible to use **Varnish** HTTP cache to avoid repeating rendering requests. It can speed up rendering and reduce load on Node processes.
+Unfortunatenly **Varnish** does cache `POST` requests by default and supports `POST` requestst caching only starting form v5.x.x. So to use renderer with **Varnish** you need to:
+1. Install **Varnish v5+**. See [Varnish releases & downloads page](https://varnish-cache.org/releases/index.html) to find installation instructions for your OS.
+2. Since **Varnish** does not cache `POST` requests by default, you have to configure it using [VCL](https://www.varnish-cache.org/docs/5.1/users-guide/vcl.html). Open your **default.vcl** file (usually at **/etc/varnish/default.vcl**) and put this config (replace matching methods if some empty examples already exist):
+```sh
+# Default backend definition. Set this to point to your content server.
+backend default {
+    .host = "127.0.0.1";
+    .port = "3800";
+}
+
+sub vcl_recv {
+    # Happens before we check if we have this in cache already.
+    #
+    # Typically you clean up the request here, removing cookies you don't need,
+    # rewriting the request, etc.
+
+    if (req.method == "PRI") {
+	/* We do not support SPDY or HTTP/2.0 */
+	return (synth(405));
+    }
+
+    if (req.method != "GET" &&
+      req.method != "HEAD" &&
+      req.method != "PUT" &&
+      req.method != "POST" &&
+      req.method != "TRACE" &&
+      req.method != "OPTIONS" &&
+      req.method != "DELETE") {
+        /* Non-RFC2616 or CONNECT which is weird. */
+        return (pipe);
+    }
+
+    if (req.method != "GET" && req.method != "HEAD" && req.method != "POST") {
+        return (pass);
+    }
+
+    if (req.method == "POST") {
+	set req.http.x-method = req.method;
+    }
+
+    if (req.http.Authorization || req.http.Cookie) {
+        /* Not cacheable by default */
+        return (pass);
+    }
+
+    return (hash);
+}
+
+sub vcl_backend_fetch {
+    set bereq.method = bereq.http.x-method;
+    return (fetch);
+}
+```
+
 ## Deploy Node renderer to Heroku
 Assuming you did not revoke your  **GitHub OAuth token** so you don't need to update your `package.json`:
 1. Create your **Heroku** app with **Node.js** buildpack, say `renderer-test.herokuapp.com`.
