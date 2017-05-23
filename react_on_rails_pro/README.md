@@ -81,9 +81,9 @@ foreman start -f Procfile.hot
 
 ## Using Varnish HTTP cache locally
 It is possible to use **Varnish** HTTP cache to avoid repeating rendering requests. It can speed up rendering and reduce load on Node processes.
-Unfortunatenly **Varnish** does cache `POST` requests by default and supports `POST` requestst caching only starting form v5.x.x. So to use renderer with **Varnish** you need to:
+Unfortunatenly **Varnish** does not cache `POST` requests by default and supports `POST` requestst caching only starting form v5.x.x. So to use renderer with **Varnish** you need to:
 1. Install **Varnish v5+**. See [Varnish releases & downloads page](https://varnish-cache.org/releases/index.html) to find installation instructions for your OS.
-2. Since **Varnish** does not cache `POST` requests by default, you have to configure it using [VCL](https://www.varnish-cache.org/docs/5.1/users-guide/vcl.html). Open your **default.vcl** file (usually at **/etc/varnish/default.vcl**) and put this config (replace matching methods if some empty examples already exist):
+2. Since **Varnish** does not cache `POST` requests by default, you have to configure it using [VCL](https://www.varnish-cache.org/docs/5.1/users-guide/vcl.html). See [Changes in Varnish 5.0](https://www.varnish-cache.org/docs/5.0/whats-new/changes-5.0.html#request-body-sent-always-cacheable-post) for additional info. Open your **default.vcl** file (usually at **/etc/varnish/default.vcl**) and put this config (replace matching methods if some empty examples already exist):
 ```sh
 # Default backend definition. Set this to point to your content server.
 backend default {
@@ -133,6 +133,14 @@ sub vcl_backend_fetch {
     set bereq.method = bereq.http.x-method;
     return (fetch);
 }
+```
+3. Restart/launch your **Varnish** service: `(sudo) service varnish (re)start`
+4. Point your Rails client to **Varnish** standart port:
+```ruby
+ReactOnRailsRenderer.configure do |config|
+  config.renderer_host = "localhost"
+  config.renderer_port = 6081
+end
 ```
 
 ## Deploy Node renderer to Heroku
