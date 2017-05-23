@@ -65,7 +65,8 @@ module ReactOnRailsRenderer
       end
 
       def eval_js(js_code)
-        rendering_request_digest = Digest::MD5.hexdigest(js_code)
+        # TODO: Remove gsub when fix random UIDs in domNodeId:
+        rendering_request_digest = Digest::MD5.hexdigest(js_code.gsub(/domNodeId: '[\w-]*',/, ''))
 
         response = RestClient.post(
           renderer_url(rendering_request_digest),
@@ -97,7 +98,8 @@ module ReactOnRailsRenderer
       end
 
       def update_bundle_and_eval_js(js_code)
-        rendering_request_digest = Digest::MD5.hexdigest(js_code)
+        # TODO: Remove gsub when fix random UIDs in domNodeId:
+        rendering_request_digest = Digest::MD5.hexdigest(js_code.gsub(/domNodeId: '[\w-]*',/, ''))
 
         response = RestClient.post(
           renderer_url(rendering_request_digest),
