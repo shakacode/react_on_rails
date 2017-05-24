@@ -81,7 +81,7 @@ module ReactOnRailsRenderer
       # rest_client treats non 2xx HTTP status for POST requests as an exception:
       rescue RestClient::ExceptionWithResponse => status_exception
         p "zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz"
-        p status_exception.http_headers
+        p status_exception.response.headers
         p status_exception.response
         case status_exception.response.code
         when 410

@@ -27,6 +27,29 @@ function undefinedForExecLogging(functionName) {
 /**
  *
  */
+function replayVmConsole() {
+  if (log.level !== 'debug') return;
+  const consoleHistoryFromVM = vm.runInContext('console.history', context);
+
+  consoleHistoryFromVM.forEach((msg) => {
+    const stringifiedList = msg.arguments.map(arg => {
+      let val;
+      try {
+        val = (typeof arg === 'string' || arg instanceof String) ? arg : JSON.stringify(arg);
+      } catch (e) {
+        val = `${e.message}: ${arg}`;
+      }
+
+      return val;
+    });
+
+    log.debug(stringifiedList.join(' '));
+  });
+}
+
+/**
+ *
+ */
 exports.buildVM = function buildVMNew(filePath) {
   // Create sandbox with new console instance:
   const sandbox = { console: new Console(process.stdout, process.stderr) };
@@ -97,6 +120,7 @@ exports.getBundleFilePath = function getBundleFilePath() {
 exports.runInVM = function runInVM(code) {
   vm.runInContext('console.history = []', context);
   const result = vm.runInContext(code, context);
+  replayVmConsole();
   return result;
 };
 
