@@ -175,11 +175,49 @@ test('ReactWebpackRailsTutorial bundle for commit ec974491', (assert) => {
     routerAppRenderingResult.includes('data-react-checksum=\\"-1777286250\\"',
     'RouterApp component has correct checksum'));
 
-
   // App component:
   const appComponentRenderingRequest = readRenderingRequest(project, commit, 'appRenderingRequest.js');
   const appRenderingResult = runInVM(appComponentRenderingRequest);
   assert.ok(
     appRenderingResult.includes('data-react-checksum=\\"-490396040\\"',
     'App component has correct checksum'));
+});
+
+test('BionicWorkshop bundle for commit fa6ccf6b', (assert) => {
+  assert.plan(4);
+
+  const project = 'bionicworkshop';
+  const commit = 'fa6ccf6b';
+
+  buildVM(path.resolve(__dirname, './fixtures/projects/bionicworkshop/fa6ccf6b/server-bundle.js'));
+
+  // SignIn page with flash component:
+  const signInPageWithFlashRenderingRequest = readRenderingRequest(project, commit, 'signInPageWithFlashRenderingRequest.js');
+  const signInPageWithFlashRenderingResult = runInVM(signInPageWithFlashRenderingRequest);
+
+  // We don't put checksum here since it changes for every request with Rails auth token:
+  assert.ok(
+    signInPageWithFlashRenderingResult.includes('data-react-checksum=',
+    'SignIn page with flash component has correct checksum'));
+
+  // Landing page component:
+  const landingPageRenderingRequest = readRenderingRequest(project, commit, 'landingPageRenderingRequest.js');
+  const landingPageRenderingResult = runInVM(landingPageRenderingRequest);
+  assert.ok(
+    landingPageRenderingResult.includes('data-react-checksum=\\"-1899958456\\"',
+    'Landing page component has correct checksum'));
+
+  // Post page component:
+  const postPageRenderingRequest = readRenderingRequest(project, commit, 'postPageRenderingRequest.js');
+  const postPageRenderingResult = runInVM(postPageRenderingRequest);
+  assert.ok(
+    postPageRenderingResult.includes('data-react-checksum=\\"-1296077150\\"',
+    'Post page component has correct checksum'));
+
+  // Authors page component:
+  const authorsPageRenderingRequest = readRenderingRequest(project, commit, 'authorsPageRenderingRequest.js');
+  const authorsPageRenderingResult = runInVM(authorsPageRenderingRequest);
+  assert.ok(
+    authorsPageRenderingResult.includes('data-react-checksum=\\"-1066737665\\"',
+    'Authors page component has correct checksum'));
 });
