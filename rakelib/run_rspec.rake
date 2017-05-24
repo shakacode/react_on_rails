@@ -1,6 +1,4 @@
-if ENV["USE_COVERALLS"] == "TRUE"
-  require "coveralls/rake/task"
-end
+require "coveralls/rake/task" if ENV["USE_COVERALLS"] == "TRUE"
 
 require "pathname"
 
@@ -57,17 +55,15 @@ namespace :run_rspec do
     sh %(COVERAGE=true rspec spec/empty_spec.rb)
   end
 
-  if ENV["USE_COVERALLS"] == "TRUE"
-    Coveralls::RakeTask.new
-  end
+  Coveralls::RakeTask.new if ENV["USE_COVERALLS"] == "TRUE"
 
   desc "run all tests no examples"
-  task all_but_examples: [:gem, :dummy_no_turbolinks, :dummy_turbolinks_2, :dummy, :empty, :js_tests] do
+  task all_but_examples: %i[gem dummy_no_turbolinks dummy_turbolinks_2 dummy empty js_tests] do
     puts "Completed all RSpec tests"
   end
 
   desc "run all tests"
-  task run_rspec: [:all_but_examples, :examples] do
+  task run_rspec: %i[all_but_examples examples] do
     puts "Completed all RSpec tests"
   end
 end
@@ -85,16 +81,17 @@ desc msg
 task run_rspec: ["run_rspec:run_rspec"]
 
 private
+
 def calc_path(dir)
-  if dir.is_a?(String)
-    path = if dir.start_with?(File::SEPARATOR)
+  path = if dir.is_a?(String)
+           if dir.start_with?(File::SEPARATOR)
              Pathname.new(dir)
            else
              Pathname.new(File.join(gem_root, dir))
-           end
-  else
-    path = dir
-  end
+                  end
+         else
+           dir
+         end
   path
 end
 

@@ -29,7 +29,7 @@ namespace :lint do
   end
 
   desc "Run all eslint, flow, rubocop linters. Skip ruby-lint and scss"
-  task lint: [:eslint, :flow, :rubocop] do
+  task lint: %i[eslint flow rubocop] do
     puts "Completed all linting"
   end
 end

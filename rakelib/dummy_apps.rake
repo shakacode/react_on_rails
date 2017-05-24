@@ -17,7 +17,7 @@ namespace :dummy_apps do
     bundle_install_with_turbolinks_2_in(dummy_app_dir)
   end
 
-  task dummy_apps: [:dummy_app, :node_package] do
+  task dummy_apps: %i[dummy_app node_package] do
     puts "Prepared all Dummy Apps"
   end
 end

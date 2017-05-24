@@ -1,7 +1,8 @@
 # coding: utf-8
-lib = File.expand_path('../lib', __FILE__)
+
+lib = File.expand_path("../lib", __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'react_on_rails/version'
+require "react_on_rails/version"
 
 Gem::Specification.new do |s|
   s.name          = "react_on_rails"
@@ -9,8 +10,8 @@ Gem::Specification.new do |s|
   s.authors       = ["Justin Gordon"]
   s.email         = ["justin@shakacode.com"]
 
-  s.summary       = %q{Rails with react server rendering with webpack. }
-  s.description   = %q{See README.md}
+  s.summary       = "Rails with react server rendering with webpack. "
+  s.description   = "See README.md"
   s.homepage      = "https://github.com/shakacode/react_on_rails"
   s.license       = "MIT"
 
@@ -19,7 +20,7 @@ Gem::Specification.new do |s|
   s.executables   = s.files.grep(%r{^exe/}) { |f| File.basename(f) }
   s.require_paths = ["lib"]
 
-  s.required_ruby_version = '>= 2.0.0'
+  s.required_ruby_version = ">= 2.0.0"
 
   s.add_dependency "connection_pool"
   s.add_dependency "execjs", "~> 2.5"

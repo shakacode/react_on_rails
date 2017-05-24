@@ -7,8 +7,8 @@ class PagesController < ApplicationController
 
   before_action :data
 
-  before_action :initialize_shared_store, only: [:client_side_hello_world_shared_store_controller,
-                                                 :server_side_hello_world_shared_store_controller]
+  before_action :initialize_shared_store, only: %i(client_side_hello_world_shared_store_controller
+                                                   server_side_hello_world_shared_store_controller)
 
   rescue_from ReactOnRails::PrerenderError do |err|
     Rails.logger.error(err.message)
