@@ -11,6 +11,7 @@ const express = require('express');
 const busBoy = require('express-busboy');
 const log = require('winston');
 const { buildConfig, getConfig } = require('./shared/configBuilder');
+const checkGemVersion = require('./worker/checkGemVersionHandler');
 const authenticate = require('./worker/authHandler');
 const handleRenderRequest = require('./worker/renderRequestHandlerVm');
 
@@ -46,11 +47,25 @@ exports.run = function run(config) {
 
   //
   app.route('/bundles/:bundleTimestamp/render/:renderRequestDigest').post((req, res) => {
+    // Check gem version:
+    const gemVersionCheckingResult = checkGemVersion(req);
+
+    if (typeof gemVersionCheckingResult === 'object') {
+      const { status, data, headers } = gemVersionCheckingResult;
+      // eslint-disable-next-line guard-for-in, no-restricted-syntax
+      for (const key in headers) res.set(key, headers[key]);
+      res.status(status);
+      res.send(data);
+      return;
+    }
+
     // Authenticate Ruby client:
     const authResult = authenticate(req);
 
     if (typeof authResult === 'object') {
-      const { status, data } = authResult;
+      const { status, data, headers } = authResult;
+      // eslint-disable-next-line guard-for-in, no-restricted-syntax
+      for (const key in headers) res.set(key, headers[key]);
       res.status(status);
       res.send(data);
       return;
@@ -58,7 +73,6 @@ exports.run = function run(config) {
 
     // Hahdle rendering request:
     const { status, data, headers, die } = handleRenderRequest(req);
-
     // eslint-disable-next-line guard-for-in, no-restricted-syntax
     for (const key in headers) res.set(key, headers[key]);
     res.status(status);

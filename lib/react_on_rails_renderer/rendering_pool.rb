@@ -71,6 +71,7 @@ module ReactOnRailsRenderer
         response = RestClient.post(
           renderer_url(rendering_request_digest),
           renderingRequest: js_code,
+          gemVersion: ReactOnRailsRenderer.const_get("VERSION"),
           password: ReactOnRailsRenderer.configuration.password
         )
 
@@ -105,6 +106,7 @@ module ReactOnRailsRenderer
           renderer_url(rendering_request_digest),
           renderingRequest: js_code,
           bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path),
+          gemVersion: ReactOnRailsRenderer.const_get("VERSION"),
           password: ReactOnRailsRenderer.configuration.password
         )
 
