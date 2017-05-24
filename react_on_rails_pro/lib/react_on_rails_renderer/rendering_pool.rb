@@ -87,6 +87,8 @@ module ReactOnRailsRenderer
         case status_exception.response.code
         when 410
           update_bundle_and_eval_js(js_code)
+        when 412
+          raise "Renderer version does not match gem version"
         #when 307
         #  eval_js(js_code)
         else
@@ -112,13 +114,13 @@ module ReactOnRailsRenderer
 
         parsed_response = JSON.parse(response.body)
         parsed_response[RENDERED_HTML_KEY]
-=begin
+
       rescue RestClient::ExceptionWithResponse => status_exception
         p "zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz"
 
         case status_exception.response.code
-        when 410
-          update_bundle_and_eval_js(js_code)
+        when 412
+          raise "Renderer version does not match gem version"
         #when 307
         #  eval_js(js_code)
         else
@@ -126,7 +128,6 @@ module ReactOnRailsRenderer
         end
       #rescue Errno::ECONNREFUSED
       #  update_bundle_and_eval_js(js_code)
-=end
       end
     end
   end
