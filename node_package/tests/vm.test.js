@@ -4,7 +4,7 @@ const { getUploadedBundlePath, createUploadedBundle, readRenderingRequest } = re
 const { buildVM, runInVM, getBundleFilePath, resetVM } = require('../src/worker/vm');
 
 test('buildVM and runInVM', (assert) => {
-  assert.plan(10);
+  assert.plan(14);
 
   createUploadedBundle();
   buildVM(getUploadedBundlePath());
@@ -50,6 +50,22 @@ test('buildVM and runInVM', (assert) => {
   assert.ok(
     runInVM('console.history !== undefined'),
     'VM has patched console with history');
+
+  assert.ok(
+    runInVM('getStackTrace !== undefined'),
+    'getStackTrace function is availble is sandbox');
+
+  assert.ok(
+    runInVM('setInterval !== undefined'),
+    'setInterval function is availble is sandbox');
+
+  assert.ok(
+    runInVM('setTimeout !== undefined'),
+    'setTimeout function is availble is sandbox');
+
+  assert.ok(
+    runInVM('clearTimeout !== undefined'),
+    'clearTimeout function is availble is sandbox');
 });
 
 test('VM security', (assert) => {
@@ -126,30 +142,30 @@ test('FriendsAndGuestst bundle for commit 1a7fe417', (assert) => {
     readRenderingRequest(project, commit, 'layoutNavbarRenderingRequest.js');
   const layoutNavbarRenderingResult = runInVM(layoutNavbarComponentRenderingRequest);
   assert.ok(
-    layoutNavbarRenderingResult.includes('data-react-checksum=\\"-667058792\\"',
-    'LayoutNavbar component has correct checksum'));
+    layoutNavbarRenderingResult.includes('data-react-checksum=\\"-667058792\\"'),
+    'LayoutNavbar component has correct checksum');
 
   // ListingIndex component:
   const listingIndexComponentRenderingRequest =
     readRenderingRequest(project, commit, 'listingIndexRenderingRequest.js');
   const listingIndexRenderingResult = runInVM(listingIndexComponentRenderingRequest);
   assert.ok(
-    listingIndexRenderingResult.includes('data-react-checksum=\\"452252439\\"',
-    'ListingIndex component has correct checksum'));
+    listingIndexRenderingResult.includes('data-react-checksum=\\"452252439\\"'),
+    'ListingIndex component has correct checksum');
 
   // ListingShow component:
   const listingShowComponentRenderingRequest = readRenderingRequest(project, commit, 'listingsShowRenderingRequest.js');
   const listingShowRenderingResult = runInVM(listingShowComponentRenderingRequest);
   assert.ok(
-    listingShowRenderingResult.includes('data-react-checksum=\\"-324043796\\"',
-    'ListingShow component has correct checksum'));
+    listingShowRenderingResult.includes('data-react-checksum=\\"-324043796\\"'),
+    'ListingShow component has correct checksum');
 
   // UserShow component:
   const userShowComponentRenderingRequest = readRenderingRequest(project, commit, 'userShowRenderingRequest.js');
   const userShowRenderingResult = runInVM(userShowComponentRenderingRequest);
   assert.ok(
-    userShowRenderingResult.includes('data-react-checksum=\\"-1039690194\\"',
-    'UserShow component has correct checksum'));
+    userShowRenderingResult.includes('data-react-checksum=\\"-1039690194\\"'),
+    'UserShow component has correct checksum');
 });
 
 test('ReactWebpackRailsTutorial bundle for commit ec974491', (assert) => {
@@ -165,21 +181,59 @@ test('ReactWebpackRailsTutorial bundle for commit ec974491', (assert) => {
     readRenderingRequest(project, commit, 'navigationBarAppRenderingRequest.js');
   const navigationBarRenderingResult = runInVM(navigationBarComponentRenderingRequest);
   assert.ok(
-    navigationBarRenderingResult.includes('data-react-checksum=\\"-472831860\\"',
-    'NavigationBar component has correct checksum'));
+    navigationBarRenderingResult.includes('data-react-checksum=\\"-472831860\\"'),
+    'NavigationBar component has correct checksum');
 
   // RouterApp component:
   const routerAppComponentRenderingRequest = readRenderingRequest(project, commit, 'routerAppRenderingRequest.js');
   const routerAppRenderingResult = runInVM(routerAppComponentRenderingRequest);
   assert.ok(
-    routerAppRenderingResult.includes('data-react-checksum=\\"-1777286250\\"',
-    'RouterApp component has correct checksum'));
-
+    routerAppRenderingResult.includes('data-react-checksum=\\"-1777286250\\"'),
+    'RouterApp component has correct checksum');
 
   // App component:
   const appComponentRenderingRequest = readRenderingRequest(project, commit, 'appRenderingRequest.js');
   const appRenderingResult = runInVM(appComponentRenderingRequest);
   assert.ok(
-    appRenderingResult.includes('data-react-checksum=\\"-490396040\\"',
-    'App component has correct checksum'));
+    appRenderingResult.includes('data-react-checksum=\\"-490396040\\"'),
+    'App component has correct checksum');
+});
+
+test('BionicWorkshop bundle for commit fa6ccf6b', (assert) => {
+  assert.plan(4);
+
+  const project = 'bionicworkshop';
+  const commit = 'fa6ccf6b';
+
+  buildVM(path.resolve(__dirname, './fixtures/projects/bionicworkshop/fa6ccf6b/server-bundle.js'));
+
+  // SignIn page with flash component:
+  const signInPageWithFlashRenderingRequest = readRenderingRequest(project, commit, 'signInPageWithFlashRenderingRequest.js');
+  const signInPageWithFlashRenderingResult = runInVM(signInPageWithFlashRenderingRequest);
+
+  // We don't put checksum here since it changes for every request with Rails auth token:
+  assert.ok(
+    signInPageWithFlashRenderingResult.includes('data-react-checksum='),
+    'SignIn page with flash component has correct checksum');
+
+  // Landing page component:
+  const landingPageRenderingRequest = readRenderingRequest(project, commit, 'landingPageRenderingRequest.js');
+  const landingPageRenderingResult = runInVM(landingPageRenderingRequest);
+  assert.ok(
+    landingPageRenderingResult.includes('data-react-checksum=\\"-1899958456\\"'),
+    'Landing page component has correct checksum');
+
+  // Post page component:
+  const postPageRenderingRequest = readRenderingRequest(project, commit, 'postPageRenderingRequest.js');
+  const postPageRenderingResult = runInVM(postPageRenderingRequest);
+  assert.ok(
+    postPageRenderingResult.includes('data-react-checksum=\\"-1296077150\\"'),
+    'Post page component has correct checksum');
+
+  // Authors page component:
+  const authorsPageRenderingRequest = readRenderingRequest(project, commit, 'authorsPageRenderingRequest.js');
+  const authorsPageRenderingResult = runInVM(authorsPageRenderingRequest);
+  assert.ok(
+    authorsPageRenderingResult.includes('data-react-checksum=\\"-1066737665\\"'),
+    'Authors page component has correct checksum');
 });

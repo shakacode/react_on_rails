@@ -71,6 +71,7 @@ module ReactOnRailsRenderer
         response = RestClient.post(
           renderer_url(rendering_request_digest),
           renderingRequest: js_code,
+          gemVersion: ReactOnRailsRenderer.const_get("VERSION"),
           password: ReactOnRailsRenderer.configuration.password
         )
 
@@ -81,11 +82,13 @@ module ReactOnRailsRenderer
       # rest_client treats non 2xx HTTP status for POST requests as an exception:
       rescue RestClient::ExceptionWithResponse => status_exception
         p "zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz"
-        p status_exception.http_headers
+        p status_exception.response.headers
         p status_exception.response
         case status_exception.response.code
         when 410
           update_bundle_and_eval_js(js_code)
+        when 412
+          raise "Renderer version does not match gem version"
         #when 307
         #  eval_js(js_code)
         else
@@ -105,18 +108,19 @@ module ReactOnRailsRenderer
           renderer_url(rendering_request_digest),
           renderingRequest: js_code,
           bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path),
+          gemVersion: ReactOnRailsRenderer.const_get("VERSION"),
           password: ReactOnRailsRenderer.configuration.password
         )
 
         parsed_response = JSON.parse(response.body)
         parsed_response[RENDERED_HTML_KEY]
-=begin
+
       rescue RestClient::ExceptionWithResponse => status_exception
         p "zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz"
 
         case status_exception.response.code
-        when 410
-          update_bundle_and_eval_js(js_code)
+        when 412
+          raise "Renderer version does not match gem version"
         #when 307
         #  eval_js(js_code)
         else
@@ -124,7 +128,6 @@ module ReactOnRailsRenderer
         end
       #rescue Errno::ECONNREFUSED
       #  update_bundle_and_eval_js(js_code)
-=end
       end
     end
   end

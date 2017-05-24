@@ -5,6 +5,9 @@ const worker = require('../src/worker');
 const { getUploadedBundlePath, createUploadedBundle } = require('./helper');
 const { buildVM } = require('../src/worker/vm');
 
+// eslint-disable-next-line import/no-dynamic-require
+const packageJson = require(path.join(__dirname, '/../../package.json'));
+
 test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
      'when password is required but no password was provided', (assert) => {
   assert.plan(2);
@@ -22,6 +25,7 @@ test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
+      gemVersion: packageJson.version,
       password: undefined,
     })
     .end((_err, res) => {
@@ -48,6 +52,7 @@ test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
+      gemVersion: packageJson.version,
       password: 'wrong',
     })
     .end((_err, res) => {
@@ -66,6 +71,7 @@ test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
 
   const app = worker.run({
     bundlePath: path.resolve(__dirname, './tmp'),
+    gemVersion: packageJson.version,
     password: 'password',
   });
 
@@ -74,6 +80,7 @@ test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
+      gemVersion: packageJson.version,
       password: 'password',
     })
     .end((_err, res) => {
@@ -100,6 +107,7 @@ test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
     .type('json')
     .send({
       renderingRequest: 'ReactOnRails.dummy',
+      gemVersion: packageJson.version,
       password: undefined,
     })
     .end((_err, res) => {

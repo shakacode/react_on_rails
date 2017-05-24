@@ -7,10 +7,8 @@
 
 const fs = require('fs');
 const vm = require('vm');
-const path = require('path');
 const cluster = require('cluster');
 const log = require('winston');
-const Console = require('console').Console;
 
 let context;
 let bundleFilePath;
@@ -18,30 +16,75 @@ let bundleFilePath;
 /**
  *
  */
+function undefinedForExecLogging(functionName) {
+  return `
+    console.error('${functionName} is not defined for renderer VM. Note babel-polyfill may call this.');
+    console.error(getStackTrace().join('\\n'));`;
+}
+
+/**
+ *
+ */
+function replayVmConsole() {
+  if (log.level !== 'debug') return;
+  const consoleHistoryFromVM = vm.runInContext('console.history', context);
+
+  consoleHistoryFromVM.forEach((msg) => {
+    const stringifiedList = msg.arguments.map(arg => {
+      let val;
+      try {
+        val = (typeof arg === 'string' || arg instanceof String) ? arg : JSON.stringify(arg);
+      } catch (e) {
+        val = `${e.message}: ${arg}`;
+      }
+
+      return val;
+    });
+
+    log.debug(stringifiedList.join(' '));
+  });
+}
+
+/**
+ *
+ */
 exports.buildVM = function buildVMNew(filePath) {
-  // Create sandbox with new console instance:
-  const sandbox = { console: new Console(process.stdout, process.stderr) };
-  context = vm.createContext(sandbox);
+  context = vm.createContext();
 
   // Create explicit reference to global context, just in case (some libs can use it):
   vm.runInContext('global = this', context);
 
-  // Run console.history script in created context to patch its console instance:
-  const consoleHistoryModuleDir = path.dirname(require.resolve('console.history'));
-  const pathToConsoleHistory = path.join(consoleHistoryModuleDir, 'console-history.js');
-  const consoleHistoryContents = fs.readFileSync(pathToConsoleHistory, 'utf8');
-  vm.runInContext(consoleHistoryContents, context);
+  // Reimplement console methods for replaying on the client:
+  vm.runInContext(`
+    console = { history: [] };
+    ['error', 'log', 'info', 'warn'].forEach(function (level) {
+      console[level] = function () {
+        var argArray = Array.prototype.slice.call(arguments);
+        if (argArray.length > 0) {
+          argArray[0] = '[SERVER] ' + argArray[0];
+        }
+        console.history.push({level: level, arguments: argArray});
+      };
+    });`, context);
 
-  // Override console._collect method to comply with ReactOnRails console replay script:
-  vm.runInContext(`console._collect = (type, args) => {
-    // Build console history entry in react_on_rails format:
-    const argArray = Array.prototype.slice.call(args);
-    if (argArray.length > 0) {
-      argArray[0] = \`[SERVER] \${argArray[0]}\`;
-    }
+  // Define global getStackTrace() function:
+  vm.runInContext(`
+    function getStackTrace() {
+      var stack;
+      try {
+        throw new Error('');
+      }
+      catch (error) {
+        stack = error.stack || '';
+      }
+      stack = stack.split('\\n').map(function (line) { return line.trim(); });
+      return stack.splice(stack[0] == 'Error' ? 2 : 1);
+    }`, context);
 
-    console.history.push({ level: 'log', arguments: argArray });
-  };`, context);
+  // Define timer polyfills:
+  vm.runInContext(`function setInterval() { ${undefinedForExecLogging('setInterval')} }`, context);
+  vm.runInContext(`function setTimeout() { ${undefinedForExecLogging('setTimeout')} }`, context);
+  vm.runInContext(`function clearTimeout() { ${undefinedForExecLogging('clearTimeout')} }`, context);
 
   // Run bundle code in created context:
   const bundleContents = fs.readFileSync(filePath, 'utf8');
@@ -69,6 +112,7 @@ exports.getBundleFilePath = function getBundleFilePath() {
 exports.runInVM = function runInVM(code) {
   vm.runInContext('console.history = []', context);
   const result = vm.runInContext(code, context);
+  replayVmConsole();
   return result;
 };
 
