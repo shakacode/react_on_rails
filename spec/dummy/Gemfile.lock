@@ -1,4 +1,12 @@
 PATH
+  remote: ../../../webpacker_lite
+  specs:
+    webpacker_lite (1.0.0)
+      activesupport (>= 4.2)
+      multi_json (~> 1.2)
+      railties (>= 4.2)
+
+PATH
   remote: ../..
   specs:
     react_on_rails (8.0.0.beta.2)
@@ -328,7 +336,11 @@ DEPENDENCIES
   sqlite3
   turbolinks (~> 5.0)
   uglifier
+<<<<<<< HEAD
   webpacker_lite (~> 2.0)
+=======
+  webpacker_lite!
+>>>>>>> e90bdb0cab87f9d902a5879d0ea3e89dbaa9c031
 
 BUNDLED WITH
    1.15.0
