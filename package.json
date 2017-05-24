@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-renderer",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "react-on-rails-renderer JavaScript for react_on_rails_renderer Ruby gem",
   "main": "node_package/src/ReactOnRailsRenderer.js",
   "directories": {
