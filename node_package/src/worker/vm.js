@@ -7,10 +7,8 @@
 
 const fs = require('fs');
 const vm = require('vm');
-const path = require('path');
 const cluster = require('cluster');
 const log = require('winston');
-const Console = require('console').Console;
 
 let context;
 let bundleFilePath;
@@ -51,43 +49,37 @@ function replayVmConsole() {
  *
  */
 exports.buildVM = function buildVMNew(filePath) {
-  // Create sandbox with new console instance:
-  const sandbox = { console: new Console(process.stdout, process.stderr) };
-  context = vm.createContext(sandbox);
+  context = vm.createContext();
 
   // Create explicit reference to global context, just in case (some libs can use it):
   vm.runInContext('global = this', context);
 
-  // Run console.history script in created context to patch its console instance:
-  const consoleHistoryModuleDir = path.dirname(require.resolve('console.history'));
-  const pathToConsoleHistory = path.join(consoleHistoryModuleDir, 'console-history.js');
-  const consoleHistoryContents = fs.readFileSync(pathToConsoleHistory, 'utf8');
-  vm.runInContext(consoleHistoryContents, context);
-
-  // Override console._collect method to comply with ReactOnRails console replay script:
-  vm.runInContext(`console._collect = (type, args) => {
-    // Build console history entry in react_on_rails format:
-    const argArray = Array.prototype.slice.call(args);
-    if (argArray.length > 0) {
-      argArray[0] = \`[SERVER] \${argArray[0]}\`;
-    }
-
-    console.history.push({ level: 'log', arguments: argArray });
-  };`, context);
+  // Reimplement console methods for replaying on the client:
+  vm.runInContext(`
+    console = { history: [] };
+    ['error', 'log', 'info', 'warn'].forEach(function (level) {
+      console[level] = function () {
+        var argArray = Array.prototype.slice.call(arguments);
+        if (argArray.length > 0) {
+          argArray[0] = '[SERVER] ' + argArray[0];
+        }
+        console.history.push({level: level, arguments: argArray});
+      };
+    });`, context);
 
   // Define global getStackTrace() function:
   vm.runInContext(`
-  function getStackTrace() {
-    var stack;
-    try {
-      throw new Error('');
-    }
-    catch (error) {
-      stack = error.stack || '';
-    }
-    stack = stack.split('\\n').map(function (line) { return line.trim(); });
-    return stack.splice(stack[0] == 'Error' ? 2 : 1);
-  }`, context);
+    function getStackTrace() {
+      var stack;
+      try {
+        throw new Error('');
+      }
+      catch (error) {
+        stack = error.stack || '';
+      }
+      stack = stack.split('\\n').map(function (line) { return line.trim(); });
+      return stack.splice(stack[0] == 'Error' ? 2 : 1);
+    }`, context);
 
   // Define timer polyfills:
   vm.runInContext(`function setInterval() { ${undefinedForExecLogging('setInterval')} }`, context);
