@@ -4,7 +4,7 @@ const { getUploadedBundlePath, createUploadedBundle, readRenderingRequest } = re
 const { buildVM, runInVM, getBundleFilePath, resetVM } = require('../src/worker/vm');
 
 test('buildVM and runInVM', (assert) => {
-  assert.plan(10);
+  assert.plan(14);
 
   createUploadedBundle();
   buildVM(getUploadedBundlePath());
@@ -50,6 +50,22 @@ test('buildVM and runInVM', (assert) => {
   assert.ok(
     runInVM('console.history !== undefined'),
     'VM has patched console with history');
+
+  assert.ok(
+    runInVM('getStackTrace !== undefined'),
+    'getStackTrace function is availble is sandbox');
+
+  assert.ok(
+    runInVM('setInterval !== undefined'),
+    'setInterval function is availble is sandbox');
+
+  assert.ok(
+    runInVM('setTimeout !== undefined'),
+    'setTimeout function is availble is sandbox');
+
+  assert.ok(
+    runInVM('clearTimeout !== undefined'),
+    'clearTimeout function is availble is sandbox');
 });
 
 test('VM security', (assert) => {
