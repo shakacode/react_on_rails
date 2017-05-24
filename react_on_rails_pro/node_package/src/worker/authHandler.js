@@ -17,6 +17,7 @@ module.exports = function authenticate(req) {
 
   if (password && password !== req.body.password) {
     return {
+      headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
       status: 401,
       data: 'Wrong password',
     };
