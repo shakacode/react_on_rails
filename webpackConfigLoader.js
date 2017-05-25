@@ -50,7 +50,11 @@ function getLocation(href) {
  */
 const configLoader = (configPath) => {
   const env = process.env;
-  const configuration = safeLoad(readFileSync(join(configPath, 'webpacker_lite.yml'), 'utf8'))[process.env.NODE_ENV || 'development'];
+
+  // Some test environments might not have the NODE_ENV set, so we'll have fallbacks.
+  const configEnv = (process.env.NODE_ENV || process.env.RAILS_ENV || 'development');
+  const ymlConfigPath = join(configPath, 'webpacker_lite.yml');
+  const configuration = safeLoad(readFileSync(ymlConfigPath, 'utf8'))[configEnv];
 
   const devBuild = env !== 'production';
   const hotReloadingHost = configuration.hot_reloading_host || DEFAULT_HOT_RELOADING_HOST;
