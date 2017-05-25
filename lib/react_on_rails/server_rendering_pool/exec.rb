@@ -77,7 +77,8 @@ module ReactOnRails
         end
 
         def create_js_context
-          server_js_file = ReactOnRails::Utils.default_server_bundle_js_file_path
+          manifest_key = ReactOnRails.configuration.server_bundle_js_file
+          server_js_file = "public/"+ActionController::Base.helpers.asset_pack_path(manifest_key)
           if server_js_file.present? && File.exist?(server_js_file)
             bundle_js_code = File.read(server_js_file)
             base_js_code = <<-JS
