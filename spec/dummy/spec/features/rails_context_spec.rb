@@ -30,7 +30,6 @@ shared_examples "railsContext" do |pathname, id_base|
         i18nLocale: "en",
         i18nDefaultLocale: "en",
         httpAcceptLanguage: http_accept_language,
-        # railsEnv: Rails.env,
         somethingUseful: "REALLY USEFUL"
       }
 

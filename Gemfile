@@ -8,12 +8,11 @@ gemspec
 # bundle install from a single Gemfile. Therefore, all gems that we will need for any dummy/example
 # app have to be manually added to this file.
 gem "bootstrap-sass"
-gem "coffee-rails", "~> 4.1.0"
 gem "jbuilder", "~> 2.0"
 gem "jquery-rails"
 gem "mini_racer"
 gem "puma"
-gem "rails", "4.2.8"
+gem "rails", "5.1.1"
 gem "rails_12factor"
 gem "rubocop", "0.47.1", require: false
 gem "ruby-lint", require: false

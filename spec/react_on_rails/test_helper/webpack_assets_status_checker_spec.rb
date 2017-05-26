@@ -6,8 +6,8 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     let(:client_dir) { client_dir_for(fixture_dirname) }
     let(:generated_assets_dir) { compiled_js_dir_for(fixture_dirname) }
     let(:webpack_generated_files) { %w(client-bundle.js server-bundle.js) }
-    let(:server_bundle_js_file) { File.join(generated_assets_dir, "server-bundle.js") }
-    let(:client_bundle_js_file) { File.join(generated_assets_dir, "client-bundle.js") }
+    let(:server_bundle_js_file) { File.realpath(File.join(generated_assets_dir, "server-bundle.js")) }
+    let(:client_bundle_js_file) { File.realpath(File.join(generated_assets_dir, "client-bundle.js")) }
 
     let(:checker) do
       ReactOnRails::TestHelper::WebpackAssetsStatusChecker
@@ -29,6 +29,12 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
       let(:fixture_dirname) { "assets_no_exist" }
 
       specify do
+        puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+        puts "webpack_assets_status_checker_spec.rb: #{__LINE__},  method: #{__method__}"
+        puts "checker.stale_generated_webpack_files = #{checker.stale_generated_webpack_files.ai}"
+        puts "#{client_bundle_js_file}, #{server_bundle_js_file}"
+        puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+
         expect(checker.stale_generated_webpack_files)
           .to eq([client_bundle_js_file, server_bundle_js_file])
       end

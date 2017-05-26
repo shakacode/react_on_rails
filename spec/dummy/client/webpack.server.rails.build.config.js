@@ -19,9 +19,13 @@ module.exports = {
     './app/startup/serverRegistration',
   ],
   output: {
+    // Important to NOT use a hash if the server webpack config runs separately from the client one.
+    // Otherwise, both would be writing to the same manifest.json file.
+    // Additionally, there's no particular need to have a fingerprint (hash) on the server bundle,
+    // since it's not cached by the browsers.
     filename: 'server-bundle.js',
 
-    // This needs a leading slash.
+    // Leading and trailing slashes ARE necessary.
     publicPath: '/' + webpackPublicOutputDir + '/',
     path: webpackOutputPath,
   },

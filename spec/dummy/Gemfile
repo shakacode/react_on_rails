@@ -43,7 +43,8 @@ gem "sdoc", "~> 0.4.0", group: :doc
 
 gem "react_on_rails", path: "../.."
 
-gem "webpacker_lite", "~> 2.0"
+# TODO: conturbo create a minimal copy of /spec/dummy called /spec/dummy_no_webpacker_lite, to verify
+gem "webpacker_lite", path: "../../../webpacker_lite"   #"~> 2.0"
 
 gem "mini_racer"
 

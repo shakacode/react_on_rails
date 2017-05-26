@@ -1,3 +1,5 @@
+require "rails/railtie"
+
 module ReactOnRails
   class Engine < ::Rails::Engine
     config.to_prepare do
