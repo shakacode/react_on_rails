@@ -47,10 +47,6 @@ module ReactOnRails
 
       def add_test_related_gems_to_gemfile
         gem("rspec-rails", group: :test)
-
-        # Already in 5.1.1
-        # gem("capybara", group: :test)
-        # gem("selenium-webdriver", group: :test)
         gem("coveralls", require: false)
         gem("poltergeist")
       end

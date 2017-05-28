@@ -12,9 +12,6 @@
     "lint": "cd client && yarn run lint",
     "install-react-on-rails": "cd client && yarn run install-react-on-rails",
     "build:clean": "rm -rf public/webpack || true",
-
-    "comment": "conturbo talk to rob about cleaning up",
-
     "build:production:client": "(cd client && yarn run build:production:client --silent)",
     "build:production:server": "(cd client && yarn run build:production:server --silent)",
     "build:client": "(cd client && yarn run build:client --silent",
