@@ -1,6 +1,7 @@
 require_relative "../support/generator_spec_helper"
 require_relative "../support/version_test_helpers"
 
+# rubocop:disable Metrics/BlockLength
 describe InstallGenerator, type: :generator do
   destination File.expand_path("../../dummy-for-generators/", __FILE__)
 
@@ -191,10 +192,52 @@ describe InstallGenerator, type: :generator do
       expect(@install_generator.send(:missing_node?)).to eq true
     end
 
-    specify "when npm is missing" do
+    specify "when yarn is missing" do
       stub_const("RUBY_PLATFORM", "mswin")
       allow(@install_generator).to receive(:`).with("where yarn").and_return("")
       expect(@install_generator.send(:missing_yarn?)).to eq true
+    end
+  end
+
+  context "when package.json already exists" do
+    before(:all) { @install_generator = InstallGenerator.new }
+
+    specify "it adds the script section if missing" do
+      data = <<-DATA
+{
+  "dependencies": {}
+}
+DATA
+
+      run_generator_test_with_args(%w()) do
+        simulate_existing_file("package.json", data)
+      end
+
+      assert_file("package.json") do |contents|
+        parsed = JSON.parse(contents)
+        assert(parsed["scripts"]["postinstall"])
+      end
+    end
+
+    specify "it adds the postinstall script to the script section" do
+      data = <<-DATA
+{
+  "scripts": {
+    "foo": "bar"
+  },
+  "dependencies": {
+  }
+}
+      DATA
+
+      run_generator_test_with_args(%w()) do
+        simulate_existing_file("package.json", data)
+      end
+
+      assert_file("package.json") do |contents|
+        parsed = JSON.parse(contents)
+        assert(parsed["scripts"]["postinstall"])
+      end
     end
   end
 end

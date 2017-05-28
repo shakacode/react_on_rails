@@ -55,7 +55,22 @@ end
 def simulate_npm_files(options)
   if options.fetch(:package_json, false)
     package_json = "client/package.json"
-    package_json_data = '    "react-on-rails": "5.2.0",'
+    package_json_data = <<-JSON
+{
+  "name": "foo",
+  "private": true,
+  "scripts": {
+    "foo": "bar"
+  },
+  "dependencies": {
+    "foo": "^0",
+    "react-on-rails": "5.2.0",
+    "bar": "^0"
+  },
+  "devDependencies": {
+  }
+}
+    JSON
     simulate_existing_file(package_json, package_json_data)
   end
 
@@ -78,6 +93,7 @@ def run_generator_test_with_args(args, options = {})
   simulate_existing_rails_files(options)
   simulate_existing_assets_files(options)
   simulate_npm_files(options)
+  yield if block_given?
   run_generator(args + ["--ignore-warnings"])
 end
 

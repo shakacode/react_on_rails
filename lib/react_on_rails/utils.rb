@@ -23,14 +23,14 @@ module ReactOnRails
     # with case for webpacker_lite, but server file is not in the file
     def self.bundle_js_file_path(bundle_name)
       # For testing outside of Rails app
-      root = Rails.root || File
 
       if using_webpacker_lite? && WebpackerLite::Manifest.lookup(bundle_name)
         # If using webpacker_lite gem
         public_subdir_hashed_file_name = ActionController::Base.helpers.asset_pack_path(bundle_name)
-        return root.join("public", public_subdir_hashed_file_name)
+        return File.join("public", public_subdir_hashed_file_name)
       end
-      root.join(ReactOnRails.configuration.generated_assets_dir, bundle_name)
+
+      File.join(ReactOnRails.configuration.generated_assets_dir, bundle_name)
     end
 
     def self.using_webpacker_lite?

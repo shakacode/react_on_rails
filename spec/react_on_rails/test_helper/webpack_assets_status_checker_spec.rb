@@ -6,8 +6,14 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     let(:client_dir) { client_dir_for(fixture_dirname) }
     let(:generated_assets_dir) { compiled_js_dir_for(fixture_dirname) }
     let(:webpack_generated_files) { %w(client-bundle.js server-bundle.js) }
-    let(:server_bundle_js_file) { File.realpath(File.join(generated_assets_dir, "server-bundle.js")) }
-    let(:client_bundle_js_file) { File.realpath(File.join(generated_assets_dir, "client-bundle.js")) }
+    # let(:server_bundle_js_file) { File.realpath(File.join(generated_assets_dir, "server-bundle.js")) }
+    # let(:client_bundle_js_file) { File.realpath(File.join(generated_assets_dir, "client-bundle.js")) }
+    let(:server_bundle_js_file) { File.join(generated_assets_dir, "server-bundle.js") }
+    let(:client_bundle_js_file) { File.join(generated_assets_dir, "client-bundle.js") }
+    before do
+      allow(ReactOnRails.configuration).to receive(:generated_assets_dir)
+        .and_return(generated_assets_dir)
+    end
 
     let(:checker) do
       ReactOnRails::TestHelper::WebpackAssetsStatusChecker
@@ -22,19 +28,42 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
         touch_files_in_dir(generated_assets_dir)
       end
 
-      xit { expect(checker.stale_generated_webpack_files).to eq([]) }
+      specify { expect(checker.stale_generated_webpack_files).to eq([]) }
+    end
+
+    context "when compiled assets with manifest exist and are up-to-date" do
+      let(:fixture_dirname) { "assets_with_manifest_exist" }
+      before do
+        require "webpacker_lite"
+        allow(ReactOnRails::Utils).to receive(:using_webpacker_lite?).and_return(true)
+        allow(WebpackerLite::Manifest).to receive(:exist?).and_return(true)
+        allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
+          .with("client-bundle.js")
+          .and_return(File.join(generated_assets_dir, "client-bundle-6bc530d039d96709b68d.js"))
+        allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
+          .with("server-bundle.js")
+          .and_return(File.join(generated_assets_dir, "server-bundle-6bc530d039d96702268d.js"))
+        touch_files_in_dir(generated_assets_dir)
+      end
+
+      specify { expect(checker.stale_generated_webpack_files).to eq([]) }
+    end
+
+    context "when using webpacker and manifest is missing" do
+      let(:fixture_dirname) { "assets_with_missing_manifest" }
+      before do
+        require "webpacker_lite"
+        allow(ReactOnRails::Utils).to receive(:using_webpacker_lite?).and_return(true)
+        allow(WebpackerLite::Manifest).to receive(:exist?).and_return(false)
+      end
+
+      specify { expect(checker.stale_generated_webpack_files).to eq(["manifest.json"]) }
     end
 
     context "when compiled assets don't exist" do
       let(:fixture_dirname) { "assets_no_exist" }
 
-      xit do
-        puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
-        puts "webpack_assets_status_checker_spec.rb: #{__LINE__},  method: #{__method__}"
-        puts "checker.stale_generated_webpack_files = #{checker.stale_generated_webpack_files.ai}"
-        puts "#{client_bundle_js_file}, #{server_bundle_js_file}"
-        puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
-
+      specify do
         expect(checker.stale_generated_webpack_files)
           .to eq([client_bundle_js_file, server_bundle_js_file])
       end
@@ -46,7 +75,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
         touch_files_in_dir(generated_assets_dir)
       end
 
-      xit do
+      specify do
         expect(checker.stale_generated_webpack_files)
           .to eq([client_bundle_js_file])
       end
@@ -56,7 +85,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
       let(:fixture_dirname) { "assets_outdated" }
       before { touch_files_in_dir(client_dir) }
 
-      xit do
+      specify do
         expect(checker.stale_generated_webpack_files)
           .to eq([client_bundle_js_file, server_bundle_js_file])
       end

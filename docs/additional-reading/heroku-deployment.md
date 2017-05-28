@@ -31,7 +31,6 @@ By default Heroku will cache the root `node_modules` directory between deploys b
   "node_modules",
   "client/node_modules"
 ],
-
 ```
 
 ## How to Deploy

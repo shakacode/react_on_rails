@@ -77,38 +77,36 @@ module ReactOnRails
         end
 
         def create_js_context
+          return if ReactOnRails.configuration.server_bundle_js_file.blank?
+
           server_js_file = ReactOnRails::Utils.server_bundle_js_file_path
 
-          if server_js_file.present? && File.exist?(server_js_file)
-            bundle_js_code = File.read(server_js_file)
-            base_js_code = <<-JS
+          unless File.exist?(server_js_file)
+            msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
+                "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\
+                "avoid this warning"
+            raise msg
+          end
+
+          bundle_js_code = File.read(server_js_file)
+          base_js_code = <<-JS
 #{console_polyfill}
-            #{execjs_timer_polyfills}
-            #{bundle_js_code};
-            JS
-            file_name = "tmp/base_js_code.js"
-            begin
-              trace_messsage(base_js_code, file_name)
-              ExecJS.compile(base_js_code)
-            rescue => e
-              msg = "ERROR when compiling base_js_code! "\
+          #{execjs_timer_polyfills}
+          #{bundle_js_code};
+          JS
+          file_name = "tmp/base_js_code.js"
+          begin
+            trace_messsage(base_js_code, file_name)
+            ExecJS.compile(base_js_code)
+          rescue => e
+            msg = "ERROR when compiling base_js_code! "\
               "See file #{file_name} to "\
               "correlate line numbers of error. Error is\n\n#{e.message}"\
               "\n\n#{e.backtrace.join("\n")}"
-              puts msg
-              Rails.logger.error(msg)
-              trace_messsage(base_js_code, file_name, true)
-              raise e
-            end
-          else
-            if server_js_file.present?
-              msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
-              "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\
-              "avoid this warning"
-              Rails.logger.warn msg
-              puts msg
-            end
-            ExecJS.compile("")
+            puts msg
+            Rails.logger.error(msg)
+            trace_messsage(base_js_code, file_name, true)
+            raise e
           end
         end
 

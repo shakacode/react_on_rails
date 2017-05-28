@@ -22,8 +22,8 @@ module ReactOnRails
       end
 
       def stale_generated_webpack_files
-        manifest_needed =  ReactOnRails::Utils.using_webpacker_lite? &&
-          !WebpackerLite::Manifest.exist?
+        manifest_needed = ReactOnRails::Utils.using_webpacker_lite? &&
+                          !WebpackerLite::Manifest.exist?
 
         return ["manifest.json"] if manifest_needed
 
@@ -48,7 +48,6 @@ module ReactOnRails
 
       def all_compiled_assets
         @all_compiled_assets ||= begin
-          # binding.pry
           webpack_generated_files = @webpack_generated_files.map do |bundle_name|
             ReactOnRails::Utils.bundle_js_file_path(bundle_name)
           end
