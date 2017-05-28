@@ -4,7 +4,12 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+Changes since last non-beta release.
+
 *Please add entries here for your pull requests.*
+
+## [8.0.0-unreleased]
+- All 8.0.0 changes since last beta.
 
 ## [8.0.0-beta.3] - 2017-05-27
 ## Changed
@@ -585,7 +590,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.3...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/7.0.4...master
+[8.0.0-unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.3...master
 [8.0.0-beta.3]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.2...8.0.0-beta.3
 [8.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.1...8.0.0-beta.2
 [8.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/7.0.4...8.0.0-beta.1
