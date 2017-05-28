@@ -47,13 +47,11 @@ module ReactOnRails
 
       def add_test_related_gems_to_gemfile
         gem("rspec-rails", group: :test)
-        gem("capybara", group: :test)
-        gem("selenium-webdriver", group: :test)
         gem("coveralls", require: false)
         gem("poltergeist")
       end
 
-      def gsub_prerender_if_server_rendering
+      def replace_prerender_if_server_rendering
         return unless options.example_server_rendering
         hello_world_index = File.join(destination_root, "app", "views", "hello_world", "index.html.erb")
         hello_world_contents = File.read(hello_world_index)
@@ -61,6 +59,19 @@ module ReactOnRails
                                                              "prerender: true")
 
         File.open(hello_world_index, "w+") { |f| f.puts new_hello_world_contents }
+      end
+
+      def add_yarn_relative_install_script_in_client_package_json
+        client_package_json = File.join(destination_root, "client", "package.json")
+        contents = File.read(client_package_json)
+        replacement_value = <<-STRING
+  "scripts": {
+    "postinstall": "yarn run install-react-on-rails",
+    "install-react-on-rails": "rm -rf node_modules/react-on-rails && npm i 'file:../../../..'",
+STRING
+        new_client_package_json_contents = contents.gsub(/ {2}"scripts": {/,
+                                                         replacement_value)
+        File.open(client_package_json, "w+") { |f| f.puts new_client_package_json_contents }
       end
     end
   end

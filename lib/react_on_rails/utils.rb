@@ -15,9 +15,26 @@ module ReactOnRails
       $CHILD_STATUS.exitstatus == 0
     end
 
-    def self.default_server_bundle_js_file_path
-      File.join(ReactOnRails.configuration.generated_assets_dir,
-                ReactOnRails.configuration.server_bundle_js_file)
+    def self.server_bundle_js_file_path
+      bundle_js_file_path(ReactOnRails.configuration.server_bundle_js_file)
+    end
+
+    # TODO: conturbo Write Test for this, with BOTH webpacker_lite installed and not, and
+    # with case for webpacker_lite, but server file is not in the file
+    def self.bundle_js_file_path(bundle_name)
+      # For testing outside of Rails app
+
+      if using_webpacker_lite? && WebpackerLite::Manifest.lookup(bundle_name)
+        # If using webpacker_lite gem
+        public_subdir_hashed_file_name = ActionController::Base.helpers.asset_pack_path(bundle_name)
+        return File.join("public", public_subdir_hashed_file_name)
+      end
+
+      File.join(ReactOnRails.configuration.generated_assets_dir, bundle_name)
+    end
+
+    def self.using_webpacker_lite?
+      ActionController::Base.helpers.respond_to?(:asset_pack_path)
     end
 
     def self.running_on_windows?

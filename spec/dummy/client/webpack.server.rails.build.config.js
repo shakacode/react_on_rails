@@ -1,14 +1,12 @@
 // Common webpack configuration for server bundle
-/* eslint-disable comma-dangle */
-
-const webpack = require('webpack');
 const { resolve, join } = require('path');
-const webpackCommon = require('./webpack.common');
+const webpack = require('webpack');
+const webpackCommon = require('./webpack.common.config');
 const { assetLoaderRules } = webpackCommon;
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
-const configPath = resolve('..', 'config', 'webpack');
-const { paths } = webpackConfigLoader(configPath);
+const configPath = resolve('..', 'config');
+const { webpackOutputPath, webpackPublicOutputDir } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
 const nodeEnv = devBuild ? 'development' : 'production';
@@ -21,8 +19,15 @@ module.exports = {
     './app/startup/serverRegistration',
   ],
   output: {
+    // Important to NOT use a hash if the server webpack config runs separately from the client one.
+    // Otherwise, both would be writing to the same manifest.json file.
+    // Additionally, there's no particular need to have a fingerprint (hash) on the server bundle,
+    // since it's not cached by the browsers.
     filename: 'server-bundle.js',
-    path: resolve('..', paths.output, paths.assets),
+
+    // Leading and trailing slashes ARE necessary.
+    publicPath: '/' + webpackPublicOutputDir + '/',
+    path: webpackOutputPath,
   },
   resolve: {
     extensions: ['.js', '.jsx'],

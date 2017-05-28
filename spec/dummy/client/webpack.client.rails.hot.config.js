@@ -2,31 +2,29 @@
 // rails s
 // cd client && babel-node server-rails-hot.js
 // Note that Foreman (Procfile.dev) has also been configured to take care of this.
-/* eslint-disable comma-dangle */
 
 const { resolve } = require('path');
 const webpack = require('webpack');
 const merge = require('webpack-merge');
 const config = require('./webpack.client.base.config');
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
-const configPath = resolve('..', 'config', 'webpack');
-const { devServer, paths, publicPath } = webpackConfigLoader(configPath);
+const configPath = resolve('..', 'config');
+const { hotReloadingUrl, webpackOutputPath } = webpackConfigLoader(configPath);
 
 module.exports = merge(config, {
 
-  config.devtool: 'eval-source-map',
+  devtool: 'eval-source-map',
 
   entry: {
     'app-bundle': [
-      `webpack-dev-server/client?${devServer.host}:${devServer.port}`,
+      `webpack-dev-server/client?${hotReloadingUrl}`,
       'webpack/hot/only-dev-server'
     ],
   },
 
   output: {
     filename: '[name].js',
-    path: resolve('..', paths.output, paths.assets),
-    publicPath,
+    path: webpackOutputPath,
   },
 
   module: {

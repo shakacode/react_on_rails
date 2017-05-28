@@ -1,5 +1,4 @@
 /* eslint no-var: 0, no-console: 0, import/no-extraneous-dependencies: 0 */
-/* eslint-disable comma-dangle */
 
 // This file is used by the yarn script:
 // "hot-assets": "babel-node server-rails-hot.js"
@@ -20,14 +19,13 @@ const { resolve } = require('path');
 import webpackConfig from './webpack.client.rails.hot.config';
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
-const configPath = resolve('..', 'config', 'webpack');
-const { devServer: devServerConfig, publicPath } = webpackConfigLoader(configPath);
+const configPath = resolve('..', 'config');
+const { hotReloadingUrl, hotReloadingPort, hotReloadingHostname } = webpackConfigLoader(configPath);
 
 const compiler = webpack(webpackConfig);
 
 const devServer = new WebpackDevServer(compiler, {
-  contentBase: `http://lvh.me:${devServerConfig.port}`,
-  publicPath,
+  contentBase: hotReloadingUrl,
   hot: true,
   inline: true,
   historyApiFallback: true,
@@ -43,9 +41,9 @@ const devServer = new WebpackDevServer(compiler, {
   },
 });
 
-devServer.listen(devServerConfig.port, 'localhost', err => {
+devServer.listen(hotReloadingPort, hotReloadingHostname, err => {
   if (err) console.error(err);
   console.log(
-    `=> 🔥  Webpack development server is running on port ${devServerConfig.port}`
+    `=> 🔥  Webpack development server is running on ${hotReloadingUrl}`
   );
 });

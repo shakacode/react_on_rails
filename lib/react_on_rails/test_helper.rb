@@ -31,7 +31,7 @@ module ReactOnRails
     # metatags - metatags to add the ensure_assets_compiled check.
     #            Default is :js, :server_rendering
     def self.configure_rspec_to_compile_assets(config, *metatags)
-      metatags = [:js, :server_rendering] if metatags.empty?
+      metatags = %i(js server_rendering controller) if metatags.empty?
 
       metatags.each do |metatag|
         config.before(:example, metatag) { ReactOnRails::TestHelper.ensure_assets_compiled }
@@ -55,7 +55,6 @@ module ReactOnRails
                                     client_dir: nil,
                                     generated_assets_dir: nil,
                                     webpack_generated_files: nil)
-
       if webpack_assets_status_checker.nil?
         client_dir ||= Rails.root.join("client")
         generated_assets_dir ||= ReactOnRails.configuration.generated_assets_dir

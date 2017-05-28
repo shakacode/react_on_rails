@@ -2,14 +2,14 @@
 // webpack.client.rails.hot.config and webpack.client.rails.build.config.
 
 const webpack = require('webpack');
-const { resolve, join } = require('path');
-const webpackCommon = require('./webpack.common');
-const { assetLoaderRules } = webpackCommon;
-
 const ManifestPlugin = require('webpack-manifest-plugin');
+const { resolve, join } = require('path');
+
+const { assetLoaderRules } = require('./webpack.common.config');
+
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
-const configPath = resolve('..', 'config', 'webpack');
-const { paths, publicPath } = webpackConfigLoader(configPath);
+const configPath = resolve('..', 'config');
+const { manifest } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
 
@@ -33,7 +33,10 @@ module.exports = {
 
 
   plugins: [
-    new webpack.EnvironmentPlugin({ NODE_ENV: 'development' }),
+    new webpack.EnvironmentPlugin({
+      NODE_ENV: 'development', // use 'development' unless process.env.NODE_ENV is defined
+      DEBUG: false,
+    }),
     new webpack.DefinePlugin({
       TRACE_TURBOLINKS: devBuild,
     }),
@@ -46,7 +49,7 @@ module.exports = {
         return module.context && module.context.indexOf('node_modules') !== -1;
       },
     }),
-    new ManifestPlugin({ fileName: paths.manifest, publicPath, writeToFileEmit: true }),
+    new ManifestPlugin({ fileName: manifest, writeToFileEmit: true }),
   ],
 
   module: {

@@ -8,7 +8,6 @@
   },
   "scripts": {
     "postinstall": "cd ./client && yarn install",
-    "gulp": "cd ./client && yarn run gulp",
     "test": "yarn run build:test && yarn run lint && rspec",
     "lint": "cd client && yarn run lint",
     "install-react-on-rails": "cd client && yarn run install-react-on-rails",

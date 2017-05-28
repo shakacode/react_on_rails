@@ -25,6 +25,7 @@ describe DevTestsGenerator, type: :generator do
     it "changes package.json to use local react-on-rails version of module" do
       assert_file("client/package.json") do |contents|
         assert_match('"react-on-rails": "file:../../../.."', contents)
+        assert_match('"postinstall":', contents)
         refute_match('"react-on-rails": "ReactOnRails::VERSION"', contents)
       end
     end
@@ -32,8 +33,6 @@ describe DevTestsGenerator, type: :generator do
     it "adds test-related gems to Gemfile" do
       assert_file("Gemfile") do |contents|
         assert_match("gem 'rspec-rails', group: :test", contents)
-        assert_match("gem 'capybara', group: :test", contents)
-        assert_match("gem 'selenium-webdriver', group: :test", contents)
         assert_match("gem 'coveralls', require: false", contents)
         assert_match("gem 'poltergeist'", contents)
       end

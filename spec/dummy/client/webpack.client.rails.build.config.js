@@ -2,15 +2,13 @@
 // cd client && yarn run build:client
 // Note that Foreman (Procfile.dev) has also been configured to take care of this.
 
-/* eslint-disable comma-dangle */
-
 const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const merge = require('webpack-merge');
 const config = require('./webpack.client.base.config');
 const { resolve } = require('path');
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
-const configPath = resolve('..', 'config', 'webpack');
-const { paths, publicPath } = webpackConfigLoader(configPath);
+const configPath = resolve('..', 'config');
+const { webpackOutputPath, webpackPublicOutputDir } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
 
@@ -24,9 +22,11 @@ if (devBuild) {
 module.exports = merge(config, {
 
   output: {
-    filename: '[name].js',
-    path: resolve('..', paths.output, paths.assets),
-    publicPath,
+    filename: '[name]-[hash].js',
+
+    // Leading and trailing slashes ARE necessary.
+    publicPath: '/' + webpackPublicOutputDir + '/',
+    path: webpackOutputPath,
   },
 
   // See webpack.client.base.config for adding modules common to both the webpack dev server and rails
