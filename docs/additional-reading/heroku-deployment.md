@@ -10,7 +10,7 @@ The generator has created the necessary files and gems for deployment to Heroku.
 If you want to see an updated example deployed to Heroku, please visit the [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial).
 
 ## More details on precompilation using webpack to create JavaScript assets
-This is how the rake task gets modified. You should be able to call `clear_prerequisites` and setup your own custom precompile if needed.
+This is how the `assets:precompile` rake task gets modified by `react_on_rails`. You should be able to call `clear_prerequisites` and setup your own custom precompile if needed.
 ```ruby
 # These tasks run as pre-requisites of assets:precompile.
 # Note, it's not possible to refer to ReactOnRails configuration values at this point.
@@ -22,6 +22,8 @@ Rake::Task["assets:precompile"]
       Rake::Task["react_on_rails:assets:delete_broken_symlinks"].invoke
     end
 ```    
+
+For an example of how to do this, see the [dummy app](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/lib/tasks/assets.rake).
 
 ## Caching Node Modules
 By default Heroku will cache the root `node_modules` directory between deploys but since we're installing in `client/node_modules` you'll need to add the following line to the `package.json` in your root directory (otherwise you'll have to sit through a full `yarn` on each deploy):
