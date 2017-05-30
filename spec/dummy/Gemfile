@@ -43,7 +43,7 @@ gem "sdoc", "~> 0.4.0", group: :doc
 
 gem "react_on_rails", path: "../.."
 
-gem "webpacker_lite", "2.0.2"
+gem "webpacker_lite", "2.0.4"
 
 gem "mini_racer"
 

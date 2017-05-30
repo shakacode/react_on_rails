@@ -110,7 +110,7 @@ module.exports = merge(config, {
 
   plugins: [
     new ExtractTextPlugin({
-      filename: '[name].css',
+      filename: '[name]-[hash].css',
       allChunks: true
     }),
   ],
