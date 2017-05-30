@@ -1,9 +1,10 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Codeship Status for shakacode/react_on_rails](https://app.codeship.com/projects/cec6c040-971f-0134-488f-0a5146246bd8/status?branch=master)](https://app.codeship.com/projects/187011) [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
-#### The Docs here on `master` refer to 8.0.0-beta.3 including support for Webpacker! 7.0.4 docs are [here](https://github.com/shakacode/react_on_rails/tree/7.0.4).
-**VERSION 8 is super close!!!**
+The Docs here on `master` refer to 8.0.0 including support for webpacker_lite! 
 
-**[VERSION 8.0.0-beta.3](https://rubygems.org/gems/react_on_rails/versions/8.0.0.beta.3)** has shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) support! Please try [the 8.0.0-beta.3 beta](https://rubygems.org/gems/react_on_rails/versions/8.0.0.beta.3) and please report issues! We're **SUPER** close as we've also upgraded the [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) with [PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395). That PR shows the changes needed to go to Webpacker Lite.
+[7.0.4 docs](https://github.com/shakacode/react_on_rails/tree/7.0.4).
+
+**[VERSION 8.0.0](https://rubygems.org/gems/react_on_rails/versions/8.0.0.beta.3)** has shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) support! [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395) shows the changes needed to go to Webpacker Lite.
 * Why did we fork webpacker to make webpacker_lite? Please provide feedback on my draft article: [Webpacker Lite: Why Did  We Fork Webpacker?](https://medium.com/@railsonmaui/webpacker-lite-why-did-we-fork-webpacker-ee3305688d66) (Draft will soon become regular article).
 
 **For a complete example of this gem, see our live demo at [www.reactrails.com](http://www.reactrails.com). ([Source Code](https://github.com/shakacode/react-webpack-rails-tutorial))**
@@ -63,7 +64,7 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 
 **Project Objective**: To provide an opinionated and optimal framework for integrating Ruby on Rails with modern JavaScript tooling and libraries, including [**Webpack**](http://webpack.github.io/), [**Babel**](https://babeljs.io/), [**React**](https://facebook.github.io/react/), [**Redux**](https://github.com/reactjs/redux), [**React-Router**](https://github.com/reactjs/react-router). This differs significantly from typical Rails architecture. When considering what goes into **react_on_rails**, we ask ourselves, is the functionality related to the intersection of using Rails and modern JavaScript? If so, then the functionality belongs right here. In other cases, we're releasing separate npm packages or Ruby gems. If you are interested in implementing React using traditional Rails architecture, see [react-rails](https://github.com/reactjs/react-rails).
 
-React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x and greater is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering, using either **execJS** or a [Node.js server](https://github.com/shakacode/react_on_rails/blob/master/docs%2Fadditional-reading%2Fnode-server-rendering.md). See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
+React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x and greater is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering, using **execJS**. See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
 
 ## Table of Contents
 
@@ -103,27 +104,25 @@ See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpac
 
 ## Why Webpack?
 
-Webpack is used to generate several JavaScript "bundles" for inclusion in `application.js` or directly in your layout.
+Webpack is used to generate JavaScript and CSS "bundles" directly to your `/public` directory. [webpacker_lite](https://github.com/shakacode/webpacker_lite) provides view helpers to access the Webpack generated (and fingerprinted) JS and CSS. These files totally skip the Rails asset pipeline. You are responsible for properly processing your Webpack output via the Webpack config files.
 
-This usage of webpack fits neatly and simply into the existing Rails sprockets system and you can include React components on a Rails view with a simple helper.
+This usage of webpack fits neatly and simply into existing Rails apps. You can include React components on a Rails view with a simple helper.
 
 Compare this to some alternative approaches for SPAs (Single Page Apps) that utilize Webpack and Rails. They will use a separate node server to distribute web pages, JavaScript assets, CSS, etc., and will still use Rails as an API server. A good example of this is our ShakaCode team member Alex's article [
 Universal React with Rails: Part I](https://medium.com/@alexfedoseev/isomorphic-react-with-rails-part-i-440754e82a59).
 
-We're definitely not doing that. With react_on_rails, webpack is mainly generating a nice JavaScript file for inclusion into `application.js`. We're going to KISS. And that's all relative given how much there is to get right in an enterprise class web application.
-
 ## Upgrade
 
-To upgrade existing apps to react on rails 7 see the [Installation Overview](docs/basics/installation-overview.md)
+To upgrade existing apps to React on Rails 8 see the [Installation Overview](docs/basics/installation-overview.md)
 
 ## Getting Started
 
 **For more detailed instructions**, see the [React on Rails Basic Tutorial](docs/tutorial.md).
 
-1. Add the following to your Gemfile and `bundle install`.
+1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `client/package.json` file.
 
   ```ruby
-  gem "react_on_rails", "~> 7"
+  gem "react_on_rails", "8.0.0"
   ```
 
 2. Commit this to git (you cannot run the generator unless you do this or pass the option `--ignore-warnings`).

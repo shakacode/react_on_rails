@@ -1,3 +1,5 @@
+## NOTE: These helpers are NOT needed if using webpacker_lite
+
 ## Hot Reloading View Helpers
 The `env_javascript_include_tag` and `env_stylesheet_link_tag` support the usage of a webpack dev server for providing the JS and CSS assets during development mode. See the [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/) for a working example.
 

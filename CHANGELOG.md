@@ -8,11 +8,21 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
-## [8.0.0-unreleased]
-- All 8.0.0 changes since last beta.
+## [8.0.1]
+### Fixed
+- Generator no longer modifies `assets.rb`. [#859](https://github.com/shakacode/react_on_rails/pull/859) by [justin808](https://github.com/justin808)
+
+## [8.0.0]
+- Generators and full support for [webpacker_lite](https://github.com/shakacode/webpacker_lite)
+- No breaking changes to move to 8.0.0 other than the default for this setting changed to nil. If you depended on the default of this setting and are using the asset pipeline (and not webpacker_lite), then add this to your `config/initializers/react_on_rails.rb`:
+  ```
+  symlink_non_digested_assets_regex: /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/,
+  ```
+- For an example of migration, see: [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395)
+- For a simple example of the webpacker_lite setup, run the basic generator.
 
 ## [8.0.0-beta.3] - 2017-05-27
-## Changed
+### Changed
 - Major updates for WebpackerLite 2.0.2. [#844](https://github.com/shakacode/react_on_rails/pull/845) by [justin808](https://github.com/justin808) with help from ](https://github.com/robwise)
 - Logging no longer occurs when trace is turned to false. [#845](https://github.com/shakacode/react_on_rails/pull/845) by [conturbo](https://github.com/Conturbo)
                                
@@ -26,9 +36,6 @@ Removed unnecessary values in default paths.yml files for generators. [#834](htt
 ### Added
 Support for WebpackerLite in the generators. [#822](https://github.com/shakacode/react_on_rails/pull/822) by [kaizencodes](https://github.com/kaizencodes) and [justin808](https://github.com/justin808).
 
-1. You do not need to switch to WebpackerLite to use 8.0.0.
-2. You can find an upgrade example in [react-webpack-rails-tutorial PR #387](https://github.com/shakacode/react-webpack-rails-tutorial/pull/387).
-
 ### Changed
 Breaking change is that the default value of symlink_non_digested_assets_regex has changed from this
 old value to nil. This is a breaking change if you didn't have this value set in your
@@ -38,7 +45,6 @@ features and you have not switched to webpacker lite.
 ```
 symlink_non_digested_assets_regex: /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/,
 ```
-
 
 ## [7.0.4] - 2017-04-27
 - Return empty json when nil in json_safe_and_pretty [#824](https://github.com/shakacode/react_on_rails/pull/824) by [dzirtusss](https://github.com/dzirtusss)
@@ -590,8 +596,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/7.0.4...master
-[8.0.0-unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.3...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.0...master
+[8.0.0]: https://github.com/shakacode/react_on_rails/compare/7.0.4...8.0.0
 [8.0.0-beta.3]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.2...8.0.0-beta.3
 [8.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.1...8.0.0-beta.2
 [8.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/7.0.4...8.0.0-beta.1

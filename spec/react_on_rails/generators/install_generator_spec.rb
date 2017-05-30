@@ -1,7 +1,6 @@
 require_relative "../support/generator_spec_helper"
 require_relative "../support/version_test_helpers"
 
-# rubocop:disable Metrics/BlockLength
 describe InstallGenerator, type: :generator do
   destination File.expand_path("../../dummy-for-generators/", __FILE__)
 
@@ -43,16 +42,6 @@ describe InstallGenerator, type: :generator do
   context "with existing application.js or application.js.coffee file" do
     before(:all) { run_generator_test_with_args([], application_js: true) }
     include_examples "base_generator", application_js: true
-  end
-
-  context "without existing assets.rb file" do
-    before(:all) { run_generator_test_with_args([], assets_rb: false) }
-    include_examples "base_generator", assets_rb: false
-  end
-
-  context "with existing assets.rb file" do
-    before(:all) { run_generator_test_with_args([], assets_rb: true) }
-    include_examples "base_generator", assets_rb: true
   end
 
   context "with rails_helper" do
