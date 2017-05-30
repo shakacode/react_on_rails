@@ -51,7 +51,7 @@ cd test-react-on-rails
 Add **React On Rails** gem to your Gemfile (`vim Gemfile` or `nano Gemfile` or in IDE):
 
 ```
-gem 'react_on_rails', '~>7'         # use latest gem version > 7
+gem 'react_on_rails', '8.0.0'         # use latest gem version, prefer exact version 
 ```
 
 ![02](https://cloud.githubusercontent.com/assets/20628911/17464919/3c2d74c2-5cf2-11e6-8704-a84958832fbb.png)

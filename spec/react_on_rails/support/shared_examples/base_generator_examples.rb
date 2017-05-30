@@ -39,11 +39,6 @@ shared_examples "base_generator" do
        Procfile.dev).each { |file| assert_file(file) }
   end
 
-  it "appends path configurations to assets.rb" do
-    expected = ReactOnRails::Generators::BaseGenerator::ASSETS_RB_APPEND
-    assert_file("config/initializers/assets.rb") { |contents| assert_match(expected, contents) }
-  end
-
   it "templates HelloWorldApp into webpack.config.js" do
     assert_file("client/webpack.config.js") do |contents|
       assert_match("registration", contents)

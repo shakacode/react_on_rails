@@ -31,7 +31,6 @@ The secret sauce is in the [app/views/layouts/application.html.erb](https://gith
 1. Configure the file Rails asset pipeline files:
    1. [app/assets/javascripts/application_static.js](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/assets/javascripts/application_static.js) 
    1. [app/assets/stylesheets/application_static.css.scss](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/assets/stylesheets/application_static.css.scss)
-1. Be sure your [config/initializers/assets.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/assets.rb) is configured to include the webpack generated files.
 1. Copy the [client/server-rails-hot.js](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/server-rails-hot.js) to the your client directory.
 1. Copy the scripts in the top level and client level `package.json` files:
    1. Top Level: [package.json](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/package.json)
