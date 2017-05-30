@@ -1,8 +1,6 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Codeship Status for shakacode/react_on_rails](https://app.codeship.com/projects/cec6c040-971f-0134-488f-0a5146246bd8/status?branch=master)](https://app.codeship.com/projects/187011) [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
-The Docs here on `master` refer to 8.0.0 including support for webpacker_lite! 
-
-[7.0.4 docs](https://github.com/shakacode/react_on_rails/tree/7.0.4).
+The Docs here on `master` refer to 8.0.0 including support for [webpacker_lite](https://github.com/shakacode/webpacker_lite)! [7.0.4 docs](https://github.com/shakacode/react_on_rails/tree/7.0.4).
 
 **[VERSION 8.0.0](https://rubygems.org/gems/react_on_rails/versions/8.0.0.beta.3)** has shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) support! [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395) shows the changes needed to go to Webpacker Lite.
 * Why did we fork webpacker to make webpacker_lite? Please provide feedback on my draft article: [Webpacker Lite: Why Did  We Fork Webpacker?](https://medium.com/@railsonmaui/webpacker-lite-why-did-we-fork-webpacker-ee3305688d66) (Draft will soon become regular article).
