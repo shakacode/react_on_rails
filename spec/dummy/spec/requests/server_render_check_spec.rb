@@ -2,17 +2,17 @@ require "rails_helper"
 
 describe "Server Rendering", :server_rendering do
   it "generates server rendered HTML if server renderering enabled" do
-    get server_side_hello_world_with_options_path
+    get server_side_main_page_with_options_path
     html_nodes = Nokogiri::HTML(response.body)
-    expect(html_nodes.css("div#my-hello-world-id").children.size).to eq(1)
-    expect(html_nodes.css("div#my-hello-world-id h3").text)
+    expect(html_nodes.css("div#my-main-page-id").children.size).to eq(1)
+    expect(html_nodes.css("div#my-main-page-id h3").text)
       .to eq("Hello, Mr. Server Side Rendering!")
-    expect(html_nodes.css("div#my-hello-world-id p input")[0]["value"])
+    expect(html_nodes.css("div#my-main-page-id p input")[0]["value"])
       .to eq("Mr. Server Side Rendering")
   end
 
   it "generates server rendered HTML if server renderering enabled for shared redux" do
-    get server_side_hello_world_shared_store_path
+    get server_side_main_page_shared_store_path
     html_nodes = Nokogiri::HTML(response.body)
     top_id = "#ReduxSharedStoreApp-react-component-0"
     expect(html_nodes.css(top_id).children.size).to eq(1)
@@ -23,9 +23,9 @@ describe "Server Rendering", :server_rendering do
   end
 
   it "generates no server rendered HTML if server renderering not enabled" do
-    get client_side_hello_world_path
+    get client_side_main_page_path
     html_nodes = Nokogiri::HTML(response.body)
-    expect(html_nodes.css("div#HelloWorld-react-component-0").children.size).to eq(0)
+    expect(html_nodes.css("div#MainPage-react-component-0").children.size).to eq(0)
   end
 
   describe "reloading the server bundle" do
@@ -42,32 +42,32 @@ describe "Server Rendering", :server_rendering do
     end
 
     it "reloads the server bundle on a new request if was changed" do
-      get server_side_hello_world_with_options_path
+      get server_side_main_page_with_options_path
       html_nodes = Nokogiri::HTML(response.body)
       sentinel = "Say hello to:"
-      expect(html_nodes.css("div#my-hello-world-id p").text).to eq(sentinel)
+      expect(html_nodes.css("div#my-main-page-id p").text).to eq(sentinel)
       original_mtime = File.mtime(server_bundle)
       replacement_text = "ZZZZZZZZZZZZZZZZZZZ"
       new_bundle_text = original_bundle_text.gsub(sentinel, replacement_text)
       File.open(server_bundle, "w") { |f| f.puts new_bundle_text }
       new_mtime = File.mtime(server_bundle)
       expect(new_mtime).not_to eq(original_mtime)
-      get server_side_hello_world_with_options_path
+      get server_side_main_page_with_options_path
       new_html_nodes = Nokogiri::HTML(response.body)
-      expect(new_html_nodes.css("div#my-hello-world-id p").text).to eq(replacement_text)
+      expect(new_html_nodes.css("div#my-main-page-id p").text).to eq(replacement_text)
     end
   end
 
   describe "server render mailer" do
     it "sends email okay" do
-      mail = DummyMailer.hello_email
+      mail = DummyMailer.main_page_email
       expect(mail.subject).to match "mail"
       expect(mail.body).to match "Mr. Mailing Server Side Rendering"
       expect(mail.body).to match "\"inMailer\":true"
     end
 
     it "sets inMailer properly" do
-      get client_side_hello_world_path
+      get client_side_main_page_path
       html_nodes = Nokogiri::HTML(response.body)
       expect(html_nodes.at_css("script#js-react-on-rails-context").content)
         .to match("\"inMailer\":false")
@@ -106,8 +106,8 @@ describe "Server Rendering", :server_rendering do
 
     context "shared redux store" do
       it "matches expected values" do
-        do_request(server_side_hello_world_shared_store_path)
-        check_match("server_side_hello_world_shared_store", "ReduxSharedStoreApp")
+        do_request(server_side_main_page_shared_store_path)
+        check_match("server_side_main_page_shared_store", "ReduxSharedStoreApp")
       end
     end
 

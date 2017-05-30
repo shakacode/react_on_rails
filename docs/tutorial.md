@@ -83,7 +83,7 @@ foreman start -f Procfile.dev
 
 ![04](https://cloud.githubusercontent.com/assets/20628911/17464921/3c2fdb40-5cf2-11e6-9343-6afa53593a70.png)
 
-Visit http://localhost:5000/hello_world and see your **React On Rails** app running!
+Visit http://localhost:5000/main_page and see your **React On Rails** app running!
 Note, foreman defaults to PORT 5000 unless you set the value of PORT in your environment.
 
 ![05](https://cloud.githubusercontent.com/assets/20628911/17464920/3c2e8ae2-5cf2-11e6-9e30-5ec5f9e2cbc6.png)
@@ -96,7 +96,7 @@ In case you are running some custom setup with different IP or PORT you should a
 web: rails s -p 8080 -b 0.0.0.0
 ```
 
-Then visit https://your-shared-addr.c9users.io:8080/hello_world 
+Then visit https://your-shared-addr.c9users.io:8080/main_page 
 
 
 ## RubyMine
@@ -171,10 +171,10 @@ rake db:migrate
 
 ![08](https://cloud.githubusercontent.com/assets/20628911/17465016/1f3559f0-5cf4-11e6-8ab4-c5572e4644a5.png)
 
-I'd recommend adding this line to the top of your `routes.rb`. That way, your root page will go to the Hello World page for React On Rails.
+I'd recommend adding this line to the top of your `routes.rb`. That way, your root page will go to the Main Page page for React On Rails.
 
 ```ruby
-root "hello_world#index"
+root "main_page#index"
 ```
 
 ![09](https://cloud.githubusercontent.com/assets/20628911/17465018/1f3b685e-5cf4-11e6-93f8-105fc48517d0.png)

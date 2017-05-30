@@ -181,14 +181,14 @@ data-dom-id="shaka_div">{"name":"My Test Name"}</script>
   describe "#server_render_js" do
     subject { server_render_js("ReactOnRails.getComponent('HelloString').component.world()") }
 
-    let(:hello_world) do
+    let(:main_page) do
       "Hello WORLD! Will this work?? YES! Time to visit Maui"
     end
 
     it { expect(self).to respond_to :react_component }
 
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
-    it { is_expected.to eq hello_world }
+    it { is_expected.to eq main_page }
   end
 
   describe "#rails_context" do

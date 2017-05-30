@@ -14,7 +14,7 @@ module ReactOnRails
       class_option :redux,
                    type: :boolean,
                    default: false,
-                   desc: "Install Redux gems and Redux version of Hello World Example. Default: false",
+                   desc: "Install Redux gems and Redux version of Main Page Example. Default: false",
                    aliases: "-R"
 
       # --redux

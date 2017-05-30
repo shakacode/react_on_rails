@@ -8,12 +8,12 @@ import ReactOnRails from 'react-on-rails';
 import HelloString from '../non_react/HelloString';
 
 // React components
-import HelloWorld from '../components/HelloWorld';
-import HelloWorldES5 from '../components/HelloWorldES5';
-import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
+import MainPage from '../components/MainPage';
+import MainPageES5 from '../components/MainPageES5';
+import MainPageWithLogAndThrow from '../components/MainPageWithLogAndThrow';
 
 // Generator function
-import HelloWorldApp from './HelloWorldApp';
+import MainPageApp from './MainPageApp';
 
 // Example of React + Redux
 import ReduxApp from './ServerReduxApp';
@@ -42,12 +42,12 @@ import ReactHelmetApp from './ReactHelmetServerApp';
 import ImageExample from '../components/ImageExample';
 
 ReactOnRails.register({
-  HelloWorld,
-  HelloWorldWithLogAndThrow,
-  HelloWorldES5,
+  MainPage,
+  MainPageWithLogAndThrow,
+  MainPageES5,
   ReduxApp,
   ReduxSharedStoreApp,
-  HelloWorldApp,
+  MainPageApp,
   RouterApp,
   HelloString,
   PureComponent,

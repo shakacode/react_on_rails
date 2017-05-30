@@ -49,7 +49,7 @@ feature "rails_context" do
   context "client rendering" do
     context "shared store" do
       include_examples("railsContext",
-                       "client_side_hello_world_shared_store",
+                       "client_side_main_page_shared_store",
                        "ReduxSharedStoreApp")
     end
   end
@@ -57,7 +57,7 @@ feature "rails_context" do
   context "server rendering" do
     context "shared store" do
       include_examples("railsContext",
-                       "server_side_hello_world_shared_store",
+                       "server_side_main_page_shared_store",
                        "ReduxSharedStoreApp")
     end
 

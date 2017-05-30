@@ -144,10 +144,10 @@ ctx.ReactOnRails = {
   },
 
   /**
-   * ReactOnRails.render("HelloWorldApp", {name: "Stranger"}, 'app');
+   * ReactOnRails.render("MainPageApp", {name: "Stranger"}, 'app');
    *
    * Does this:
-   *   ReactDOM.render(React.createElement(HelloWorldApp, {name: "Stranger"}),
+   *   ReactDOM.render(React.createElement(MainPageApp, {name: "Stranger"}),
    *     document.getElementById('app'))
    *
    * @param name Name of your registered component

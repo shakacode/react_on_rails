@@ -13,10 +13,10 @@ end
 
 def simulate_existing_rails_files(options)
   simulate_existing_file(".gitignore") if options.fetch(:gitignore, true)
-  if options.fetch(:hello_world_file, false)
+  if options.fetch(:main_page_file, false)
     simulate_existing_file(
-      "app/views/hello_world/index.html.erb",
-      "<%= react_component('HelloWorldApp', props: @hello_world_props, prerender: false) %>"
+      "app/views/main_page/index.html.erb",
+      "<%= react_component('MainPageApp', props: @main_page_props, prerender: false) %>"
     )
   end
   simulate_existing_file("Gemfile", "")

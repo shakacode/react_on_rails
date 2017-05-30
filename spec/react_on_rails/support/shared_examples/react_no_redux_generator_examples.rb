@@ -1,10 +1,10 @@
 shared_examples "no_redux_generator" do
   it "creates appropriate templates" do
-    assert_file("client/app/bundles/HelloWorld/startup/registration.jsx") do |contents|
-      assert_match("import HelloWorld from '../components/HelloWorld';", contents)
+    assert_file("client/app/bundles/MainPage/startup/registration.jsx") do |contents|
+      assert_match("import MainPage from '../components/MainPage';", contents)
     end
-    assert_file("app/views/hello_world/index.html.erb") do |contents|
-      assert_match(/"HelloWorld"/, contents)
+    assert_file("app/views/main_page/index.html.erb") do |contents|
+      assert_match(/"MainPage"/, contents)
     end
   end
 

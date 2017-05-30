@@ -12,7 +12,7 @@ Usage:
   rails generate react_on_rails:install [options]
 
 Options:
-  -R, [--redux], [--no-redux]                      # Install Redux gems and Redux version of Hello World Example. Default: false
+  -R, [--redux], [--no-redux]                      # Install Redux gems and Redux version of Main Page Example. Default: false
   -N, [--node], [--no-node]                        # Sets up node as a server rendering option. Default: false
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
 
@@ -29,7 +29,7 @@ can pass the redux option if you'd like to have redux setup for you automaticall
 
 * Redux
 
-    Passing the --redux generator option causes the generated Hello World example
+    Passing the --redux generator option causes the generated Main Page example
     to integrate the Redux state container framework. The necessary node modules
     will be automatically included for you.
 
@@ -57,7 +57,7 @@ Another good option is to create a simple test app per the [Tutorial](../tutoria
 ### Understanding the Organization of the Generated Client Code
 The generated client code follows our organization scheme. Each unique set of functionality, is given its own folder inside of `client/app/bundles`. This encourages for modularity of *domains*.
 
-Inside of the generated "HelloWorld" domain you will find the following folders:
+Inside of the generated "MainPage" domain you will find the following folders:
 
 +  `startup`: This contains the entry point files for webpack. It defaults to a single file that is used for server and client compilation, but if these need to be different, then you can create two webpack configurations with separate endpoints.
 + `containers`: "smart components" (components that have functionality and logic that is passed to child "dumb components").
@@ -66,7 +66,7 @@ Inside of the generated "HelloWorld" domain you will find the following folders:
 You may also notice the `app/lib` folder. This is for any code that is common between bundles and therefore needs to be shared (for example, middleware).
 
 ### Redux
-If you have used the `--redux` generator option, you will notice the familiar additional redux folders in addition to the aforementioned folders. The Hello World example has also been modified to use Redux.
+If you have used the `--redux` generator option, you will notice the familiar additional redux folders in addition to the aforementioned folders. The Main Page example has also been modified to use Redux.
 
 Note the organizational paradigm of "bundles". These are like application domains and are used for grouping your code into webpack bundles, in case you decide to create different bundles for deployment. This is also useful for separating out logical parts of your application. The concept is that each bundle will have it's own Redux store. If you have code that you want to reuse across bundles, including components and reducers, place them under `/client/app/lib`.
 

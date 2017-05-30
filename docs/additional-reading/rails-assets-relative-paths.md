@@ -132,7 +132,7 @@ const nodeEnv = devBuild ? 'development' : 'production';
 
 module.exports = {
   entry: [
-    './app/bundles/HelloWorld/startup/registration',
+    './app/bundles/MainPage/startup/registration',
   ],
 
   output: {

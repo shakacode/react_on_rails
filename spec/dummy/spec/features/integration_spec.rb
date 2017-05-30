@@ -32,20 +32,20 @@ feature "Pages/Index", :js do
     end
 
     context "Server Rendered/Cached React Component Without Redux" do
-      include_examples "React Component", "div#HelloWorld-react-component-1"
+      include_examples "React Component", "div#MainPage-react-component-1"
     end
 
     context "Simple Client Rendered Component" do
-      include_examples "React Component", "div#HelloWorldApp-react-component-2"
+      include_examples "React Component", "div#MainPageApp-react-component-2"
 
       context "same component with different props" do
-        include_examples "React Component", "div#HelloWorldApp-react-component-3"
+        include_examples "React Component", "div#MainPageApp-react-component-3"
       end
     end
 
     context "Simple Component Without Redux" do
-      include_examples "React Component", "div#HelloWorld-react-component-5"
-      include_examples "React Component", "div#HelloWorldES5-react-component-5"
+      include_examples "React Component", "div#MainPage-react-component-5"
+      include_examples "React Component", "div#MainPageES5-react-component-5"
     end
 
     context "Non-React Component" do
@@ -55,10 +55,10 @@ feature "Pages/Index", :js do
 
   context "Server Rendering with Options" do
     background do
-      visit server_side_hello_world_with_options_path
+      visit server_side_main_page_with_options_path
     end
 
-    include_examples "React Component", "div#my-hello-world-id"
+    include_examples "React Component", "div#my-main-page-id"
   end
 end
 
@@ -66,10 +66,10 @@ feature "Turbolinks across pages", :js do
   subject { page }
 
   scenario "changes name in message according to input" do
-    visit "/client_side_hello_world"
-    change_text_expect_dom_selector("#HelloWorld-react-component-0")
-    click_link "Hello World Component Server Rendered, with extra options"
-    change_text_expect_dom_selector("#my-hello-world-id")
+    visit "/client_side_main_page"
+    change_text_expect_dom_selector("#MainPage-react-component-0")
+    click_link "Main Page Component Server Rendered, with extra options"
+    change_text_expect_dom_selector("#my-main-page-id")
   end
 end
 
@@ -95,7 +95,7 @@ feature "Pages/server_side_log_throw", :js do
 
   scenario "page has server side throw messages", driver: js_errors_driver do
     expect(subject).to have_text "This example demonstrates server side logging and error handling."
-    expect(subject).to have_text "Exception in rendering!\n\nMessage: throw in HelloWorldContainer"
+    expect(subject).to have_text "Exception in rendering!\n\nMessage: throw in MainPageContainer"
   end
 end
 
@@ -103,8 +103,8 @@ feature "Pages/server_side_log_throw_raise" do
   subject { page }
   background { visit "/server_side_log_throw_raise" }
 
-  scenario "redirects to /client_side_hello_world and flashes an error" do
-    expect(current_path).to eq("/client_side_hello_world")
+  scenario "redirects to /client_side_main_page and flashes an error" do
+    expect(current_path).to eq("/client_side_main_page")
     flash_message = page.find(:css, ".flash").text
     expect(flash_message).to eq("Error prerendering in react_on_rails. See server logs.")
   end
@@ -114,7 +114,7 @@ feature "Pages/index after using browser's back button", :js do
   subject { page }
   background do
     visit root_path
-    visit "/client_side_hello_world"
+    visit "/client_side_main_page"
     go_back
   end
 
@@ -245,25 +245,25 @@ shared_examples "React Component Shared Store" do |url|
 end
 
 feature "2 react components, 1 store, client only", :js do
-  include_examples "React Component Shared Store", "/client_side_hello_world_shared_store"
+  include_examples "React Component Shared Store", "/client_side_main_page_shared_store"
 end
 
 feature "2 react components, 1 store, server side", :js do
-  include_examples "React Component Shared Store", "/server_side_hello_world_shared_store"
+  include_examples "React Component Shared Store", "/server_side_main_page_shared_store"
 end
 
 feature "2 react components, 1 store, client only, controller setup", :js do
-  include_examples "React Component Shared Store", "/client_side_hello_world_shared_store_controller"
+  include_examples "React Component Shared Store", "/client_side_main_page_shared_store_controller"
 end
 
 feature "2 react components, 1 store, server side, controller setup", :js do
-  include_examples "React Component Shared Store", "/server_side_hello_world_shared_store_controller"
+  include_examples "React Component Shared Store", "/server_side_main_page_shared_store_controller"
 end
 
 feature "2 react components, 1 store, client only, defer", :js do
-  include_examples "React Component Shared Store", "/client_side_hello_world_shared_store_defer"
+  include_examples "React Component Shared Store", "/client_side_main_page_shared_store_defer"
 end
 
 feature "2 react components, 1 store, server side, defer", :js do
-  include_examples "React Component Shared Store", "/server_side_hello_world_shared_store_defer"
+  include_examples "React Component Shared Store", "/server_side_main_page_shared_store_defer"
 end

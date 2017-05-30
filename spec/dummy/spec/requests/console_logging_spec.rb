@@ -6,14 +6,14 @@ describe "Server Error Logging" do
     html_nodes = Nokogiri::HTML(response.body)
 
     expected = <<-JS
-console.log.apply(console, ["[SERVER] RENDERED HelloWorldWithLogAndThrow to dom node \
-with id: HelloWorldWithLogAndThrow-react-component-0 with railsContext:"
-console.log.apply(console, ["[SERVER] console.log in HelloWorld"]);
-console.warn.apply(console, ["[SERVER] console.warn in HelloWorld"]);
-console.error.apply(console, ["[SERVER] console.error in HelloWorld"]);
+console.log.apply(console, ["[SERVER] RENDERED MainPageWithLogAndThrow to dom node \
+with id: MainPageWithLogAndThrow-react-component-0 with railsContext:"
+console.log.apply(console, ["[SERVER] console.log in MainPage"]);
+console.warn.apply(console, ["[SERVER] console.warn in MainPage"]);
+console.error.apply(console, ["[SERVER] console.error in MainPage"]);
 console.error.apply(console, ["[SERVER] Exception in rendering!"]);
-console.error.apply(console, ["[SERVER] message: throw in HelloWorldContainer"]);
-console.error.apply(console, ["[SERVER] stack: Error: throw in HelloWorldContainer\n    at HelloWorldWithLogAndThrow
+console.error.apply(console, ["[SERVER] message: throw in MainPageContainer"]);
+console.error.apply(console, ["[SERVER] stack: Error: throw in MainPageContainer\n    at MainPageWithLogAndThrow
     JS
 
     expected_lines = expected.split("\n")

@@ -19,7 +19,7 @@ describe DevTestsGenerator, type: :generator do
     end
 
     it "copies tests" do
-      %w(spec/features/hello_world_spec.rb).each { |file| assert_file(file) }
+      %w(spec/features/main_page_spec.rb).each { |file| assert_file(file) }
     end
 
     it "changes package.json to use local react-on-rails version of module" do
@@ -45,11 +45,11 @@ describe DevTestsGenerator, type: :generator do
                                    package_json: true,
                                    webpack_client_base_config: true,
                                    spec: false,
-                                   hello_world_file: true)
+                                   main_page_file: true)
     end
 
     it "adds prerender for examples with example-server-rendering" do
-      assert_file("app/views/hello_world/index.html.erb") do |contents|
+      assert_file("app/views/main_page/index.html.erb") do |contents|
         assert_match("prerender: true", contents)
       end
     end
