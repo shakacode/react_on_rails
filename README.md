@@ -4,7 +4,7 @@ The Docs here on `master` refer to 8.0.0 including support for [webpacker_lite](
 *Use the [7.0.4 docs](https://github.com/shakacode/react_on_rails/tree/7.0.4) to refer to the older asset pipeline way.*
 
 **[VERSION 8.0.0](https://rubygems.org/gems/react_on_rails/versions/8.0.0.beta.3)** has shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) support! [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395) shows the changes needed to go to Webpacker Lite.
-* Why did we fork webpacker to make webpacker_lite? Please provide feedback on my draft article: [Webpacker Lite: Why Did  We Fork Webpacker?](https://medium.com/@railsonmaui/webpacker-lite-why-did-we-fork-webpacker-ee3305688d66) (Draft will soon become regular article).
+* Why did we fork webpacker to make webpacker_lite? Please provide feedback on my draft article: [Webpacker Lite: Why Did  We Fork Webpacker?](https://medium.com/@railsonmaui/webpacker-lite-why-did-i-fork-webpacker-f0a7707fac92) (Draft will soon become regular article).
 
 **For a complete example of this gem, see our live demo at [www.reactrails.com](http://www.reactrails.com). ([Source Code](https://github.com/shakacode/react-webpack-rails-tutorial))**
 
