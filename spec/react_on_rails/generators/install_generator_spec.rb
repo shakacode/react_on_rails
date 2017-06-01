@@ -10,6 +10,12 @@ describe InstallGenerator, type: :generator do
     include_examples "no_redux_generator"
   end
 
+  context "--material" do
+    before(:all) { run_generator_test_with_args(%w(--material)) }
+    include_examples "base_generator", application_js: true
+    include_examples "react_with_material_generator"
+  end
+
   context "--redux" do
     before(:all) { run_generator_test_with_args(%w(--redux)) }
     include_examples "base_generator", application_js: true
