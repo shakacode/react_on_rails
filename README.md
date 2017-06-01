@@ -3,7 +3,7 @@
 The Docs here on `master` refer to 8.0.0 including support for [webpacker_lite](https://github.com/shakacode/webpacker_lite)!
 *Use the [7.0.4 docs](https://github.com/shakacode/react_on_rails/tree/7.0.4) to refer to the older asset pipeline way.*
 
-**[VERSION 8.0.0](https://rubygems.org/gems/react_on_rails/versions/8.0.0.beta.3)** has shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) support! [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395) shows the changes needed to migrate from the Asset Pipeline to Webpacker Lite. For more information, see my article: [Webpacker Lite: Why Did  We Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92).
+**[VERSION 8.0.0](https://rubygems.org/gems/react_on_rails/versions/8.0.0.beta.3)** has shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) support! [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395) shows the changes needed to migrate from the Asset Pipeline to Webpacker Lite. For more information, see my article: [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92).
 
 **For a complete example of this gem, see our live demo at [www.reactrails.com](http://www.reactrails.com). ([Source Code](https://github.com/shakacode/react-webpack-rails-tutorial))**
 
@@ -38,7 +38,7 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 
 ### Articles
 
-* [Webpacker Lite: Why Did  We Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92)
+* [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92)
 * [React on Rails, 2000+ 🌟 Stars](https://medium.com/shakacode/react-on-rails-2000-stars-32ff5cfacfbf#.6gmfb2gpy)
 * [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 
@@ -514,7 +514,7 @@ Node.js can be used as the backend for server-side rendering instead of [execJS]
 ## Additional Documentation
 **Try out our new [Documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) for improved readability & reference!**
 + **Webpacker Lite**
-  + [Webpacker Lite: Why Did  We Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92)
+  + [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92)
 
 + **Rails**
   + [Rails Assets](./docs/additional-reading/rails-assets.md)
