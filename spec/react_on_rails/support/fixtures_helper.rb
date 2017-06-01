@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module FixturesHelper
   def self.fixtures_dir
     File.join(__dir__, "..", "fixtures")

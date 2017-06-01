@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 require "rails/generators"
 require_relative "generator_helper"
 
 module ReactOnRails
   module Generators
-    FALLBACK_OPTION_FOR_NODE_MODULES = <<-TEXT.freeze
+    FALLBACK_OPTION_FOR_NODE_MODULES = <<-TEXT
     // This fixes an issue with resolving 'react' when using a local symlinked version
     // of the node_package folder
     modules: [
@@ -26,29 +28,21 @@ module ReactOnRails
                    desc: "Setup prerender true for server rendered examples"
 
       def copy_rspec_files
-        %w(spec/spec_helper.rb
+        %w[spec/spec_helper.rb
            spec/rails_helper.rb
            spec/simplecov_helper.rb
-           .rspec).each { |file| copy_file(file) }
+           .rspec].each { |file| copy_file(file) }
       end
 
       def copy_tests
-        %w(spec/features/hello_world_spec.rb).each { |file| copy_file(file) }
-      end
-
-      # We want to use the node module in the local build, not the one published to NPM
-      def change_package_json_to_use_local_react_on_rails_module
-        package_json = File.join(destination_root, "client", "package.json")
-        old_contents = File.read(package_json)
-        new_contents = old_contents.gsub(/"react-on-rails": ".+",/,
-                                         '"react-on-rails": "file:../../../..",')
-        File.open(package_json, "w+") { |f| f.puts new_contents }
+        %w[spec/features/hello_world_spec.rb].each { |file| copy_file(file) }
       end
 
       def add_test_related_gems_to_gemfile
         gem("rspec-rails", group: :test)
+        gem("poltergeist", group: :test)
+        gem("rails-controller-testing", group: :test)
         gem("coveralls", require: false)
-        gem("poltergeist")
       end
 
       def replace_prerender_if_server_rendering
@@ -66,8 +60,7 @@ module ReactOnRails
         contents = File.read(client_package_json)
         replacement_value = <<-STRING
   "scripts": {
-    "postinstall": "yarn run install-react-on-rails",
-    "install-react-on-rails": "rm -rf node_modules/react-on-rails && npm i 'file:../../../..'",
+    "postinstall": "yarn link react-on-rails",
 STRING
         new_client_package_json_contents = contents.gsub(/ {2}"scripts": {/,
                                                          replacement_value)

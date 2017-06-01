@@ -1,6 +1,9 @@
+# frozen_string_literal: true
+
 module ReactOnRails
   class AssetsPrecompile
-    class SymlinkTargetDoesNotExistException < StandardError; end
+    class SymlinkTargetDoesNotExistException < StandardError
+    end
 
     # Used by the rake task
     def default_asset_path
@@ -9,13 +12,16 @@ module ReactOnRails
       Pathname.new(dir)
     end
 
+    # assets_path should be a Pathname object
     def initialize(assets_path: nil,
                    symlink_non_digested_assets_regex: nil,
                    generated_assets_dir: nil)
-      @assets_path = assets_path.presence || default_asset_path
-      @symlink_non_digested_assets_regex = symlink_non_digested_assets_regex.presence ||
-                                           ReactOnRails.configuration.symlink_non_digested_assets_regex
-      @generated_assets_dir = generated_assets_dir.presence || ReactOnRails.configuration.generated_assets_dir
+      @assets_path = ReactOnRails::Utils.truthy_presence(assets_path) || default_asset_path
+      @symlink_non_digested_assets_regex =
+        ReactOnRails::Utils.truthy_presence(symlink_non_digested_assets_regex) ||
+        ReactOnRails.configuration.symlink_non_digested_assets_regex
+      @generated_assets_dir = ReactOnRails::Utils.truthy_presence(generated_assets_dir) ||
+                              ReactOnRails.configuration.generated_assets_dir
     end
 
     # target and symlink are relative to the assets directory

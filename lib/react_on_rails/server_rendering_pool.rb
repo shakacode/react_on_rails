@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "connection_pool"
 require_relative "server_rendering_pool/exec"
 require_relative "server_rendering_pool/node"

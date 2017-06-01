@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "erb"
 
 module ReactOnRails
@@ -27,7 +29,7 @@ module ReactOnRails
     end
 
     def js_file_names
-      %w(translations default)
+      %w[translations default]
     end
 
     def js_files
@@ -43,7 +45,9 @@ module ReactOnRails
         if i18n_yml_dir.present?
           Dir["#{i18n_yml_dir}/**/*.yml"]
         else
-          (Rails.application && Rails.application.config.i18n.load_path).presence
+          ReactOnRails::Utils.truthy_presence(
+            Rails.application && Rails.application.config.i18n.load_path
+          ).presence
         end
       end
     end
@@ -110,20 +114,20 @@ module ReactOnRails
     end
 
     def template_translations
-      <<-JS
-export const translations = #{@translations};
+      <<-JS.strip_heredoc
+        export const translations = #{@translations};
       JS
     end
 
     def template_default
-      <<-JS
-import { defineMessages } from 'react-intl';
+      <<-JS.strip_heredoc
+        import { defineMessages } from 'react-intl';
 
-const defaultLocale = \'#{default_locale}\';
+        const defaultLocale = \'#{default_locale}\';
 
-const defaultMessages = defineMessages(#{@defaults});
+        const defaultMessages = defineMessages(#{@defaults});
 
-export { defaultMessages, defaultLocale };
+        export { defaultMessages, defaultLocale };
       JS
     end
   end

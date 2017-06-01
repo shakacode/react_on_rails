@@ -3,7 +3,7 @@
 
 AllCops:
   DisplayCopNames: true
-  TargetRubyVersion: 2.1
+  TargetRubyVersion: 2.3
 
   Include:
     - '**/Rakefile'
@@ -23,11 +23,21 @@ AllCops:
     - 'bin/**/*'
     - !ruby/regexp /old_and_unused\.rb$/
     - 'spec/react_on_rails/dummy-for-generators/**/*'
+    - 'spec/dummy/Procfile.*'
     - 'spec/dummy/bin/**/*'
     - 'spec/dummy/client/node_modules/**/*'
     - 'spec/dummy/client/node_modules/**/.*'
     - 'gen-examples/examples/**/.*'
     - 'gen-examples/examples/**/*'
+
+Style/FileName:
+  Exclude:
+    - 'Gemfile'
+    - 'spec/dummy/Gemfile'
+
+# Turn off until we require 2.3 ruby
+Style/SafeNavigation:
+  Enabled: false
 
 Metrics/LineLength:
   Max: 120

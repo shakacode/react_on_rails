@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rails/generators"
 require_relative "generator_helper"
 
@@ -10,7 +12,7 @@ module ReactOnRails
 
       def copy_base_files
         base_path = "base/base/"
-        base_files = %w(client/app/bundles/HelloWorld/components/HelloWorld.jsx)
+        base_files = %w[client/app/bundles/HelloWorld/components/HelloWorld.jsx]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "coveralls/rake/task" if ENV["USE_COVERALLS"] == "TRUE"
 
 require "pathname"
@@ -7,6 +9,7 @@ require_relative "example_type"
 
 include ReactOnRails::TaskHelpers
 
+# rubocop:disable Metrics/BlockLength
 namespace :run_rspec do
   spec_dummy_dir = File.join("spec", "dummy")
 
@@ -30,13 +33,6 @@ namespace :run_rspec do
     bundle_install_in(dummy_app_dir)
   end
 
-  desc "Runs dummy respec with turbolinks 2"
-  task dummy_turbolinks_2: ["dummy_apps:dummy_app_with_turbolinks_2"] do
-    clean_gen_assets(spec_dummy_dir)
-    run_tests_in(spec_dummy_dir, env_vars:
-      "ENABLE_TURBOLINKS_2=TRUE BUNDLE_GEMFILE=#{dummy_app_dir}/Gemfile")
-  end
-
   # Dynamically define Rake tasks for each example app found in the examples directory
   ExampleType.all.each do |example_type|
     desc "Runs RSpec for #{example_type.name_pretty} only"
@@ -58,7 +54,7 @@ namespace :run_rspec do
   Coveralls::RakeTask.new if ENV["USE_COVERALLS"] == "TRUE"
 
   desc "run all tests no examples"
-  task all_but_examples: %i[gem dummy_no_turbolinks dummy_turbolinks_2 dummy empty js_tests] do
+  task all_but_examples: %i[gem dummy_no_turbolinks dummy empty js_tests] do
     puts "Completed all RSpec tests"
   end
 
@@ -73,9 +69,9 @@ task :js_tests do
   sh "yarn run test"
 end
 
-msg = <<-DESC
-Runs all tests, run `rake -D run_rspec` to see all available test options.
-"rake run_rspec:example_basic" is a good way to run only one generator test.
+msg = <<~DESC
+  Runs all tests, run `rake -D run_rspec` to see all available test options.
+  "rake run_rspec:example_basic" is a good way to run only one generator test.
 DESC
 desc msg
 task run_rspec: ["run_rspec:run_rspec"]
@@ -88,7 +84,7 @@ def calc_path(dir)
              Pathname.new(dir)
            else
              Pathname.new(File.join(gem_root, dir))
-                  end
+           end
          else
            dir
          end

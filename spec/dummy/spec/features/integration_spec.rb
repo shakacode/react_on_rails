@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rails_helper"
 
 def change_text_expect_dom_selector(dom_selector)

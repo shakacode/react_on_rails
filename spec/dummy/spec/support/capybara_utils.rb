@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module CapybaraUtils
   # Sets the driver header for poltergeist and webkit.
   # Selenium is not feasible.

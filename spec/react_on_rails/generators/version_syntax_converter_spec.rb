@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "../simplecov_helper"
 require_relative "../spec_helper"
 require_relative "../support/version_test_helpers"

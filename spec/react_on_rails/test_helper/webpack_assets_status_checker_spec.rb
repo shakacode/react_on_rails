@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative File.join("..", "support", "fixtures_helper")
 require_relative "../spec_helper"
 
@@ -5,7 +7,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
   describe "#stale_generated_webpack_files" do
     let(:client_dir) { client_dir_for(fixture_dirname) }
     let(:generated_assets_dir) { compiled_js_dir_for(fixture_dirname) }
-    let(:webpack_generated_files) { %w(client-bundle.js server-bundle.js) }
+    let(:webpack_generated_files) { %w[client-bundle.js server-bundle.js] }
     let(:server_bundle_js_file) { File.join(generated_assets_dir, "server-bundle.js") }
     let(:client_bundle_js_file) { File.join(generated_assets_dir, "client-bundle.js") }
     before do
@@ -91,11 +93,11 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
   end
 
   def client_dir_for(fixture_dirname)
-    FixturesHelper.get_file(%W(webpack_assets #{fixture_dirname} client))
+    FixturesHelper.get_file(%W[webpack_assets #{fixture_dirname} client])
   end
 
   def compiled_js_dir_for(fixture_dirname)
-    FixturesHelper.get_file(%W(webpack_assets #{fixture_dirname} compiled_js))
+    FixturesHelper.get_file(%W[webpack_assets #{fixture_dirname} compiled_js])
   end
 
   # Necessary for ensuring file mtimes of fixtures are correct

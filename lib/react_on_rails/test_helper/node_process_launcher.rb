@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ReactOnRails
   module TestHelper
     def self.launch_node

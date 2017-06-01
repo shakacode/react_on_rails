@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ReactOnRails
   # Responsible for checking versions of rubygem versus yarn node package
   # against each otherat runtime.

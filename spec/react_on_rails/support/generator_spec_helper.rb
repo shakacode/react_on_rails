@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "../simplecov_helper"
 require "generator_spec" # let's us use Rails's generator testing helpers but with RSpec syntax
 Dir[File.expand_path("../../support/shared_examples", __FILE__) + "/*.rb"].each { |file| require file }
@@ -34,21 +36,21 @@ end
 def simulate_npm_files(options)
   if options.fetch(:package_json, false)
     package_json = "client/package.json"
-    package_json_data = <<-JSON
-{
-  "name": "foo",
-  "private": true,
-  "scripts": {
-    "foo": "bar"
-  },
-  "dependencies": {
-    "foo": "^0",
-    "react-on-rails": "5.2.0",
-    "bar": "^0"
-  },
-  "devDependencies": {
-  }
-}
+    package_json_data = <<-JSON.strip_heredoc
+      {
+        "name": "foo",
+        "private": true,
+        "scripts": {
+          "foo": "bar"
+        },
+        "dependencies": {
+          "foo": "^0",
+          "react-on-rails": "5.2.0",
+          "bar": "^0"
+        },
+        "devDependencies": {
+        }
+      }
     JSON
     simulate_existing_file(package_json, package_json_data)
   end
@@ -81,7 +83,7 @@ def simulate_existing_file(file, data = "some existing text\n")
   path = Pathname.new(File.join(destination_root, file))
   mkdir_p(path.dirname)
   File.open(path, "w+") do |f|
-    f.puts(data) if data.presence
+    f.puts(data) if data.present?
   end
 end
 
