@@ -437,8 +437,10 @@ ReactOnRails.setStore('#{store_name}', store);
         inMailer: in_mailer?,
         # Locale settings
         i18nLocale: I18n.locale,
-        i18nDefaultLocale: I18n.default_locale
+        i18nDefaultLocale: I18n.default_locale,
+        railsEnv: Rails.env
       }
+
       if defined?(request) && request.present?
         # Check for encoding of the request's original_url and try to force-encoding the
         # URLs as UTF-8. This situation can occur in browsers that do not encode the
