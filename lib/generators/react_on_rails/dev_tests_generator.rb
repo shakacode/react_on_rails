@@ -66,7 +66,6 @@ module ReactOnRails
         contents = File.read(client_package_json)
         replacement_value = <<-STRING
   "scripts": {
-    "postinstall": "yarn run install-react-on-rails",
     "install-react-on-rails": "rm -rf node_modules/react-on-rails && npm i --no-shrinkwrap 'file:../../../..'",
 STRING
         new_client_package_json_contents = contents.gsub(/ {2}"scripts": {/,
