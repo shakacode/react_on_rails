@@ -44,6 +44,9 @@ install:
   - travis_retry yarn global add babel-cli
   - travis_retry bundle install
   - travis_retry yarn
+  - cd spec/dummy
+  - travis_retry bundle
+  - travis_retry yarn
   - rake dummy_apps
   - rake examples
   - rake node_package
