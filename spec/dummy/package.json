@@ -8,7 +8,7 @@
   },
   "scripts": {
     "postinstall": "cd ./client && yarn install",
-    "install-react-on-rails": "cd client && yarn run install-react-on-rails",
+    "install-react-on-rails": "cd client && npm run install-react-on-rails",
     "test": "yarn run build:test && yarn run lint && rspec",
     "lint": "cd client && yarn run lint",
     "build:clean": "rm -rf public/webpack || true",
