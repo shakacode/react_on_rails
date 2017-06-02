@@ -47,6 +47,7 @@ install:
   - cd spec/dummy
   - travis_retry bundle
   - travis_retry yarn
+  - cd ../..
   - rake dummy_apps
   - rake examples
   - rake node_package
