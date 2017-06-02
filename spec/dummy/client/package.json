@@ -34,7 +34,7 @@
     "react": "^15.5.4",
     "react-dom": "^15.5.4",
     "react-helmet": "^5.0.3",
-    "react-on-rails": "file:../../../",
+    "react-on-rails": "file:../../..",
     "react-proptypes": "^0.0.1",
     "react-redux": "^5.0.4",
     "react-router": "3.0.5",
@@ -68,7 +68,7 @@
   },
   "scripts": {
     "postinstall": "yarn run install-react-on-rails",
-    "install-react-on-rails": "npm i 'file:../../..'",
+    "install-react-on-rails": "rm -rf node_modules/react-on-rails && npm i 'file:../../..'",
     "lint": "eslint --ext .js,.jsx .",
     "test": "yarn run build:test && rspec",
     "build:test": "yarn run build:test:client && yarn run build:test:server",
