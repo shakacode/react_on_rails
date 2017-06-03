@@ -41,13 +41,13 @@ install:
   - travis_retry bundle install
   - travis_retry yarn
   - travis_retry yarn run build
-  - rake prepare_for_ci
+  - bundle exec rake prepare_for_ci
 
 before_script:
   - "export DISPLAY=:99"
 
 script:
-  - rake
+  - bundle exec rake
 
 notifications:
   slack:
