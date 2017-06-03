@@ -1,18 +1,17 @@
 # frozen_string_literal: true
 
-# This file is copied to spec/ when you run 'rails generate rspec:install'
 ENV["RAILS_ENV"] ||= "test"
 
 require_relative "simplecov_helper"
+require_relative "spec_helper"
+
 require_relative("../config/environment")
 
 # Prevent database truncation if the environment is production
 abort("The Rails environment is running in production mode!") if Rails.env.production?
 
-require_relative "spec_helper"
 require "rspec/rails"
 require "capybara/rspec"
-require "capybara/poltergeist"
 require "capybara/poltergeist"
 require "capybara-screenshot/rspec"
 
