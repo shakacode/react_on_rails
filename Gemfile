@@ -41,4 +41,3 @@ gem "launchy"
 gem "poltergeist"
 gem "selenium-webdriver"
 gem "webpacker_lite"
-
