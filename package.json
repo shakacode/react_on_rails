@@ -66,7 +66,7 @@
     "release:major": "node_package/scripts/release major",
     "dummy:install": "rake dummy_apps",
     "dummy:spec": "rake run_rspec:dummy",
-    "local": "echo 'Be sure to run yarn run dummy:install' && yarn run build && cd spec/dummy && foreman start"
+    "install-react-on-rails": "yarn link"
   },
   "repository": {
     "type": "git",

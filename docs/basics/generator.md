@@ -41,7 +41,7 @@ can pass the redux option if you'd like to have redux setup for you automaticall
 
 After running the generator, you will want to:
 
-    bundle && npm i
+    bundle && yarn 
 
 Then you may run
 

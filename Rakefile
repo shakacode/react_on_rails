@@ -12,3 +12,6 @@ task default: tasks
 
 desc "All actions but no examples, good for local developer run."
 task all_but_examples: ["run_rspec:all_but_examples", "lint"]
+
+desc "Prepare for ci, including node_package, dummy app, and generator examples"
+task prepare_for_ci: ["node_package", "dummy_apps", "examples"]

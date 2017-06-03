@@ -36,15 +36,6 @@ module ReactOnRails
         %w(spec/features/hello_world_spec.rb).each { |file| copy_file(file) }
       end
 
-      # We want to use the node module in the local build, not the one published to NPM
-      def change_package_json_to_use_local_react_on_rails_module
-        package_json = File.join(destination_root, "client", "package.json")
-        old_contents = File.read(package_json)
-        new_contents = old_contents.gsub(/"react-on-rails": ".+",/,
-                                         '"react-on-rails": "file:../../../..",')
-        File.open(package_json, "w+") { |f| f.puts new_contents }
-      end
-
       def add_test_related_gems_to_gemfile
         gem("rspec-rails", group: :test)
         gem("coveralls", require: false)
@@ -66,7 +57,7 @@ module ReactOnRails
         contents = File.read(client_package_json)
         replacement_value = <<-STRING
   "scripts": {
-    "install-react-on-rails": "rm -rf node_modules/react-on-rails && npm i --no-shrinkwrap 'file:../../../..'",
+    "postinstall": "yarn link react-on-rails",
 STRING
         new_client_package_json_contents = contents.gsub(/ {2}"scripts": {/,
                                                          replacement_value)
