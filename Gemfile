@@ -42,12 +42,3 @@ gem "poltergeist"
 gem "selenium-webdriver"
 gem "webpacker_lite"
 
-################################################################################
-# Favorite debugging gems
-gem "pry"
-gem "pry-byebug"
-gem "pry-doc"
-gem "pry-rails"
-gem "pry-rescue"
-gem "pry-stack_explorer"
-################################################################################

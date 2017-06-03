@@ -40,7 +40,6 @@ Gem::Specification.new do |s|
   s.add_development_dependency "pry-state"
   s.add_development_dependency "pry-toys"
   s.add_development_dependency "pry-rescue"
-  s.add_development_dependency "binding_of_caller"
   s.add_development_dependency "awesome_print"
   s.add_development_dependency "gem-release"
 end
