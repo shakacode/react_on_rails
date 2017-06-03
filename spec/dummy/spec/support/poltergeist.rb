@@ -6,9 +6,9 @@
 
 RESTART_PHANTOMJS = ENV["RESTART_PHANTOMJS"] &&
                     %w[TRUE YES].include?(ENV["RESTART_PHANTOMJS"].upcase)
-puts "RESTART_PHANTOMJS = #{RESTART_PHANTOMJS}"
+# puts "RESTART_PHANTOMJS = #{RESTART_PHANTOMJS}"
 
-CAPYBARA_TIMEOUT_RETRIES = 5
+CAPYBARA_TIMEOUT_RETRIES = 3
 
 # HACK: workaround for Capybara Poltergeist StatusFailErrors, simply retries
 # based on https://gist.github.com/afn/c04ccfe71d648763b306
@@ -27,6 +27,7 @@ RSpec.configure do |config|
       if use_selenium
         Capybara.current_driver = js_selenium_driver
         Capybara.javascript_driver = js_selenium_driver
+        Capybara.default_driver = js_selenium_driver
         puts "Switched to #{js_selenium_driver} from #{Capybara.current_driver}"
       end
 
@@ -56,7 +57,8 @@ RSpec.configure do |config|
 
       puts "\n"
       puts "=" * 80
-      puts "Exception caught! #{example_ex.ai}"
+      puts "Exception caught! #{example_ex}"
+      puts example_ex.message
       puts "when running example:\n  #{example.full_description}"
       puts "  at #{example.location} with driver #{Capybara.current_driver}."
 
@@ -69,6 +71,7 @@ RSpec.configure do |config|
     end
     Capybara.current_driver = original_driver
     Capybara.javascript_driver = original_driver
+    Capybara.default_driver = original_driver
     Capybara.use_default_driver
   end
 end

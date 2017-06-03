@@ -15,6 +15,7 @@ require "capybara/rspec"
 require "capybara/poltergeist"
 require "capybara/poltergeist"
 require "capybara-screenshot/rspec"
+require "awesome_print"
 
 # Add additional requires below this line. Rails is not loaded until this point!
 
@@ -31,11 +32,15 @@ require "capybara-screenshot/rspec"
 # directory. Alternatively, in the individual `*_spec.rb` files, manually
 # require only the support files necessary.
 #
-Dir[Rails.root.join("spec/support/**/*.rb")].each { |f| require f }
+# Dir[Rails.root.join("spec/support/**/*.rb")].each { |f| require f }
 
 # Checks for pending migrations before tests are run.
 # If you are not using ActiveRecord, you can remove this line.
 ActiveRecord::Migration.maintain_test_schema!
+
+# Requires supporting files with custom matchers and macros, etc,
+# in ./support/ and its subdirectories.
+Dir[Rails.root.join("spec/support/**/*.rb")].each { |f| require f }
 
 RSpec.configure do |config|
   # Ensure that if we are running js tests, we are using latest webpack assets
@@ -68,7 +73,7 @@ RSpec.configure do |config|
   # Capybara config
   #
   # selenium_firefox webdriver only works for Travis-CI builds.
-  default_driver = :poltergeist
+  default_driver = :poltergeist_no_animations
 
   supported_drivers = %i[ poltergeist poltergeist_errors_ok
                           poltergeist_no_animations webkit
@@ -136,6 +141,8 @@ RSpec.configure do |config|
 
   Capybara.save_path = Rails.root.join("tmp", "capybara")
   Capybara::Screenshot.prune_strategy = { keep: 10 }
+
+  config.use_transactional_fixtures = false
 
   config.append_after(:each) do
     Capybara.reset_sessions!
