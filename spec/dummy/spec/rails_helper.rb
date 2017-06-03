@@ -15,7 +15,6 @@ require "capybara/rspec"
 require "capybara/poltergeist"
 require "capybara/poltergeist"
 require "capybara-screenshot/rspec"
-require "awesome_print"
 
 # Add additional requires below this line. Rails is not loaded until this point!
 
