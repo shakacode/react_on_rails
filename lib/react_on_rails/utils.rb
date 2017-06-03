@@ -1,4 +1,6 @@
 require "English"
+require "open3"
+require "rainbow"
 
 module ReactOnRails
   module Utils
@@ -10,9 +12,24 @@ module ReactOnRails
       ReactOnRails.configuration.server_bundle_js_file.present?
     end
 
-    def self.last_process_completed_successfully?
-      # rubocop:disable Style/NumericPredicate
-      $CHILD_STATUS.exitstatus == 0
+    # Invokes command, exiting with a detailed message if there's a failure.
+    def self.invoke_and_exit_if_failed(cmd, failure_message)
+      stdout, stderr, status = Open3.capture3(cmd)
+      unless status.success?
+        msg = <<-MSG
+#{'Z' * 80}
+React on Rails FATAL ERROR!
+#{failure_message}
+cmd: #{cmd}"
+stdout: #{stdout.strip}
+stderr: #{stderr.strip}
+exitstatus: #{status.exitstatus}
+#{'Z' * 80}
+        MSG
+        puts Rainbow(msg).red
+        exit(1)
+      end
+      [stdout, stderr, status]
     end
 
     def self.server_bundle_js_file_path

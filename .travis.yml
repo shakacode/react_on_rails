@@ -37,6 +37,7 @@ before_install:
   - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen scn 1600x1200x16"
 
 install:
+  - travis_retry gem install bundler
   - travis_retry nvm install node 8.0.0
   - node -v
   - travis_retry npm i -g npm

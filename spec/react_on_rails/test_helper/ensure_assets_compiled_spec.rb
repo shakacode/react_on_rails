@@ -1,6 +1,6 @@
 require_relative "../spec_helper"
 
-describe ReactOnRails::TestHelper do
+describe ReactOnRails::TestHelper::EnsureAssetsCompiled do
   describe "#ensureAssetsCompiled" do
     let(:compiler) { double_assets_compiler }
     after { ReactOnRails::TestHelper::EnsureAssetsCompiled.has_been_run = false }
