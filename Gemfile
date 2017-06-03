@@ -14,7 +14,6 @@ gem "mini_racer"
 gem "puma"
 gem "rails", "5.1.1"
 gem "rails_12factor"
-gem "rainbow"
 gem "rubocop", "0.47.1", require: false
 gem "ruby-lint", require: false
 gem "sass-rails", "~> 5.0"

@@ -22,7 +22,7 @@ Gem::Specification.new do |s|
 
   s.required_ruby_version = ">= 2.0.0"
 
-  s.add_dependency "rainbow", "~> 2.1"
+  s.add_dependency "rainbow", "~> 2.2"
   s.add_dependency "connection_pool"
   s.add_dependency "execjs", "~> 2.5"
   s.add_dependency "rails", ">= 3.2"
