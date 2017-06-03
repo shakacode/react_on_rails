@@ -23,13 +23,7 @@ gem "scss_lint", require: false
 gem "sdoc", group: :doc
 gem "spring"
 gem "sqlite3"
-if ENV["ENABLE_TURBOLINKS_2"].nil? || ENV["ENABLE_TURBOLINKS_2"].strip.empty?
-  gem "turbolinks", "~> 5.0"
-else
-  # rubocop:disable Bundler/DuplicatedGem
-  gem "turbolinks", "2.5.3"
-  # rubocop:enable Bundler/DuplicatedGem
-end
+gem "turbolinks", "~> 5.0"
 gem "uglifier"
 gem "web-console", group: :development
 

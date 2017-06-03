@@ -215,7 +215,7 @@ If you run `rspec` at the top level, you'll see this message: `require': cannot 
 
 After running a test, you can view the coverage results SimpleCov reports by opening `coverage/index.html`.
 
-To test `spec/dummy` against Turbolinks 2, install the gem by running `ENABLE_TURBOLINKS_2=TRUE bundle install` in the `spec/dummy` directory before running `rake`. Turbolinks 5 is the default.
+Turbolinks 5 is included in the test app, unless "DISABLE_TURBOLINKS" is set to YES in the environment.
 
 Run `rake -T` or `rake -D` to see testing options.
 

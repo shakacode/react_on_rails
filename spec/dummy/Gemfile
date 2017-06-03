@@ -22,13 +22,7 @@ gem "puma"
 
 # Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
 if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
-  if ENV["ENABLE_TURBOLINKS_2"].nil? || ENV["ENABLE_TURBOLINKS_2"].strip.empty?
-    gem "turbolinks", "~> 5.0"
-  else
-    # rubocop:disable Bundler/DuplicatedGem
-    gem "turbolinks", "2.5.3"
-    # rubocop:enable Bundler/DuplicatedGem
-  end
+  gem "turbolinks", "~> 5.0"
 end
 
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder

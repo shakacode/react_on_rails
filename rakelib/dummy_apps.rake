@@ -14,11 +14,6 @@ namespace :dummy_apps do
     bundle_install_in(dummy_app_dir)
   end
 
-  task dummy_app_with_turbolinks_2: [:yarn_install] do
-    dummy_app_dir = File.join(gem_root, "spec/dummy")
-    bundle_install_with_turbolinks_2_in(dummy_app_dir)
-  end
-
   task dummy_apps: %i[dummy_app node_package] do
     puts "Prepared all Dummy Apps"
   end
