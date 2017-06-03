@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ReactOnRails
   class AssetsPrecompile
     class SymlinkTargetDoesNotExistException < StandardError; end

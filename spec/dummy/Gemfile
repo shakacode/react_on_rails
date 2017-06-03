@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 source "https://rubygems.org"
 
 eval_gemfile File.expand_path("../../../react_on_rails.gemspec", __FILE__)
@@ -23,14 +25,16 @@ if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
   if ENV["ENABLE_TURBOLINKS_2"].nil? || ENV["ENABLE_TURBOLINKS_2"].strip.empty?
     gem "turbolinks", "~> 5.0"
   else
+    # rubocop:disable Bundler/DuplicatedGem
     gem "turbolinks", "2.5.3"
+    # rubocop:enable Bundler/DuplicatedGem
   end
 end
 
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
-gem "jbuilder", "~> 2.0"
+gem "jbuilder"
 # bundle exec rake doc:rails generates the API under doc/api.
-gem "sdoc", "~> 0.4.0", group: :doc
+gem "sdoc", group: :doc
 
 # Use ActiveModel has_secure_password
 # gem 'bcrypt', '~> 3.1.7'

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class ReactRouterController < ApplicationController
   before_action :data
 

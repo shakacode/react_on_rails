@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # rubocop:disable Metrics/ModuleLength
 # NOTE:
 # For any heredoc JS:
@@ -11,7 +13,7 @@ require "react_on_rails/json_output"
 module ReactOnRailsHelper
   include ReactOnRails::Utils::Required
 
-  COMPONENT_HTML_KEY = "componentHtml".freeze
+  COMPONENT_HTML_KEY = "componentHtml"
 
   # The env_javascript_include_tag and env_stylesheet_link_tag support the usage of a webpack
   # dev server for providing the JS and CSS assets during development mode. See
@@ -175,7 +177,7 @@ module ReactOnRailsHelper
   # that contains a data props.
   def redux_store_hydration_data
     return if @registered_stores_defer_render.blank?
-    @registered_stores_defer_render.reduce("") do |accum, redux_store_data|
+    @registered_stores_defer_render.reduce("".dup) do |accum, redux_store_data|
       accum << render_redux_store_data(redux_store_data)
     end.html_safe
   end
@@ -188,32 +190,32 @@ module ReactOnRailsHelper
   # If you have more than one line that needs to be executed, wrap it in an IIFE.
   # JS exceptions are caught and console messages are handled properly.
   def server_render_js(js_expression, options = {})
-    wrapper_js = <<-JS
-(function() {
-  var htmlResult = '';
-  var consoleReplayScript = '';
-  var hasErrors = false;
-
-  try {
-    htmlResult =
+    wrapper_js = <<-JS.strip_heredoc
       (function() {
-        return #{js_expression};
-      })();
-  } catch(e) {
-    htmlResult = ReactOnRails.handleError({e: e, name: null,
-      jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
-    hasErrors = true;
-  }
+        var htmlResult = '';
+        var consoleReplayScript = '';
+        var hasErrors = false;
 
-  consoleReplayScript = ReactOnRails.buildConsoleReplay();
+        try {
+          htmlResult =
+            (function() {
+              return #{js_expression};
+            })();
+        } catch(e) {
+          htmlResult = ReactOnRails.handleError({e: e, name: null,
+            jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
+          hasErrors = true;
+        }
 
-  return JSON.stringify({
-      html: htmlResult,
-      consoleReplayScript: consoleReplayScript,
-      hasErrors: hasErrors
-  });
+        consoleReplayScript = ReactOnRails.buildConsoleReplay();
 
-})()
+        return JSON.stringify({
+            html: htmlResult,
+            consoleReplayScript: consoleReplayScript,
+            hasErrors: hasErrors
+        });
+
+      })()
     JS
 
     result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
@@ -300,11 +302,13 @@ module ReactOnRailsHelper
 
   def compose_react_component_html_with_spec_and_console(component_specification_tag, rendered_output, console_script)
     # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
+    # rubocop:disable Layout/IndentHeredoc
     <<-HTML.html_safe
 #{component_specification_tag}
     #{rendered_output}
     #{console_script}
     HTML
+    # rubocop:enable Layout/IndentHeredoc
   end
 
   # prepend the rails_context if not yet applied
@@ -367,6 +371,7 @@ module ReactOnRailsHelper
     #
     # Read more here: http://timelessrepo.com/json-isnt-a-javascript-subset
 
+    # rubocop:disable Layout/IndentHeredoc
     wrapper_js = <<-JS
 (function() {
   var railsContext = #{rails_context(server_side: true).to_json};
@@ -381,6 +386,7 @@ module ReactOnRailsHelper
   });
 })()
     JS
+    # rubocop:enable Layout/IndentHeredoc
 
     result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
 
@@ -407,22 +413,22 @@ module ReactOnRailsHelper
 
   def initialize_redux_stores
     return "" unless @registered_stores.present? || @registered_stores_defer_render.present?
-    declarations = "var reduxProps, store, storeGenerator;\n"
+    declarations = "var reduxProps, store, storeGenerator;\n".dup
 
     all_stores = (@registered_stores || []) + (@registered_stores_defer_render || [])
 
-    result = <<-JS
+    result = <<-JS.dup
       ReactOnRails.clearHydratedStores();
     JS
 
     result << all_stores.each_with_object(declarations) do |redux_store_data, memo|
       store_name = redux_store_data[:store_name]
       props = props_string(redux_store_data[:props])
-      memo << <<-JS
-reduxProps = #{props};
-storeGenerator = ReactOnRails.getStoreGenerator('#{store_name}');
-store = storeGenerator(reduxProps, railsContext);
-ReactOnRails.setStore('#{store_name}', store);
+      memo << <<-JS.strip_heredoc
+        reduxProps = #{props};
+        storeGenerator = ReactOnRails.getStoreGenerator('#{store_name}');
+        store = storeGenerator(reduxProps, railsContext);
+        ReactOnRails.setStore('#{store_name}', store);
       JS
     end
     result
@@ -486,7 +492,7 @@ ReactOnRails.setStore('#{store_name}', store);
   def send_tag_method(tag_method_name, args)
     asset_type = use_hot_reloading? ? :hot : :static
     assets = Array(args[asset_type])
-    options = args.delete_if { |key, _value| %i(hot static).include?(key) }
+    options = args.delete_if { |key, _value| %i[hot static].include?(key) }
     send(tag_method_name, *assets, options) unless assets.empty?
   end
 

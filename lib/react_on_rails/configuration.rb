@@ -1,10 +1,12 @@
+# frozen_string_literal: true
+
 module ReactOnRails
   def self.configure
     yield(configuration)
     setup_config_values
   end
 
-  DEFAULT_GENERATED_ASSETS_DIR = File.join(%w(public webpack), Rails.env).freeze
+  DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
 
   def self.setup_config_values
     ensure_webpack_generated_files_exists

@@ -6,7 +6,7 @@ PATH
       connection_pool
       execjs (~> 2.5)
       rails (>= 3.2)
-      rainbow (~> 2.1)
+      rainbow (~> 2.2)
 
 GEM
   remote: https://rubygems.org/
@@ -272,9 +272,8 @@ GEM
     thread_safe (0.3.6)
     tilt (2.0.7)
     tins (1.14.0)
-    turbolinks (5.0.1)
-      turbolinks-source (~> 5)
-    turbolinks-source (5.0.3)
+    turbolinks (2.5.3)
+      coffee-rails
     tzinfo (1.2.3)
       thread_safe (~> 0.1)
     uglifier (3.2.0)
@@ -303,7 +302,7 @@ DEPENDENCIES
   coffee-rails
   coveralls
   generator_spec
-  jbuilder (~> 2.0)
+  jbuilder
   jquery-rails
   launchy
   listen
@@ -325,11 +324,11 @@ DEPENDENCIES
   ruby-lint
   sass-rails
   scss_lint
-  sdoc (~> 0.4.0)
+  sdoc
   selenium-webdriver
   spring
   sqlite3
-  turbolinks (~> 5.0)
+  turbolinks (= 2.5.3)
   uglifier
   webpacker_lite (= 2.0.4)
 

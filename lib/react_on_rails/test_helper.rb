@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ReactOnRails
   module TestHelper
     # Because you will probably want to run RSpec tests that rely on compiled webpack assets
@@ -31,7 +33,7 @@ module ReactOnRails
     # metatags - metatags to add the ensure_assets_compiled check.
     #            Default is :js, :server_rendering
     def self.configure_rspec_to_compile_assets(config, *metatags)
-      metatags = %i(js server_rendering controller) if metatags.empty?
+      metatags = %i[js server_rendering controller] if metatags.empty?
 
       metatags.each do |metatag|
         config.before(:example, metatag) { ReactOnRails::TestHelper.ensure_assets_compiled }

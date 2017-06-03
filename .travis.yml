@@ -3,11 +3,7 @@ sudo: required
 language: ruby
 
 rvm:
-  # Ruby 2.0.0 fails due to newer Nokogir
-  # nokogiri-1.7.0.1 requires ruby version >= 2.1.0, which is incompatible with the current version, ruby 2.0.0p648
   # Rails 5 requires 2.2
-  # - 2.1.10
-  - 2.2.6
   - 2.3.1
   - 2.4.1
 services:

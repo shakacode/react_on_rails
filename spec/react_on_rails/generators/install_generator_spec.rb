@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "../support/generator_spec_helper"
 require_relative "../support/version_test_helpers"
 
@@ -5,31 +7,31 @@ describe InstallGenerator, type: :generator do
   destination File.expand_path("../../dummy-for-generators/", __FILE__)
 
   context "no args" do
-    before(:all) { run_generator_test_with_args(%w()) }
+    before(:all) { run_generator_test_with_args(%w[]) }
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
   end
 
   context "--redux" do
-    before(:all) { run_generator_test_with_args(%w(--redux)) }
+    before(:all) { run_generator_test_with_args(%w[--redux]) }
     include_examples "base_generator", application_js: true
     include_examples "react_with_redux_generator"
   end
 
   context "-R" do
-    before(:all) { run_generator_test_with_args(%w(-R)) }
+    before(:all) { run_generator_test_with_args(%w[-R]) }
     include_examples "base_generator", application_js: true
     include_examples "react_with_redux_generator"
   end
 
   context "--node" do
-    before(:all) { run_generator_test_with_args(%w(--node)) }
+    before(:all) { run_generator_test_with_args(%w[--node]) }
     include_examples "base_generator", application_js: true
     include_examples "node_generator"
   end
 
   context "-N" do
-    before(:all) { run_generator_test_with_args(%w(-N)) }
+    before(:all) { run_generator_test_with_args(%w[-N]) }
     include_examples "base_generator", application_js: true
     include_examples "node_generator"
   end
@@ -94,13 +96,13 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "base generator contains a helpful message" do
-      run_generator_test_with_args(%w())
+      run_generator_test_with_args(%w[])
       expect(GeneratorMessages.output)
         .to include(GeneratorMessages.format_info(expected))
     end
 
     specify "react with redux generator contains a helpful message" do
-      run_generator_test_with_args(%w(--redux))
+      run_generator_test_with_args(%w[--redux])
       expected = <<-MSG.strip_heredoc
 
         What to do next:
@@ -192,13 +194,13 @@ describe InstallGenerator, type: :generator do
     before(:all) { @install_generator = InstallGenerator.new }
 
     specify "it adds the script section if missing" do
-      data = <<-DATA
-{
-  "dependencies": {}
-}
-DATA
+      data = <<-DATA.strip_heredoc
+        {
+          "dependencies": {}
+        }
+      DATA
 
-      run_generator_test_with_args(%w()) do
+      run_generator_test_with_args(%w[]) do
         simulate_existing_file("package.json", data)
       end
 
@@ -209,17 +211,17 @@ DATA
     end
 
     specify "it adds the postinstall script to the script section" do
-      data = <<-DATA
-{
-  "scripts": {
-    "foo": "bar"
-  },
-  "dependencies": {
-  }
-}
+      data = <<-DATA.strip_heredoc
+        {
+          "scripts": {
+            "foo": "bar"
+          },
+          "dependencies": {
+          }
+        }
       DATA
 
-      run_generator_test_with_args(%w()) do
+      run_generator_test_with_args(%w[]) do
         simulate_existing_file("package.json", data)
       end
 

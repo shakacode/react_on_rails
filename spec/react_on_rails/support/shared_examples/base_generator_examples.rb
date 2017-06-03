@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 shared_examples "base_generator" do
   it "adds a route for get 'hello_world' to 'hello_world#index'" do
     match = <<-MATCH.strip_heredoc
@@ -22,12 +24,12 @@ shared_examples "base_generator" do
   end
 
   it "creates react directories" do
-    dirs = %w(components containers startup)
+    dirs = %w[components containers startup]
     dirs.each { |dirname| assert_directory "client/app/bundles/HelloWorld/#{dirname}" }
   end
 
   it "copies react files" do
-    %w(app/controllers/hello_world_controller.rb
+    %w[app/controllers/hello_world_controller.rb
        client/app/bundles/HelloWorld/components/HelloWorld.jsx
        client/REACT_ON_RAILS_CLIENT_README.md
        client/webpack.config.js
@@ -36,7 +38,7 @@ shared_examples "base_generator" do
        config/initializers/react_on_rails.rb
        config/webpacker_lite.yml
        package.json
-       Procfile.dev).each { |file| assert_file(file) }
+       Procfile.dev].each { |file| assert_file(file) }
   end
 
   it "templates HelloWorldApp into webpack.config.js" do

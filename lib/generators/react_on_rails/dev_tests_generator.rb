@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 require "rails/generators"
 require_relative "generator_helper"
 
 module ReactOnRails
   module Generators
-    FALLBACK_OPTION_FOR_NODE_MODULES = <<-TEXT.freeze
+    FALLBACK_OPTION_FOR_NODE_MODULES = <<-TEXT
     // This fixes an issue with resolving 'react' when using a local symlinked version
     // of the node_package folder
     modules: [
@@ -26,14 +28,14 @@ module ReactOnRails
                    desc: "Setup prerender true for server rendered examples"
 
       def copy_rspec_files
-        %w(spec/spec_helper.rb
+        %w[spec/spec_helper.rb
            spec/rails_helper.rb
            spec/simplecov_helper.rb
-           .rspec).each { |file| copy_file(file) }
+           .rspec].each { |file| copy_file(file) }
       end
 
       def copy_tests
-        %w(spec/features/hello_world_spec.rb).each { |file| copy_file(file) }
+        %w[spec/features/hello_world_spec.rb].each { |file| copy_file(file) }
       end
 
       def add_test_related_gems_to_gemfile

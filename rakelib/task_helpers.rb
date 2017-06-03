@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ReactOnRails
   module TaskHelpers
     # Returns the root folder of the react_on_rails gem

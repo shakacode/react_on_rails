@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Starts SimpleCov for code coverage.
 
 if ENV["COVERAGE"]

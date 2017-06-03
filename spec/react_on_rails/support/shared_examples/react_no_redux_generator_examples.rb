@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 shared_examples "no_redux_generator" do
   it "creates appropriate templates" do
     assert_file("client/app/bundles/HelloWorld/startup/registration.jsx") do |contents|
@@ -9,7 +11,7 @@ shared_examples "no_redux_generator" do
   end
 
   it "does not place react folders in root" do
-    %w(reducers store middlewares constants actions).each do |dir|
+    %w[reducers store middlewares constants actions].each do |dir|
       assert_no_directory(dir)
     end
   end

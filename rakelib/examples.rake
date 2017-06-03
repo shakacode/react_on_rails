@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Defines tasks related to generating example apps using the gem's generator.
 # Allows us to create and test apps generated using a wide range of options.
 #
@@ -8,6 +10,7 @@ require_relative "example_type"
 require_relative "task_helpers"
 include ReactOnRails::TaskHelpers
 
+# rubocop:disable Metrics/BlockLength
 namespace :examples do
   # Loads data from examples_config.yml and instantiates corresponding ExampleType objects
   examples_config_file = File.expand_path("../examples_config.yml", __FILE__)

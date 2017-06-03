@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 namespace :docker do
   desc "Run Rubocop linter from docker"
   task :rubocop do

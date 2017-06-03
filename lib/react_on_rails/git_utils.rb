@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ReactOnRails
   module GitUtils
     def self.uncommitted_changes?(message_handler)

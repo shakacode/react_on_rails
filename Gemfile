@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 source "https://rubygems.org"
 
 # Specify your gem"s dependencies in react_on_rails.gemspec
@@ -14,20 +16,22 @@ gem "mini_racer"
 gem "puma"
 gem "rails", "5.1.1"
 gem "rails_12factor"
-gem "rubocop", "0.47.1", require: false
+gem "rubocop", require: false
 gem "ruby-lint", require: false
 gem "sass-rails", "~> 5.0"
 gem "scss_lint", require: false
-gem "sdoc", "~> 0.4.0", group: :doc
+gem "sdoc", group: :doc
 gem "spring"
 gem "sqlite3"
 if ENV["ENABLE_TURBOLINKS_2"].nil? || ENV["ENABLE_TURBOLINKS_2"].strip.empty?
   gem "turbolinks", "~> 5.0"
 else
+  # rubocop:disable Bundler/DuplicatedGem
   gem "turbolinks", "2.5.3"
+  # rubocop:enable Bundler/DuplicatedGem
 end
-gem "uglifier", ">= 2.7.2"
-gem "web-console", "~> 2.0", group: :development
+gem "uglifier"
+gem "web-console", group: :development
 
 # below are copied from spec/dummy/Gemfile
 gem "capybara"

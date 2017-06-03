@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rails/generators"
 
 module ReactOnRails
@@ -12,8 +14,8 @@ module ReactOnRails
 
       def copy_base_redux_files
         base_path = "node/base/"
-        %w(client/node/server.js
-           client/node/package.json).each do |file|
+        %w[client/node/server.js
+           client/node/package.json].each do |file|
              copy_file(base_path + file, file)
            end
       end

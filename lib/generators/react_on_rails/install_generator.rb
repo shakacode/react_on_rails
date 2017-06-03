@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rails/generators"
 require_relative "generator_helper"
 require_relative "generator_messages"
@@ -65,16 +67,14 @@ module ReactOnRails
 
       def missing_yarn?
         return false unless ReactOnRails::Utils.running_on_windows? ? `where yarn`.blank? : `which yarn`.blank?
-        error = "yarn is required. Please install it before continuing. "
-        error << "https://yarnpkg.com/en/docs/install"
+        error = "yarn is required. Please install it before continuing. https://yarnpkg.com/en/docs/install"
         GeneratorMessages.add_error(error)
         true
       end
 
       def missing_node?
         return false unless ReactOnRails::Utils.running_on_windows? ? `where node`.blank? : `which node`.blank?
-        error = "** nodejs is required. Please install it before continuing. "
-        error << "https://nodejs.org/en/"
+        error = "** nodejs is required. Please install it before continuing. https://nodejs.org/en/"
         GeneratorMessages.add_error(error)
         true
       end
