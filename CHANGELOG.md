@@ -8,6 +8,13 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
+## [8.0.2]
+### Fixed
+- Any failure in webpack to build test files quits tests. 
+- CI Improvements: 
+  - Switched to yarn link and removed relative path install of react-on-rails
+- [#862](https://github.com/shakacode/react_on_rails/pull/862) by [justin808](https://github.com/justin808)
+
 ## [8.0.1]
 ### Fixed
 - Generator no longer modifies `assets.rb`. [#859](https://github.com/shakacode/react_on_rails/pull/859) by [justin808](https://github.com/justin808)
