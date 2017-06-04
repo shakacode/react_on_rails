@@ -43,10 +43,10 @@ Dir[Rails.root.join("spec/support/**/*.rb")].each { |f| require f }
 RSpec.configure do |config|
   # This shouldn't be required, but codeship is breaking
   # https://github.com/rails/rails-controller-testing#rspec
-  [:controller, :view, :request].each do |type|
-    config.include ::Rails::Controller::Testing::TestProcess, :type => type
-    config.include ::Rails::Controller::Testing::TemplateAssertions, :type => type
-    config.include ::Rails::Controller::Testing::Integration, :type => type
+  %i[controller view request].each do |type|
+    config.include ::Rails::Controller::Testing::TestProcess, type: type
+    config.include ::Rails::Controller::Testing::TemplateAssertions, type: type
+    config.include ::Rails::Controller::Testing::Integration, type: type
   end
 
   # Ensure that if we are running js tests, we are using latest webpack assets
