@@ -2,7 +2,7 @@
 
 module ReactOnRails
   class AssetsPrecompile
-    class SymlinkTargetDoesNotExistException < StandardError;
+    class SymlinkTargetDoesNotExistException < StandardError
     end
 
     # Used by the rake task
@@ -19,8 +19,9 @@ module ReactOnRails
       @assets_path = ReactOnRails::Utils.truthy_presence(assets_path) || default_asset_path
       @symlink_non_digested_assets_regex =
         ReactOnRails::Utils.truthy_presence(symlink_non_digested_assets_regex) ||
-          ReactOnRails.configuration.symlink_non_digested_assets_regex
-      @generated_assets_dir = ReactOnRails::Utils.truthy_presence(generated_assets_dir) || ReactOnRails.configuration.generated_assets_dir
+        ReactOnRails.configuration.symlink_non_digested_assets_regex
+      @generated_assets_dir = ReactOnRails::Utils.truthy_presence(generated_assets_dir) ||
+                              ReactOnRails.configuration.generated_assets_dir
     end
 
     # target and symlink are relative to the assets directory
@@ -64,8 +65,8 @@ module ReactOnRails
       # file back to the original digested name, and make a similar symlink for the gz version.
       return unless @symlink_non_digested_assets_regex
       manifest_glob = Dir.glob(@assets_path.join(".sprockets-manifest-*.json")) +
-        Dir.glob(@assets_path.join("manifest-*.json")) +
-        Dir.glob(@assets_path.join("manifest.yml"))
+                      Dir.glob(@assets_path.join("manifest-*.json")) +
+                      Dir.glob(@assets_path.join("manifest.yml"))
       if manifest_glob.empty?
         puts "Warning: React On Rails: expected to find .sprockets-manifest-*.json, manifest-*.json "\
                  "or manifest.yml at #{@assets_path}, but found none. Canceling symlinking tasks."
@@ -103,7 +104,7 @@ module ReactOnRails
           target = File.readlink(filename)
         rescue
           puts "React on Rails: Warning: your platform doesn't support File::readlink method." /
-                 "Skipping broken link check."
+               "Skipping broken link check."
           break
         end
         path = Pathname.new(File.dirname(filename))

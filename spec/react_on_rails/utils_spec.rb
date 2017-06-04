@@ -42,8 +42,10 @@ module ReactOnRails
 
       context "With pathname pointing to empty file" do
         let(:empty_dir) { Pathname.new(Dir.mktmpdir) }
-        subject(:empty_file) { File.basename(Tempfile.new("tempfile",
-                                                          empty_dir)) }
+        subject(:empty_file) do
+          File.basename(Tempfile.new("tempfile",
+                                     empty_dir))
+        end
         it "returns Pathname object" do
           expect(Utils.truthy_presence(empty_file)).to eq(empty_file)
         end
@@ -52,7 +54,6 @@ module ReactOnRails
 
     describe ".rails_version_less_than" do
       subject { Utils.rails_version_less_than("4") }
-
 
       describe ".rails_version_less_than" do
         before(:each) { Utils.instance_variable_set :@rails_version_less_than, nil }

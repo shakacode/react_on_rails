@@ -46,7 +46,8 @@ module ReactOnRails
           Dir["#{i18n_yml_dir}/**/*.yml"]
         else
           ReactOnRails::Utils.truthy_presence(
-            Rails.application && Rails.application.config.i18n.load_path).presence
+            Rails.application && Rails.application.config.i18n.load_path
+          ).presence
         end
       end
     end
