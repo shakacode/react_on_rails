@@ -5,7 +5,7 @@ module CapybaraUtils
   # Selenium is not feasible.
   def set_driver_header(key, value)
     case Capybara.javascript_driver
-    when :poltergeist, :poltergeist_errors_ok
+    when :poltergeist, :poltergeist_errors_ok, :poltergeist_no_animations
       page.driver.headers = { key => value }
       # Skip webkit for now due to install trouble on Sierra
       # when :webkit

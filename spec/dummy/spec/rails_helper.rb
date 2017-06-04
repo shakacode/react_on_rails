@@ -107,18 +107,22 @@ RSpec.configure do |config|
     Capybara.register_driver :poltergeist_errors_ok do |app|
       Capybara::Poltergeist::Driver.new(app, no_animation_opts.merge(js_errors: false))
     end
+
     Capybara::Screenshot.register_driver(:poltergeist) do |js_driver, path|
       js_driver.browser.save_screenshot(path)
     end
+
     Capybara::Screenshot.register_driver(:poltergeist_no_animations) do |js_driver, path|
       js_driver.render(path, full: true)
     end
+
     Capybara::Screenshot.register_driver(:poltergeist_errors_ok) do |js_driver, path|
       js_driver.render(path, full: true)
     end
 
   when :selenium_chrome
     DriverRegistration.register_selenium_chrome
+
   when :selenium_firefox, :selenium
     DriverRegistration.register_selenium_firefox
     driver = :selenium_firefox
@@ -167,7 +171,7 @@ RSpec.configure do |config|
   Capybara.asset_host = "http://localhost:3000"
 
   def js_errors_driver
-    Capybara.javascript_driver == :poltergeist ? :poltergeist_errors_ok : Capybara.javascript_driver
+    Capybara.javascript_driver =~ /^poltergeist/ ? :poltergeist_errors_ok : Capybara.javascript_driver
   end
 
   def js_selenium_driver
