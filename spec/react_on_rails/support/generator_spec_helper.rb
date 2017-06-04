@@ -83,7 +83,7 @@ def simulate_existing_file(file, data = "some existing text\n")
   path = Pathname.new(File.join(destination_root, file))
   mkdir_p(path.dirname)
   File.open(path, "w+") do |f|
-    f.puts(data) if data.presence
+    f.puts(data) if data.present?
   end
 end
 

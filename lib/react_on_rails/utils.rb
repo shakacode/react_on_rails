@@ -7,6 +7,17 @@ require "active_support"
 
 module ReactOnRails
   module Utils
+
+    # https://forum.shakacode.com/t/yak-of-the-week-ruby-2-4-pathname-empty-changed-to-look-at-file-size/901
+    # return object if truthy, else return nil
+    def self.truthy_presence(obj)
+      if obj.nil? || obj == false
+        nil
+      else
+        obj
+      end
+    end
+
     def self.object_to_boolean(value)
       [true, "true", "yes", 1, "1", "t"].include?(value.class == String ? value.downcase : value)
     end
@@ -20,14 +31,14 @@ module ReactOnRails
       stdout, stderr, status = Open3.capture3(cmd)
       unless status.success?
         msg = <<-MSG.strip_heredoc
-          #{'Z' * 80}
+#{'Z' * 80}
           React on Rails FATAL ERROR!
           #{failure_message}
           cmd: #{cmd}"
           stdout: #{stdout.strip}
           stderr: #{stderr.strip}
           exitstatus: #{status.exitstatus}
-          #{'Z' * 80}
+        #{'Z' * 80}
         MSG
         puts Rainbow(msg).red
         exit(1)
