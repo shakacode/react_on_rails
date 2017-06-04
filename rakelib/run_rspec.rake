@@ -21,16 +21,17 @@ namespace :run_rspec do
   desc "Runs dummy rspec with turbolinks"
   task dummy: ["dummy_apps:dummy_app"] do
     clean_gen_assets(spec_dummy_dir)
+    bundle_install_in(dummy_app_dir)
     run_tests_in(spec_dummy_dir)
   end
 
   desc "Runs dummy rspec without turbolinks"
   task dummy_no_turbolinks: ["dummy_apps:dummy_app"] do
     clean_gen_assets(spec_dummy_dir)
+    bundle_install_in(dummy_app_dir)
     run_tests_in(spec_dummy_dir,
                  env_vars: "DISABLE_TURBOLINKS=TRUE",
                  command_name: "dummy_no_turbolinks")
-    bundle_install_in(dummy_app_dir)
   end
 
   # Dynamically define Rake tasks for each example app found in the examples directory
@@ -101,6 +102,11 @@ def run_tests_in(dir, options = {})
   command_name = options.fetch(:command_name, path.basename)
   rspec_args = options.fetch(:rspec_args, "")
   env_vars = %(#{options.fetch(:env_vars, '')} COVERAGE=true TEST_ENV_COMMAND_NAME="#{command_name}")
+  puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+  puts "run_rspec.rake: #{__LINE__},  method: #{__method__}"
+  puts "path.realpath = #{path.realpath}"
+  puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+
   sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
 end
 

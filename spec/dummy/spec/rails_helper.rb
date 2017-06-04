@@ -41,14 +41,6 @@ ActiveRecord::Migration.maintain_test_schema!
 Dir[Rails.root.join("spec/support/**/*.rb")].each { |f| require f }
 
 RSpec.configure do |config|
-  # This shouldn't be required, but codeship is breaking
-  # https://github.com/rails/rails-controller-testing#rspec
-  %i[controller view request].each do |type|
-    config.include ::Rails::Controller::Testing::TestProcess, type: type
-    config.include ::Rails::Controller::Testing::TemplateAssertions, type: type
-    config.include ::Rails::Controller::Testing::Integration, type: type
-  end
-
   # Ensure that if we are running js tests, we are using latest webpack assets
   # This will use the defaults of :js and :server_rendering meta tags
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
