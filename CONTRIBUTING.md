@@ -111,7 +111,7 @@ When you use a relative path, be sure to run the above `yarn` command whenever y
 
 #### Example: Testing NPM changes with the dummy app
 1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/clientStartup.js#L181) in `react_on_rails/node_package/src/clientStartup.js` to confirm we're getting an update to the node package.
-2. Run the install script `npm run install-react-on-rails` in `react_on_rails/spec/dummy` to copy over our changes to the dummy app. Alternatively, you can run `rm -rf node_modules/react-on-rails && npm i 'file:../../../'` in `react_on_rails/spec/dummy/client`. Our NPM changes are now available in the dummy app.
+2. The "postinstall" script of "spec/dummy/client" calls "yarn link react-on-rails" to setup a sym link to the parent package.
 3. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console.
 
 _Note: running `npm i` automatically builds the npm package before installing. However, when using yarn you will need to run `yarn run build` in the root directory before the install script. This will be updated when [yarn issue #2649](https://github.com/yarnpkg/yarn/issues/2649) (above) is resolved._
@@ -215,7 +215,7 @@ If you run `rspec` at the top level, you'll see this message: `require': cannot 
 
 After running a test, you can view the coverage results SimpleCov reports by opening `coverage/index.html`.
 
-To test `spec/dummy` against Turbolinks 2, install the gem by running `ENABLE_TURBOLINKS_2=TRUE bundle install` in the `spec/dummy` directory before running `rake`. Turbolinks 5 is the default.
+Turbolinks 5 is included in the test app, unless "DISABLE_TURBOLINKS" is set to YES in the environment.
 
 Run `rake -T` or `rake -D` to see testing options.
 

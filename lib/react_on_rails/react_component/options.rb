@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "react_on_rails/utils"
 
 module ReactOnRails

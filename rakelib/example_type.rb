@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rake"
 require "pathname"
 
@@ -80,7 +82,7 @@ module ReactOnRails
         "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record"
       end
 
-      %w(gen prepare clean clobber npm_install build_webpack_bundles).each do |task_type|
+      %w[gen prepare clean clobber npm_install build_webpack_bundles].each do |task_type|
         method_name_normal = "#{task_type}_task_name"          # ex: `clean_task_name`
         method_name_short = "#{method_name_normal}_short"      # ex: `clean_task_name_short`
 

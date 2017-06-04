@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rails_helper"
 
 describe "Server Error Logging" do
@@ -5,6 +7,7 @@ describe "Server Error Logging" do
     get server_side_log_throw_path
     html_nodes = Nokogiri::HTML(response.body)
 
+    # rubocop:disable Layout/IndentHeredoc
     expected = <<-JS
 console.log.apply(console, ["[SERVER] RENDERED HelloWorldWithLogAndThrow to dom node \
 with id: HelloWorldWithLogAndThrow-react-component-0 with railsContext:"

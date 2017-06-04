@@ -3,12 +3,9 @@ sudo: required
 language: ruby
 
 rvm:
-  # Ruby 2.0.0 fails due to newer Nokogir
-  # nokogiri-1.7.0.1 requires ruby version >= 2.1.0, which is incompatible with the current version, ruby 2.0.0p648
   # Rails 5 requires 2.2
-  # - 2.1.10
-  - 2.2.6
   - 2.3.1
+  - 2.4.1
 services:
   - docker
 
@@ -36,20 +33,21 @@ before_install:
   - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen scn 1600x1200x16"
 
 install:
-  - travis_retry nvm install node
+  - travis_retry gem install bundler
+  - travis_retry nvm install node 8.0.0
   - node -v
-  - travis_retry npm i -g yarn@0.20.3
-  - travis_retry yarn
+  - travis_retry npm i -g yarn@0.24.6
+  - travis_retry yarn global add babel-cli
   - travis_retry bundle install
-  - rake dummy_apps
-  - rake examples
-  - rake node_package
+  - travis_retry yarn
+  - travis_retry yarn run build
+  - bundle exec rake prepare_for_ci
 
 before_script:
   - "export DISPLAY=:99"
 
 script:
-  - rake
+  - bundle exec rake
 
 notifications:
   slack:

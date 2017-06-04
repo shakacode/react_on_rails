@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 source "https://rubygems.org"
 
 eval_gemfile File.expand_path("../../../react_on_rails.gemspec", __FILE__)
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
-gem "rails"
+gem "rails", "~> 5.1.1"
 # Use sqlite3 as the database for Active Record
 gem "sqlite3"
 # Use SCSS for stylesheets
@@ -20,17 +22,13 @@ gem "puma"
 
 # Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
 if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
-  if ENV["ENABLE_TURBOLINKS_2"].nil? || ENV["ENABLE_TURBOLINKS_2"].strip.empty?
-    gem "turbolinks", "~> 5.0"
-  else
-    gem "turbolinks", "2.5.3"
-  end
+  gem "turbolinks", "~> 5.0"
 end
 
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
-gem "jbuilder", "~> 2.0"
+gem "jbuilder"
 # bundle exec rake doc:rails generates the API under doc/api.
-gem "sdoc", "~> 0.4.0", group: :doc
+gem "sdoc", group: :doc
 
 # Use ActiveModel has_secure_password
 # gem 'bcrypt', '~> 3.1.7'

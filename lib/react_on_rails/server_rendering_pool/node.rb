@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ReactOnRails
   module ServerRenderingPool
     class Node
@@ -51,7 +53,7 @@ module ReactOnRails
         end
 
         def eval_js(js_code)
-          eof_symbol = "\r\n\0".freeze
+          eof_symbol = "\r\n\0"
           max_int = (2**30 - 1)
           @js_context_pool.with do |js_context|
             js_context.send(js_code + eof_symbol, 0)

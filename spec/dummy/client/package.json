@@ -34,7 +34,7 @@
     "react": "^15.5.4",
     "react-dom": "^15.5.4",
     "react-helmet": "^5.0.3",
-    "react-on-rails": "file:../../../",
+    "react-on-rails": "^8.0.1",
     "react-proptypes": "^0.0.1",
     "react-redux": "^5.0.4",
     "react-router": "3.0.5",
@@ -67,6 +67,7 @@
     "fs": false
   },
   "scripts": {
+    "postinstall": "yarn link react-on-rails",
     "lint": "eslint --ext .js,.jsx .",
     "test": "yarn run build:test && rspec",
     "build:test": "yarn run build:test:client && yarn run build:test:server",
@@ -76,9 +77,7 @@
     "build:dev:server": "NODE_ENV=development webpack -w --config webpack.server.rails.build.config.js",
     "build:production:client": "NODE_ENV=production webpack --config webpack.client.rails.build.config.js",
     "build:production:server": "NODE_ENV=production webpack --config webpack.server.rails.build.config.js",
-    "hot-assets": "NODE_ENV=development babel-node server-rails-hot.js",
-    "postinstall": "yarn run install-react-on-rails",
-    "install-react-on-rails": "rm -rf node_modules/react-on-rails && npm i 'file:../../..'"
+    "hot-assets": "NODE_ENV=development babel-node server-rails-hot.js"
   },
   "author": "",
   "license": "ISC"

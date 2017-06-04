@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "../simplecov_helper"
 
 describe GeneratorMessages do

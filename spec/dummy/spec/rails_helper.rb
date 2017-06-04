@@ -1,15 +1,18 @@
-# This file is copied to spec/ when you run 'rails generate rspec:install'
+# frozen_string_literal: true
+
 ENV["RAILS_ENV"] ||= "test"
 
 require_relative "simplecov_helper"
+require_relative "spec_helper"
+
 require_relative("../config/environment")
 
 # Prevent database truncation if the environment is production
 abort("The Rails environment is running in production mode!") if Rails.env.production?
 
-require_relative "spec_helper"
 require "rspec/rails"
 require "capybara/rspec"
+require "capybara/poltergeist"
 require "capybara-screenshot/rspec"
 
 # Add additional requires below this line. Rails is not loaded until this point!
@@ -27,11 +30,15 @@ require "capybara-screenshot/rspec"
 # directory. Alternatively, in the individual `*_spec.rb` files, manually
 # require only the support files necessary.
 #
-# Dir[Rails.root.join('spec/support/**/*.rb')].each { |f| require f }
+# Dir[Rails.root.join("spec/support/**/*.rb")].each { |f| require f }
 
 # Checks for pending migrations before tests are run.
 # If you are not using ActiveRecord, you can remove this line.
 ActiveRecord::Migration.maintain_test_schema!
+
+# Requires supporting files with custom matchers and macros, etc,
+# in ./support/ and its subdirectories.
+Dir[Rails.root.join("spec/support/**/*.rb")].each { |f| require f }
 
 RSpec.configure do |config|
   # Ensure that if we are running js tests, we are using latest webpack assets
@@ -64,48 +71,95 @@ RSpec.configure do |config|
   # Capybara config
   #
   # selenium_firefox webdriver only works for Travis-CI builds.
-  default_driver = :poltergeist
+  default_driver = :poltergeist_no_animations
 
-  supported_drivers = %i( poltergeist poltergeist_errors_ok
-                          selenium_chrome selenium_firefox selenium)
+  supported_drivers = %i[ poltergeist poltergeist_errors_ok
+                          poltergeist_no_animations webkit
+                          selenium_chrome selenium_firefox selenium]
   driver = ENV["DRIVER"].try(:to_sym) || default_driver
+  Capybara.default_driver = driver
 
   unless supported_drivers.include?(driver)
     raise "Unsupported driver: #{driver} (supported = #{supported_drivers})"
   end
 
   case driver
-  when :poltergeist, :poltergeist_errors_ok
-    require "capybara/poltergeist"
+  when :poltergeist, :poltergeist_errors_ok, :poltergeist_no_animations
+    basic_opts = {
+      window_size: [1300, 1800],
+      screen_size: [1400, 1900],
+      phantomjs_options: ["--load-images=no", "--ignore-ssl-errors=true"],
+      timeout: 180
+    }
+
+    Capybara.register_driver :poltergeist do |app|
+      Capybara::Poltergeist::Driver.new(app, basic_opts)
+    end
+
+    no_animation_opts = basic_opts.merge( # Leaving animations off, as a sleep was still needed.
+      extensions: ["#{Rails.root}/spec/support/phantomjs-disable-animations.js"]
+    )
+
+    Capybara.register_driver :poltergeist_no_animations do |app|
+      Capybara::Poltergeist::Driver.new(app, no_animation_opts)
+    end
+
     Capybara.register_driver :poltergeist_errors_ok do |app|
-      Capybara::Poltergeist::Driver.new(app, js_errors: false)
+      Capybara::Poltergeist::Driver.new(app, no_animation_opts.merge(js_errors: false))
     end
-    config.after :each do |_example|
-      page.driver.restart if defined?(page.driver.restart)
+    Capybara::Screenshot.register_driver(:poltergeist) do |js_driver, path|
+      js_driver.browser.save_screenshot(path)
     end
+    Capybara::Screenshot.register_driver(:poltergeist_no_animations) do |js_driver, path|
+      js_driver.render(path, full: true)
+    end
+    Capybara::Screenshot.register_driver(:poltergeist_errors_ok) do |js_driver, path|
+      js_driver.render(path, full: true)
+    end
+
   when :selenium_chrome
-    Capybara.register_driver :selenium_chrome do |app|
-      Capybara::Selenium::Driver.new(app, browser: :chrome)
-    end
-    Capybara::Screenshot.register_driver(:selenium_chrome) do |js_driver, path|
-      js_driver.browser.save_screenshot(path)
-    end
+    DriverRegistration.register_selenium_chrome
   when :selenium_firefox, :selenium
-    Capybara.register_driver :selenium_firefox do |app|
-      Capybara::Selenium::Driver.new(app, browser: :firefox)
-    end
-    Capybara::Screenshot.register_driver(:selenium_firefox) do |js_driver, path|
-      js_driver.browser.save_screenshot(path)
-    end
+    DriverRegistration.register_selenium_firefox
     driver = :selenium_firefox
   end
 
   Capybara.javascript_driver = driver
+  Capybara.default_driver = driver
 
+  Capybara.register_server(Capybara.javascript_driver) do |app, port|
+    require "rack/handler/puma"
+    Rack::Handler::Puma.run(app, Port: port)
+  end
+
+  # Capybara.default_max_wait_time = 15
+  puts "=" * 80
   puts "Capybara using driver: #{Capybara.javascript_driver}"
+  puts "=" * 80
 
+  Capybara.save_path = Rails.root.join("tmp", "capybara")
   Capybara::Screenshot.prune_strategy = { keep: 10 }
-  # [END] Capybara config
+
+  config.use_transactional_fixtures = false
+
+  config.append_after(:each) do
+    Capybara.reset_sessions!
+  end
+
+  # RSpec Rails can automatically mix in different behaviours to your tests
+  # based on their file location, for example enabling you to call `get` and
+  # `post` in specs under `spec/controllers`.
+  #
+  # You can disable this behaviour by removing the line below, and instead
+  # explicitly tag your specs with their type, e.g.:
+  #
+  #     RSpec.describe UsersController, :type => :controller do
+  #       # ...
+  #     end
+  #
+  # The different available types are documented in the features, such as in
+  # https://relishapp.com/rspec/rspec-rails/docs
+  config.infer_spec_type_from_file_location!
 
   # This will insert a <base> tag with the asset host into the pages created by
   # save_and_open_page, meaning that relative links will be loaded from the
@@ -114,5 +168,15 @@ RSpec.configure do |config|
 
   def js_errors_driver
     Capybara.javascript_driver == :poltergeist ? :poltergeist_errors_ok : Capybara.javascript_driver
+  end
+
+  def js_selenium_driver
+    driver = Capybara.javascript_driver == :selenium_firefox ? :selenium_firefox : :selenium_chrome
+    if driver == :selenium_firefox
+      DriverRegistration.register_selenium_firefox
+    else
+      DriverRegistration.register_selenium_chrome
+    end
+    driver
   end
 end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "spec_helper"
 require_relative "support/version_test_helpers"
 
@@ -16,7 +18,7 @@ module ReactOnRails
 
       context "when gem and node package major and minor versions are equal" do
         let(:node_package_version) do
-          double_package_version(raw: "^2.2.5-beta.2", major_minor_patch: %w(2 2 5))
+          double_package_version(raw: "^2.2.5-beta.2", major_minor_patch: %w[2 2 5])
         end
         before { stub_gem_version("2.2.5.beta.2") }
 
@@ -27,7 +29,7 @@ module ReactOnRails
 
       context "when gem and node package major versions differ" do
         let(:node_package_version) do
-          double_package_version(raw: "13.0.0.beta-2", major_minor_patch: %w(13 0 0))
+          double_package_version(raw: "13.0.0.beta-2", major_minor_patch: %w[13 0 0])
         end
         before { stub_gem_version("12.0.0.beta.1") }
 
@@ -39,7 +41,7 @@ module ReactOnRails
 
       context "when gem and node package major versions match and minor differs" do
         let(:node_package_version) do
-          double_package_version(raw: "13.0.0.beta-2", major_minor_patch: %w(13 0 0))
+          double_package_version(raw: "13.0.0.beta-2", major_minor_patch: %w[13 0 0])
         end
         before { stub_gem_version("13.1.0") }
 
@@ -51,7 +53,7 @@ module ReactOnRails
 
       context "when gem and node package major, minor versions match and patch differs" do
         let(:node_package_version) do
-          double_package_version(raw: "13.0.1", major_minor_patch: %w(13 0 1))
+          double_package_version(raw: "13.0.1", major_minor_patch: %w[13 0 1])
         end
         before { stub_gem_version("13.0.0") }
 
@@ -100,7 +102,7 @@ module ReactOnRails
         end
 
         describe "#major" do
-          specify { expect(node_package_version.major_minor_patch).to eq(%w(0 0 2)) }
+          specify { expect(node_package_version.major_minor_patch).to eq(%w[0 0 2]) }
         end
       end
 
@@ -116,7 +118,7 @@ module ReactOnRails
         end
 
         describe "#major_minor_patch" do
-          specify { expect(node_package_version.major_minor_patch).to eq(%w(14 0 0)) }
+          specify { expect(node_package_version.major_minor_patch).to eq(%w[14 0 0]) }
         end
       end
 

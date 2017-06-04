@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rails/generators"
 require_relative "generator_messages"
 require_relative "generator_helper"
@@ -38,26 +40,26 @@ module ReactOnRails
       end
 
       def create_react_directories
-        dirs = %w(components containers startup)
+        dirs = %w[components containers startup]
         dirs.each { |name| empty_directory("client/app/bundles/HelloWorld/#{name}") }
       end
 
       def copy_base_files
         base_path = "base/base/"
-        base_files = %w(app/controllers/hello_world_controller.rb
+        base_files = %w[app/controllers/hello_world_controller.rb
                         config/webpacker_lite.yml
                         client/.babelrc
                         client/webpack.config.js
-                        client/REACT_ON_RAILS_CLIENT_README.md)
+                        client/REACT_ON_RAILS_CLIENT_README.md]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
       def template_base_files
         base_path = "base/base/"
-        %w(app/views/layouts/hello_world.html.erb
+        %w[app/views/layouts/hello_world.html.erb
            config/initializers/react_on_rails.rb
            Procfile.dev
-           client/package.json).each { |file| template("#{base_path}#{file}.tt", file) }
+           client/package.json].each { |file| template("#{base_path}#{file}.tt", file) }
       end
 
       def template_package_json
@@ -136,12 +138,12 @@ STRING
           regexp = / {2}"scripts": {/
         else
           regexp = /^{/
-          replacement = <<-STRING
-{
-  "scripts": {
-    #{postinstall}
-  },
-STRING
+          replacement = <<-STRING.strip_heredoc
+            {
+              "scripts": {
+                #{postinstall}
+              },
+          STRING
         end
 
         contents.gsub!(regexp, replacement)

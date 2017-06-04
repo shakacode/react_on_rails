@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ReactOnRails
   module ServerRenderingPool
     # This implementation of the rendering pool uses ExecJS to execute javasript code
@@ -89,11 +91,13 @@ module ReactOnRails
           end
 
           bundle_js_code = File.read(server_js_file)
+          # rubocop:disable Layout/IndentHeredoc
           base_js_code = <<-JS
 #{console_polyfill}
           #{execjs_timer_polyfills}
           #{bundle_js_code};
           JS
+          # rubocop:enable Layout/IndentHeredoc
           file_name = "tmp/base_js_code.js"
           begin
             trace_messsage(base_js_code, file_name)
@@ -111,6 +115,7 @@ module ReactOnRails
         end
 
         def execjs_timer_polyfills
+          # rubocop:disable Layout/IndentHeredoc
           <<-JS
 function getStackTrace () {
   var stack;
@@ -136,6 +141,7 @@ function clearTimeout() {
   #{undefined_for_exec_js_logging('clearTimeout')}
 }
           JS
+          # rubocop:enable Layout/IndentHeredoc
         end
 
         def undefined_for_exec_js_logging(function_name)
@@ -150,6 +156,7 @@ function clearTimeout() {
 
         # Reimplement console methods for replaying on the client
         def console_polyfill
+          # rubocop:disable Layout/IndentHeredoc
           <<-JS
 var console = { history: [] };
 ['error', 'log', 'info', 'warn'].forEach(function (level) {
@@ -162,6 +169,7 @@ var console = { history: [] };
   };
 });
           JS
+          # rubocop:enable Layout/IndentHeredoc
         end
       end
     end

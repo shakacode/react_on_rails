@@ -1,12 +1,14 @@
+# frozen_string_literal: true
+
 require_relative "../spec_helper"
 
 describe ReactOnRails::ReactComponent::Options do
-  CONFIGURABLE_OPTIONS = %i(
+  CONFIGURABLE_OPTIONS = %i[
     prerender
     trace
     replay_console
     raise_on_prerender_error
-  ).freeze
+  ].freeze
 
   def the_attrs(name: "App", options: {})
     {

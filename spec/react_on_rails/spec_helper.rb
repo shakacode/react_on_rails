@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 $LOAD_PATH.unshift File.expand_path("../../../lib", __FILE__)
 require "react_on_rails"
 require "awesome_print"
@@ -57,8 +59,11 @@ RSpec.configure do |config|
     ### Fix Net::ReadTimeout error on first test
     # Show retry status in spec process
     config.verbose_retry = true
-    # Try twice (retry once)
+
+    # ENV value RSPEC_RETRY_RETRY_COUNT should be set to 1 if you don't want to retry (defined in
+    # rspec/retry)
     config.default_retry_count = 3
+
     # Only retry when Selenium raises Net::ReadTimeout
     # config.exceptions_to_retry = [Net::ReadTimeout]
   end

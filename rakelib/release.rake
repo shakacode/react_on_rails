@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "task_helpers"
 include ReactOnRails::TaskHelpers
 require_relative File.join(gem_root, "lib", "react_on_rails", "version_syntax_converter")

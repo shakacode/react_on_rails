@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rainbow"
 
 module GeneratorHelper
@@ -13,11 +15,13 @@ module GeneratorHelper
   end
 
   def setup_file_error(file, data)
+    # rubocop:disable Layout/IndentHeredoc
     <<-MSG
 #{file} was not found.
 Please add the following content to your #{file} file:
 #{data}
     MSG
+    # rubocop:enable Layout/IndentHeredoc
   end
 
   def empty_directory_with_keep_file(destination, config = {})

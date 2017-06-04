@@ -1,6 +1,8 @@
+# frozen_string_literal: true
+
 require_relative "../spec_helper"
 
-describe ReactOnRails::TestHelper do
+describe ReactOnRails::TestHelper::EnsureAssetsCompiled do
   describe "#ensureAssetsCompiled" do
     let(:compiler) { double_assets_compiler }
     after { ReactOnRails::TestHelper::EnsureAssetsCompiled.has_been_run = false }
@@ -8,7 +10,7 @@ describe ReactOnRails::TestHelper do
     context "when assets are not up to date" do
       let(:assets_checker) do
         double_assets_checker(stale_generated_webpack_files:
-                                                     %w(client-bundle.js server-bundle.js))
+                                                     %w[client-bundle.js server-bundle.js])
       end
 
       it "compiles the webpack assets" do
