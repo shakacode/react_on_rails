@@ -29,15 +29,15 @@ module ReactOnRails
     def self.invoke_and_exit_if_failed(cmd, failure_message)
       stdout, stderr, status = Open3.capture3(cmd)
       unless status.success?
-        msg = <<~MSG.strip_heredoc
-          #{'Z' * 80}
-                    React on Rails FATAL ERROR!
-                    #{failure_message}
-                    cmd: #{cmd}"
-                    stdout: #{stdout.strip}
-                    stderr: #{stderr.strip}
-                    exitstatus: #{status.exitstatus}
-                  #{'Z' * 80}
+        msg = <<~MSG
+#{'Z' * 80}
+React on Rails FATAL ERROR!
+#{failure_message}
+cmd: #{cmd}"
+stdout: #{stdout.strip}
+stderr: #{stderr.strip}
+exitstatus: #{status.exitstatus}
+#{'Z' * 80}
         MSG
         puts Rainbow(msg).red
         exit(1)
