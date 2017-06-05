@@ -11,6 +11,7 @@ Changes since last non-beta release.
 ## [8.0.2]
 ### Fixed
 - Any failure in webpack to build test files quits tests. 
+- Fixed a Ruby 2.4 potential crash which could cause a crash due to pathname change in Ruby 2.4.
 - CI Improvements: 
   - Switched to yarn link and removed relative path install of react-on-rails
   - Removed testing of Turbolinks 2
