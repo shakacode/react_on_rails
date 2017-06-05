@@ -22,13 +22,14 @@ module ReactOnRails
     # Pass in the msg and color as a symbol.
     def self.wrap_message(msg, color = :red)
       # binding.pry
-      wrapper_line = "#{'=' * 80}"
+      wrapper_line = ("=" * 80).to_s
       # rubocop:disable Layout/IndentHeredoc
       fenced_msg = <<-MSG
 #{wrapper_line}
 #{msg.strip}
 #{wrapper_line}
       MSG
+      # rubocop:enable Layout/IndentHeredoc
       Rainbow(fenced_msg).color(color)
     end
 
@@ -45,14 +46,15 @@ module ReactOnRails
       stdout, stderr, status = Open3.capture3(cmd)
       unless status.success?
         stdout_msg = stdout.present? ? "\nstdout:\n#{stdout.strip}\n" : ""
-        stderr_msg =stderr.present? ? "\nstderr:\n#{stderr.strip}\n" : ""
+        stderr_msg = stderr.present? ? "\nstderr:\n#{stderr.strip}\n" : ""
         # rubocop:disable Layout/IndentHeredoc
-        msg = <<-MSG.strip_heredoc
+        msg = <<-MSG
 React on Rails FATAL ERROR!
 #{failure_message}
 cmd: #{cmd}
 exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
         MSG
+        # rubocop:enable Layout/IndentHeredoc
         puts wrap_message(msg)
         exit(1)
       end

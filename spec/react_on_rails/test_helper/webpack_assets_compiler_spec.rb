@@ -6,11 +6,10 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
   describe "#ensureAssetsCompiled" do
     context "when assets compiler command is invalid" do
       before do
-        allow(ReactOnRails.configuration).
-          to receive(:npm_build_test_command).
-            and_return("invalid command")
+        allow(ReactOnRails.configuration)
+          .to receive(:npm_build_test_command)
+          .and_return("invalid command")
       end
-
 
       it "exits immediately" do
         puts "\n\nBEGIN IGNORE PRINTS IN THIS TEST"
@@ -35,9 +34,11 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
         expect do
           begin
             ReactOnRails::TestHelper::WebpackAssetsCompiler.new.compile_assets
+            # rubocop:disable Lint/HandleExceptions
           rescue SystemExit
             # No op
           end
+          # rubocop:enable Lint/HandleExceptions
         end.to output(/#{expected_output}/).to_stdout
       end
     end
