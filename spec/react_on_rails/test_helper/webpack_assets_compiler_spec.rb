@@ -21,14 +21,9 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
 
       it "prints the correct message" do
         expected_output = <<-MSG.strip_heredoc
-          ================================================================================
           React on Rails FATAL ERROR!
           Error in building webpack assets!
           cmd: cd client && invalid command
-          exitstatus: 1
-          stderr:
-          sh: line 0: cd: client: No such file or directory
-          ================================================================================
         MSG
 
         expect do
