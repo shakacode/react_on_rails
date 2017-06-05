@@ -4,6 +4,29 @@ require_relative "spec_helper"
 
 module ReactOnRails
   RSpec.describe Utils do
+    describe ".wrap_message" do
+      subject do
+        <<-MSG.strip_heredoc
+          Something to wrap
+          with 2 lines
+        MSG
+      end
+
+      let(:expected) do
+        msg = <<-MSG.strip_heredoc
+          ================================================================================
+          Something to wrap
+          with 2 lines
+          ================================================================================
+        MSG
+        Rainbow(msg).red
+      end
+
+      it "outputs the correct text" do
+        expect(Utils.wrap_message(subject)).to eq(expected)
+      end
+    end
+
     describe ".truthy_presence" do
       context "With non-empty string" do
         subject { "foobar" }

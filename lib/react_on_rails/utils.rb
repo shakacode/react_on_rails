@@ -4,6 +4,7 @@ require "English"
 require "open3"
 require "rainbow"
 require "active_support"
+require "active_support/core_ext/string"
 
 module ReactOnRails
   module Utils
@@ -15,6 +16,20 @@ module ReactOnRails
       else
         obj
       end
+    end
+
+    # Wraps message and makes it colored.
+    # Pass in the msg and color as a symbol.
+    def self.wrap_message(msg, color = :red)
+      # binding.pry
+      wrapper_line = "#{'=' * 80}"
+      # rubocop:disable Layout/IndentHeredoc
+      fenced_msg = <<-MSG
+#{wrapper_line}
+#{msg.strip}
+#{wrapper_line}
+      MSG
+      Rainbow(fenced_msg).color(color)
     end
 
     def self.object_to_boolean(value)
@@ -29,17 +44,16 @@ module ReactOnRails
     def self.invoke_and_exit_if_failed(cmd, failure_message)
       stdout, stderr, status = Open3.capture3(cmd)
       unless status.success?
-        msg = <<~MSG
-#{'Z' * 80}
+        stdout_msg = stdout.present? ? "\nstdout:\n#{stdout.strip}\n" : ""
+        stderr_msg =stderr.present? ? "\nstderr:\n#{stderr.strip}\n" : ""
+        # rubocop:disable Layout/IndentHeredoc
+        msg = <<-MSG.strip_heredoc
 React on Rails FATAL ERROR!
 #{failure_message}
-cmd: #{cmd}"
-stdout: #{stdout.strip}
-stderr: #{stderr.strip}
-exitstatus: #{status.exitstatus}
-#{'Z' * 80}
+cmd: #{cmd}
+exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
         MSG
-        puts Rainbow(msg).red
+        puts wrap_message(msg)
         exit(1)
       end
       [stdout, stderr, status]
