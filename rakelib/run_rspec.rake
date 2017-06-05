@@ -21,16 +21,17 @@ namespace :run_rspec do
   desc "Runs dummy rspec with turbolinks"
   task dummy: ["dummy_apps:dummy_app"] do
     clean_gen_assets(spec_dummy_dir)
+    bundle_install_in(dummy_app_dir)
     run_tests_in(spec_dummy_dir)
   end
 
   desc "Runs dummy rspec without turbolinks"
   task dummy_no_turbolinks: ["dummy_apps:dummy_app"] do
     clean_gen_assets(spec_dummy_dir)
+    bundle_install_in(dummy_app_dir)
     run_tests_in(spec_dummy_dir,
                  env_vars: "DISABLE_TURBOLINKS=TRUE",
                  command_name: "dummy_no_turbolinks")
-    bundle_install_in(dummy_app_dir)
   end
 
   # Dynamically define Rake tasks for each example app found in the examples directory

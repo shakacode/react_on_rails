@@ -163,7 +163,7 @@ GEM
       binding_of_caller (>= 0.7)
       pry (>= 0.9.11)
     public_suffix (2.0.5)
-    puma (3.9.0)
+    puma (3.9.1)
     rack (2.0.3)
     rack-test (0.6.3)
       rack (>= 1.0)
@@ -179,10 +179,6 @@ GEM
       bundler (>= 1.3.0, < 2.0)
       railties (= 5.1.1)
       sprockets-rails (>= 2.0.0)
-    rails-controller-testing (1.0.2)
-      actionpack (~> 5.x, >= 5.0.1)
-      actionview (~> 5.x, >= 5.0.1)
-      activesupport (~> 5.x)
     rails-dom-testing (2.0.3)
       activesupport (>= 4.2.0)
       nokogiri (>= 1.6)
@@ -317,7 +313,6 @@ DEPENDENCIES
   pry-stack_explorer
   puma
   rails (~> 5.1.1)
-  rails-controller-testing
   react_on_rails!
   rspec-rails
   rspec-retry

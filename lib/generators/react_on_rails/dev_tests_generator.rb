@@ -41,7 +41,6 @@ module ReactOnRails
       def add_test_related_gems_to_gemfile
         gem("rspec-rails", group: :test)
         gem("poltergeist", group: :test)
-        gem("rails-controller-testing", group: :test)
         gem("coveralls", require: false)
       end
 

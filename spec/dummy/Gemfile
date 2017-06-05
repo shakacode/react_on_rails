@@ -67,7 +67,6 @@ group :test do
   gem "capybara"
   gem "capybara-screenshot"
   gem "coveralls", require: false
-  gem "rails-controller-testing"
   # install trouble with updated
   # gem "capybara-webkit"
   gem "chromedriver-helper"

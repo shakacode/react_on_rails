@@ -26,9 +26,7 @@ RSpec.configure do |config|
 
       if use_selenium
         Capybara.current_driver = js_selenium_driver
-        Capybara.javascript_driver = js_selenium_driver
-        Capybara.default_driver = js_selenium_driver
-        puts "Switched to #{js_selenium_driver} from #{Capybara.current_driver}"
+        puts "Switched to #{Capybara.current_driver} from #{original_driver}"
       end
 
       ex.run
@@ -70,9 +68,6 @@ RSpec.configure do |config|
       puts "=" * 80
     end
     Capybara.current_driver = original_driver
-    Capybara.javascript_driver = original_driver
-    Capybara.default_driver = original_driver
-    Capybara.use_default_driver
   end
 end
 
