@@ -28,6 +28,7 @@ module.exports = {
     extensions: ['.js', '.jsx'],
     alias: {
       images: join(process.cwd(), 'app', 'assets', 'images'),
+      lib: join(process.cwd(), 'lib'),
     },
   },
 
