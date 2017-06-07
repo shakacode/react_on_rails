@@ -47,7 +47,7 @@ module ReactOnRails
         dirs = %w[components containers startup]
         dirs.each do |name|
           empty_directory \
-            "client/app/bundles/#{options.example_page_name}/#{name}"
+            "client/app/bundles/#{example_page_name}/#{name}"
         end
       end
 
