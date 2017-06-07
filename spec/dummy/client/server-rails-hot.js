@@ -26,6 +26,10 @@ const compiler = webpack(webpackConfig);
 
 const devServer = new WebpackDevServer(compiler, {
   contentBase: hotReloadingUrl,
+  headers: {
+    'Access-Control-Allow-Origin': '*',
+  },
+  disableHostCheck: true,
   clientLogLevel: 'info',
   hot: true,
   inline: true,

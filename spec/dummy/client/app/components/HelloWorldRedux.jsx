@@ -47,7 +47,7 @@ export default class HelloWorldRedux extends React.Component {
           Redux Hello, {name}!
         </h3>
         <p>
-          With Redux, say hello to my little friend:
+          With Redux, say hello to:
           <input
             type="text"
             ref={this.setNameDomRef}
