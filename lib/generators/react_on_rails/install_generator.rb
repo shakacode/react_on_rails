@@ -9,7 +9,7 @@ module ReactOnRails
   module Generators
     class InstallGenerator < Rails::Generators::Base
       include GeneratorHelper
-      extend OptionHelper
+      include OptionHelper
 
       # fetch USAGE file for details generator description
       source_root(File.expand_path("../", __FILE__))

@@ -9,7 +9,7 @@ module ReactOnRails
   module Generators
     class BaseGenerator < Rails::Generators::Base
       include GeneratorHelper
-      extend OptionHelper
+      include OptionHelper
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates", __FILE__))
 
