@@ -1,9 +1,10 @@
 module OptionHelper
   def define_name_option
-    # --name
-    class_option :name,
+    # --example-page-name=NAME
+    class_option :"example_page_name",
                  type: :string,
                  default: "HelloWorld",
-                 desc: "Name the example page NAME"
+                 desc: "Name the example page EXAMPLE-PAGE-NAME",
+                 aliases: "-E"
   end
 end
