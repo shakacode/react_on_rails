@@ -6,7 +6,6 @@ import { Provider } from 'react-redux';
 import ReactOnRails from 'react-on-rails';
 import { AppContainer } from "react-hot-loader";
 import { render } from "react-dom";
-import consoleErrorReporter from "lib/consoleErrorReporter";
 
 import HelloWorldContainer from '../components/HelloWorldContainer';
 
@@ -26,7 +25,7 @@ export default (props, railsContext, domNodeId) => {
   // This allows redux to add additional props to the HelloWorldContainer.
   const renderApp = (Komponent) => {
     const element = (
-      <AppContainer errorReporter={consoleErrorReporter}>
+      <AppContainer>
         <Provider store={store}>
           <Komponent />
         </Provider>

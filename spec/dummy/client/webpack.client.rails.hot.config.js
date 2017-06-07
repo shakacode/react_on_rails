@@ -3,6 +3,9 @@
 // cd client && babel-node server-rails-hot.js
 // Note that Foreman (Procfile.dev) has also been configured to take care of this.
 
+// require() is used rather than import because hot reloading with webpack
+// requires webpack to transform modules from ES6 to ES5 instead of babel
+// and webpack can not transform its own config files.
 const { resolve } = require('path');
 const webpack = require('webpack');
 const merge = require('webpack-merge');
@@ -11,6 +14,8 @@ const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
 const { hotReloadingUrl, webpackOutputPath } = webpackConfigLoader(configPath);
 
+// entry is prepended because 'react-hot-loader/patch' must be the very first entry
+// for hot reloading to work.
 module.exports = merge.strategy(
   {
     entry: 'prepend'
@@ -100,6 +105,10 @@ module.exports = merge.strategy(
       },
     ],
   },
+
+// webpack.NamedModulesPlugin() is an optional module that is great for HMR debugging
+// since it transform module IDs (112, 698, etc...) into their respective paths,
+// but it can conflict with other libraries that expect global references. When in doubt, throw it out.
 
   plugins: [
     new webpack.HotModuleReplacementPlugin(),

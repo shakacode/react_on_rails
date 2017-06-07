@@ -8,7 +8,6 @@ import { Provider } from 'react-redux';
 import thunkMiddleware from 'redux-thunk';
 import { AppContainer } from "react-hot-loader";
 import { render } from "react-dom";
-import consoleErrorReporter from "lib/consoleErrorReporter";
 
 import reducers from '../reducers/reducersIndex';
 import composeInitialState from '../store/composeInitialState';
@@ -36,7 +35,7 @@ export default (props, railsContext, domNodeId) => {
   // This allows redux to add additional props to the HelloWorldContainer.
   const renderApp = (Komponent) => {
     const element = (
-      <AppContainer errorReporter={consoleErrorReporter}>
+      <AppContainer>
         <Provider store={store}>
           <Komponent />
         </Provider>
