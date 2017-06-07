@@ -2,14 +2,18 @@
 
 require "rails/generators"
 require_relative "generator_messages"
+require_relative "option_helper"
 require_relative "generator_helper"
 
 module ReactOnRails
   module Generators
     class BaseGenerator < Rails::Generators::Base
       include GeneratorHelper
+      extend OptionHelper
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates", __FILE__))
+
+      define_name_option
 
       # --redux
       class_option :redux,

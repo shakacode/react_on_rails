@@ -2,15 +2,19 @@
 
 require "rails/generators"
 require_relative "generator_helper"
+require_relative "option_helper"
 require_relative "generator_messages"
 
 module ReactOnRails
   module Generators
     class InstallGenerator < Rails::Generators::Base
       include GeneratorHelper
+      extend OptionHelper
 
       # fetch USAGE file for details generator description
       source_root(File.expand_path("../", __FILE__))
+
+      define_name_option
 
       # --redux
       class_option :redux,
