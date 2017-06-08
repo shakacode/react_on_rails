@@ -80,7 +80,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.using_webpacker_lite?
-      ActionController::Base.helpers.respond_to?(:asset_pack_path)
+      defined?(WebpackerLite)
     end
 
     def self.running_on_windows?
