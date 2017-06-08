@@ -2,18 +2,23 @@
 
 require "rails/generators"
 require_relative "generator_helper"
+require_relative "option_helper"
 
 module ReactOnRails
   module Generators
     class ReactNoReduxGenerator < Rails::Generators::Base
       include GeneratorHelper
+      include OptionHelper
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates", __FILE__))
+      define_name_option
 
       def copy_base_files
         base_path = "base/base/"
         base_files = %w[client/app/bundles/HelloWorld/components/HelloWorld.jsx]
-        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
+        base_files.each do |file|
+          copy_file("#{base_path}#{file}", dest_filename(file))
+        end
       end
 
       def create_appropriate_templates
@@ -21,11 +26,13 @@ module ReactOnRails
         location = "client/app/bundles/HelloWorld/"
         source = base_path + location
         config = {
-          component_name: "HelloWorld",
-          app_relative_path: "../components/HelloWorld"
+          component_name: example_page_name,
+          app_relative_path: "../components/#{example_page_name}"
         }
-        template("#{source}/startup/registration.jsx.tt", "#{location}/startup/registration.jsx", config)
-        template("#{base_path}app/views/hello_world/index.html.erb.tt", "app/views/hello_world/index.html.erb", config)
+        template("#{source}/startup/registration.jsx.tt",
+                 dest_filename("#{location}/startup/registration.jsx"), config)
+        template("#{base_path}app/views/hello_world/index.html.erb.tt",
+                 dest_filename("app/views/hello_world/index.html.erb"), config)
       end
     end
   end
