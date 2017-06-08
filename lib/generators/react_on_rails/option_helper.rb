@@ -2,7 +2,7 @@ module OptionHelper
   extend ActiveSupport::Concern
 
   def example_page_name
-    options.example_page_name.capitalize
+    options.example_page_name.camelize
   end
 
   def example_page_title
