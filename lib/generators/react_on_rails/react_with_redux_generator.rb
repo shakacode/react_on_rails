@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
 require "rails/generators"
+require_relative "generator_helper"
 require_relative "option_helper"
 
 module ReactOnRails
   module Generators
     class ReactWithReduxGenerator < Rails::Generators::Base
+      include GeneratorHelper
       include OptionHelper
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates", __FILE__))
