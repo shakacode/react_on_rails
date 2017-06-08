@@ -10,7 +10,9 @@ module OptionHelper
   end
 
   def dst_filename(src_filename)
-    src_filename.gsub /hello_world/, example_page_path
+    src_filename.gsub(/hello_world/, example_page_path)
+                .gsub(/HelloWorld/, example_page_name)
+                .gsub(/helloWorld/, example_page_name.camelcase(:lower))
   end
 
   module ClassMethods
