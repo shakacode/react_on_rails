@@ -5,6 +5,10 @@ module OptionHelper
     options.example_page_name.capitalize
   end
 
+  def example_page_title
+    options.example_page_name.underscore.humanize.titleize
+  end
+
   def example_page_path
     options.example_page_name.underscore
   end
