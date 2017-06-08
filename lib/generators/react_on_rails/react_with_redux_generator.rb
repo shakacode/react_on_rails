@@ -29,7 +29,7 @@ module ReactOnRails
            client/app/bundles/HelloWorld/reducers/helloWorldReducer.jsx
            client/app/bundles/HelloWorld/store/helloWorldStore.jsx
            client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx].each do |file|
-             copy_file(base_path + file, dst_filename(file))
+             copy_file(base_path + file, dest_filename(file))
            end
       end
 
@@ -42,9 +42,9 @@ module ReactOnRails
           app_relative_path: "./#{example_page_name}App"
         }
         template("#{source}/startup/registration.jsx.tt",
-                 dst_filename("#{location}/startup/registration.jsx"), config)
+                 dest_filename("#{location}/startup/registration.jsx"), config)
         template("#{base_path}app/views/hello_world/index.html.erb.tt",
-                 dst_filename("app/views/hello_world/index.html.erb"), config)
+                 dest_filename("app/views/hello_world/index.html.erb"), config)
       end
     end
   end
