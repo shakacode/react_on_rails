@@ -1,5 +1,9 @@
 # Hot Reloading of Assets For Rails Development
 
+_Note, this document is not yet updated for React on Rails v8+. See [PR #865](https://github.com/shakacode/react_on_rails/pull/865) for a detailed example of doing hot reloading using V8+ with Webpack v2. Any volunteers to update this page? See [#772](https://github.com/shakacode/react_on_rails/issues/772) and [#361](https://github.com/shakacode/react-webpack-rails-tutorial/issues/361)._
+
+------
+
 This document outlines the steps to setup your React On Rails Environment so that you can experience the pleasure of hot reloading of JavaScript and Sass during your Rails development work. See [Issue 332](https://github.com/shakacode/react_on_rails/issues/332) for troubleshooting. There are 3 examples of this setup:
 
 1. [minimal demo here](https://github.com/retroalgic/react-on-rails-hot-minimal): The most simple and updated hot reloading setup.
