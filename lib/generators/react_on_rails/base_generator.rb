@@ -55,7 +55,6 @@ module ReactOnRails
         base_path = "base/base/"
         base_files = %w[config/webpacker_lite.yml
                         client/.babelrc
-                        client/webpack.config.js
                         client/REACT_ON_RAILS_CLIENT_README.md]
         base_files.each do |file|
           copy_file("#{base_path}#{file}", dest_filename(file))
@@ -68,6 +67,7 @@ module ReactOnRails
            app/views/layouts/hello_world.html.erb
            config/initializers/react_on_rails.rb
            Procfile.dev
+           client/webpack.config.js
            client/package.json].each do |file|
           template("#{base_path}#{file}.tt", dest_filename(file))
         end
