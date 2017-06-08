@@ -3,6 +3,9 @@
 // cd client && babel-node server-rails-hot.js
 // Note that Foreman (Procfile.dev) has also been configured to take care of this.
 
+// require() is used rather than import because hot reloading with webpack
+// requires webpack to transform modules from ES6 to ES5 instead of babel
+// and webpack can not transform its own config files.
 const { resolve } = require('path');
 const webpack = require('webpack');
 const merge = require('webpack-merge');
@@ -11,12 +14,19 @@ const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
 const { hotReloadingUrl, webpackOutputPath } = webpackConfigLoader(configPath);
 
-module.exports = merge(config, {
+// entry is prepended because 'react-hot-loader/patch' must be the very first entry
+// for hot reloading to work.
+module.exports = merge.strategy(
+  {
+    entry: 'prepend'
+  }
+)(config, {
 
   devtool: 'eval-source-map',
 
   entry: {
     'app-bundle': [
+      'react-hot-loader/patch',
       `webpack-dev-server/client?${hotReloadingUrl}`,
       'webpack/hot/only-dev-server'
     ],
@@ -25,6 +35,7 @@ module.exports = merge(config, {
   output: {
     filename: '[name].js',
     path: webpackOutputPath,
+    publicPath: `${hotReloadingUrl}/`,
   },
 
   module: {
@@ -33,22 +44,6 @@ module.exports = merge(config, {
         test: /\.jsx?$/,
         loader: 'babel-loader',
         exclude: /node_modules/,
-        query: {
-          plugins: [
-            [
-              'react-transform',
-              {
-                transforms: [
-                  {
-                    transform: 'react-transform-hmr',
-                    imports: ['react'],
-                    locals: ['module'],
-                  },
-                ],
-              },
-            ],
-          ],
-        },
       },
       {
         test: /\.css$/,
@@ -111,8 +106,13 @@ module.exports = merge(config, {
     ],
   },
 
+// webpack.NamedModulesPlugin() is an optional module that is great for HMR debugging
+// since it transform module IDs (112, 698, etc...) into their respective paths,
+// but it can conflict with other libraries that expect global references. When in doubt, throw it out.
+
   plugins: [
     new webpack.HotModuleReplacementPlugin(),
+    new webpack.NamedModulesPlugin(),
     new webpack.NoEmitOnErrorsPlugin(),
   ],
 });

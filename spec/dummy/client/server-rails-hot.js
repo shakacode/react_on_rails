@@ -13,10 +13,10 @@
 // 2. Make sure you have a hot-assets target in your client/package.json
 // 3. Start up `foreman start -f Procfile.hot` to start both Rails and the hot reload server.
 
-import webpack from 'webpack';
-import WebpackDevServer from 'webpack-dev-server';
+const webpack = require('webpack');
+const WebpackDevServer = require('webpack-dev-server');
 const { resolve } = require('path');
-import webpackConfig from './webpack.client.rails.hot.config';
+const webpackConfig = require('./webpack.client.rails.hot.config');
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
@@ -26,6 +26,11 @@ const compiler = webpack(webpackConfig);
 
 const devServer = new WebpackDevServer(compiler, {
   contentBase: hotReloadingUrl,
+  headers: {
+    'Access-Control-Allow-Origin': '*',
+  },
+  disableHostCheck: true,
+  clientLogLevel: 'info',
   hot: true,
   inline: true,
   historyApiFallback: true,

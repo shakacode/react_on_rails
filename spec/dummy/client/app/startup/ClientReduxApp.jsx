@@ -5,7 +5,9 @@
 import React from 'react';
 import { combineReducers, applyMiddleware, createStore } from 'redux';
 import { Provider } from 'react-redux';
-import middleware from 'redux-thunk';
+import thunkMiddleware from 'redux-thunk';
+import { AppContainer } from "react-hot-loader";
+import { render } from "react-dom";
 
 import reducers from '../reducers/reducersIndex';
 import composeInitialState from '../store/composeInitialState';
@@ -18,19 +20,36 @@ import HelloWorldContainer from '../components/HelloWorldContainer';
  *  React will see that the state is the same and not do anything.
  *
  */
-export default (props, railsContext) => {
+export default (props, railsContext, domNodeId) => {
   const combinedReducer = combineReducers(reducers);
   const combinedProps = composeInitialState(props, railsContext);
 
   // This is where we'll put in the middleware for the async function. Placeholder.
   // store will have helloWorldData as a top level property
-  const store = applyMiddleware(middleware)(createStore)(combinedReducer, combinedProps);
+  const store = createStore(combinedReducer, combinedProps, applyMiddleware(thunkMiddleware));
 
-  // Provider uses the this.props.children, so we're not typical React syntax.
+  // renderApp is a function required for hot reloading. see
+  // https://github.com/retroalgic/react-on-rails-hot-minimal/blob/master/client/src/entry.js
+
+  // Provider uses this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
-  return (
-    <Provider store={store}>
-      <HelloWorldContainer />
-    </Provider>
-  );
+  const renderApp = (Komponent) => {
+    const element = (
+      <AppContainer>
+        <Provider store={store}>
+          <Komponent />
+        </Provider>
+      </AppContainer>
+    )
+    render(element, document.getElementById(domNodeId));
+  }
+
+  renderApp(HelloWorldContainer);
+
+  if (module.hot) {
+    module.hot.accept(['../reducers/reducersIndex', '../components/HelloWorldContainer'], () => {
+      store.replaceReducer(combineReducers(reducers));
+      renderApp(HelloWorldContainer);
+    })
+  }
 };
