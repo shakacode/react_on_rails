@@ -49,7 +49,7 @@ namespace :run_rspec do
 
   desc "(HACK) Run RSpec on spec/empty_spec in order to have SimpleCov generate a coverage report from cache"
   task :empty do
-    sh %(COVERAGE=true rspec spec/empty_spec.rb)
+    sh %(#{ENV['USE_COVERALLS'] ? 'COVERAGE=true' : ''} rspec spec/empty_spec.rb)
   end
 
   Coveralls::RakeTask.new if ENV["USE_COVERALLS"] == "TRUE"
@@ -101,7 +101,8 @@ def run_tests_in(dir, options = {})
 
   command_name = options.fetch(:command_name, path.basename)
   rspec_args = options.fetch(:rspec_args, "")
-  env_vars = %(#{options.fetch(:env_vars, '')} COVERAGE=true TEST_ENV_COMMAND_NAME="#{command_name}")
+  env_vars = %(#{options.fetch(:env_vars, '')} TEST_ENV_COMMAND_NAME="#{command_name}").dup
+  env_vars << "COVERAGE=true" if ENV["USE_COVERALLS"]
   sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
 end
 
