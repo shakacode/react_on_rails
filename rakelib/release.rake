@@ -22,6 +22,7 @@ which are installed via `bundle install` and `yarn`
 
 Example: `rake release[2.1.0,false]`")
 
+# rubocop:disable Metrics/BlockLength
 task :release, %i[gem_version dry_run tools_install] do |_t, args|
   class MessageHandler
     def add_error(error)
@@ -66,4 +67,8 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
 
   # Release the new gem version
   sh_in_dir(gem_root, "gem release") unless is_dry_run
+
+  # Update master with new npm version
+  sh_in_dir(Path.join(gem_root, "spec", "dummy", "client"), "yarn add react-on-rails@#{npm_version}")
+  sh_in_dir(gem_root, "git commit -am 'Updated spec/dummy/client/package.json latest version'") unless is_dry_run
 end

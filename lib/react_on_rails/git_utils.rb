@@ -3,7 +3,7 @@
 module ReactOnRails
   module GitUtils
     def self.uncommitted_changes?(message_handler)
-      return false if ENV["COVERAGE"]
+      return false if ENV["COVERAGE"] == "true"
       status = `git status --porcelain`
       return false if status.empty?
       error = "You have uncommitted code. Please commit or stash your changes before continuing"
