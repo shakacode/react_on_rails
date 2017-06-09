@@ -41,3 +41,7 @@ gem "selenium-webdriver"
 gem "webpacker_lite"
 
 gem "rainbow"
+
+group :development do
+  gem "listen"
+end
