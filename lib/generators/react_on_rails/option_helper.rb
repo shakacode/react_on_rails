@@ -21,6 +21,12 @@ module OptionHelper
     example_page_path.upcase
   end
 
+  def convert_filename_to_use_example_page_name(file)
+    file.gsub("hello_world", example_page_path)
+        .gsub("HelloWorld", example_page_name)
+        .gsub("helloWorld", example_page_js_filename)
+  end
+
   module ClassMethods
     def define_name_option
       # --example-page-name=NAME
