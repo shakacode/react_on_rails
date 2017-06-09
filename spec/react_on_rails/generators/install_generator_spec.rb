@@ -7,7 +7,7 @@ describe InstallGenerator, type: :generator do
   destination File.expand_path("../../dummy-for-generators/", __FILE__)
 
   let(:default_example_page_name) { "HelloWorld" }
-  let(:default_example_page_path) {"hello_world" }
+  let(:default_example_page_path) { "hello_world" }
   let(:default_example_page_lower_camelcase) { "helloWorld" }
 
   let(:example_page_name) { default_example_page_name }
