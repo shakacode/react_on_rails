@@ -5,7 +5,7 @@ module OptionHelper
     options.example_page_name.camelize
   end
 
-  def example_page_js_filename
+  def example_page_lower_camelcase
     options.example_page_name.camelize :lower
   end
 
@@ -24,7 +24,7 @@ module OptionHelper
   def convert_filename_to_use_example_page_name(file)
     file.gsub("hello_world", example_page_path)
         .gsub("HelloWorld", example_page_name)
-        .gsub("helloWorld", example_page_js_filename)
+        .gsub("helloWorld", example_page_lower_camelcase)
   end
 
   module ClassMethods

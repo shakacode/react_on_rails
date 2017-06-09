@@ -1,8 +1,8 @@
 import { createStore } from 'redux';
-import <%= example_page_js_filename %>Reducer from '../reducers/<%= example_page_js_filename %>Reducer';
+import <%= example_page_lower_camelcase %>Reducer from '../reducers/<%= example_page_lower_camelcase %>Reducer';
 
 const configureStore = (railsProps) => (
-  createStore(<%= example_page_js_filename %>Reducer, railsProps)
+  createStore(<%= example_page_lower_camelcase %>Reducer, railsProps)
 );
 
 export default configureStore;

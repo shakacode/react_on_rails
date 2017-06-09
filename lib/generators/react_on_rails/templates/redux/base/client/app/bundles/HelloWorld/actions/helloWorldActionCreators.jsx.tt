@@ -1,7 +1,7 @@
 /* eslint-disable import/prefer-default-export */
 
 import { <%= example_page_path_in_caps %>_NAME_UPDATE } from '../constants/<%=
-example_page_js_filename %>Constants';
+example_page_lower_camelcase %>Constants';
 
 export const updateName = (text) => ({
   type: <%= example_page_path_in_caps %>_NAME_UPDATE,

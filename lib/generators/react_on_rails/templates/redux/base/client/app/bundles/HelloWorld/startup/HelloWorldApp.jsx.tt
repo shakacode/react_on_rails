@@ -1,7 +1,7 @@
 import React from 'react';
 import { Provider } from 'react-redux';
 
-import configureStore from '../store/<%= example_page_js_filename %>Store';
+import configureStore from '../store/<%= example_page_lower_camelcase %>Store';
 import <%= example_page_name %>Container from '../containers/<%= example_page_name %>Container';
 
 // See documentation for https://github.com/reactjs/react-redux.

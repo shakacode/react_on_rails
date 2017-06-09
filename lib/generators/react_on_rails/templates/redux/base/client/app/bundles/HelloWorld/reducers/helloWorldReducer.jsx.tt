@@ -1,5 +1,5 @@
 import { combineReducers } from 'redux';
-import { <%= example_page_path_in_caps %>_NAME_UPDATE } from '../constants/<%= example_page_js_filename %>Constants';
+import { <%= example_page_path_in_caps %>_NAME_UPDATE } from '../constants/<%= example_page_lower_camelcase %>Constants';
 
 const name = (state = '', action) => {
   switch (action.type) {
@@ -10,6 +10,6 @@ const name = (state = '', action) => {
   }
 };
 
-const <%= example_page_js_filename %>Reducer = combineReducers({ name });
+const <%= example_page_lower_camelcase %>Reducer = combineReducers({ name });
 
-export default <%= example_page_js_filename %>Reducer;
+export default <%= example_page_lower_camelcase %>Reducer;
