@@ -2,7 +2,7 @@
 
 # Starts SimpleCov for code coverage.
 
-if ENV["COVERAGE"]
+if ENV["COVERAGE"] == "true"
   require "simplecov"
 
   # Using a command name along with the test_env_number prevents results from
