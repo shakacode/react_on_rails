@@ -9,7 +9,7 @@ module ReactOnRails
       message = "ERROR in SERVER PRERENDERING\n".dup
       if err
         # rubocop:disable Layout/IndentHeredoc
-        message << <<-MSG.strip_heredoc
+        message << <<-MSG
 Encountered error: \"#{err}\"
         MSG
         # rubocop:enable Layout/IndentHeredoc
@@ -18,7 +18,7 @@ Encountered error: \"#{err}\"
         backtrace = nil
       end
       # rubocop:disable Layout/IndentHeredoc
-      message << <<-MSG.strip_heredoc
+      message << <<-MSG
 when prerendering #{component_name} with props: #{props}
 js_code was:
 #{js_code}
@@ -27,7 +27,7 @@ js_code was:
 
       if console_messages
         # rubocop:disable Layout/IndentHeredoc
-        message << <<-MSG.strip_heredoc
+        message << <<-MSG
 console messages:
 #{console_messages}
         MSG
