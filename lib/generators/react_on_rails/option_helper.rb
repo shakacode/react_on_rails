@@ -5,6 +5,10 @@ module OptionHelper
     options.example_page_name.camelize
   end
 
+  def example_page_js_filename
+    options.example_page_name.camelize :lower
+  end
+
   def example_page_title
     options.example_page_name.underscore.humanize.titleize
   end
