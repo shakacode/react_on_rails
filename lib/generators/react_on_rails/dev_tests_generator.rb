@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "rails/generators"
-require_relative "option_helper"
 require_relative "generator_helper"
 
 module ReactOnRails

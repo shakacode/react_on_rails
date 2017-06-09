@@ -2,7 +2,6 @@
 
 require "rails/generators"
 require_relative "generator_helper"
-require_relative "option_helper"
 
 module ReactOnRails
   module Generators

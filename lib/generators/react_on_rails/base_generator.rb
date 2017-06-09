@@ -2,7 +2,6 @@
 
 require "rails/generators"
 require_relative "generator_messages"
-require_relative "option_helper"
 require_relative "generator_helper"
 
 module ReactOnRails

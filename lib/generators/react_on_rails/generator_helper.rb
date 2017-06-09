@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rainbow"
+require_relative "option_helper"
 
 module GeneratorHelper
   def src_file_exists?(file)
