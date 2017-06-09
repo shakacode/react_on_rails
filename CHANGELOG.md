@@ -8,6 +8,10 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
+### Added
+Ability to specify generated example page name. For example:
+`rails generate react_on_rails:install --example-page-name MainPage`
+
 ## [8.0.3]
 ### Fixed
 - Ruby 2.1 issue due to `<<~` as reported in [issue #870](https://github.com/shakacode/react_on_rails/issues/870). [#867](https://github.com/shakacode/react_on_rails/pull/867) by [justin808](https://github.com/justin808)
