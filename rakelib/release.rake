@@ -22,6 +22,7 @@ which are installed via `bundle install` and `yarn`
 
 Example: `rake release[2.1.0,false]`")
 
+# rubocop:disable Metrics/BlockLength
 task :release, %i[gem_version dry_run tools_install] do |_t, args|
   class MessageHandler
     def add_error(error)

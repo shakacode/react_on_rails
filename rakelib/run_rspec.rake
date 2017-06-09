@@ -70,7 +70,7 @@ task :js_tests do
   sh "yarn run test"
 end
 
-msg = <<~DESC
+msg = <<-DESC.strip_heredoc
   Runs all tests, run `rake -D run_rspec` to see all available test options.
   "rake run_rspec:example_basic" is a good way to run only one generator test.
 DESC
