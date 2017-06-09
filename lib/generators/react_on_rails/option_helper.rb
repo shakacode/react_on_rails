@@ -17,6 +17,10 @@ module OptionHelper
     options.example_page_name.underscore
   end
 
+  def example_page_path_in_caps
+    example_page_path.upcase
+  end
+
   module ClassMethods
     def define_name_option
       # --example-page-name=NAME
