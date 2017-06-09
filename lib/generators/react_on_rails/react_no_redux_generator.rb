@@ -16,7 +16,7 @@ module ReactOnRails
         base_path = "base/base/"
         base_files = %w[client/app/bundles/HelloWorld/components/HelloWorld.jsx]
         base_files.each do |file|
-          copy_or_template(base_path + file, dest_filename(file))
+          copy_or_template(base_path + file, convert_filename_to_use_example_page_name(file))
         end
       end
 
@@ -29,9 +29,9 @@ module ReactOnRails
           app_relative_path: "../components/#{example_page_name}"
         }
         template("#{source}/startup/registration.jsx.tt",
-                 dest_filename("#{location}/startup/registration.jsx"), config)
+                 convert_filename_to_use_example_page_name("#{location}/startup/registration.jsx"), config)
         template("#{base_path}app/views/hello_world/index.html.erb.tt",
-                 dest_filename("app/views/hello_world/index.html.erb"), config)
+                 convert_filename_to_use_example_page_name("app/views/hello_world/index.html.erb"), config)
       end
     end
   end

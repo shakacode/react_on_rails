@@ -19,7 +19,7 @@ module GeneratorHelper
     Dir.exist?(dest_dir) ? dest_dir : nil
   end
 
-  def dest_filename(file)
+  def convert_filename_to_use_example_page_name(file)
     file.gsub("hello_world", example_page_path)
         .gsub("HelloWorld", example_page_name)
         .gsub("helloWorld", example_page_js_filename)
