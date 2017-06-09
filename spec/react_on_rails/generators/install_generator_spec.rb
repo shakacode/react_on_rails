@@ -5,9 +5,22 @@ require_relative "../support/version_test_helpers"
 
 describe InstallGenerator, type: :generator do
   destination File.expand_path("../../dummy-for-generators/", __FILE__)
+  let(:example_page_name) { "HelloWorld" }
+  let(:example_page_path) { "hello_world" }
 
   context "no args" do
     before(:all) { run_generator_test_with_args(%w[]) }
+    include_examples "base_generator", application_js: true
+    include_examples "no_redux_generator"
+  end
+
+  context "--example-page-name" do
+    let(:example_page_name) { "MainPage" }
+    let(:example_page_path) { "main_page" }
+
+    before(:all) do
+      run_generator_test_with_args(%w[--example-page-name MainPage])
+    end
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
   end
