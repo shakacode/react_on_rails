@@ -29,7 +29,7 @@ module ReactOnRails
            client/app/bundles/HelloWorld/reducers/helloWorldReducer.jsx
            client/app/bundles/HelloWorld/store/helloWorldStore.jsx
            client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx].each do |file|
-             copy_file(base_path + file, dest_filename(file))
+             copy_or_template(base_path + file, dest_filename(file))
            end
       end
 

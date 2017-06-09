@@ -17,7 +17,7 @@ module ReactOnRails
         base_path = "base/base/"
         base_files = %w[client/app/bundles/HelloWorld/components/HelloWorld.jsx]
         base_files.each do |file|
-          copy_file("#{base_path}#{file}", dest_filename(file))
+          copy_or_template(base_path + file, dest_filename(file))
         end
       end
 
