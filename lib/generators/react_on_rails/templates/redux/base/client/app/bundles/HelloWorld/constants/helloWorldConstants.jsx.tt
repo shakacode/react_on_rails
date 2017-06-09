@@ -1,0 +1,3 @@
+/* eslint-disable import/prefer-default-export */
+
+export const <%= example_page_path_in_caps %>_NAME_UPDATE = '<%= example_page_path_in_caps %>_NAME_UPDATE';
