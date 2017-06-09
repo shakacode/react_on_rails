@@ -2,7 +2,7 @@
 
 import { connect } from 'react-redux';
 import <%= example_page_name %> from '../components/<%= example_page_name %>';
-import * as actions from '../actions/<%= example_page_js_filename %>dActionCreators';
+import * as actions from '../actions/<%= example_page_js_filename %>ActionCreators';
 
 // Which part of the Redux global state does our component want to receive as props?
 const mapStateToProps = (state) => ({ name: state.name });
