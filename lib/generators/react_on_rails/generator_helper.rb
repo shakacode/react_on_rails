@@ -3,6 +3,10 @@
 require "rainbow"
 
 module GeneratorHelper
+  def src_file_exists?(file)
+    File.exist?(File.join("templates", file))
+  end
+
   # Takes a relative path from the destination root, such as `.gitignore` or `app/assets/javascripts/application.js`
   def dest_file_exists?(file)
     dest_file = File.join(destination_root, file)
@@ -59,5 +63,15 @@ Please add the following content to your #{file} file:
     parent_directories = destination_path.dirname
     empty_directory(parent_directories) unless dest_dir_exists?(parent_directories)
     copy_file source_file, destination_file
+  end
+
+  def copy_or_template(src_file, dest_file)
+    if src_file_exists?(src_file)
+      copy_file(src_file, dest_file)
+      return
+    end
+
+    src_template = "#{src_file}.tt"
+    template(src_template, dest_file)
   end
 end
