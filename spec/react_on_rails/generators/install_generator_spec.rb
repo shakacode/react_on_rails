@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+# rubocop:disable Metrics/BlockLength
+
 require_relative "../support/generator_spec_helper"
 require_relative "../support/version_test_helpers"
 
