@@ -14,6 +14,13 @@ module ReactOnRails
 
       define_name_option
 
+      # --redux
+      class_option :redux,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install Redux gems and Redux version of Hello World Example",
+                   aliases: "-R"
+
       def add_example_page_route
         route "get '#{example_page_path}', to: '#{example_page_path}#index'"
       end
