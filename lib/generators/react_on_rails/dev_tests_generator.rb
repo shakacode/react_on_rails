@@ -39,7 +39,7 @@ module ReactOnRails
 
       def copy_tests
         %w[spec/features/hello_world_spec.rb].each do |file|
-          copy_file(file, convert_filename_to_use_example_page_name(file))
+          template("#{file}.tt", convert_filename_to_use_example_page_name(file))
         end
       end
 
