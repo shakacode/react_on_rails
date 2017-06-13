@@ -29,7 +29,7 @@ Please add the following content to your #{file} file:
     # rubocop:enable Layout/IndentHeredoc
   end
 
-  def create_dest_directories(*dir_names)
+  def create_client_directories(*dir_names)
     dir_names.each do |dir_name|
       dest_dir = "client/app/bundles/HelloWorld/#{dir_name}"
       empty_directory \

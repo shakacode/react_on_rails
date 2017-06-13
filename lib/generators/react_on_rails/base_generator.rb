@@ -43,7 +43,7 @@ module ReactOnRails
       end
 
       def create_react_directories
-        create_dest_directories "components", "containers", "startup"
+        create_client_directories "components", "containers", "startup"
       end
 
       def copy_base_files
