@@ -45,8 +45,9 @@ module ReactOnRails
       def create_react_directories
         dirs = %w[components containers startup]
         dirs.each do |name|
+          path = "client/app/bundles/HelloWorld/#{name}"
           empty_directory \
-            "client/app/bundles/#{example_page_name}/#{name}"
+            convert_filename_to_use_example_page_name(path)
         end
       end
 

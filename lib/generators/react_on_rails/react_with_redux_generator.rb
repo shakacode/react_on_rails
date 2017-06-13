@@ -15,7 +15,9 @@ module ReactOnRails
       def create_redux_directories
         dirs = %w[actions constants reducers store]
         dirs.each do |name|
-          empty_directory("client/app/bundles/#{example_page_name}/#{name}")
+          path = "client/app/bundles/HelloWorld/#{name}"
+          empty_directory \
+            convert_filename_to_use_example_page_name(path)
         end
       end
 
