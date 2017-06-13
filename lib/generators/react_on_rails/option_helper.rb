@@ -35,7 +35,7 @@ module OptionHelper
       class_option :example_page_name,
                    type: :string,
                    default: "HelloWorld",
-                   desc: "Name the example page EXAMPLE-PAGE-NAME",
+                   desc: "Name the example page EXAMPLE_PAGE_NAME",
                    aliases: "-E"
     end
   end
