@@ -13,7 +13,7 @@ module ReactOnRails
       define_name_option
 
       def create_redux_directories
-        create_dest_directories *%w[actions constants reducers store]
+        create_dest_directories "actions", "constants", "reducers", "store"
       end
 
       def copy_base_redux_files
