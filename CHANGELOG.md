@@ -9,8 +9,10 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests.*
 
 ### Added
-Ability to specify generated example page name. For example:
-`rails generate react_on_rails:install --example-page-name MainPage`
+- Ability to specify generated example page name. For example: `rails generate
+  react_on_rails:install --example-page-name MainPage`.
+  [#869](https://github.com/shakacode/react_on_rails/pull/869) by
+  [ledestin](https://github.com/ledestin)
 
 ## [8.0.3]
 ### Fixed
