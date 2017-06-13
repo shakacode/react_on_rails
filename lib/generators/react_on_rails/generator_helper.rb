@@ -29,6 +29,14 @@ Please add the following content to your #{file} file:
     # rubocop:enable Layout/IndentHeredoc
   end
 
+  def create_dest_directories(*dirs)
+    dirs.each do |name|
+      path = "client/app/bundles/HelloWorld/#{name}"
+      empty_directory \
+        convert_filename_to_use_example_page_name(path)
+    end
+  end
+
   def empty_directory_with_keep_file(destination, config = {})
     empty_directory(destination, config)
     keep_file(destination)

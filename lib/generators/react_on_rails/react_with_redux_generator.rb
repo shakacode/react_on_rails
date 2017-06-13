@@ -13,12 +13,7 @@ module ReactOnRails
       define_name_option
 
       def create_redux_directories
-        dirs = %w[actions constants reducers store]
-        dirs.each do |name|
-          path = "client/app/bundles/HelloWorld/#{name}"
-          empty_directory \
-            convert_filename_to_use_example_page_name(path)
-        end
+        create_dest_directories *%w[actions constants reducers store]
       end
 
       def copy_base_redux_files
