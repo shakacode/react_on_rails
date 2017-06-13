@@ -29,11 +29,11 @@ Please add the following content to your #{file} file:
     # rubocop:enable Layout/IndentHeredoc
   end
 
-  def create_dest_directories(*dirs)
-    dirs.each do |name|
-      path = "client/app/bundles/HelloWorld/#{name}"
+  def create_dest_directories(*dir_names)
+    dir_names.each do |dir_name|
+      dest_dir = "client/app/bundles/HelloWorld/#{dir_name}"
       empty_directory \
-        convert_filename_to_use_example_page_name(path)
+        convert_filename_to_use_example_page_name(dest_dir)
     end
   end
 
