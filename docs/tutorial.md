@@ -65,7 +65,12 @@ git add -A
 git commit -m "Initial commit"
 ```
 
-update dependencies and generate empty app via `react_on_rails:install` or `react_on_rails:install --redux`. You need to first git commit your files before running the generator, or else it will generate an error.
+update dependencies and generate empty app via `react_on_rails:install` or `react_on_rails:install --redux`.
+
+You can also specify name for the generated page with `react_on_rails:install
+--example-page-name MyApp`. It will affect URL path (`http://localhost:3000/my_app/`) and source code names (instead of HelloWorld things will be called MyApp).
+
+You need to first git commit your files before running the generator, or else it will generate an error.
 
 ```
 bundle
