@@ -56,7 +56,7 @@ const configLoader = (configPath) => {
   const ymlConfigPath = join(configPath, 'webpacker_lite.yml');
   const configuration = safeLoad(readFileSync(ymlConfigPath, 'utf8'))[configEnv];
 
-  const devBuild = env !== 'production';
+  const devBuild = env.NODE_ENV !== 'production';
   const hotReloadingHost = configuration.hot_reloading_host || DEFAULT_HOT_RELOADING_HOST;
 
   // NOTE: Rails path is hard coded to `/public`
