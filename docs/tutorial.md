@@ -48,10 +48,11 @@ cd test-react-on-rails
 
 ![01](https://cloud.githubusercontent.com/assets/20628911/17464917/3c29e55a-5cf2-11e6-8754-046ba3ee92d9.png)
 
-Add **React On Rails** gem to your Gemfile (`vim Gemfile` or `nano Gemfile` or in IDE):
+Add **React On Rails** and foreman gem to your Gemfile (`vim Gemfile` or `nano Gemfile` or in IDE):
 
 ```
 gem 'react_on_rails', '8.0.0'         # use latest gem version, prefer exact version 
+gem 'foreman', '0.82.0'
 ```
 
 ![02](https://cloud.githubusercontent.com/assets/20628911/17464919/3c2d74c2-5cf2-11e6-8704-a84958832fbb.png)
