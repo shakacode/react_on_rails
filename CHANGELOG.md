@@ -8,6 +8,8 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
+- Fixed `devBuild` for webpack production build.
+
 ## [8.0.3]
 ### Fixed
 - Ruby 2.1 issue due to `<<~` as reported in [issue #870](https://github.com/shakacode/react_on_rails/issues/870). [#867](https://github.com/shakacode/react_on_rails/pull/867) by [justin808](https://github.com/justin808)
