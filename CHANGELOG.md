@@ -8,6 +8,10 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
+## [8.0.4]
+### Fixed
+ - Fixed `devBuild` for webpack production build. [#877](https://github.com/shakacode/react_on_rails/pull/877) by [chenqingspring](https://github.com/chenqingspring)
+
 ## [8.0.3]
 ### Fixed
 - Ruby 2.1 issue due to `<<~` as reported in [issue #870](https://github.com/shakacode/react_on_rails/issues/870). [#867](https://github.com/shakacode/react_on_rails/pull/867) by [justin808](https://github.com/justin808)
@@ -611,7 +615,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.3...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.4...master
+[8.0.4]: https://github.com/shakacode/react_on_rails/compare/8.0.3...8.0.4
 [8.0.3]: https://github.com/shakacode/react_on_rails/compare/8.0.2...8.0.3
 [8.0.2]: https://github.com/shakacode/react_on_rails/compare/8.0.1...8.0.2
 [8.0.1]: https://github.com/shakacode/react_on_rails/compare/8.0.0...8.0.1
