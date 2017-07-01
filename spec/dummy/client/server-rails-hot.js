@@ -25,7 +25,9 @@ const { hotReloadingUrl, hotReloadingPort, hotReloadingHostname } = webpackConfi
 const compiler = webpack(webpackConfig);
 
 const devServer = new WebpackDevServer(compiler, {
-  contentBase: hotReloadingUrl,
+  proxy: {
+    '*': hotReloadingUrl,
+  },
   headers: {
     'Access-Control-Allow-Origin': '*',
   },
