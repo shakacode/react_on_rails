@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Codeship Status for shakacode/react_on_rails](https://app.codeship.com/projects/cec6c040-971f-0134-488f-0a5146246bd8/status?branch=master)](https://app.codeship.com/projects/187011) [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
 ## Thank you from [Justin Gordon](https://github.com/justin808) and [ShakaCode](https://github.com/shakacode)
-Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails). For an overview and the "why?" of this project, see my GORUCO 2017 talk [Front-End Sadness to Happiness: The React on Rails Story](https://www.youtube.com/watch?v=SGkTvKRPYrk)**. You can get the *[slides here](http://www.shakacode.com/talks)*.
+Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails). For an overview and the "why?" of this project, see my GORUCO 2017 talk [Front-End Sadness to Happiness: The React on Rails Story](https://www.youtube.com/watch?v=SGkTvKRPYrk). You can get the [slides here](http://www.shakacode.com/talks).
 
 We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first application development company. We fund this project by:
 
@@ -632,7 +632,7 @@ The following companies support open source, and ShakaCode uses their products!
 *Identical to top of page*
 
 ## Thank you from [Justin Gordon](https://github.com/justin808) and [ShakaCode](https://github.com/shakacode)
-Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails). For an overview and the "why?" of this project, see my GORUCO 2017 talk [Front-End Sadness to Happiness: The React on Rails Story](https://www.youtube.com/watch?v=SGkTvKRPYrk)**. You can get the *[slides here](http://www.shakacode.com/talks)*.
+Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails). For an overview and the "why?" of this project, see my GORUCO 2017 talk [Front-End Sadness to Happiness: The React on Rails Story](https://www.youtube.com/watch?v=SGkTvKRPYrk). You can get the [slides here](http://www.shakacode.com/talks).
 
 We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first application development company. We fund this project by:
 
