@@ -1,38 +1,47 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Codeship Status for shakacode/react_on_rails](https://app.codeship.com/projects/cec6c040-971f-0134-488f-0a5146246bd8/status?branch=master)](https://app.codeship.com/projects/187011) [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
-The Docs here on `master` refer to 8.0.0 including support for [webpacker_lite](https://github.com/shakacode/webpacker_lite)!
-*Use the [7.0.4 docs](https://github.com/shakacode/react_on_rails/tree/7.0.4) to refer to the older asset pipeline way.*
+## Thank you from [Justin Gordon](https://github.com/justin808) and [ShakaCode](https://github.com/shakacode)
+Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails). For an overview and the "why?" of this project, see my GORUCO 2017 talk [Front-End Sadness to Happiness: The React on Rails Story](https://www.youtube.com/watch?v=SGkTvKRPYrk)**. You can get the *[slides here](http://www.shakacode.com/talks)*.
 
-**[VERSION 8.0.0](https://rubygems.org/gems/react_on_rails/versions/8.0.0.beta.3)** has shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) (soon [**webpacker**](https://github.com/rails/webpacker/issues/464#issuecomment-310986140) support! [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395) shows the changes needed to migrate from the Asset Pipeline to Webpacker Lite. For more information, see my article: [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92). Per recent discussions, we [will merge Webpacker Lite changes back into Webpacker](https://github.com/rails/webpacker/issues/464#issuecomment-310986140).
+We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first application development company. We fund this project by:
 
-**For a complete example of this gem, see our live demo at [www.reactrails.com](http://www.reactrails.com). ([Source Code](https://github.com/shakacode/react-webpack-rails-tutorial))**
+* Providing priority support and training for anything related to React + Webpack + Rails in our [Coaching Program](http://www.shakacode.com/work/shakacode-coaching-plan.pdf).
+* Building custom web and mobile (React Native) applications, sometimes leveraging the code of our own consumer product, [Friends and Guests](https://www.friendsandguests.com), a vacation rental website like Airbnb. We typically work with a technical founder or CTO and instantly provide a full development team including designers.
+* Migrating **Angular** + Rails to React + Rails. You can see an example of React on Rails and our work converting Angular to React on Rails at [egghead.io](https://egghead.io/browse/frameworks).
+* Augmenting your team to get your product completed more efficiently and quickly.
 
-**Speaking!**: Justin is speaking [GORUCO](http://goruco.com/#speakers) on Saturday, June 24, 2017 in NYC: "Front-End Sadness to Happiness: The React on Rails Story". [Email Justin](mailto:justin@shakacode.com) to give this talk at your local meetup or company. I'll also be discussing Webpacker versus or with React on Rails! [Subscribe](https://app.mailerlite.com/webforms/landing/l1d9x5) to be notified of local and *online* presentations of this talk. See the dates of other talks [here](https://forum.shakacode.com/t/talks-on-react-on-rails-june-2017/891), including: Tuesday, June 13th at Pivotal Labs, Santa Monica, CA. Tuesday, June 20th at Pivotal Labs, San Francisco, CA. Thursday, June 22nd in NYC. Tuesday, June 27th at Austin on Rails. Details [here](https://forum.shakacode.com/t/talks-on-react-on-rails-june-2017/891).
+My article "[Why Hire ShakaCode?](https://blog.shakacode.com/can-shakacode-help-you-4a5b1e5a8a63#.jex6tg9w9)" provides additional details about our projects.
 
-**Aloha from Justin Gordon** ([bio](http://www.railsonmaui.com/about)) and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects involving React, React-Native, and Rails, including conversion of AngularJs to React. Please [contact me](mailto:justin@shakacode.com) if we could potentially help you in any way. Besides consulting on bigger projects, [ShakaCode](http://www.shakacode.com) is doing ScreenHero plus Slack/Github based [coaching](http://www.shakacode.com/work/shakacode-coaching-plan.pdf) for React on Rails. See our blog post [Can ShakaCode Help You?](https://blog.shakacode.com/can-shakacode-help-you-4a5b1e5a8a63#.jex6tg9w9) for more information.
+If any of this resonates with you, please email me, [justin@shakacode.com](mailto:justin@shakacode.com). I offer a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products. 
 
-I'm offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development for both consumer and enterprise products. In addition to React.js and Rails, we're doing React-Native iOS and Android apps!
+We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our product, [Friends and Guests](https://www.friendsandguests.com). By working on our product, new hires get trained in the ShakaCode way.
 
-Whether you have a new project or need help on an existing project, feel free to contact me directly at [justin@shakacode.com](mailto:justin@shakacode.com) and thanks in advance for any referrals!
+I appreciate your attention and sharing of these offerings with anybody that we can help. Your support allows me to bring you and your team [front-end happiness in the Rails world](https://www.youtube.com/watch?v=SGkTvKRPYrk).
 
-Your support keeps this project going!
+Aloha and best wishes from the ShakaCode team!
 
-(Want to become a contributor? We're hiring! Want to join a 100% remote-first team? [Contact us](mailto:contact@shakacode.com) for a Slack room invite and let us know that you want to contribute.)
+------
 
 # Community
-Please [Subscribe](https://app.mailerlite.com/webforms/landing/l1d9x5) to keep in touch with Justin Gordon and [ShakaCode](http://www.shakacode.com/). I intend to send a monthly summary including announcements of new releases of React on Rails and of our latest [blog articles](https://blog.shakacode.com) and tutorials. Subscribers will also have access to **exclusive content**, including tips and examples.
+Please [**click to subscribe**](https://app.mailerlite.com/webforms/landing/l1d9x5) to keep in touch with Justin Gordon and [ShakaCode](http://www.shakacode.com/). I intend to send announcements of new releases of React on Rails and of our latest [blog articles](https://blog.shakacode.com) and tutorials. Subscribers will also have access to **exclusive content**, including tips and examples.
 
 [![2017-01-31_14-16-56](https://cloud.githubusercontent.com/assets/1118459/22490211/f7a70418-e7bf-11e6-9bef-b3ccd715dbf8.png)](https://app.mailerlite.com/webforms/landing/l1d9x5)
 
-* **Slack Room**: [Contact us](mailto:contact@shakacode.com) for an invite to the ShakaCode Slack room!
+* **Slack Room**: [Contact us](mailto:contact@shakacode.com) for an invite to the ShakaCode Slack room! Let us know if you want to contribute.
 * **[forum.shakacode.com](https://forum.shakacode.com)**: Post your questions
 * **[@ShakaCode on Twitter](https://twitter.com/shakacode)**
+* For a live, [open source](https://github.com/shakacode/react-webpack-rails-tutorial), example of this gem, see [www.reactrails.com](http://www.reactrails.com). 
+
+------
 
 # Testimonials
 From Joel Hooks, Co-Founder, Chief Nerd at [egghead.io](https://egghead.io/), January 30, 2017:
+
 ![2017-01-30_11-33-59](https://cloud.githubusercontent.com/assets/1118459/22443635/b3549fb4-e6e3-11e6-8ea2-6f589dc93ed3.png)
 
 For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
+
+-------
 
 # Articles, Videos, and Podcasts
 
@@ -43,7 +52,7 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 * [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
 
 ### Videos
-
+1. [GORUCO 2017: Front-End Sadness to Happiness: The React on Rails Story by Justin Gordon](https://www.youtube.com/watch?v=SGkTvKRPYrk)
 1. [egghead.io: Creating a component with React on Rails](https://egghead.io/lessons/react-creating-a-component-with-react-on-rails)
 1. [egghead.io: Creating a redux component with React on Rails](https://egghead.io/lessons/react-add-redux-state-management-to-a-react-on-rails-project)
 1. [React On Rails Tutorial Series](https://www.youtube.com/playlist?list=PL5VAKH-U1M6dj84BApfUtvBjvF-0-JfEU)
@@ -54,10 +63,15 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 ### Podcasts
 * [284 Ruby Rogues: React on Rails with Justin Gordon and Rob Wise](https://devchat.tv/ruby-rogues/284-rr-react-on-rails-with-justin-gordon-and-rob-wise)
 
+------
+
 # NEWS
-* 2017-04-25: 7.0.0 Shipped! Performance improvements! Please upgrade! Only "breaking" change is that you have to update both the node module and the Ruby gem.
-* 2017-04-09: 8.0.0 beta work to include webpacker_lite gem has begun. See [#786](https://github.com/shakacode/react_on_rails/issues/786).
+* The Docs here on `master` refer to 8.0.0 including support for [webpacker_lite](https://github.com/shakacode/webpacker_lite)!
+*Use the [7.0.4 docs](https://github.com/shakacode/react_on_rails/tree/7.0.4) to refer to the older asset pipeline way.*
+* **[VERSION 8.0.0](https://rubygems.org/gems/react_on_rails/)** shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) (soon [**webpacker**](https://github.com/rails/webpacker/issues/464#issuecomment-310986140) support! [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395) shows the changes needed to migrate from the Asset Pipeline to Webpacker Lite. For more information, see my article: [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92). Per recent discussions, we [will merge Webpacker Lite changes back into Webpacker](https://github.com/rails/webpacker/issues/464#issuecomment-310986140). There's no reason to wait for this. The upgrade will eventually be trivial.
 * *See [NEWS.md](NEWS.md) for more notes over time.*
+
+------
 
 # React on Rails
 
@@ -175,7 +189,7 @@ Configure the `config/initializers/react_on_rails.rb`. You can adjust some neces
   <%= react_component("HelloWorld", props: @some_props, prerender: true) %>
   ```
 
-+ The `component_name` parameter is a string matching the name you used to expose your React component globally. So, in the above examples, if you had a React component named "HelloWorld," you would register it with the following lines:
++ The `component_name` parameter is a string matching the name you used to expose your React component globally. So, in the above examples, if you had a React component named "HelloWorld", you would register it with the following lines:
 
   ```js
   import ReactOnRails from 'react-on-rails';
@@ -226,14 +240,14 @@ Now the server will interpret your JavaScript using [ExecJS](https://github.com/
 
 In the following screenshot you can see the 3 parts of React on Rails rendering:
 
-1. A hidden HTML div that contains the properties of the React component, such as the registered name and any props. A JavaScript function runs after the page loads to convert take this data and build initialize React components.
+1. A hidden HTML div contains the properties of the React component, such as the registered name and any props. A JavaScript function runs after the page loads to take this data and build initialize React components.
 2. The wrapper div `<div id="HelloWorld-react-component-0">` specifies the div where to place the React rendering. It encloses the server-rendered HTML for the React component
-3. Additional JavaScript is placed to console log any messages, such as server rendering errors. Note, these server side logs can be configured to only be sent to the server logs.
+3. Additional JavaScript is placed to console-log any messages, such as server rendering errors. Note, these server side logs can be configured only to be sent to the server logs.
 
 **Note**:
 
 * If server rendering is not used (prerender: false), then the major difference is that the HTML rendered for the React component only contains the outer div: `<div id="HelloWorld-react-component-0"/>`. The first specification of the React component is just the same.
-* The below image is not yet updated for version 7.0.0 which uses a `<script>` tag for the props. Instead of a hidden div, we have the props inside of the a `<script>` tag.
+* The below image is not yet updated for version 7.0.0 which uses a `<script>` tag for the props. Instead of a hidden div, we have the props inside of the `<script>` tag.
 
 ![Comparison of a normal React Component with its server-rendered version](https://cloud.githubusercontent.com/assets/1118459/12607542/a959d5c8-c48a-11e5-8187-2433d543ccaa.png)
 
@@ -245,7 +259,7 @@ On production deployments that use asset precompilation, such as Heroku deployme
 If you have used the provided generator, these bundles will automatically be added to your `.gitignore` to prevent extraneous noise from re-generated code in your pull requests. You will want to do this manually if you do not use the provided generator.
 
 ### Rails Context
-When you use a "generator function" to create react components (or renderedHtml on the server) or you used shared redux stores, you get 2 params passed to your function:
+When you use a "generator function" to create react components (or renderedHtml on the server), or you used shared redux stores, you get two params passed to your function:
 
 1. Props that you pass in the view helper of either `react_component` or `redux_store`
 2. Rails contextual information, such as the current pathname. You can customize this in your config file.
@@ -265,7 +279,7 @@ and for a store:
 reduxStore = MyReduxStore(props, railsContext);
 ```
 
-Note, you never make these calls. This is what React on Rails does when either server or client rendering. You'll be defining functions that take these params and return a React component or a Redux Store.
+Note, you never make these calls. React on Rails makes these calls when it does either server or client rendering. You'll be defining functions that take these params and return a React component or a Redux Store.
 
 (Note, see below [section](#multiple-react-components-on-a-page-with-one-store) on how to setup redux stores that allow multiple components to talk to the same store.)
 
@@ -290,8 +304,8 @@ The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](h
 ```
 
 #### Use Cases
-##### Needing the current url path for server rendering
-Suppose you want to display a nav bar with the current navigation link highlighted by the URL. When you server render the code, you will need to know the current URL/path if that is what you want your logic to be based on. The new `railsContext` has this information so the application of an "active" class can be done server side.
+##### Needing the current URL path for server rendering
+Suppose you want to display a nav bar with the current navigation link highlighted by the URL. When you server-render the code, your code will need to know the current URL/path. The new `railsContext` has this information. Your application will apply something like an "active" class on the server rendering.
 
 ##### Configuring different code for server side rendering
 Suppose you want to turn off animation when doing server side rendering. The `serverSide` value is just what you need.
@@ -326,9 +340,9 @@ end
 In this case, a prop and value for `somethingUseful` will go into the railsContext passed to all react_component and redux_store calls. You may set any values available in the view rendering context.
 
 ### Globally Exposing Your React Components
-Place your JavaScript code inside of the provided `client/app` folder. Use modules just as you would when using webpack alone. The difference here is that instead of mounting React components directly to an element using `React.render`, you **expose your components globally and then mount them with helpers inside of your Rails views**.
+Place your JavaScript code inside of the provided `client/app` folder. Use modules just as you would when using webpack alone. The difference here is that instead of mounting React components directly to an element using `React.render`, you **register your components to ReactOnRails and then mount them with helpers inside of your Rails views**.
 
-This is an example of how to expose a component to the `react_component` view helper.
+This is how to expose a component to the `react_component` view helper.
 
   ```javascript
   // client/app/bundles/HelloWorld/startup/HelloWorld.jsx
@@ -339,27 +353,25 @@ This is an example of how to expose a component to the `react_component` view he
 
 #### Different Server-Side Rendering Code (and a Server Specific Bundle)
 
-You may want different initialization for your server rendered components. For example, if you have animation that runs when a component is displayed, you might need to turn that off when server rendering. However, the `railsContext` will tell you if your JavaScript code is running client side or server side. So code that required a different server bundle previously may no longer require this!
+You may want different initialization for your server-rendered components. For example, if you have an animation that runs when a component is displayed, you might need to turn that off when server rendering. However, the `railsContext` will tell you if your JavaScript code is running client side or server side. So code that required a different server bundle previously may no longer require this!
 
-If you do want different code to run, you'd setup a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverHelloWorld.jsx'. Note, you might be initializing HelloWorld with version specialized for server rendering.
+If you want different code to run, you'd set up a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverHelloWorld.jsx'. Note, you might be initializing HelloWorld with version specialized for server rendering.
 
 #### Generator Functions
-Why would you create a function that returns a React component? For example, you may want the ability to use the passed-in props to initialize a redux store or setup react-router. Or you may want to return different components depending on what's in the props. ReactOnRails will automatically detect a registered generator function.
+Why would you create a function that returns a React component? For example, you may want the ability to use the passed-in props to initialize a redux store or set up react-router. Or you may want to return different components depending on what's in the props. ReactOnRails will automatically detect a registered generator function.
 
 Another reason to use a generator function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }.
 
-For server rendering, if you wish to return multiple HTML strings from a generator function, you may return an Object from your generator function with a single top level property of renderedHtml. Inside this Object, place a key called componentHtml, along with any other needed keys. This is useful when you using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
+For server rendering, if you wish to return multiple HTML strings from a generator function, you may return an Object from your generator function with a single top level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
 { renderedHtml: { componentHtml, customKey1, customKey2} }
 
 #### Renderer Functions
-A renderer function is a generator function that accepts three arguments: `(props, railsContext, domNodeId) => { ... }`. Instead of returning a React component, a renderer is responsible for calling `ReactDOM.render` to manually render a React component into the dom. Why would you want to call `ReactDOM.render` yourself? One possible use case is [code splitting](./docs/additional-reading/code-splitting.md).
+A renderer function is a generator function that accepts three arguments: `(props, railsContext, domNodeId) => { ... }`. Instead of returning a React component, a renderer is responsible for calling `ReactDOM.render` to render a React component into the dom. Why would you want to call `ReactDOM.render` yourself? One possible use case is [code splitting](./docs/additional-reading/code-splitting.md).
 
-Renderer functions are not meant to be used on the server, since there's no DOM on the server. Instead, use a generator function. Attempting to server render with a renderer function will cause an error.
+Renderer functions are not meant to be used on the server since there's no DOM on the server. Instead, use a generator function. Attempting to server render with a renderer function will cause an error.
 
 ## ReactOnRails View Helpers API
-Once the bundled files have been generated in your `app/assets/webpack` folder and you have exposed your components globally, you will want to run your code in your Rails views using the included helper method.
-
-This is how you actually render the React components you exposed to `window` inside of `clientRegistration` (and `global` inside of `serverRegistration` if you are server rendering).
+Once the bundled files have been generated in your `app/assets/webpack` folder and you have registered your components, you will want to render these components on your Rails views using the included helper method, `react_component`.
 
 ### react_component
 ```ruby
@@ -373,19 +385,19 @@ react_component(component_name,
                 html_options: {})
 ```
 
-+ **component_name:** Can be a React component, created using a ES6 class, or `React.createClass`, a generator function that returns a React component (or only on the server side, an object with shape { redirectLocation, error, renderedHtml }), or a renderer function that manually renders a React component to the dom (client side only).
++ **component_name:** Can be a React component, created using an ES6 class or a generator function that returns a React component (or, only on the server side, an object with shape { redirectLocation, error, renderedHtml }), or a "renderer function" that manually renders a React component to the dom (client side only).
 + **options:**
   + **props:** Ruby Hash which contains the properties to pass to the react object, or a JSON string. If you pass a string, we'll escape it for you.
-  + **prerender:** enable server-side rendering of component. Set to false when debugging!
+  + **prerender:** enable server-side rendering of a component. Set to false when debugging!
   + **id:** Id for the div, will be used to attach the React component. This will get assigned automatically if you do not provide an id. Must be unique.
-  + **html_options:** Any other html options to get placed on the added div for the component. For example, you can set a class (or inline style) on the outer div so that it behaves like a span, with styling of `display:inline-block`.
-  + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise. Note, on the client you will so both the railsContext and your props. On the server, you only see the railsContext being logged.
-  + **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the default configuration of logging_on_server set to true, you'll still see the errors on the server.
+  + **html_options:** Any other HTML options get placed on the added div for the component. For example, you can set a class (or inline style) on the outer div so that it behaves like a span, with the styling of `display:inline-block`.
+  + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise. Note, on the client, you will see both the `railsContext` and your props. On the server, you only see the `railsContext` being logged.
+  + **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the default configuration of `logging_on_server` set to true, you'll still see the errors on the server.
   + **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
 
 ### redux_store
 #### Controller Extension
-Include the module ReactOnRails::Controller in your controller, probably in ApplicationController. This will provide the following controller method, which you can call in your controller actions:
+Include the module `ReactOnRails::Controller` in your controller, probably in ApplicationController. This will provide the following controller method, which you can call in your controller actions:
 
 `redux_store(store_name, props: {})`
 
@@ -399,28 +411,28 @@ For an example, see [spec/dummy/app/controllers/pages_controller.rb](https://git
 #### View Helper
 `redux_store(store_name, props: {})`
 
-Same API as the controller extension. **HOWEVER**, we recommend the controller extension instead because the Rails executes the template code in the controller action's view file (`erb`, `haml`, `slim`, etc.) before the layout. So long as you call `redux_store` at the beginning of your action's view file, this will work. However, it's an easy mistake to put this call in the wrong place. Calling `redux_store` in the controller action ensures proper load order, regardless of where you call this in the controller action. Note, you won't know of this subtle ordering issue until you server render and you find that your store is not hydrated properly.
+This method has the same API as the controller extension. **HOWEVER**, we recommend the controller extension instead because the Rails executes the template code in the controller action's view file (`erb`, `haml`, `slim`, etc.) before the layout. So long as you call `redux_store` at the beginning of your action's view file, this will work. However, it's an easy mistake to put this call in the wrong place. Calling `redux_store` in the controller action ensures proper load order, regardless of where you call this in the controller action. Note, you won't know of this subtle ordering issue until you server render and you find that your store is not hydrated properly.
 
 `redux_store_hydration_data`
 
-Place this view helper (no parameters) at the end of your shared layout. This tell ReactOnRails where to client render the redux store hydration data. Since we're going to be setting up the stores in the controllers, we need to know where on the view to put the client side rendering of this hydration data, which is a hidden div with a matching class that contains a data props. For an example, see [spec/dummy/app/views/layouts/application.html.erb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/layouts/application.html.erb).
+Place this view helper (no parameters) at the end of your shared layout so ReactOnRails will render the redux store hydration data. Since we're going to be setting up the stores in the controllers, we need to know where on the view to put the client-side rendering of this hydration data, which is a hidden div with a matching class that contains a data props. For an example, see [spec/dummy/app/views/layouts/application.html.erb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/layouts/application.html.erb).
 
 #### Redux Store Notes
-Note, you don't need to separately initialize your redux store. However, it's recommended for the two following use cases:
+Note, you don't need to initialize your redux store. You can pass the props to your React component in a "generator function." However, consider using the `redux_store` helper for the two following use cases:
 
-1. You want to have multiple components that access the same store.
+1. You want to have multiple React components accessing the same store at once.
 2. You want to place the props to hydrate the client side stores at the very end of your HTML so that the browser can render all earlier HTML first. This is particularly useful if your props will be large.
 
 ### server_render_js
 `server_render_js(js_expression, options = {})`
 
-+ js_expression, like 2 + 3, and not a block of js code. If you have more than one line that needs to be executed, wrap it in an [IIFE](https://en.wikipedia.org/wiki/Immediately-invoked_function_expression). JS exceptions will be caught and console messages handled properly
++ js_expression, like 2 + 3, and not a block of js code. If you have more than one line that needs to be executed, wrap it in an [IIFE](https://en.wikipedia.org/wiki/Immediately-invoked_function_expression). JS exceptions will be caught, and console messages will be handled properly
 + Currently, the only option you may pass is `replay_console` (boolean)
 
 This is a helper method that takes any JavaScript expression and returns the output from evaluating it. If you have more than one line that needs to be executed, wrap it in an IIFE. JS exceptions will be caught and console messages handled properly.
 
 ## Multiple React Components on a Page with One Store
-You may wish to have 2 React components share the same the Redux store. For example, if your navbar is a React component, you may want it to use the same store as your component in the main area of the page. You may even want multiple React components in the main area, which allows for greater modularity. In addition, you may want this to work with Turbolinks to minimize reloading the JavaScript. A good example of this would be something like a notifications counter in a header. As each notification is read in the body of the page, you would like to update the header. If both the header and body share the same Redux store, then this is trivial. Otherwise, we have to rely on other solutions, such as the header polling the server to see how many unread notifications exist.
+You may wish to have 2 React components share the same the Redux store. For example, if your navbar is a React component, you may want it to use the same store as your component in the main area of the page. You may even want multiple React components in the main area, which allows for greater modularity. Also, you may want this to work with Turbolinks to minimize reloading the JavaScript. A good example of this would be something like a notifications counter in a header. As each notification is read in the body of the page, you would like to update the header. If both the header and body share the same Redux store, then this is trivial. Otherwise, we have to rely on other solutions, such as the header polling the server to see how many unread notifications exist.
 
 Suppose the Redux store is called `appStore`, and you have 3 React components that each needs to connect to a store: `NavbarApp`, `CommentsApp`, and `BlogsApp`. I named them with `App` to indicate that they are the registered components.
 
@@ -450,7 +462,7 @@ return (
 );
 ```
 
-From your Rails view, you can use the provided helper `redux_store(store_name, props)` to create a fresh version of the store (because it may already exist if you came from visiting a previous page). Note, for this example, since we're initializing this from the main layout, we're using a generic name of `@react_props`. This means in this case that Rails controllers would set `@react_props` to the properties to hydrate the Redux store.
+From your Rails view, you can use the provided helper `redux_store(store_name, props)` to create a fresh version of the store (because it may already exist if you came from visiting a previous page). Note, for this example, since we're initializing this from the main layout, we're using a generic name of `@react_props`. In other words, the Rails controller would set `@react_props` to the properties to hydrate the Redux store.
 
 **app/views/layouts/application.html.erb**
 ```erb
@@ -480,7 +492,7 @@ See [ReactOnRails JavaScript API](docs/api/javascript-api.md).
 
 #### Using Rails built-in CSRF protection in JavaScript
 
-Rails has built-in protection for Cross-Site Request Forgery (CSRF), see [Rails Documentation](http://guides.rubyonrails.org/security.html#cross-site-request-forgery-csrf). To nicely utilize this feature in JavaScript requests, React on Rails is offerring two helpers that can be used as following for POST, PUT or DELETE requests:
+Rails has built-in protection for Cross-Site Request Forgery (CSRF), see [Rails Documentation](http://guides.rubyonrails.org/security.html#cross-site-request-forgery-csrf). To nicely utilize this feature in JavaScript requests, React on Rails provides two helpers that can be used as following for POST, PUT or DELETE requests:
 
 ```js
 import ReactOnRails from 'react-on-rails';
@@ -495,7 +507,7 @@ header = ReactOnRails.authenticityHeaders(otherHeader);
 If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX calls, then these helpers are not needed because the [jquery-ujs](https://github.com/rails/jquery-ujs) library updates header automatically, see [jquery-ujs documentation](https://robots.thoughtbot.com/a-tour-of-rails-jquery-ujs#cross-site-request-forgery-protection).
 
 ## React Router
-[React Router](https://github.com/reactjs/react-router) is supported, including server side rendering! See:
+[React Router](https://github.com/reactjs/react-router) is supported, including server-side rendering! See:
 
 1. [React on Rails docs for react-router](./docs/additional-reading/react-router.md)
 1. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/ServerRouterApp.jsx).
@@ -506,10 +518,10 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
   * `config.symlink_non_digested_assets_regex`: Set to nil to turn off the setup of non-js assets.
   * `npm_build_production_command`: Set to nil to turn off the precompilation of the js assets.
 * See the [Heroku Deployment](./docs/additional-reading/heroku-deployment.md) doc for specifics regarding Heroku. The information here should apply to other deployments.
-* If you're using the node server for server rendering, you may want to do your own AWS install. We'll have more docs on this in the future. [Get in touch](mailto:justin@shakacode.com) if you're keenly interested in this feature.
 
-## Integration with Node
-Node.js can be used as the backend for server-side rendering instead of [execJS](https://github.com/rails/execjs). Before you try this, consider the tradeoff of extra complexity with your deployments versus *potential* performance gains. We've found that using ExecJS with [mini_racer](https://github.com/discourse/mini_racer) to be "fast enough" so far. That being said, we've heard of other large websites using Node.js for better server rendering performance. See [Node.js for Server Rendering](./docs/additional-reading/node-server-rendering.md) for more information.
+## Integration with Node.js for Server Rendering
+
+If you want to use a node server for server rendering, [get in touch](mailto:justin@shakacode.com). ShakaCode has built a premium Node rendering server for React on Rails.
 
 ## Additional Documentation
 **Try out our new [Documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) for improved readability & reference!**
@@ -606,19 +618,37 @@ The following companies support open source, and ShakaCode uses their products!
 * [JetBrains](https://www.jetbrains.com/)
 * [![2017-02-21_22-35-32](https://cloud.githubusercontent.com/assets/1118459/23203304/1261e468-f886-11e6-819e-93b1a3f17da4.png)](https://www.browserstack.com)
 
+*If you'd like to support React on Rails and have your company listed here, [get in touch](mailto:justin@shakacode.com).*
+
 # FINAL NOTES
 * See [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
 * Follow [@railsonmaui](https://twitter.com/railsonmaui) and [@shakacode](https://twitter.com/shakacode) on Twitter for updates on releases. We've also got a forum category dedicated to [react_on_rails](https://forum.shakacode.com/c/rails/reactonrails).
-* Please [Subscribe](https://app.mailerlite.com/webforms/landing/l1d9x5) to keep in touch with Justin Gordon and [ShakaCode](http://www.shakacode.com/). I intend to send a monthly summary including announcements of new releases of React on Rails and of our latest [blog articles](https://blog.shakacode.com) and tutorials. Subscribers will also have access to **exclusive content**, including tips and examples.
+* Please [Subscribe](https://app.mailerlite.com/webforms/landing/l1d9x5) to keep in touch with Justin Gordon and [ShakaCode](http://www.shakacode.com/). I intend to send announcements of new releases of React on Rails and of our latest [blog articles](https://blog.shakacode.com) and tutorials. Subscribers will also have access to **exclusive content**, including tips and examples.
 
 [![2017-01-31_14-16-56](https://cloud.githubusercontent.com/assets/1118459/22490211/f7a70418-e7bf-11e6-9bef-b3ccd715dbf8.png)](https://app.mailerlite.com/webforms/landing/l1d9x5)
 
 ---
 
-Aloha from Justin Gordon ([bio](http://www.railsonmaui.com/about)) and the [ShakaCode](http://www.shakacode.com) Team! We're actively looking for new projects involving React, React-Native, and Rails. Please contact me at [justin@shakacode.com](mailto:justin@shakacode.com) if we could potentially help you in any way. Besides consulting on bigger projects, [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for React on Rails. See our blog post [Can ShakaCode Help You?](https://blog.shakacode.com/can-shakacode-help-you-4a5b1e5a8a63#.jex6tg9w9) for more information.
+*Identical to top of page*
 
-We're offering a free half-hour project consultation, on anything from React on Rails to any aspect of web application development for both consumer and enterprise products. In addition to React.js and Rails, we're doing React-Native iOS and Android apps!
+## Thank you from [Justin Gordon](https://github.com/justin808) and [ShakaCode](https://github.com/shakacode)
+Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails). For an overview and the "why?" of this project, see my GORUCO 2017 talk [Front-End Sadness to Happiness: The React on Rails Story](https://www.youtube.com/watch?v=SGkTvKRPYrk)**. You can get the *[slides here](http://www.shakacode.com/talks)*.
 
-Whether you have a new project or need help on an existing project, feel free to contact me directly at [justin@shakacode.com](mailto:justin@shakacode.com) and thanks in advance for any referrals!
+We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first application development company. We fund this project by:
 
-Your support keeps this project going.
+* Providing priority support and training for anything related to React + Webpack + Rails in our [Coaching Program](http://www.shakacode.com/work/shakacode-coaching-plan.pdf).
+* Building custom web and mobile (React Native) applications, sometimes leveraging the code of our own consumer product, [Friends and Guests](https://www.friendsandguests.com), a vacation rental website like Airbnb. We typically work with a technical founder or CTO and instantly provide a full development team including designers.
+* Migrating **Angular** + Rails to React + Rails. You can see an example of React on Rails and our work converting Angular to React on Rails at [egghead.io](https://egghead.io/browse/frameworks).
+* Augmenting your team to get your product completed more efficiently and quickly.
+
+My article "[Why Hire ShakaCode?](https://blog.shakacode.com/can-shakacode-help-you-4a5b1e5a8a63#.jex6tg9w9)" provides additional details about our projects.
+
+If any of this resonates with you, please email me, [justin@shakacode.com](mailto:justin@shakacode.com). I offer a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products. 
+
+We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our product, [Friends and Guests](https://www.friendsandguests.com). By working on our product, new hires get trained in the ShakaCode way.
+
+I appreciate your attention and sharing of these offerings with anybody that we can help. Your support allows me to bring you and your team [front-end happiness in the Rails world](https://www.youtube.com/watch?v=SGkTvKRPYrk).
+
+Aloha and best wishes from the ShakaCode team!
+
+------
