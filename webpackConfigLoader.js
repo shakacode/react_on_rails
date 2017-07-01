@@ -55,7 +55,6 @@ const configLoader = (configPath) => {
   const configEnv = (process.env.NODE_ENV || process.env.RAILS_ENV || 'development');
   const ymlConfigPath = join(configPath, 'webpacker_lite.yml');
   const configuration = safeLoad(readFileSync(ymlConfigPath, 'utf8'))[configEnv];
-  
   const devBuild = configEnv !== 'production';
   const hotReloadingHost = configuration.hot_reloading_host || DEFAULT_HOT_RELOADING_HOST;
 
