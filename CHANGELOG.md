@@ -8,6 +8,7 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
+## [8.0.4]
 ### Fixed
  - Fixed `devBuild` for webpack production build. [#877](https://github.com/shakacode/react_on_rails/pull/877) by [chenqingspring](https://github.com/chenqingspring)
 
