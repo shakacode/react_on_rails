@@ -8,9 +8,8 @@ export default class HelloWorld extends React.Component {
 
   /**
    * @param props - Comes from your rails view.
-   * @param _railsContext - Comes from React on Rails
    */
-  constructor(props, _railsContext) {
+  constructor(props) {
     super(props);
 
     // How to set initial state in ES6 class syntax

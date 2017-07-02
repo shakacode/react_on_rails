@@ -12,6 +12,7 @@ Changes since last non-beta release.
 ### Fixed
  - Corrects `devBuild` value for webpack production build from webpackConfigLoader. [#877](https://github.com/shakacode/react_on_rails/pull/877) by [chenqingspring](https://github.com/chenqingspring).
  - Remove contentBase deprecation warning message. [#878](https://github.com/shakacode/react_on_rails/pull/878) by [ened ](https://github.com/ened).
+ - Removes invalid to _railsContext in the generator.
 
 ## [8.0.3]
 ### Fixed
