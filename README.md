@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Codeship Status for shakacode/react_on_rails](https://app.codeship.com/projects/cec6c040-971f-0134-488f-0a5146246bd8/status?branch=master)](https://app.codeship.com/projects/187011) [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
-## Thank you from [Justin Gordon](https://github.com/justin808) and [ShakaCode](https://github.com/shakacode)
+## Thank you from Justin Gordon and [ShakaCode](http://www.shakacode.com)
 
 Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails). 
 
@@ -262,22 +262,37 @@ On production deployments that use asset precompilation, such as Heroku deployme
 
 If you have used the provided generator, these bundles will automatically be added to your `.gitignore` to prevent extraneous noise from re-generated code in your pull requests. You will want to do this manually if you do not use the provided generator.
 
-### Rails Context
-When you use a "generator function" to create react components (or renderedHtml on the server), or you used shared redux stores, you get two params passed to your function:
+### Rails Context and Generator Functions
+When you use a "generator function" to create react components (or renderedHtml on the server), or you used shared redux stores, you get two params passed to your function that creates a React component:
 
 1. Props that you pass in the view helper of either `react_component` or `redux_store`
 2. Rails contextual information, such as the current pathname. You can customize this in your config file.
 
-This information (`props` and `railsContext`) should be the same regardless of either client or server side rendering.
+This parameters (`props` and `railsContext`) will be the same regardless of either client or server side rendering, except for the key `serverSide` based on whether or not you are server rendering.
 
 While you could manually pass the `railsContext` information in as "props", the `rails_context` is a convenience because it's passed consistently to all invocations of generator functions.
+
+For example, suppose you create a "generator function" called MyAppComponent. 
+
+```js
+import React from 'react';
+const MyAppComponent = (props, railsContext) => (
+  <div>
+    <p>props are: {JSON.stringify(props)}</p>
+    <p>railsContext is: {JSON.stringify(railsContext)}
+    </p>
+  </div>
+);
+export default MyAppComponent;
+```
 
 So if you register your generator function `MyAppComponent`, it will get called like:
 
 ```js
 reactComponent = MyAppComponent(props, railsContext);
 ```
-and for a store:
+
+and, similarly, for a store get initialized with 2 parameters:
 
 ```js
 reduxStore = MyReduxStore(props, railsContext);
@@ -362,7 +377,13 @@ You may want different initialization for your server-rendered components. For e
 If you want different code to run, you'd set up a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverHelloWorld.jsx'. Note, you might be initializing HelloWorld with version specialized for server rendering.
 
 #### Generator Functions
-Why would you create a function that returns a React component? For example, you may want the ability to use the passed-in props to initialize a redux store or set up react-router. Or you may want to return different components depending on what's in the props. ReactOnRails will automatically detect a registered generator function.
+Why would you create a function that returns a React component? 
+
+1. You need access to the `railsContext`. See documentation for the railsContext in terms of why you might need it.
+1. You may want the ability to use the passed-in props to initialize a redux store or set up react-router
+1. You may want to return different components depending on what's in the props. 
+
+ReactOnRails will automatically detect a registered generator function. Thus, there is no difference between registering a React Component versus a "generator function."
 
 Another reason to use a generator function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }.
 
@@ -635,7 +656,7 @@ The following companies support open source, and ShakaCode uses their products!
 
 *Identical to top of page*
 
-## Thank you from [Justin Gordon](https://github.com/justin808) and [ShakaCode](https://github.com/shakacode)
+## Thank you from Justin Gordon and [ShakaCode](http://www.shakacode.com)
 
 Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails). 
 
