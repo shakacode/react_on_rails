@@ -8,12 +8,14 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
-## [8.0.4]
-### Fixed
+## [8.0.5]
+### fixed
  - Corrects `devBuild` value for webpack production build from webpackConfigLoader. [#877](https://github.com/shakacode/react_on_rails/pull/877) by [chenqingspring](https://github.com/chenqingspring).
  - Remove contentBase deprecation warning message. [#878](https://github.com/shakacode/react_on_rails/pull/878) by [ened ](https://github.com/ened).
  - Removes invalid reference to _railsContext in the generated files. [#886](https://github.com/shakacode/react_on_rails/pull/8876) by [justin808](https://github.com/justin808)
  - All tests run against Rails 5.1.2
+
+*Note: 8.0.4 skipped.*
 
 ## [8.0.3]
 ### Fixed
@@ -618,8 +620,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.4...master
-[8.0.4]: https://github.com/shakacode/react_on_rails/compare/8.0.3...8.0.4
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.5...master
+[8.0.5]: https://github.com/shakacode/react_on_rails/compare/8.0.3...8.0.5
 [8.0.3]: https://github.com/shakacode/react_on_rails/compare/8.0.2...8.0.3
 [8.0.2]: https://github.com/shakacode/react_on_rails/compare/8.0.1...8.0.2
 [8.0.1]: https://github.com/shakacode/react_on_rails/compare/8.0.0...8.0.1
