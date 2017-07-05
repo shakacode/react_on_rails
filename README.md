@@ -1,10 +1,10 @@
 [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Codeship Status for shakacode/react_on_rails](https://app.codeship.com/projects/cec6c040-971f-0134-488f-0a5146246bd8/status?branch=master)](https://app.codeship.com/projects/187011) [![Dependency Status](https://gemnasium.com/shakacode/react_on_rails.svg)](https://gemnasium.com/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
-## Thank you from [Justin Gordon](https://github.com/justin808) and [ShakaCode](https://github.com/shakacode)
+## Thank you from Justin Gordon and [ShakaCode](http://www.shakacode.com)
 
-Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails). 
+Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails).
 
-* **Video:** [Front-End Sadness to Happiness: The React on Rails Story](https://www.youtube.com/watch?v=SGkTvKRPYrk): History, motivations, philosophy, and overview. 
+* **Video:** [Front-End Sadness to Happiness: The React on Rails Story](https://www.youtube.com/watch?v=SGkTvKRPYrk): History, motivations, philosophy, and overview.
 * *[Click here for talk slides](http://www.shakacode.com/talks).*
 
 We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first application development company. We fund this project by:
@@ -16,9 +16,9 @@ We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first 
 
 My article "[Why Hire ShakaCode?](https://blog.shakacode.com/can-shakacode-help-you-4a5b1e5a8a63#.jex6tg9w9)" provides additional details about our projects.
 
-If any of this resonates with you, please email me, [justin@shakacode.com](mailto:justin@shakacode.com). I offer a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products. 
+If any of this resonates with you, please email me, [justin@shakacode.com](mailto:justin@shakacode.com). I offer a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products.
 
-We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Friends and Guests](https://www.friendsandguests.com). 
+We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Friends and Guests](https://www.friendsandguests.com).
 
 I appreciate your attention and sharing of these offerings with anybody that we can help. Your support allows me to bring you and your team [front-end happiness in the Rails world](https://www.youtube.com/watch?v=SGkTvKRPYrk).
 
@@ -34,7 +34,7 @@ Please [**click to subscribe**](https://app.mailerlite.com/webforms/landing/l1d9
 * **Slack Room**: [Contact us](mailto:contact@shakacode.com) for an invite to the ShakaCode Slack room! Let us know if you want to contribute.
 * **[forum.shakacode.com](https://forum.shakacode.com)**: Post your questions
 * **[@ShakaCode on Twitter](https://twitter.com/shakacode)**
-* For a live, [open source](https://github.com/shakacode/react-webpack-rails-tutorial), example of this gem, see [www.reactrails.com](http://www.reactrails.com). 
+* For a live, [open source](https://github.com/shakacode/react-webpack-rails-tutorial), example of this gem, see [www.reactrails.com](http://www.reactrails.com).
 
 ------
 
@@ -226,7 +226,7 @@ See the [How to add I18n](docs/basics/i18n.md) for a summary of adding I18n.
 ## NPM
 All JavaScript in React On Rails is loaded from npm: [react-on-rails](https://www.npmjs.com/package/react-on-rails). To manually install this (you did not use the generator), assuming you have a standard configuration, run this command:
 
-```
+```bash
 cd client && yarn add react-on-rails
 ```
 
@@ -262,28 +262,60 @@ On production deployments that use asset precompilation, such as Heroku deployme
 
 If you have used the provided generator, these bundles will automatically be added to your `.gitignore` to prevent extraneous noise from re-generated code in your pull requests. You will want to do this manually if you do not use the provided generator.
 
-### Rails Context
-When you use a "generator function" to create react components (or renderedHtml on the server), or you used shared redux stores, you get two params passed to your function:
 
-1. Props that you pass in the view helper of either `react_component` or `redux_store`
-2. Rails contextual information, such as the current pathname. You can customize this in your config file.
+### Generator Functions
+Why would you create a function that returns a React component?
 
-This information (`props` and `railsContext`) should be the same regardless of either client or server side rendering.
+1. You need access to the `railsContext`. See documentation for the railsContext in terms of why you might need it.
+1. You may want the ability to use the passed-in props to initialize a redux store or set up react-router
+1. You may want to return different components depending on what's in the props.
 
-While you could manually pass the `railsContext` information in as "props", the `rails_context` is a convenience because it's passed consistently to all invocations of generator functions.
+ReactOnRails will automatically detect a registered generator function. Thus, there is no difference between registering a React Component versus a "generator function."
+
+Another reason to use a generator function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }.
+
+For server rendering, if you wish to return multiple HTML strings from a generator function, you may return an Object from your generator function with a single top level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
+{ renderedHtml: { componentHtml, customKey1, customKey2} }
+
+### Rails Context and Generator Functions
+When you use a "generator function" to create react components (or renderedHtml on the server), or you used shared redux stores, you get two params passed to your function that creates a React component:
+
+1. `props`: Props that you pass in the view helper of either `react_component` or `redux_store`
+2. `railsContext`: Rails contextual information, such as the current pathname. You can customize this in your config file.
+
+This parameters (`props` and `railsContext`) will be the same regardless of either client or server side rendering, except for the key `serverSide` based on whether or not you are server rendering.
+
+While you could manually configure your Rails code to pass the "`railsContext` information" with the rest of your "props", the `railsContext` is a convenience because it's passed consistently to all invocations of generator functions.
+
+For example, suppose you create a "generator function" called MyAppComponent.
+
+```js
+import React from 'react';
+const MyAppComponent = (props, railsContext) => (
+  <div>
+    <p>props are: {JSON.stringify(props)}</p>
+    <p>railsContext is: {JSON.stringify(railsContext)}
+    </p>
+  </div>
+);
+export default MyAppComponent;
+```
+
+*Note: you will get a React browser console warning if you try to serverRender this since the value of `serverSide` will be different for server rendering.*
 
 So if you register your generator function `MyAppComponent`, it will get called like:
 
 ```js
 reactComponent = MyAppComponent(props, railsContext);
 ```
-and for a store:
+
+and, similarly, any redux store always initialized with 2 parameters:
 
 ```js
 reduxStore = MyReduxStore(props, railsContext);
 ```
 
-Note, you never make these calls. React on Rails makes these calls when it does either server or client rendering. You'll be defining functions that take these params and return a React component or a Redux Store.
+Note, you never make these calls. React on Rails makes these calls when it does either client or server rendering. You will define functions that take these 2 params and return a React component or a Redux Store. Naturally, you do not have to use second parameter of the railsContext if you do not need it.
 
 (Note, see below [section](#multiple-react-components-on-a-page-with-one-store) on how to setup redux stores that allow multiple components to talk to the same store.)
 
@@ -306,6 +338,26 @@ The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](h
      # server version!
   }
 ```
+
+#### Why the railsContext is only passed to generator functions
+There's no reason that the railsContext would ever get passed to your React component unless the value is explicitly put into the props used for rendering. If you create a react component, rather than a generator function, for use by React on Rails, then you get whatever props are passed in from the view helper, which **does not include the Rails Context**. It's trivial to wrap your component in a "generator function" to return a new component that takes both:
+
+```js
+import React from 'react';
+import AppComponent from './AppComponent';
+const AppComponentWithRailsContext = (props, railsContext) => (
+  <AppComponent {...{...props, railsContext}}/>
+)
+export default AppComponentWithRailsContext;
+```
+
+Consider this line in depth:
+
+```js
+  <AppComponent {...{ ...props, railsContext }}/>
+```
+
+The outer `{...` is for the [JSX spread operator for attributes](https://facebook.github.io/react/docs/jsx-in-depth.html#spread-attributes) and the innner `{...` is for the [Spread in object literals](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_operator#Spread_in_object_literals).
 
 #### Use Cases
 ##### Needing the current URL path for server rendering
@@ -360,14 +412,6 @@ This is how to expose a component to the `react_component` view helper.
 You may want different initialization for your server-rendered components. For example, if you have an animation that runs when a component is displayed, you might need to turn that off when server rendering. However, the `railsContext` will tell you if your JavaScript code is running client side or server side. So code that required a different server bundle previously may no longer require this!
 
 If you want different code to run, you'd set up a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverHelloWorld.jsx'. Note, you might be initializing HelloWorld with version specialized for server rendering.
-
-#### Generator Functions
-Why would you create a function that returns a React component? For example, you may want the ability to use the passed-in props to initialize a redux store or set up react-router. Or you may want to return different components depending on what's in the props. ReactOnRails will automatically detect a registered generator function.
-
-Another reason to use a generator function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }.
-
-For server rendering, if you wish to return multiple HTML strings from a generator function, you may return an Object from your generator function with a single top level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
-{ renderedHtml: { componentHtml, customKey1, customKey2} }
 
 #### Renderer Functions
 A renderer function is a generator function that accepts three arguments: `(props, railsContext, domNodeId) => { ... }`. Instead of returning a React component, a renderer is responsible for calling `ReactDOM.render` to render a React component into the dom. Why would you want to call `ReactDOM.render` yourself? One possible use case is [code splitting](./docs/additional-reading/code-splitting.md).
@@ -635,11 +679,11 @@ The following companies support open source, and ShakaCode uses their products!
 
 *Identical to top of page*
 
-## Thank you from [Justin Gordon](https://github.com/justin808) and [ShakaCode](https://github.com/shakacode)
+## Thank you from Justin Gordon and [ShakaCode](http://www.shakacode.com)
 
-Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails). 
+Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails).
 
-* **Video:** [Front-End Sadness to Happiness: The React on Rails Story](https://www.youtube.com/watch?v=SGkTvKRPYrk): History, motivations, philosophy, and overview. 
+* **Video:** [Front-End Sadness to Happiness: The React on Rails Story](https://www.youtube.com/watch?v=SGkTvKRPYrk): History, motivations, philosophy, and overview.
 * *[Click here for talk slides](http://www.shakacode.com/talks).*
 
 We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first application development company. We fund this project by:
@@ -651,9 +695,9 @@ We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first 
 
 My article "[Why Hire ShakaCode?](https://blog.shakacode.com/can-shakacode-help-you-4a5b1e5a8a63#.jex6tg9w9)" provides additional details about our projects.
 
-If any of this resonates with you, please email me, [justin@shakacode.com](mailto:justin@shakacode.com). I offer a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products. 
+If any of this resonates with you, please email me, [justin@shakacode.com](mailto:justin@shakacode.com). I offer a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products.
 
-We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Friends and Guests](https://www.friendsandguests.com). 
+We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Friends and Guests](https://www.friendsandguests.com).
 
 I appreciate your attention and sharing of these offerings with anybody that we can help. Your support allows me to bring you and your team [front-end happiness in the Rails world](https://www.youtube.com/watch?v=SGkTvKRPYrk).
 
