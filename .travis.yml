@@ -36,7 +36,7 @@ install:
   - travis_retry gem install bundler
   - travis_retry nvm install node 8.0.0
   - node -v
-  - travis_retry npm i -g yarn@0.24.6
+  - travis_retry npm i -g yarn@0.27.5
   - travis_retry yarn global add babel-cli
   - travis_retry bundle install
   - travis_retry yarn

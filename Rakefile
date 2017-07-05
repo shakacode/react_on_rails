@@ -17,3 +17,6 @@ task all_but_examples: ["run_rspec:all_but_examples", "lint"]
 
 desc "Prepare for ci, including node_package, dummy app, and generator examples"
 task prepare_for_ci: %w[node_package dummy_apps examples]
+
+desc "Runs prepare_for_ci and tasks"
+task ci: [:prepare_for_ci, *tasks]
