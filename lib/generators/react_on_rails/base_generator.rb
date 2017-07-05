@@ -8,8 +8,11 @@ module ReactOnRails
   module Generators
     class BaseGenerator < Rails::Generators::Base
       include GeneratorHelper
+      include OptionHelper
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates", __FILE__))
+
+      define_name_option
 
       # --redux
       class_option :redux,
@@ -18,8 +21,8 @@ module ReactOnRails
                    desc: "Install Redux gems and Redux version of Hello World Example",
                    aliases: "-R"
 
-      def add_hello_world_route
-        route "get 'hello_world', to: 'hello_world#index'"
+      def add_example_page_route
+        route "get '#{example_page_path}', to: '#{example_page_path}#index'"
       end
 
       def update_git_ignore
@@ -40,26 +43,29 @@ module ReactOnRails
       end
 
       def create_react_directories
-        dirs = %w[components containers startup]
-        dirs.each { |name| empty_directory("client/app/bundles/HelloWorld/#{name}") }
+        create_client_directories "components", "containers", "startup"
       end
 
       def copy_base_files
         base_path = "base/base/"
-        base_files = %w[app/controllers/hello_world_controller.rb
-                        config/webpacker_lite.yml
+        base_files = %w[config/webpacker_lite.yml
                         client/.babelrc
-                        client/webpack.config.js
                         client/REACT_ON_RAILS_CLIENT_README.md]
-        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
+        base_files.each do |file|
+          copy_file("#{base_path}#{file}", convert_filename_to_use_example_page_name(file))
+        end
       end
 
       def template_base_files
         base_path = "base/base/"
-        %w[app/views/layouts/hello_world.html.erb
+        %w[app/controllers/hello_world_controller.rb
+           app/views/layouts/hello_world.html.erb
            config/initializers/react_on_rails.rb
            Procfile.dev
-           client/package.json].each { |file| template("#{base_path}#{file}.tt", file) }
+           client/webpack.config.js
+           client/package.json].each do |file|
+          template("#{base_path}#{file}.tt", convert_filename_to_use_example_page_name(file))
+        end
       end
 
       def template_package_json
@@ -119,7 +125,7 @@ module ReactOnRails
 
                 foreman start -f Procfile.dev
 
-            - Visit http://localhost:3000/hello_world and see your React On Rails app running!
+            - Visit http://localhost:3000/#{example_page_path} and see your React On Rails app running!
         MSG
         GeneratorMessages.add_info(message)
       end

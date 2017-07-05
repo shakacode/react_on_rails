@@ -1,15 +1,47 @@
 # frozen_string_literal: true
 
+# rubocop:disable Metrics/BlockLength
+
 require_relative "../support/generator_spec_helper"
 require_relative "../support/version_test_helpers"
 
 describe InstallGenerator, type: :generator do
   destination File.expand_path("../../dummy-for-generators/", __FILE__)
 
+  let(:default_example_page_name) { "HelloWorld" }
+  let(:default_example_page_path) { "hello_world" }
+  let(:default_example_page_lower_camelcase) { "helloWorld" }
+
+  let(:example_page_name) { default_example_page_name }
+  let(:example_page_path) { default_example_page_path }
+  let(:example_page_lower_camelcase) { default_example_page_lower_camelcase }
+
   context "no args" do
     before(:all) { run_generator_test_with_args(%w[]) }
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
+  end
+
+  context "--example-page-name" do
+    let(:example_page_name) { "MainPage" }
+    let(:example_page_path) { "main_page" }
+    let(:example_page_lower_camelcase) { "mainPage" }
+
+    context "no redux" do
+      before(:all) do
+        run_generator_test_with_args(%w[--example-page-name MainPage])
+      end
+      include_examples "base_generator", application_js: true
+      include_examples "no_redux_generator"
+    end
+
+    context "with redux" do
+      before(:all) do
+        run_generator_test_with_args(%w[--example-page-name MainPage -R])
+      end
+      include_examples "base_generator", application_js: true
+      include_examples "react_with_redux_generator"
+    end
   end
 
   context "--redux" do
@@ -230,5 +262,12 @@ describe InstallGenerator, type: :generator do
         assert(parsed["scripts"]["postinstall"])
       end
     end
+  end
+
+  def convert_example_page_name(string)
+    string.gsub(default_example_page_name, example_page_name)
+          .gsub(default_example_page_path, example_page_path)
+          .gsub(default_example_page_lower_camelcase,
+                example_page_lower_camelcase)
   end
 end

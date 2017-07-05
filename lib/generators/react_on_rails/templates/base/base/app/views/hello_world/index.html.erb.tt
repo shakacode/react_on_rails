@@ -1,3 +1,3 @@
-<h1>Hello World</h1>
-<%%= react_component("<%= config[:component_name] %>", props: @hello_world_props, prerender: false) %>
+<h1><%= example_page_title %></h1>
+<%%= react_component("<%= config[:component_name] %>", props: @<%= example_page_path %>_props, prerender: false) %>
 

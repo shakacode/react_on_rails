@@ -12,7 +12,9 @@ Usage:
   rails generate react_on_rails:install [options]
 
 Options:
-  -R, [--redux], [--no-redux]                      # Install Redux gems and Redux version of Hello World Example. Default: false
+  -E, [--example-page-name=EXAMPLE_PAGE_NAME]      # Name the example page EXAMPLE_PAGE_NAME
+                                                   # Default: HelloWorld
+  -R, [--redux], [--no-redux]                      # Install Redux gems and Redux version of Example Page. Default: false
   -N, [--node], [--no-node]                        # Sets up node as a server rendering option. Default: false
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
 
@@ -41,7 +43,7 @@ can pass the redux option if you'd like to have redux setup for you automaticall
 
 After running the generator, you will want to:
 
-    bundle && yarn 
+    bundle && yarn
 
 Then you may run
 

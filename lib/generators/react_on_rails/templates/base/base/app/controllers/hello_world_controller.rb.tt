@@ -1,0 +1,9 @@
+# frozen_string_literal: true
+
+class <%= example_page_name %>Controller < ApplicationController
+  layout "<%= example_page_path %>"
+
+  def index
+    @<%= example_page_path %>_props = { name: "Stranger" }
+  end
+end

@@ -18,8 +18,11 @@ module ReactOnRails
 
     class DevTestsGenerator < Rails::Generators::Base
       include GeneratorHelper
+      include OptionHelper
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("../templates/dev_tests", __FILE__))
+
+      define_name_option
 
       # --example-server-rendering
       class_option :example_server_rendering,
@@ -35,7 +38,9 @@ module ReactOnRails
       end
 
       def copy_tests
-        %w[spec/features/hello_world_spec.rb].each { |file| copy_file(file) }
+        %w[spec/features/hello_world_spec.rb].each do |file|
+          template("#{file}.tt", convert_filename_to_use_example_page_name(file))
+        end
       end
 
       def add_test_related_gems_to_gemfile
@@ -46,12 +51,16 @@ module ReactOnRails
 
       def replace_prerender_if_server_rendering
         return unless options.example_server_rendering
-        hello_world_index = File.join(destination_root, "app", "views", "hello_world", "index.html.erb")
-        hello_world_contents = File.read(hello_world_index)
-        new_hello_world_contents = hello_world_contents.gsub(/prerender: false/,
-                                                             "prerender: true")
 
-        File.open(hello_world_index, "w+") { |f| f.puts new_hello_world_contents }
+        example_page_index = File.join(destination_root, "app", "views",
+                                       example_page_path, "index.html.erb")
+        example_page_contents = File.read(example_page_index)
+        new_example_page_contents = \
+          example_page_contents.gsub(/prerender: false/, "prerender: true")
+
+        File.open(example_page_index, "w+") do |f|
+          f.puts new_example_page_contents
+        end
       end
 
       def add_yarn_relative_install_script_in_client_package_json

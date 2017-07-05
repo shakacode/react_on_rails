@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import React from 'react';
 
-const HelloWorld = ({ name, updateName }) => (
+const <%= example_page_name %> = ({ name, updateName }) => (
   <div>
     <h3>
       Hello, {name}!
@@ -21,9 +21,9 @@ const HelloWorld = ({ name, updateName }) => (
   </div>
 );
 
-HelloWorld.propTypes = {
+<%= example_page_name %>.propTypes = {
   name: PropTypes.string.isRequired,
   updateName: PropTypes.func.isRequired,
 };
 
-export default HelloWorld;
+export default <%= example_page_name %>;

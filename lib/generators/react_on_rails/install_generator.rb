@@ -8,15 +8,18 @@ module ReactOnRails
   module Generators
     class InstallGenerator < Rails::Generators::Base
       include GeneratorHelper
+      include OptionHelper
 
       # fetch USAGE file for details generator description
       source_root(File.expand_path("../", __FILE__))
+
+      define_name_option
 
       # --redux
       class_option :redux,
                    type: :boolean,
                    default: false,
-                   desc: "Install Redux gems and Redux version of Hello World Example. Default: false",
+                   desc: "Install Redux gems and Redux version of Example Page. Default: false",
                    aliases: "-R"
 
       # --redux
