@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (8.0.3)
+    react_on_rails (8.0.5)
       addressable
       connection_pool
       execjs (~> 2.5)
