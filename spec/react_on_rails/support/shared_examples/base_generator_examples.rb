@@ -46,4 +46,11 @@ shared_examples "base_generator" do
       assert_match("registration", contents)
     end
   end
+
+  it "creates a client/package.json file configured to create production builds" do
+    production_script = "NODE_ENV=production webpack -p --config webpack.config.js"
+    assert_file("client/package.json") do |contents|
+      assert_match(production_script, contents)
+    end
+  end
 end
