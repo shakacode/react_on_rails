@@ -53,5 +53,4 @@ shared_examples "base_generator" do
       assert_match(production_script, contents)
     end
   end
-
 end
