@@ -19,13 +19,6 @@ module ReactOnRails
                    desc: "Install Redux gems and Redux version of Hello World Example. Default: false",
                    aliases: "-R"
 
-      # --redux
-      class_option :node,
-                   type: :boolean,
-                   default: false,
-                   desc: "Sets up node as a server rendering option. Default: false",
-                   aliases: "-N"
-
       # --ignore-warnings
       class_option :ignore_warnings,
                    type: :boolean,

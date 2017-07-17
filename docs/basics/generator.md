@@ -13,7 +13,6 @@ Usage:
 
 Options:
   -R, [--redux], [--no-redux]                      # Install Redux gems and Redux version of Hello World Example. Default: false
-  -N, [--node], [--no-node]                        # Sets up node as a server rendering option. Default: false
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
 
 Runtime options:
@@ -33,15 +32,11 @@ can pass the redux option if you'd like to have redux setup for you automaticall
     to integrate the Redux state container framework. The necessary node modules
     will be automatically included for you.
 
-* Node
-
-    Passing the --node generator option sets up the necessary files for node to render the react_components.
-
 *******************************************************************************
 
 After running the generator, you will want to:
 
-    bundle && yarn 
+    bundle && yarn
 
 Then you may run
 
