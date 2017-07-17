@@ -12,6 +12,8 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
+- Fixes GitUtils.uncommitted_changes? throwing an error when called in an environment without Git, and allows install generator to be run successfully with `--ignore-warnings` [#878](https://github.com/shakacode/react_on_rails/pull/878) by [jasonblalock](https://github.com/jasonblalock)
+
 ## [8.0.5]
 ### fixed
  - Corrects `devBuild` value for webpack production build from webpackConfigLoader. [#877](https://github.com/shakacode/react_on_rails/pull/877) by [chenqingspring](https://github.com/chenqingspring).
@@ -27,9 +29,9 @@ Changes since last non-beta release.
 
 ## [8.0.2]
 ### Fixed
-- Any failure in webpack to build test files quits tests. 
+- Any failure in webpack to build test files quits tests.
 - Fixed a Ruby 2.4 potential crash which could cause a crash due to pathname change in Ruby 2.4.
-- CI Improvements: 
+- CI Improvements:
   - Switched to yarn link and removed relative path install of react-on-rails
   - Removed testing of Turbolinks 2
   - All tests run against Rails 5.1.1
@@ -53,7 +55,7 @@ Changes since last non-beta release.
 ### Changed
 - Major updates for WebpackerLite 2.0.2. [#844](https://github.com/shakacode/react_on_rails/pull/845) by [justin808](https://github.com/justin808) with help from ](https://github.com/robwise)
 - Logging no longer occurs when trace is turned to false. [#845](https://github.com/shakacode/react_on_rails/pull/845) by [conturbo](https://github.com/Conturbo)
-                               
+
 ## [8.0.0-beta.2] - 2017-05-08
 
 ### Changed
