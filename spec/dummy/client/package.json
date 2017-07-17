@@ -54,7 +54,7 @@
     "babel-plugin-react-transform": "^2.0.2",
     "body-parser": "^1.17.1",
     "eslint": "^3.19.0",
-    "eslint-config-shakacode": "^14.1.1",
+    "eslint-config-shakacode": "^15.0.0",
     "eslint-plugin-import": "^2.2.0",
     "eslint-plugin-jsx-a11y": "^4.0.0",
     "eslint-plugin-react": "^6.10.3",
