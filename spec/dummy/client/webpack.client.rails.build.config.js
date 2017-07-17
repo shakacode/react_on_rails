@@ -52,7 +52,12 @@ module.exports = merge(config, {
                 localIdentName: '[name]__[local]__[hash:base64:5]',
               },
             },
-            'postcss-loader',
+            {
+              loader: 'postcss-loader',
+              options: {
+                plugins: 'autoprefixer'
+              }
+            }
           ],
         }),
       },
