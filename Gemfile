@@ -38,6 +38,6 @@ gem "chromedriver-helper"
 gem "launchy"
 gem "poltergeist"
 gem "selenium-webdriver"
-gem "webpacker_lite"
+gem "webpacker_lite", "~> 2.1"
 
 gem "rainbow"
