@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (8.0.5)
+    react_on_rails (8.0.6.rc.0)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -276,7 +276,7 @@ GEM
     uglifier (3.2.0)
       execjs (>= 0.3.0, < 3)
     unicode-display_width (1.2.1)
-    webpacker_lite (2.0.4)
+    webpacker_lite (2.1.0)
       activesupport (>= 4.2)
       multi_json (~> 1.2)
       railties (>= 4.2)
@@ -326,7 +326,7 @@ DEPENDENCIES
   sqlite3
   turbolinks (~> 5.0)
   uglifier
-  webpacker_lite (= 2.0.4)
+  webpacker_lite (= 2.1.0)
 
 BUNDLED WITH
    1.15.1
