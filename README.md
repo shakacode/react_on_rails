@@ -7,7 +7,7 @@
 Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails).
 
 * **Video:** [Front-End Sadness to Happiness: The React on Rails Story](https://www.youtube.com/watch?v=SGkTvKRPYrk): History, motivations, philosophy, and overview.
-* *[Click here for talk slides](http://www.shakacode.com/talks).*
+* [Front-End Sadness to Happiness: The React on Rails Story at GORUCO 2017](https://blog.shakacode.com/front-end-sadness-to-happiness-the-react-on-rails-story-at-goruco-2017-d63b8fd26ca4)
 
 We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first application development company. We fund this project by:
 
@@ -53,6 +53,7 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 
 ### Articles
 
+* [Front-End Sadness to Happiness: The React on Rails Story at GORUCO 2017](https://blog.shakacode.com/front-end-sadness-to-happiness-the-react-on-rails-story-at-goruco-2017-d63b8fd26ca4)
 * [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92)
 * [React on Rails, 2000+ 🌟 Stars](https://medium.com/shakacode/react-on-rails-2000-stars-32ff5cfacfbf#.6gmfb2gpy)
 * [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
@@ -72,9 +73,9 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 ------
 
 # NEWS
-* The Docs here on `master` refer to 8.0.0 including support for [webpacker_lite](https://github.com/shakacode/webpacker_lite)!
+* **[VERSION 8.1.0](https://rubygems.org/gems/react_on_rails/)** shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) (soon [**webpacker**](https://github.com/rails/webpacker/issues/464#issuecomment-310986140) support! [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395) shows the changes needed to migrate from the Asset Pipeline to Webpacker Lite. For more information, see my article: [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92). Per recent discussions, we [will merge Webpacker Lite changes back into Webpacker](https://github.com/rails/webpacker/issues/464#issuecomment-310986140). There's no reason to wait for this. The upgrade will eventually be trivial.
+* The Docs here on `master` refer to 8.1.0 including support for [webpacker_lite](https://github.com/shakacode/webpacker_lite)!
 *Use the [7.0.4 docs](https://github.com/shakacode/react_on_rails/tree/7.0.4) to refer to the older asset pipeline way.*
-* **[VERSION 8.0.0](https://rubygems.org/gems/react_on_rails/)** shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) (soon [**webpacker**](https://github.com/rails/webpacker/issues/464#issuecomment-310986140) support! [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395) shows the changes needed to migrate from the Asset Pipeline to Webpacker Lite. For more information, see my article: [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92). Per recent discussions, we [will merge Webpacker Lite changes back into Webpacker](https://github.com/rails/webpacker/issues/464#issuecomment-310986140). There's no reason to wait for this. The upgrade will eventually be trivial.
 * *See [NEWS.md](NEWS.md) for more notes over time.*
 
 ------
