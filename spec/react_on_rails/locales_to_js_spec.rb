@@ -9,6 +9,19 @@ module ReactOnRails
     let(:translations_path) { "#{i18n_dir}/translations.js" }
     let(:default_path) { "#{i18n_dir}/default.js" }
 
+
+
+    it "i18n_dir set to nil" do
+      ReactOnRails.configure do |config|
+        config.i18n_dir = nil
+      end
+      expect { ReactOnRails::LocalesToJs.new }.to raise_error("i18n_dir missing, did you set i18n_dir in react_on_rails intializer?")
+    end
+
+
+
+
+
     shared_examples "locale to js" do
       context "with obsolete js files" do
         before do
@@ -86,5 +99,29 @@ module ReactOnRails
 
       it_behaves_like "locale to js"
     end
+    
+    describe "with i18n_dir" do
+      let(:locale_dir) { File.expand_path("../fixtures/i18n/locales", __FILE__) }
+      let(:en_path) { "#{locale_dir}/en.yml" }
+
+      before do
+        ReactOnRails.configure do |config|
+          config.i18n_dir = i18n_dir
+          config.i18n_yml_dir = locale_dir
+        end
+      end
+
+      after do
+        ReactOnRails.configure do |config|
+          config.i18n_dir = nil
+          config.i18n_yml_dir = nil
+        end
+      end
+
+      it_behaves_like "locale to js"
+    end
+    
+    
+    
   end
 end
