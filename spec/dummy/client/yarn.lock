@@ -1869,22 +1869,22 @@ escope@^3.6.0:
     esrecurse "^4.1.0"
     estraverse "^4.1.1"
 
-eslint-config-airbnb-base@^11.1.0:
+eslint-config-airbnb-base@^11.2.0:
   version "11.2.0"
   resolved "https://registry.yarnpkg.com/eslint-config-airbnb-base/-/eslint-config-airbnb-base-11.2.0.tgz#19a9dc4481a26f70904545ec040116876018f853"
 
-eslint-config-airbnb@^14.1.0:
-  version "14.1.0"
-  resolved "https://registry.yarnpkg.com/eslint-config-airbnb/-/eslint-config-airbnb-14.1.0.tgz#355d290040bbf8e00bf8b4b19f4b70cbe7c2317f"
+eslint-config-airbnb@^15.0.1:
+  version "15.0.2"
+  resolved "https://registry.yarnpkg.com/eslint-config-airbnb/-/eslint-config-airbnb-15.0.2.tgz#7b99fa421d0c15aee3310d647644315b02ea24da"
   dependencies:
-    eslint-config-airbnb-base "^11.1.0"
+    eslint-config-airbnb-base "^11.2.0"
 
-eslint-config-shakacode@^14.1.1:
-  version "14.1.1"
-  resolved "https://registry.yarnpkg.com/eslint-config-shakacode/-/eslint-config-shakacode-14.1.1.tgz#bc31841c20799435c14ae7b008f04fc8e1d7f97a"
+eslint-config-shakacode@^15.0.0:
+  version "15.0.0"
+  resolved "https://registry.yarnpkg.com/eslint-config-shakacode/-/eslint-config-shakacode-15.0.0.tgz#186a6dd3b4e103aa5faaec8e771f865a10a6e55a"
   dependencies:
     babel-eslint "^7.1.1"
-    eslint-config-airbnb "^14.1.0"
+    eslint-config-airbnb "^15.0.1"
 
 eslint-import-resolver-node@^0.2.0:
   version "0.2.3"
