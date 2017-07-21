@@ -99,29 +99,5 @@ module ReactOnRails
 
       it_behaves_like "locale to js"
     end
-    
-    describe "with i18n_dir" do
-      let(:locale_dir) { File.expand_path("../fixtures/i18n/locales", __FILE__) }
-      let(:en_path) { "#{locale_dir}/en.yml" }
-
-      before do
-        ReactOnRails.configure do |config|
-          config.i18n_dir = i18n_dir
-          config.i18n_yml_dir = locale_dir
-        end
-      end
-
-      after do
-        ReactOnRails.configure do |config|
-          config.i18n_dir = nil
-          config.i18n_yml_dir = nil
-        end
-      end
-
-      it_behaves_like "locale to js"
-    end
-    
-    
-    
   end
 end
