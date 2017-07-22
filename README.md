@@ -267,9 +267,9 @@ If you have used the provided generator, these bundles will automatically be add
 
 
 ### Generator Functions
-Why would you create a function that returns a React component?
+Why would you create a function that returns a React component rather than simply an Object that is a React class?
 
-1. You need access to the `railsContext`. See documentation for the railsContext in terms of why you might need it.
+1. You need access to the `railsContext`. See documentation for the railsContext in terms of why you might need it. You **need** a generator function to access the `railsContext`.
 1. You may want the ability to use the passed-in props to initialize a redux store or set up react-router
 1. You may want to return different components depending on what's in the props.
 
@@ -284,7 +284,7 @@ For server rendering, if you wish to return multiple HTML strings from a generat
 When you use a "generator function" to create react components (or renderedHtml on the server), or you used shared redux stores, you get two params passed to your function that creates a React component:
 
 1. `props`: Props that you pass in the view helper of either `react_component` or `redux_store`
-2. `railsContext`: Rails contextual information, such as the current pathname. You can customize this in your config file.
+2. `railsContext`: Rails contextual information, such as the current pathname. You can customize this in your config file. **Note**: The `railsContext` is not related to the concept of a ["context" for React components](https://facebook.github.io/react/docs/context.html#how-to-use-context).
 
 This parameters (`props` and `railsContext`) will be the same regardless of either client or server side rendering, except for the key `serverSide` based on whether or not you are server rendering.
 
