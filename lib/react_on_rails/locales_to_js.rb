@@ -5,10 +5,7 @@ require "erb"
 module ReactOnRails
   class LocalesToJs
     def initialize
-      if i18n_dir.blank?
-        raise "i18n_dir missing, did you set i18n_dir in react_on_rails intializer?"
-      end
-      unless i18n_dir.directory?
+      unless File.directory?(i18n_dir.to_s)
         raise "i18n_dir is not a directory did you set i18n_dir in react_on_rails intializer?"
       end
       return unless obsolete?

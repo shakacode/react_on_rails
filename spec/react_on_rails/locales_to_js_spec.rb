@@ -9,19 +9,20 @@ module ReactOnRails
     let(:translations_path) { "#{i18n_dir}/translations.js" }
     let(:default_path) { "#{i18n_dir}/default.js" }
 
-
-
-    it "i18n_dir set to nil" do
+    it "with i18n_dir set to ''" do
+      ReactOnRails.configure do |config|
+        config.i18n_dir = ''
+      end
+      expect { ReactOnRails::LocalesToJs.new }.to raise_error(/did you set i18n_dir in react_on_rails intializer?/)
+    end
+    
+    it "with i18n_dir set to nil" do
       ReactOnRails.configure do |config|
         config.i18n_dir = nil
       end
-      expect { ReactOnRails::LocalesToJs.new }.to raise_error("i18n_dir missing, did you set i18n_dir in react_on_rails intializer?")
+      expect { ReactOnRails::LocalesToJs.new }.to raise_error(/did you set i18n_dir in react_on_rails intializer?/)
     end
-
-
-
-
-
+    
     shared_examples "locale to js" do
       context "with obsolete js files" do
         before do
