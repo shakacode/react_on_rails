@@ -46,7 +46,7 @@
     "sass-resources-loader": "1.2.1",
     "style-loader": "^0.16.1",
     "url-loader": "^0.5.8",
-    "webpack": "^2.3.3",
+    "webpack": "^3.4.1",
     "webpack-manifest-plugin": "^1.1.0",
     "webpack-merge": "^4.1.0"
   },

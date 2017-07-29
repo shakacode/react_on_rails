@@ -28,7 +28,7 @@
     "react-redux": "^5.0.4",
     "redux": "^3.6.0",
     <%- end -%>
-    "webpack": "^2.3.3",
+    "webpack": "^3.4.1",
     "webpack-manifest-plugin": "^1.1.0"
   },
   "devDependencies": {
