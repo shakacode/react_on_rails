@@ -44,26 +44,27 @@ module ReactOnRails
     # an example of usage.
     #
     # Typical usage passes all params as nil defaults.
-    # webpack_assets_status_checker: provide: `up_to_date?`, `whats_not_up_to_date`, `client_dir`
+    # webpack_assets_status_checker: provide: `up_to_date?`, `whats_not_up_to_date`, `source_path`
     #                         defaults to ReactOnRails::TestHelper::WebpackAssetsStatusChecker
     # webpack_assets_compiler: provide one method: `def compile`
     #                         defaults to ReactOnRails::TestHelper::WebpackAssetsCompiler
-    # client_dir and generated_assets_dir are passed into the default webpack_assets_status_checker if you
+    # source_path and generated_assets_dir are passed into the default webpack_assets_status_checker if you
     #                        don't provide one.
     # webpack_generated_files List of files to check for up-to-date-status, defaulting to
     #                        webpack_generated_files in your configuration
     def self.ensure_assets_compiled(webpack_assets_status_checker: nil,
                                     webpack_assets_compiler: nil,
-                                    client_dir: nil,
+                                    source_path: nil,
                                     generated_assets_dir: nil,
                                     webpack_generated_files: nil)
+      ReactOnRails::Utils.check_manifest_not_cached
       if webpack_assets_status_checker.nil?
-        client_dir ||= Rails.root.join("client")
-        generated_assets_dir ||= ReactOnRails.configuration.generated_assets_dir
+        source_path ||= ReactOnRails::Utils.source_path
+        generated_assets_dir ||= ReactOnRails::Utils.generated_assets_dir
         webpack_generated_files ||= ReactOnRails.configuration.webpack_generated_files
 
         webpack_assets_status_checker ||=
-          WebpackAssetsStatusChecker.new(client_dir: client_dir,
+          WebpackAssetsStatusChecker.new(source_path: source_path,
                                          generated_assets_dir: generated_assets_dir,
                                          webpack_generated_files: webpack_generated_files)
 

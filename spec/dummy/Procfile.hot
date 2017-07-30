@@ -1,9 +1,9 @@
 # Procfile for development with hot reloading of JavaScript and CSS
 
-rails: HOT_RELOADING=TRUE rails s -b 0.0.0.0
+rails: rails s -b 0.0.0.0
 
 # Run the hot reload server for client development
-hot-assets: HOT_RELOADING=TRUE yarn run hot-assets
+hot-assets: yarn run hot-assets
 
 # Keep the JS fresh for server rendering. Remove if not server rendering
 rails-server-assets: yarn run build:dev:server

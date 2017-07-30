@@ -4,13 +4,16 @@
 
 const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const merge = require('webpack-merge');
+const { env } = require('process')
 const config = require('./webpack.client.base.config');
 const { resolve } = require('path');
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
-const { webpackOutputPath, webpackPublicOutputDir } = webpackConfigLoader(configPath);
+const { output, settings } = webpackConfigLoader(configPath);
+const isHMR = settings.dev_server && settings.dev_server.hmr
 
 const devBuild = process.env.NODE_ENV !== 'production';
+
 
 if (devBuild) {
   console.log('Webpack dev build for Rails'); // eslint-disable-line no-console
@@ -22,11 +25,12 @@ if (devBuild) {
 module.exports = merge(config, {
 
   output: {
-    filename: '[name]-[hash].js',
+    filename: isHMR ? '[name]-[hash].js' : '[name]-[chunkhash].js',
+    chunkFilename: '[name]-[chunkhash].chunk.js',
 
-    // Leading and trailing slashes ARE necessary.
-    publicPath: '/' + webpackPublicOutputDir + '/',
-    path: webpackOutputPath,
+    publicPath: output.publicPath,
+    path: output.path,
+    pathinfo: devBuild,
   },
 
   // See webpack.client.base.config for adding modules common to both the webpack dev server and rails
@@ -110,7 +114,7 @@ module.exports = merge(config, {
 
   plugins: [
     new ExtractTextPlugin({
-      filename: '[name]-[hash].css',
+      filename: '[name]-[contenthash].css',
       allChunks: true
     }),
   ],

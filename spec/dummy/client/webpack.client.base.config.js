@@ -9,7 +9,7 @@ const { assetLoaderRules } = require('./webpack.common.config');
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
-const { manifest } = webpackConfigLoader(configPath);
+const { output } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
 
@@ -51,7 +51,10 @@ module.exports = {
         return module.context && module.context.indexOf('node_modules') !== -1;
       },
     }),
-    new ManifestPlugin({ fileName: manifest, writeToFileEmit: true }),
+    new ManifestPlugin({
+        publicPath: output.publicPath,
+        writeToFileEmit: true
+      }),
   ],
 
   module: {

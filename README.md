@@ -24,7 +24,6 @@ Turn on HMR (Hot reloading)
 
 ---------------
 
-
 ## Thank you from Justin Gordon and [ShakaCode](http://www.shakacode.com)
 
 Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails).
@@ -148,7 +147,7 @@ See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpac
 
 ## Why Webpack?
 
-Webpack is used to generate JavaScript and CSS "bundles" directly to your `/public` directory. [webpacker_lite](https://github.com/shakacode/webpacker_lite) provides view helpers to access the Webpack generated (and fingerprinted) JS and CSS. These files totally skip the Rails asset pipeline. You are responsible for properly processing your Webpack output via the Webpack config files.
+Webpack is used to generate JavaScript and CSS "bundles" directly to your `/public` directory. [webpacker](https://github.com/rails/webpacker) provides view helpers to access the Webpack generated (and fingerprinted) JS and CSS. These files totally skip the Rails asset pipeline. You are responsible for properly processing your Webpack output via the Webpack config files.
 
 This usage of webpack fits neatly and simply into existing Rails apps. You can include React components on a Rails view with a simple helper.
 
@@ -166,10 +165,18 @@ To upgrade existing apps to React on Rails 8 see the [Installation Overview](doc
 1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `client/package.json` file.
 
   ```ruby
-  gem "react_on_rails", "8.0.0"
+  gem "react_on_rails", "9.0.0"
+  gem "webpacker", "~> 3.0"
   ```
 
-2. Commit this to git (you cannot run the generator unless you do this or pass the option `--ignore-warnings`).
+2. Run the following 2 commands to install Webpacker with React:
+   ```
+   bundle exec rails webpacker:install
+   bundle exec rails webpacker:install:react
+   
+   ```
+
+2. Commit this to git (or else you cannot run the generator unless you pass the option `--ignore-warnings`).
 
 3. See help for the generator:
 
@@ -183,13 +190,7 @@ To upgrade existing apps to React on Rails 8 see the [Installation Overview](doc
   rails generate react_on_rails:install
   ```
 
-5. Bundle and NPM install. Make sure you are on a recent version of node. Please use at least Node v5. Bundle is for adding execJs. You can remove that if you are sure you will not server render.
-
-  ```bash
-  bundle && yarn
-  ```
-
-6. Ensure that you have `foreman` installed: `gem install foreman`.
+5. Ensure that you have `foreman` installed: `gem install foreman`.
 
 7. Start your Rails server:
 
@@ -258,6 +259,11 @@ cd client && yarn add react-on-rails
 ```
 
 That will install the latest version and update your package.json.
+
+## Webpacker Configuration
+
+React on Rails users should set configuration value `compile` to false, as React on Rails handles compilation for test and production environments.
+
 
 ## How it Works
 The generator installs your webpack files in the `client` folder. Foreman uses webpack to compile your code and output the bundled results to `app/assets/webpack`, which are then loaded by sprockets. These generated bundle files have been added to your `.gitignore` for your convenience.
@@ -423,12 +429,12 @@ end
 In this case, a prop and value for `somethingUseful` will go into the railsContext passed to all react_component and redux_store calls. You may set any values available in the view rendering context.
 
 ### Globally Exposing Your React Components
-Place your JavaScript code inside of the provided `client/app` folder. Use modules just as you would when using webpack alone. The difference here is that instead of mounting React components directly to an element using `React.render`, you **register your components to ReactOnRails and then mount them with helpers inside of your Rails views**.
+Place your JavaScript code inside of the default `app/javascript` folder. Use modules just as you would when using webpack alone. The difference here is that instead of mounting React components directly to an element using `React.render`, you **register your components to ReactOnRails and then mount them with helpers inside of your Rails views**.
 
 This is how to expose a component to the `react_component` view helper.
 
   ```javascript
-  // client/app/bundles/HelloWorld/startup/HelloWorld.jsx
+  // app/javascript/packs/hello-world-bundle.js
   import HelloWorld from '../components/HelloWorld';
   import ReactOnRails from 'react-on-rails';
   ReactOnRails.register({ HelloWorld });
@@ -591,7 +597,7 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 ## Deployment
 * Version 6.0 puts the necessary precompile steps automatically in the rake precompile step. You can, however, disable this by setting certain values to nil in the [config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb).
   * `config.symlink_non_digested_assets_regex`: Set to nil to turn off the setup of non-js assets.
-  * `npm_build_production_command`: Set to nil to turn off the precompilation of the js assets.
+  * `build_production_command`: Set to nil to turn off the precompilation of the js assets.
 * See the [Heroku Deployment](./docs/additional-reading/heroku-deployment.md) doc for specifics regarding Heroku. The information here should apply to other deployments.
 
 ## Integration with Node.js for Server Rendering
@@ -628,6 +634,7 @@ If you want to use a node server for server rendering, [get in touch](mailto:jus
 + **Development**
   + [React on Rails Basic Installation Tutorial](./docs/tutorial.md) ([live demo](https://hello-react-on-rails.herokuapp.com))
   + [Installation Overview](./docs/basics/installation-overview.md)
+  + [Configuration](./docs/basics/configuration.md)
   + [Migration from react-rails](./docs/basics/migrating-from-react-rails.md)
   + [Recommended Project Structure](./docs/additional-reading/recommended-project-structure.md)
   + [Generator Tips](./docs/basics/generator.md)

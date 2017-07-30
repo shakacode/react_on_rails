@@ -16,6 +16,8 @@ namespace :assets do
 
   desc "Compile assets with webpack"
   task :webpack do
+    # Leave in these hard coded overrides for the legacy tests
+
     sh "cd client && yarn run build:client"
 
     # Skip next line if not doing server rendering

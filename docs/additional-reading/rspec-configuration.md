@@ -5,7 +5,6 @@ ReactOnRails provides a helper method called `ReactOnRails::TestHelper.configure
 
 ```ruby
 RSpec.configure do |config|
-  # Next line will ensure that assets are built if webpack -w is not running to build the bundles
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
 ```
 
@@ -24,7 +23,9 @@ If you are using Webpack to build CSS assets, you should do something like this 
 ```
 
 Please take note of the following:
-- This utility uses your `npm_build_test_command` to build the static generated files. This command **must** not include the `--watch` option. If you have different server and client bundle files, this command **must** create all the bundles.
+- This utility uses your `build_test_command` to build the static generated files. This command **must not** include the `--watch` option. If you have different server and client bundle files, this command **must** create all the bundles. If you are using webpacker, the default value will come from the `config/webpacker.yml` value for the `public_output_path` and the `source_path`
+- If you add an older file to your source files, that is already older than the produced output files, no new recompilation is done. The solution to this issue is to clear out your directory of webpack generated files when adding new source files that may have older dates. This is actually a common occurrence when you've built your test generated files and then you sync up your repository files.
+
 - By default, the webpack processes look for the `app/assets/webpack` folders (configured as setting `webpack_generated_files` in the `config/react_on_rails.rb`. If this folder is missing, is empty, or contains files in the `config.webpack_generated_files` list with `mtime`s older than any of the files in your `client` folder, the helper will recompile your assets. You can override the location of these files inside of `config/initializers/react_on_rails.rb` by passing a filepath (relative to the root of the app) to the `generated_assets_dir` configuration option.
 
 The following `config/react_on_rails.rb` settings **must** match your setup:
@@ -35,36 +36,18 @@ The following `config/react_on_rails.rb` settings **must** match your setup:
   config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
 
   # Define the files we need to check for webpack compilation when running tests.
-  config.webpack_generated_files = %w( webpack-bundle.js )
+  # Generally, the manifest.json is good enough for this check if using webpacker
+  config.webpack_generated_files = %w( hello-world-bundle.js )
   
   # If you are using the ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
   # with rspec then this controls what yarn command is run
   # to automatically refresh your webpack assets on every test run.
-  config.npm_build_test_command = "yarn run build:test"
+  config.build_test_command = "yarn run build:test"
 ```
 
-If you want to speed up the re-compiling process, you can call `yarn run build:development` (per below script) to have webpack run in "watch" mode and recompile these files in the background, which will be much faster when making incremental changes than compiling from scratch, assuming you have your setup like this:
-
-```
-  "scripts": {
-    "build:test": "webpack --config webpack.config.js",
-    "build:production": "NODE_ENV=production webpack --config webpack.config.js",
-    "build:development": "webpack -w --config webpack.config.js"
-  },
-```
+If you want to speed up the re-compiling process so you don't wait to run your tests to build the files, you can run your test compilation with the "watch" flags.
 
 [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) contains examples of how to set the proc files for this purpose.
-
-## Hot Reloading
-If you're using the hot reloading setup, you'll be running a Webpack development server to provide the JavaScript and mabye CSS assets to your Rails app. If you're doing server rendering, you'll also have a webpack watch process to refresh the server rendering file. **If your server and client bundles are different**, and you run specs, the client bundle files will not be created until React on Rails detects it's out of date. Then your script to create all bundle files will redo the server bundle file. There's a few simple remedies for this situation:
-
-1. Switch to using static compilation of the webpack bundle files. This way, you're running a Webpack watch process to generate the same files used for tests as well as developmentment. You should have a separate Procfile for doing development using a "static" setup, rather than a "hot" setup.
-2. Change your Procfile for starting the hot reloading server to also run a webpack process to automatically rebuild a the client assets while also doing hot reloading for browser testing.
-
-Note, none of these issues matter if you're using the same file for both server and client side rendering.
-
-## Using RubyMine and other IDEs that save files right before invoking tests
-We had previously tried to allow using a process check to see if a Webpack watch process would already be automatically compiling the files. However, we removed this as it proved to be fragile with various setups. Thus, you want to hit the save keystroke when you save a JavaScript file, and then run your tests. Yes, you might not do this in time, and the test runner may be building the same files as you Webpack watch processes. This will probably happen infrequently, but if this does become an issue, we can look into bring back this functionality ([#398](https://github.com/shakacode/react_on_rails/pull/398)).
 
 If you want to use a testing framework other than RSpec, please submit let us know on the changes you need to do and we'll update the docs.
 

@@ -4,6 +4,13 @@ source "https://rubygems.org"
 
 eval_gemfile File.expand_path("../../../react_on_rails.gemspec", __FILE__)
 
+gem "react_on_rails", path: "../.."
+
+gem "webpacker", "~> 3.0"
+
+# TODO: remove once we get out of beta.
+# gem 'webpacker', path: "../../../../forks/webpacker"
+
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
 gem "rails", "~> 5.1.2"
 # Use sqlite3 as the database for Active Record
@@ -38,11 +45,6 @@ gem "sdoc", group: :doc
 
 # Use Capistrano for deployment
 # gem 'capistrano-rails', group: :development
-
-gem "react_on_rails", path: "../.."
-
-gem "webpacker_lite", "2.1.0"
-
 gem "mini_racer"
 
 group :development, :test do
