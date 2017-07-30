@@ -51,7 +51,6 @@ ReactOnRails.configure do |config|
   ################################################################################
   # SERVER RENDERING OPTIONS
   ################################################################################
-
   # If set to true, this forces Rails to reload the server bundle if it is modified
   config.development_mode = Rails.env.development?
 
@@ -79,6 +78,8 @@ ReactOnRails.configure do |config|
   # Replace the following line to the location where you keep translation.js & default.js for use
   # by the npm packages react-intl. Be sure this directory exists!
   # config.i18n_dir = Rails.root.join("client", "app", "libs", "i18n")
+  # If not using the i18n feature, then leave this section commented out or set the value
+  # of config.i18n_dir to nil.
   #
   # Replace the following line to the location where you keep your client i18n yml files
   # that will source for automatic generation on translations.js & default.js
