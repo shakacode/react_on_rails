@@ -127,7 +127,7 @@ See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpac
 
 ## Why Webpack?
 
-Webpack is used to generate JavaScript and CSS "bundles" directly to your `/public` directory. [webpacker_lite](https://github.com/shakacode/webpacker_lite) provides view helpers to access the Webpack generated (and fingerprinted) JS and CSS. These files totally skip the Rails asset pipeline. You are responsible for properly processing your Webpack output via the Webpack config files.
+Webpack is used to generate JavaScript and CSS "bundles" directly to your `/public` directory. [webpacker](https://github.com/rails/webpacker) provides view helpers to access the Webpack generated (and fingerprinted) JS and CSS. These files totally skip the Rails asset pipeline. You are responsible for properly processing your Webpack output via the Webpack config files.
 
 This usage of webpack fits neatly and simply into existing Rails apps. You can include React components on a Rails view with a simple helper.
 

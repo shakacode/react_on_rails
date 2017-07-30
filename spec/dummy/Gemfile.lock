@@ -4,6 +4,16 @@ GIT
   specs:
     equivalent-xml (1.0.0)
 
+GIT
+  remote: https://github.com/shakacode/webpacker.git
+  revision: afe9c996b6884fd35d7fc1f3f83078b1df409ff8
+  branch: issue-464-merge-webpacker-lite-into-webpacker
+  specs:
+    webpacker (2.0)
+      activesupport (>= 4.2)
+      multi_json (~> 1.2)
+      railties (>= 4.2)
+
 PATH
   remote: ../..
   specs:
@@ -108,7 +118,7 @@ GEM
       railties (>= 3.0.0)
     globalid (0.4.0)
       activesupport (>= 4.2.0)
-    i18n (0.8.4)
+    i18n (0.8.6)
     interception (0.5)
     io-like (0.3.0)
     jbuilder (2.6.4)
@@ -137,7 +147,7 @@ GEM
     mini_portile2 (2.2.0)
     mini_racer (0.1.9)
       libv8 (~> 5.3)
-    minitest (5.10.2)
+    minitest (5.10.3)
     multi_json (1.12.1)
     nio4r (2.1.0)
     nokogiri (1.8.0)
@@ -282,10 +292,6 @@ GEM
     uglifier (3.2.0)
       execjs (>= 0.3.0, < 3)
     unicode-display_width (1.2.1)
-    webpacker_lite (2.1.0)
-      activesupport (>= 4.2)
-      multi_json (~> 1.2)
-      railties (>= 4.2)
     websocket (1.2.4)
     websocket-driver (0.6.5)
       websocket-extensions (>= 0.1.0)
@@ -333,7 +339,7 @@ DEPENDENCIES
   sqlite3
   turbolinks (~> 5.0)
   uglifier
-  webpacker_lite (= 2.1.0)
+  webpacker!
 
 BUNDLED WITH
    1.15.3

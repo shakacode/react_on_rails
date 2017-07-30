@@ -20,13 +20,13 @@ const webpackConfig = require('./webpack.client.rails.hot.config');
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
-const { hotReloadingUrl, hotReloadingPort, hotReloadingHostname } = webpackConfigLoader(configPath);
+const { devServerUrl, devServerPort, devServerHostname } = webpackConfigLoader(configPath);
 
 const compiler = webpack(webpackConfig);
 
 const devServer = new WebpackDevServer(compiler, {
   proxy: {
-    '*': hotReloadingUrl,
+    '*': devServerUrl,
   },
   headers: {
     'Access-Control-Allow-Origin': '*',
@@ -48,9 +48,9 @@ const devServer = new WebpackDevServer(compiler, {
   },
 });
 
-devServer.listen(hotReloadingPort, hotReloadingHostname, err => {
+devServer.listen(devServerPort, devServerHostname, err => {
   if (err) console.error(err);
   console.log(
-    `=> 🔥  Webpack development server is running on ${hotReloadingUrl}`
+    `=> 🔥  Webpack development server is running on ${devServerUrl}`
   );
 });

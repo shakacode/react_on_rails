@@ -8,10 +8,30 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
+### [9.0.0.beta.1]
+- Switch over to using Webpacker
+
+- If using the WebpackConfigLoader, you will need to rename the following object properties:
+  - hotReloadingUrl       devServerUrl         
+  - hotReloadingHostname  devServerHost        
+  - hotReloadingPort      devServerPort
+
+- Find your webpacker_lite.yml and rename it to webpacker.yml
+  - Add a section like this under your development env:
+    ```
+    dev_server:
+      host: localhost
+      port: 8080
+      https: false
+      # Can be enabled by export WEBPACKER_HMR=TRUE in env
+      hot: false   
+    ```
+  - remove `hot_reloading_host` and `hot_reloading_enabled_by_default`
+  - rename `webpack_public_output_dir` to `public_output_path`
+
 ### [8.0.7]
 #### fixed
 - Fixes generator bug by keeping blank line at top in case existing .gitignore does not end in a newline. [#916](https://github.com/shakacode/react_on_rails/pull/916) by [justin808](https://github.com/justin808).
-
 
 ### [8.0.6]
 #### fixed
