@@ -62,25 +62,31 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.server_bundle_js_file_path
+      # Don't ever use the hashed file name?
+      # Cases:
+      # 1. Using same bundle for both server and client, so server bundle will be hashed
+      # 2. Using a different bundle (different Webpack config), so file is not hashed
       bundle_js_file_path(ReactOnRails.configuration.server_bundle_js_file)
     end
 
-    # TODO: conturbo Write Test for this, with BOTH webpacker_lite installed and not, and
-    # with case for webpacker_lite, but server file is not in the file
+    # TODO: conturbo Write Test for this, with BOTH webpacker installed and not, and
+    # with case for webpacker, but server file is not in the file
     def self.bundle_js_file_path(bundle_name)
       # For testing outside of Rails app
 
-      if using_webpacker_lite? && WebpackerLite::Manifest.lookup(bundle_name)
-        # If using webpacker_lite gem
-        # Per https://github.com/rails/webpacker/issues/571, this path might
-        public_subdir_hashed_file_name = ActionController::Base.helpers.pack_path(bundle_name)
-        return File.join("public", public_subdir_hashed_file_name)
+      if using_webpacker?
+        # Note, server bundle should not be in the manifest
+        # If using webpacker gem
+        # Per https://github.com/rails/webpacker/issues/571
+        path = Webpacker::Manifest.lookup_path_no_throw(bundle_name)
+        return path if path.present?
+        # Else either the file is not in the manifest, so we'll default to the non-hashed name.
       end
 
       File.join(ReactOnRails.configuration.generated_assets_dir, bundle_name)
     end
 
-    def self.using_webpacker_lite?
+    def self.using_webpacker?
       ActionController::Base.helpers.respond_to?(:asset_pack_path)
     end
 

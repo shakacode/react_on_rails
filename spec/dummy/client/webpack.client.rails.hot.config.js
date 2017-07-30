@@ -12,7 +12,7 @@ const merge = require('webpack-merge');
 const config = require('./webpack.client.base.config');
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
-const { hotReloadingUrl, webpackOutputPath } = webpackConfigLoader(configPath);
+const { devServerUrl, webpackOutputPath } = webpackConfigLoader(configPath);
 
 // entry is prepended because 'react-hot-loader/patch' must be the very first entry
 // for hot reloading to work.
@@ -27,7 +27,7 @@ module.exports = merge.strategy(
   entry: {
     'app-bundle': [
       'react-hot-loader/patch',
-      `webpack-dev-server/client?${hotReloadingUrl}`,
+      `webpack-dev-server/client?${devServerUrl}`,
       'webpack/hot/only-dev-server'
     ],
   },
@@ -35,7 +35,7 @@ module.exports = merge.strategy(
   output: {
     filename: '[name].js',
     path: webpackOutputPath,
-    publicPath: `${hotReloadingUrl}/`,
+    publicPath: `${devServerUrl}/`,
   },
 
   module: {

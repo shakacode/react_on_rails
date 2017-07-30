@@ -74,7 +74,7 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 
 # NEWS
 * **[VERSION 8.1.0](https://rubygems.org/gems/react_on_rails/)** shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) (soon [**webpacker**](https://github.com/rails/webpacker/issues/464#issuecomment-310986140) support! [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395) shows the changes needed to migrate from the Asset Pipeline to Webpacker Lite. For more information, see my article: [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92). Per recent discussions, we [will merge Webpacker Lite changes back into Webpacker](https://github.com/rails/webpacker/issues/464#issuecomment-310986140). There's no reason to wait for this. The upgrade will eventually be trivial.
-* The Docs here on `master` refer to 8.1.0 including support for [webpacker_lite](https://github.com/shakacode/webpacker_lite)!
+* The Docs here on `master` refer to 9.0.0 including support for [webpacker](https://github.com/shakacode/webpacker)!
 *Use the [7.0.4 docs](https://github.com/shakacode/react_on_rails/tree/7.0.4) to refer to the older asset pipeline way.*
 * *See [NEWS.md](NEWS.md) for more notes over time.*
 
@@ -124,7 +124,7 @@ See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpac
 
 ## Why Webpack?
 
-Webpack is used to generate JavaScript and CSS "bundles" directly to your `/public` directory. [webpacker_lite](https://github.com/shakacode/webpacker_lite) provides view helpers to access the Webpack generated (and fingerprinted) JS and CSS. These files totally skip the Rails asset pipeline. You are responsible for properly processing your Webpack output via the Webpack config files.
+Webpack is used to generate JavaScript and CSS "bundles" directly to your `/public` directory. [webpacker](https://github.com/rails/webpacker) provides view helpers to access the Webpack generated (and fingerprinted) JS and CSS. These files totally skip the Rails asset pipeline. You are responsible for properly processing your Webpack output via the Webpack config files.
 
 This usage of webpack fits neatly and simply into existing Rails apps. You can include React components on a Rails view with a simple helper.
 

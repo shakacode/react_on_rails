@@ -34,9 +34,9 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     context "when compiled assets with manifest exist and are up-to-date" do
       let(:fixture_dirname) { "assets_with_manifest_exist" }
       before do
-        require "webpacker_lite"
-        allow(ReactOnRails::Utils).to receive(:using_webpacker_lite?).and_return(true)
-        allow(WebpackerLite::Manifest).to receive(:exist?).and_return(true)
+        require "webpacker"
+        allow(ReactOnRails::Utils).to receive(:using_webpacker?).and_return(true)
+        allow(Webpacker::Manifest).to receive(:exist?).and_return(true)
         allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
           .with("client-bundle.js")
           .and_return(File.join(generated_assets_dir, "client-bundle-6bc530d039d96709b68d.js"))
@@ -52,9 +52,9 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     context "when using webpacker and manifest is missing" do
       let(:fixture_dirname) { "assets_with_missing_manifest" }
       before do
-        require "webpacker_lite"
-        allow(ReactOnRails::Utils).to receive(:using_webpacker_lite?).and_return(true)
-        allow(WebpackerLite::Manifest).to receive(:exist?).and_return(false)
+        require "webpacker"
+        allow(ReactOnRails::Utils).to receive(:using_webpacker?).and_return(true)
+        allow(Webpacker::Manifest).to receive(:exist?).and_return(false)
       end
 
       specify { expect(checker.stale_generated_webpack_files).to eq(["manifest.json"]) }
