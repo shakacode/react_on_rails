@@ -47,7 +47,7 @@ module ReactOnRails
       def copy_base_files
         base_path = "base/base/"
         base_files = %w[app/controllers/hello_world_controller.rb
-                        config/webpacker_lite.yml
+                        config/webpacker.yml
                         client/.babelrc
                         client/webpack.config.js
                         client/REACT_ON_RAILS_CLIENT_README.md]
@@ -71,7 +71,14 @@ module ReactOnRails
       end
 
       def add_base_gems_to_gemfile
-        append_to_file("Gemfile", "\ngem 'mini_racer', platforms: :ruby\ngem 'webpacker_lite'\n")
+        gems = <<-GEMS.strip_heredoc
+
+        gem 'mini_racer', platforms: :ruby
+        gem 'webpacker', git: "https://github.com/shakacode/webpacker.git",
+                         branch: "issue-464-merge-webpacker-lite-into-webpacker"
+        GEMS
+        append_to_file("Gemfile",
+                       gems)
       end
 
       def append_to_spec_rails_helper

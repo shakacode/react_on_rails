@@ -38,6 +38,7 @@ gem "chromedriver-helper"
 gem "launchy"
 gem "poltergeist"
 gem "selenium-webdriver"
-gem "webpacker_lite", "~> 2.1"
+gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
+                 branch: "issue-464-merge-webpacker-lite-into-webpacker"
 
 gem "rainbow"

@@ -8,6 +8,30 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
+### [9.0.0.beta.1]
+- Switch over to using Webpacker
+
+- If using the WebpackConfigLoader, you will need to rename the following object properties:
+  - hotReloadingUrl       devServerUrl         
+  - hotReloadingHostname  devServerHost        
+  - hotReloadingPort      devServerPort
+
+- Find your webpacker_lite.yml and rename it to webpacker.yml
+  - Add a section like this under your development env:
+    ```
+    dev_server:
+      host: localhost
+      port: 8080
+      https: false
+      # Can be enabled by export WEBPACKER_HMR=TRUE in env
+      hot: false   
+    ```
+  - remove `hot_reloading_host` and `hot_reloading_enabled_by_default`
+  - rename `webpack_public_output_dir` to `public_output_path`
+
+  
+
+
 ### [8.0.6]
 #### fixed
 - Fixes server rendering when using a CDN. Server rendering would try to fetch a file with the "asset_host". This change updates the webpacker_lite dependency to 2.1.0 which has a new helper `pack_path`. [#901](https://github.com/shakacode/react_on_rails/pull/901) by [justin808](https://github.com/justin808). Be sure to update webpacker_lite to 2.1.0.
