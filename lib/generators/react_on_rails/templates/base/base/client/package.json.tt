@@ -29,7 +29,7 @@
     "redux": "^3.7.2",
     <%- end -%>
     "webpack": "^3.4.1",
-    "webpack-manifest-plugin": "^1.2.1",
+    "webpack-manifest-plugin": "^1.2.1"
   },
   "devDependencies": {
   }
