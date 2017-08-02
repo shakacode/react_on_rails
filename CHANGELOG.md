@@ -49,10 +49,10 @@ gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
 ### [9.0.0]
 *Diffs for the beta to master*
 
-### [9.0.0.beta.2]
+### [9.0.0-beta.2]
 - Fixed problems when running in development mode for both the generator and spec/dummy. 
 
-### [9.0.0.beta.1]
+### [9.0.0-beta.1]
 - First version of depending on Webpacker rather than Webpacker Lite  
 
 ### [8.0.6]
@@ -674,8 +674,8 @@ Best done with Object destructing:
 - Fix several generator related issues.
 
 [Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.5...master
-[9.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.1...master
-[9.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.1...9.0.0-beta.1r
+[9.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.2...master
+[9.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.2...9.0.0-beta.1
 [9.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.1...master
 [8.0.6]: https://github.com/shakacode/react_on_rails/compare/8.0.5...8.0.6
 [8.0.5]: https://github.com/shakacode/react_on_rails/compare/8.0.3...8.0.5
