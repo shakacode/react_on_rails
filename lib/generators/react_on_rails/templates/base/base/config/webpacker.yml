@@ -8,12 +8,13 @@ development:
   # generated files for development, in /public/webpack/development
   public_output_path: webpack/development
 
-  dev_server:
-    host: localhost
-    port: 8080
-    https: false
-    # Can be enabled by export WEBPACKER_HMR=TRUE in env
-    hot: false
+#  Temporarily disabling live-reloading until the server script is added.
+#  dev_server:
+#    host: localhost
+#    port: 8080
+#    https: false
+#    # Can be enabled by export WEBPACKER_HMR=TRUE in env
+#    hot: false
 
 test:
   <<: *default
