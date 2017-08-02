@@ -8,15 +8,23 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
-### [9.0.0.beta.1]
-- Switch over to using Webpacker
+## 9.0 from 8.x. Upgrade Instructions
+All 9.0.0 beta versions can be viewed in [PR 908](https://github.com/shakacode/react_on_rails/pull/908)
 
-- If using the WebpackConfigLoader, you will need to rename the following object properties:
-  - hotReloadingUrl       devServerUrl         
-  - hotReloadingHostname  devServerHost        
-  - hotReloadingPort      devServerPort
+- Update the gemfile. Switch over to using Webpacker on the ShakaCode branch:
 
-- Find your webpacker_lite.yml and rename it to webpacker.yml
+```rb
+gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
+    branch: "issue-464-merge-webpacker-lite-into-webpacker"
+```
+
+- Update for the renaming in the `WebpackConfigLoader` in your webpack configuration.
+  You will need to rename the following object properties:
+  - hotReloadingUrl       ==> devServerUrl         
+  - hotReloadingHostname  ==> devServerHost        
+  - hotReloadingPort      ==> devServerPort
+
+- Find your `webpacker_lite.yml` and rename it to `webpacker.yml`
   - Add a section like this under your development env:
     ```
     dev_server:
@@ -26,11 +34,26 @@ Changes since last non-beta release.
       # Can be enabled by export WEBPACKER_HMR=TRUE in env
       hot: false   
     ```
-  - remove `hot_reloading_host` and `hot_reloading_enabled_by_default`
-  - rename `webpack_public_output_dir` to `public_output_path`
-
+  - See the example `spec/dummy/config/webpacker.yml`.
+  - Remove keys `hot_reloading_host` and `hot_reloading_enabled_by_default`. These are replaced by the `dev_server` key.
+  - Rename `webpack_public_output_dir` to `public_output_path`.
   
+- Edit your Procfile.dev
+  - For static loading, either:
+    - Comment out or remove the dev_server area of your config.
+    - Edit your static procfile to set env value WEBPACKER_DEV_SERVER=FALSE
+  - For hot loading, either:
+    - Set the hot key in your `webpacker.yml` to `true`.
+    - Edit your hot procfile to set env value WEBPACKER_HMR=TRUE
+  
+### [9.0.0]
+*Diffs for the beta to master*
 
+### [9.0.0.beta.2]
+- Fixed problems when running in development mode for both the generator and spec/dummy. 
+
+### [9.0.0.beta.1]
+- First version of depending on Webpacker rather than Webpacker Lite  
 
 ### [8.0.6]
 #### fixed
@@ -650,7 +673,10 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.6...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.5...master
+[9.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.1...master
+[9.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.1...9.0.0-beta.1r
+[9.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.1...master
 [8.0.6]: https://github.com/shakacode/react_on_rails/compare/8.0.5...8.0.6
 [8.0.5]: https://github.com/shakacode/react_on_rails/compare/8.0.3...8.0.5
 [8.0.3]: https://github.com/shakacode/react_on_rails/compare/8.0.2...8.0.3
