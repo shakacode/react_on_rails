@@ -42,7 +42,7 @@ const configLoader = (configPath) => {
   const devServerHost = devServerValues && (devServerValues.host || DEFAULT_DEV_SERVER_HOST);
   const devServerPort = devServerValues && (devServerValues.port || DEFAULT_DEV_SERVER_PORT);
   const devServerHttps = devServerValues && (devServerValues.https || DEFAULT_DEV_SERVER_HTTPS);
-  const devServerHot = devServerValues && (devServerValues.https || DEFAULT_DEV_SERVER_HOT);
+  const devServerHot = devServerValues && (devServerValues.hot || DEFAULT_DEV_SERVER_HOT);
 
   // NOTE: Rails path is hard coded to `/public`
   const webpackPublicOutputDir = configuration.public_output_path ||

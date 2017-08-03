@@ -45,10 +45,22 @@ gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
   - For hot loading, either:
     - Set the hot key in your `webpacker.yml` to `true`.
     - Edit your hot procfile to set env value WEBPACKER_HMR=TRUE
+    
+    
+#### Troubleshooting
+If you want to skip using the dev server (as is current for beta.3 and below), then be sure to either
+set WEBPACKER_DEV_SERVER=FALSE or comment out the dev_server section of your `config/webpacker.yml` file.
+
+Otherwise, you'll get an error that the bundle can't be found, because your Rails server thinks you are
+deploying assets using the webpack-dev-server.
+    
   
 ### [9.0.0]
 *Diffs for the beta to master*
 
+### [9.0.0-beta.3]
+- Fix typo on webpackConfigLoader.js
+ 
 ### [9.0.0-beta.2]
 - Fixed problems when running in development mode for both the generator and spec/dummy. 
 
@@ -677,8 +689,9 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.5...master
-[9.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/rails-webpacker...9.0.0-beta.3
+[9.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.3...master
+[9.0.0-beta.3]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.2...9.0.0-beta.1
 [9.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.2...9.0.0-beta.1
 [9.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.1...master
 [8.0.7]: https://github.com/shakacode/react_on_rails/compare/8.0.6...8.0.7
