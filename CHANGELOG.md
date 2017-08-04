@@ -691,7 +691,7 @@ Best done with Object destructing:
 
 [Unreleased]: https://github.com/shakacode/react_on_rails/compare/rails-webpacker...9.0.0-beta.3
 [9.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.3...master
-[9.0.0-beta.3]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.2...9.0.0-beta.1
+[9.0.0-beta.3]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.3...9.0.0-beta.2
 [9.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.2...9.0.0-beta.1
 [9.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.1...master
 [8.0.7]: https://github.com/shakacode/react_on_rails/compare/8.0.6...8.0.7
