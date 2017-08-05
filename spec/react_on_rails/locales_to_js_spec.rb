@@ -13,14 +13,7 @@ module ReactOnRails
       ReactOnRails.configure do |config|
         config.i18n_dir = ''
       end
-      expect { ReactOnRails::LocalesToJs.new }.to raise_error(/did you set i18n_dir in react_on_rails intializer?/)
-    end
-    
-    it "with i18n_dir set to nil" do
-      ReactOnRails.configure do |config|
-        config.i18n_dir = nil
-      end
-      expect { ReactOnRails::LocalesToJs.new }.to raise_error(/did you set i18n_dir in react_on_rails intializer?/)
+      expect { ReactOnRails::LocalesToJs.new }.to raise_error(/config.i18n_dir is set and it is not a directory. Did you set config.i18n_dir in the react_on_rails initializer?/)
     end
     
     shared_examples "locale to js" do
