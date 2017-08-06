@@ -69,17 +69,13 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       bundle_js_file_path(ReactOnRails.configuration.server_bundle_js_file)
     end
 
-    # TODO: conturbo Write Test for this, with BOTH webpacker installed and not, and
-    # with case for webpacker, but server file is not in the file
     def self.bundle_js_file_path(bundle_name)
-      # For testing outside of Rails app
-
       if using_webpacker?
         # Note, server bundle should not be in the manifest
-        # If using webpacker gem
-        # Per https://github.com/rails/webpacker/issues/571
-        path = Webpacker::Manifest.lookup_path_no_throw(bundle_name)
-        return path if path.present?
+        # If using webpacker gem per https://github.com/rails/webpacker/issues/571
+        hashed_name = Webpacker::Manifest.lookup(bundle_name, throw_if_missing: false)
+        hashed_name = bundle_name if hashed_name.blank?
+        Rails.root.join(File.join(Webpacker::Configuration.output_path, hashed_name))
         # Else either the file is not in the manifest, so we'll default to the non-hashed name.
       end
 
