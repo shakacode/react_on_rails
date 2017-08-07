@@ -106,6 +106,10 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       rails_version_less_than("4.1.1")
     end
 
+    def manifest_exists?
+      Webpacker::Configuration.manifest_path.exist?
+    end
+
     module Required
       def required(arg_name)
         raise ArgumentError, "#{arg_name} is required"
