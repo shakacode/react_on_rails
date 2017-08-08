@@ -109,7 +109,7 @@ module ReactOnRails
 
             - Include your webpack assets to your application layout.
 
-              <%= javascript_pack_tag 'main' %>
+              <%= javascript_pack_tag 'webpack-bundle' %>
 
             - Ensure your bundle and yarn installs of dependencies are up to date.
 
