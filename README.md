@@ -145,7 +145,7 @@ To upgrade existing apps to React on Rails 8 see the [Installation Overview](doc
 1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `client/package.json` file.
 
   ```ruby
-  gem "react_on_rails", "8.0.0"
+  gem "react_on_rails", "9.0.0"
   ```
 
 2. Commit this to git (you cannot run the generator unless you do this or pass the option `--ignore-warnings`).
@@ -237,6 +237,11 @@ cd client && yarn add react-on-rails
 ```
 
 That will install the latest version and update your package.json.
+
+## Webpacker Configuration
+
+React on Rails users should set configuration value `compile` to false, as React on Railsh andles compilation for test and production environments.
+
 
 ## How it Works
 The generator installs your webpack files in the `client` folder. Foreman uses webpack to compile your code and output the bundled results to `app/assets/webpack`, which are then loaded by sprockets. These generated bundle files have been added to your `.gitignore` for your convenience.

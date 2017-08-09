@@ -106,7 +106,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       rails_version_less_than("4.1.1")
     end
 
-    def manifest_exists?
+    def self.manifest_exists?
       Webpacker::Configuration.manifest_path.exist?
     end
 

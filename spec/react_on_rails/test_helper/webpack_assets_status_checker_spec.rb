@@ -36,7 +36,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
       before do
         require "webpacker"
         allow(ReactOnRails::Utils).to receive(:using_webpacker?).and_return(true)
-        allow(Webpacker::Manifest).to receive(:exist?).and_return(true)
+        allow(ReactOnRails::Utils).to receive(:manifest_exists?).and_return(true)
         allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
           .with("client-bundle.js")
           .and_return(File.join(generated_assets_dir, "client-bundle-6bc530d039d96709b68d.js"))
@@ -54,7 +54,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
       before do
         require "webpacker"
         allow(ReactOnRails::Utils).to receive(:using_webpacker?).and_return(true)
-        allow(Webpacker::Manifest).to receive(:exist?).and_return(false)
+        allow(ReactOnRails::Utils).to receive(:manifest_exists?).and_return(false)
       end
 
       specify { expect(checker.stale_generated_webpack_files).to eq(["manifest.json"]) }
