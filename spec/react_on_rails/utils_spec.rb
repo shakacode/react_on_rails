@@ -8,7 +8,7 @@ module ReactOnRails
     describe ".bundle_js_file_path" do
       before do
         allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
-                               .and_return("public/webpack/development")
+          .and_return("public/webpack/development")
       end
 
       subject do
@@ -19,10 +19,10 @@ module ReactOnRails
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
           allow(Webpacker::Configuration).to receive(:output_path)
-                                             .and_return("public/webpack/development")
+            .and_return("public/webpack/development")
           allow(Webpacker::Manifest).to receive(:lookup)
-                                        .with("webpack-bundle", throw_if_missing: false)
-                                        .and_return("webpack-bundle-0123456789abcdef")
+            .with("webpack-bundle", throw_if_missing: false)
+            .and_return("webpack-bundle-0123456789abcdef")
           allow(Utils).to receive(:using_webpacker?).and_return(true)
         end
 
