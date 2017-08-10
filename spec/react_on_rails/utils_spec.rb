@@ -12,7 +12,7 @@ module ReactOnRails
       end
 
       subject do
-        Utils.bundle_js_file_path('webpack-bundle')
+        Utils.bundle_js_file_path("webpack-bundle.js")
       end
 
       context "With Webpacker enabled" do
@@ -21,18 +21,18 @@ module ReactOnRails
           allow(Webpacker::Configuration).to receive(:output_path)
             .and_return("public/webpack/development")
           allow(Webpacker::Manifest).to receive(:lookup)
-            .with("webpack-bundle", throw_if_missing: false)
-            .and_return("webpack-bundle-0123456789abcdef")
+            .with("webpack-bundle.js", throw_if_missing: false)
+            .and_return("webpack-bundle-0123456789abcdef.js")
           allow(Utils).to receive(:using_webpacker?).and_return(true)
         end
 
-        it { expect(subject).to eq("public/webpack/development/webpack-bundle-0123456789abcdef") }
+        it { expect(subject).to eq("public/webpack/development/webpack-bundle-0123456789abcdef.js") }
       end
 
       context "Without Webpacker enabled" do
         before { allow(Utils).to receive(:using_webpacker?).and_return(false) }
 
-        it { expect(subject).to eq("public/webpack/development/webpack-bundle") }
+        it { expect(subject).to eq("public/webpack/development/webpack-bundle.js") }
       end
     end
 
