@@ -76,10 +76,10 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
         hashed_name = Webpacker::Manifest.lookup(bundle_name, throw_if_missing: false)
         hashed_name = bundle_name if hashed_name.blank?
         Rails.root.join(File.join(Webpacker::Configuration.output_path, hashed_name))
+      else
         # Else either the file is not in the manifest, so we'll default to the non-hashed name.
+        File.join(ReactOnRails.configuration.generated_assets_dir, bundle_name)
       end
-
-      File.join(ReactOnRails.configuration.generated_assets_dir, bundle_name)
     end
 
     def self.using_webpacker?
