@@ -1,9 +1,41 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
+require "webpacker"
 
 module ReactOnRails
   RSpec.describe Utils do
+    describe ".bundle_js_file_path" do
+      before do
+        allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
+                               .and_return("public/webpack/development")
+      end
+
+      subject do
+        Utils.bundle_js_file_path('webpack-bundle')
+      end
+
+      context "With Webpacker enabled" do
+        before do
+          allow(Rails).to receive(:root).and_return(Pathname.new("."))
+          allow(Webpacker::Configuration).to receive(:output_path)
+                                             .and_return("public/webpack/development")
+          allow(Webpacker::Manifest).to receive(:lookup)
+                                        .with("webpack-bundle", throw_if_missing: false)
+                                        .and_return("webpack-bundle-0123456789abcdef")
+          allow(Utils).to receive(:using_webpacker?).and_return(true)
+        end
+
+        it { expect(subject).to eq("public/webpack/development/webpack-bundle-0123456789abcdef") }
+      end
+
+      context "Without Webpacker enabled" do
+        before { allow(Utils).to receive(:using_webpacker?).and_return(false) }
+
+        it { expect(subject).to eq("public/webpack/development/webpack-bundle") }
+      end
+    end
+
     describe ".wrap_message" do
       subject do
         <<-MSG.strip_heredoc
