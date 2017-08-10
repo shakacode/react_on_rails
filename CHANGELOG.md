@@ -8,6 +8,9 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
+- Fix regression where `react_component(... prerender: true)` wouldn't find the generated asset bundle, because it wasn't looking for the hashed path.
+
+
 ## 9.0 from 8.x. Upgrade Instructions
 All 9.0.0 beta versions can be viewed in [PR 908](https://github.com/shakacode/react_on_rails/pull/908)
 
