@@ -2,7 +2,7 @@
  * Allow defaults for the config/webpacker.yml. Thee values in this file MUST match values
  * in https://github.com/rails/webpacker/blob/master/lib/install/config/webpacker.yml
  *
- * NOTE: for hot reloading, env.WEBPACKER_HMR value will override any config value. This env value
+ * NOTE: for HMR reloading, env.WEBPACKER_HMR value will override any config value. This env value
  * should be set to TRUE to turn this on.
  */
 const { join, resolve } = require('path');
@@ -14,13 +14,13 @@ const DEFAULT_PUBLIC_OUTPUT_PATH = 'packs';
 const DEFAULT_DEV_SERVER_HOST = 'localhost';
 const DEFAULT_DEV_SERVER_PORT = '8080';
 const DEFAULT_DEV_SERVER_HTTPS = false;
-const DEFAULT_DEV_SERVER_HOT = false;
+const DEFAULT_DEV_SERVER_HMR = false;
 
 /**
  * @param configPath, location where webpacker.yml will be found
  * @returns {{
  * devBuild,
- * hotReloadingEnabled,
+ * hmrReloadingEnabled,
  * devServerEnabled,
  * devServerHost,
  * devServerPort,
@@ -42,7 +42,7 @@ const configLoader = (configPath) => {
   const devServerHost = devServerValues && (devServerValues.host || DEFAULT_DEV_SERVER_HOST);
   const devServerPort = devServerValues && (devServerValues.port || DEFAULT_DEV_SERVER_PORT);
   const devServerHttps = devServerValues && (devServerValues.https || DEFAULT_DEV_SERVER_HTTPS);
-  const devServerHot = devServerValues && (devServerValues.hot || DEFAULT_DEV_SERVER_HOT);
+  const devServerHmr = devServerValues && (devServerValues.hmr || DEFAULT_DEV_SERVER_HMR);
 
   // NOTE: Rails path is hard coded to `/public`
   const webpackPublicOutputDir = configuration.public_output_path ||
@@ -52,7 +52,7 @@ const configLoader = (configPath) => {
   const manifest = MANIFEST;
 
   const devServerEnabled = !!devServerValues;
-  const hotReloadingEnabled = !!devServerHot || env.WEBPACKER_HMR === 'TRUE';
+  const hmrReloadingEnabled = !!devServerHmr || env.WEBPACKER_HMR === 'TRUE';
 
   let devServerUrl = null;
   if (devServerValues) {
@@ -61,7 +61,7 @@ const configLoader = (configPath) => {
 
   return {
     devBuild,
-    hotReloadingEnabled,
+    hmrReloadingEnabled,
     devServerEnabled,
     devServerHost,
     devServerPort,

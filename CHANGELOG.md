@@ -35,7 +35,7 @@ gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
       port: 8080
       https: false
       # Can be enabled by export WEBPACKER_HMR=TRUE in env
-      hot: false   
+      hmr: false
     ```
   - See the example `spec/dummy/config/webpacker.yml`.
   - Remove keys `hot_reloading_host` and `hot_reloading_enabled_by_default`. These are replaced by the `dev_server` key.
@@ -46,7 +46,7 @@ gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
     - Comment out or remove the dev_server area of your config.
     - Edit your static procfile to set env value WEBPACKER_DEV_SERVER=FALSE
   - For hot loading, either:
-    - Set the hot key in your `webpacker.yml` to `true`.
+    - Set the `hmr` key in your `webpacker.yml` to `true`.
     - Edit your hot procfile to set env value WEBPACKER_HMR=TRUE
     
     
