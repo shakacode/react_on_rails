@@ -57,6 +57,9 @@ gem "webpacker"
 =======
 - Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set.
 >>>>>>> updated changelog.md
+=======
+- Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set. [#899](https://github.com/shakacode/react_on_rails/pull/899) by [hakongit](https://github.com/hakongit)
+>>>>>>> updated changelog.md
 - Fixes GitUtils.uncommitted_changes? throwing an error when called in an environment without Git, and allows install generator to be run successfully with `--ignore-warnings` [#878](https://github.com/shakacode/react_on_rails/pull/878) by [jasonblalock](https://github.com/jasonblalock)
 
 - Update for the renaming in the `WebpackConfigLoader` in your webpack configuration.
