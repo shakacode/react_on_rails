@@ -10,7 +10,6 @@ Changes since last non-beta release.
 - Fixed `react_component_hash` functionality in cases of prerendering errors: [PR 960](https://github.com/shakacode/react_on_rails/pull/960) by [Judahmeek](https://github.com/Judahmeek)
 
 *Please add entries here for your pull requests.*
-<<<<<<< HEAD
 - Changes check in locales_to_js to check for i18n_dir.blank? and i18n_dir.directory?
 
 ### [10.0.0] - 2017-10-08
@@ -55,6 +54,9 @@ gem "webpacker"
 ```
 =======
 - Fixes check for i18n_dir returning false when present in LocalesToJs.
+=======
+- Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set.
+>>>>>>> updated changelog.md
 - Fixes GitUtils.uncommitted_changes? throwing an error when called in an environment without Git, and allows install generator to be run successfully with `--ignore-warnings` [#878](https://github.com/shakacode/react_on_rails/pull/878) by [jasonblalock](https://github.com/jasonblalock)
 
 - Update for the renaming in the `WebpackConfigLoader` in your webpack configuration.
