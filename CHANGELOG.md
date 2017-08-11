@@ -11,7 +11,7 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
-- Fixes check for i18n_dir returning false when present in LocalesToJs.
+- Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set.
 - Fixes GitUtils.uncommitted_changes? throwing an error when called in an environment without Git, and allows install generator to be run successfully with `--ignore-warnings` [#878](https://github.com/shakacode/react_on_rails/pull/878) by [jasonblalock](https://github.com/jasonblalock)
 
 ## [8.0.5]
