@@ -72,7 +72,8 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
 
       if using_webpacker_lite? && WebpackerLite::Manifest.lookup(bundle_name)
         # If using webpacker_lite gem
-        public_subdir_hashed_file_name = ActionController::Base.helpers.asset_pack_path(bundle_name)
+        # Per https://github.com/rails/webpacker/issues/571, this path might
+        public_subdir_hashed_file_name = ActionController::Base.helpers.pack_path(bundle_name)
         return File.join("public", public_subdir_hashed_file_name)
       end
 

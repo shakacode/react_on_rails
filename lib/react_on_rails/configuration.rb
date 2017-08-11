@@ -24,7 +24,7 @@ module ReactOnRails
 
     raise "Error configuring /config/react_on_rails.rb: invalid value for `config.i18n_dir`. "\
         "Directory does not exist: #{@configuration.i18n_dir}. Set to value to nil or comment it "\
-        "out if not using this i18n with React on Rails."
+        "out if not using the React on Rails i18n feature."
   end
 
   def self.check_i18n_yml_directory_exists
