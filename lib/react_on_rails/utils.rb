@@ -83,7 +83,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     def self.bundle_js_file_path(bundle_name)
       if using_webpacker?
         # Next line will throw if the file or manifest does not exist
-        Webpacker.manifest.lookup(bundle_name)
+        Rails.root.join(File.join("public", Webpacker.manifest.lookup(bundle_name))).to_s
       else
         # Default to the non-hashed name in the specified output directory, which, for legacy
         # React on Rails, this is the output directory picked up by the asset pipeline.
