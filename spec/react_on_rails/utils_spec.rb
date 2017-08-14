@@ -18,11 +18,11 @@ module ReactOnRails
       context "With Webpacker enabled" do
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
-          allow(Webpacker::Configuration).to receive(:output_path)
+          allow(Webpacker).to receive_message_chain("config.public_output_path")
             .and_return("public/webpack/development")
-          allow(Webpacker::Manifest).to receive(:lookup)
-            .with("webpack-bundle.js", throw_if_missing: false)
-            .and_return("webpack-bundle-0123456789abcdef.js")
+          allow(Webpacker).to receive_message_chain("manifest.lookup")
+            .with("webpack-bundle.js")
+            .and_return("public/webpack/development/webpack-bundle-0123456789abcdef.js")
           allow(Utils).to receive(:using_webpacker?).and_return(true)
         end
 
