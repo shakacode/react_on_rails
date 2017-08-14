@@ -5,70 +5,53 @@
  * NOTE: for HMR reloading, env.WEBPACKER_HMR value will override any config value. This env value
  * should be set to TRUE to turn this on.
  */
+
 const { join, resolve } = require('path');
+const { env } = require('process');
 const { safeLoad } = require('js-yaml');
 const { readFileSync } = require('fs');
 
-const MANIFEST = 'manifest.json';
-const DEFAULT_PUBLIC_OUTPUT_PATH = 'packs';
-const DEFAULT_DEV_SERVER_HOST = 'localhost';
-const DEFAULT_DEV_SERVER_PORT = '8080';
-const DEFAULT_DEV_SERVER_HTTPS = false;
-const DEFAULT_DEV_SERVER_HMR = false;
+
+function removeOuterSlashes(string) {
+  return string.replace(/^\/*/, '').replace(/\/*$/, '');
+}
+
+function formatPublicPath(host = '', path = '') {
+  let formattedHost = removeOuterSlashes(host);
+  if (formattedHost && !/^http/i.test(formattedHost)) {
+    formattedHost = `//${formattedHost}`;
+  }
+  const formattedPath = removeOuterSlashes(path);
+  return `${formattedHost}/${formattedPath}/`;
+}
 
 /**
  * @param configPath, location where webpacker.yml will be found
+ * Return values are consistent with Webpacker's js helpers
  * @returns {{
- * devBuild,
- * hmrReloadingEnabled,
- * devServerEnabled,
- * devServerHost,
- * devServerPort,
- * devServerUrl,
- * manifest,
- * webpackOutputPath,
- * webpackPublicOutputDir
- * }}
+     settings,
+     resolvedModules,
+     output: { path, publicPath, publicPathWithHosts }
+   }}
  */
 const configLoader = (configPath) => {
-  const env = process.env;
-
   // Some test environments might not have the NODE_ENV set, so we'll have fallbacks.
   const configEnv = (process.env.NODE_ENV || process.env.RAILS_ENV || 'development');
   const ymlConfigPath = join(configPath, 'webpacker.yml');
-  const configuration = safeLoad(readFileSync(ymlConfigPath, 'utf8'))[configEnv];
-  const devServerValues = configuration.dev_server;
-  const devBuild = configEnv !== 'production';
-  const devServerHost = devServerValues && (devServerValues.host || DEFAULT_DEV_SERVER_HOST);
-  const devServerPort = devServerValues && (devServerValues.port || DEFAULT_DEV_SERVER_PORT);
-  const devServerHttps = devServerValues && (devServerValues.https || DEFAULT_DEV_SERVER_HTTPS);
-  const devServerHmr = devServerValues && (devServerValues.hmr || DEFAULT_DEV_SERVER_HMR);
+  const settings = safeLoad(readFileSync(ymlConfigPath, 'utf8'))[configEnv];
 
   // NOTE: Rails path is hard coded to `/public`
-  const webpackPublicOutputDir = configuration.public_output_path ||
-    DEFAULT_PUBLIC_OUTPUT_PATH;
-  const webpackOutputPath = resolve(configPath, '..', 'public', webpackPublicOutputDir);
-
-  const manifest = MANIFEST;
-
-  const devServerEnabled = !!devServerValues;
-  const hmrReloadingEnabled = !!devServerHmr || env.WEBPACKER_HMR === 'TRUE';
-
-  let devServerUrl = null;
-  if (devServerValues) {
-    devServerUrl = `http${devServerHttps ? 's' : ''}://${devServerHost}:${devServerPort}`;
-  }
+  const output = {
+    // Next line differs from the webpacker definition as we use the configPath to create
+    // the relative path.
+    path: resolve(configPath, '..', 'public', settings.public_output_path),
+    publicPath: `/${settings.public_output_path}/`.replace(/([^:]\/)\/+/g, '$1'),
+    publicPathWithHost: formatPublicPath(env.ASSET_HOST, settings.public_output_path),
+  };
 
   return {
-    devBuild,
-    hmrReloadingEnabled,
-    devServerEnabled,
-    devServerHost,
-    devServerPort,
-    devServerUrl,
-    manifest,
-    webpackOutputPath,
-    webpackPublicOutputDir,
+    settings,
+    output,
   };
 };
 

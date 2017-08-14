@@ -18,23 +18,47 @@ All 9.0.0 beta versions can be viewed in [PR 908](https://github.com/shakacode/r
 
 ```rb
 gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
-    branch: "issue-464-merge-webpacker-lite-into-webpacker"
+    branch: "issue-464-merge-webpacker-lite-into-webpacker-v2"
 ```
 
 - Update for the renaming in the `WebpackConfigLoader` in your webpack configuration.
   You will need to rename the following object properties:
-  - hotReloadingUrl       ==> devServerUrl         
-  - hotReloadingHostname  ==> devServerHost        
-  - hotReloadingPort      ==> devServerPort
+  - webpackOutputPath      ==> output.path
+  - webpackPublicOutputDir ==> output.publicPath
+  - hotReloadingUrl        ==> output.publicPathWithHost
+  - hotReloadingHostname   ==> settings.dev_server.host
+  - hotReloadingPort       ==> settings.dev_server.port
+  - hmr                    ==> settings.dev_server.hmr
+  - manifest               ==> Remove this one. We use the default for Webpack of manifest.json
+  - env                    ==> Use `const { env } = require('process');
+  - devBuild               ==> Use `const devBuild = process.env.NODE_ENV !== 'production';
+ 
+- Edit your Webpack.config files:
+  - Change your Webpack output to be like:
+    ```
+    // Leading slash is necessary
+    publicPath: `/${output.publicPath}`,
+    path: output.path,
+    ```
+  - Change your ManifestPlugin definition to include publicPath
+    ```
+    output: {
+      // Name comes from the entry section.
+      filename: '[name]-[chunkhash].js',
+   
+      publicPath: output.publicPath,
+      path: output.path,
+    },
+
+    ```
+  
 
 - Find your `webpacker_lite.yml` and rename it to `webpacker.yml`
   - Add a section like this under your development env:
     ```
     dev_server:
       host: localhost
-      port: 8080
-      https: false
-      # Can be enabled by export WEBPACKER_HMR=TRUE in env
+      port: 3035
       hmr: false
     ```
   - See the example `spec/dummy/config/webpacker.yml`.
@@ -60,6 +84,19 @@ deploying assets using the webpack-dev-server.
   
 ### [9.0.0]
 *Diffs for the beta to master*
+
+### [9.0.0-beta.7]
+- Depend on updated rails/webpacker in branch 
+
+gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
+    branch: "issue-464-merge-webpacker-lite-into-webpacker-v2"
+
+
+### [9.0.0-beta.6]
+- Change "hot" to "hmr".
+
+### [9.0.0-beta.3]
+- Fix typo on webpackConfigLoader.js
 
 ### [9.0.0-beta.3]
 - Fix typo on webpackConfigLoader.js
@@ -692,8 +729,12 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/rails-webpacker...9.0.0-beta.3
-[9.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.3...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/rails-webpacker...9.0.0-beta.7
+[9.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.7...master
+[9.0.0-beta.7]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.7...9.0.0-beta.6
+[9.0.0-beta.6]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.6...9.0.0-beta.5
+[9.0.0-beta.5]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.5...9.0.0-beta.4
+[9.0.0-beta.4]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.4...9.0.0-beta.3
 [9.0.0-beta.3]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.3...9.0.0-beta.2
 [9.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.2...9.0.0-beta.1
 [9.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.1...master

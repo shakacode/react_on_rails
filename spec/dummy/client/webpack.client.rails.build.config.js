@@ -4,13 +4,15 @@
 
 const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const merge = require('webpack-merge');
+const { env } = require('process')
 const config = require('./webpack.client.base.config');
 const { resolve } = require('path');
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
-const { webpackOutputPath, webpackPublicOutputDir } = webpackConfigLoader(configPath);
+const { output } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
+
 
 if (devBuild) {
   console.log('Webpack dev build for Rails'); // eslint-disable-line no-console
@@ -22,11 +24,11 @@ if (devBuild) {
 module.exports = merge(config, {
 
   output: {
-    filename: '[name]-[hash].js',
+    filename: env.NODE_ENV === 'production' ? '[name]-[hash].js' : '[name].js',
 
     // Leading and trailing slashes ARE necessary.
-    publicPath: '/' + webpackPublicOutputDir + '/',
-    path: webpackOutputPath,
+    publicPath: output.publicPath,
+    path: output.path,
   },
 
   // See webpack.client.base.config for adding modules common to both the webpack dev server and rails

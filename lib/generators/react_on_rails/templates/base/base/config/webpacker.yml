@@ -11,9 +11,7 @@ development:
 #  Temporarily disabling live-reloading until the server script is added.
 #  dev_server:
 #    host: localhost
-#    port: 8080
-#    https: false
-#    # Can be enabled by export WEBPACKER_HMR=TRUE in env
+#    port: 3035
 #    hmr: false
 
 test:

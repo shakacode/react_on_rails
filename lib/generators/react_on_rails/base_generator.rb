@@ -76,7 +76,7 @@ module ReactOnRails
 
         gem 'mini_racer', platforms: :ruby
         gem 'webpacker', git: "https://github.com/shakacode/webpacker.git",
-                         branch: "issue-464-merge-webpacker-lite-into-webpacker"
+                         branch: "issue-464-merge-webpacker-lite-into-webpacker-v2"
         GEMS
         append_to_file("Gemfile",
                        gems)

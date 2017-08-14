@@ -62,22 +62,31 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.server_bundle_js_file_path
-      # Don't ever use the hashed file name?
-      # Cases:
-      # 1. Using same bundle for both server and client, so server bundle will be hashed
-      # 2. Using a different bundle (different Webpack config), so file is not hashed
-      bundle_js_file_path(ReactOnRails.configuration.server_bundle_js_file)
+      # Either:
+      # 1. Using same bundle for both server and client, so server bundle will be hashed in manifest
+      # 2. Using a different bundle (different Webpack config), so file is not hashed, and
+      #    bundle_js_path will throw.
+      # 3. Not using webpacker, and bundle_js_path always returns
+
+      # Note, server bundle should not be in the manifest
+      # If using webpacker gem per https://github.com/rails/webpacker/issues/571
+      return @server_bundle_path if @server_bundle_path && !Rails.env.development?
+
+      bundle_name = ReactOnRails.configuration.server_bundle_js_file
+      @server_bundle_path = begin
+        bundle_js_file_path(bundle_name)
+      rescue Webpacker::Manifest::MissingEntryError
+        Rails.root.join(File.join(Webpacker.config.public_output_path, bundle_name)).to_s
+      end
     end
 
     def self.bundle_js_file_path(bundle_name)
       if using_webpacker?
-        # Note, server bundle should not be in the manifest
-        # If using webpacker gem per https://github.com/rails/webpacker/issues/571
-        hashed_name = Webpacker::Manifest.lookup(bundle_name, throw_if_missing: false)
-        hashed_name = bundle_name if hashed_name.blank?
-        Rails.root.join(File.join(Webpacker::Configuration.output_path, hashed_name)).to_s
+        # Next line will throw if the file or manifest does not exist
+        Webpacker.manifest.lookup(bundle_name)
       else
-        # Else either the file is not in the manifest, so we'll default to the non-hashed name.
+        # Default to the non-hashed name in the specified output directory, which, for legacy
+        # React on Rails, this is the output directory picked up by the asset pipeline.
         File.join(ReactOnRails.configuration.generated_assets_dir, bundle_name)
       end
     end
@@ -107,7 +116,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.manifest_exists?
-      Webpacker::Configuration.manifest_path.exist?
+      Webpacker.config.public_manifest_path.exist?
     end
 
     module Required
