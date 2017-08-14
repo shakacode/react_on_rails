@@ -38,25 +38,24 @@ module ReactOnRails
 
     describe ".server_bundle_js_file_path" do
       subject do
-        Utils.server_bundle_js_file_path()
+        Utils.server_bundle_js_file_path
       end
 
       context "With Webpacker enabled and server file not in manifest" do
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                                   .and_return("webpack-bundle.js")
+            .and_return("webpack-bundle.js")
           allow(Webpacker).to receive_message_chain("config.public_output_path")
-                                .and_return("public/webpack/development")
+            .and_return("public/webpack/development")
           allow(Webpacker).to receive_message_chain("manifest.lookup")
-                                .with("webpack-bundle.js")
-                                .and_raise(Webpacker::Manifest::MissingEntryError)
+            .with("webpack-bundle.js")
+            .and_raise(Webpacker::Manifest::MissingEntryError)
           allow(Utils).to receive(:using_webpacker?).and_return(true)
         end
 
         it { expect(subject).to eq("public/webpack/development/webpack-bundle.js") }
       end
-
     end
 
     describe ".wrap_message" do
