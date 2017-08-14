@@ -240,7 +240,7 @@ That will install the latest version and update your package.json.
 
 ## Webpacker Configuration
 
-React on Rails users should set configuration value `compile` to false, as React on Railsh andles compilation for test and production environments.
+React on Rails users should set configuration value `compile` to false, as React on Rails handles compilation for test and production environments.
 
 
 ## How it Works
