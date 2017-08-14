@@ -2,13 +2,8 @@
 
 source "https://rubygems.org"
 
-# Specify your gem"s dependencies in react_on_rails.gemspec
-gemspec
+eval_gemfile File.expand_path("../react_on_rails.gemspec", __FILE__)
 
-# The following gems are dependencies of the gem's dummy/example apps, not the gem itself.
-# They must be defined here because of the way Travis CI works, in that it will only
-# bundle install from a single Gemfile. Therefore, all gems that we will need for any dummy/example
-# app have to be manually added to this file.
 gem "bootstrap-sass"
 gem "jbuilder", "~> 2.0"
 gem "jquery-rails"
