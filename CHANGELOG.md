@@ -85,6 +85,9 @@ deploying assets using the webpack-dev-server.
 ### [9.0.0]
 *Diffs for the beta to master*
 
+### [9.0.0-beta.8]
+- bugfix for server rendering
+
 ### [9.0.0-beta.7]
 - Depend on updated rails/webpacker in branch 
 
@@ -729,8 +732,9 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/rails-webpacker...9.0.0-beta.7
-[9.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.7...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/rails-webpacker...9.0.0-beta.8
+[9.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.8...master
+[9.0.0-beta.8]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.8...9.0.0-beta.7
 [9.0.0-beta.7]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.7...9.0.0-beta.6
 [9.0.0-beta.6]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.6...9.0.0-beta.5
 [9.0.0-beta.5]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.5...9.0.0-beta.4
