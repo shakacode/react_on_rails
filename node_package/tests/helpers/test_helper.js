@@ -1,6 +1,7 @@
-import JsDom from 'jsdom';
+import { JSDOM } from 'jsdom';
 
-global.document = JsDom.jsdom('<div id="root"></div>');
+const { document } = (new JSDOM('<div id="root"></div>')).window;
+global.document = document;
 global.window = document.defaultView;
 
 Object.keys(window).forEach((key) => {
