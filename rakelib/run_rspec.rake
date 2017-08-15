@@ -20,8 +20,10 @@ namespace :run_rspec do
 
   desc "Run RSpec with rails32 gemfile"
   task :gem_rails32 do
+    rspec_args = "spec/react_on_rails --exclude-pattern "\
+                 "\"**/generators/*_spec.rb,**/test_helper/*_spec.rb\""
     run_tests_in("",
-                 rspec_args: File.join("spec", "react_on_rails"),
+                 rspec_args: rspec_args,
                  env_vars: "BUNDLE_GEMFILE=Gemfile.rails32")
   end
 
