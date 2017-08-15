@@ -12,7 +12,7 @@ if ENV["USE_COVERALLS"] == "TRUE"
 end
 
 if File.basename(ENV["BUNDLE_GEMFILE"] || "") == "Gemfile.rails32"
-  tasks = %w[run_rspec:gem_rails32]
+  tasks = %w[run_rspec:gem_rails32 lint:rubocop]
   prepare_for_ci = ["nothing"]
 end
 
