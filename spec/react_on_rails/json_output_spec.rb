@@ -24,7 +24,7 @@ module ReactOnRails
 
     describe ".escape" do
       subject { described_class.escape(hash_value.to_json) }
-      
+
       it_behaves_like :escaped_json
     end
 
