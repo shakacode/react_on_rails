@@ -11,7 +11,7 @@ if ENV["USE_COVERALLS"] == "TRUE"
   tasks << "coveralls:push"
 end
 
-if File.basename(ENV["BUNDLE_GEMFILE"]) == "Gemfile.rails32"
+if File.basename(ENV["BUNDLE_GEMFILE"] || "") == "Gemfile.rails32"
   tasks = %w[run_rspec:gem_rails32]
   prepare_for_ci = ["nothing"]
 end
