@@ -4,9 +4,13 @@ All notable changes to this project's source code will be documented in this fil
 Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+### Added
+- Rails.env is provided in the default railsContext, as suggested in [#697](https://github.com/shakacode/react_on_rails/issues/697) by [robwise](https://github.com/robwise), added by [conturbo](https://github.com/conturbo).
+
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
+
 
 ### [8.0.6]
 #### fixed
