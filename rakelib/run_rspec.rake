@@ -17,11 +17,12 @@ namespace :run_rspec do
   task :gem do
     run_tests_in("", rspec_args: File.join("spec", "react_on_rails"))
   end
-  
+
   desc "Run RSpec with rails32 gemfile"
   task :gem_rails32 do
-    run_tests_in("", rspec_args: File.join("spec", "react_on_rails"),
-                env_vars: "BUNDLE_GEMFILE=Gemfile.rails32")
+    run_tests_in("",
+                 rspec_args: File.join("spec", "react_on_rails"),
+                 env_vars: "BUNDLE_GEMFILE=Gemfile.rails32")
   end
 
   desc "Runs dummy rspec with turbolinks"
