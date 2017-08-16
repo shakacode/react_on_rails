@@ -13,6 +13,7 @@ shared_examples "base_generator" do
   it "updates the .gitignore file" do
     match = <<-MATCH.strip_heredoc
       some existing text
+
       # React on Rails
       npm-debug.log*
       node_modules

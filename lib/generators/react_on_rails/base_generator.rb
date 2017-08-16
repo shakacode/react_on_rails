@@ -33,7 +33,8 @@ module ReactOnRails
         DATA
 
         if dest_file_exists?(".gitignore")
-          append_to_file(".gitignore", data)
+          # NOTE: keep blank line at top in case existing .gitignore does not end in a newline
+          append_to_file(".gitignore", "\n#{data}")
         else
           GeneratorMessages.add_error(setup_file_error(".gitignore", data))
         end
