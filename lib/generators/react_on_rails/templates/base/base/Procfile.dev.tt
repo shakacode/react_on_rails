@@ -1,9 +1,3 @@
-# To ensure that Rails uses static assets rather than the webpack-dev-server
-# you may set ENV value WEBPACKER_DEV_SERVER=FALSE or delete or comment out the dev_server section
-# of config/webpacker.yml
-# For example:
-# web: WEBPACKER_DEV_SERVER=FALSE rails s -p 3000
-
 web: rails s -p 3000
 
 # Next line runs a watch process with webpack

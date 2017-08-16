@@ -18,7 +18,7 @@ All 9.0.0 beta versions can be viewed in [PR 908](https://github.com/shakacode/r
 
 ```rb
 gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
-    branch: "issue-464-merge-webpacker-lite-into-webpacker-v2"
+    branch: "issue-464-merge-webpacker-lite-into-webpacker-v3"
 ```
 
 - Update for the renaming in the `WebpackConfigLoader` in your webpack configuration.
@@ -75,15 +75,17 @@ gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
     
     
 #### Troubleshooting
-If you want to skip using the dev server (as is current for beta.3 and below), then be sure to either
-set WEBPACKER_DEV_SERVER=FALSE or comment out the dev_server section of your `config/webpacker.yml` file.
-
-Otherwise, you'll get an error that the bundle can't be found, because your Rails server thinks you are
-deploying assets using the webpack-dev-server.
+* Be sure to    
+   
     
   
 ### [9.0.0]
 *Diffs for the beta to master*
+
+### [9.0.0-beta.9]
+- Update for latest from rails/webpacker
+gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
+    branch: "issue-464-merge-webpacker-lite-into-webpacker-v3"
 
 ### [9.0.0-beta.8]
 - bugfix for server rendering
@@ -733,7 +735,8 @@ Best done with Object destructing:
 - Fix several generator related issues.
 
 [Unreleased]: https://github.com/shakacode/react_on_rails/compare/rails-webpacker...9.0.0-beta.8
-[9.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.8...master
+[9.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.9...master
+[9.0.0-beta.9]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.9...9.0.0-beta.8
 [9.0.0-beta.8]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.8...9.0.0-beta.7
 [9.0.0-beta.7]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.7...9.0.0-beta.6
 [9.0.0-beta.6]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.6...9.0.0-beta.5
