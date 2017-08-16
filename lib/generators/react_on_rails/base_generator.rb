@@ -115,9 +115,9 @@ module ReactOnRails
 
           What to do next:
 
-            - Include your webpack assets to your application layout.
+            - Include your webpack assets to your application layout. Change hello-world-bundle as needed.
 
-              <%= javascript_pack_tag 'webpack-bundle' %>
+                <%= javascript_pack_tag 'hello-world-bundle' %>
 
             - Ensure your bundle and yarn installs of dependencies are up to date.
 

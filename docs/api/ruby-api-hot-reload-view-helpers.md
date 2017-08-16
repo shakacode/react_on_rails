@@ -17,7 +17,7 @@ static vs. hot is picked based on whether `ENV["REACT_ON_RAILS_ENV"] == "HOT"`
  <!-- This is to load the hot assets. -->
  
  <!-- Note, you can have multiple files here. It's an array. -->
- <%= env_javascript_include_tag(hot: ['http://localhost:3500/webpack-bundle.js]') %>
+ <%= env_javascript_include_tag(hot: ['http://localhost:3500/hello-world-bundle.js]') %>
 
  <!-- These do use turbolinks -->
  <%= env_javascript_include_tag(static: 'application_static',

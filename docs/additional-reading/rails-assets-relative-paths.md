@@ -138,7 +138,7 @@ module.exports = {
   ],
 
   output: {
-    filename: 'webpack-bundle.js',
+    filename: 'hello-world-bundle.js',
     path: '../app/assets/webpack'
   },
 

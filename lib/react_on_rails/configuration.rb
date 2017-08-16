@@ -59,7 +59,7 @@ module ReactOnRails
   def self.ensure_webpack_generated_files_exists
     return unless @configuration.webpack_generated_files.empty?
 
-    files = ["webpack-bundle.js"]
+    files = ["hello-world-bundle.js"]
     if @configuration.server_bundle_js_file.present?
       files << @configuration.server_bundle_js_file
     end
