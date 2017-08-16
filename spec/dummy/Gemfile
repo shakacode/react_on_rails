@@ -7,7 +7,7 @@ eval_gemfile File.expand_path("../../../react_on_rails.gemspec", __FILE__)
 gem "react_on_rails", path: "../.."
 
 gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
-                 branch: "issue-464-merge-webpacker-lite-into-webpacker-v2"
+                 branch: "issue-464-merge-webpacker-lite-into-webpacker-v3"
 
 # TODO: remove once we get out of beta.
 # gem 'webpacker', path: "../../../../forks/webpacker"
