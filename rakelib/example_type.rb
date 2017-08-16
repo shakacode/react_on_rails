@@ -56,7 +56,7 @@ module ReactOnRails
 
       def webpack_bundles
         bundles = []
-        bundles << File.join(webpack_bundles_dir, "webpack-bundle.js")
+        bundles << File.join(webpack_bundles_dir, "hello-world-bundle.js")
       end
 
       def gemfile
