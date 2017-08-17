@@ -2,6 +2,7 @@
 default: &default
   # Critical to set compile as false for React on Rails projects
   compile: false
+  custom_compile: true
 
 development:
   <<: *default
@@ -21,5 +22,5 @@ test:
 
 production:
   <<: *default
-  # generated files for tests, in /public/webpack/production
+  # generated files for production, in /public/webpack/production
   public_output_path: webpack/production
