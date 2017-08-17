@@ -75,8 +75,9 @@
     "build:test:server": "NODE_ENV=test webpack --config webpack.server.rails.build.config.js",
     "build:dev:client": "NODE_ENV=development webpack -w --config webpack.client.rails.build.config.js",
     "build:dev:server": "NODE_ENV=development webpack -w --config webpack.server.rails.build.config.js",
-    "build:production:client": "NODE_ENV=production webpack --config webpack.client.rails.build.config.js",
-    "build:production:server": "NODE_ENV=production webpack --config webpack.server.rails.build.config.js",
+    "build:production:client": "NODE_ENV=production webpack -p --config webpack.client.rails.build.config.js",
+    "build:production:server": "NODE_ENV=production webpack -p --config webpack.server.rails.build.config.js",
+    "build:production": "yarn run build:production:server && yarn run build:production:client",
     "hot-assets": "NODE_ENV=development babel-node server-rails-hot.js"
   },
   "author": "",

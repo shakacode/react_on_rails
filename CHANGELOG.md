@@ -54,6 +54,10 @@ gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
   
 
 - Find your `webpacker_lite.yml` and rename it to `webpacker.yml`
+  - Add a default setting
+    ```
+    custom_compile: true
+    ```
   - Add a section like this under your development env:
     ```
     dev_server:
@@ -83,6 +87,8 @@ gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
 *Diffs for the beta to master*
 
 ### [9.0.0-beta.9]
+- Fixes precompile task going to Webpacker's. You need to set `custom_compile: true` in your `webpacker.yml`.
+- Changed webpack-bundle.js name to hello-world-bundle.js
 - Update for latest from rails/webpacker
 gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
     branch: "issue-464-merge-webpacker-lite-into-webpacker-v3"

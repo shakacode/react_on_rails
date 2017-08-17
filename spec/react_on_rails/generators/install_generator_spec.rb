@@ -110,7 +110,7 @@ node_modules
 
           - Include your webpack assets to your application layout. Change hello-world-bundle as needed.
 
-            <%= javascript_pack_tag 'hello-world-bundle' %>
+              <%= javascript_pack_tag 'hello-world-bundle' %>
 
           - Ensure your bundle and yarn installs of dependencies are up to date.
 
@@ -138,7 +138,7 @@ node_modules
 
           - Include your webpack assets to your application layout. Change hello-world-bundle as needed.
 
-            <%= javascript_pack_tag 'hello-world-bundle' %>
+              <%= javascript_pack_tag 'hello-world-bundle' %>
 
           - Ensure your bundle and yarn installs of dependencies are up to date.
 
