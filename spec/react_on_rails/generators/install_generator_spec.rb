@@ -3,6 +3,7 @@
 require_relative "../support/generator_spec_helper"
 require_relative "../support/version_test_helpers"
 
+# rubocop:disable Metrics/BlockLength
 describe InstallGenerator, type: :generator do
   destination File.expand_path("../../dummy-for-generators/", __FILE__)
 
@@ -70,6 +71,34 @@ describe InstallGenerator, type: :generator do
         MSG
       expect(GeneratorMessages.output)
         .to include(GeneratorMessages.format_error(expected))
+    end
+  end
+
+  context "when gitignore already exists and has no EOF newline" do
+    before(:all) { @install_generator = InstallGenerator.new }
+
+    specify "it adds the script section if missing" do
+      data = "#lib from simplecov\ncoverage"
+
+      run_generator_test_with_args(%w[]) do
+        simulate_existing_file(".gitignore", data)
+      end
+
+      # rubocop:disable Layout/IndentHeredoc
+      expected = <<-MSG
+#{data}
+
+# React on Rails
+npm-debug.log*
+node_modules
+
+# Generated js bundles
+/public/webpack/*
+      MSG
+      assert_file(".gitignore") do |contents|
+        expect(contents).to eq(expected)
+      end
+      # rubocop:enable Layout/IndentHeredoc
     end
   end
 

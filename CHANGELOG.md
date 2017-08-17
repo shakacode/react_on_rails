@@ -8,6 +8,11 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
+### [8.0.7]
+#### fixed
+- Fixes generator bug by keeping blank line at top in case existing .gitignore does not end in a newline. [#916](https://github.com/shakacode/react_on_rails/pull/916) by [justin808](https://github.com/justin808).
+
+
 ### [8.0.6]
 #### fixed
 - Fixes server rendering when using a CDN. Server rendering would try to fetch a file with the "asset_host". This change updates the webpacker_lite dependency to 2.1.0 which has a new helper `pack_path`. [#901](https://github.com/shakacode/react_on_rails/pull/901) by [justin808](https://github.com/justin808). Be sure to update webpacker_lite to 2.1.0.
@@ -626,7 +631,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.6...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.7...master
+[8.0.7]: https://github.com/shakacode/react_on_rails/compare/8.0.6...8.0.7
 [8.0.6]: https://github.com/shakacode/react_on_rails/compare/8.0.5...8.0.6
 [8.0.5]: https://github.com/shakacode/react_on_rails/compare/8.0.3...8.0.5
 [8.0.3]: https://github.com/shakacode/react_on_rails/compare/8.0.2...8.0.3
