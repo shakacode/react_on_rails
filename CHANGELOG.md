@@ -57,6 +57,11 @@ gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
   - Add a default setting
     ```
     custom_compile: true
+    cache_manifest: false
+    ```
+  - For production, set:  
+    ```
+    cache_manifest: true
     ```
   - Add a section like this under your development env:
     ```
@@ -85,6 +90,9 @@ gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
   
 ### [9.0.0]
 *Diffs for the beta to master*
+
+### [9.0.0-beta.10]
+- Updated for the latest rails/webpacker. Added the cache_manifest setting.
 
 ### [9.0.0-beta.9]
 - Fixes precompile task going to Webpacker's. You need to set `custom_compile: true` in your `webpacker.yml`.

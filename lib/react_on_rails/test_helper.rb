@@ -57,6 +57,7 @@ module ReactOnRails
                                     client_dir: nil,
                                     generated_assets_dir: nil,
                                     webpack_generated_files: nil)
+      ReactOnRails::Utils.check_manifest_not_cached
       if webpack_assets_status_checker.nil?
         client_dir ||= Rails.root.join("client")
         generated_assets_dir ||= ReactOnRails.configuration.generated_assets_dir
