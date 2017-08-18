@@ -12,8 +12,8 @@ if ENV["USE_COVERALLS"] == "TRUE"
 end
 
 if File.basename(ENV["BUNDLE_GEMFILE"] || "") == "Gemfile.rails32"
-  tasks = %w[run_rspec:gem_rails32]
-  prepare_for_ci = ["nothing"]
+  tasks = %w[run_rspec:gem_rails32 run_rspec:dummy_no_webpacker]
+  prepare_for_ci = ["dummy_apps:dummy_no_webpacker"]
 end
 
 desc "do nothing"

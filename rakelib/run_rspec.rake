@@ -43,6 +43,14 @@ namespace :run_rspec do
                  command_name: "dummy_no_turbolinks")
   end
 
+  desc "Runs dummy_no_webpacker rspec"
+  task :dummy_no_webpacker do
+    dummy_app_dir = File.join(gem_root, "spec/dummy_no_webpacker")
+    clean_gen_assets(dummy_app_dir)
+    run_tests_in(dummy_app_dir,
+                 env_vars: "BUNDLE_GEMFILE=Gemfile.rails32")
+  end
+
   # Dynamically define Rake tasks for each example app found in the examples directory
   ExampleType.all.each do |example_type|
     desc "Runs RSpec for #{example_type.name_pretty} only"
