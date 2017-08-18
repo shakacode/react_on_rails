@@ -1,0 +1,39 @@
+<%= render "header" %>
+<% redux_store("SharedReduxStore", props: @app_props_server_render, defer: true) %>
+
+<%= react_component("ReduxSharedStoreApp", prerender: true, trace: true, id: "ReduxSharedStoreApp-react-component-0") %>
+<hr/>
+<h1>Second Hello World</h1>
+<%= react_component("ReduxSharedStoreApp", prerender: true, trace: true, id: "ReduxSharedStoreApp-react-component-1") %>
+<hr/>
+
+<h1>React Rails Client Side Only Rendering, 2 components, same Redux store </h1>
+<p>
+  This example demonstrates using 2 components attached to the same store.<br/><br/>
+</p>
+
+<hr/>
+<h2>Setup</h2>
+<ol>
+  <li>
+    Create component source: spec/dummy/client/app/startup/ReduxSharedStoreApp.jsx
+  </li>
+  <li>
+    Create store source: spec/dummy/client/app/stores/SharedReduxStore.jsx
+  </li>
+  <li>
+    Register the components: spec/dummy/client/app/startup/clientRegistration.jsx
+  </li>
+  <li>
+    Place the components and store on the view: spec/dummy/app/views/pages/client_side_hello_world_shared_store.html.erb
+    <br/>
+    <pre>
+<%%= redux_store("SharedReduxStore", props: @app_props_server_render, defer: true) %>
+
+<%%= react_component("ReduxSharedStoreApp", prerender: false, trace: true, id: "ReduxSharedStoreApp-react-component-0") %>
+
+Second Hello World
+<%%= react_component("ReduxSharedStoreApp", prerender: false, trace: true, id: "ReduxSharedStoreApp-react-component-1") %>
+    </pre>
+  </li>
+</ol>

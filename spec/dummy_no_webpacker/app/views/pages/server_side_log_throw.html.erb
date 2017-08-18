@@ -1,0 +1,29 @@
+<%= render "header" %>
+
+<%= react_component("HelloWorldWithLogAndThrow", props: @app_props_server_render, prerender: true, trace: true, id: "HelloWorldWithLogAndThrow-react-component-0") %>
+<hr/>
+
+<h1>React Rails Server Rendering</h1>
+<p>
+  This example demonstrates server side logging and error handling.<br/>
+  Open up your browser console and see the messages.<br/>
+  <br/>
+  What you see in your console is the result of running the JS code found in spec/dummy/client/app/components/HelloWorldWithLogAndThrow.jsx (reproduced below):<br/>
+  <pre>
+    console.log("console.log in HelloWorld")
+    console.warn("console.warn in HelloWorld")
+    console.error("console.error in HelloWorld");
+    throw new Error("throw in HelloWorldContainer");
+  </pre>
+</p>
+
+<h2>Server render plain JS</h2>
+<p>Suppose you have some JavaScript that generates a string of HTML, but throws this error:</p>
+<pre>
+  <%%= server_render_js("(function() { var x = ReactOnRails.getComponent('HelloString').world(); console.warn('ran console.warn on the server()'); throw new Error('Error thrown on server'); return x;})()") %>
+</pre>
+
+
+<pre>
+<%= server_render_js("(function() { var x = ReactOnRails.getComponent('HelloString').world(); console.warn('ran console.warn on the server()'); throw new Error('Error thrown on server'); return x;})()") %>
+</pre>
