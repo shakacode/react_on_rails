@@ -1,9 +1,5 @@
-Rails.application.routes.draw do
-  # The priority is based upon order of creation: first created -> highest priority.
-  # See how all your routes lay out with "rake routes".
-
-  # You can have the root of your site routed with "root"
-  root "pages#index"
+Dummy::Application.routes.draw do
+  root :to =>  "pages#index"
 
   get "client_side_hello_world" => "pages#client_side_hello_world"
   get "client_side_hello_world_shared_store" => "pages#client_side_hello_world_shared_store"
