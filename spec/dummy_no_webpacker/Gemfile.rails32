@@ -37,6 +37,10 @@ gem 'sdoc', group: :doc
 gem "react_on_rails", path: "../.."
 
 gem "mini_racer"
+gem "connection_pool"
+gem "rainbow"
+gem "addressable"
+gem "execjs"
 
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console

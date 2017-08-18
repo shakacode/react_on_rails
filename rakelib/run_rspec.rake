@@ -24,7 +24,7 @@ namespace :run_rspec do
                  "\"**/generators/*_spec.rb,**/test_helper/*_spec.rb\""
     run_tests_in("",
                  rspec_args: rspec_args,
-                 env_vars: "BUNDLE_GEMFILE=Gemfile.rails32")
+                 env_vars: "BUNDLE_GEMFILE=spec/dummy_no_webpacker/Gemfile.rails32")
   end
 
   desc "Runs dummy rspec with turbolinks"
