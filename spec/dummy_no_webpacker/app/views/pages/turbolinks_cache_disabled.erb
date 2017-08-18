@@ -1,0 +1,10 @@
+<% content_for(:head) do %>
+  <meta name="turbolinks-cache-control" content="no-cache">
+<% end %>
+
+<%= render "header" %>
+
+<%= react_component("CacheDisabled") %>
+<hr/>
+
+This page demonstrates that components are still unmounted when the Turbolinks cache is disabled.
