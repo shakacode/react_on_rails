@@ -9,7 +9,8 @@ const config = require('./webpack.client.base.config');
 const { resolve } = require('path');
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
-const { output } = webpackConfigLoader(configPath);
+const { output, settings } = webpackConfigLoader(configPath);
+const isHMR = settings.dev_server && settings.dev_server.hmr
 
 const devBuild = process.env.NODE_ENV !== 'production';
 
@@ -24,7 +25,8 @@ if (devBuild) {
 module.exports = merge(config, {
 
   output: {
-    filename: env.NODE_ENV === 'production' ? '[name]-[hash].js' : '[name].js',
+    filename: isHMR ? '[name]-[hash].js' : '[name]-[chunkhash].js',
+    chunkFilename: '[name]-[chunkhash].chunk.js',
 
     // Leading and trailing slashes ARE necessary.
     publicPath: output.publicPath,

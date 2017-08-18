@@ -21,7 +21,6 @@ module ReactOnRails
     # Wraps message and makes it colored.
     # Pass in the msg and color as a symbol.
     def self.wrap_message(msg, color = :red)
-      # binding.pry
       wrapper_line = ("=" * 80).to_s
       # rubocop:disable Layout/IndentHeredoc
       fenced_msg = <<-MSG
@@ -91,10 +90,6 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       end
     end
 
-    def self.using_webpacker?
-      ActionController::Base.helpers.respond_to?(:asset_pack_path)
-    end
-
     def self.running_on_windows?
       (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
     end
@@ -115,14 +110,33 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       rails_version_less_than("4.1.1")
     end
 
-    def self.manifest_exists?
-      Webpacker.config.public_manifest_path.exist?
-    end
-
     module Required
       def required(arg_name)
         raise ArgumentError, "#{arg_name} is required"
       end
+    end
+
+    ###########################################################################
+    # WEBPACKER WRAPPERS
+    ###########################################################################
+
+    def self.using_webpacker?
+      ActionController::Base.helpers.respond_to?(:asset_pack_path)
+    end
+
+    def self.manifest_exists?
+      Webpacker.config.public_manifest_path.exist?
+    end
+
+    def self.check_manifest_not_cached
+      return unless using_webpacker? && Webpacker.config.cache_manifest?
+      msg = <<-MSG.strip_heredoc
+          ERROR: you have enabled cache_manifest in the #{Rails.env} env when using the
+          ReactOnRails::TestHelper.configure_rspec_to_compile_assets helper
+          To fix this: edit your config/webpacker.yml file and set cache_manifest to false for test.
+      MSG
+      puts wrap_message(msg)
+      exit!
     end
   end
 end

@@ -28,6 +28,8 @@ function formatPublicPath(host = '', path = '') {
 /**
  * @param configPath, location where webpacker.yml will be found
  * Return values are consistent with Webpacker's js helpers
+ * For example, you might define:
+ *   const isHMR = settings.dev_server && settings.dev_server.hmr
  * @returns {{
      settings,
      resolvedModules,
