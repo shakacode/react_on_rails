@@ -1,6 +1,9 @@
 require "rails_helper"
+require "support/script_tag_utils"
 
 describe ReactOnRailsHelper, type: :helper do
+  include ScriptTagUtils
+
   before do
     allow(self).to receive(:request) {
       OpenStruct.new(
@@ -112,7 +115,10 @@ data-trace="false" data-dom-id="App-react-component-0">{}</script>
       subject { react_component("App") }
       it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
       it { is_expected.to include react_component_div }
-      it { is_expected.to include react_definition_script_no_params }
+      it { 
+        expect(script_tag_included?(is_expected.target,
+                                    react_definition_script_no_params)).to be true
+      }
     end
 
     it { expect(self).to respond_to :react_component }
@@ -121,7 +127,10 @@ data-trace="false" data-dom-id="App-react-component-0">{}</script>
     it { is_expected.to start_with "<script" }
     it { is_expected.to match %r{</script>\s*$} }
     it { is_expected.to include react_component_div }
-    it { is_expected.to include react_definition_script }
+    it { 
+      expect(script_tag_included?(is_expected.target,
+                                  react_definition_script)).to be true
+    }
 
     context "with 'id' option" do
       subject { react_component("App", props: props, id: id) }
@@ -137,7 +146,10 @@ data-trace="false" data-dom-id="shaka_div">{"name":"My Test Name"}</script>
 
       it { is_expected.to include id }
       it { is_expected.not_to include react_component_div }
-      it { is_expected.to include react_definition_script }
+      it { 
+        expect(script_tag_included?(is_expected.target,
+                                    react_definition_script)).to be true
+      }
     end
   end
 
@@ -159,7 +171,10 @@ data-trace="false" data-dom-id="shaka_div">{"name":"My Test Name"}</script>
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
     it { is_expected.to start_with "<script" }
     it { is_expected.to end_with "</script>" }
-    it { is_expected.to include react_store_script }
+    it {
+      expect(script_tag_included?(is_expected.target,
+                                  react_store_script)).to be true
+    }
   end
 
   describe "#server_render_js" do
