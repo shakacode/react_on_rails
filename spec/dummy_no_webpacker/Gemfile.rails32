@@ -71,5 +71,5 @@ group :test do
   gem "selenium-webdriver"
   gem "rails3-before_action"
   gem 'test-unit', '~> 3.0'
-  gem 'equivalent-xml', '~> 0.6.0'
+  gem "equivalent-xml", github: "mbklein/equivalent-xml"
 end

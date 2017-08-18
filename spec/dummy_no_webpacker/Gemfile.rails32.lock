@@ -1,4 +1,10 @@
 GIT
+  remote: git://github.com/mbklein/equivalent-xml.git
+  revision: 47de39c006636eaeea2eb153e0a346470e0ec693
+  specs:
+    equivalent-xml (1.0.0)
+
+GIT
   remote: git://github.com/turbolinks/turbolinks-classic.git
   revision: 80216ce9d89920bf073709405e3fce6d0a3ccd9a
   specs:
@@ -90,8 +96,6 @@ GEM
     debug_inspector (0.0.3)
     diff-lcs (1.3)
     docile (1.1.5)
-    equivalent-xml (0.6.0)
-      nokogiri (>= 1.4.3)
     erubis (2.7.0)
     execjs (2.7.0)
     ffi (1.9.18)
@@ -280,7 +284,7 @@ DEPENDENCIES
   chromedriver-helper
   coffee-rails
   coveralls
-  equivalent-xml (~> 0.6.0)
+  equivalent-xml!
   generator_spec
   jbuilder (~> 2.0)
   jquery-rails
