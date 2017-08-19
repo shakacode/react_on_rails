@@ -744,17 +744,18 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/rails-webpacker...9.0.0-beta.8
-[9.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.9...master
-[9.0.0-beta.9]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.9...9.0.0-beta.8
-[9.0.0-beta.8]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.8...9.0.0-beta.7
-[9.0.0-beta.7]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.7...9.0.0-beta.6
-[9.0.0-beta.6]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.6...9.0.0-beta.5
-[9.0.0-beta.5]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.5...9.0.0-beta.4
-[9.0.0-beta.4]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.4...9.0.0-beta.3
-[9.0.0-beta.3]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.3...9.0.0-beta.2
-[9.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.2...9.0.0-beta.1
-[9.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/rails-webpacker...9.0.0-beta.10
+[9.0.0]: https://github.com/shakacode/react_on_rails/compare/master...9.0.0-beta.10
+[9.0.0-beta.10]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.9...9.0.0-beta.10
+[9.0.0-beta.9]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.8...9.0.0-beta.9
+[9.0.0-beta.8]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.7...9.0.0-beta.8
+[9.0.0-beta.7]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.6...9.0.0-beta.7
+[9.0.0-beta.6]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.5...9.0.0-beta.6
+[9.0.0-beta.5]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.4...9.0.0-beta.5
+[9.0.0-beta.4]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.3...9.0.0-beta.4
+[9.0.0-beta.3]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.2...9.0.0-beta.3
+[9.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.1...9.0.0-beta.2
+[9.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/master...9.0.0-beta.1
 [8.0.6]: https://github.com/shakacode/react_on_rails/compare/8.0.5...8.0.6
 [8.0.5]: https://github.com/shakacode/react_on_rails/compare/8.0.3...8.0.5
 [8.0.3]: https://github.com/shakacode/react_on_rails/compare/8.0.2...8.0.3
