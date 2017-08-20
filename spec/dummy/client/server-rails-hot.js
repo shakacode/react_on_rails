@@ -20,13 +20,20 @@ const webpackConfig = require('./webpack.client.rails.hot.config');
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
-const { devServerUrl, devServerPort, devServerHostname } = webpackConfigLoader(configPath);
+const { output, settings } = webpackConfigLoader(configPath);
+
+console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
+console.log("output", JSON.stringify(output));
+console.log("settings", JSON.stringify(settings));
+console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
+
 
 const compiler = webpack(webpackConfig);
 
 const devServer = new WebpackDevServer(compiler, {
+  publicPath: output.publicPath,
   proxy: {
-    '*': devServerUrl,
+    '*': output.publicPathWithHost,
   },
   headers: {
     'Access-Control-Allow-Origin': '*',
@@ -48,9 +55,9 @@ const devServer = new WebpackDevServer(compiler, {
   },
 });
 
-devServer.listen(devServerPort, devServerHostname, err => {
+devServer.listen(settings.dev_server.port, settings.dev_server.host, err => {
   if (err) console.error(err);
   console.log(
-    `=> 🔥  Webpack development server is running on ${devServerUrl}`
+    `=> 🔥  Webpack development server is running on ${output.publicPathWithHost}`
   );
 });

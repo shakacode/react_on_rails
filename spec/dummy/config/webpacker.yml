@@ -13,7 +13,7 @@ development:
 
   dev_server:
     host: localhost
-    port: 8080
+    port: 3035
     # Can be enabled by export WEBPACKER_HMR=TRUE in env
     hmr: false
 

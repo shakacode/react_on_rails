@@ -16,8 +16,10 @@ function removeOuterSlashes(string) {
   return string.replace(/^\/*/, '').replace(/\/*$/, '');
 }
 
-function formatPublicPath(host = '', path = '') {
-  let formattedHost = removeOuterSlashes(host);
+function formatPublicPath(host = 'localhost', port = "3035", path = '') {
+  const hostWithHttp = `http://${host}:${port}`
+
+  let formattedHost = removeOuterSlashes(hostWithHttp);
   if (formattedHost && !/^http/i.test(formattedHost)) {
     formattedHost = `//${formattedHost}`;
   }
@@ -33,7 +35,7 @@ function formatPublicPath(host = '', path = '') {
  * @returns {{
      settings,
      resolvedModules,
-     output: { path, publicPath, publicPathWithHosts }
+     output: { path, publicPath, publicPathWithHost }
    }}
  */
 const configLoader = (configPath) => {
@@ -48,7 +50,8 @@ const configLoader = (configPath) => {
     // the relative path.
     path: resolve(configPath, '..', 'public', settings.public_output_path),
     publicPath: `/${settings.public_output_path}/`.replace(/([^:]\/)\/+/g, '$1'),
-    publicPathWithHost: formatPublicPath(env.ASSET_HOST, settings.public_output_path),
+    publicPathWithHost: formatPublicPath(settings.dev_server.host,
+      settings.dev_server.port, settings.public_output_path),
   };
 
   return {
