@@ -16,15 +16,23 @@ function removeOuterSlashes(string) {
   return string.replace(/^\/*/, '').replace(/\/*$/, '');
 }
 
-function formatPublicPath(host = 'localhost', port = "3035", path = '') {
-  const hostWithHttp = `http://${host}:${port}`
+function formatPublicPath(settings) {
+  if (settings.dev_server) {
+    const host = settings.dev_server.host;
+    const port = settings.dev_server.port;
+    const path = settings.public_output_path;
+    const hostWithHttp = `http://${host}:${port}`
 
-  let formattedHost = removeOuterSlashes(hostWithHttp);
-  if (formattedHost && !/^http/i.test(formattedHost)) {
-    formattedHost = `//${formattedHost}`;
+    let formattedHost = removeOuterSlashes(hostWithHttp);
+    if (formattedHost && !/^http/i.test(formattedHost)) {
+      formattedHost = `//${formattedHost}`;
+    }
+    const formattedPath = removeOuterSlashes(path);
+    return `${formattedHost}/${formattedPath}/`;
+  } else {
+    const formattedPath = removeOuterSlashes(settings.public_output_path);
+    return `//${formattedPath}/`;
   }
-  const formattedPath = removeOuterSlashes(path);
-  return `${formattedHost}/${formattedPath}/`;
 }
 
 /**
@@ -50,8 +58,7 @@ const configLoader = (configPath) => {
     // the relative path.
     path: resolve(configPath, '..', 'public', settings.public_output_path),
     publicPath: `/${settings.public_output_path}/`.replace(/([^:]\/)\/+/g, '$1'),
-    publicPathWithHost: formatPublicPath(settings.dev_server.host,
-      settings.dev_server.port, settings.public_output_path),
+    publicPathWithHost: formatPublicPath(settings),
   };
 
   return {
