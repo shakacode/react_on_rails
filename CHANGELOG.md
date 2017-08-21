@@ -18,7 +18,7 @@ All 9.0.0 beta versions can be viewed in [PR 908](https://github.com/shakacode/r
 
 ```rb
 gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
-    branch: "issue-464-merge-webpacker-lite-into-webpacker-v3"
+    branch: "issue-464-merge-webpacker-lite-into-webpacker-v4"
 ```
 
 - Update for the renaming in the `WebpackConfigLoader` in your webpack configuration.
@@ -36,27 +36,31 @@ gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
 - Edit your Webpack.config files:
   - Change your Webpack output to be like:
     ```
-    // Leading slash is necessary
-    publicPath: `/${output.publicPath}`,
-    path: output.path,
-    ```
-  - Change your ManifestPlugin definition to include publicPath
-    ```
+    const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
+    const configPath = resolve('..', 'config');
+    const { output, settings } = webpackConfigLoader(configPath);
+    const devBuild = process.env.NODE_ENV !== 'production';
+
     output: {
-      // Name comes from the entry section.
-      filename: '[name]-[chunkhash].js',
+      filename: isHMR ? '[name]-[hash].js' : '[name]-[chunkhash].js',
+      chunkFilename: '[name]-[chunkhash].chunk.js',
    
       publicPath: output.publicPath,
       path: output.path,
     },
+    ```
+  - Change your ManifestPlugin definition to something like the following
+    ```
+    new ManifestPlugin({
+        publicPath: output.publicPath,
+        writeToFileEmit: true
+      }),
 
     ```
-  
 
 - Find your `webpacker_lite.yml` and rename it to `webpacker.yml`
   - Add a default setting
     ```
-    custom_compile: true
     cache_manifest: false
     ```
   - For production, set:  
@@ -70,6 +74,7 @@ gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
       port: 3035
       hmr: false
     ```
+    Set hmr to your preference.
   - See the example `spec/dummy/config/webpacker.yml`.
   - Remove keys `hot_reloading_host` and `hot_reloading_enabled_by_default`. These are replaced by the `dev_server` key.
   - Rename `webpack_public_output_dir` to `public_output_path`.
@@ -744,8 +749,9 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/rails-webpacker...9.0.0-beta.10
-[9.0.0]: https://github.com/shakacode/react_on_rails/compare/master...9.0.0-beta.10
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/rails-webpacker...9.0.0-beta.11
+[9.0.0]: https://github.com/shakacode/react_on_rails/compare/master...9.0.0-beta.11
+[9.0.0-beta.11]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.10...9.0.0-beta.11
 [9.0.0-beta.10]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.9...9.0.0-beta.10
 [9.0.0-beta.9]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.8...9.0.0-beta.9
 [9.0.0-beta.8]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.7...9.0.0-beta.8
