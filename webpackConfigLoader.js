@@ -21,7 +21,7 @@ function formatPublicPath(settings) {
     const host = settings.dev_server.host;
     const port = settings.dev_server.port;
     const path = settings.public_output_path;
-    const hostWithHttp = `http://${host}:${port}`
+    const hostWithHttp = `http://${host}:${port}`;
 
     let formattedHost = removeOuterSlashes(hostWithHttp);
     if (formattedHost && !/^http/i.test(formattedHost)) {
@@ -29,10 +29,10 @@ function formatPublicPath(settings) {
     }
     const formattedPath = removeOuterSlashes(path);
     return `${formattedHost}/${formattedPath}/`;
-  } else {
-    const formattedPath = removeOuterSlashes(settings.public_output_path);
-    return `//${formattedPath}/`;
   }
+
+  const publicOuterPathWithoutOutsideSlashes = removeOuterSlashes(settings.public_output_path);
+  return `//${publicOuterPathWithoutOutsideSlashes}/`;
 }
 
 /**
@@ -48,7 +48,7 @@ function formatPublicPath(settings) {
  */
 const configLoader = (configPath) => {
   // Some test environments might not have the NODE_ENV set, so we'll have fallbacks.
-  const configEnv = (process.env.NODE_ENV || process.env.RAILS_ENV || 'development');
+  const configEnv = (env.NODE_ENV || env.RAILS_ENV || 'development');
   const ymlConfigPath = join(configPath, 'webpacker.yml');
   const settings = safeLoad(readFileSync(ymlConfigPath, 'utf8'))[configEnv];
 
