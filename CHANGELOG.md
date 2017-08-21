@@ -18,7 +18,7 @@ All 9.0.0 beta versions can be viewed in [PR 908](https://github.com/shakacode/r
 
 ```rb
 gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
-    branch: "issue-464-merge-webpacker-lite-into-webpacker-v4"
+    branch: "issue-464-merge-webpacker-lite-into-webpacker-v5"
 ```
 
 - Update for the renaming in the `WebpackConfigLoader` in your webpack configuration.
