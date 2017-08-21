@@ -7,7 +7,7 @@ GIT
 GIT
   remote: https://github.com/shakacode/webpacker.git
   revision: f14935f7d34382ed116dd12bdc60f6b13705bbde
-  branch: issue-464-merge-webpacker-lite-into-webpacker-v3
+  branch: issue-464-merge-webpacker-lite-into-webpacker-v4
   specs:
     webpacker (2.0)
       activesupport (>= 4.2)
@@ -16,7 +16,7 @@ GIT
 PATH
   remote: ../..
   specs:
-    react_on_rails (9.0.0.beta.9)
+    react_on_rails (9.0.0.beta.10)
       addressable
       connection_pool
       execjs (~> 2.5)

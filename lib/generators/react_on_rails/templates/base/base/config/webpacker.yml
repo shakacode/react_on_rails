@@ -11,15 +11,14 @@ development:
   # generated files for development, in /public/webpack/development
   public_output_path: webpack/development
 
-#  Temporarily disabling live-reloading until the server script is added.
-#  dev_server:
-#    host: localhost
-#    port: 3035
-#    hmr: false
+  dev_server:
+    host: localhost
+    port: 3035
+    hmr: true
 
 test:
   <<: *default
-  # generated files for tests, in /public/webpack/test
+  # generated files for test, in /public/webpack/test
   public_output_path: webpack/test
 
 production:
