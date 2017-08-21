@@ -27,15 +27,15 @@ module.exports = merge.strategy(
   entry: {
     'app-bundle': [
       'react-hot-loader/patch',
-      `webpack-dev-server/client?${output.devServerUrl}`,
+      `webpack-dev-server/client?http://${settings.dev_server.host}:${settings.dev_server.port}`,
       'webpack/hot/only-dev-server'
     ],
   },
 
   output: {
     filename: '[name].js',
-    path: output.publicPath,
-    publicPath: output.publicPathWithHost,
+    path: output.path,
+    publicPath: output.publicPath,
   },
 
   module: {
