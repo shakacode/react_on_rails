@@ -46,10 +46,9 @@ namespace :run_rspec do
   desc "Runs dummy_no_webpacker rspec"
   task :dummy_no_webpacker do
     path = calc_path(File.join(gem_root, "spec/dummy_no_webpacker"))
-    sh_in_dir(path.realpath, "cd client && ls -al ./client/node_modules/")
+    sh_in_dir(path.realpath, "cd client && ls -al ./node_modules/.bin/")
     sh_in_dir(path.realpath, "cd client && which /usr/local/bin/webpack")
     sh_in_dir(path.realpath, "cd client && echo $PATH")
-    
     dummy_app_dir = File.join(gem_root, "spec/dummy_no_webpacker")
     clean_gen_assets(dummy_app_dir)
     run_tests_in(dummy_app_dir,
