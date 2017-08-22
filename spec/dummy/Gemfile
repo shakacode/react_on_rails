@@ -70,11 +70,11 @@ group :test do
   # install trouble with updated
   # gem "capybara-webkit"
   gem "chromedriver-helper"
+  gem "equivalent-xml", github: "mbklein/equivalent-xml"
   gem "generator_spec"
   gem "launchy"
   gem "poltergeist"
   gem "rspec-rails"
   gem "rspec-retry"
   gem "selenium-webdriver"
-  gem "equivalent-xml", github: "mbklein/equivalent-xml"
 end
