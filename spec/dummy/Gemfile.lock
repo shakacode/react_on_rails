@@ -1,3 +1,9 @@
+GIT
+  remote: git://github.com/mbklein/equivalent-xml.git
+  revision: 47de39c006636eaeea2eb153e0a346470e0ec693
+  specs:
+    equivalent-xml (1.0.0)
+
 PATH
   remote: ../..
   specs:
@@ -298,6 +304,7 @@ DEPENDENCIES
   chromedriver-helper
   coffee-rails
   coveralls
+  equivalent-xml!
   generator_spec
   jbuilder
   jquery-rails

@@ -278,13 +278,16 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  addressable
   awesome_print
   capybara
   capybara-screenshot
   chromedriver-helper
   coffee-rails
+  connection_pool
   coveralls
   equivalent-xml!
+  execjs
   generator_spec
   jbuilder (~> 2.0)
   jquery-rails
@@ -301,6 +304,7 @@ DEPENDENCIES
   puma
   rails (~> 3.2)
   rails3-before_action
+  rainbow
   react_on_rails!
   rspec-rails
   rspec-retry
