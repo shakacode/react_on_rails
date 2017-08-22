@@ -13,7 +13,7 @@ namespace :dummy_apps do
     dummy_app_dir = File.join(gem_root, "spec/dummy")
     bundle_install_in(dummy_app_dir)
   end
-  
+
   task :dummy_no_webpacker do
     yarn_install_cmd = "yarn install --mutex network && yarn run install-react-on-rails"
     dummy_app_dir = File.join(gem_root, "spec/dummy_no_webpacker")
