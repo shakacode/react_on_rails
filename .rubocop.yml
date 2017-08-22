@@ -27,6 +27,7 @@ AllCops:
     - 'spec/dummy/bin/**/*'
     - 'spec/dummy/client/node_modules/**/*'
     - 'spec/dummy/client/node_modules/**/.*'
+    - 'spec/dummy_no_webpacker/**/*'
     - 'gen-examples/examples/**/.*'
     - 'gen-examples/examples/**/*'
 
