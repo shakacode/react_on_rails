@@ -33,7 +33,6 @@ before_install:
   - wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
   - sudo dpkg -i google-chrome*.deb
   - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen scn 1600x1200x16"
-  - export PATH=$PATH:./node_modules/.bin/
 
 install:
   - travis_retry gem install bundler
@@ -48,6 +47,7 @@ install:
 
 before_script:
   - "export DISPLAY=:99"
+  - "export PATH=$PATH:./node_modules/.bin/"
 
 script:
   - bundle exec rake
