@@ -102,8 +102,8 @@ describe "Server Rendering", :server_rendering do
 
     def do_request(path)
       get(path,
-          params: { ab: :cd },
-          headers: { "HTTP_ACCEPT_LANGUAGE" => http_accept_language })
+          { ab: :cd },
+          "HTTP_ACCEPT_LANGUAGE" => http_accept_language)
     end
 
     context "shared redux store" do
