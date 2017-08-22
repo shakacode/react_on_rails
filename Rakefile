@@ -16,11 +16,6 @@ if File.basename(ENV["BUNDLE_GEMFILE"] || "") == "Gemfile.rails32"
   prepare_for_ci = %w[node_package dummy_apps:dummy_no_webpacker]
 end
 
-desc "do nothing"
-task :nothing do
-  true
-end
-
 desc "Run all tests and linting"
 task default: tasks
 
