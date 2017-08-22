@@ -23,5 +23,5 @@ test:
 
 production:
   <<: *default
-  # generated files for tests, in /public/webpack/production
+  # generated files for production, in /public/webpack/production
   webpack_public_output_dir: webpack/production
