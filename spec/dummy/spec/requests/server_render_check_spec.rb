@@ -101,9 +101,15 @@ describe "Server Rendering", :server_rendering do
     end
 
     def do_request(path)
-      get(path,
-          { ab: :cd },
-          "HTTP_ACCEPT_LANGUAGE" => http_accept_language)
+      if ReactOnRails::Utils.rails_version_less_than("5.0")
+        get(path,
+            { ab: :cd },
+            "HTTP_ACCEPT_LANGUAGE" => http_accept_language)
+      else
+        get(path,
+            params: { ab: :cd },
+            headers: { "HTTP_ACCEPT_LANGUAGE" => http_accept_language })
+      end
     end
 
     context "shared redux store" do
