@@ -47,7 +47,6 @@ install:
 
 before_script:
   - "export DISPLAY=:99"
-  - "export PATH=$PATH:./node_modules/.bin/"
 
 script:
   - bundle exec rake
