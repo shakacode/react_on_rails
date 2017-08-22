@@ -31,7 +31,7 @@ describe "Server Rendering", :server_rendering do
   end
 
   describe "reloading the server bundle" do
-    let(:server_bundle) { File.expand_path("../../../public/webpack/" + Rails.env + "/server-bundle.js", __FILE__) }
+    let(:server_bundle) { SERVER_BUNDLE_PATH }
     let!(:original_bundle_text) { File.read(server_bundle) }
 
     before do
