@@ -190,7 +190,7 @@ data-dom-id="App-react-component-0">{}</script>
     }
   end
 
-  describe "#server_render_js" do
+  describe "#server_render_js", :js do
     subject { server_render_js("ReactOnRails.getComponent('HelloString').component.world()") }
 
     let(:hello_world) do
