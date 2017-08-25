@@ -1,5 +1,8 @@
+# frozen_string_literal: true
+
 # This file is copied to spec/ when you run 'rails generate rspec:install'
 ENV["RAILS_ENV"] ||= "test"
+SERVER_BUNDLE_PATH = File.expand_path("../../app/assets/webpack/server-bundle.js", __FILE__)
 
 require_relative "simplecov_helper"
 require_relative("../config/environment")
@@ -28,10 +31,6 @@ require "capybara-screenshot/rspec"
 # require only the support files necessary.
 #
 # Dir[Rails.root.join('spec/support/**/*.rb')].each { |f| require f }
-
-# Checks for pending migrations before tests are run.
-# If you are not using ActiveRecord, you can remove this line.
-ActiveRecord::Migration.maintain_test_schema!
 
 RSpec.configure do |config|
   # Ensure that if we are running js tests, we are using latest webpack assets
@@ -66,8 +65,8 @@ RSpec.configure do |config|
   # selenium_firefox webdriver only works for Travis-CI builds.
   default_driver = :poltergeist
 
-  supported_drivers = %i( poltergeist poltergeist_errors_ok
-                          selenium_chrome selenium_firefox selenium)
+  supported_drivers = %i[ poltergeist poltergeist_errors_ok
+                          selenium_chrome selenium_firefox selenium]
   driver = ENV["DRIVER"].try(:to_sym) || default_driver
 
   unless supported_drivers.include?(driver)

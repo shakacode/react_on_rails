@@ -1,12 +1,18 @@
+GIT
+  remote: git://github.com/mbklein/equivalent-xml.git
+  revision: 47de39c006636eaeea2eb153e0a346470e0ec693
+  specs:
+    equivalent-xml (1.0.0)
+
 PATH
   remote: ../..
   specs:
-    react_on_rails (7.0.4)
+    react_on_rails (8.0.6)
       addressable
       connection_pool
       execjs (~> 2.5)
       rails (>= 3.2)
-      rainbow (~> 2.1)
+      rainbow (~> 2.2)
 
 GEM
   remote: https://rubygems.org/
@@ -295,6 +301,7 @@ DEPENDENCIES
   chromedriver-helper
   coffee-rails
   coveralls
+  equivalent-xml!
   generator_spec
   jbuilder (~> 2.0)
   jquery-rails
@@ -326,4 +333,4 @@ DEPENDENCIES
   uglifier
 
 BUNDLED WITH
-   1.14.6
+   1.15.3
