@@ -12,13 +12,8 @@ if ENV["USE_COVERALLS"] == "TRUE"
 end
 
 if File.basename(ENV["BUNDLE_GEMFILE"] || "") == "Gemfile.rails32"
-  tasks = %w[run_rspec:gem_rails32 lint:rubocop]
-  prepare_for_ci = ["nothing"]
-end
-
-desc "do nothing"
-task :nothing do
-  true
+  tasks = %w[run_rspec:gem_rails32 run_rspec:dummy_no_webpacker]
+  prepare_for_ci = %w[node_package dummy_apps:dummy_no_webpacker]
 end
 
 desc "Run all tests and linting"

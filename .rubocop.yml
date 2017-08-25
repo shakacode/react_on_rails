@@ -27,6 +27,10 @@ AllCops:
     - 'spec/dummy/bin/**/*'
     - 'spec/dummy/client/node_modules/**/*'
     - 'spec/dummy/client/node_modules/**/.*'
+    - 'spec/dummy_no_webpacker/Procfile.*'
+    - 'spec/dummy_no_webpacker/bin/**/*'
+    - 'spec/dummy_no_webpacker/client/node_modules/**/*'
+    - 'spec/dummy_no_webpacker/client/node_modules/**/.*'
     - 'gen-examples/examples/**/.*'
     - 'gen-examples/examples/**/*'
 
@@ -34,6 +38,7 @@ Style/FileName:
   Exclude:
     - 'Gemfile'
     - 'spec/dummy/Gemfile'
+    - 'spec/dummy_no_webpacker/Gemfile'
 
 # Turn off until we require 2.3 ruby
 Style/SafeNavigation:

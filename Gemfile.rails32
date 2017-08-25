@@ -69,4 +69,6 @@ group :test do
   gem "rspec-rails"
   gem "rspec-retry"
   gem "selenium-webdriver"
+  gem 'test-unit', '~> 3.0'
+  gem "equivalent-xml", github: "mbklein/equivalent-xml"
 end

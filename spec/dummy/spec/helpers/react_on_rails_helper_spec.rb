@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rails_helper"
+require "support/script_tag_utils"
 
 describe ReactOnRailsHelper, type: :helper do
   before do
@@ -116,7 +117,9 @@ data-dom-id="App-react-component-0">{}</script>
       subject { react_component("App") }
       it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
       it { is_expected.to include react_component_div }
-      it { is_expected.to include react_definition_script_no_params }
+      it {
+        expect(is_expected.target).to script_tag_be_included(react_definition_script_no_params)
+      }
     end
 
     it { expect(self).to respond_to :react_component }
@@ -125,7 +128,9 @@ data-dom-id="App-react-component-0">{}</script>
     it { is_expected.to start_with "<script" }
     it { is_expected.to match %r{</script>\s*$} }
     it { is_expected.to include react_component_div }
-    it { is_expected.to include react_definition_script }
+    it {
+      expect(is_expected.target).to script_tag_be_included(react_definition_script)
+    }
 
     context "with 'id' option" do
       subject { react_component("App", props: props, id: id) }
@@ -140,7 +145,9 @@ data-dom-id="App-react-component-0">{}</script>
 
       it { is_expected.to include id }
       it { is_expected.not_to include react_component_div }
-      it { is_expected.to include react_definition_script }
+      it {
+        expect(is_expected.target).to script_tag_be_included(react_definition_script)
+      }
     end
 
     context "with 'trace' == true" do
@@ -178,10 +185,12 @@ data-dom-id="App-react-component-0">{}</script>
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
     it { is_expected.to start_with "<script" }
     it { is_expected.to end_with "</script>" }
-    it { is_expected.to include react_store_script }
+    it {
+      expect(is_expected.target).to script_tag_be_included(react_store_script)
+    }
   end
 
-  describe "#server_render_js" do
+  describe "#server_render_js", :js do
     subject { server_render_js("ReactOnRails.getComponent('HelloString').component.world()") }
 
     let(:hello_world) do

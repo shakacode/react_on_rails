@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 ENV["RAILS_ENV"] ||= "test"
+SERVER_BUNDLE_PATH = File.expand_path("../../public/webpack/" + ENV["RAILS_ENV"] + "/server-bundle.js", __FILE__)
 
 require_relative "simplecov_helper"
 require_relative "spec_helper"
