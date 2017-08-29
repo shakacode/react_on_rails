@@ -1,0 +1,74 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+eval_gemfile File.expand_path("../react_on_rails.gemspec", __FILE__)
+
+# Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
+gem "rails", "~> 3.2"
+# Use sqlite3 as the database for Active Record
+gem "sqlite3"
+# Use SCSS for stylesheets
+gem "sass-rails"
+# Use Uglifier as compressor for JavaScript assets
+gem "uglifier"
+# Use CoffeeScript for .coffee assets and views
+gem "coffee-rails"
+
+# Use jquery as the JavaScript library
+gem "jquery-rails"
+
+gem "puma"
+
+# Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
+gem "jbuilder"
+# bundle exec rake doc:rails generates the API under doc/api.
+gem "sdoc", group: :doc
+
+# Use ActiveModel has_secure_password
+# gem 'bcrypt', '~> 3.1.7'
+
+# Use Unicorn as the app server
+# gem 'unicorn'
+
+# Use Capistrano for deployment
+# gem 'capistrano-rails', group: :development
+
+gem "mini_racer"
+gem "connection_pool"
+gem "rainbow"
+gem "addressable"
+gem "execjs"
+
+group :development, :test do
+  # Call 'byebug' anywhere in the code to stop execution and get a debugger console
+  gem "awesome_print"
+  gem "listen"
+  gem "pry"
+  gem "pry-byebug"
+  gem "pry-doc"
+  gem "pry-rails"
+  gem "pry-rescue"
+  gem "pry-stack_explorer"
+  gem "rubocop", require: false
+  gem "ruby-lint", require: false
+  gem "scss_lint", require: false
+
+end
+
+group :test do
+  gem "capybara"
+  gem "capybara-screenshot"
+  gem "coveralls", require: false
+  # install trouble with updated
+  # gem "capybara-webkit"
+  gem "chromedriver-helper"
+  gem "generator_spec"
+  gem "launchy"
+  gem "poltergeist"
+  gem "rspec-rails"
+  gem "rspec-retry"
+  gem "selenium-webdriver"
+  gem 'test-unit', '~> 3.0'
+  gem "equivalent-xml", github: "mbklein/equivalent-xml"
+end

@@ -183,7 +183,7 @@ module ReactOnRailsHelper
   end
 
   def sanitized_props_string(props)
-    props.is_a?(String) ? ERB::Util.json_escape(props) : props.to_json
+    ReactOnRails::JsonOutput.escape(props.is_a?(String) ? props : props.to_json)
   end
 
   # Helper method to take javascript expression and returns the output from evaluating it.

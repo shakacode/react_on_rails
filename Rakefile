@@ -3,10 +3,17 @@
 # Rake will automatically load any *.rake files inside of the "rakelib" folder
 # See rakelib/
 tasks = %w[run_rspec lint]
+prepare_for_ci = %w[node_package dummy_apps examples]
+
 if ENV["USE_COVERALLS"] == "TRUE"
   require "coveralls/rake/task"
   Coveralls::RakeTask.new
   tasks << "coveralls:push"
+end
+
+if File.basename(ENV["BUNDLE_GEMFILE"] || "") == "Gemfile.rails32"
+  tasks = %w[run_rspec:gem_rails32 run_rspec:dummy_no_webpacker]
+  prepare_for_ci = %w[node_package dummy_apps:dummy_no_webpacker]
 end
 
 desc "Run all tests and linting"
@@ -16,7 +23,7 @@ desc "All actions but no examples, good for local developer run."
 task all_but_examples: ["run_rspec:all_but_examples", "lint"]
 
 desc "Prepare for ci, including node_package, dummy app, and generator examples"
-task prepare_for_ci: %w[node_package dummy_apps examples]
+task prepare_for_ci: prepare_for_ci
 
 desc "Runs prepare_for_ci and tasks"
 task ci: [:prepare_for_ci, *tasks]

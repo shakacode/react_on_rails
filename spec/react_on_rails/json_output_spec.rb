@@ -25,17 +25,7 @@ module ReactOnRails
     describe ".escape" do
       subject { described_class.escape(hash_value.to_json) }
 
-      context "with Rails version 4.1.1 and higher" do
-        before { allow(Rails).to receive(:version).and_return("4.1.1") }
-
-        it_behaves_like :escaped_json
-      end
-
-      context "with Rails version lower than 4.1.1" do
-        before { allow(Rails).to receive(:version).and_return("4.1.0") }
-
-        it_behaves_like :escaped_json
-      end
+      it_behaves_like :escaped_json
     end
 
     describe ".escaped_without_erb_utils" do
