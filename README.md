@@ -2,6 +2,8 @@
 
 *If this projects helps you, please give us a star!*
 
+[rails/webpacker](https://github.com/rails/webpacker) just shipped 3.0. This now enables me to ship version 9.0. See [PR #908](https://github.com/shakacode/react_on_rails/pull/908) for more details.
+
 ## Thank you from Justin Gordon and [ShakaCode](http://www.shakacode.com)
 
 Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails).
