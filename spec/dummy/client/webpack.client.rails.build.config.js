@@ -28,9 +28,9 @@ module.exports = merge(config, {
     filename: isHMR ? '[name]-[hash].js' : '[name]-[chunkhash].js',
     chunkFilename: '[name]-[chunkhash].chunk.js',
 
-    // Leading and trailing slashes ARE necessary.
     publicPath: output.publicPath,
     path: output.path,
+    pathinfo: devBuild,
   },
 
   // See webpack.client.base.config for adding modules common to both the webpack dev server and rails
@@ -114,7 +114,7 @@ module.exports = merge(config, {
 
   plugins: [
     new ExtractTextPlugin({
-      filename: '[name]-[hash].css',
+      filename: '[name]-[contenthash].css',
       allChunks: true
     }),
   ],

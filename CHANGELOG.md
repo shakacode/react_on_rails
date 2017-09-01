@@ -17,8 +17,7 @@ All 9.0.0 beta versions can be viewed in [PR 908](https://github.com/shakacode/r
 - Update the gemfile. Switch over to using Webpacker on the ShakaCode branch:
 
 ```rb
-gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
-    branch: "issue-464-merge-webpacker-lite-into-webpacker-v5"
+gem "webpacker"
 ```
 
 - Update for the renaming in the `WebpackConfigLoader` in your webpack configuration.
@@ -89,12 +88,19 @@ gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
     
     
 #### Troubleshooting
-* Be sure to    
    
     
   
 ### [9.0.0]
 *Diffs for the beta to master*
+
+### [9.0.0-beta.12]
+- Updated for latest rails/webpacker using the official gem
+- hot reloading working in generator
+
+### [9.0.0-beta.11]
+- Updated for latest rails_webpacker.
+- hot reloading working in spec/dummy
 
 ### [9.0.0-beta.10]
 - Updated for the latest rails/webpacker. Added the cache_manifest setting.
@@ -755,6 +761,7 @@ Best done with Object destructing:
 
 [Unreleased]: https://github.com/shakacode/react_on_rails/compare/rails-webpacker...9.0.0-beta.11
 [9.0.0]: https://github.com/shakacode/react_on_rails/compare/master...9.0.0-beta.11
+[9.0.0-beta.12]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.11...9.0.0-beta.12
 [9.0.0-beta.11]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.10...9.0.0-beta.11
 [9.0.0-beta.10]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.9...9.0.0-beta.10
 [9.0.0-beta.9]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.8...9.0.0-beta.9

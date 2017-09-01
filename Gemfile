@@ -38,8 +38,7 @@ gem "chromedriver-helper"
 gem "launchy"
 gem "poltergeist"
 gem "selenium-webdriver"
-gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
-                 branch: "issue-464-merge-webpacker-lite-into-webpacker-v5"
+gem "webpacker", "~> 3.0"
 
 # TODO: remove once we get out of beta.
 # gem 'webpacker', path: "../../forks/webpacker"

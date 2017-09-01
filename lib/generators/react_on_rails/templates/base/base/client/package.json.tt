@@ -9,6 +9,7 @@
   },
   "cacheDirectories": ["node_modules", "client/node_modules"],
   "dependencies": {
+    "@rails/webpacker": "^3.0.0",
     "babel-cli": "^6.24.1",
     "babel-core": "^6.25.0",
     "babel-loader": "^7.1.1",

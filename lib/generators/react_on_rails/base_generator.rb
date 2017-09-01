@@ -75,8 +75,8 @@ module ReactOnRails
         gems = <<-GEMS.strip_heredoc
 
         gem 'mini_racer', platforms: :ruby
-        gem 'webpacker', git: "https://github.com/shakacode/webpacker.git",
-                         branch: "issue-464-merge-webpacker-lite-into-webpacker-v5"
+        gem "webpacker", "~> 3.0"
+
         GEMS
         append_to_file("Gemfile",
                        gems)

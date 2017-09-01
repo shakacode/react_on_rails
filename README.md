@@ -162,7 +162,7 @@ To upgrade existing apps to React on Rails 8 see the [Installation Overview](doc
   rails generate react_on_rails:install
   ```
 
-5. Bundle and NPM install. Make sure you are on a recent version of node. Please use at least Node v5. Bundle is for adding execJs. You can remove that if you are sure you will not server render.
+5. Bundle and NPM install. Make sure you are on a recent version of node. Please use at least Node v5. Bundle is for adding execJs. You can remove that if you are sure you will not server render. Note, this will add the gems "miniracer" and "webpacker"
 
   ```bash
   bundle && yarn

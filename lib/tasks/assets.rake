@@ -54,6 +54,11 @@ namespace :react_on_rails do
       sh "cd client && `ReactOnRails.configuration.npm_build_production_command`"
     DESC
     task webpack: :locale do
+      if Rake::Task.task_defined?("webpacker:compile")
+        # TODO: Eventually, this will need reconsideration if we use any of the Webpacker compilation
+        Rake::Task["webpacker:compile"].clear
+      end
+
       if ReactOnRails.configuration.npm_build_production_command.present?
         sh "cd client && #{ReactOnRails.configuration.npm_build_production_command}"
       end
