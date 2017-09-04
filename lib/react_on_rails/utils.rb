@@ -81,14 +81,14 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
 
     def self.bundle_js_file_path(bundle_name)
       if using_webpacker?
-        # Next line will throw if the file or manifest does not exist
-        Rails.root.join(File.join("public", Webpacker.manifest.lookup(bundle_name))).to_s
+        bundle_js_file_path_from_webpacker(bundle_name)
       else
         # Default to the non-hashed name in the specified output directory, which, for legacy
         # React on Rails, this is the output directory picked up by the asset pipeline.
         File.join(ReactOnRails.configuration.generated_assets_dir, bundle_name)
       end
     end
+
 
     def self.running_on_windows?
       (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
@@ -116,9 +116,26 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       end
     end
 
+    def self.prepend_cd_node_modules_directory(cmd)
+      return cmd unless ReactOnRails.configuration.node_modules_path.present?
+      return "cd #{ReactOnRails.configuration.node_modules_path} && #{cmd}"
+    end
+
     ###########################################################################
     # WEBPACKER WRAPPERS
     ###########################################################################
+
+    def self.bundle_js_file_path_from_webpacker(bundle_name)
+      hashed_bundle_name = Webpacker.manifest.lookup(bundle_name)
+      if Webpacker.dev_server.running?
+        result = "#{Webpacker.dev_server.protocol}://#{Webpacker.dev_server.host_with_port}#{hashed_bundle_name}"
+        result
+      else
+        # Next line will throw if the file or manifest does not exist
+        Rails.root.join(File.join("public", hashed_bundle_name)).to_s
+      end
+    end
+
 
     def self.using_webpacker?
       ActionController::Base.helpers.respond_to?(:asset_pack_path)

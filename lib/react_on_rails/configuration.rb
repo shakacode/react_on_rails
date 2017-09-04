@@ -81,6 +81,7 @@ module ReactOnRails
 
   def self.configuration
     @configuration ||= Configuration.new(
+      node_modules_path: "",
       generated_assets_dirs: nil,
 
       # generated_assets_dirs is deprecated
@@ -109,7 +110,7 @@ module ReactOnRails
   end
 
   class Configuration
-    attr_accessor :server_bundle_js_file, :prerender, :replay_console,
+    attr_accessor :node_modules_path, :server_bundle_js_file, :prerender, :replay_console,
                   :trace, :development_mode,
                   :logging_on_server, :server_renderer_pool_size,
                   :server_renderer_timeout, :skip_display_none, :raise_on_prerender_error,
@@ -119,7 +120,8 @@ module ReactOnRails
                   :i18n_dir, :i18n_yml_dir,
                   :server_render_method, :symlink_non_digested_assets_regex
 
-    def initialize(server_bundle_js_file: nil, prerender: nil, replay_console: nil,
+    def initialize(node_modules_path: "", server_bundle_js_file: nil, prerender: nil,
+                   replay_console: nil,
                    trace: nil, development_mode: nil,
                    logging_on_server: nil, server_renderer_pool_size: nil,
                    server_renderer_timeout: nil, raise_on_prerender_error: nil,
@@ -129,6 +131,7 @@ module ReactOnRails
                    npm_build_production_command: nil,
                    i18n_dir: nil, i18n_yml_dir: nil,
                    server_render_method: nil, symlink_non_digested_assets_regex: nil)
+      self.node_modules_path = node_modules_path
       self.server_bundle_js_file = server_bundle_js_file
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir

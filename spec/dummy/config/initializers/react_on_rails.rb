@@ -15,6 +15,8 @@ module RenderingExtension
 end
 
 ReactOnRails.configure do |config|
+  config.node_modules_path = "client" # Pre 9.0.0 always used "client"
+
   # Directory where your generated assets go. All generated assets must go to the same directory.
   # Configure this in your webpack config files. This relative to your Rails root directory.
   config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
