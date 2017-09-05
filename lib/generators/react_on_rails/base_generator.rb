@@ -78,8 +78,8 @@ module ReactOnRails
           ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
       STR
 
-      def print_helpful_message
-        message = <<-MSG.strip_heredoc
+      def self.helpful_message
+        <<-MSG.strip_heredoc
 
           What to do next:
 
@@ -109,7 +109,10 @@ module ReactOnRails
 
             - Visit http://localhost:3000/hello_world and see your React On Rails app running!
         MSG
-        GeneratorMessages.add_info(message)
+      end
+
+      def print_helpful_message
+        GeneratorMessages.add_info(self.class.helpful_message)
       end
 
       private

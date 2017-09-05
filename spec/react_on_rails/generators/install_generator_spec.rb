@@ -44,18 +44,20 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with helpful message" do
-    let(:expected) { "your React On Rails app running" }
+    let(:expected) do
+      GeneratorMessages.format_info(ReactOnRails::Generators::BaseGenerator.helpful_message)
+    end
 
     specify "base generator contains a helpful message" do
       run_generator_test_with_args(%w[])
       # GeneratorMessages.output is an array with the git error being the first one
-      expect(GeneratorMessages.output[1]).to include(expected)
+      expect(GeneratorMessages.output).to include(expected)
     end
 
     specify "react with redux generator contains a helpful message" do
       run_generator_test_with_args(%w[--redux])
       # GeneratorMessages.output is an array with the git error being the first one
-      expect(GeneratorMessages.output[1]).to include(expected)
+      expect(GeneratorMessages.output).to include(expected)
     end
   end
 
