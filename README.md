@@ -4,6 +4,27 @@
 
 [rails/webpacker](https://github.com/rails/webpacker) just shipped 3.0. This now enables me to ship version 9.0. See [PR #908](https://github.com/shakacode/react_on_rails/pull/908) for more details.
 
+# React on Rails v9 beta 12 is based on Webpacker 3.0!
+
+* See the updated [Tutorial](https://github.com/shakacode/react_on_rails/blob/rails-webpacker/docs/tutorial.md).
+* I'm grateful for any [PR 908 reviews](https://github.com/shakacode/react_on_rails/pull/908).
+
+## Steps to a New App with rails/webpacker v3 plus React on Rails v9.beta:
+1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory.
+2. Add beta gem version: `gem 'react_on_rails', '~> 9.0.0.beta.12'`
+3. Run the generator: `rails generate react_on_rails:install`
+4. Start the app: `foreman start -f Procfile.dev`
+5. Visit http://localhost:3000/hello_world
+
+Turn on HMR (Hot reloading)
+1. Edit `config/webpacker.yml` and set `hmr: true`
+2. Start the app: `foreman start -f Procfile.dev-server`
+3. Visit http://localhost:3000/hello_world
+4. Edit `app/javascript/bundles/HelloWorld/components/HelloWorld.jsx`, hit save, and see the screen update.
+
+---------------
+
+
 ## Thank you from Justin Gordon and [ShakaCode](http://www.shakacode.com)
 
 Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails).
