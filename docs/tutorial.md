@@ -1,5 +1,8 @@
 # React on Rails Basic Tutorial
 
+* NOTE: Please be sure to use the BETA or RC versions of React on Rails until 9.0 is released.*
+
+
 This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering. It is updated to 9.0.0.
 
 After finishing this tutorial you will get an application that can do the following (live on Heroku):
@@ -55,8 +58,6 @@ bundle exec rails webpacker:install:react
 ```
 
 
-![01](https://cloud.githubusercontent.com/assets/20628911/17464917/3c29e55a-5cf2-11e6-8754-046ba3ee92d9.png)
-
 
 Add the **React On Rails** gem to your Gemfile:
 
@@ -65,9 +66,8 @@ gem 'react_on_rails', '9.0.0'         # use latest gem version, prefer exact ver
 ```
 
 
-![02](https://cloud.githubusercontent.com/assets/20628911/17464919/3c2d74c2-5cf2-11e6-8704-a84958832fbb.png)
-
 Then run `bundle` and commit the git repository (or `rails generate` will not work properly)
+
 
 ```
 bundle
@@ -85,20 +85,14 @@ rails generate react_on_rails:install
 bundle && yarn
 ```
 
-![03](https://cloud.githubusercontent.com/assets/20628911/17464918/3c2c1f00-5cf2-11e6-9525-7b2e15659e01.png)
-
 and then run server with
 
 ```
 foreman start -f Procfile.dev
 ```
 
-![04](https://cloud.githubusercontent.com/assets/20628911/17464921/3c2fdb40-5cf2-11e6-9343-6afa53593a70.png)
-
 Visit http://localhost:3000/hello_world and see your **React On Rails** app running!
 Note, foreman defaults to PORT 5000 unless you set the value of PORT in your environment or in the Procfile.
-
-![05](https://cloud.githubusercontent.com/assets/20628911/17464920/3c2e8ae2-5cf2-11e6-9e30-5ec5f9e2cbc6.png)
 
 ### Custom IP & PORT setup (Cloud9 example)
 
@@ -115,8 +109,8 @@ Then visit https://your-shared-addr.c9users.io:8080/hello_world
 
 It's super important to exclude certain directories from RubyMine or else it will slow to a crawl as it tries to parse all the npm files.
 
-* `public/webpack` (or `app/assets/webpack` on older versions of react_on_rails)
-* `client/node_modules`
+* Generated files, per the settings in your `config/webpacker.yml`, which default to `public/packs` and `public/packs-test`
+* `node_modules`
 
 ## Deploying to Heroku
 
@@ -224,14 +218,5 @@ git add -A
 git commit -m "Latest changes"
 git push heroku master
 ```
-
-![10](https://cloud.githubusercontent.com/assets/20628911/17465017/1f38fbaa-5cf4-11e6-8d86-a3d91e3878e0.png)
-
-## Links
-These are updated for 8.0.0:
-
-* [PR for using the generator with the Redux option](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/17)
-* [PR showing the changes to deploy to Heroku](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/18)
-* [Live on Heroku](https://hello-react-on-rails-8-0-0.herokuapp.com/)
 
 Feedback is greatly appreciated! As are stars on github! If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com).
