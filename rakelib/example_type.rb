@@ -38,20 +38,16 @@ module ReactOnRails
         Dir.exist?(dir)
       end
 
-      def client_dir
-        File.join(dir, "client")
-      end
-
-      def source_package_json
-        File.join(gem_root, "lib/generators/react_on_rails/templates/base/base/client/package.json.tt")
+      def node_modules_location
+        dir
       end
 
       def node_modules_dir
-        File.join(client_dir, "node_modules")
+        File.join(node_modules_location, "node_modules")
       end
 
       def webpack_bundles_dir
-        File.join(dir, "public", "webpack", "test")
+        File.join(dir, "public", "packs-test")
       end
 
       def webpack_bundles
@@ -68,7 +64,7 @@ module ReactOnRails
       end
 
       def package_json
-        File.join(client_dir, "package.json")
+        File.join(node_modules_location, "package.json")
       end
 
       # Gems we need to add to the Gemfile before bundle installing
@@ -79,7 +75,7 @@ module ReactOnRails
 
       # Options we pass when running `rails new` from the command-line
       def rails_options
-        "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record"
+        "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record --webpack=react"
       end
 
       %w[gen prepare clean clobber npm_install build_webpack_bundles].each do |task_type|
@@ -108,12 +104,12 @@ module ReactOnRails
         FileList.new(all_files_in_dir(dir)) do |fl|
           fl.include(gemfile)                          # explicitly declared file (dependency of Gemfile.lock)
           fl.include(package_json)                     # explicitly declared file (dependency of NPM Install)
-          fl.exclude(%r{client(/node_modules(.+)?)?$}) # leave node_modules folder
+          fl.exclude(%r{(/node_modules(.+)?)?$})       # leave node_modules folder
         end
       end
 
       def generated_client_files
-        generated_files.exclude { |f| !f.start_with?(client_dir) }
+        generated_files.exclude { |f| !f.start_with?(node_modules_location) }
       end
 
       # generated files plus explicitly included files resulting from running
@@ -127,13 +123,6 @@ module ReactOnRails
 
       def clean_files
         generated_files
-      end
-
-      # Assumes we are inside client folder
-      def build_webpack_bundles_shell_commands
-        webpack_command = File.join("$(yarn bin)", "webpack")
-        shell_commands = []
-        shell_commands << "NODE_ENV=test #{webpack_command} --config webpack.config.js"
       end
 
       # Assumes we are inside a rails app's folder and necessary gems have been installed

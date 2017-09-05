@@ -1,0 +1,4 @@
+web: rails s -p 3000
+
+# Next line runs a watch process with webpack
+client: sh -c 'rm -rf public/packs/* || true && bundle exec rake react_on_rails:locale && bin/webpack -w'

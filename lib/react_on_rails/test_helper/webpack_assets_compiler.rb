@@ -9,7 +9,8 @@ module ReactOnRails
         puts "\nBuilding Webpack assets..."
 
         cmd = ReactOnRails::Utils.prepend_cd_node_modules_directory(
-          ReactOnRails.configuration.npm_build_test_command)
+          ReactOnRails.configuration.build_test_command
+        )
 
         ReactOnRails::Utils.invoke_and_exit_if_failed(cmd, "Error in building webpack assets!")
 

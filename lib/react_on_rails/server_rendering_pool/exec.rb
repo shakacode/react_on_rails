@@ -97,7 +97,7 @@ module ReactOnRails
 
           # bundle_js_code = File.read(server_js_file)
           begin
-            bundle_js_code = open(server_js_file) { |f| f.read }
+            bundle_js_code = open(server_js_file, &:read)
           rescue => e
             msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
                 "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\

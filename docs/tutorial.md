@@ -1,6 +1,6 @@
 # React on Rails Basic Tutorial
 
-This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering. It is updated to 8.0.0.
+This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering. It is updated to 9.0.0.
 
 After finishing this tutorial you will get an application that can do the following (live on Heroku):
 
@@ -28,47 +28,59 @@ nvm list                        # check
 
 brew install yarn               # you can use other installer if desired
 
-rvm install 2.3.1               # download and install latest stable Ruby (update to exact version)
-rvm use 2.3.1 --default         # use it and make it default
+rvm install 2.4.1               # download and install latest stable Ruby (update to exact version)
+rvm use 2.4.1 --default         # use it and make it default
 rvm list                        # check
 
 gem install rails               # download and install latest stable Rails
 gem install foreman             # download and install Foreman
 ```
 
-Then we need to create a fresh Rails application as following:
+Then we need to create a fresh Rails application with webpacker react support as following:
 
 ```
-cd <basic directory where you want to create your new Rails app>
+cd <directory where you want to create your new Rails app>
 
-rails new test-react-on-rails       # any name you like
+# any name you like for the rails app
+rails new test-react-on-rails --webpack=react 
 
 cd test-react-on-rails
 ```
 
+Note: you can do the following two commands in an existing Rails app:
+
+```
+bundle exec rails webpacker:install
+bundle exec rails webpacker:install:react
+```
+
+
 ![01](https://cloud.githubusercontent.com/assets/20628911/17464917/3c29e55a-5cf2-11e6-8754-046ba3ee92d9.png)
 
-Add **React On Rails** gem to your Gemfile (`vim Gemfile` or `nano Gemfile` or in IDE):
+
+Add the **React On Rails** gem to your Gemfile:
 
 ```
-gem 'react_on_rails', '8.0.0'         # use latest gem version, prefer exact version 
+gem 'react_on_rails', '9.0.0'         # use latest gem version, prefer exact version 
 ```
+
 
 ![02](https://cloud.githubusercontent.com/assets/20628911/17464919/3c2d74c2-5cf2-11e6-8704-a84958832fbb.png)
 
-put everything under git repository (or `rails generate` will not work properly)
+Then run `bundle` and commit the git repository (or `rails generate` will not work properly)
 
 ```
-# Here are git commands to make a new git repo and commit everything
-git init
+bundle
+
+# Here are git commands to make a new git repo and commit everything.
+# Newer versions of Rails create the git repo by default.
 git add -A
 git commit -m "Initial commit"
 ```
 
-update dependencies and generate empty app via `react_on_rails:install` or `react_on_rails:install --redux`. You need to first git commit your files before running the generator, or else it will generate an error.
+Install React on Rails: `rails generator react_on_rails:install` or `rails generate react_on_rails:install --redux`. You need to first git commit your files before running the generator, or else it will generate an error.
 
 ```
-bundle
 rails generate react_on_rails:install
 bundle && yarn
 ```

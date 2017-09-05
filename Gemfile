@@ -43,4 +43,5 @@ gem "webpacker", "~> 3.0"
 # TODO: remove once we get out of beta.
 # gem 'webpacker', path: "../../forks/webpacker"
 
+gem "equivalent-xml", github: "mbklein/equivalent-xml"
 gem "rainbow"

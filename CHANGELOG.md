@@ -14,7 +14,13 @@ Changes since last non-beta release.
 ## 9.0 from 8.x. Upgrade Instructions
 All 9.0.0 beta versions can be viewed in [PR 908](https://github.com/shakacode/react_on_rails/pull/908)
 
-- Update the gemfile. Switch over to using Webpacker on the ShakaCode branch:
+- Breaking Configuration Changes
+  1. Added `config.node_modules_location` which defaults to `""` if Webpacker is installed. You may want to set this to 'client'` to `config/initializers/react_on_rails.rb` to keep your node_modules inside of `/client`
+  2. Renamed
+   * config.npm_build_test_command ==> config.build_test_command
+   * config.npm_build_production_command ==> config.build_production_command
+
+- Update the gemfile. Switch over to using the webpacker gem.
 
 ```rb
 gem "webpacker"
@@ -79,12 +85,9 @@ gem "webpacker"
   - Rename `webpack_public_output_dir` to `public_output_path`.
   
 - Edit your Procfile.dev
-  - For static loading, either:
-    - Comment out or remove the dev_server area of your config.
-    - Edit your static procfile to set env value WEBPACKER_DEV_SERVER=FALSE
-  - For hot loading, either:
+  - Remove the env value WEBPACKER_DEV_SERVER as it's not used
+  - For hot loading:
     - Set the `hmr` key in your `webpacker.yml` to `true`.
-    - Edit your hot procfile to set env value WEBPACKER_HMR=TRUE
     
     
 #### Troubleshooting

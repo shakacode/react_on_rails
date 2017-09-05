@@ -18,6 +18,8 @@ module ReactOnRails
       context "With Webpacker enabled and file in manifest" do
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
+          allow(Webpacker).to receive_message_chain("dev_server.running?")
+            .and_return(false)
           allow(Webpacker).to receive_message_chain("config.public_output_path")
             .and_return("/webpack/development")
           allow(Webpacker).to receive_message_chain("manifest.lookup")

@@ -81,6 +81,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
 
     def self.bundle_js_file_path(bundle_name)
       if using_webpacker?
+        return bundle_name if bundle_name == "manifest.json"
         bundle_js_file_path_from_webpacker(bundle_name)
       else
         # Default to the non-hashed name in the specified output directory, which, for legacy
@@ -88,7 +89,6 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
         File.join(ReactOnRails.configuration.generated_assets_dir, bundle_name)
       end
     end
-
 
     def self.running_on_windows?
       (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
@@ -117,13 +117,24 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.prepend_cd_node_modules_directory(cmd)
-      return cmd unless ReactOnRails.configuration.node_modules_path.present?
-      return "cd #{ReactOnRails.configuration.node_modules_path} && #{cmd}"
+      return cmd unless ReactOnRails.configuration.node_modules_location.present?
+      "cd #{ReactOnRails.configuration.node_modules_location} && #{cmd}"
+    end
+
+    def self.source_path
+      using_webpacker? ? webpacker_source_path : ReactOnRails.configuration.node_modules_location
+    end
+
+    def self.generated_assets_dir
+      using_webpacker? ? webpacker_public_output_path : ReactOnRails.configuration.generated_assets_dir
     end
 
     ###########################################################################
     # WEBPACKER WRAPPERS
     ###########################################################################
+    def self.using_webpacker?
+      ActionController::Base.helpers.respond_to?(:asset_pack_path)
+    end
 
     def self.bundle_js_file_path_from_webpacker(bundle_name)
       hashed_bundle_name = Webpacker.manifest.lookup(bundle_name)
@@ -136,9 +147,12 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       end
     end
 
+    def self.webpacker_source_path
+      Webpacker.config.source_path
+    end
 
-    def self.using_webpacker?
-      ActionController::Base.helpers.respond_to?(:asset_pack_path)
+    def self.webpacker_public_output_path
+      Webpacker.config.public_output_path
     end
 
     def self.manifest_exists?

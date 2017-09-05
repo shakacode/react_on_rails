@@ -40,14 +40,12 @@ namespace :examples do
 
     # BUILD WEBPACK BUNDLES
     task example_type.build_webpack_bundles_task_name_short => example_type.npm_install_task_name do
-      sh_in_dir(example_type.client_dir, example_type.build_webpack_bundles_shell_commands)
+      sh_in_dir(example_type.node_modules_location, example_type.build_webpack_bundles_shell_commands)
     end
 
-    # YARN INSTALL
+    # # YARN INSTALL
     task example_type.npm_install_task_name_short => example_type.package_json do
-      unless uptodate?(example_type.node_modules_dir, [example_type.source_package_json])
-        sh_in_dir(example_type.client_dir, "yarn install --mutex network")
-      end
+      sh_in_dir(example_type.node_modules_location, "yarn install --mutex network")
     end
 
     # CLEAN
