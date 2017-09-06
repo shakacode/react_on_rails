@@ -44,11 +44,11 @@ namespace :examples do
   end
 
   desc "Generates all example apps"
-  multitask gen_all: ExampleType.all.map(&:gen_task_name)
+  task gen_all: ExampleType.all.map(&:gen_task_name)
 end
 
 desc "Generates all example apps. Run `rake -D examples` to see all available options"
-multitask examples: ["examples:gen_all"]
+task examples: ["examples:gen_all"]
 
 private
 
