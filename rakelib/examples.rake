@@ -34,6 +34,7 @@ namespace :examples do
       append_to_gemfile(example_type.gemfile, example_type.required_gems)
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, example_type.generator_shell_commands)
+      sh_in_dir(example_type.dir, "yarn")
     end
   end
 
