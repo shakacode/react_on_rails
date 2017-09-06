@@ -107,7 +107,7 @@ module ReactOnRails
       build_test_command: "",
       i18n_dir: "",
       i18n_yml_dir: "",
-      npm_build_production_command: ""
+      build_production_command: ""
     )
   end
 
@@ -118,7 +118,7 @@ module ReactOnRails
                   :server_renderer_timeout, :skip_display_none, :raise_on_prerender_error,
                   :generated_assets_dirs, :generated_assets_dir,
                   :webpack_generated_files, :rendering_extension, :build_test_command,
-                  :npm_build_production_command,
+                  :build_production_command,
                   :i18n_dir, :i18n_yml_dir,
                   :server_render_method, :symlink_non_digested_assets_regex
 
@@ -130,7 +130,7 @@ module ReactOnRails
                    skip_display_none: nil, generated_assets_dirs: nil,
                    generated_assets_dir: nil, webpack_generated_files: nil,
                    rendering_extension: nil, build_test_command: nil,
-                   npm_build_production_command: nil,
+                   build_production_command: nil,
                    i18n_dir: nil, i18n_yml_dir: nil,
                    server_render_method: "ExecJS", symlink_non_digested_assets_regex: nil)
       self.node_modules_location = node_modules_location
@@ -138,7 +138,7 @@ module ReactOnRails
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir
       self.build_test_command = build_test_command
-      self.npm_build_production_command = npm_build_production_command
+      self.build_production_command = build_production_command
       self.i18n_dir = i18n_dir
       self.i18n_yml_dir = i18n_yml_dir
 

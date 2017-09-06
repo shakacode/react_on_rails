@@ -18,7 +18,7 @@ All 9.0.0 beta versions can be viewed in [PR 908](https://github.com/shakacode/r
   1. Added `config.node_modules_location` which defaults to `""` if Webpacker is installed. You may want to set this to 'client'` to `config/initializers/react_on_rails.rb` to keep your node_modules inside of `/client`
   2. Renamed
    * config.npm_build_test_command ==> config.build_test_command
-   * config.npm_build_production_command ==> config.build_production_command
+   * config.build_production_command ==> config.build_production_command
 
 - Update the gemfile. Switch over to using the webpacker gem.
 
@@ -444,7 +444,7 @@ No changes.
   - See [shakacode/react-webpack-rails-tutorial/pull/287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287) for an    example of upgrading from v5.
 
   - To configure the asset compliation you can either
-    1. Specify a `config/react_on_rails` setting for `npm_build_production_command` to be nil to turn this feature off.
+    1. Specify a `config/react_on_rails` setting for `build_production_command` to be nil to turn this feature off.
     2. Specify the script command you want to run to build your production assets, and remove your assets.rake file.
 
   - If you are using the ReactOnRails test helper, then you will need to add the 'config.npm_build_test_command' to your config to tell react_on_rails what command to run when you run rspec.
@@ -455,7 +455,7 @@ Here is the addition to the generated config file:
 ```ruby
   # This configures the script to run to build the production assets by webpack. Set this to nil
   # if you don't want react_on_rails building this file for you.
-  config.npm_build_production_command = "npm run build:production"
+  config.build_production_command = "npm run build:production"
 
   # If you are using the ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
   # with rspec then this controls what npm command is run

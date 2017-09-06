@@ -597,7 +597,7 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 ## Deployment
 * Version 6.0 puts the necessary precompile steps automatically in the rake precompile step. You can, however, disable this by setting certain values to nil in the [config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb).
   * `config.symlink_non_digested_assets_regex`: Set to nil to turn off the setup of non-js assets.
-  * `npm_build_production_command`: Set to nil to turn off the precompilation of the js assets.
+  * `build_production_command`: Set to nil to turn off the precompilation of the js assets.
 * See the [Heroku Deployment](./docs/additional-reading/heroku-deployment.md) doc for specifics regarding Heroku. The information here should apply to other deployments.
 
 ## Integration with Node.js for Server Rendering

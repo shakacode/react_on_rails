@@ -18,7 +18,7 @@ end
 
 ReactOnRails.configure do |config|
   config.node_modules_location = "client" # Pre 9.0.0 always used "client"
-  config.npm_build_production_command = "yarn run build:production"
+  config.build_production_command = "yarn run build:production"
   config.build_test_command = "yarn run build:test"
   config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
   config.webpack_generated_files = %w[manifest.json]

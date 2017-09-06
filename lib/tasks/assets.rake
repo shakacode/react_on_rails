@@ -50,9 +50,9 @@ namespace :react_on_rails do
   namespace :assets do
     desc <<-DESC.strip_heredoc
       Compile assets with webpack
-      Uses command defined with ReactOnRails.configuration.npm_build_production_command
+      Uses command defined with ReactOnRails.configuration.build_production_command
 
-      sh "#{ReactOnRails::Utils.prepend_cd_node_modules_directory('<ReactOnRails.configuration.npm_build_production_command>')}"
+      sh "#{ReactOnRails::Utils.prepend_cd_node_modules_directory('<ReactOnRails.configuration.build_production_command>')}"
     DESC
     task webpack: :locale do
       if Rake::Task.task_defined?("webpacker:compile")
@@ -60,9 +60,9 @@ namespace :react_on_rails do
         Rake::Task["webpacker:compile"].clear
       end
 
-      if ReactOnRails.configuration.npm_build_production_command.present?
+      if ReactOnRails.configuration.build_production_command.present?
         sh ReactOnRails::Utils.prepend_cd_node_modules_directory(
-          ReactOnRails.configuration.npm_build_production_command
+          ReactOnRails.configuration.build_production_command
         ).to_s
       end
     end
