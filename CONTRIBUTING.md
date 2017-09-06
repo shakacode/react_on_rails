@@ -46,7 +46,7 @@ When making doc changes, we want the change to work on both the gitbook and the 
 
 ```sh
 cd react_on_rails/
-bundle && yarn && rake examples:prepare_all && rake node_package && rake
+bundle && yarn && rake examples:gen_all && rake node_package && rake
 ```
 
 In order to run tests in browser
@@ -145,7 +145,7 @@ yarn run install-react-on-rails
 ```
 _Note: this runs npm under the hood as explained in **Test NPM for react-on-rails** section above_
 
-From now on, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:prepare_all` rake task.
+From now on, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:gen_all` rake task.
 
 *Side note: It's critical to use the alias section of the webpack config to avoid a double inclusion error. This has already been done for you in the example and dummy apps, but for reference:*
 
