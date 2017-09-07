@@ -4,10 +4,10 @@
 
 [rails/webpacker](https://github.com/rails/webpacker) just shipped 3.0. This now enables me to ship version 9.0. See [PR #908](https://github.com/shakacode/react_on_rails/pull/908) for more details.
 
-# React on Rails v9 beta 12 is based on Webpacker 3.0!
+# React on Rails v9 is based on Webpacker 3.0!
 
 * See the updated [Tutorial](https://github.com/shakacode/react_on_rails/blob/rails-webpacker/docs/tutorial.md).
-* I'm grateful for any [PR 908 reviews](https://github.com/shakacode/react_on_rails/pull/908).
+* See the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/rails-webpacker/CHANGELOG.md) for migration instructions. 
 
 ## Steps to a New App with rails/webpacker v3 plus React on Rails v9.beta:
 1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory.
