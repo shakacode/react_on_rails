@@ -35,8 +35,8 @@ gem "webpacker"
   - hotReloadingPort       ==> settings.dev_server.port
   - hmr                    ==> settings.dev_server.hmr
   - manifest               ==> Remove this one. We use the default for Webpack of manifest.json
-  - env                    ==> Use `const { env } = require('process');
-  - devBuild               ==> Use `const devBuild = process.env.NODE_ENV !== 'production';
+  - env                    ==> Use `const { env } = require('process');`
+  - devBuild               ==> Use `const devBuild = process.env.NODE_ENV !== 'production';`
  
 - Edit your Webpack.config files:
   - Change your Webpack output to be like:

@@ -22,12 +22,6 @@ const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
 const { output, settings } = webpackConfigLoader(configPath);
 
-console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
-console.log("output", JSON.stringify(output));
-console.log("settings", JSON.stringify(settings));
-console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
-
-
 const compiler = webpack(webpackConfig);
 
 const devServer = new WebpackDevServer(compiler, {
