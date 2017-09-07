@@ -14,6 +14,8 @@ Changes since last non-beta release.
 ## 9.0 from 8.x. Upgrade Instructions
 All 9.0.0 beta versions can be viewed in [PR 908](https://github.com/shakacode/react_on_rails/pull/908)
 
+For an example of upgrading, see [react-webpack-rails-tutorial/pull/416](https://github.com/shakacode/react-webpack-rails-tutorial/pull/416).
+
 - Breaking Configuration Changes
   1. Added `config.node_modules_location` which defaults to `""` if Webpacker is installed. You may want to set this to 'client'` to `config/initializers/react_on_rails.rb` to keep your node_modules inside of `/client`
   2. Renamed
@@ -44,6 +46,7 @@ gem "webpacker"
     const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
     const configPath = resolve('..', 'config');
     const { output, settings } = webpackConfigLoader(configPath);
+    const hmr = settings.dev_server.hmr;
     const devBuild = process.env.NODE_ENV !== 'production';
 
     output: {
@@ -64,6 +67,9 @@ gem "webpacker"
     ```
 
 - Find your `webpacker_lite.yml` and rename it to `webpacker.yml`
+  - Consider copying a default webpacker.yml setup such as https://github.com/shakacode/react-on-rails-v9-rc-generator/blob/master/config/webpacker.yml
+  - If you are not using the webpacker webpacker setup, be sure to put in `compile: false` in the `default` section.
+  - Alternately, if you are updating from webpacker_lite, you can manually change these:
   - Add a default setting
     ```
     cache_manifest: false
