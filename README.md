@@ -6,8 +6,8 @@
 
 # React on Rails v9 is based on Webpacker 3.0!
 
-* See the updated [Tutorial](https://github.com/shakacode/react_on_rails/blob/rails-webpacker/docs/tutorial.md).
-* See the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/rails-webpacker/CHANGELOG.md) for migration instructions. 
+* See the updated [Tutorial](https://github.com/shakacode/react_on_rails/blob/master/docs/tutorial.md).
+* See the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for migration instructions. 
 
 ## Steps to a New App with rails/webpacker v3 plus React on Rails v9.beta:
 1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory.
@@ -95,9 +95,9 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 ------
 
 # NEWS
-* **[VERSION 9.0.0.beta (branch)](https://github.com/shakacode/react_on_rails/tree/rails-webpacker) shipped!** This version depends on Webpacker directly. See the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/rails-webpacker/CHANGELOG.md) for migration instructions.
+* 2017-09-06: **VERSION 9.0.0 shipped!** This version depends on Webpacker directly. See the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for migration instructions.
 * [VERSION 8.1.0](https://rubygems.org/gems/react_on_rails/) shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) (soon [**webpacker**](https://github.com/rails/webpacker/issues/464#issuecomment-310986140) support! [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395) shows the changes needed to migrate from the Asset Pipeline to Webpacker Lite. For more information, see my article: [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92). Per recent discussions, we [will merge Webpacker Lite changes back into Webpacker](https://github.com/rails/webpacker/issues/464#issuecomment-310986140). There's no reason to wait for this. The upgrade will eventually be trivial.
-* The Docs here on `master` refer to 8.1.0 including support for [webpacker_lite](https://github.com/shakacode/webpacker_lite). The docs on [on the 9.0.0 beta branch](https://github.com/shakacode/react_on_rails/tree/rails-webpacker) refer to using Webpacker rather than Webpacker Lite.
+* The Docs here on `master` refer to 9.x including support for [rails/webpacker](https://github.com/rails/webpacker).
 *Use the [7.0.4 docs](https://github.com/shakacode/react_on_rails/tree/7.0.4) to refer to the older asset pipeline way.*
 * *See [NEWS.md](NEWS.md) for more notes over time.*
 

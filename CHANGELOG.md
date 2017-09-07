@@ -8,11 +8,11 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
-- Fix regression where `react_component(... prerender: true)` wouldn't find the generated asset bundle, because it wasn't looking for the hashed path.
+### [9.0.0]
+Updated React on Rails to depend on [rails/webpacker](https://github.com/rails/webpacker). [PR 908](https://github.com/shakacode/react_on_rails/pull/908) by [justin808](https://github.com/justin808).
 
 
-## 9.0 from 8.x. Upgrade Instructions
-All 9.0.0 beta versions can be viewed in [PR 908](https://github.com/shakacode/react_on_rails/pull/908)
+#### 9.0 from 8.x. Upgrade Instructions
 
 For an example of upgrading, see [react-webpack-rails-tutorial/pull/416](https://github.com/shakacode/react-webpack-rails-tutorial/pull/416).
 
@@ -96,56 +96,6 @@ gem "webpacker"
     - Set the `hmr` key in your `webpacker.yml` to `true`.
     
     
-#### Troubleshooting
-   
-    
-  
-### [9.0.0]
-*Diffs for the beta to master*
-
-### [9.0.0-beta.12]
-- Updated for latest rails/webpacker using the official gem
-- hot reloading working in generator
-
-### [9.0.0-beta.11]
-- Updated for latest rails_webpacker.
-- hot reloading working in spec/dummy
-
-### [9.0.0-beta.10]
-- Updated for the latest rails/webpacker. Added the cache_manifest setting.
-
-### [9.0.0-beta.9]
-- Fixes precompile task going to Webpacker's. You need to set `custom_compile: true` in your `webpacker.yml`.
-- Changed webpack-bundle.js name to hello-world-bundle.js
-- Update for latest from rails/webpacker
-gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
-    branch: "issue-464-merge-webpacker-lite-into-webpacker-v3"
-
-### [9.0.0-beta.8]
-- bugfix for server rendering
-
-### [9.0.0-beta.7]
-- Depend on updated rails/webpacker in branch 
-
-gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
-    branch: "issue-464-merge-webpacker-lite-into-webpacker-v2"
-
-
-### [9.0.0-beta.6]
-- Change "hot" to "hmr".
-
-### [9.0.0-beta.3]
-- Fix typo on webpackConfigLoader.js
-
-### [9.0.0-beta.3]
-- Fix typo on webpackConfigLoader.js
- 
-### [9.0.0-beta.2]
-- Fixed problems when running in development mode for both the generator and spec/dummy. 
-
-### [9.0.0-beta.1]
-- First version of depending on Webpacker rather than Webpacker Lite  
-
 ### [8.0.7]
 #### fixed
 - Fixes generator bug by keeping blank line at top in case existing .gitignore does not end in a newline. [#916](https://github.com/shakacode/react_on_rails/pull/916) by [justin808](https://github.com/justin808).
@@ -768,20 +718,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/rails-webpacker...9.0.0-beta.11
-[9.0.0]: https://github.com/shakacode/react_on_rails/compare/master...9.0.0-beta.11
-[9.0.0-beta.12]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.11...9.0.0-beta.12
-[9.0.0-beta.11]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.10...9.0.0-beta.11
-[9.0.0-beta.10]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.9...9.0.0-beta.10
-[9.0.0-beta.9]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.8...9.0.0-beta.9
-[9.0.0-beta.8]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.7...9.0.0-beta.8
-[9.0.0-beta.7]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.6...9.0.0-beta.7
-[9.0.0-beta.6]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.5...9.0.0-beta.6
-[9.0.0-beta.5]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.4...9.0.0-beta.5
-[9.0.0-beta.4]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.3...9.0.0-beta.4
-[9.0.0-beta.3]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.2...9.0.0-beta.3
-[9.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.1...9.0.0-beta.2
-[9.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/master...9.0.0-beta.1
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/9.0.0...master
+[9.0.0]: https://github.com/shakacode/react_on_rails/compare/8.0.7...9.0.0
 [8.0.7]: https://github.com/shakacode/react_on_rails/compare/8.0.6...8.0.7
 [8.0.6]: https://github.com/shakacode/react_on_rails/compare/8.0.5...8.0.6
 [8.0.5]: https://github.com/shakacode/react_on_rails/compare/8.0.3...8.0.5
