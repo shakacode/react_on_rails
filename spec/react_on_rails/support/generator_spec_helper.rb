@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
+require_relative "../spec_helper"
 require_relative "../simplecov_helper"
+require "generator_spec/test_case"
+
 Dir[File.expand_path("../../support/shared_examples", __FILE__) + "/*.rb"].each { |file| require file }
 generators_glob = File.expand_path("../../../../lib/generators/react_on_rails/*_generator.rb", __FILE__)
 Dir[generators_glob.to_s].each { |file| require file }
@@ -33,9 +36,10 @@ def simulate_existing_rails_files(options)
 end
 
 def simulate_npm_files(options)
-  if options.fetch(:package_json, false)
-    package_json = "client/package.json"
-    package_json_data = <<-JSON.strip_heredoc
+  return unless options.fetch(:package_json, false)
+
+  package_json = "package.json"
+  package_json_data = <<-JSON.strip_heredoc
       {
         "name": "foo",
         "private": true,
@@ -50,21 +54,8 @@ def simulate_npm_files(options)
         "devDependencies": {
         }
       }
-    JSON
-    simulate_existing_file(package_json, package_json_data)
-  end
-
-  return unless options.fetch(:webpack_client_base_config, false)
-  config = "client/webpack.config.js"
-  text = <<-TEXT
-  resolve: {
-    ...
-  },
-  plugins: [
-    ...
-  ]
-  TEXT
-  simulate_existing_file(config, text)
+  JSON
+  simulate_existing_file(package_json, package_json_data)
 end
 
 # Expects an array of strings, such as "--redux"
@@ -73,6 +64,8 @@ def run_generator_test_with_args(args, options = {})
   simulate_existing_rails_files(options)
   simulate_npm_files(options)
   yield if block_given?
+
+  # WARNING: std out is swallowed from running the generator during tests
   run_generator(args + ["--ignore-warnings"])
 end
 

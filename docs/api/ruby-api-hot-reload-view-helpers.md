@@ -1,4 +1,4 @@
-## NOTE: These helpers are NOT needed if using webpacker_lite
+## NOTE: These helpers are NOT needed if using webpacker
 
 ## Hot Reloading View Helpers
 The `env_javascript_include_tag` and `env_stylesheet_link_tag` support the usage of a webpack dev server for providing the JS and CSS assets during development mode. See the [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/) for a working example.
@@ -17,7 +17,7 @@ static vs. hot is picked based on whether `ENV["REACT_ON_RAILS_ENV"] == "HOT"`
  <!-- This is to load the hot assets. -->
  
  <!-- Note, you can have multiple files here. It's an array. -->
- <%= env_javascript_include_tag(hot: ['http://localhost:3500/webpack-bundle.js]') %>
+ <%= env_javascript_include_tag(hot: ['http://localhost:3500/hello-world-bundle.js]') %>
 
  <!-- These do use turbolinks -->
  <%= env_javascript_include_tag(static: 'application_static',

@@ -21,7 +21,6 @@ module ReactOnRails
     # Wraps message and makes it colored.
     # Pass in the msg and color as a symbol.
     def self.wrap_message(msg, color = :red)
-      # binding.pry
       wrapper_line = ("=" * 80).to_s
       # rubocop:disable Layout/IndentHeredoc
       fenced_msg = <<-MSG
@@ -62,26 +61,33 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.server_bundle_js_file_path
-      bundle_js_file_path(ReactOnRails.configuration.server_bundle_js_file)
-    end
+      # Either:
+      # 1. Using same bundle for both server and client, so server bundle will be hashed in manifest
+      # 2. Using a different bundle (different Webpack config), so file is not hashed, and
+      #    bundle_js_path will throw.
+      # 3. Not using webpacker, and bundle_js_path always returns
 
-    # TODO: conturbo Write Test for this, with BOTH webpacker_lite installed and not, and
-    # with case for webpacker_lite, but server file is not in the file
-    def self.bundle_js_file_path(bundle_name)
-      # For testing outside of Rails app
+      # Note, server bundle should not be in the manifest
+      # If using webpacker gem per https://github.com/rails/webpacker/issues/571
+      return @server_bundle_path if @server_bundle_path && !Rails.env.development?
 
-      if using_webpacker_lite? && WebpackerLite::Manifest.lookup(bundle_name)
-        # If using webpacker_lite gem
-        # Per https://github.com/rails/webpacker/issues/571, this path might
-        public_subdir_hashed_file_name = ActionController::Base.helpers.pack_path(bundle_name)
-        return File.join("public", public_subdir_hashed_file_name)
+      bundle_name = ReactOnRails.configuration.server_bundle_js_file
+      @server_bundle_path = begin
+        bundle_js_file_path(bundle_name)
+      rescue Webpacker::Manifest::MissingEntryError
+        Rails.root.join(File.join(Webpacker.config.public_output_path, bundle_name)).to_s
       end
-
-      File.join(ReactOnRails.configuration.generated_assets_dir, bundle_name)
     end
 
-    def self.using_webpacker_lite?
-      ActionController::Base.helpers.respond_to?(:asset_pack_path)
+    def self.bundle_js_file_path(bundle_name)
+      if using_webpacker?
+        return bundle_name if bundle_name == "manifest.json"
+        bundle_js_file_path_from_webpacker(bundle_name)
+      else
+        # Default to the non-hashed name in the specified output directory, which, for legacy
+        # React on Rails, this is the output directory picked up by the asset pipeline.
+        File.join(ReactOnRails.configuration.generated_assets_dir, bundle_name)
+      end
     end
 
     def self.running_on_windows?
@@ -108,6 +114,60 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       def required(arg_name)
         raise ArgumentError, "#{arg_name} is required"
       end
+    end
+
+    def self.prepend_cd_node_modules_directory(cmd)
+      return cmd unless ReactOnRails.configuration.node_modules_location.present?
+      "cd #{ReactOnRails.configuration.node_modules_location} && #{cmd}"
+    end
+
+    def self.source_path
+      using_webpacker? ? webpacker_source_path : ReactOnRails.configuration.node_modules_location
+    end
+
+    def self.generated_assets_dir
+      using_webpacker? ? webpacker_public_output_path : ReactOnRails.configuration.generated_assets_dir
+    end
+
+    ###########################################################################
+    # WEBPACKER WRAPPERS
+    ###########################################################################
+    def self.using_webpacker?
+      ActionController::Base.helpers.respond_to?(:asset_pack_path)
+    end
+
+    def self.bundle_js_file_path_from_webpacker(bundle_name)
+      hashed_bundle_name = Webpacker.manifest.lookup(bundle_name)
+      if Webpacker.dev_server.running?
+        result = "#{Webpacker.dev_server.protocol}://#{Webpacker.dev_server.host_with_port}#{hashed_bundle_name}"
+        result
+      else
+        # Next line will throw if the file or manifest does not exist
+        Rails.root.join(File.join("public", hashed_bundle_name)).to_s
+      end
+    end
+
+    def self.webpacker_source_path
+      Webpacker.config.source_path
+    end
+
+    def self.webpacker_public_output_path
+      Webpacker.config.public_output_path
+    end
+
+    def self.manifest_exists?
+      Webpacker.config.public_manifest_path.exist?
+    end
+
+    def self.check_manifest_not_cached
+      return unless using_webpacker? && Webpacker.config.cache_manifest?
+      msg = <<-MSG.strip_heredoc
+          ERROR: you have enabled cache_manifest in the #{Rails.env} env when using the
+          ReactOnRails::TestHelper.configure_rspec_to_compile_assets helper
+          To fix this: edit your config/webpacker.yml file and set cache_manifest to false for test.
+      MSG
+      puts wrap_message(msg)
+      exit!
     end
   end
 end

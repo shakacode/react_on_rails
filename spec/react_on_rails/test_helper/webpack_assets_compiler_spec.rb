@@ -4,11 +4,12 @@ require_relative "../spec_helper"
 
 describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
   describe "#ensureAssetsCompiled" do
+    let(:invalid_command) { "sh -c 'exit 1'" }
     context "when assets compiler command is invalid" do
       before do
         allow(ReactOnRails.configuration)
-          .to receive(:npm_build_test_command)
-          .and_return("invalid command")
+          .to receive(:build_test_command)
+          .and_return(invalid_command)
       end
 
       it "exits immediately" do
@@ -23,7 +24,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
         expected_output = <<-MSG.strip_heredoc
           React on Rails FATAL ERROR!
           Error in building webpack assets!
-          cmd: cd client && invalid command
+          cmd: #{invalid_command}
         MSG
 
         expect do

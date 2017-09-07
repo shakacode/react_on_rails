@@ -2,9 +2,9 @@
 
 require_relative "../support/generator_spec_helper"
 require_relative "../support/version_test_helpers"
-
-# rubocop:disable Metrics/BlockLength
 describe InstallGenerator, type: :generator do
+  include GeneratorSpec::TestCase
+
   destination File.expand_path("../../dummy-for-generators/", __FILE__)
 
   context "no args" do
@@ -25,18 +25,6 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator"
   end
 
-  context "--node" do
-    before(:all) { run_generator_test_with_args(%w[--node]) }
-    include_examples "base_generator", application_js: true
-    include_examples "node_generator"
-  end
-
-  context "-N" do
-    before(:all) { run_generator_test_with_args(%w[-N]) }
-    include_examples "base_generator", application_js: true
-    include_examples "node_generator"
-  end
-
   context "without existing application.js or application.js.coffee file" do
     before(:all) { run_generator_test_with_args([], application_js: false) }
     include_examples "base_generator", application_js: false
@@ -55,103 +43,21 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "with missing files to trigger errors" do
-    specify "GeneratorMessages has the missing file error" do
-      run_generator_test_with_args([], gitignore: false)
-      expected = <<-MSG.strip_heredoc
-        .gitignore was not found.
-        Please add the following content to your .gitignore file:
-        # React on Rails
-        npm-debug.log*
-        node_modules
-
-        # Generated js bundles
-        /public/webpack/*
-
-        MSG
-      expect(GeneratorMessages.output)
-        .to include(GeneratorMessages.format_error(expected))
-    end
-  end
-
-  context "when gitignore already exists and has no EOF newline" do
-    before(:all) { @install_generator = InstallGenerator.new }
-
-    specify "it adds the script section if missing" do
-      data = "#lib from simplecov\ncoverage"
-
-      run_generator_test_with_args(%w[]) do
-        simulate_existing_file(".gitignore", data)
-      end
-
-      # rubocop:disable Layout/IndentHeredoc
-      expected = <<-MSG
-#{data}
-
-# React on Rails
-npm-debug.log*
-node_modules
-
-# Generated js bundles
-/public/webpack/*
-      MSG
-      assert_file(".gitignore") do |contents|
-        expect(contents).to eq(expected)
-      end
-      # rubocop:enable Layout/IndentHeredoc
-    end
-  end
-
   context "with helpful message" do
     let(:expected) do
-      <<-MSG.strip_heredoc
-
-        What to do next:
-
-          - Include your webpack assets to your application layout.
-
-            <%= javascript_pack_tag 'webpack-bundle' %>
-
-          - Ensure your bundle and yarn installs of dependencies are up to date.
-
-              bundle && yarn
-
-          - Run the foreman command to start the rails server and run webpack in watch mode.
-
-              foreman start -f Procfile.dev
-
-          - Visit http://localhost:3000/hello_world and see your React On Rails app running!
-      MSG
+      GeneratorMessages.format_info(ReactOnRails::Generators::BaseGenerator.helpful_message)
     end
 
     specify "base generator contains a helpful message" do
       run_generator_test_with_args(%w[])
-      expect(GeneratorMessages.output)
-        .to include(GeneratorMessages.format_info(expected))
+      # GeneratorMessages.output is an array with the git error being the first one
+      expect(GeneratorMessages.output).to include(expected)
     end
 
     specify "react with redux generator contains a helpful message" do
       run_generator_test_with_args(%w[--redux])
-      expected = <<-MSG.strip_heredoc
-
-        What to do next:
-
-          - Include your webpack assets to your application layout.
-
-            <%= javascript_pack_tag 'webpack-bundle' %>
-
-          - Ensure your bundle and yarn installs of dependencies are up to date.
-
-              bundle && yarn
-
-          - Run the foreman command to start the rails server and run webpack in watch mode.
-
-              foreman start -f Procfile.dev
-
-          - Visit http://localhost:3000/hello_world and see your React On Rails app running!
-      MSG
-      expect(GeneratorMessages.output)
-        .to include(GeneratorMessages.format_info(expected))
+      # GeneratorMessages.output is an array with the git error being the first one
+      expect(GeneratorMessages.output).to include(expected)
     end
   end
 
@@ -216,48 +122,6 @@ node_modules
       stub_const("RUBY_PLATFORM", "mswin")
       allow(@install_generator).to receive(:`).with("where yarn").and_return("")
       expect(@install_generator.send(:missing_yarn?)).to eq true
-    end
-  end
-
-  context "when package.json already exists" do
-    before(:all) { @install_generator = InstallGenerator.new }
-
-    specify "it adds the script section if missing" do
-      data = <<-DATA.strip_heredoc
-        {
-          "dependencies": {}
-        }
-      DATA
-
-      run_generator_test_with_args(%w[]) do
-        simulate_existing_file("package.json", data)
-      end
-
-      assert_file("package.json") do |contents|
-        parsed = JSON.parse(contents)
-        assert(parsed["scripts"]["postinstall"])
-      end
-    end
-
-    specify "it adds the postinstall script to the script section" do
-      data = <<-DATA.strip_heredoc
-        {
-          "scripts": {
-            "foo": "bar"
-          },
-          "dependencies": {
-          }
-        }
-      DATA
-
-      run_generator_test_with_args(%w[]) do
-        simulate_existing_file("package.json", data)
-      end
-
-      assert_file("package.json") do |contents|
-        parsed = JSON.parse(contents)
-        assert(parsed["scripts"]["postinstall"])
-      end
     end
   end
 end

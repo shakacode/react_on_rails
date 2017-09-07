@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "open-uri"
+
 module ReactOnRails
   module ServerRenderingPool
     # This implementation of the rendering pool uses ExecJS to execute javasript code
@@ -14,11 +16,21 @@ module ReactOnRails
 
       def self.reset_pool_if_server_bundle_was_modified
         return unless ReactOnRails.configuration.development_mode
-        file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
-        @server_bundle_timestamp ||= file_mtime
-        return if @server_bundle_timestamp == file_mtime
+
+        server_bundle_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path
+
+        if Webpacker.dev_server.running?
+          return if @last_loaded_server_bundle == server_bundle_js_file_path
+          @last_loaded_server_bundle = server_bundle_js_file_path
+        else
+          # we're not hashing the server name and we can use the mtime
+          file_mtime = File.mtime(server_bundle_js_file_path)
+          @server_bundle_timestamp ||= file_mtime
+          return if @server_bundle_timestamp == file_mtime
+          @server_bundle_timestamp = file_mtime
+        end
+
         ReactOnRails::ServerRenderingPool.reset_pool
-        @server_bundle_timestamp = file_mtime
       end
 
       # js_code: JavaScript expression that returns a string.
@@ -83,14 +95,15 @@ module ReactOnRails
 
           server_js_file = ReactOnRails::Utils.server_bundle_js_file_path
 
-          unless File.exist?(server_js_file)
+          # bundle_js_code = File.read(server_js_file)
+          begin
+            bundle_js_code = open(server_js_file, &:read)
+          rescue => e
             msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
                 "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\
-                "avoid this warning"
+                "avoid this warning.\nError is: #{e}"
             raise msg
           end
-
-          bundle_js_code = File.read(server_js_file)
           # rubocop:disable Layout/IndentHeredoc
           base_js_code = <<-JS
 #{console_polyfill}

@@ -9,8 +9,6 @@ require "yaml"
 require_relative "example_type"
 require_relative "task_helpers"
 include ReactOnRails::TaskHelpers
-
-# rubocop:disable Metrics/BlockLength
 namespace :examples do
   # Loads data from examples_config.yml and instantiates corresponding ExampleType objects
   examples_config_file = File.expand_path("../examples_config.yml", __FILE__)
@@ -19,43 +17,6 @@ namespace :examples do
 
   # Define tasks for each example type
   ExampleType.all.each do |example_type|
-    # GENERATED FILES
-    example_type.generated_files.each do |f|
-      file f => example_type.source_files do
-        Rake::Task[example_type.gen_task_name].invoke
-      end
-    end
-
-    # GEMFILE.LOCK
-    file example_type.gemfile_lock => example_type.gemfile do
-      bundle_install_in(example_type.dir)
-    end
-
-    # WEBPACK BUNDLES
-    example_type.webpack_bundles.each do |f|
-      file f => example_type.generated_client_files do
-        Rake::Task[example_type.build_webpack_bundles_task_name].invoke
-      end
-    end
-
-    # BUILD WEBPACK BUNDLES
-    task example_type.build_webpack_bundles_task_name_short => example_type.npm_install_task_name do
-      sh_in_dir(example_type.client_dir, example_type.build_webpack_bundles_shell_commands)
-    end
-
-    # YARN INSTALL
-    task example_type.npm_install_task_name_short => example_type.package_json do
-      unless uptodate?(example_type.node_modules_dir, [example_type.source_package_json])
-        sh_in_dir(example_type.client_dir, "yarn install --mutex network")
-      end
-    end
-
-    # CLEAN
-    desc "Cleans #{example_type.name_pretty}"
-    task example_type.clean_task_name_short do
-      example_type.clean_files.each { |f| rm_rf(f) }
-    end
-
     # CLOBBER
     desc "Clobbers (deletes) #{example_type.name_pretty}"
     task example_type.clobber_task_name_short do
@@ -64,24 +25,16 @@ namespace :examples do
 
     # GENERATE
     desc "Generates #{example_type.name_pretty}"
-    task example_type.gen_task_name_short => example_type.clean_task_name do
+    task example_type.gen_task_name_short => example_type.clobber_task_name do
       mkdir_p(example_type.dir)
       sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options}")
       sh_in_dir(example_type.dir, "touch .gitignore")
       append_to_gemfile(example_type.gemfile, example_type.required_gems)
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, example_type.generator_shell_commands)
-    end
-
-    # PREPARE
-    desc "Prepares #{example_type.name_pretty} (generates example, `yarn`s, and generates webpack bundles)"
-    multitask example_type.prepare_task_name_short => example_type.prepared_files do
-      Rake::Task["node_package"].invoke
+      sh_in_dir(example_type.dir, "yarn")
     end
   end
-
-  desc "Cleans all example apps"
-  multitask clean: ExampleType.all.map(&:clean_task_name)
 
   desc "Clobbers (deletes) all example apps"
   task :clobber do
@@ -89,14 +42,11 @@ namespace :examples do
   end
 
   desc "Generates all example apps"
-  multitask gen_all: ExampleType.all.map(&:gen_task_name)
-
-  desc "Prepares all example apps"
-  multitask prepare_all: ExampleType.all.map(&:prepare_task_name)
+  task gen_all: ExampleType.all.map(&:gen_task_name)
 end
 
-desc "Prepares all example apps. Run `rake -D examples` to see all available options"
-multitask examples: ["examples:prepare_all"]
+desc "Generates all example apps. Run `rake -D examples` to see all available options"
+task examples: ["examples:gen_all"]
 
 private
 

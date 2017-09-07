@@ -13,7 +13,6 @@ Usage:
 
 Options:
   -R, [--redux], [--no-redux]                      # Install Redux gems and Redux version of Hello World Example. Default: false
-  -N, [--node], [--no-node]                        # Sets up node as a server rendering option. Default: false
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
 
 Runtime options:
@@ -70,7 +69,3 @@ If you have used the `--redux` generator option, you will notice the familiar ad
 
 Note the organizational paradigm of "bundles". These are like application domains and are used for grouping your code into webpack bundles, in case you decide to create different bundles for deployment. This is also useful for separating out logical parts of your application. The concept is that each bundle will have it's own Redux store. If you have code that you want to reuse across bundles, including components and reducers, place them under `/client/app/lib`.
 
-### Using Images and Fonts
-The generator has amended the folders created in `client/assets/` to Rails's asset path. We recommend that if you have any existing assets that you want to use with your client code, you should move them to these folders and use webpack as normal. This allows webpack's development server to have access to your assets, as it will not be able to see any assets in the default Rails directories which are above the `/client` directory.
-
-Alternatively, if you have many existing assets and don't wish to move them, you could consider creating symlinks from client/assets that point to your Rails assets folders inside of `app/assets/`. The assets there will then be visible to both Rails and webpack.

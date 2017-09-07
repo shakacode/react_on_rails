@@ -9,12 +9,3 @@ We are currently using Travis for CI. Because of the way Travis works, it is not
 ## Configuring what Apps are Generated
 You can specify additional apps to generate and test by adding to the rakelib/examples_config.yml file. The necessary build and test tasks will automatically be created for you dynamically at runtime.
 
-## More on the Rake Tasks
-In order to maximize efficiency, we took several steps to improve the performance of the rake tasks that utilize somewhat advanced rake functionality such as task dependencies, `file` tasks, task synthesizing, and concurrent tasks with `multitask`.
-
-For example, re-generating the app, running `yarn`, and re-generating the webpack bundles are all only done when they need to be done. Rake will also run certain tasks, including those that generate multiple applications, concurrently. 
-
-For more insight, see:
-
-- [Avdi Grimm's series of articles on Rake](http://devblog.avdi.org/2014/04/30/learn-advanced-rake-in-7-episodes/)
-- [Martin Fowler's rake article](http://martinfowler.com/articles/rake.html)

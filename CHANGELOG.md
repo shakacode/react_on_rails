@@ -8,10 +8,147 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
+- Fix regression where `react_component(... prerender: true)` wouldn't find the generated asset bundle, because it wasn't looking for the hashed path.
+
+
+## 9.0 from 8.x. Upgrade Instructions
+All 9.0.0 beta versions can be viewed in [PR 908](https://github.com/shakacode/react_on_rails/pull/908)
+
+For an example of upgrading, see [react-webpack-rails-tutorial/pull/416](https://github.com/shakacode/react-webpack-rails-tutorial/pull/416).
+
+- Breaking Configuration Changes
+  1. Added `config.node_modules_location` which defaults to `""` if Webpacker is installed. You may want to set this to 'client'` to `config/initializers/react_on_rails.rb` to keep your node_modules inside of `/client`
+  2. Renamed
+   * config.npm_build_test_command ==> config.build_test_command
+   * config.build_production_command ==> config.build_production_command
+
+- Update the gemfile. Switch over to using the webpacker gem.
+
+```rb
+gem "webpacker"
+```
+
+- Update for the renaming in the `WebpackConfigLoader` in your webpack configuration.
+  You will need to rename the following object properties:
+  - webpackOutputPath      ==> output.path
+  - webpackPublicOutputDir ==> output.publicPath
+  - hotReloadingUrl        ==> output.publicPathWithHost
+  - hotReloadingHostname   ==> settings.dev_server.host
+  - hotReloadingPort       ==> settings.dev_server.port
+  - hmr                    ==> settings.dev_server.hmr
+  - manifest               ==> Remove this one. We use the default for Webpack of manifest.json
+  - env                    ==> Use `const { env } = require('process');`
+  - devBuild               ==> Use `const devBuild = process.env.NODE_ENV !== 'production';`
+ 
+- Edit your Webpack.config files:
+  - Change your Webpack output to be like:
+    ```
+    const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
+    const configPath = resolve('..', 'config');
+    const { output, settings } = webpackConfigLoader(configPath);
+    const hmr = settings.dev_server.hmr;
+    const devBuild = process.env.NODE_ENV !== 'production';
+
+    output: {
+      filename: isHMR ? '[name]-[hash].js' : '[name]-[chunkhash].js',
+      chunkFilename: '[name]-[chunkhash].chunk.js',
+   
+      publicPath: output.publicPath,
+      path: output.path,
+    },
+    ```
+  - Change your ManifestPlugin definition to something like the following
+    ```
+    new ManifestPlugin({
+        publicPath: output.publicPath,
+        writeToFileEmit: true
+      }),
+
+    ```
+
+- Find your `webpacker_lite.yml` and rename it to `webpacker.yml`
+  - Consider copying a default webpacker.yml setup such as https://github.com/shakacode/react-on-rails-v9-rc-generator/blob/master/config/webpacker.yml
+  - If you are not using the webpacker webpacker setup, be sure to put in `compile: false` in the `default` section.
+  - Alternately, if you are updating from webpacker_lite, you can manually change these:
+  - Add a default setting
+    ```
+    cache_manifest: false
+    ```
+  - For production, set:  
+    ```
+    cache_manifest: true
+    ```
+  - Add a section like this under your development env:
+    ```
+    dev_server:
+      host: localhost
+      port: 3035
+      hmr: false
+    ```
+    Set hmr to your preference.
+  - See the example `spec/dummy/config/webpacker.yml`.
+  - Remove keys `hot_reloading_host` and `hot_reloading_enabled_by_default`. These are replaced by the `dev_server` key.
+  - Rename `webpack_public_output_dir` to `public_output_path`.
+  
+- Edit your Procfile.dev
+  - Remove the env value WEBPACKER_DEV_SERVER as it's not used
+  - For hot loading:
+    - Set the `hmr` key in your `webpacker.yml` to `true`.
+    
+    
+#### Troubleshooting
+   
+    
+  
+### [9.0.0]
+*Diffs for the beta to master*
+
+### [9.0.0-beta.12]
+- Updated for latest rails/webpacker using the official gem
+- hot reloading working in generator
+
+### [9.0.0-beta.11]
+- Updated for latest rails_webpacker.
+- hot reloading working in spec/dummy
+
+### [9.0.0-beta.10]
+- Updated for the latest rails/webpacker. Added the cache_manifest setting.
+
+### [9.0.0-beta.9]
+- Fixes precompile task going to Webpacker's. You need to set `custom_compile: true` in your `webpacker.yml`.
+- Changed webpack-bundle.js name to hello-world-bundle.js
+- Update for latest from rails/webpacker
+gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
+    branch: "issue-464-merge-webpacker-lite-into-webpacker-v3"
+
+### [9.0.0-beta.8]
+- bugfix for server rendering
+
+### [9.0.0-beta.7]
+- Depend on updated rails/webpacker in branch 
+
+gem "webpacker", git: "https://github.com/shakacode/webpacker.git",
+    branch: "issue-464-merge-webpacker-lite-into-webpacker-v2"
+
+
+### [9.0.0-beta.6]
+- Change "hot" to "hmr".
+
+### [9.0.0-beta.3]
+- Fix typo on webpackConfigLoader.js
+
+### [9.0.0-beta.3]
+- Fix typo on webpackConfigLoader.js
+ 
+### [9.0.0-beta.2]
+- Fixed problems when running in development mode for both the generator and spec/dummy. 
+
+### [9.0.0-beta.1]
+- First version of depending on Webpacker rather than Webpacker Lite  
+
 ### [8.0.7]
 #### fixed
 - Fixes generator bug by keeping blank line at top in case existing .gitignore does not end in a newline. [#916](https://github.com/shakacode/react_on_rails/pull/916) by [justin808](https://github.com/justin808).
-
 
 ### [8.0.6]
 #### fixed
@@ -313,7 +450,7 @@ No changes.
   - See [shakacode/react-webpack-rails-tutorial/pull/287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287) for an    example of upgrading from v5.
 
   - To configure the asset compliation you can either
-    1. Specify a `config/react_on_rails` setting for `npm_build_production_command` to be nil to turn this feature off.
+    1. Specify a `config/react_on_rails` setting for `build_production_command` to be nil to turn this feature off.
     2. Specify the script command you want to run to build your production assets, and remove your assets.rake file.
 
   - If you are using the ReactOnRails test helper, then you will need to add the 'config.npm_build_test_command' to your config to tell react_on_rails what command to run when you run rspec.
@@ -324,7 +461,7 @@ Here is the addition to the generated config file:
 ```ruby
   # This configures the script to run to build the production assets by webpack. Set this to nil
   # if you don't want react_on_rails building this file for you.
-  config.npm_build_production_command = "npm run build:production"
+  config.build_production_command = "npm run build:production"
 
   # If you are using the ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
   # with rspec then this controls what npm command is run
@@ -631,7 +768,20 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.7...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/rails-webpacker...9.0.0-beta.11
+[9.0.0]: https://github.com/shakacode/react_on_rails/compare/master...9.0.0-beta.11
+[9.0.0-beta.12]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.11...9.0.0-beta.12
+[9.0.0-beta.11]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.10...9.0.0-beta.11
+[9.0.0-beta.10]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.9...9.0.0-beta.10
+[9.0.0-beta.9]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.8...9.0.0-beta.9
+[9.0.0-beta.8]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.7...9.0.0-beta.8
+[9.0.0-beta.7]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.6...9.0.0-beta.7
+[9.0.0-beta.6]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.5...9.0.0-beta.6
+[9.0.0-beta.5]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.4...9.0.0-beta.5
+[9.0.0-beta.4]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.3...9.0.0-beta.4
+[9.0.0-beta.3]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.2...9.0.0-beta.3
+[9.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/9.0.0-beta.1...9.0.0-beta.2
+[9.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/master...9.0.0-beta.1
 [8.0.7]: https://github.com/shakacode/react_on_rails/compare/8.0.6...8.0.7
 [8.0.6]: https://github.com/shakacode/react_on_rails/compare/8.0.5...8.0.6
 [8.0.5]: https://github.com/shakacode/react_on_rails/compare/8.0.3...8.0.5

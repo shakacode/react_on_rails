@@ -38,6 +38,10 @@ gem "chromedriver-helper"
 gem "launchy"
 gem "poltergeist"
 gem "selenium-webdriver"
-gem "webpacker_lite", "~> 2.1"
+gem "webpacker", "~> 3.0"
 
+# TODO: remove once we get out of beta.
+# gem 'webpacker', path: "../../forks/webpacker"
+
+gem "equivalent-xml", github: "mbklein/equivalent-xml"
 gem "rainbow"

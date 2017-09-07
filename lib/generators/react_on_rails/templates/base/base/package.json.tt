@@ -1,8 +1,0 @@
-{
-  "name": "<%= app_name %>",
-  "private": true,
-  "dependencies": {},
-  "scripts": {
-    "postinstall": "cd client && yarn install"
-  }
-}

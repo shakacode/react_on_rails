@@ -1,95 +1,69 @@
 /**
- * Allow defaults for the config/webpacker_lite.yml. Thee values in this file MUST match values
- * in README for https://github.com/shakacode/webpacker_lite
+ * Allow defaults for the config/webpacker.yml. Thee values in this file MUST match values
+ * in https://github.com/rails/webpacker/blob/master/lib/install/config/webpacker.yml
  *
- * webpack_public_output_dir: 'webpack'
- * manifest: 'manifest.json'
- *
- * hot_reloading_enabled_by_default: false
- * hot_reloading_host: localhost:3500
- *
- * NOTE: for hot reloading, env.HOT_RELOADING value will override any config value. This env value
+ * NOTE: for HMR reloading, env.WEBPACKER_HMR value will override any config value. This env value
  * should be set to TRUE to turn this on.
  */
+
 const { join, resolve } = require('path');
+const { env } = require('process');
 const { safeLoad } = require('js-yaml');
 const { readFileSync } = require('fs');
 
-const DEFAULT_WEBPACK_PUBLIC_OUTPUT_DIR = 'webpack';
-const DEFAULT_MANIFEST = 'manifest.json';
-const DEFAULT_HOT_RELOADING_HOST = 'localhost:3500';
-const HOT_RELOADING_ENABLED_BY_DEFAULT = false;
 
-function getLocation(href) {
-  const match = href.match(/^(https?:)\/\/(([^:/?#]*)(?::([0-9]+))?)([/]?[^?#]*)(\?[^#]*|)(#.*|)$/);
+function removeOuterSlashes(string) {
+  return string.replace(/^\/*/, '').replace(/\/*$/, '');
+}
 
-  return match && {
-    href,
-    protocol: match[1],
-    host: match[2],
-    hostname: match[3],
-    port: match[4],
-    pathname: match[5],
-    search: match[6],
-    hash: match[7],
-  };
+function formatPublicPath(settings) {
+  if (settings.dev_server) {
+    const host = settings.dev_server.host;
+    const port = settings.dev_server.port;
+    const path = settings.public_output_path;
+    const hostWithHttp = `http://${host}:${port}`;
+
+    let formattedHost = removeOuterSlashes(hostWithHttp);
+    if (formattedHost && !/^http/i.test(formattedHost)) {
+      formattedHost = `//${formattedHost}`;
+    }
+    const formattedPath = removeOuterSlashes(path);
+    return `${formattedHost}/${formattedPath}/`;
+  }
+
+  const publicOuterPathWithoutOutsideSlashes = removeOuterSlashes(settings.public_output_path);
+  return `//${publicOuterPathWithoutOutsideSlashes}/`;
 }
 
 /**
- * @param configPath, location where webpacker_lite.yml will be found
+ * @param configPath, location where webpacker.yml will be found
+ * Return values are consistent with Webpacker's js helpers
+ * For example, you might define:
+ *   const isHMR = settings.dev_server && settings.dev_server.hmr
  * @returns {{
- * devBuild,
- * hotReloadingEnabled,
- * hotReloadingHost,
- * hotReloadingPort,
- * hotReloadingUrl,
- * manifest,
- * webpackOutputPath,
- * webpackPublicOutputDir
- * }}
+     settings,
+     resolvedModules,
+     output: { path, publicPath, publicPathWithHost }
+   }}
  */
 const configLoader = (configPath) => {
-  const env = process.env;
-
   // Some test environments might not have the NODE_ENV set, so we'll have fallbacks.
-  const configEnv = (process.env.NODE_ENV || process.env.RAILS_ENV || 'development');
-  const ymlConfigPath = join(configPath, 'webpacker_lite.yml');
-  const configuration = safeLoad(readFileSync(ymlConfigPath, 'utf8'))[configEnv];
-  const devBuild = configEnv !== 'production';
-  const hotReloadingHost = configuration.hot_reloading_host || DEFAULT_HOT_RELOADING_HOST;
+  const configEnv = (env.NODE_ENV || env.RAILS_ENV || 'development');
+  const ymlConfigPath = join(configPath, 'webpacker.yml');
+  const settings = safeLoad(readFileSync(ymlConfigPath, 'utf8'))[configEnv];
 
   // NOTE: Rails path is hard coded to `/public`
-  const webpackPublicOutputDir = configuration.webpack_public_output_dir ||
-    DEFAULT_WEBPACK_PUBLIC_OUTPUT_DIR;
-  const webpackOutputPath = resolve(configPath, '..', 'public', webpackPublicOutputDir);
-
-  const manifest = configuration.manifest || DEFAULT_MANIFEST;
-
-  const hotReloadingEnabled = (env.HOT_RELOADING === 'TRUE' || env.HOT_RELOADING === 'YES' ||
-    configuration.hot_reloading_enabled_by_default || HOT_RELOADING_ENABLED_BY_DEFAULT);
-
-  const hotReloadingUrl = hotReloadingHost.match(/^http/)
-    ? hotReloadingHost
-    : `http://${hotReloadingHost}`;
-
-  const url = getLocation(hotReloadingUrl);
-  const hotReloadingPort = url.port;
-  const hotReloadingHostname = url.hostname;
-  if (hotReloadingPort === '' || hotReloadingHostname === '') {
-    const msg = 'Missing port number. Please specify the `hot_reloading_host` like `localhost:3500`';
-    throw new Error(msg);
-  }
+  const output = {
+    // Next line differs from the webpacker definition as we use the configPath to create
+    // the relative path.
+    path: resolve(configPath, '..', 'public', settings.public_output_path),
+    publicPath: `/${settings.public_output_path}/`.replace(/([^:]\/)\/+/g, '$1'),
+    publicPathWithHost: formatPublicPath(settings),
+  };
 
   return {
-    devBuild,
-    hotReloadingEnabled,
-    hotReloadingHost,
-    hotReloadingHostname,
-    hotReloadingPort,
-    hotReloadingUrl,
-    manifest,
-    webpackOutputPath,
-    webpackPublicOutputDir,
+    settings,
+    output,
   };
 };
 

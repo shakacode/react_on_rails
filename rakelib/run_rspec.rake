@@ -21,7 +21,8 @@ namespace :run_rspec do
   desc "Run RSpec with rails32 gemfile"
   task :gem_rails32 do
     rspec_args = "spec/react_on_rails --exclude-pattern "\
-                 "\"**/generators/*_spec.rb,**/test_helper/*_spec.rb\""
+                 "\"**/generators/*_spec.rb,**/utils_spec.rb,"\
+                 "**/webpack_assets_status_checker_spec.rb,**/test_helper/*_spec.rb\""
     run_tests_in("",
                  rspec_args: rspec_args,
                  env_vars: "BUNDLE_GEMFILE=spec/dummy_no_webpacker/Gemfile.rails32")
@@ -54,13 +55,13 @@ namespace :run_rspec do
   # Dynamically define Rake tasks for each example app found in the examples directory
   ExampleType.all.each do |example_type|
     desc "Runs RSpec for #{example_type.name_pretty} only"
-    task example_type.rspec_task_name_short => example_type.prepare_task_name do
+    task example_type.rspec_task_name_short => example_type.gen_task_name do
       run_tests_in(File.join(examples_dir, example_type.name)) # have to use relative path
     end
   end
 
   desc "Runs Rspec for example apps only"
-  task examples: "examples:prepare_all" do
+  task examples: "examples:gen_all" do
     ExampleType.all.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 

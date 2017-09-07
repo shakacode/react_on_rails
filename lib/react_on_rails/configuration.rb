@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+# NOTE: ReactOnRails::Utils.using_webpacker? always will return false when called here.
+
 module ReactOnRails
   def self.configure
     yield(configuration)
@@ -59,7 +61,7 @@ module ReactOnRails
   def self.ensure_webpack_generated_files_exists
     return unless @configuration.webpack_generated_files.empty?
 
-    files = ["webpack-bundle.js"]
+    files = ["hello-world-bundle.js"]
     if @configuration.server_bundle_js_file.present?
       files << @configuration.server_bundle_js_file
     end
@@ -81,6 +83,7 @@ module ReactOnRails
 
   def self.configuration
     @configuration ||= Configuration.new(
+      node_modules_location: "",
       generated_assets_dirs: nil,
 
       # generated_assets_dirs is deprecated
@@ -97,43 +100,45 @@ module ReactOnRails
       skip_display_none: nil,
 
       # skip_display_none is deprecated
-      webpack_generated_files: [],
+      webpack_generated_files: %w[manifest.json],
       rendering_extension: nil,
-      server_render_method: "",
+      server_render_method: "ExecJS",
       symlink_non_digested_assets_regex: nil,
-      npm_build_test_command: "",
+      build_test_command: "",
       i18n_dir: "",
       i18n_yml_dir: "",
-      npm_build_production_command: ""
+      build_production_command: ""
     )
   end
 
   class Configuration
-    attr_accessor :server_bundle_js_file, :prerender, :replay_console,
+    attr_accessor :node_modules_location, :server_bundle_js_file, :prerender, :replay_console,
                   :trace, :development_mode,
                   :logging_on_server, :server_renderer_pool_size,
                   :server_renderer_timeout, :skip_display_none, :raise_on_prerender_error,
                   :generated_assets_dirs, :generated_assets_dir,
-                  :webpack_generated_files, :rendering_extension, :npm_build_test_command,
-                  :npm_build_production_command,
+                  :webpack_generated_files, :rendering_extension, :build_test_command,
+                  :build_production_command,
                   :i18n_dir, :i18n_yml_dir,
                   :server_render_method, :symlink_non_digested_assets_regex
 
-    def initialize(server_bundle_js_file: nil, prerender: nil, replay_console: nil,
+    def initialize(node_modules_location: "", server_bundle_js_file: nil, prerender: nil,
+                   replay_console: nil,
                    trace: nil, development_mode: nil,
                    logging_on_server: nil, server_renderer_pool_size: nil,
-                   server_renderer_timeout: nil, raise_on_prerender_error: nil,
+                   server_renderer_timeout: nil, raise_on_prerender_error: true,
                    skip_display_none: nil, generated_assets_dirs: nil,
                    generated_assets_dir: nil, webpack_generated_files: nil,
-                   rendering_extension: nil, npm_build_test_command: nil,
-                   npm_build_production_command: nil,
+                   rendering_extension: nil, build_test_command: nil,
+                   build_production_command: nil,
                    i18n_dir: nil, i18n_yml_dir: nil,
-                   server_render_method: nil, symlink_non_digested_assets_regex: nil)
+                   server_render_method: "ExecJS", symlink_non_digested_assets_regex: nil)
+      self.node_modules_location = node_modules_location
       self.server_bundle_js_file = server_bundle_js_file
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir
-      self.npm_build_test_command = npm_build_test_command
-      self.npm_build_production_command = npm_build_production_command
+      self.build_test_command = build_test_command
+      self.build_production_command = build_production_command
       self.i18n_dir = i18n_dir
       self.i18n_yml_dir = i18n_yml_dir
 

@@ -3,7 +3,7 @@
 # Rake will automatically load any *.rake files inside of the "rakelib" folder
 # See rakelib/
 tasks = %w[run_rspec lint]
-prepare_for_ci = %w[node_package dummy_apps examples]
+prepare_for_ci = %w[node_package dummy_apps]
 
 if ENV["USE_COVERALLS"] == "TRUE"
   require "coveralls/rake/task"
