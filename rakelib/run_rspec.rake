@@ -20,9 +20,9 @@ namespace :run_rspec do
 
   desc "Run RSpec with rails32 gemfile"
   task :gem_rails32 do
-    rspec_args = "spec/react_on_rails --exclude-pattern "\
-                 "\"**/generators/*_spec.rb,**/utils_spec.rb,"\
-                 "**/webpack_assets_status_checker_spec.rb,**/test_helper/*_spec.rb\""
+    rspec_args = "spec/react_on_rails --tag ~webpacker --exclude-pattern "\
+                 "\"**/generators/*_spec.rb,"\
+                 "**/test_helper/webpack_*_spec.rb\""
     run_tests_in("",
                  rspec_args: rspec_args,
                  env_vars: "BUNDLE_GEMFILE=spec/dummy_no_webpacker/Gemfile.rails32")
