@@ -37,7 +37,7 @@ First be sure to run `rails -v` and check that you are using Rails 5.1.3 or abov
 This is the line where you turn server rendering on by setting prerender to true:
 
 ```
-<%%= react_component("<%= config[:component_name] %>", props: @hello_world_props, prerender: false) %>
+<%%= react_component("HelloWorld", props: @hello_world_props, prerender: false) %>
 ```
 
 ---------------
