@@ -10,6 +10,8 @@
 * See the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for migration instructions. 
 
 ## Steps to a New App with rails/webpacker v3 plus React on Rails v9.beta:
+First be sure `rails -v` and use Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with react per the instructions [here](https://github.com/rails/webpacker).
+
 1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory.
 2. Add beta gem version: `gem 'react_on_rails', '~> 9.0.0.beta.12'`
 3. Run the generator: `rails generate react_on_rails:install`
