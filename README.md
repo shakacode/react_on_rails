@@ -12,17 +12,33 @@
 ## Steps to a New App with rails/webpacker v3 plus React on Rails v9.beta:
 First be sure to run `rails -v` and check that you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
 
+### Basic installation
+
 1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory.
 2. Add beta gem version: `gem 'react_on_rails', '~> 9.0.0.beta.12'`
 3. Run the generator: `rails generate react_on_rails:install`
 4. Start the app: `foreman start -f Procfile.dev`
 5. Visit http://localhost:3000/hello_world
 
-Turn on HMR (Hot reloading)
+### Turn on HMR (Hot reloading)
+
 1. Edit `config/webpacker.yml` and set `hmr: true`
 2. Start the app: `foreman start -f Procfile.dev-server`
 3. Visit http://localhost:3000/hello_world
 4. Edit `app/javascript/bundles/HelloWorld/components/HelloWorld.jsx`, hit save, and see the screen update.
+
+### Turn on server rendering
+
+*Does not work with hot reloading, yet, per [Webpacker issue #732](https://github.com/rails/webpacker/issues/732)*
+
+1. Edit `app/views/hello_world/index.html.erb` and set `prerender` to `true`.
+2. Refresh the page.
+
+This is the line where you turn server rendering on by setting prerender to true:
+
+```
+<%%= react_component("<%= config[:component_name] %>", props: @hello_world_props, prerender: false) %>
+```
 
 ---------------
 
