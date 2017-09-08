@@ -22,7 +22,7 @@ _Note: some of the screen images below show the "npm" command. react_on_rails 6.
 
 ## Setting up the environment
 
-Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 4.x and node version 6+. I recommend `rvm` and `nvm` to install Ruby and Node, and [brew](https://brew.sh/) to install [yarn](https://yarnpkg.com/en/docs/install#mac-tab). Rails can be installed as an ordinary gem.
+Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 5.x and node version 6+. I recommend `rvm` and `nvm` to install Ruby and Node, and [brew](https://brew.sh/) to install [yarn](https://yarnpkg.com/en/docs/install#mac-tab). Rails can be installed as an ordinary gem.
 
 ```
 nvm install node                # download and install latest stable Node
@@ -39,7 +39,9 @@ gem install rails               # download and install latest stable Rails
 gem install foreman             # download and install Foreman
 ```
 
-Then we need to create a fresh Rails application with webpacker react support as following:
+Then we need to create a fresh Rails application with webpacker react support as following. Be sure that 
+
+First be sure to run `rails -v` and check you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with react per the instructions [here](https://github.com/rails/webpacker).
 
 ```
 cd <directory where you want to create your new Rails app>
@@ -50,7 +52,7 @@ rails new test-react-on-rails --webpack=react
 cd test-react-on-rails
 ```
 
-Note: you can do the following two commands in an existing Rails app:
+Note: you can do the following two commands in an existing Rails app or pre Rails 5.1.3:
 
 ```
 bundle exec rails webpacker:install
