@@ -19,7 +19,7 @@ module ReactOnRails
 
         server_bundle_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path
 
-        if Webpacker.dev_server.running?
+        if Utils.using_webpacker? && Webpacker.dev_server.running?
           return if @last_loaded_server_bundle == server_bundle_js_file_path
           @last_loaded_server_bundle = server_bundle_js_file_path
         else
