@@ -131,7 +131,7 @@ After checking out the repo, making sure you have rvm and nvm setup (setup ruby 
 Additionally, our RSpec tests use the poltergeist web driver. You will need to install the phantomjs node module:
 
 ```sh
-yarn global add phantomjs
+yarn global add phantomjs-prebuilt
 ```
 
 Note this *must* be installed globally for the dummy test project rspec runner to see it properly.
