@@ -72,11 +72,16 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       return @server_bundle_path if @server_bundle_path && !Rails.env.development?
 
       bundle_name = ReactOnRails.configuration.server_bundle_js_file
-      @server_bundle_path = begin
-        bundle_js_file_path(bundle_name)
-      rescue Webpacker::Manifest::MissingEntryError
-        Rails.root.join(File.join(Webpacker.config.public_output_path, bundle_name)).to_s
-      end
+      @server_bundle_path = if using_webpacker?
+                              begin
+                                bundle_js_file_path(bundle_name)
+                              rescue Webpacker::Manifest::MissingEntryError
+                                Rails.root.join(File.join(Webpacker.config.public_output_path,
+                                                          bundle_name)).to_s
+                              end
+                            else
+                              bundle_js_file_path(bundle_name)
+                            end
     end
 
     def self.bundle_js_file_path(bundle_name)

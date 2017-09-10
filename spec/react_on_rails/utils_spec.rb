@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
-require "webpacker"
 
 module ReactOnRails
   RSpec.describe Utils do
@@ -15,7 +14,7 @@ module ReactOnRails
         Utils.bundle_js_file_path("webpack-bundle.js")
       end
 
-      context "With Webpacker enabled and file in manifest" do
+      context "With Webpacker enabled and file in manifest", :webpacker do
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
           allow(Webpacker).to receive_message_chain("dev_server.running?")
@@ -43,7 +42,7 @@ module ReactOnRails
         Utils.server_bundle_js_file_path
       end
 
-      context "With Webpacker enabled and server file not in manifest" do
+      context "With Webpacker enabled and server file not in manifest", :webpacker do
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")

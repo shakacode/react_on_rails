@@ -74,6 +74,6 @@ group :test do
   gem "rspec-retry"
   gem "selenium-webdriver"
   gem "rails3-before_action"
-  gem 'test-unit', '~> 3.0'
+  gem 'test-unit', '~> 3.0', :require => false
   gem "equivalent-xml", github: "mbklein/equivalent-xml"
 end
