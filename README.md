@@ -3,19 +3,31 @@
 *If this projects helps you, please give us a star!*
 
 [rails/webpacker](https://github.com/rails/webpacker) just shipped 3.0. This now enables me to ship version 9.0. See [PR #908](https://github.com/shakacode/react_on_rails/pull/908) for more details.
-
 # React on Rails v9 is based on Webpacker 3.0!
 
+* See the article React on Rails plus Webpacker, Peanut Butter and Jelly for an overview of the integration of React on Rails with Webpacker (article coming soon).
 * See the updated [Tutorial](https://github.com/shakacode/react_on_rails/blob/master/docs/tutorial.md).
-* See the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for migration instructions. 
+* See the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for migration instructions.
 
-## Steps to a New App with rails/webpacker v3 plus React on Rails v9.beta:
+----
+
+Given that Webpacker already provides React integration, why would you add React on Rails? Additional features of React on Rails include:
+
+1. Server rendering, often for SEO optimization.
+2. Easy passing of props directly from your Rails view to your React components rather than having your Rails view load and then make a separate request to your API.
+3. Redux and React-Router integration
+4. Localization support
+5. Rspec test helpers to ensure your Webpack bundles are ready for tests
+
+---- 
+
+## Steps to a New App with rails/webpacker v3 plus React on Rails v9:
 First be sure to run `rails -v` and check that you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
 
 ### Basic installation
 
 1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory.
-2. Add beta gem version: `gem 'react_on_rails', '~> 9.0.0.beta.12'`
+2. Add gem version: `gem 'react_on_rails', '~> 9.0.1'`
 3. Run the generator: `rails generate react_on_rails:install`
 4. Start the app: `foreman start -f Procfile.dev`
 5. Visit http://localhost:3000/hello_world
@@ -270,10 +282,10 @@ React on Rails provides an option for automatic conversions of Rails `*.yml` loc
 See the [How to add I18n](docs/basics/i18n.md) for a summary of adding I18n.
 
 ## NPM
-All JavaScript in React On Rails is loaded from npm: [react-on-rails](https://www.npmjs.com/package/react-on-rails). To manually install this (you did not use the generator), assuming you have a standard configuration, run this command:
+All JavaScript in React On Rails is loaded from npm: [react-on-rails](https://www.npmjs.com/package/react-on-rails). To manually install this (you did not use the generator), assuming you have a standard configuration, run this command (assuming you are in the directory where you have your `node_modules`):
 
 ```bash
-cd client && yarn add react-on-rails
+yarn add react-on-rails
 ```
 
 That will install the latest version and update your package.json.
@@ -624,8 +636,6 @@ If you want to use a node server for server rendering, [get in touch](mailto:jus
 
 ## Additional Documentation
 **Try out our new [Documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) for improved readability & reference!**
-+ **Webpacker Lite**
-  + [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92)
 
 + **Rails**
   + [Rails Assets](./docs/additional-reading/rails-assets.md)
