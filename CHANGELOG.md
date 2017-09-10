@@ -8,6 +8,11 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
+### [9.0.1]
+
+#### Fixed
+- Fixes Rails 3.2 compatability issues. [PR 926](https://github.com/shakacode/react_on_rails/pull/926) by [morozovm](https://github.com/morozovm ) 
+
 ### [9.0.0]
 Updated React on Rails to depend on [rails/webpacker](https://github.com/rails/webpacker). [PR 908](https://github.com/shakacode/react_on_rails/pull/908) by [justin808](https://github.com/justin808).
 
@@ -97,11 +102,11 @@ gem "webpacker"
     
     
 ### [8.0.7]
-#### fixed
+#### Fixed
 - Fixes generator bug by keeping blank line at top in case existing .gitignore does not end in a newline. [#916](https://github.com/shakacode/react_on_rails/pull/916) by [justin808](https://github.com/justin808).
 
 ### [8.0.6]
-#### fixed
+#### Fixed
 - Fixes server rendering when using a CDN. Server rendering would try to fetch a file with the "asset_host". This change updates the webpacker_lite dependency to 2.1.0 which has a new helper `pack_path`. [#901](https://github.com/shakacode/react_on_rails/pull/901) by [justin808](https://github.com/justin808). Be sure to update webpacker_lite to 2.1.0.
 - The package.json file created by the generator now creates minified javascript production builds by default. This was done by adding the -p flag to webpack on the build:production script. [#895](https://github.com/shakacode/react_on_rails/pull/895) by [serodriguez68 ](https://github.com/serodriguez68)
 - Fixes GitUtils.uncommitted_changes? throwing an error when called in an environment without Git, and allows install generator to be run successfully with `--ignore-warnings` [#878](https://github.com/shakacode/react_on_rails/pull/878) by [jasonblalock](https://github.com/jasonblalock).
@@ -718,7 +723,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/9.0.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/9.0.1...master
+[9.0.1]: https://github.com/shakacode/react_on_rails/compare/9.0.0...9.0.1
 [9.0.0]: https://github.com/shakacode/react_on_rails/compare/8.0.7...9.0.0
 [8.0.7]: https://github.com/shakacode/react_on_rails/compare/8.0.6...8.0.7
 [8.0.6]: https://github.com/shakacode/react_on_rails/compare/8.0.5...8.0.6
