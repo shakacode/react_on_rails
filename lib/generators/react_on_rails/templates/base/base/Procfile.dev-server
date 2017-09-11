@@ -1,5 +1,7 @@
+# You can run these commands in separate shells instead of using foreman
 web: rails s -p 3000
 
 # Next line runs the webpack-dev-server
-# You can edit config/webpacker.yml to set HMR to true to see hot reloading
+# You can edit config/webpacker.yml to set HMR to true to see hot reloading.
+# Note,
 client: sh -c 'rm -rf public/packs/* || true && bundle exec rake react_on_rails:locale && bin/webpack-dev-server'
