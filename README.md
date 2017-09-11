@@ -5,7 +5,7 @@
 [rails/webpacker](https://github.com/rails/webpacker) just shipped 3.0. This now enables me to ship version 9.0. See [PR #908](https://github.com/shakacode/react_on_rails/pull/908) for more details.
 # React on Rails v9 is based on Webpacker 3.0!
 
-* See the article [Introducing React on Rails v9 with Webpacker Support](https://blog.shakacode.com/introducing-react-on-rails-v9-with-webpacker-support-f2584c6c8fa4), for an overview of the integration of React on Rails with Webpacker.
+* See the article [Introducing React on Rails v9 with Webpacker Support](https://blog.shakacode.com/introducing-react-on-rails-v9-with-webpacker-support-f2584c6c8fa4) for an overview of the integration of React on Rails with Webpacker.
 * [Video of running the v9 installer with Webpacker v3](https://youtu.be/M0WUM_XPaII).
 * See the updated [Tutorial](https://github.com/shakacode/react_on_rails/blob/master/docs/tutorial.md).
 * See the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for migration instructions.
