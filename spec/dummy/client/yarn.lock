@@ -4529,9 +4529,9 @@ react-hot-loader@^3.0.0-beta.6:
     redbox-react "^1.3.6"
     source-map "^0.4.4"
 
-react-on-rails@9.0.1:
-  version "9.0.1"
-  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-9.0.1.tgz#49bf7520866214e410e6f88b298e889183d93786"
+react-on-rails@9.0.2:
+  version "9.0.2"
+  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-9.0.2.tgz#fe33a52dd3fe36338d08c18adbf5bc2515de10db"
   dependencies:
     react-on-rails "^9.0.0-beta.12"
     react-redux "^5.0.6"
