@@ -19,7 +19,7 @@ export default function createReactElement({
   railsContext,
   domNodeId,
   trace,
-  }) {
+}) {
   const { name, component, generatorFunction } = componentObj;
 
   if (trace) {

@@ -5,7 +5,7 @@
 [rails/webpacker](https://github.com/rails/webpacker) just shipped 3.0. This now enables me to ship version 9.0. See [PR #908](https://github.com/shakacode/react_on_rails/pull/908) for more details.
 # React on Rails v9 is based on Webpacker 3.0!
 
-* See the article React on Rails plus Webpacker, Peanut Butter and Jelly for an overview of the integration of React on Rails with Webpacker (article coming soon).
+* See the article [Introducing React on Rails v9 with Webpacker Support](https://blog.shakacode.com/introducing-react-on-rails-v9-with-webpacker-support-f2584c6c8fa4),  for an overview of the integration of React on Rails with Webpacker. 
 * See the updated [Tutorial](https://github.com/shakacode/react_on_rails/blob/master/docs/tutorial.md).
 * See the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for migration instructions.
 
@@ -24,20 +24,14 @@ Given that Webpacker already provides React integration, why would you add React
 ## Steps to a New App with rails/webpacker v3 plus React on Rails v9:
 First be sure to run `rails -v` and check that you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
 
-### Basic installation
+### Basic installation for a new Rails App
+*See below for steps on an existing Rails app*
 
-1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory.
+1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory. 
 2. Add gem version: `gem 'react_on_rails', '~> 9.0.1'`
 3. Run the generator: `rails generate react_on_rails:install`
-4. Start the app: `foreman start -f Procfile.dev`
+4. Start the app: `rails s`
 5. Visit http://localhost:3000/hello_world
-
-### Turn on HMR (Hot reloading)
-
-1. Edit `config/webpacker.yml` and set `hmr: true`
-2. Start the app: `foreman start -f Procfile.dev-server`
-3. Visit http://localhost:3000/hello_world
-4. Edit `app/javascript/bundles/HelloWorld/components/HelloWorld.jsx`, hit save, and see the screen update.
 
 ### Turn on server rendering
 
@@ -126,7 +120,6 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 
 # NEWS
 * 2017-09-06: **VERSION 9.0.0 shipped!** This version depends on Webpacker directly. See the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for migration instructions.
-* [VERSION 8.1.0](https://rubygems.org/gems/react_on_rails/) shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) (soon [**webpacker**](https://github.com/rails/webpacker/issues/464#issuecomment-310986140) support! [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395) shows the changes needed to migrate from the Asset Pipeline to Webpacker Lite. For more information, see my article: [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92). Per recent discussions, we [will merge Webpacker Lite changes back into Webpacker](https://github.com/rails/webpacker/issues/464#issuecomment-310986140). There's no reason to wait for this. The upgrade will eventually be trivial.
 * The Docs here on `master` refer to 9.x including support for [rails/webpacker](https://github.com/rails/webpacker).
 *Use the [7.0.4 docs](https://github.com/shakacode/react_on_rails/tree/7.0.4) to refer to the older asset pipeline way.*
 * *See [NEWS.md](NEWS.md) for more notes over time.*
@@ -135,9 +128,9 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 
 # React on Rails
 
-**Project Objective**: To provide an opinionated and optimal framework for integrating Ruby on Rails with modern JavaScript tooling and libraries, including [**Webpack**](http://webpack.github.io/), [**Babel**](https://babeljs.io/), [**React**](https://facebook.github.io/react/), [**Redux**](https://github.com/reactjs/redux), [**React-Router**](https://github.com/reactjs/react-router). This differs significantly from typical Rails architecture. When considering what goes into **react_on_rails**, we ask ourselves, is the functionality related to the intersection of using Rails and modern JavaScript? If so, then the functionality belongs right here. In other cases, we're releasing separate npm packages or Ruby gems. If you are interested in implementing React using traditional Rails architecture, see [react-rails](https://github.com/reactjs/react-rails).
+**Project Objective**: To provide an opinionated and optimal framework for integrating Ruby on Rails with React via the [**Webpacker**](https://github.com/rails/webpacker) gem.
 
-React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x and greater is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering, using **execJS**. See the Rails on Maui [blog post](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/) that started it all!
+React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x and greater is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering, using **execJS**. 
 
 ## Table of Contents
 
@@ -188,9 +181,9 @@ Universal React with Rails: Part I](https://medium.com/@alexfedoseev/isomorphic-
 
 To upgrade existing apps to React on Rails 8 see the [Installation Overview](docs/basics/installation-overview.md)
 
-## Getting Started
+## Getting Started with an existing Rails app
 
-**For more detailed instructions**, see the [React on Rails Basic Tutorial](docs/tutorial.md).
+**For more detailed instructions on a fresh Rails app**, see the [React on Rails Basic Tutorial](docs/tutorial.md).
 
 1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `client/package.json` file.
 
