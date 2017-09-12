@@ -45,7 +45,7 @@ We'll use a Webpack Dev server on port 3500 to provide the assets to Rails, rath
    2. Start the rails server, setting an ENV value of REACT_ON_RAILS_ENV to HOT if we're hot loading or else setting this to blank.
 1. Configure the file Rails asset pipeline files:
    1. [app/assets/javascripts/application_static.js](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/assets/javascripts/application_static.js) 
-   1. [app/assets/stylesheets/application_static.css.scss](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/assets/stylesheets/application_static.css.scss)
+   1. [app/assets/stylesheets/application_non_webpack.scss](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/app/assets/stylesheets/application_non_webpack.scss)
 1. Copy the [client/server-rails-hot.js](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/server-rails-hot.js) to the your client directory.
 1. Copy the scripts in the top level and client level `package.json` files:
    1. Top Level: [package.json](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/package.json)
