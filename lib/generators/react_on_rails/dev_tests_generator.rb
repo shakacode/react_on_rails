@@ -5,18 +5,6 @@ require_relative "generator_helper"
 
 module ReactOnRails
   module Generators
-    # TODO9: Do we need something like this still? How to put in with
-    FALLBACK_OPTION_FOR_NODE_MODULES = <<-TEXT
-    // This fixes an issue with resolving 'react' when using a local symlinked version
-    // of the node_package folder
-    modules: [
-      path.join(__dirname, 'node_modules'),
-      'node_modules',
-    ],
-  },
-  plugins: [
-    TEXT
-
     class DevTestsGenerator < Rails::Generators::Base
       include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
