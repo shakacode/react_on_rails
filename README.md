@@ -36,7 +36,7 @@ First be sure to run `rails -v` and check that you are using Rails 5.1.3 or abov
 
 ### Turn on server rendering
 
-*Does not work with hot reloading, yet, per [Webpacker issue #732](https://github.com/rails/webpacker/issues/732)*
+*The rails/wepbacker default setup does not work with hot or live reloading, yet, per [Webpacker issue #842](https://github.com/rails/webpacker/issues/842). If you want the combination of both server rendering and hot reloading during development, you will need to a custom webpack setup as shown [here](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.client.rails.hot.config.js)*
 
 1. Edit `app/views/hello_world/index.html.erb` and set `prerender` to `true`.
 2. Refresh the page.
