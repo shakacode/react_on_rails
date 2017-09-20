@@ -8,6 +8,10 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
+### [9.0.3] - 2017-09-20
+#### Improved
+- Improved comments in generated Procfile.dev-server. [PR 940](https://github.com/shakacode/react_on_rails/pull/940) by [justin808](https://github.com/justin808 ) 
+
 ### [9.0.2] - 2017-09-10
 #### Fixed
 - Improved post install doc comments for generator. [PR 933](https://github.com/shakacode/react_on_rails/pull/933) by [justin808](https://github.com/justin808 ) 
@@ -727,7 +731,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/9.0.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/9.0.3...master
+[9.0.3]: https://github.com/shakacode/react_on_rails/compare/9.0.2...9.0.3
 [9.0.2]: https://github.com/shakacode/react_on_rails/compare/9.0.1...9.0.2
 [9.0.1]: https://github.com/shakacode/react_on_rails/compare/9.0.0...9.0.1
 [9.0.0]: https://github.com/shakacode/react_on_rails/compare/8.0.7...9.0.0
