@@ -161,7 +161,7 @@ React on Rails integrates Facebook's [React](https://github.com/facebook/react) 
 ---
 
 ## Features
-Like the [react-rails](https://github.com/reactjs/react-rails) gem, React on Rails is capable of server-side rendering with fragment caching and is compatible with [turbolinks](https://github.com/turbolinks/turbolinks). Unlike react-rails, which depends heavily on sprockets and jquery-ujs, React on Rails uses [webpack](http://webpack.github.io/) and does not depend on jQuery. While the initial setup is slightly more involved, it allows for advanced functionality such as:
+Like the [react-rails](https://github.com/reactjs/react-rails) gem, React on Rails is capable of server-side rendering with fragment caching and is compatible with [turbolinks](https://github.com/turbolinks/turbolinks). While the initial setup is slightly more involved, it allows for advanced functionality such as:
 
 + [Redux](https://github.com/reactjs/redux)
 + [Webpack optimization functionality](https://github.com/webpack/docs/wiki/optimization)
