@@ -33,7 +33,7 @@ For an example of upgrading, see [react-webpack-rails-tutorial/pull/416](https:/
   1. Added `config.node_modules_location` which defaults to `""` if Webpacker is installed. You may want to set this to 'client'` to `config/initializers/react_on_rails.rb` to keep your node_modules inside of `/client`
   2. Renamed
    * config.npm_build_test_command ==> config.build_test_command
-   * config.build_production_command ==> config.build_production_command
+   * config.npm_build_production_command ==> config.build_production_command
 
 - Update the gemfile. Switch over to using the webpacker gem.
 
