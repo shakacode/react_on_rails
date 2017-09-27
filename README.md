@@ -2,7 +2,8 @@
 
 *If this projects helps you, please give us a star!*
 
-[rails/webpacker](https://github.com/rails/webpacker) just shipped 3.0. This now enables me to ship version 9.0. See [PR #908](https://github.com/shakacode/react_on_rails/pull/908) for more details.
+[ShakaCode is hiring team members](http://www.shakacode.com/about/#work-with-us) for our own app, [Friends and Guests](https://www.friendsandguests.com).
+
 # React on Rails v9 is based on Webpacker 3.0!
 
 * See the article [Introducing React on Rails v9 with Webpacker Support](https://blog.shakacode.com/introducing-react-on-rails-v9-with-webpacker-support-f2584c6c8fa4) for an overview of the integration of React on Rails with Webpacker.
