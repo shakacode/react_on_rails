@@ -26,6 +26,10 @@ module ReactOnRails
         @dom_id ||= options.fetch(:id) { generate_unique_dom_id }
       end
 
+      def hash_result
+        retrieve_key(:hash_result)
+      end
+
       def html_options
         options[:html_options].to_h
       end
