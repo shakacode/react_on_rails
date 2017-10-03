@@ -105,8 +105,7 @@ feature "Pages/server_side_log_throw_raise" do
   subject { page }
   background { visit "/server_side_log_throw_raise" }
 
-  scenario "redirects to /client_side_hello_world and flashes an error" do
-    expect(current_path).to eq("/client_side_hello_world")
+  scenario "flashes an error" do
     flash_message = page.find(:css, ".flash").text
     expect(flash_message).to eq("Error prerendering in react_on_rails. See server logs.")
   end
@@ -190,9 +189,14 @@ end
 
 feature "returns hash if hash_result == true even with prerendering error", :js do
   subject { page }
-  background { visit "/broken_app" }
+  background {
+    begin
+      visit "/broken_app"
+    rescue Capybara::Poltergeist::JavascriptError
+    end
+  }
   scenario "react_component should return hash" do
-    expect(subject.html).to include("EXCEPTION in rendering!")
+    expect(subject.html).to include("Exception in rendering!")
   end
 end
 

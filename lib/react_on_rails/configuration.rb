@@ -114,26 +114,24 @@ module ReactOnRails
 
   class Configuration
     attr_accessor :node_modules_location, :server_bundle_js_file, :prerender, :replay_console,
-                  :trace, :development_mode,
-                  :logging_on_server, :server_renderer_pool_size,
+                  :trace, :development_mode, :logging_on_server, :server_renderer_pool_size,
                   :server_renderer_timeout, :skip_display_none, :raise_on_prerender_error,
-                  :generated_assets_dirs, :generated_assets_dir,
+                  :generated_assets_dirs, :generated_assets_dir, :hash_result,
                   :webpack_generated_files, :rendering_extension, :build_test_command,
-                  :build_production_command,
-                  :i18n_dir, :i18n_yml_dir,
+                  :build_production_command, :i18n_dir, :i18n_yml_dir,
                   :server_render_method, :symlink_non_digested_assets_regex
 
     def initialize(node_modules_location: "", server_bundle_js_file: nil, prerender: nil,
-                   replay_console: nil,
-                   trace: nil, development_mode: nil,
+                   replay_console: nil, trace: nil, development_mode: nil,
                    logging_on_server: nil, server_renderer_pool_size: nil,
                    server_renderer_timeout: nil, raise_on_prerender_error: true,
                    skip_display_none: nil, generated_assets_dirs: nil,
                    generated_assets_dir: nil, webpack_generated_files: nil,
                    rendering_extension: nil, build_test_command: nil,
-                   build_production_command: nil,
+                   build_production_command: nil, hash_result: nil,
                    i18n_dir: nil, i18n_yml_dir: nil,
-                   server_render_method: "ExecJS", symlink_non_digested_assets_regex: nil)
+                   server_render_method: "ExecJS",
+                   symlink_non_digested_assets_regex: nil)
       self.node_modules_location = node_modules_location
       self.server_bundle_js_file = server_bundle_js_file
       self.generated_assets_dirs = generated_assets_dirs
@@ -153,6 +151,7 @@ module ReactOnRails
                               end
       self.trace = trace.nil? ? Rails.env.development? : trace
       self.raise_on_prerender_error = raise_on_prerender_error
+      self.hash_result = hash_result
       self.skip_display_none = skip_display_none
 
       # Server rendering:
