@@ -94,7 +94,9 @@ module ReactOnRailsHelper
   #                   so long as you have the default configuration of logging_on_server set to
   #                   true, you'll still see the errors on the server.
   #   raise_on_prerender_error: <true/false> Default to false. True will raise exception on server
-  #      if the JS code throws
+  #                             if the JS code throws
+  #   hash_result: <true/false> Default to false. True will guarantee that react_component returns a hash_result
+  #                even if there is a prerendering error
   # Any other options are passed to the content tag, including the id.
   def react_component(component_name, raw_options = {})
     # Create the JavaScript and HTML to allow either client or server rendering of the
@@ -124,7 +126,12 @@ module ReactOnRailsHelper
                                                   trace: options.trace,
                                                   raise_on_prerender_error: options.raise_on_prerender_error)
 
-    server_rendered_html = result["html"]
+
+    if result["hasErrors"] && options.hash_result
+      server_rendered_html = Hash[COMPONENT_HTML_KEY, result["html"]]
+    else
+      server_rendered_html = result["html"]
+    end
     console_script = result["consoleReplayScript"]
 
     if server_rendered_html.is_a?(String)
