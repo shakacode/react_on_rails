@@ -188,6 +188,14 @@ feature "renderedHtml from generator function", :js do
   end
 end
 
+feature "returns hash if hash_result == true even with prerendering error", :js do
+  subject { page }
+  background { visit "/broken_app" }
+  scenario "react_component should return hash" do
+    expect(subject.html).to include("EXCEPTION in rendering!")
+  end
+end
+
 feature "generator function returns renderedHtml as an object with additional HTML markups" do
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
     subject { page }

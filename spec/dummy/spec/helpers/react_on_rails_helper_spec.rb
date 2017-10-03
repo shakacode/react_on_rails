@@ -165,14 +165,6 @@ data-dom-id="App-react-component-0">{}</script>
         expect(result).not_to match(/data-trace=/)
       end
     end
-
-    context "with 'hash_result' == true" do
-      it "returns a Hash" do
-        result = react_component("App", hash_result: true)
-
-        expect(result.class).to match(/Hash/)
-      end
-    end
   end
 
   describe "#redux_store" do
