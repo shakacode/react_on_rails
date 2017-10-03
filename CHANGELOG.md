@@ -54,7 +54,7 @@ gem "webpacker"
   - devBuild               ==> Use `const devBuild = process.env.NODE_ENV !== 'production';`
  
 - Edit your Webpack.config files:
-  - Change your Webpack output to be like:
+  - Change your Webpack output to be like this. **Be sure to have the hash or chunkhash in the filename,** unless the bundle is server side.:
     ```
     const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
     const configPath = resolve('..', 'config');
