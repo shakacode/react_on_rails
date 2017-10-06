@@ -14,7 +14,7 @@ module ReactOnRails
     end
 
     it "does not raises if the i18n directory does exist" do
-      dir = File.expand_path(File.dirname(__FILE__))
+      dir = __dir__
       expect do
         ReactOnRails.configure do |config|
           config.i18n_dir = dir
@@ -33,7 +33,7 @@ module ReactOnRails
     end
 
     it "does not raises if the i18n yaml directory does exist" do
-      dir = File.expand_path(File.dirname(__FILE__))
+      dir = __dir__
       expect do
         ReactOnRails.configure do |config|
           config.i18n_yml_dir = dir

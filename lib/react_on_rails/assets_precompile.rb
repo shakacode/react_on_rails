@@ -102,7 +102,7 @@ module ReactOnRails
         next unless File.lstat(filename).symlink?
         begin
           target = File.readlink(filename)
-        rescue
+        rescue # rubocop:disable Lint/RescueWithoutErrorClass
           puts "React on Rails: Warning: your platform doesn't support File::readlink method." /
                "Skipping broken link check."
           break
@@ -139,7 +139,7 @@ module ReactOnRails
       # pointing to. We can't use File.exist?, as that would check the file pointed at by the symlink.
       File.lstat(path)
       true
-    rescue
+    rescue # rubocop:disable Lint/RescueWithoutErrorClass
       false
     end
   end
