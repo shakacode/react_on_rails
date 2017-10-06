@@ -48,7 +48,7 @@ Please add the following content to your #{file} file:
   end
 
   def copy_file_and_missing_parent_directories(source_file, destination_file = nil)
-    destination_file = source_file unless destination_file
+    destination_file ||= source_file
     destination_path = Pathname.new(destination_file)
     parent_directories = destination_path.dirname
     empty_directory(parent_directories) unless dest_dir_exists?(parent_directories)

@@ -14,11 +14,9 @@ require "rspec/rails"
 require "capybara/rspec"
 require "capybara/rails"
 Capybara.javascript_driver = :selenium_chrome
-return if @selenium_chrome_registered
 Capybara.register_driver :selenium_chrome do |app|
   Capybara::Selenium::Driver.new(app, browser: :chrome)
 end
-@selenium_chrome_registered = true
 
 # Requires supporting ruby files with custom matchers and macros, etc, in
 # spec/support/ and its subdirectories. Files matching `spec/**/*_spec.rb` are

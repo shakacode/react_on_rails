@@ -25,6 +25,6 @@ namespace :assets do
   end
 
   task :clobber do
-    rm_r Dir.glob(Rails.root.join("app/assets/webpack/*"))
+    rm_r Dir.glob(Rails.root.join("app", "assets", "webpack", "*"))
   end
 end

@@ -3248,6 +3248,13 @@ react-on-rails@^9.0.0-beta.12:
     react-on-rails "^9.0.0-beta.12"
     react-redux "^5.0.6"
 
+react-on-rails@^9.0.3:
+  version "9.0.3"
+  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-9.0.3.tgz#da8a9873a94d62fe91e1f80d76716583f2be9da7"
+  dependencies:
+    react-on-rails "^9.0.0-beta.12"
+    react-redux "^5.0.6"
+
 react-proxy@^1.1.7:
   version "1.1.8"
   resolved "https://registry.yarnpkg.com/react-proxy/-/react-proxy-1.1.8.tgz#9dbfd9d927528c3aa9f444e4558c37830ab8c26a"
