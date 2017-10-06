@@ -1,6 +1,6 @@
 Here is the full set of config options.
 
-```yaml
+```ruby
 # frozen_string_literal: true
 
 # NOTE: you typically will leave the commented out configurations set to their defaults.
