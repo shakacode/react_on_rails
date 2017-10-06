@@ -98,8 +98,8 @@ module ReactOnRailsHelper
   # Any other options are passed to the content tag, including the id.
   def react_component(component_name, raw_options = {})
     internal_result = internal_react_component(component_name, raw_options)
-    server_rendered_html = internal_result.dig("result", "html")
-    console_script = internal_result.dig("result", "consoleReplayScript")
+    server_rendered_html = internal_result["result"]["html"]
+    console_script = internal_result["result"]["consoleReplayScript"]
 
     if server_rendered_html.is_a?(String)
       build_react_component_result_for_server_rendered_string(
@@ -123,8 +123,8 @@ module ReactOnRailsHelper
 
   def react_component_hash(component_name, raw_options = {})
     internal_result = internal_react_component(component_name, raw_options)
-    server_rendered_html = internal_result.dig("result", "html")
-    console_script = internal_result.dig("result", "consoleReplayScript")
+    server_rendered_html = internal_result["result"]["html"]
+    console_script = internal_result["result"]["consoleReplayScript"]
 
     if server_rendered_html.is_a?(Hash)
       build_react_component_result_for_server_rendered_hash(
@@ -171,7 +171,9 @@ module ReactOnRailsHelper
   # that contains a data props.
   def redux_store_hydration_data
     return if @registered_stores_defer_render.blank?
-    @registered_stores_defer_render.reduce(+"") do |accum, redux_store_data|
+    # rubocop:disable Performance/UnfreezeString
+    @registered_stores_defer_render.reduce("".dup) do |accum, redux_store_data|
+      # rubocop:enable Performance/UnfreezeString
       accum << render_redux_store_data(redux_store_data)
     end.html_safe
   end
@@ -438,13 +440,15 @@ module ReactOnRailsHelper
 
   def initialize_redux_stores
     return "" unless @registered_stores.present? || @registered_stores_defer_render.present?
-    declarations = +"var reduxProps, store, storeGenerator;\n"
+    declarations = "var reduxProps, store, storeGenerator;\n".dup # rubocop:disable Performance/UnfreezeString
 
     all_stores = (@registered_stores || []) + (@registered_stores_defer_render || [])
 
-    result = +<<-JS
+    # rubocop:disable Performance/UnfreezeString
+    result = <<-JS.dup
       ReactOnRails.clearHydratedStores();
     JS
+    # rubocop:enable Performance/UnfreezeString
 
     result << all_stores.each_with_object(declarations) do |redux_store_data, memo|
       store_name = redux_store_data[:store_name]
