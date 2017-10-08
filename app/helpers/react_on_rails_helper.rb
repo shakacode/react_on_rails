@@ -109,7 +109,7 @@ module ReactOnRailsHelper
         options: internal_result["options"]
       )
     elsif server_rendered_html.is_a?(Hash)
-      puts "[DEPRECATION] ReactOnRails: Use react_component_hash for generator function support"
+      puts "[DEPRECATION] ReactOnRails: Use react_component_hash to return a Hash to your ruby view code"
       build_react_component_result_for_server_rendered_hash(
         server_rendered_html: server_rendered_html,
         component_specification_tag: internal_result["tag"],
@@ -117,7 +117,10 @@ module ReactOnRailsHelper
         options: internal_result["options"]
       )
     else
-      raise "server_rendered_html expected to be a String."
+      raise "server_rendered_html is expected to be a String. If you're trying to use a generator function to
+      return a Hash to your ruby view code, then use react_component_hash instead of react_component and
+      see https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+      for an example of the necessary javascript configuration."
     end
   end
 
@@ -134,9 +137,9 @@ module ReactOnRailsHelper
         options: internal_result["options"]
       )
     else
-      raise "server_rendered_html expected to be a Hash. See
+      raise "Generator function is expected to return an Object. See
       https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
-      for an example of the necessary configuration."
+      for an example of the necessary javascript configuration."
     end
   end
 

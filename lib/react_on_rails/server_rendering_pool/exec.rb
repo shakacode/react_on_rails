@@ -54,7 +54,7 @@ module ReactOnRails
           console_script = result["consoleReplayScript"]
           console_script_lines = console_script.split("\n")
           console_script_lines = console_script_lines[2..-2]
-          re = /console\.log\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
+          re = /console\.(log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
           if console_script_lines
             console_script_lines.each do |line|
               match = re.match(line)

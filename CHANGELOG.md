@@ -8,18 +8,26 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
 
+### [10.0.0] - 2017-10-08
+#### Created
+- Created `react_component_hash` method for react_helmet support.
+#### Deprecated
+- Deprecated `react_component` functionality for react_helmet support.
+To clarify, the method itself is not deprecated, only certain functionality which has been moved to `react_component_hash`
+[PR 951](https://github.com/shakacode/react_on_rails/pull/951) by [Judahmeek](https://github.com/Judahmeek)
+
 ### [9.0.3] - 2017-09-20
 #### Improved
-- Improved comments in generated Procfile.dev-server. [PR 940](https://github.com/shakacode/react_on_rails/pull/940) by [justin808](https://github.com/justin808 ) 
+- Improved comments in generated Procfile.dev-server. [PR 940](https://github.com/shakacode/react_on_rails/pull/940) by [justin808](https://github.com/justin808 )
 
 ### [9.0.2] - 2017-09-10
 #### Fixed
-- Improved post install doc comments for generator. [PR 933](https://github.com/shakacode/react_on_rails/pull/933) by [justin808](https://github.com/justin808 ) 
+- Improved post install doc comments for generator. [PR 933](https://github.com/shakacode/react_on_rails/pull/933) by [justin808](https://github.com/justin808 )
 
 ### [9.0.1] - 2017-09-10
 
 #### Fixed
-- Fixes Rails 3.2 compatability issues. [PR 926](https://github.com/shakacode/react_on_rails/pull/926) by [morozovm](https://github.com/morozovm ) 
+- Fixes Rails 3.2 compatability issues. [PR 926](https://github.com/shakacode/react_on_rails/pull/926) by [morozovm](https://github.com/morozovm )
 
 ### [9.0.0] - 2017-09-06
 Updated React on Rails to depend on [rails/webpacker](https://github.com/rails/webpacker). [PR 908](https://github.com/shakacode/react_on_rails/pull/908) by [justin808](https://github.com/justin808).
@@ -52,7 +60,7 @@ gem "webpacker"
   - manifest               ==> Remove this one. We use the default for Webpack of manifest.json
   - env                    ==> Use `const { env } = require('process');`
   - devBuild               ==> Use `const devBuild = process.env.NODE_ENV !== 'production';`
- 
+
 - Edit your Webpack.config files:
   - Change your Webpack output to be like this. **Be sure to have the hash or chunkhash in the filename,** unless the bundle is server side.:
     ```
@@ -65,7 +73,7 @@ gem "webpacker"
     output: {
       filename: isHMR ? '[name]-[hash].js' : '[name]-[chunkhash].js',
       chunkFilename: '[name]-[chunkhash].chunk.js',
-   
+
       publicPath: output.publicPath,
       path: output.path,
     },
@@ -102,13 +110,13 @@ gem "webpacker"
   - See the example `spec/dummy/config/webpacker.yml`.
   - Remove keys `hot_reloading_host` and `hot_reloading_enabled_by_default`. These are replaced by the `dev_server` key.
   - Rename `webpack_public_output_dir` to `public_output_path`.
-  
+
 - Edit your Procfile.dev
   - Remove the env value WEBPACKER_DEV_SERVER as it's not used
   - For hot loading:
     - Set the `hmr` key in your `webpacker.yml` to `true`.
-    
-    
+
+
 ### [8.0.7] - 2017-08-16
 #### Fixed
 - Fixes generator bug by keeping blank line at top in case existing .gitignore does not end in a newline. [#916](https://github.com/shakacode/react_on_rails/pull/916) by [justin808](https://github.com/justin808).
