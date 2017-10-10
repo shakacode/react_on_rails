@@ -87,6 +87,6 @@ Run:
 
 ```
 bundle
-bin/rake db:migrate
 bin/rake db:setup
+bin/rake db:migrate
 ```
