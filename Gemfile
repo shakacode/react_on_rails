@@ -38,7 +38,7 @@ gem "chromedriver-helper"
 gem "launchy"
 gem "poltergeist"
 gem "selenium-webdriver"
-gem "webpacker", "3.0.2"
+gem "webpacker", "3.0.1"
 
 # TODO: remove once we get out of beta.
 # gem 'webpacker', path: "../../forks/webpacker"
