@@ -4529,16 +4529,23 @@ react-hot-loader@^3.0.0-beta.6:
     redbox-react "^1.3.6"
     source-map "^0.4.4"
 
-react-on-rails@9.0.3:
-  version "9.0.3"
-  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-9.0.3.tgz#da8a9873a94d62fe91e1f80d76716583f2be9da7"
+react-on-rails@10.0.0:
+  version "10.0.0"
+  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-10.0.0.tgz#afc658bf23f5dfe3fd836adc178eb4672727a89d"
   dependencies:
-    react-on-rails "^9.0.0-beta.12"
+    react-on-rails "^9.0.3"
     react-redux "^5.0.6"
 
 react-on-rails@^9.0.0-beta.12:
   version "9.0.0-rc.0"
   resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-9.0.0-rc.0.tgz#5b62bfe1f5cf99c428b0daa02de492a66c33c58e"
+  dependencies:
+    react-on-rails "^9.0.0-beta.12"
+    react-redux "^5.0.6"
+
+react-on-rails@^9.0.3:
+  version "9.0.3"
+  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-9.0.3.tgz#da8a9873a94d62fe91e1f80d76716583f2be9da7"
   dependencies:
     react-on-rails "^9.0.0-beta.12"
     react-redux "^5.0.6"
