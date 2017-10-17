@@ -142,7 +142,8 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.bundle_js_file_path_from_webpacker(bundle_name)
-      hashed_bundle_name = Webpacker.manifest.lookup!(bundle_name)
+      possible_result = Webpacker.manifest.lookup(bundle_name)
+      hashed_bundle_name = possible_result.nil? ? Webpacker.manifest.lookup!(bundle_name) : possible_result
       if Webpacker.dev_server.running?
         result = "#{Webpacker.dev_server.protocol}://#{Webpacker.dev_server.host_with_port}#{hashed_bundle_name}"
         result
