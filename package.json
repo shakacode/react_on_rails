@@ -45,7 +45,6 @@
     "js-yaml": ">= 3.0.0",
     "react": ">= 0.14",
     "react-dom": ">= 0.14",
-    "webpacker": ">= 3.0.0"
   },
   "files": [
     "node_package/lib",
