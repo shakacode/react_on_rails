@@ -12,8 +12,8 @@ module ReactOnRails
     shared_examples "locale to js" do
       context "with obsolete js files" do
         before do
-          FileUtils.touch(translations_path, mtime: Time.now - 1.year)
-          FileUtils.touch(en_path, mtime: Time.now - 1.month)
+          FileUtils.touch(translations_path, mtime: Time.current - 1.year)
+          FileUtils.touch(en_path, mtime: Time.current - 1.month)
         end
 
         it "updates files" do
@@ -36,10 +36,10 @@ module ReactOnRails
         end
 
         it "doesn't update files" do
-          ref_time = Time.now - 1.minute
+          ref_time = Time.current - 1.minute
           FileUtils.touch(translations_path, mtime: ref_time)
 
-          update_time = Time.now
+          update_time = Time.current
           ReactOnRails::LocalesToJs.new
           expect(update_time).to be > File.mtime(translations_path)
         end

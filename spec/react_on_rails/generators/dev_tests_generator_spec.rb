@@ -34,7 +34,7 @@ describe DevTestsGenerator, type: :generator do
       assert_file("Gemfile") do |contents|
         assert_match("gem 'rspec-rails', group: :test", contents)
         assert_match("gem 'coveralls', require: false", contents)
-        assert_match("gem 'poltergeist'", contents)
+        assert_match("gem 'chromedriver-helper', group: :test", contents)
       end
     end
   end

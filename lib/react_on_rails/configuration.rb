@@ -21,7 +21,7 @@ module ReactOnRails
   end
 
   def self.check_i18n_directory_exists
-    return unless @configuration.i18n_dir.present?
+    return if @configuration.i18n_dir.blank?
     return if Dir.exist?(@configuration.i18n_dir)
 
     raise "Error configuring /config/react_on_rails.rb: invalid value for `config.i18n_dir`. "\
@@ -30,7 +30,7 @@ module ReactOnRails
   end
 
   def self.check_i18n_yml_directory_exists
-    return unless @configuration.i18n_yml_dir.present?
+    return if @configuration.i18n_yml_dir.blank?
     return if Dir.exist?(@configuration.i18n_yml_dir)
 
     raise "Error configuring /config/react_on_rails.rb: invalid value for `config.i18n_yml_dir`. "\
@@ -39,14 +39,14 @@ module ReactOnRails
   end
 
   def self.ensure_generated_assets_dir_present
-    return unless @configuration.generated_assets_dir.blank?
+    return if @configuration.generated_assets_dir.present?
 
     @configuration.generated_assets_dir = DEFAULT_GENERATED_ASSETS_DIR
     puts "ReactOnRails: Set generated_assets_dir to default: #{DEFAULT_GENERATED_ASSETS_DIR}"
   end
 
   def self.configure_generated_assets_dirs_deprecation
-    return unless @configuration.generated_assets_dirs.present?
+    return if @configuration.generated_assets_dirs.blank?
 
     puts "[DEPRECATION] ReactOnRails: Use config.generated_assets_dir rather than "\
         "generated_assets_dirs"

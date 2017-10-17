@@ -49,9 +49,8 @@ module ReactOnRails
       end
 
       # Options we pass when running `rails new` from the command-line.
-      # The webpack=react option is key.
       def rails_options
-        "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record --webpack=react"
+        "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record"
       end
 
       %w[gen clobber npm_install build_webpack_bundles].each do |task_type|

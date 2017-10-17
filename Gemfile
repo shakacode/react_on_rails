@@ -16,7 +16,7 @@ gem "mini_racer"
 gem "puma"
 gem "rails", "5.1.2"
 gem "rails_12factor"
-gem "rubocop", require: false
+gem "rubocop", "~> 0.50", require: false
 gem "ruby-lint", require: false
 gem "sass-rails", "~> 5.0"
 gem "scss_lint", require: false
@@ -38,7 +38,7 @@ gem "chromedriver-helper"
 gem "launchy"
 gem "poltergeist"
 gem "selenium-webdriver"
-gem "webpacker", "~> 3.0"
+gem "webpacker", "3.0.2"
 
 # TODO: remove once we get out of beta.
 # gem 'webpacker', path: "../../forks/webpacker"

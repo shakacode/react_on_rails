@@ -54,7 +54,7 @@ module ReactOnRails
           console_script = result["consoleReplayScript"]
           console_script_lines = console_script.split("\n")
           console_script_lines = console_script_lines[2..-2]
-          re = /console\.log\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
+          re = /console\.(log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
           if console_script_lines
             console_script_lines.each do |line|
               match = re.match(line)
@@ -98,7 +98,7 @@ module ReactOnRails
           # bundle_js_code = File.read(server_js_file)
           begin
             bundle_js_code = open(server_js_file, &:read)
-          rescue => e
+          rescue # rubocop:disable Lint/RescueWithoutErrorClass => e
             msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
                 "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\
                 "avoid this warning.\nError is: #{e}"
@@ -115,7 +115,7 @@ module ReactOnRails
           begin
             trace_messsage(base_js_code, file_name)
             ExecJS.compile(base_js_code)
-          rescue => e
+          rescue # rubocop:disable Lint/RescueWithoutErrorClass => e
             msg = "ERROR when compiling base_js_code! "\
               "See file #{file_name} to "\
               "correlate line numbers of error. Error is\n\n#{e.message}"\

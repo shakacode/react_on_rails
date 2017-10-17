@@ -97,52 +97,49 @@ module ReactOnRailsHelper
   #      if the JS code throws
   # Any other options are passed to the content tag, including the id.
   def react_component(component_name, raw_options = {})
-    # Create the JavaScript and HTML to allow either client or server rendering of the
-    # react_component.
-    #
-    # Create the JavaScript setup of the global to initialize the client rendering
-    # (re-hydrate the data). This enables react rendered on the client to see that the
-    # server has already rendered the HTML.
-
-    options = ReactOnRails::ReactComponent::Options.new(name: component_name, options: raw_options)
-
-    # Setup the page_loaded_js, which is the same regardless of prerendering or not!
-    # The reason is that React is smart about not doing extra work if the server rendering did its job.
-    component_specification_tag = content_tag(:script,
-                                              json_safe_and_pretty(options.props).html_safe,
-                                              type: "application/json",
-                                              class: "js-react-on-rails-component",
-                                              "data-component-name" => options.name,
-                                              "data-trace" => (options.trace ? true : nil),
-                                              "data-dom-id" => options.dom_id)
-
-    # Create the HTML rendering part
-    result = server_rendered_react_component_html(options.props,
-                                                  options.name,
-                                                  options.dom_id,
-                                                  prerender: options.prerender,
-                                                  trace: options.trace,
-                                                  raise_on_prerender_error: options.raise_on_prerender_error)
-
-    server_rendered_html = result["html"]
-    console_script = result["consoleReplayScript"]
+    internal_result = internal_react_component(component_name, raw_options)
+    server_rendered_html = internal_result["result"]["html"]
+    console_script = internal_result["result"]["consoleReplayScript"]
 
     if server_rendered_html.is_a?(String)
       build_react_component_result_for_server_rendered_string(
         server_rendered_html: server_rendered_html,
-        component_specification_tag: component_specification_tag,
+        component_specification_tag: internal_result["tag"],
         console_script: console_script,
-        options: options
+        options: internal_result["options"]
       )
     elsif server_rendered_html.is_a?(Hash)
+      puts "[DEPRECATION] ReactOnRails: Use react_component_hash to return a Hash to your ruby view code"
       build_react_component_result_for_server_rendered_hash(
         server_rendered_html: server_rendered_html,
-        component_specification_tag: component_specification_tag,
+        component_specification_tag: internal_result["tag"],
         console_script: console_script,
-        options: options
+        options: internal_result["options"]
       )
     else
-      raise "server_rendered_html expected to be a String or a Hash."
+      raise "server_rendered_html is expected to be a String. If you're trying to use a generator function to
+      return a Hash to your ruby view code, then use react_component_hash instead of react_component and
+      see https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+      for an example of the necessary javascript configuration."
+    end
+  end
+
+  def react_component_hash(component_name, raw_options = {})
+    internal_result = internal_react_component(component_name, raw_options)
+    server_rendered_html = internal_result["result"]["html"]
+    console_script = internal_result["result"]["consoleReplayScript"]
+
+    if server_rendered_html.is_a?(Hash)
+      build_react_component_result_for_server_rendered_hash(
+        server_rendered_html: server_rendered_html,
+        component_specification_tag: internal_result["tag"],
+        console_script: console_script,
+        options: internal_result["options"]
+      )
+    else
+      raise "Generator function is expected to return an Object. See
+      https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+      for an example of the necessary javascript configuration."
     end
   end
 
@@ -177,7 +174,9 @@ module ReactOnRailsHelper
   # that contains a data props.
   def redux_store_hydration_data
     return if @registered_stores_defer_render.blank?
+    # rubocop:disable Performance/UnfreezeString
     @registered_stores_defer_render.reduce("".dup) do |accum, redux_store_data|
+      # rubocop:enable Performance/UnfreezeString
       accum << render_redux_store_data(redux_store_data)
     end.html_safe
   end
@@ -327,6 +326,37 @@ module ReactOnRailsHelper
     "#{rails_context_content}\n#{render_value}".html_safe
   end
 
+  def internal_react_component(component_name, raw_options = {})
+    # Create the JavaScript and HTML to allow either client or server rendering of the
+    # react_component.
+    #
+    # Create the JavaScript setup of the global to initialize the client rendering
+    # (re-hydrate the data). This enables react rendered on the client to see that the
+    # server has already rendered the HTML.
+
+    options = ReactOnRails::ReactComponent::Options.new(name: component_name, options: raw_options)
+
+    # Setup the page_loaded_js, which is the same regardless of prerendering or not!
+    # The reason is that React is smart about not doing extra work if the server rendering did its job.
+    component_specification_tag = content_tag(:script,
+                                              json_safe_and_pretty(options.props).html_safe,
+                                              type: "application/json",
+                                              class: "js-react-on-rails-component",
+                                              "data-component-name" => options.name,
+                                              "data-trace" => (options.trace ? true : nil),
+                                              "data-dom-id" => options.dom_id)
+
+    # Create the HTML rendering part
+    result = server_rendered_react_component_html(options.props,
+                                                  options.name,
+                                                  options.dom_id,
+                                                  prerender: options.prerender,
+                                                  trace: options.trace,
+                                                  raise_on_prerender_error: options.raise_on_prerender_error)
+
+    { "options" => options, "tag" => component_specification_tag, "result" => result }
+  end
+
   def render_redux_store_data(redux_store_data)
     result = content_tag(:script,
                          json_safe_and_pretty(redux_store_data[:props]).html_safe,
@@ -413,13 +443,15 @@ module ReactOnRailsHelper
 
   def initialize_redux_stores
     return "" unless @registered_stores.present? || @registered_stores_defer_render.present?
-    declarations = "var reduxProps, store, storeGenerator;\n".dup
+    declarations = "var reduxProps, store, storeGenerator;\n".dup # rubocop:disable Performance/UnfreezeString
 
     all_stores = (@registered_stores || []) + (@registered_stores_defer_render || [])
 
+    # rubocop:disable Performance/UnfreezeString
     result = <<-JS.dup
       ReactOnRails.clearHydratedStores();
     JS
+    # rubocop:enable Performance/UnfreezeString
 
     result << all_stores.each_with_object(declarations) do |redux_store_data, memo|
       store_name = redux_store_data[:store_name]

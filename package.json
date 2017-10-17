@@ -42,6 +42,7 @@
   },
   "peerDependencies": {
     "babel-runtime": ">= 6",
+    "js-yaml": ">= 3.0.0",
     "react": ">= 0.14",
     "react-dom": ">= 0.14"
   },
@@ -87,7 +88,7 @@
   },
   "homepage": "https://github.com/shakacode/react_on_rails#readme",
   "dependencies": {
-    "react-on-rails": "^9.0.0-beta.12",
+    "react-on-rails": "^9.0.3",
     "react-redux": "^5.0.6"
   }
 }

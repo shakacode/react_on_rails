@@ -34,7 +34,7 @@ AllCops:
     - 'gen-examples/examples/**/.*'
     - 'gen-examples/examples/**/*'
 
-Style/FileName:
+Naming/FileName:
   Exclude:
     - 'Gemfile'
     - 'spec/dummy/Gemfile'

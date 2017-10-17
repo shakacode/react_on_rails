@@ -21,7 +21,7 @@ Given that Webpacker already provides React integration, why would you add React
 4. Localization support
 5. Rspec test helpers to ensure your Webpack bundles are ready for tests
 
----- 
+----
 
 ## Steps to a New App with rails/webpacker v3 plus React on Rails v9:
 First be sure to run `rails -v` and check that you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
@@ -29,7 +29,7 @@ First be sure to run `rails -v` and check that you are using Rails 5.1.3 or abov
 ### Basic installation for a new Rails App
 *See below for steps on an existing Rails app*
 
-1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory. 
+1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory.
 2. Add gem version: `gem 'react_on_rails', '~> 9.0.1'`
 3. Run the generator: `rails generate react_on_rails:install`
 4. Start the app: `rails s`
@@ -132,7 +132,7 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 
 **Project Objective**: To provide an opinionated and optimal framework for integrating Ruby on Rails with React via the [**Webpacker**](https://github.com/rails/webpacker) gem.
 
-React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x and greater is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering, using **execJS**. 
+React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x and greater is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-redux) are supported as well, also with server rendering, using **execJS**.
 
 ## Table of Contents
 
@@ -198,7 +198,7 @@ To upgrade existing apps to React on Rails 8 see the [Installation Overview](doc
    ```
    bundle exec rails webpacker:install
    bundle exec rails webpacker:install:react
-   
+
    ```
 
 2. Commit this to git (or else you cannot run the generator unless you pass the option `--ignore-warnings`).
@@ -223,7 +223,7 @@ To upgrade existing apps to React on Rails 8 see the [Installation Overview](doc
   foreman start -f Procfile.dev
   ```
 
-8. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world). Note, `foreman` defaults to PORT 5000 unless you set the value of PORT in your environment. For example, you can `export PORT=3000` to use the Rails default port of 3000. For the hello_world example this is already set.
+8. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world). Note: `foreman` defaults to PORT 5000 unless you set the value of PORT in your environment. For example, you can `export PORT=3000` to use the Rails default port of 3000. For the hello_world example this is already set.
 
 ### Installation Overview
 
@@ -304,7 +304,7 @@ In the following screenshot you can see the 3 parts of React on Rails rendering:
 
 1. A hidden HTML div contains the properties of the React component, such as the registered name and any props. A JavaScript function runs after the page loads to take this data and build initialize React components.
 2. The wrapper div `<div id="HelloWorld-react-component-0">` specifies the div where to place the React rendering. It encloses the server-rendered HTML for the React component
-3. Additional JavaScript is placed to console-log any messages, such as server rendering errors. Note, these server side logs can be configured only to be sent to the server logs.
+3. Additional JavaScript is placed to console-log any messages, such as server rendering errors. Note: these server side logs can be configured only to be sent to the server logs.
 
 **Note**:
 
@@ -334,6 +334,8 @@ Another reason to use a generator function is that sometimes in server rendering
 
 For server rendering, if you wish to return multiple HTML strings from a generator function, you may return an Object from your generator function with a single top level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
 { renderedHtml: { componentHtml, customKey1, customKey2} }
+
+Note: The functionality in the above paragraph requires the use of our new `react_component_hash` method. Said functionality in our `react_component` method is now deprecated.
 
 ### Rails Context and Generator Functions
 When you use a "generator function" to create react components (or renderedHtml on the server), or you used shared redux stores, you get two params passed to your function that creates a React component:
@@ -373,9 +375,9 @@ and, similarly, any redux store always initialized with 2 parameters:
 reduxStore = MyReduxStore(props, railsContext);
 ```
 
-Note, you never make these calls. React on Rails makes these calls when it does either client or server rendering. You will define functions that take these 2 params and return a React component or a Redux Store. Naturally, you do not have to use second parameter of the railsContext if you do not need it.
+Note: you never make these calls. React on Rails makes these calls when it does either client or server rendering. You will define functions that take these 2 params and return a React component or a Redux Store. Naturally, you do not have to use second parameter of the railsContext if you do not need it.
 
-(Note, see below [section](#multiple-react-components-on-a-page-with-one-store) on how to setup redux stores that allow multiple components to talk to the same store.)
+(Note: see below [section](#multiple-react-components-on-a-page-with-one-store) on how to setup redux stores that allow multiple components to talk to the same store.)
 
 The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](https://github.com/shakacode/react_on_rails/tree/master/app/helpers/react_on_rails_helper.rb), method `rails_context` for the definitive list).
 
@@ -391,7 +393,7 @@ The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](h
     search: uri.query, # id=30&limit=5
 
     # Other
-    serverSide: boolean # Are we being called on the server or client? NOTE, if you conditionally
+    serverSide: boolean # Are we being called on the server or client? Note: if you conditionally
      # render something different on the server than the client, then React will only show the
      # server version!
   }
@@ -469,7 +471,7 @@ This is how to expose a component to the `react_component` view helper.
 
 You may want different initialization for your server-rendered components. For example, if you have an animation that runs when a component is displayed, you might need to turn that off when server rendering. However, the `railsContext` will tell you if your JavaScript code is running client side or server side. So code that required a different server bundle previously may no longer require this!
 
-If you want different code to run, you'd set up a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverHelloWorld.jsx'. Note, you might be initializing HelloWorld with version specialized for server rendering.
+If you want different code to run, you'd set up a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverHelloWorld.jsx'. Note: you might be initializing HelloWorld with version specialized for server rendering.
 
 #### Renderer Functions
 A renderer function is a generator function that accepts three arguments: `(props, railsContext, domNodeId) => { ... }`. Instead of returning a React component, a renderer is responsible for calling `ReactDOM.render` to render a React component into the dom. Why would you want to call `ReactDOM.render` yourself? One possible use case is [code splitting](./docs/additional-reading/code-splitting.md).
@@ -497,7 +499,7 @@ react_component(component_name,
   + **prerender:** enable server-side rendering of a component. Set to false when debugging!
   + **id:** Id for the div, will be used to attach the React component. This will get assigned automatically if you do not provide an id. Must be unique.
   + **html_options:** Any other HTML options get placed on the added div for the component. For example, you can set a class (or inline style) on the outer div so that it behaves like a span, with the styling of `display:inline-block`.
-  + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise. Note, on the client, you will see both the `railsContext` and your props. On the server, you only see the `railsContext` being logged.
+  + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise. Note: on the client, you will see both the `railsContext` and your props. On the server, you only see the `railsContext` being logged.
   + **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the default configuration of `logging_on_server` set to true, you'll still see the errors on the server.
   + **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
 
@@ -512,19 +514,19 @@ Include the module `ReactOnRails::Controller` in your controller, probably in Ap
   2. In your component definition, you'll call `ReactOnRails.getStore('storeName')` to get the hydrated Redux store to attach to your components.
 + **props:**  Named parameter `props`. ReactOnRails takes care of setting up the hydration of your store with props from the view.
 
-For an example, see [spec/dummy/app/controllers/pages_controller.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/controllers/pages_controller.rb). Note, this is preferable to using the equivalent view_helper `redux_store` in that you can be assured that the store is initialized before your components.
+For an example, see [spec/dummy/app/controllers/pages_controller.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/controllers/pages_controller.rb). Note: this is preferable to using the equivalent view_helper `redux_store` in that you can be assured that the store is initialized before your components.
 
 #### View Helper
 `redux_store(store_name, props: {})`
 
-This method has the same API as the controller extension. **HOWEVER**, we recommend the controller extension instead because the Rails executes the template code in the controller action's view file (`erb`, `haml`, `slim`, etc.) before the layout. So long as you call `redux_store` at the beginning of your action's view file, this will work. However, it's an easy mistake to put this call in the wrong place. Calling `redux_store` in the controller action ensures proper load order, regardless of where you call this in the controller action. Note, you won't know of this subtle ordering issue until you server render and you find that your store is not hydrated properly.
+This method has the same API as the controller extension. **HOWEVER**, we recommend the controller extension instead because the Rails executes the template code in the controller action's view file (`erb`, `haml`, `slim`, etc.) before the layout. So long as you call `redux_store` at the beginning of your action's view file, this will work. However, it's an easy mistake to put this call in the wrong place. Calling `redux_store` in the controller action ensures proper load order, regardless of where you call this in the controller action. Note: you won't know of this subtle ordering issue until you server render and you find that your store is not hydrated properly.
 
 `redux_store_hydration_data`
 
 Place this view helper (no parameters) at the end of your shared layout so ReactOnRails will render the redux store hydration data. Since we're going to be setting up the stores in the controllers, we need to know where on the view to put the client-side rendering of this hydration data, which is a hidden div with a matching class that contains a data props. For an example, see [spec/dummy/app/views/layouts/application.html.erb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/layouts/application.html.erb).
 
 #### Redux Store Notes
-Note, you don't need to initialize your redux store. You can pass the props to your React component in a "generator function." However, consider using the `redux_store` helper for the two following use cases:
+Note: you don't need to initialize your redux store. You can pass the props to your React component in a "generator function." However, consider using the `redux_store` helper for the two following use cases:
 
 1. You want to have multiple React components accessing the same store at once.
 2. You want to place the props to hydrate the client side stores at the very end of your HTML so that the browser can render all earlier HTML first. This is particularly useful if your props will be large.
@@ -542,7 +544,7 @@ You may wish to have 2 React components share the same the Redux store. For exam
 
 Suppose the Redux store is called `appStore`, and you have 3 React components that each needs to connect to a store: `NavbarApp`, `CommentsApp`, and `BlogsApp`. I named them with `App` to indicate that they are the registered components.
 
-You will need to make a function that can create the store you will be using for all components and register it via the `registerStore` method. Note, this is a **storeCreator**, meaning that it is a function that takes (props, location) and returns a store:
+You will need to make a function that can create the store you will be using for all components and register it via the `registerStore` method. Note: this is a **storeCreator**, meaning that it is a function that takes (props, location) and returns a store:
 
 ```js
 function appStore(props, railsContext) {
@@ -568,7 +570,7 @@ return (
 );
 ```
 
-From your Rails view, you can use the provided helper `redux_store(store_name, props)` to create a fresh version of the store (because it may already exist if you came from visiting a previous page). Note, for this example, since we're initializing this from the main layout, we're using a generic name of `@react_props`. In other words, the Rails controller would set `@react_props` to the properties to hydrate the Redux store.
+From your Rails view, you can use the provided helper `redux_store(store_name, props)` to create a fresh version of the store (because it may already exist if you came from visiting a previous page). Note: for this example, since we're initializing this from the main layout, we're using a generic name of `@react_props`. In other words, the Rails controller would set `@react_props` to the properties to hydrate the Redux store.
 
 **app/views/layouts/application.html.erb**
 ```erb

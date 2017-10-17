@@ -13,8 +13,10 @@ require_relative "spec_helper"
 require "rspec/rails"
 require "capybara/rspec"
 require "capybara/rails"
-require "capybara/poltergeist"
-Capybara.javascript_driver = :poltergeist
+Capybara.javascript_driver = :selenium_chrome
+Capybara.register_driver :selenium_chrome do |app|
+  Capybara::Selenium::Driver.new(app, browser: :chrome)
+end
 
 # Requires supporting ruby files with custom matchers and macros, etc, in
 # spec/support/ and its subdirectories. Files matching `spec/**/*_spec.rb` are
