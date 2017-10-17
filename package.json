@@ -44,7 +44,7 @@
     "babel-runtime": ">= 6",
     "js-yaml": ">= 3.0.0",
     "react": ">= 0.14",
-    "react-dom": ">= 0.14",
+    "react-dom": ">= 0.14"
   },
   "files": [
     "node_package/lib",
