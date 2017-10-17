@@ -9,7 +9,7 @@ require "yaml"
 require_relative "example_type"
 require_relative "task_helpers"
 include ReactOnRails::TaskHelpers
-namespace :examples do
+namespace :examples do # rubocop:disable Metrics/BlockLength
   # Loads data from examples_config.yml and instantiates corresponding ExampleType objects
   examples_config_file = File.expand_path("../examples_config.yml", __FILE__)
   examples_config = symbolize_keys(YAML.safe_load(File.read(examples_config_file)))
@@ -29,6 +29,9 @@ namespace :examples do
       mkdir_p(example_type.dir)
       sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options}")
       sh_in_dir(example_type.dir, "touch .gitignore")
+      sh_in_dir(example_type.dir, "rake webpacker:install")
+      sh_in_dir(example_type.dir, "bundle binstubs --path=#{example_type.dir}/bin webpacker")
+      sh_in_dir(example_type.dir, "rake webpacker:install:react")
       append_to_gemfile(example_type.gemfile, example_type.required_gems)
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, example_type.generator_shell_commands)
