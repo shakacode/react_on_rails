@@ -129,6 +129,10 @@ module ReactOnRailsHelper
     server_rendered_html = internal_result["result"]["html"]
     console_script = internal_result["result"]["consoleReplayScript"]
 
+    if server_rendered_html.is_a?(String) && internal_result["result"]["hasErrors"]
+      server_rendered_html = { COMPONENT_HTML_KEY => internal_result["result"]["html"] }
+    end
+
     if server_rendered_html.is_a?(Hash)
       build_react_component_result_for_server_rendered_hash(
         server_rendered_html: server_rendered_html,

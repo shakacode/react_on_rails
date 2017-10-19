@@ -14,6 +14,7 @@ import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 
 // Generator function
 import HelloWorldApp from './HelloWorldApp';
+import BrokenApp from './BrokenApp';
 
 // Example of React + Redux
 import ReduxApp from './ServerReduxApp';
@@ -42,6 +43,7 @@ import ReactHelmetApp from './ReactHelmetServerApp';
 import ImageExample from '../components/ImageExample';
 
 ReactOnRails.register({
+  BrokenApp,
   HelloWorld,
   HelloWorldWithLogAndThrow,
   HelloWorldES5,

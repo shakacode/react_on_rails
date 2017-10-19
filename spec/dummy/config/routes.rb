@@ -32,5 +32,6 @@ Rails.application.routes.draw do
   get "turbolinks_cache_disabled" => "pages#turbolinks_cache_disabled"
   get "rendered_html" => "pages#rendered_html"
   get "react_helmet" => "pages#react_helmet"
+  get "broken_app" => "pages#broken_app"
   get "image_example" => "pages#image_example"
 end
