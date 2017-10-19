@@ -4,7 +4,7 @@
 
 [ShakaCode is hiring team members](http://www.shakacode.com/about/#work-with-us) for our own app, [Friends and Guests](https://www.friendsandguests.com).
 
-# React on Rails v9 is based on Webpacker 3.0!
+# React on Rails v10 is based on Webpacker 3.0!
 
 * See the article [Introducing React on Rails v9 with Webpacker Support](https://blog.shakacode.com/introducing-react-on-rails-v9-with-webpacker-support-f2584c6c8fa4) for an overview of the integration of React on Rails with Webpacker.
 * [Video of running the v9 installer with Webpacker v3](https://youtu.be/M0WUM_XPaII).
@@ -190,7 +190,7 @@ To upgrade existing apps to React on Rails 8 see the [Installation Overview](doc
 1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `client/package.json` file.
 
   ```ruby
-  gem "react_on_rails", "9.0.0"
+  gem "react_on_rails", "10.0.0"
   gem "webpacker", "~> 3.0"
   ```
 
