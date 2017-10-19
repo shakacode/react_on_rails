@@ -1,0 +1,10 @@
+<% p flash %>
+<%= flash["error"] %>
+
+<%= render "header" %>
+
+<%= react_component_hash("BrokenApp", prerender: true)['componentHtml'] %>
+
+<hr/>
+
+This page demonstrates a component that suffers a prerendering error but still returns a hash.
