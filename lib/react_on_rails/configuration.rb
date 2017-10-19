@@ -83,7 +83,7 @@ module ReactOnRails
 
   def self.configuration
     @configuration ||= Configuration.new(
-      node_modules_location: "",
+      node_modules_location: ".",
       generated_assets_dirs: nil,
 
       # generated_assets_dirs is deprecated
@@ -122,7 +122,7 @@ module ReactOnRails
                   :i18n_dir, :i18n_yml_dir,
                   :server_render_method, :symlink_non_digested_assets_regex
 
-    def initialize(node_modules_location: "", server_bundle_js_file: nil, prerender: nil,
+    def initialize(node_modules_location: ".", server_bundle_js_file: nil, prerender: nil,
                    replay_console: nil,
                    trace: nil, development_mode: nil,
                    logging_on_server: nil, server_renderer_pool_size: nil,
