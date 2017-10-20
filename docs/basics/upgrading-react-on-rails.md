@@ -13,6 +13,7 @@ Pretty simple:
 * In `/config/initializers/react_on_rails.rb`, rename:
     *   config.npm_build_test_command ==> config.build_test_command
     *   config.npm_build_production_command ==> config.build_production_command
+* Also create `config.node_modules_location` and set it to `"client"`
 
 ...and you're done.
 
@@ -20,7 +21,87 @@ Pretty simple:
 Reason for doing this: This enables your webpack bundles to bypass the Rails asset pipeline and it's extra minification, enabling you to use source-maps in production, while still maintaining total control over everything in the client directory
 
 #### From version 8
-See [our changelog for instructions](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#90-from-8x-upgrade-instructions)
+
+For an example of upgrading, see [react-webpack-rails-tutorial/pull/416](https://github.com/shakacode/react-webpack-rails-tutorial/pull/416).
+
+- Breaking Configuration Changes
+  1. Added `config.node_modules_location` which defaults to `""` if Webpacker is installed. You may want to set this to 'client'` to `config/initializers/react_on_rails.rb` to keep your node_modules inside of `/client`
+  2. Renamed
+   * config.npm_build_test_command ==> config.build_test_command
+   * config.npm_build_production_command ==> config.build_production_command
+
+- Update the gemfile. Switch over to using the webpacker gem.
+
+```rb
+gem "webpacker"
+```
+
+- Update for the renaming in the `WebpackConfigLoader` in your webpack configuration.
+  You will need to rename the following object properties:
+  - webpackOutputPath      ==> output.path
+  - webpackPublicOutputDir ==> output.publicPath
+  - hotReloadingUrl        ==> output.publicPathWithHost
+  - hotReloadingHostname   ==> settings.dev_server.host
+  - hotReloadingPort       ==> settings.dev_server.port
+  - hmr                    ==> settings.dev_server.hmr
+  - manifest               ==> Remove this one. We use the default for Webpack of manifest.json
+  - env                    ==> Use `const { env } = require('process');`
+  - devBuild               ==> Use `const devBuild = process.env.NODE_ENV !== 'production';`
+
+- Edit your Webpack.config files:
+  - Change your Webpack output to be like this. **Be sure to have the hash or chunkhash in the filename,** unless the bundle is server side.:
+    ```
+    const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
+    const configPath = resolve('..', 'config');
+    const { output, settings } = webpackConfigLoader(configPath);
+    const hmr = settings.dev_server.hmr;
+    const devBuild = process.env.NODE_ENV !== 'production';
+
+    output: {
+      filename: isHMR ? '[name]-[hash].js' : '[name]-[chunkhash].js',
+      chunkFilename: '[name]-[chunkhash].chunk.js',
+
+      publicPath: output.publicPath,
+      path: output.path,
+    },
+    ```
+  - Change your ManifestPlugin definition to something like the following
+    ```
+    new ManifestPlugin({
+        publicPath: output.publicPath,
+        writeToFileEmit: true
+      }),
+
+    ```
+
+- Find your `webpacker_lite.yml` and rename it to `webpacker.yml`
+  - Consider copying a default webpacker.yml setup such as https://github.com/shakacode/react-on-rails-v9-rc-generator/blob/master/config/webpacker.yml
+  - If you are not using the webpacker webpacker setup, be sure to put in `compile: false` in the `default` section.
+  - Alternately, if you are updating from webpacker_lite, you can manually change these:
+  - Add a default setting
+    ```
+    cache_manifest: false
+    ```
+  - For production, set:  
+    ```
+    cache_manifest: true
+    ```
+  - Add a section like this under your development env:
+    ```
+    dev_server:
+      host: localhost
+      port: 3035
+      hmr: false
+    ```
+    Set hmr to your preference.
+  - See the example `spec/dummy/config/webpacker.yml`.
+  - Remove keys `hot_reloading_host` and `hot_reloading_enabled_by_default`. These are replaced by the `dev_server` key.
+  - Rename `webpack_public_output_dir` to `public_output_path`.
+
+- Edit your Procfile.dev
+  - Remove the env value WEBPACKER_DEV_SERVER as it's not used
+  - For hot loading:
+    - Set the `hmr` key in your `webpacker.yml` to `true`.
 
 #### From version 7 or lower
 
@@ -29,7 +110,7 @@ Unfortunately, this requires quite a few steps:
 *   `.gitignore`: add `/public/webpack/*`
 *   `Gemfile`: bump `react_on_rails` and add `webpacker`
 *   layout views: anything bundled by webpack will need to be requested by a `javascript_pack_tag` or `stylesheet_pack_tag`
-*   `config/initializers/assets.rb`: Delete it. You don't need it anymore.
+*   `config/initializers/assets.rb`: we no longer need to modify `Rails.application.config.assets.paths` or append anything to `Rails.application.config.assets.precompile`.
 *   `config/initializers/react_on_rails.rb`:
     *   Delete `config.generated_assets_dir`. Webpacker's config now supplies this information
     *   Replace `config.npm_build_(test|production)_command` with `config.build_(test|production)_command`
