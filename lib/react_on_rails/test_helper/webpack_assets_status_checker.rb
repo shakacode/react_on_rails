@@ -10,22 +10,24 @@ module ReactOnRails
   module TestHelper
     class WebpackAssetsStatusChecker
       include Utils::Required
-      # client_dir is typically /client, where all client files go
-      attr_reader :client_dir, :generated_assets_dir
+      # source_path is typically configured in the webpacker.yml file
+      # for `source_path`
+      # or for legacy React on Rails, it's /client, where all client files go
+      attr_reader :source_path, :generated_assets_dir
 
       def initialize(
         generated_assets_dir: required("generated_assets_dir"),
-        client_dir: required("client_dir"),
+        source_path: required("source_path"),
         webpack_generated_files: required("webpack_generated_files")
       )
         @generated_assets_dir = generated_assets_dir
-        @client_dir = client_dir
+        @source_path = source_path
         @webpack_generated_files = webpack_generated_files
       end
 
       def stale_generated_webpack_files
-        manifest_needed = ReactOnRails::Utils.using_webpacker_lite? &&
-                          !WebpackerLite::Manifest.exist?
+        manifest_needed = ReactOnRails::Utils.using_webpacker? &&
+                          !ReactOnRails::Utils.manifest_exists?
 
         return ["manifest.json"] if manifest_needed
 
@@ -53,13 +55,15 @@ module ReactOnRails
           webpack_generated_files = @webpack_generated_files.map do |bundle_name|
             ReactOnRails::Utils.bundle_js_file_path(bundle_name)
           end
+
           if webpack_generated_files.present?
             webpack_generated_files
           else
             file_list = make_file_list(make_globs(generated_assets_dir)).to_ary
             puts "V" * 80
             puts "Please define config.webpack_generated_files (array) so the test helper knows "\
-            "which files are required."
+            "which files are required. If you are using webpacker, you typically need to only "\
+            "include 'manifest.json'."
             puts "Detected the possible following files to check for webpack compilation in "\
               "#{generated_assets_dir}"
             puts file_list.join("\n")
@@ -70,7 +74,7 @@ module ReactOnRails
       end
 
       def client_files
-        @client_files ||= make_file_list(make_globs(client_dir)).to_ary
+        @client_files ||= make_file_list(make_globs(source_path)).to_ary
       end
 
       def make_globs(dirs)

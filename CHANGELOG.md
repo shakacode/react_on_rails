@@ -6,18 +6,147 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 Changes since last non-beta release.
 
+#### Fixed
+- Fixed `react_component_hash` functionality in cases of prerendering errors: [PR 960](https://github.com/shakacode/react_on_rails/pull/960) by [Judahmeek](https://github.com/Judahmeek)
+
 *Please add entries here for your pull requests.*
 - Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set. [#899](https://github.com/shakacode/react_on_rails/pull/899) by [hakongit](https://github.com/hakongit)
 
+### [10.0.0] - 2017-10-08
+#### Created
+- Created `react_component_hash` method for react_helmet support.
+#### Deprecated
+- Deprecated `react_component` functionality for react_helmet support.
+To clarify, the method itself is not deprecated, only certain functionality which has been moved to `react_component_hash`
+[PR 951](https://github.com/shakacode/react_on_rails/pull/951) by [Judahmeek](https://github.com/Judahmeek)
 
-### [8.0.6]
-#### fixed
+### [9.0.3] - 2017-09-20
+#### Improved
+- Improved comments in generated Procfile.dev-server. [PR 940](https://github.com/shakacode/react_on_rails/pull/940) by [justin808](https://github.com/justin808 )
+
+### [9.0.2] - 2017-09-10
+#### Fixed
+- Improved post install doc comments for generator. [PR 933](https://github.com/shakacode/react_on_rails/pull/933) by [justin808](https://github.com/justin808 )
+
+### [9.0.1] - 2017-09-10
+
+#### Fixed
+- Fixes Rails 3.2 compatability issues. [PR 926](https://github.com/shakacode/react_on_rails/pull/926) by [morozovm](https://github.com/morozovm )
+
+### [9.0.0] - 2017-09-06
+Updated React on Rails to depend on [rails/webpacker](https://github.com/rails/webpacker). [PR 908](https://github.com/shakacode/react_on_rails/pull/908) by [justin808](https://github.com/justin808).
+>>>>>>> my-branch
+
+
+#### 9.0 from 8.x. Upgrade Instructions
+
+For an example of upgrading, see [react-webpack-rails-tutorial/pull/416](https://github.com/shakacode/react-webpack-rails-tutorial/pull/416).
+
+- Breaking Configuration Changes
+  1. Added `config.node_modules_location` which defaults to `""` if Webpacker is installed. You may want to set this to 'client'` to `config/initializers/react_on_rails.rb` to keep your node_modules inside of `/client`
+  2. Renamed
+   * config.npm_build_test_command ==> config.build_test_command
+   * config.npm_build_production_command ==> config.build_production_command
+
+- Update the gemfile. Switch over to using the webpacker gem.
+
+```rb
+gem "webpacker"
+```
+=======
+- Fixes check for i18n_dir returning false when present in LocalesToJs.
+=======
+- Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set.
+>>>>>>> updated changelog.md
+=======
+- Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set. [#899](https://github.com/shakacode/react_on_rails/pull/899) by [hakongit](https://github.com/hakongit)
+>>>>>>> updated changelog.md
+- Fixes GitUtils.uncommitted_changes? throwing an error when called in an environment without Git, and allows install generator to be run successfully with `--ignore-warnings` [#878](https://github.com/shakacode/react_on_rails/pull/878) by [jasonblalock](https://github.com/jasonblalock)
+
+- Update for the renaming in the `WebpackConfigLoader` in your webpack configuration.
+  You will need to rename the following object properties:
+  - webpackOutputPath      ==> output.path
+  - webpackPublicOutputDir ==> output.publicPath
+  - hotReloadingUrl        ==> output.publicPathWithHost
+  - hotReloadingHostname   ==> settings.dev_server.host
+  - hotReloadingPort       ==> settings.dev_server.port
+  - hmr                    ==> settings.dev_server.hmr
+  - manifest               ==> Remove this one. We use the default for Webpack of manifest.json
+  - env                    ==> Use `const { env } = require('process');`
+  - devBuild               ==> Use `const devBuild = process.env.NODE_ENV !== 'production';`
+
+- Edit your Webpack.config files:
+  - Change your Webpack output to be like this. **Be sure to have the hash or chunkhash in the filename,** unless the bundle is server side.:
+    ```
+    const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
+    const configPath = resolve('..', 'config');
+    const { output, settings } = webpackConfigLoader(configPath);
+    const hmr = settings.dev_server.hmr;
+    const devBuild = process.env.NODE_ENV !== 'production';
+
+    output: {
+      filename: isHMR ? '[name]-[hash].js' : '[name]-[chunkhash].js',
+      chunkFilename: '[name]-[chunkhash].chunk.js',
+
+      publicPath: output.publicPath,
+      path: output.path,
+    },
+    ```
+  - Change your ManifestPlugin definition to something like the following
+    ```
+    new ManifestPlugin({
+        publicPath: output.publicPath,
+        writeToFileEmit: true
+      }),
+
+    ```
+
+- Find your `webpacker_lite.yml` and rename it to `webpacker.yml`
+  - Consider copying a default webpacker.yml setup such as https://github.com/shakacode/react-on-rails-v9-rc-generator/blob/master/config/webpacker.yml
+  - If you are not using the webpacker webpacker setup, be sure to put in `compile: false` in the `default` section.
+  - Alternately, if you are updating from webpacker_lite, you can manually change these:
+  - Add a default setting
+    ```
+    cache_manifest: false
+    ```
+  - For production, set:  
+    ```
+    cache_manifest: true
+    ```
+  - Add a section like this under your development env:
+    ```
+    dev_server:
+      host: localhost
+      port: 3035
+      hmr: false
+    ```
+    Set hmr to your preference.
+  - See the example `spec/dummy/config/webpacker.yml`.
+  - Remove keys `hot_reloading_host` and `hot_reloading_enabled_by_default`. These are replaced by the `dev_server` key.
+  - Rename `webpack_public_output_dir` to `public_output_path`.
+
+- Edit your Procfile.dev
+  - Remove the env value WEBPACKER_DEV_SERVER as it's not used
+  - For hot loading:
+    - Set the `hmr` key in your `webpacker.yml` to `true`.
+
+
+### [8.0.7] - 2017-08-16
+#### Fixed
+- Fixes generator bug by keeping blank line at top in case existing .gitignore does not end in a newline. [#916](https://github.com/shakacode/react_on_rails/pull/916) by [justin808](https://github.com/justin808).
+
+### [8.0.6] - 2017-07-19
+#### Fixed
 - Fixes server rendering when using a CDN. Server rendering would try to fetch a file with the "asset_host". This change updates the webpacker_lite dependency to 2.1.0 which has a new helper `pack_path`. [#901](https://github.com/shakacode/react_on_rails/pull/901) by [justin808](https://github.com/justin808). Be sure to update webpacker_lite to 2.1.0.
 - The package.json file created by the generator now creates minified javascript production builds by default. This was done by adding the -p flag to webpack on the build:production script. [#895](https://github.com/shakacode/react_on_rails/pull/895) by [serodriguez68 ](https://github.com/serodriguez68)
 - Fixes GitUtils.uncommitted_changes? throwing an error when called in an environment without Git, and allows install generator to be run successfully with `--ignore-warnings` [#878](https://github.com/shakacode/react_on_rails/pull/878) by [jasonblalock](https://github.com/jasonblalock).
 
+<<<<<<< HEAD
 
 ## [8.0.5]
+=======
+## [8.0.5] - 2017-07-04
+>>>>>>> my-branch
 ### fixed
  - Corrects `devBuild` value for webpack production build from webpackConfigLoader. [#877](https://github.com/shakacode/react_on_rails/pull/877) by [chenqingspring](https://github.com/chenqingspring).
  - Remove contentBase deprecation warning message. [#878](https://github.com/shakacode/react_on_rails/pull/878) by [ened ](https://github.com/ened).
@@ -26,11 +155,11 @@ Changes since last non-beta release.
 
 *Note: 8.0.4 skipped.*
 
-## [8.0.3]
+## [8.0.3] - 2017-06-19
 ### Fixed
 - Ruby 2.1 issue due to `<<~` as reported in [issue #870](https://github.com/shakacode/react_on_rails/issues/870). [#867](https://github.com/shakacode/react_on_rails/pull/867) by [justin808](https://github.com/justin808)
 
-## [8.0.2]
+## [8.0.2] - 2017-06-04
 ### Fixed
 - Any failure in webpack to build test files quits tests.
 - Fixed a Ruby 2.4 potential crash which could cause a crash due to pathname change in Ruby 2.4.
@@ -41,11 +170,11 @@ Changes since last non-beta release.
   - Fixed test failures against Ruby 2.4
 - [#862](https://github.com/shakacode/react_on_rails/pull/862) by [justin808](https://github.com/justin808)
 
-## [8.0.1]
+## [8.0.1] - 2017-05-30
 ### Fixed
 - Generator no longer modifies `assets.rb`. [#859](https://github.com/shakacode/react_on_rails/pull/859) by [justin808](https://github.com/justin808)
 
-## [8.0.0]
+## [8.0.0] - 2017-05-29
 - Generators and full support for [webpacker_lite](https://github.com/shakacode/webpacker_lite)
 - No breaking changes to move to 8.0.0 other than the default for this setting changed to nil. If you depended on the default of this setting and are using the asset pipeline (and not webpacker_lite), then add this to your `config/initializers/react_on_rails.rb`:
   ```
@@ -311,7 +440,7 @@ No changes.
   - See [shakacode/react-webpack-rails-tutorial/pull/287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287) for an    example of upgrading from v5.
 
   - To configure the asset compliation you can either
-    1. Specify a `config/react_on_rails` setting for `npm_build_production_command` to be nil to turn this feature off.
+    1. Specify a `config/react_on_rails` setting for `build_production_command` to be nil to turn this feature off.
     2. Specify the script command you want to run to build your production assets, and remove your assets.rake file.
 
   - If you are using the ReactOnRails test helper, then you will need to add the 'config.npm_build_test_command' to your config to tell react_on_rails what command to run when you run rspec.
@@ -322,7 +451,7 @@ Here is the addition to the generated config file:
 ```ruby
   # This configures the script to run to build the production assets by webpack. Set this to nil
   # if you don't want react_on_rails building this file for you.
-  config.npm_build_production_command = "npm run build:production"
+  config.build_production_command = "npm run build:production"
 
   # If you are using the ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
   # with rspec then this controls what npm command is run
@@ -629,7 +758,12 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/8.0.6...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/9.0.3...master
+[9.0.3]: https://github.com/shakacode/react_on_rails/compare/9.0.2...9.0.3
+[9.0.2]: https://github.com/shakacode/react_on_rails/compare/9.0.1...9.0.2
+[9.0.1]: https://github.com/shakacode/react_on_rails/compare/9.0.0...9.0.1
+[9.0.0]: https://github.com/shakacode/react_on_rails/compare/8.0.7...9.0.0
+[8.0.7]: https://github.com/shakacode/react_on_rails/compare/8.0.6...8.0.7
 [8.0.6]: https://github.com/shakacode/react_on_rails/compare/8.0.5...8.0.6
 [8.0.5]: https://github.com/shakacode/react_on_rails/compare/8.0.3...8.0.5
 [8.0.3]: https://github.com/shakacode/react_on_rails/compare/8.0.2...8.0.3

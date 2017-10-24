@@ -80,7 +80,7 @@ function delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)
     if (trace) {
       console.log(`\
 DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, railsContext:`,
-        props, railsContext);
+      props, railsContext);
     }
 
     component(props, railsContext, domNodeId);

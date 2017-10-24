@@ -6,7 +6,7 @@ const { assetLoaderRules } = webpackCommon;
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 const configPath = resolve('..', 'config');
-const { webpackOutputPath, webpackPublicOutputDir } = webpackConfigLoader(configPath);
+const { output } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
 const nodeEnv = devBuild ? 'development' : 'production';
@@ -26,8 +26,8 @@ module.exports = {
     filename: 'server-bundle.js',
 
     // Leading and trailing slashes ARE necessary.
-    publicPath: '/' + webpackPublicOutputDir + '/',
-    path: webpackOutputPath,
+    publicPath: output.publicPath,
+    path: output.path,
   },
   resolve: {
     extensions: ['.js', '.jsx'],

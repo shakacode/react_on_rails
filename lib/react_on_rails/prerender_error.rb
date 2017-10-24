@@ -6,7 +6,7 @@ module ReactOnRails
     # err might be nil if JS caught the error
     def initialize(component_name: nil, err: nil, props: nil,
                    js_code: nil, console_messages: nil)
-      message = "ERROR in SERVER PRERENDERING\n".dup
+      message = "ERROR in SERVER PRERENDERING\n".dup # rubocop:disable Performance/UnfreezeString
       if err
         # rubocop:disable Layout/IndentHeredoc
         message << <<-MSG

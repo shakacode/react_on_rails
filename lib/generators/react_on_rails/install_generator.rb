@@ -19,13 +19,6 @@ module ReactOnRails
                    desc: "Install Redux gems and Redux version of Hello World Example. Default: false",
                    aliases: "-R"
 
-      # --redux
-      class_option :node,
-                   type: :boolean,
-                   default: false,
-                   desc: "Sets up node as a server rendering option. Default: false",
-                   aliases: "-N"
-
       # --ignore-warnings
       class_option :ignore_warnings,
                    type: :boolean,
@@ -53,9 +46,11 @@ module ReactOnRails
 
       def invoke_generators
         invoke "react_on_rails:base"
-        invoke "react_on_rails:react_no_redux" unless options.redux?
-        invoke "react_on_rails:react_with_redux" if options.redux?
-        invoke "react_on_rails:node" if options.node?
+        if options.redux?
+          invoke "react_on_rails:react_with_redux"
+        else
+          invoke "react_on_rails:react_no_redux"
+        end
       end
 
       # NOTE: other requirements for existing files such as .gitignore or application.

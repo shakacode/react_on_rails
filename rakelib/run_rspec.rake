@@ -18,6 +18,16 @@ namespace :run_rspec do
     run_tests_in("", rspec_args: File.join("spec", "react_on_rails"))
   end
 
+  desc "Run RSpec with rails32 gemfile"
+  task :gem_rails32 do
+    rspec_args = "spec/react_on_rails --tag ~webpacker --exclude-pattern "\
+                 "\"**/generators/*_spec.rb,"\
+                 "**/test_helper/webpack_*_spec.rb\""
+    run_tests_in("",
+                 rspec_args: rspec_args,
+                 env_vars: "BUNDLE_GEMFILE=spec/dummy_no_webpacker/Gemfile.rails32")
+  end
+
   desc "Runs dummy rspec with turbolinks"
   task dummy: ["dummy_apps:dummy_app"] do
     clean_gen_assets(spec_dummy_dir)
@@ -34,16 +44,24 @@ namespace :run_rspec do
                  command_name: "dummy_no_turbolinks")
   end
 
+  desc "Runs dummy_no_webpacker rspec"
+  task :dummy_no_webpacker do
+    dummy_app_dir = File.join(gem_root, "spec/dummy_no_webpacker")
+    clean_gen_assets(dummy_app_dir)
+    run_tests_in(dummy_app_dir,
+                 env_vars: "BUNDLE_GEMFILE=Gemfile.rails32")
+  end
+
   # Dynamically define Rake tasks for each example app found in the examples directory
   ExampleType.all.each do |example_type|
     desc "Runs RSpec for #{example_type.name_pretty} only"
-    task example_type.rspec_task_name_short => example_type.prepare_task_name do
+    task example_type.rspec_task_name_short => example_type.gen_task_name do
       run_tests_in(File.join(examples_dir, example_type.name)) # have to use relative path
     end
   end
 
   desc "Runs Rspec for example apps only"
-  task examples: "examples:prepare_all" do
+  task examples: "examples:gen_all" do
     ExampleType.all.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
@@ -101,7 +119,9 @@ def run_tests_in(dir, options = {})
 
   command_name = options.fetch(:command_name, path.basename)
   rspec_args = options.fetch(:rspec_args, "")
-  env_vars = %(#{options.fetch(:env_vars, '')} TEST_ENV_COMMAND_NAME="#{command_name}").dup
+  # rubocop:disable Performance/UnfreezeString
+  env_vars = "#{options.fetch(:env_vars, '')} TEST_ENV_COMMAND_NAME=\"#{command_name}\"".dup
+  # rubocop:enable Performance/UnfreezeString
   env_vars << "COVERAGE=true" if ENV["USE_COVERALLS"]
   sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
 end

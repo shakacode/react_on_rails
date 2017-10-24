@@ -22,56 +22,28 @@ module ReactOnRails
         route "get 'hello_world', to: 'hello_world#index'"
       end
 
-      def update_git_ignore
-        data = <<-DATA.strip_heredoc
-          # React on Rails
-          npm-debug.log*
-          node_modules
-
-          # Generated js bundles
-          /public/webpack/*
-        DATA
-
-        if dest_file_exists?(".gitignore")
-          append_to_file(".gitignore", data)
-        else
-          GeneratorMessages.add_error(setup_file_error(".gitignore", data))
-        end
-      end
-
       def create_react_directories
-        dirs = %w[components containers startup]
-        dirs.each { |name| empty_directory("client/app/bundles/HelloWorld/#{name}") }
+        dirs = %w[components]
+        dirs.each { |name| empty_directory("app/javascript/bundles/HelloWorld/#{name}") }
       end
 
       def copy_base_files
         base_path = "base/base/"
         base_files = %w[app/controllers/hello_world_controller.rb
-                        config/webpacker_lite.yml
-                        client/.babelrc
-                        client/webpack.config.js
-                        client/REACT_ON_RAILS_CLIENT_README.md]
+                        app/views/layouts/hello_world.html.erb
+                        config/initializers/react_on_rails.rb
+                        Procfile.dev
+                        Procfile.dev-server]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
-      def template_base_files
-        base_path = "base/base/"
-        %w[app/views/layouts/hello_world.html.erb
-           config/initializers/react_on_rails.rb
-           Procfile.dev
-           client/package.json].each { |file| template("#{base_path}#{file}.tt", file) }
-      end
-
-      def template_package_json
-        if dest_file_exists?("package.json")
-          add_yarn_postinstall_script_in_package_json
-        else
-          template("base/base/package.json", "package.json")
-        end
-      end
-
       def add_base_gems_to_gemfile
-        append_to_file("Gemfile", "\ngem 'mini_racer', platforms: :ruby\ngem 'webpacker_lite'\n")
+        gem "mini_racer", platforms: :ruby
+        run "bundle"
+      end
+
+      def add_yarn_dependencies
+        run "yarn add react-on-rails"
       end
 
       def append_to_spec_rails_helper
@@ -85,10 +57,14 @@ module ReactOnRails
           else
             GeneratorMessages.add_info(
               <<-MSG.strip_heredoc
-              Did not find spec/rails_helper.rb or spec/spec_helper.rb to add
-                # Ensure that if we are running js tests, we are using latest webpack assets
-                # This will use the defaults of :js and :server_rendering meta tags
-                ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+
+              We did not find a spec/rails_helper.rb or spec/spec_helper.rb to add
+              the React on Rails Test helper, which ensures that if we are running
+              js tests, then we are using latest webpack assets. You can later add
+              this to your rspec config:
+
+              # This will use the defaults of :js and :server_rendering meta tags
+              ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
               MSG
             )
           end
@@ -102,53 +78,46 @@ module ReactOnRails
           ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
       STR
 
-      def print_helpful_message
-        message = <<-MSG.strip_heredoc
+      def self.helpful_message
+        <<-MSG.strip_heredoc
 
           What to do next:
 
+            - See the documentation on https://github.com/rails/webpacker/blob/master/docs/webpack.md
+              for how to customize the default webpack configuration.
+
             - Include your webpack assets to your application layout.
 
-              <%= javascript_pack_tag 'webpack-bundle' %>
+                <%= javascript_pack_tag 'hello-world-bundle' %>
 
-            - Ensure your bundle and yarn installs of dependencies are up to date.
+            - Run `rails s` to start the Rails server and use Webpacker's default lazy compilation.
 
-                bundle && yarn
+            - Visit http://localhost:3000/hello_world and see your React On Rails app running!
 
-            - Run the foreman command to start the rails server and run webpack in watch mode.
+            - Run bin/webpack-dev-server to start the Webpack dev server for compilation of Webpack
+              assets assets as soon as you save. This default setup with the dev server does not work
+              for server rendering
+
+            - Alternately, you may turn off compile in config/webpacker.yml and run the foreman
+              command to start the rails server and run webpack in watch mode.
 
                 foreman start -f Procfile.dev
 
-            - Visit http://localhost:3000/hello_world and see your React On Rails app running!
+            - To turn on HMR, edit config/webpacker.yml and set HMR to true. Restart the rails server
+              and bin/webpack-dev-server. Or use Procfile.dev-server.
+
+            - To server render, change this line app/views/hello_world/index.html.erb to
+              `prerender: true` to see server rendering (right click on page and select "view source").
+
+                <%= react_component("HelloWorldApp", props: @hello_world_props, prerender: true) %>
         MSG
-        GeneratorMessages.add_info(message)
+      end
+
+      def print_helpful_message
+        GeneratorMessages.add_info(self.class.helpful_message)
       end
 
       private
-
-      def add_yarn_postinstall_script_in_package_json
-        client_package_json = File.join(destination_root, "package.json")
-        contents = File.read(client_package_json)
-        postinstall = %("postinstall": "cd client && yarn install")
-        if contents =~ /"scripts" *:/
-          replacement = <<-STRING
-  "scripts": {
-    #{postinstall},
-STRING
-          regexp = / {2}"scripts": {/
-        else
-          regexp = /^{/
-          replacement = <<-STRING.strip_heredoc
-            {
-              "scripts": {
-                #{postinstall}
-              },
-          STRING
-        end
-
-        contents.gsub!(regexp, replacement)
-        File.open(client_package_json, "w+") { |f| f.puts contents }
-      end
 
       # From https://github.com/rails/rails/blob/4c940b2dbfb457f67c6250b720f63501d74a45fd/railties/lib/rails/generators/rails/app/app_generator.rb
       def app_name

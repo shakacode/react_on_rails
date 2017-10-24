@@ -1,6 +1,7 @@
 /.bundle/
 /.yardoc
 /Gemfile.lock
+/Gemfile.rails32.lock
 /_yardoc/
 /coverage/
 /doc/

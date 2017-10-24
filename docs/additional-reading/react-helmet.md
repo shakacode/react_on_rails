@@ -61,9 +61,9 @@ ReactOnRails.register({
   ReactHelmetApp
 });
 ```
-Now when `react_component` helper will be called with **"ReactHelmetApp"** as a first argument it will return a hash instead of HTML string:
+Now when the `react_component_hash` helper is called with **"ReactHelmetApp"** as a first argument it will return a hash instead of HTML string:
 ```ruby
-<% react_helmet_app = react_component("ReactHelmetApp", prerender: true, props: { hello: "world" }, trace: true) %>
+<% react_helmet_app = react_component_hash("ReactHelmetApp", prerender: true, props: { hello: "world" }, trace: true) %>
 
 <% content_for :title do %>
   <%= react_helmet_app['title'] %>
@@ -76,3 +76,5 @@ So now we're able to insert received title tag to our application layout:
 ```ruby
  <%= yield(:title) if content_for?(:title) %>
 ```
+
+Note: Use of `react_component` for this functionality is deprecated. Please use `react_component_hash` instead.
