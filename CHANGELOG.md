@@ -7,6 +7,8 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests.*
+#### Fixed
+- rubocop disabling comments in rescue statements [PR 963](https://github.com/shakacode/react_on_rails/pull/963) by [railsme](https://github.com/railsme).
 
 ### [10.0.0] - 2017-10-08
 #### Created
