@@ -10,7 +10,7 @@ Changes since last non-beta release.
 - Fixed `react_component_hash` functionality in cases of prerendering errors: [PR 960](https://github.com/shakacode/react_on_rails/pull/960) by [Judahmeek](https://github.com/Judahmeek)
 
 *Please add entries here for your pull requests.*
-- Changes check in locales_to_js to check for i18n_dir.blank? and i18n_dir.directory?
+- Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set. #899 by hakongit
 
 ### [10.0.0] - 2017-10-08
 #### Created
