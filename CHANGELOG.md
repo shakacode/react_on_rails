@@ -35,7 +35,6 @@ To clarify, the method itself is not deprecated, only certain functionality whic
 
 ### [9.0.0] - 2017-09-06
 Updated React on Rails to depend on [rails/webpacker](https://github.com/rails/webpacker). [PR 908](https://github.com/shakacode/react_on_rails/pull/908) by [justin808](https://github.com/justin808).
->>>>>>> my-branch
 
 
 #### 9.0 from 8.x. Upgrade Instructions
