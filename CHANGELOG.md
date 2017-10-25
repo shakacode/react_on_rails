@@ -53,15 +53,6 @@ For an example of upgrading, see [react-webpack-rails-tutorial/pull/416](https:/
 ```rb
 gem "webpacker"
 ```
-=======
-- Fixes check for i18n_dir returning false when present in LocalesToJs.
-=======
-- Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set.
->>>>>>> updated changelog.md
-=======
-- Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set. [#899](https://github.com/shakacode/react_on_rails/pull/899) by [hakongit](https://github.com/hakongit)
->>>>>>> updated changelog.md
-- Fixes GitUtils.uncommitted_changes? throwing an error when called in an environment without Git, and allows install generator to be run successfully with `--ignore-warnings` [#878](https://github.com/shakacode/react_on_rails/pull/878) by [jasonblalock](https://github.com/jasonblalock)
 
 - Update for the renaming in the `WebpackConfigLoader` in your webpack configuration.
   You will need to rename the following object properties:
@@ -141,12 +132,7 @@ gem "webpacker"
 - The package.json file created by the generator now creates minified javascript production builds by default. This was done by adding the -p flag to webpack on the build:production script. [#895](https://github.com/shakacode/react_on_rails/pull/895) by [serodriguez68 ](https://github.com/serodriguez68)
 - Fixes GitUtils.uncommitted_changes? throwing an error when called in an environment without Git, and allows install generator to be run successfully with `--ignore-warnings` [#878](https://github.com/shakacode/react_on_rails/pull/878) by [jasonblalock](https://github.com/jasonblalock).
 
-<<<<<<< HEAD
-
-## [8.0.5]
-=======
 ## [8.0.5] - 2017-07-04
->>>>>>> my-branch
 ### fixed
  - Corrects `devBuild` value for webpack production build from webpackConfigLoader. [#877](https://github.com/shakacode/react_on_rails/pull/877) by [chenqingspring](https://github.com/chenqingspring).
  - Remove contentBase deprecation warning message. [#878](https://github.com/shakacode/react_on_rails/pull/878) by [ened ](https://github.com/ened).
