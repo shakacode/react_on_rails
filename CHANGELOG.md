@@ -6,12 +6,13 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 Changes since last non-beta release.
 
-#### Fixed
-- Fixed `react_component_hash` functionality in cases of prerendering errors: [PR 960](https://github.com/shakacode/react_on_rails/pull/960) by [Judahmeek](https://github.com/Judahmeek)
-- Fix to add missing dependency to run generator spec individually: [PR 962](https://github.com/shakacode/react_on_rails/pull/962) by [tricknotes](https://github.com/tricknotes)
+*Please add entries here for your pull requests that are not yet released.*
 
-*Please add entries here for your pull requests.*
-- Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set. [PR 899](https://github.com/shakacode/react_on_rails/pull/899) by [hakongit](https://github.com/hakongit)
+
+#### Fixed
+- Fixed `react_component_hash` functionality in cases of prerendering errors: [PR 960](https://github.com/shakacode/react_on_rails/pull/960) by [Judahmeek](https://github.com/Judahmeek).
+- Fix to add missing dependency to run generator spec individually: [PR 962](https://github.com/shakacode/react_on_rails/pull/962) by [tricknotes](https://github.com/tricknotes).
+- Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set. [PR 899](https://github.com/shakacode/react_on_rails/pull/899) by [hakongit](https://github.com/hakongit).
 
 ### [10.0.0] - 2017-10-08
 #### Created
@@ -19,20 +20,20 @@ Changes since last non-beta release.
 #### Deprecated
 - Deprecated `react_component` functionality for react_helmet support.
 To clarify, the method itself is not deprecated, only certain functionality which has been moved to `react_component_hash`
-[PR 951](https://github.com/shakacode/react_on_rails/pull/951) by [Judahmeek](https://github.com/Judahmeek)
+[PR 951](https://github.com/shakacode/react_on_rails/pull/951) by [Judahmeek](https://github.com/Judahmeek).
 
 ### [9.0.3] - 2017-09-20
 #### Improved
-- Improved comments in generated Procfile.dev-server. [PR 940](https://github.com/shakacode/react_on_rails/pull/940) by [justin808](https://github.com/justin808 )
+- Improved comments in generated Procfile.dev-server. [PR 940](https://github.com/shakacode/react_on_rails/pull/940) by [justin808](https://github.com/justin808).
 
 ### [9.0.2] - 2017-09-10
 #### Fixed
-- Improved post install doc comments for generator. [PR 933](https://github.com/shakacode/react_on_rails/pull/933) by [justin808](https://github.com/justin808 )
+- Improved post install doc comments for generator. [PR 933](https://github.com/shakacode/react_on_rails/pull/933) by [justin808](https://github.com/justin808).
 
 ### [9.0.1] - 2017-09-10
 
 #### Fixed
-- Fixes Rails 3.2 compatability issues. [PR 926](https://github.com/shakacode/react_on_rails/pull/926) by [morozovm](https://github.com/morozovm )
+- Fixes Rails 3.2 compatability issues. [PR 926](https://github.com/shakacode/react_on_rails/pull/926) by [morozovm](https://github.com/morozovm).
 
 ### [9.0.0] - 2017-09-06
 Updated React on Rails to depend on [rails/webpacker](https://github.com/rails/webpacker). [PR 908](https://github.com/shakacode/react_on_rails/pull/908) by [justin808](https://github.com/justin808).
@@ -744,7 +745,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/9.0.3...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/10.0.0...master
+[10.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.3...10.0.o
 [9.0.3]: https://github.com/shakacode/react_on_rails/compare/9.0.2...9.0.3
 [9.0.2]: https://github.com/shakacode/react_on_rails/compare/9.0.1...9.0.2
 [9.0.1]: https://github.com/shakacode/react_on_rails/compare/9.0.0...9.0.1
