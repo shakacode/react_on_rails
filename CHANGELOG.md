@@ -11,6 +11,7 @@ Changes since last non-beta release.
 - Fix to add missing dependency to run generator spec individually: [PR 962](https://github.com/shakacode/react_on_rails/pull/962) by [tricknotes](https://github.com/tricknotes)
 
 *Please add entries here for your pull requests.*
+- Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set. [PR 899](https://github.com/shakacode/react_on_rails/pull/899) by [hakongit](https://github.com/hakongit)
 
 ### [10.0.0] - 2017-10-08
 #### Created
