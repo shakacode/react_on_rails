@@ -9,6 +9,13 @@ module ReactOnRails
     let(:translations_path) { "#{i18n_dir}/translations.js" }
     let(:default_path) { "#{i18n_dir}/default.js" }
 
+    it "with i18n_dir set to ''" do
+      ReactOnRails.configure do |config|
+        config.i18n_dir = ''
+      end
+      expect { ReactOnRails::LocalesToJs.new }.to raise_error(/config.i18n_dir is set and it is not a directory. Did you set config.i18n_dir in the react_on_rails initializer?/)
+    end
+    
     shared_examples "locale to js" do
       context "with obsolete js files" do
         before do
