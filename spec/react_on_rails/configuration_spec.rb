@@ -4,42 +4,71 @@ require_relative "spec_helper"
 
 module ReactOnRails
   RSpec.describe Configuration do
-    it "raises if the i18n directory does not exist" do
-      junk_name = "/XXXX/junkXXXX"
-      expect do
-        ReactOnRails.configure do |config|
-          config.i18n_dir = junk_name
-        end
-      end.to raise_error(/#{junk_name}/)
+    let(:existing_path) { Pathname.new(Dir.mktmpdir) }
+    let(:not_existing_path) { "/path/to/#{SecureRandom.hex(4)}" }
+
+    describe ".i18n_dir" do
+      let(:i18n_dir) { existing_path }
+
+      after do
+        ReactOnRails.configure { |config| config.i18n_dir = nil }
+      end
+
+      it "passes if directory exists" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.i18n_dir = i18n_dir
+          end
+        end.not_to raise_error
+      end
+
+      it "fails with empty string value" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.i18n_dir = ""
+          end
+        end.to raise_error(RuntimeError, /invalid value for `config\.i18n_dir`/)
+      end
+
+      it "fails with not existing directory" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.i18n_dir = not_existing_path
+          end
+        end.to raise_error(RuntimeError, /invalid value for `config\.i18n_dir`/)
+      end
     end
 
-    it "does not raises if the i18n directory does exist" do
-      dir = __dir__
-      expect do
-        ReactOnRails.configure do |config|
-          config.i18n_dir = dir
-        end
-      end.to_not raise_error
-      expect(ReactOnRails.configuration.i18n_dir).to eq(dir)
-    end
+    describe ".i18n_yml_dir" do
+      let(:i18n_yml_dir) { existing_path }
 
-    it "raises if the i18n yaml directory does not exist" do
-      junk_name = "/YYYY/junkYYYY"
-      expect do
-        ReactOnRails.configure do |config|
-          config.i18n_yml_dir = junk_name
-        end
-      end.to raise_error(/#{junk_name}/)
-    end
+      after do
+        ReactOnRails.configure { |config| config.i18n_yml_dir = nil }
+      end
 
-    it "does not raises if the i18n yaml directory does exist" do
-      dir = __dir__
-      expect do
-        ReactOnRails.configure do |config|
-          config.i18n_yml_dir = dir
-        end
-      end.to_not raise_error
-      expect(ReactOnRails.configuration.i18n_yml_dir).to eq(dir)
+      it "passes if directory exists" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.i18n_yml_dir = i18n_yml_dir
+          end
+        end.not_to raise_error
+      end
+
+      it "fails with empty string value" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.i18n_yml_dir = ""
+          end
+        end.to raise_error(RuntimeError, /invalid value for `config\.i18n_yml_dir`/)
+      end
+
+      it "fails with not existing directory" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.i18n_yml_dir = not_existing_path
+          end
+        end.to raise_error(RuntimeError, /invalid value for `config\.i18n_yml_dir`/)
+      end
     end
 
     it "be able to config default configuration of the gem" do
