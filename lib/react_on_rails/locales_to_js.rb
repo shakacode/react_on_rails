@@ -5,10 +5,7 @@ require "erb"
 module ReactOnRails
   class LocalesToJs
     def initialize
-      if !i18n_dir.nil? && !File.directory?(i18n_dir)
-        raise "config.i18n_dir is set and it is not a directory. Did you set config.i18n_dir in the react_on_rails initializer?"
-      end
-      return if i18n_yml_dir.nil?
+      return if i18n_dir.nil?
       return unless obsolete?
       @translations, @defaults = generate_translations
       convert
