@@ -1,6 +1,6 @@
 <%= render "header" %>
 
-<% react_helmet_app = react_component("ReactHelmetApp", prerender: true, props: { hello: "world" }, trace: true) %>
+<% react_helmet_app = react_component_hash("ReactHelmetApp", prerender: true, props: { hello: "world" }, trace: true) %>
 
 <% content_for :title do %>
   <%= react_helmet_app['title'] %>

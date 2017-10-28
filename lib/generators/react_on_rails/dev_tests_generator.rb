@@ -5,17 +5,6 @@ require_relative "generator_helper"
 
 module ReactOnRails
   module Generators
-    FALLBACK_OPTION_FOR_NODE_MODULES = <<-TEXT
-    // This fixes an issue with resolving 'react' when using a local symlinked version
-    // of the node_package folder
-    modules: [
-      path.join(__dirname, 'node_modules'),
-      'node_modules',
-    ],
-  },
-  plugins: [
-    TEXT
-
     class DevTestsGenerator < Rails::Generators::Base
       include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
@@ -28,7 +17,8 @@ module ReactOnRails
                    desc: "Setup prerender true for server rendered examples"
 
       def copy_rspec_files
-        %w[spec/spec_helper.rb
+        %w[.eslintrc
+           spec/spec_helper.rb
            spec/rails_helper.rb
            spec/simplecov_helper.rb
            .rspec].each { |file| copy_file(file) }
@@ -40,7 +30,7 @@ module ReactOnRails
 
       def add_test_related_gems_to_gemfile
         gem("rspec-rails", group: :test)
-        gem("poltergeist", group: :test)
+        gem("chromedriver-helper", group: :test)
         gem("coveralls", require: false)
       end
 
@@ -54,16 +44,16 @@ module ReactOnRails
         File.open(hello_world_index, "w+") { |f| f.puts new_hello_world_contents }
       end
 
-      def add_yarn_relative_install_script_in_client_package_json
-        client_package_json = File.join(destination_root, "client", "package.json")
-        contents = File.read(client_package_json)
+      def add_yarn_relative_install_script_in_package_json
+        package_json = File.join(destination_root, "package.json")
+        contents = File.read(package_json)
         replacement_value = <<-STRING
   "scripts": {
     "postinstall": "yarn link react-on-rails",
 STRING
         new_client_package_json_contents = contents.gsub(/ {2}"scripts": {/,
                                                          replacement_value)
-        File.open(client_package_json, "w+") { |f| f.puts new_client_package_json_contents }
+        File.open(package_json, "w+") { |f| f.puts new_client_package_json_contents }
       end
     end
   end

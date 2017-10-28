@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "open-uri"
+
 module ReactOnRails
   module ServerRenderingPool
     # This implementation of the rendering pool uses ExecJS to execute javasript code
@@ -14,11 +16,21 @@ module ReactOnRails
 
       def self.reset_pool_if_server_bundle_was_modified
         return unless ReactOnRails.configuration.development_mode
-        file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
-        @server_bundle_timestamp ||= file_mtime
-        return if @server_bundle_timestamp == file_mtime
+
+        server_bundle_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path
+
+        if Utils.using_webpacker? && Webpacker.dev_server.running?
+          return if @last_loaded_server_bundle == server_bundle_js_file_path
+          @last_loaded_server_bundle = server_bundle_js_file_path
+        else
+          # we're not hashing the server name and we can use the mtime
+          file_mtime = File.mtime(server_bundle_js_file_path)
+          @server_bundle_timestamp ||= file_mtime
+          return if @server_bundle_timestamp == file_mtime
+          @server_bundle_timestamp = file_mtime
+        end
+
         ReactOnRails::ServerRenderingPool.reset_pool
-        @server_bundle_timestamp = file_mtime
       end
 
       # js_code: JavaScript expression that returns a string.
@@ -42,7 +54,7 @@ module ReactOnRails
           console_script = result["consoleReplayScript"]
           console_script_lines = console_script.split("\n")
           console_script_lines = console_script_lines[2..-2]
-          re = /console\.log\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
+          re = /console\.(log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
           if console_script_lines
             console_script_lines.each do |line|
               match = re.match(line)
@@ -83,14 +95,15 @@ module ReactOnRails
 
           server_js_file = ReactOnRails::Utils.server_bundle_js_file_path
 
-          unless File.exist?(server_js_file)
+          # bundle_js_code = File.read(server_js_file)
+          begin
+            bundle_js_code = open(server_js_file, &:read)
+          rescue => e # rubocop:disable Lint/RescueWithoutErrorClass
             msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
                 "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\
-                "avoid this warning"
+                "avoid this warning.\nError is: #{e}"
             raise msg
           end
-
-          bundle_js_code = File.read(server_js_file)
           # rubocop:disable Layout/IndentHeredoc
           base_js_code = <<-JS
 #{console_polyfill}
@@ -102,7 +115,7 @@ module ReactOnRails
           begin
             trace_messsage(base_js_code, file_name)
             ExecJS.compile(base_js_code)
-          rescue => e
+          rescue => e # rubocop:disable Lint/RescueWithoutErrorClass
             msg = "ERROR when compiling base_js_code! "\
               "See file #{file_name} to "\
               "correlate line numbers of error. Error is\n\n#{e.message}"\

@@ -1,0 +1,7 @@
+<%= render "header" %>
+
+<%= react_component("RenderedHtml", prerender: true, props: { hello: "world" }, trace: true) %>
+
+<hr/>
+
+This page demonstrates a component that returns renderToString on the server side.

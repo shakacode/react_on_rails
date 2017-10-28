@@ -1,0 +1,28 @@
+# Note: Base output directory of /public is assumed for static files
+default: &default
+  # Critical to set compile as false for React on Rails projects
+  compile: false
+  custom_compile: true
+  # Cache manifest.json for performance
+  cache_manifest: false
+
+development:
+  <<: *default
+  # generated files for development, in /public/webpack/development
+  public_output_path: webpack/development
+
+  dev_server:
+    host: localhost
+    port: 3035
+    hmr: true
+
+test:
+  <<: *default
+  # generated files for test, in /public/webpack/test
+  public_output_path: webpack/test
+
+production:
+  <<: *default
+  # generated files for production, in /public/webpack/production
+  public_output_path: webpack/production
+  cache_manifest: true

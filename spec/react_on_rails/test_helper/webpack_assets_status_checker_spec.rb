@@ -5,7 +5,7 @@ require_relative "../spec_helper"
 
 describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
   describe "#stale_generated_webpack_files" do
-    let(:client_dir) { client_dir_for(fixture_dirname) }
+    let(:source_path) { source_path_for(fixture_dirname) }
     let(:generated_assets_dir) { compiled_js_dir_for(fixture_dirname) }
     let(:webpack_generated_files) { %w[client-bundle.js server-bundle.js] }
     let(:server_bundle_js_file) { File.join(generated_assets_dir, "server-bundle.js") }
@@ -18,7 +18,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     let(:checker) do
       ReactOnRails::TestHelper::WebpackAssetsStatusChecker
         .new(generated_assets_dir: generated_assets_dir,
-             client_dir: client_dir,
+             source_path: source_path,
              webpack_generated_files: webpack_generated_files)
     end
 
@@ -34,9 +34,9 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     context "when compiled assets with manifest exist and are up-to-date" do
       let(:fixture_dirname) { "assets_with_manifest_exist" }
       before do
-        require "webpacker_lite"
-        allow(ReactOnRails::Utils).to receive(:using_webpacker_lite?).and_return(true)
-        allow(WebpackerLite::Manifest).to receive(:exist?).and_return(true)
+        require "webpacker"
+        allow(ReactOnRails::Utils).to receive(:using_webpacker?).and_return(true)
+        allow(ReactOnRails::Utils).to receive(:manifest_exists?).and_return(true)
         allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
           .with("client-bundle.js")
           .and_return(File.join(generated_assets_dir, "client-bundle-6bc530d039d96709b68d.js"))
@@ -52,9 +52,9 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     context "when using webpacker and manifest is missing" do
       let(:fixture_dirname) { "assets_with_missing_manifest" }
       before do
-        require "webpacker_lite"
-        allow(ReactOnRails::Utils).to receive(:using_webpacker_lite?).and_return(true)
-        allow(WebpackerLite::Manifest).to receive(:exist?).and_return(false)
+        require "webpacker"
+        allow(ReactOnRails::Utils).to receive(:using_webpacker?).and_return(true)
+        allow(ReactOnRails::Utils).to receive(:manifest_exists?).and_return(false)
       end
 
       specify { expect(checker.stale_generated_webpack_files).to eq(["manifest.json"]) }
@@ -83,7 +83,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
 
     context "when assets exist but are outdated" do
       let(:fixture_dirname) { "assets_outdated" }
-      before { touch_files_in_dir(client_dir) }
+      before { touch_files_in_dir(source_path) }
 
       specify do
         expect(checker.stale_generated_webpack_files)
@@ -92,7 +92,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     end
   end
 
-  def client_dir_for(fixture_dirname)
+  def source_path_for(fixture_dirname)
     FixturesHelper.get_file(%W[webpack_assets #{fixture_dirname} client])
   end
 

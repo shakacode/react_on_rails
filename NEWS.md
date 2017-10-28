@@ -3,6 +3,7 @@
 *We'll keep a history of the news. A few bullets at the top will also show on the [README.md](./README.md).*
 
 * Always see the [CHANGELOG.md](./CHANGELOG.md) for the latest project changes.
+* [VERSION 8.1.0](https://rubygems.org/gems/react_on_rails/) shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) (soon [**webpacker**](https://github.com/rails/webpacker/issues/464#issuecomment-310986140) support! [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395) shows the changes needed to migrate from the Asset Pipeline to Webpacker Lite. For more information, see my article: [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92). Per recent discussions, we [will merge Webpacker Lite changes back into Webpacker](https://github.com/rails/webpacker/issues/464#issuecomment-310986140). There's no reason to wait for this. The upgrade will eventually be trivial.
 * 2017-04-25: 7.0.0 Shipped! Performance improvements! Please upgrade! Only "breaking" change is that you have to update both the node module and the Ruby gem. 
 * 2017-04-09: 8.0.0 beta work to include webpacker_lite gem has begun. See [#786](https://github.com/shakacode/react_on_rails/issues/786).
 * 2017-04-03: 6.9.3 Released! Props rendered in JSON script tag. Page size is smaller now due to less escaping!

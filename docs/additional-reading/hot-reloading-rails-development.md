@@ -1,3 +1,16 @@
+# Live Reloading vs. Hot Reloading (aka HMR)
+
+The use of the [webpack-dev-server](https://webpack.js.org/configuration/dev-server/) provides "Live Reloading" by default. The difference between live and hot reloading is that live reloading will act similarly to hitting refresh in the browser. Hot reloading will attempt to preserve the state of any props.
+
+See the Webpack document [Hot Module Replacement](https://webpack.js.org/concepts/hot-module-replacement/) for more details on the concepts of live vs. hot reloading.
+
+The remainder of this document discusses HMR.
+
+# Using the Webpacker Webpack setup
+
+If you are using the default Webpacker setup of running the dev server with `bin/webpack-dev-server`, see the [Webpacker Webpack Dev Server discussion of HMR](https://github.com/rails/webpacker/blob/master/docs/webpack-dev-server.md#hot-module-replacement).
+
+
 # Hot Reloading of Assets For Rails Development
 
 _Note, this document is not yet updated for React on Rails v8+. See [PR #865](https://github.com/shakacode/react_on_rails/pull/865) for a detailed example of doing hot reloading using V8+ with Webpack v2. Any volunteers to update this page? See [#772](https://github.com/shakacode/react_on_rails/issues/772) and [#361](https://github.com/shakacode/react-webpack-rails-tutorial/issues/361)._
@@ -20,8 +33,6 @@ We'll use a Webpack Dev server on port 3500 to provide the assets to Rails, rath
 
 `Procfile.static` provides an alternative that uses "static" assets, similar to a production deployment.
 
-The secret sauce is in the [app/views/layouts/application.html.erb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/layouts/application.html.erb) where it uses view helps to configure the correct assets to load, being either the "hot" assets or the "static" assets.
-
 ## Places to Configure (Files to Examine)
 
 1. See the Webpack config files. Note, these examples are now setup for using [CSS Modules](https://github.com/css-modules/css-modules).
@@ -34,7 +45,7 @@ The secret sauce is in the [app/views/layouts/application.html.erb](https://gith
    2. Start the rails server, setting an ENV value of REACT_ON_RAILS_ENV to HOT if we're hot loading or else setting this to blank.
 1. Configure the file Rails asset pipeline files:
    1. [app/assets/javascripts/application_static.js](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/assets/javascripts/application_static.js) 
-   1. [app/assets/stylesheets/application_static.css.scss](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/assets/stylesheets/application_static.css.scss)
+   1. [app/assets/stylesheets/application_non_webpack.scss](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/app/assets/stylesheets/application_non_webpack.scss)
 1. Copy the [client/server-rails-hot.js](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/server-rails-hot.js) to the your client directory.
 1. Copy the scripts in the top level and client level `package.json` files:
    1. Top Level: [package.json](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/package.json)
@@ -43,77 +54,4 @@ The secret sauce is in the [app/views/layouts/application.html.erb](https://gith
 
 ## Code Snippets
 Please refer to the examples linked above in `spec/dummy` as these code samples might be out of date.
-
-
-### config/initializers/assets.rb
-
-```ruby
-# Add folder with webpack generated assets to assets.paths
-Rails.application.config.assets.paths << Rails.root.join("app", "assets", "webpack")
-
-# Precompile additional assets.
-# application.js, application.css, and all non-JS/CSS in app/assets folder are already added.
-Rails.application.config.assets.precompile << "server-bundle.js"
-
-type = ENV["REACT_ON_RAILS_ENV"] == "HOT" ? "non_webpack" : "static"
-Rails.application.config.assets.precompile +=
-  [
-    "application_#{type}.js",
-    "application_#{type}.css"
-  ]
-```
-
-### app/views/layouts/application.html.erb
-
-```erb
-<head>
-  <title>Dummy</title>
-
-  <!-- These do use turbolinks 5 -->
-  <%= env_stylesheet_link_tag(static: 'application_static',
-                              hot: 'application_non_webpack',
-                              media: 'all',
-                              'data-turbolinks-track' => "reload") %>
-
-  <!-- These do not use turbolinks, so no data-turbolinks-track -->
-  <!-- This is to load the hot assets. -->
-  <%= env_javascript_include_tag(hot: ['http://localhost:3500/vendor-bundle.js',
-                                       'http://localhost:3500/app-bundle.js']) %>
-
-  <!-- These do use turbolinks 5 -->
-  <%= env_javascript_include_tag(static: 'application_static',
-                                 hot: 'application_non_webpack',
-                                 'data-turbolinks-track' => "reload") %>
-
-  <%= csrf_meta_tags %>
-</head>
-```
-
-### Procfile.static
-```
-  # Run Rails without hot reloading (static assets).
-  rails: REACT_ON_RAILS_ENV= rails s -b 0.0.0.0
-  
-  # Build client assets, watching for changes.
-  rails-client-assets: yarn run build:dev:client
-  
-  # Build server assets, watching for changes. Remove if not server rendering.
-  rails-server-assets: yarn run build:dev:server
-```
-
-### Procfile.hot
-
-```
-# Procfile for development with hot reloading of JavaScript and CSS 
-
-# Development rails requires both rails and rails-assets
-# (and rails-server-assets if server rendering)
-rails: REACT_ON_RAILS_ENV=HOT rails s -b 0.0.0.0
-
-# Run the hot reload server for client development
-hot-assets: HOT_RAILS_PORT=3500 yarn run hot-assets
-
-# Keep the JS fresh for server rendering. Remove if not server rendering
-rails-server-assets: yarn run build:dev:server
-```
 

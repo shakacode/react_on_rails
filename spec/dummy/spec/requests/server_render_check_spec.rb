@@ -31,7 +31,7 @@ describe "Server Rendering", :server_rendering do
   end
 
   describe "reloading the server bundle" do
-    let(:server_bundle) { File.expand_path("../../../public/webpack/" + Rails.env + "/server-bundle.js", __FILE__) }
+    let(:server_bundle) { SERVER_BUNDLE_PATH }
     let!(:original_bundle_text) { File.read(server_bundle) }
 
     before do
@@ -101,9 +101,15 @@ describe "Server Rendering", :server_rendering do
     end
 
     def do_request(path)
-      get(path,
-          params: { ab: :cd },
-          headers: { "HTTP_ACCEPT_LANGUAGE" => http_accept_language })
+      if ReactOnRails::Utils.rails_version_less_than("5.0")
+        get(path,
+            { ab: :cd },
+            "HTTP_ACCEPT_LANGUAGE" => http_accept_language)
+      else
+        get(path,
+            params: { ab: :cd },
+            headers: { "HTTP_ACCEPT_LANGUAGE" => http_accept_language })
+      end
     end
 
     context "shared redux store" do

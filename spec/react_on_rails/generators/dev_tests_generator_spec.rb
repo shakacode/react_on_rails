@@ -9,7 +9,6 @@ describe DevTestsGenerator, type: :generator do
     before(:all) do
       run_generator_test_with_args(%w[],
                                    package_json: true,
-                                   webpack_client_base_config: true,
                                    spec: false)
     end
 
@@ -25,7 +24,7 @@ describe DevTestsGenerator, type: :generator do
     end
 
     it "changes package.json to use local react-on-rails version of module" do
-      assert_file("client/package.json") do |contents|
+      assert_file("package.json") do |contents|
         assert_match('"react-on-rails"', contents)
         assert_match('"postinstall"', contents)
       end
@@ -35,7 +34,7 @@ describe DevTestsGenerator, type: :generator do
       assert_file("Gemfile") do |contents|
         assert_match("gem 'rspec-rails', group: :test", contents)
         assert_match("gem 'coveralls', require: false", contents)
-        assert_match("gem 'poltergeist'", contents)
+        assert_match("gem 'chromedriver-helper', group: :test", contents)
       end
     end
   end
@@ -44,7 +43,6 @@ describe DevTestsGenerator, type: :generator do
     before(:all) do
       run_generator_test_with_args(%w[--example-server-rendering],
                                    package_json: true,
-                                   webpack_client_base_config: true,
                                    spec: false,
                                    hello_world_file: true)
     end

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 ENV["RAILS_ENV"] ||= "test"
+SERVER_BUNDLE_PATH = File.expand_path("../../public/webpack/" + ENV["RAILS_ENV"] + "/server-bundle.js", __FILE__)
 
 require_relative "simplecov_helper"
 require_relative "spec_helper"
@@ -38,7 +39,7 @@ ActiveRecord::Migration.maintain_test_schema!
 
 # Requires supporting files with custom matchers and macros, etc,
 # in ./support/ and its subdirectories.
-Dir[Rails.root.join("spec/support/**/*.rb")].each { |f| require f }
+Dir[Rails.root.join("spec", "support", "**", "*.rb")].each { |f| require f }
 
 RSpec.configure do |config|
   # Ensure that if we are running js tests, we are using latest webpack assets
