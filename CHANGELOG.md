@@ -6,7 +6,14 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 Changes since last non-beta release.
 
-*Please add entries here for your pull requests.*
+*Please add entries here for your pull requests that are not yet released.*
+
+#### Fixed
+- Fixed `react_component_hash` functionality in cases of prerendering errors: [PR 960](https://github.com/shakacode/react_on_rails/pull/960) by [Judahmeek](https://github.com/Judahmeek).
+- Fix to add missing dependency to run generator spec individually: [PR 962](https://github.com/shakacode/react_on_rails/pull/962) by [tricknotes](https://github.com/tricknotes).
+- Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set. [PR 899](https://github.com/shakacode/react_on_rails/pull/899) by [hakongit](https://github.com/hakongit).
+- Fixed mistake in rubocop comments that led to errors when handling exceptions in ReactOnRails::ServerRendering::Exec [PR 963](https://github.com/shakacode/react_on_rails/pull/963) by [railsme](https://github.com/railsme).
+- Fixed and improved I18n directories checks: [PR 967](https://github.com/shakacode/react_on_rails/pull/967) by [railsme](https://github.com/railsme)
 
 ### [10.0.0] - 2017-10-08
 #### Created
@@ -14,108 +21,27 @@ Changes since last non-beta release.
 #### Deprecated
 - Deprecated `react_component` functionality for react_helmet support.
 To clarify, the method itself is not deprecated, only certain functionality which has been moved to `react_component_hash`
-[PR 951](https://github.com/shakacode/react_on_rails/pull/951) by [Judahmeek](https://github.com/Judahmeek)
+[PR 951](https://github.com/shakacode/react_on_rails/pull/951) by [Judahmeek](https://github.com/Judahmeek).
 
 ### [9.0.3] - 2017-09-20
 #### Improved
-- Improved comments in generated Procfile.dev-server. [PR 940](https://github.com/shakacode/react_on_rails/pull/940) by [justin808](https://github.com/justin808 )
+- Improved comments in generated Procfile.dev-server. [PR 940](https://github.com/shakacode/react_on_rails/pull/940) by [justin808](https://github.com/justin808).
 
 ### [9.0.2] - 2017-09-10
 #### Fixed
-- Improved post install doc comments for generator. [PR 933](https://github.com/shakacode/react_on_rails/pull/933) by [justin808](https://github.com/justin808 )
+- Improved post install doc comments for generator. [PR 933](https://github.com/shakacode/react_on_rails/pull/933) by [justin808](https://github.com/justin808).
 
 ### [9.0.1] - 2017-09-10
 
 #### Fixed
-- Fixes Rails 3.2 compatability issues. [PR 926](https://github.com/shakacode/react_on_rails/pull/926) by [morozovm](https://github.com/morozovm )
+- Fixes Rails 3.2 compatability issues. [PR 926](https://github.com/shakacode/react_on_rails/pull/926) by [morozovm](https://github.com/morozovm).
 
 ### [9.0.0] - 2017-09-06
 Updated React on Rails to depend on [rails/webpacker](https://github.com/rails/webpacker). [PR 908](https://github.com/shakacode/react_on_rails/pull/908) by [justin808](https://github.com/justin808).
 
 
 #### 9.0 from 8.x. Upgrade Instructions
-
-For an example of upgrading, see [react-webpack-rails-tutorial/pull/416](https://github.com/shakacode/react-webpack-rails-tutorial/pull/416).
-
-- Breaking Configuration Changes
-  1. Added `config.node_modules_location` which defaults to `""` if Webpacker is installed. You may want to set this to 'client'` to `config/initializers/react_on_rails.rb` to keep your node_modules inside of `/client`
-  2. Renamed
-   * config.npm_build_test_command ==> config.build_test_command
-   * config.npm_build_production_command ==> config.build_production_command
-
-- Update the gemfile. Switch over to using the webpacker gem.
-
-```rb
-gem "webpacker"
-```
-
-- Update for the renaming in the `WebpackConfigLoader` in your webpack configuration.
-  You will need to rename the following object properties:
-  - webpackOutputPath      ==> output.path
-  - webpackPublicOutputDir ==> output.publicPath
-  - hotReloadingUrl        ==> output.publicPathWithHost
-  - hotReloadingHostname   ==> settings.dev_server.host
-  - hotReloadingPort       ==> settings.dev_server.port
-  - hmr                    ==> settings.dev_server.hmr
-  - manifest               ==> Remove this one. We use the default for Webpack of manifest.json
-  - env                    ==> Use `const { env } = require('process');`
-  - devBuild               ==> Use `const devBuild = process.env.NODE_ENV !== 'production';`
-
-- Edit your Webpack.config files:
-  - Change your Webpack output to be like this. **Be sure to have the hash or chunkhash in the filename,** unless the bundle is server side.:
-    ```
-    const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
-    const configPath = resolve('..', 'config');
-    const { output, settings } = webpackConfigLoader(configPath);
-    const hmr = settings.dev_server.hmr;
-    const devBuild = process.env.NODE_ENV !== 'production';
-
-    output: {
-      filename: isHMR ? '[name]-[hash].js' : '[name]-[chunkhash].js',
-      chunkFilename: '[name]-[chunkhash].chunk.js',
-
-      publicPath: output.publicPath,
-      path: output.path,
-    },
-    ```
-  - Change your ManifestPlugin definition to something like the following
-    ```
-    new ManifestPlugin({
-        publicPath: output.publicPath,
-        writeToFileEmit: true
-      }),
-
-    ```
-
-- Find your `webpacker_lite.yml` and rename it to `webpacker.yml`
-  - Consider copying a default webpacker.yml setup such as https://github.com/shakacode/react-on-rails-v9-rc-generator/blob/master/config/webpacker.yml
-  - If you are not using the webpacker webpacker setup, be sure to put in `compile: false` in the `default` section.
-  - Alternately, if you are updating from webpacker_lite, you can manually change these:
-  - Add a default setting
-    ```
-    cache_manifest: false
-    ```
-  - For production, set:  
-    ```
-    cache_manifest: true
-    ```
-  - Add a section like this under your development env:
-    ```
-    dev_server:
-      host: localhost
-      port: 3035
-      hmr: false
-    ```
-    Set hmr to your preference.
-  - See the example `spec/dummy/config/webpacker.yml`.
-  - Remove keys `hot_reloading_host` and `hot_reloading_enabled_by_default`. These are replaced by the `dev_server` key.
-  - Rename `webpack_public_output_dir` to `public_output_path`.
-
-- Edit your Procfile.dev
-  - Remove the env value WEBPACKER_DEV_SERVER as it's not used
-  - For hot loading:
-    - Set the `hmr` key in your `webpacker.yml` to `true`.
-
+Moved to [our additional reading documentation](https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/upgrading-react-on-rails#from-version-8).
 
 ### [8.0.7] - 2017-08-16
 #### Fixed
@@ -739,7 +665,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/9.0.3...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/10.0.0...master
+[10.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.3...10.0.o
 [9.0.3]: https://github.com/shakacode/react_on_rails/compare/9.0.2...9.0.3
 [9.0.2]: https://github.com/shakacode/react_on_rails/compare/9.0.1...9.0.2
 [9.0.1]: https://github.com/shakacode/react_on_rails/compare/9.0.0...9.0.1

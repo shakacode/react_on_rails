@@ -21,7 +21,7 @@ module ReactOnRails
   end
 
   def self.check_i18n_directory_exists
-    return if @configuration.i18n_dir.blank?
+    return if @configuration.i18n_dir.nil?
     return if Dir.exist?(@configuration.i18n_dir)
 
     raise "Error configuring /config/react_on_rails.rb: invalid value for `config.i18n_dir`. "\
@@ -30,7 +30,7 @@ module ReactOnRails
   end
 
   def self.check_i18n_yml_directory_exists
-    return if @configuration.i18n_yml_dir.blank?
+    return if @configuration.i18n_yml_dir.nil?
     return if Dir.exist?(@configuration.i18n_yml_dir)
 
     raise "Error configuring /config/react_on_rails.rb: invalid value for `config.i18n_yml_dir`. "\
@@ -105,8 +105,6 @@ module ReactOnRails
       server_render_method: "ExecJS",
       symlink_non_digested_assets_regex: nil,
       build_test_command: "",
-      i18n_dir: "",
-      i18n_yml_dir: "",
       build_production_command: ""
     )
   end

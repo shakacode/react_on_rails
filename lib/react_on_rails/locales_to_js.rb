@@ -5,7 +5,7 @@ require "erb"
 module ReactOnRails
   class LocalesToJs
     def initialize
-      return if i18n_dir.blank?
+      return if i18n_dir.nil?
       return unless obsolete?
       @translations, @defaults = generate_translations
       convert
