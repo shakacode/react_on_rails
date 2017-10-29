@@ -8,6 +8,7 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [10.0.1] - 2017-10-28
 #### Fixed
 - Fixed `react_component_hash` functionality in cases of prerendering errors: [PR 960](https://github.com/shakacode/react_on_rails/pull/960) by [Judahmeek](https://github.com/Judahmeek).
 - Fix to add missing dependency to run generator spec individually: [PR 962](https://github.com/shakacode/react_on_rails/pull/962) by [tricknotes](https://github.com/tricknotes).
@@ -665,8 +666,9 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/10.0.0...master
-[10.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.3...10.0.o
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/10.0.1...master
+[10.0.0]: https://github.com/shakacode/react_on_rails/compare/10.0.0...10.0.1
+[10.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.3...10.0.0
 [9.0.3]: https://github.com/shakacode/react_on_rails/compare/9.0.2...9.0.3
 [9.0.2]: https://github.com/shakacode/react_on_rails/compare/9.0.1...9.0.2
 [9.0.1]: https://github.com/shakacode/react_on_rails/compare/9.0.0...9.0.1
