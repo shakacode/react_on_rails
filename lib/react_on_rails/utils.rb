@@ -122,7 +122,6 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.prepend_cd_node_modules_directory(cmd)
-      return cmd if ReactOnRails.configuration.node_modules_location.blank?
       "cd #{ReactOnRails.configuration.node_modules_location} && #{cmd}"
     end
 
