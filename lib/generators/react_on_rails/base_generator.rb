@@ -95,7 +95,7 @@ module ReactOnRails
             - Visit http://localhost:3000/hello_world and see your React On Rails app running!
 
             - Run bin/webpack-dev-server to start the Webpack dev server for compilation of Webpack
-              assets assets as soon as you save. This default setup with the dev server does not work
+              assets as soon as you save. This default setup with the dev server does not work
               for server rendering
 
             - Alternately, you may turn off compile in config/webpacker.yml and run the foreman
