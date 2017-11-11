@@ -7,6 +7,8 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+#### Fixed
+- Remove unnecessary dependencies from released NPM package: [PR 968](https://github.com/shakacode/react_on_rails/pull/968) by [tricknotes](https://github.com/tricknotes).
 
 ### [10.0.1] - 2017-10-28
 #### Fixed

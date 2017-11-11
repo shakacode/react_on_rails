@@ -65,8 +65,10 @@ def run_generator_test_with_args(args, options = {})
   simulate_npm_files(options)
   yield if block_given?
 
-  # WARNING: std out is swallowed from running the generator during tests
-  run_generator(args + ["--ignore-warnings"])
+  Dir.chdir(destination_root) do
+    # WARNING: std out is swallowed from running the generator during tests
+    run_generator(args + ["--ignore-warnings"])
+  end
 end
 
 # Simulate having an existing file for cases where the generator needs to modify, not create, a file

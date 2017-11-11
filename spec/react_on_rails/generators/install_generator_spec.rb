@@ -8,35 +8,35 @@ describe InstallGenerator, type: :generator do
   destination File.expand_path("../../dummy-for-generators/", __FILE__)
 
   context "no args" do
-    before(:all) { run_generator_test_with_args(%w[]) }
+    before(:all) { run_generator_test_with_args(%w[], package_json: true) }
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
   end
 
   context "--redux" do
-    before(:all) { run_generator_test_with_args(%w[--redux]) }
+    before(:all) { run_generator_test_with_args(%w[--redux], package_json: true) }
     include_examples "base_generator", application_js: true
     include_examples "react_with_redux_generator"
   end
 
   context "-R" do
-    before(:all) { run_generator_test_with_args(%w[-R]) }
+    before(:all) { run_generator_test_with_args(%w[-R], package_json: true) }
     include_examples "base_generator", application_js: true
     include_examples "react_with_redux_generator"
   end
 
   context "without existing application.js or application.js.coffee file" do
-    before(:all) { run_generator_test_with_args([], application_js: false) }
+    before(:all) { run_generator_test_with_args([], application_js: false, package_json: true) }
     include_examples "base_generator", application_js: false
   end
 
   context "with existing application.js or application.js.coffee file" do
-    before(:all) { run_generator_test_with_args([], application_js: true) }
+    before(:all) { run_generator_test_with_args([], application_js: true, package_json: true) }
     include_examples "base_generator", application_js: true
   end
 
   context "with rails_helper" do
-    before(:all) { run_generator_test_with_args([], spec: true) }
+    before(:all) { run_generator_test_with_args([], spec: true, package_json: true) }
     it "adds ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)" do
       expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_RSPEC_TO_COMPILE_ASSETS
       assert_file("spec/rails_helper.rb") { |contents| assert_match(expected, contents) }
@@ -49,13 +49,13 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "base generator contains a helpful message" do
-      run_generator_test_with_args(%w[])
+      run_generator_test_with_args(%w[], package_json: true)
       # GeneratorMessages.output is an array with the git error being the first one
       expect(GeneratorMessages.output).to include(expected)
     end
 
     specify "react with redux generator contains a helpful message" do
-      run_generator_test_with_args(%w[--redux])
+      run_generator_test_with_args(%w[--redux], package_json: true)
       # GeneratorMessages.output is an array with the git error being the first one
       expect(GeneratorMessages.output).to include(expected)
     end
