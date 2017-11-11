@@ -2680,10 +2680,6 @@ hoist-non-react-statics@^1.0.3, hoist-non-react-statics@^1.2.0:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/hoist-non-react-statics/-/hoist-non-react-statics-1.2.0.tgz#aa448cf0986d55cc40773b17174b7dd066cb7cfb"
 
-hoist-non-react-statics@^2.2.1:
-  version "2.3.1"
-  resolved "https://registry.yarnpkg.com/hoist-non-react-statics/-/hoist-non-react-statics-2.3.1.tgz#343db84c6018c650778898240135a1420ee22ce0"
-
 home-or-tmp@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/home-or-tmp/-/home-or-tmp-2.0.0.tgz#e36c3f2d2cae7d746a857e38d18d5f32a7882db8"
@@ -4529,12 +4525,9 @@ react-hot-loader@^3.0.0-beta.6:
     redbox-react "^1.3.6"
     source-map "^0.4.4"
 
-react-on-rails@10.0.1, react-on-rails@^10.0.0:
-  version "10.0.1"
-  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-10.0.1.tgz#5abd1835109dcf7f362f2e4ccd08fca316eec87e"
-  dependencies:
-    react-on-rails "^10.0.0"
-    react-redux "^5.0.6"
+react-on-rails@10.0.2:
+  version "10.0.2"
+  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-10.0.2.tgz#4d17b9e1df403ad3ff013f36654957051761c35a"
 
 react-proptypes@^1.0.0:
   version "1.0.0"
@@ -4554,17 +4547,6 @@ react-redux@^5.0.5:
   dependencies:
     create-react-class "^15.5.3"
     hoist-non-react-statics "^1.0.3"
-    invariant "^2.0.0"
-    lodash "^4.2.0"
-    lodash-es "^4.2.0"
-    loose-envify "^1.1.0"
-    prop-types "^15.5.10"
-
-react-redux@^5.0.6:
-  version "5.0.6"
-  resolved "https://registry.yarnpkg.com/react-redux/-/react-redux-5.0.6.tgz#23ed3a4f986359d68b5212eaaa681e60d6574946"
-  dependencies:
-    hoist-non-react-statics "^2.2.1"
     invariant "^2.0.0"
     lodash "^4.2.0"
     lodash-es "^4.2.0"
