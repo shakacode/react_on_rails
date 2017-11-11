@@ -7,6 +7,8 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+
+### [10.0.2] - 2017-11-10
 #### Fixed
 - Remove unnecessary dependencies from released NPM package: [PR 968](https://github.com/shakacode/react_on_rails/pull/968) by [tricknotes](https://github.com/tricknotes).
 
@@ -669,6 +671,7 @@ Best done with Object destructing:
 - Fix several generator related issues.
 
 [Unreleased]: https://github.com/shakacode/react_on_rails/compare/10.0.1...master
+[10.0.2]: https://github.com/shakacode/react_on_rails/compare/10.0.0...10.0.2
 [10.0.1]: https://github.com/shakacode/react_on_rails/compare/10.0.0...10.0.1
 [10.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.3...10.0.0
 [9.0.3]: https://github.com/shakacode/react_on_rails/compare/9.0.2...9.0.3
