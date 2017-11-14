@@ -1,9 +1,6 @@
 # React on Rails Basic Tutorial
 
-* NOTE: Please be sure to use the BETA or RC versions of React on Rails until 9.0 is released.*
-
-
-This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering. It is updated to 9.0.0.
+This tutorial setups up a new Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering. It is updated to 10.0.2.
 
 After finishing this tutorial you will get an application that can do the following (live on Heroku):
 
@@ -39,7 +36,7 @@ gem install rails               # download and install latest stable Rails
 gem install foreman             # download and install Foreman
 ```
 
-Then we need to create a fresh Rails application with webpacker react support as following. Be sure that 
+Then we need to create a fresh Rails application with webpacker react support as following.
 
 First be sure to run `rails -v` and check you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with react per the instructions [here](https://github.com/rails/webpacker).
 
@@ -52,23 +49,22 @@ rails new test-react-on-rails --webpack=react
 cd test-react-on-rails
 ```
 
-Note: you can do the following two commands in an existing Rails app or pre Rails 5.1.3:
+Note: if you are installing React On Rails in an existing app or an app that uses Rails pre 5.1.3, you will need to run these two commands as well:
 
 ```
 bundle exec rails webpacker:install
 bundle exec rails webpacker:install:react
 ```
 
-
-
 Add the **React On Rails** gem to your Gemfile:
 
 ```
-gem 'react_on_rails', '9.0.0'         # use latest gem version, prefer exact version 
+gem 'react_on_rails', '10.0.2'         # prefer exact version 
 ```
 
+Note: Latest released React On Rails version is considered stable. Please use the latest version to ensure you get all the security patches and the best support.
 
-Then run `bundle` and commit the git repository (or `rails generate` will not work properly)
+Run `bundle` and commit the git repository (or `rails generate` will not work properly)
 
 
 ```
