@@ -23,14 +23,14 @@ Given that Webpacker already provides React integration, why would you add React
 
 ----
 
-## Steps to a New App with rails/webpacker v3 plus React on Rails v9:
+## Steps to a New App with rails/webpacker v3 plus latest React on Rails:
 First be sure to run `rails -v` and check that you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
 
 ### Basic installation for a new Rails App
 *See below for steps on an existing Rails app*
 
 1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory.
-2. Add gem version: `gem 'react_on_rails', '~> 9.0.1'`
+2. Add gem version: `gem 'react_on_rails', '10.0.2' # prefer exact gem version to match npm version`
 3. Run the generator: `rails generate react_on_rails:install`
 4. Start the app: `rails s`
 5. Visit http://localhost:3000/hello_world
