@@ -2,7 +2,7 @@
 
 *If this projects helps you, please give us a star!*
 
-[ShakaCode is hiring team members](http://www.shakacode.com/about/#work-with-us) for our own app, [Friends and Guests](https://www.friendsandguests.com).
+[ShakaCode is hiring team members](http://www.shakacode.com/about/#work-with-us) for our own vacation rental listing site app, [Hawaii Chee](https://www.hawaiichee.com).
 
 # React on Rails v10 is based on Webpacker 3.0!
 
