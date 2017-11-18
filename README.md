@@ -138,6 +138,7 @@ React on Rails integrates Facebook's [React](https://github.com/facebook/react) 
 
 + [Features](#features)
 + [Why Webpack?](#why-webpack)
++ [rails/webpacker or custom setup for Webpack?](##rails-webpacker-or-custom-setup-for-webpack)
 + [Getting Started with an existing Rails app](#getting-started-with-an-existing-rails-app)
     - [Installation Overview](#installation-overview)
     - [Initializer Configuration: config/initializers/react_on_rails.rb](#initializer-configuration)
@@ -179,6 +180,20 @@ This usage of webpack fits neatly and simply into existing Rails apps. You can i
 
 Compare this to some alternative approaches for SPAs (Single Page Apps) that utilize Webpack and Rails. They will use a separate node server to distribute web pages, JavaScript assets, CSS, etc., and will still use Rails as an API server. A good example of this is our ShakaCode team member Alex's article [
 Universal React with Rails: Part I](https://medium.com/@alexfedoseev/isomorphic-react-with-rails-part-i-440754e82a59).
+
+## rails/webpacker or custom setup for Webpack?
+
+You have 2 main options when setting up React on Rails. You can either
+
+1. Keep your client-side app completely within the `/client` directory, as shown in the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial). The [ShakaCode Team](http://www.shakacode.com) recommends this approach for most projects as it provides the greatest transparency in your webpack and overall client-side setup. The *big advantage* to this is that almost everything within the `/client` directory app will apply if you wish to convert your client-side code to pure Single Page Application that runs without Rails.
+2. Use the [rails/webpacker](https://github.com/rails/webpacker) Webpack configuration mechanism. The advantage of this is that there is very little code needed to get started. The *big disadvantage* to this is that you will need to learn the ins and outs of rails/webpacker if you wish to beyond the basic setup, and this sort of knowledge is not going to be particularly applicable if you eventually want to convert your client-side app to a pure Single Page Application that runs without rails.
+
+The [basic tutorial](https://github.com/shakacode/react_on_rails/blob/master/docs/tutorial.md) and generator use the Webpacker Webpack configuration for 2 reasons:
+
+1. It's less code to generate and thus less to explain.
+2. `rails/webpacker` can be viewed as a convention in the Rails community.
+
+See [Issue 982: Tutorial Generating Correct Project Structure?](https://github.com/shakacode/react_on_rails/issues/982) to discuss this.
 
 ## Upgrade
 
