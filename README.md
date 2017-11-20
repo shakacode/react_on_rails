@@ -138,7 +138,7 @@ React on Rails integrates Facebook's [React](https://github.com/facebook/react) 
 
 + [Features](#features)
 + [Why Webpack?](#why-webpack)
-+ [rails/webpacker or custom setup for Webpack?](#railswebpacker-or-custom-setup-for-webpack)
++ [rails/webpacker or custom setup for Webpack?](#webpack-configuration-custom-setup-for-webpack-or-railswebpacker)
 + [Getting Started with an existing Rails app](#getting-started-with-an-existing-rails-app)
     - [Installation Overview](#installation-overview)
     - [Initializer Configuration: config/initializers/react_on_rails.rb](#initializer-configuration)
