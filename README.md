@@ -145,6 +145,8 @@ React on Rails integrates Facebook's [React](https://github.com/facebook/react) 
     - [Including your React Component in your Rails Views](#including-your-react-component-in-your-rails-views)
     - [I18n](#i18n)
     - [Convert rails-5 API only app to rails app](#convert-rails-5-api-only-app-to-rails-app)
+    - [NPM](#npm)
+    - [Webpacker Configuration](#webpacker-configuration)
 + [How it Works](#how-it-works)
     - [Client-Side Rendering vs. Server-Side Rendering](#client-side-rendering-vs-server-side-rendering)
     - [Building the Bundles](#building-the-bundles)
@@ -332,7 +334,7 @@ Rails will start creating the app and will skip the files you have already creat
 3. Run `bundle install` and follow [Getting started](#getting-started-with-an-existing-rails-app)
 
 
-## NPM
+### NPM
 All JavaScript in React On Rails is loaded from npm: [react-on-rails](https://www.npmjs.com/package/react-on-rails). To manually install this (you did not use the generator), assuming you have a standard configuration, run this command (assuming you are in the directory where you have your `node_modules`):
 
 ```bash
@@ -341,7 +343,7 @@ yarn add react-on-rails
 
 That will install the latest version and update your package.json.
 
-## Webpacker Configuration
+### Webpacker Configuration
 
 React on Rails users should set configuration value `compile` to false, as React on Rails handles compilation for test and production environments.
 
