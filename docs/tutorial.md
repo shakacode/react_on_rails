@@ -76,7 +76,7 @@ git add -A
 git commit -m "Initial commit"
 ```
 
-Install React on Rails: `rails generator react_on_rails:install` or `rails generate react_on_rails:install --redux`. You need to first git commit your files before running the generator, or else it will generate an error.
+Install React on Rails: `rails generate react_on_rails:install` or `rails generate react_on_rails:install --redux`. You need to first git commit your files before running the generator, or else it will generate an error.
 
 ```
 rails generate react_on_rails:install
