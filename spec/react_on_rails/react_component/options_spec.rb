@@ -55,7 +55,7 @@ describe ReactOnRails::ReactComponent::Options do
 
       opts = described_class.new(attrs)
 
-      expect(opts.name).to eq "SomeApp"
+      expect(opts.name).to eq "some_app"
     end
   end
 

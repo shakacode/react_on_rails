@@ -7,6 +7,8 @@ module ReactOnRails
     class Options
       include Utils::Required
 
+      attr_reader :name
+
       NO_PROPS = {}.freeze
 
       def initialize(name: required("name"), options: required("options"))
@@ -16,10 +18,6 @@ module ReactOnRails
 
       def props
         options.fetch(:props) { NO_PROPS }
-      end
-
-      def name
-        @name.camelize
       end
 
       def dom_id
