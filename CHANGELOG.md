@@ -46,7 +46,7 @@ Updated React on Rails to depend on [rails/webpacker](https://github.com/rails/w
 
 
 #### 9.0 from 8.x. Upgrade Instructions
-Moved to [our additional reading documentation](https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/upgrading-react-on-rails#from-version-8).
+Moved to [our documentation](docs/basics/upgrading-react-on-rails.md#upgrading-to-version-9).
 
 ### [8.0.7] - 2017-08-16
 #### Fixed
