@@ -55,6 +55,8 @@ module ReactOnRails
           if File.exist?(spec_helper)
             add_configure_rspec_to_compile_assets(spec_helper)
           else
+            # rubocop:disable Lint/UnneededDisable
+            # rubocop:disable Layout/EmptyLinesAroundArguments
             GeneratorMessages.add_info(
               <<-MSG.strip_heredoc
 
@@ -67,6 +69,8 @@ module ReactOnRails
               ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
               MSG
             )
+            # rubocop:enable Layout/EmptyLinesAroundArguments
+            # rubocop:enable Lint/UnneededDisable
           end
         end
       end
