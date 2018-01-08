@@ -14,7 +14,7 @@ module ReactOnRails
       end
 
       def copy_base_files
-        base_js_path = "base/base"
+        base_js_path = "redux/base"
         base_files = %w[app/javascript/bundles/HelloWorld/components/HelloWorld.jsx]
         base_files.each { |file| copy_file("#{base_js_path}/#{file}", file) }
       end
