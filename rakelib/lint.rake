@@ -1,9 +1,10 @@
 # frozen_string_literal: true
 
 require_relative "task_helpers"
-include ReactOnRails::TaskHelpers
 
-namespace :lint do
+namespace :lint do # rubocop:disable Metrics/BlockLength
+  include ReactOnRails::TaskHelpers
+
   desc "Run Rubocop as shell"
   task :rubocop do
     sh_in_dir(gem_root, "bundle exec rubocop .")

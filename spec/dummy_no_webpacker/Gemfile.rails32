@@ -1,5 +1,7 @@
 source 'https://rubygems.org'
 
+ruby "2.2.1"
+
 eval_gemfile File.expand_path("../../../react_on_rails.gemspec", __FILE__)
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails'

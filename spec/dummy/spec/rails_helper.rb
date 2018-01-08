@@ -80,9 +80,7 @@ RSpec.configure do |config|
   driver = ENV["DRIVER"].try(:to_sym) || default_driver
   Capybara.default_driver = driver
 
-  unless supported_drivers.include?(driver)
-    raise "Unsupported driver: #{driver} (supported = #{supported_drivers})"
-  end
+  raise "Unsupported driver: #{driver} (supported = #{supported_drivers})" unless supported_drivers.include?(driver)
 
   case driver
   when :poltergeist, :poltergeist_errors_ok, :poltergeist_no_animations
