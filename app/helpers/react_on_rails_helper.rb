@@ -13,7 +13,7 @@ require "react_on_rails/json_output"
 module ReactOnRailsHelper
   include ReactOnRails::Utils::Required
 
-  COMPONENT_HTML_KEY = "componentHtml"
+  COMPONENT_HTML_KEY = "componentHtml".freeze
 
   # The env_javascript_include_tag and env_stylesheet_link_tag support the usage of a webpack
   # dev server for providing the JS and CSS assets during development mode. See
@@ -178,9 +178,7 @@ module ReactOnRailsHelper
   # that contains a data props.
   def redux_store_hydration_data
     return if @registered_stores_defer_render.blank?
-    # rubocop:disable Performance/UnfreezeString
     @registered_stores_defer_render.reduce("".dup) do |accum, redux_store_data|
-      # rubocop:enable Performance/UnfreezeString
       accum << render_redux_store_data(redux_store_data)
     end.html_safe
   end
@@ -447,15 +445,12 @@ module ReactOnRailsHelper
 
   def initialize_redux_stores
     return "" unless @registered_stores.present? || @registered_stores_defer_render.present?
-    declarations = "var reduxProps, store, storeGenerator;\n".dup # rubocop:disable Performance/UnfreezeString
-
+    declarations = "var reduxProps, store, storeGenerator;\n".dup
     all_stores = (@registered_stores || []) + (@registered_stores_defer_render || [])
 
-    # rubocop:disable Performance/UnfreezeString
     result = <<-JS.dup
       ReactOnRails.clearHydratedStores();
     JS
-    # rubocop:enable Performance/UnfreezeString
 
     result << all_stores.each_with_object(declarations) do |redux_store_data, memo|
       store_name = redux_store_data[:store_name]
@@ -516,6 +511,7 @@ module ReactOnRailsHelper
 
     @rails_context.merge(serverSide: server_side)
   end
+  # rubocop:enable Metrics/AbcSize
 
   def replay_console_option(val)
     val.nil? ? ReactOnRails.configuration.replay_console : val
@@ -539,3 +535,4 @@ module ReactOnRailsHelper
     controller.is_a?(ActionMailer::Base)
   end
 end
+# rubocop:enable Metrics/ModuleLength
