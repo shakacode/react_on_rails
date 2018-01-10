@@ -14,20 +14,33 @@ module ReactOnRails
         Utils.bundle_js_file_path("webpack-bundle.js")
       end
 
-      context "With Webpacker enabled and file in manifest", :webpacker do
+      context "With Webpacker enabled", :webpacker do
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
           allow(Webpacker).to receive_message_chain("dev_server.running?")
             .and_return(false)
           allow(Webpacker).to receive_message_chain("config.public_output_path")
             .and_return("/webpack/development")
-          allow(Webpacker).to receive_message_chain("manifest.lookup")
-            .with("webpack-bundle.js")
-            .and_return("/webpack/development/webpack-bundle-0123456789abcdef.js")
           allow(Utils).to receive(:using_webpacker?).and_return(true)
         end
 
-        it { expect(subject).to eq("public/webpack/development/webpack-bundle-0123456789abcdef.js") }
+        context "and file in manifest", :webpacker do
+          before do
+            allow(Webpacker).to receive_message_chain("manifest.lookup")
+              .with("webpack-bundle.js")
+              .and_return("/webpack/development/webpack-bundle-0123456789abcdef.js")
+          end
+
+          it { expect(subject).to eq("public/webpack/development/webpack-bundle-0123456789abcdef.js") }
+        end
+
+        context "manifest.json" do
+          subject do
+            Utils.bundle_js_file_path("manifest.json")
+          end
+
+          it { expect(subject).to eq("public/webpack/development/manifest.json") }
+        end
       end
 
       context "Without Webpacker enabled" do

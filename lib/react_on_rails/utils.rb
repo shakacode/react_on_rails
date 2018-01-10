@@ -85,8 +85,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.bundle_js_file_path(bundle_name)
-      if using_webpacker?
-        return bundle_name if bundle_name == "manifest.json"
+      if using_webpacker? && bundle_name != "manifest.json"
         bundle_js_file_path_from_webpacker(bundle_name)
       else
         # Default to the non-hashed name in the specified output directory, which, for legacy
