@@ -9,7 +9,7 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 
 #### Fixed
-- Fixed `Utils.bundle_js_file_path` generating the incorrect path for `manifest.json` in webpacker projects: [#1011] by [elstgav](https://github.com/elstgav)
+- Fixed `Utils.bundle_js_file_path` generating the incorrect path for `manifest.json` in webpacker projects: [Issue #1011](https://github.com/shakacode/react_on_rails/issues/1011) by [elstgav](https://github.com/elstgav)
 
 ### [10.0.2] - 2017-11-10
 #### Fixed
