@@ -8,6 +8,9 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+#### Fixed
+- Fixed `ReactDOM.render()` deprecation warning with React v16: [Issue #965](https://github.com/shakacode/react_on_rails/issues/965) by [elstgav](https://github.com/elstgav)
+
 ### [10.0.2] - 2017-11-10
 #### Fixed
 - Remove unnecessary dependencies from released NPM package: [PR 968](https://github.com/shakacode/react_on_rails/pull/968) by [tricknotes](https://github.com/tricknotes).

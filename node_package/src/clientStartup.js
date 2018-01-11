@@ -95,8 +95,8 @@ function domNodeIdForEl(el) {
 }
 
 /**
- * Used for client rendering by ReactOnRails. Either calls ReactDOM.render or delegates
- * to a renderer registered by the user.
+ * Used for client rendering by ReactOnRails. Either calls ReactDOM.hydrate, ReactDOM.render, or
+ * delegates to a renderer registered by the user.
  * @param el
  */
 function render(el, railsContext) {
@@ -128,7 +128,17 @@ function render(el, railsContext) {
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);
       } else {
-        ReactDOM.render(reactElementOrRouterResult, domNode);
+        const shouldHydrate = !!(
+          ReactDOM.hydrate &&
+          domNode &&
+          domNode.hasAttribute('data-reactroot')
+        );
+
+        if (shouldHydrate) {
+          ReactDOM.hydrate(reactElementOrRouterResult, domNode);
+        } else {
+          ReactDOM.render(reactElementOrRouterResult, domNode);
+        }
       }
     }
   } catch (e) {
