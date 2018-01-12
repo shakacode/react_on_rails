@@ -5,9 +5,10 @@
 ## Commercial Products Live
 * **[Friends and Guests](https://www.friendsandguests.com/)**, the signature product of [ShakaCode](http://www.shakacode.com), which is a "Network Connecting Hosts and Guests".
 * **[KissKissBankBank](https://www.kisskissbankbank.com/)**, large French crowdfunding platform.
-* **[Nootrobox](https://nootrobox.com)**: Web ecommerce site for "biohacking" products.
+* **[HVMN](https://hvmn.com)**: Web ecommerce site for "biohacking" products.
 * **[GuavaPass](https://guavapass.com/)**: Coaching client of [ShakaCode](http://www.shakacode.com) and React on Rails fan!
 * **[Pivotal Tracker](http://www.pivotaltracker.com/)**: The first (and most-loved) agile project management tool built on Rails.  React on Rails has greatly simplified integration and workflow for our React components in Rails!
+* **[Estately](https://www.estately.com)**: Home search.
 * **[Blink Inc](https://www.blinkinc.com)**: Website and more built by [ShakaCode](http://www.shakacode.com).
 * **[Madrone Analytics](http://madroneco.com/)**: The original client of [ShakaCode](http://www.shakacode.com) that led to the development of React on Rails, as described in [Fast Rich Client Rails Development With Webpack and the ES6 Transpiler](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/).
 * **[Deliveroo](https://deliveroo.co.uk/)**: The leading food delivery site in Europe has gone live with React on Rails, with multi-lingual JavaScript support!
