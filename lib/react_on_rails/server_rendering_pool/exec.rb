@@ -98,7 +98,7 @@ module ReactOnRails
           # bundle_js_code = File.read(server_js_file)
           begin
             bundle_js_code = open(server_js_file, &:read)
-          rescue => e # rubocop:disable Lint/RescueWithoutErrorClass
+          rescue StandardError
             msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
                 "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\
                 "avoid this warning.\nError is: #{e}"
@@ -115,7 +115,7 @@ module ReactOnRails
           begin
             trace_messsage(base_js_code, file_name)
             ExecJS.compile(base_js_code)
-          rescue => e # rubocop:disable Lint/RescueWithoutErrorClass
+          rescue StandardError
             msg = "ERROR when compiling base_js_code! "\
               "See file #{file_name} to "\
               "correlate line numbers of error. Error is\n\n#{e.message}"\

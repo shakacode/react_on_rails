@@ -5,7 +5,6 @@ require File.expand_path("../application", __FILE__)
 
 # Initialize the Rails application.
 # Rails.application.initialize!
-if File.basename(ENV["BUNDLE_GEMFILE"] || "") == "Gemfile.rails32"
-  require "rails3/before_action"
-end
+require "rails3/before_action" if File.basename(ENV["BUNDLE_GEMFILE"] || "") == "Gemfile.rails32"
+
 Dummy::Application.initialize!
