@@ -69,9 +69,7 @@ RSpec.configure do |config|
                           selenium_chrome selenium_firefox selenium]
   driver = ENV["DRIVER"].try(:to_sym) || default_driver
 
-  unless supported_drivers.include?(driver)
-    raise "Unsupported driver: #{driver} (supported = #{supported_drivers})"
-  end
+  raise "Unsupported driver: #{driver} (supported = #{supported_drivers})" unless supported_drivers.include?(driver)
 
   case driver
   when :poltergeist, :poltergeist_errors_ok

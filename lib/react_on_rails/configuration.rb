@@ -62,9 +62,8 @@ module ReactOnRails
     return unless @configuration.webpack_generated_files.empty?
 
     files = ["hello-world-bundle.js"]
-    if @configuration.server_bundle_js_file.present?
-      files << @configuration.server_bundle_js_file
-    end
+    files << @configuration.server_bundle_js_file if @configuration.server_bundle_js_file.present?
+
     @configuration.webpack_generated_files = files
   end
 
@@ -85,7 +84,6 @@ module ReactOnRails
     @configuration ||= Configuration.new(
       node_modules_location: nil,
       generated_assets_dirs: nil,
-
       # generated_assets_dirs is deprecated
       generated_assets_dir: "",
       server_bundle_js_file: "",
@@ -98,7 +96,6 @@ module ReactOnRails
       server_renderer_pool_size: 1,
       server_renderer_timeout: 20,
       skip_display_none: nil,
-
       # skip_display_none is deprecated
       webpack_generated_files: %w[manifest.json],
       rendering_extension: nil,

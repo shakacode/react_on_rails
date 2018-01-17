@@ -8,8 +8,9 @@
 require "yaml"
 require_relative "example_type"
 require_relative "task_helpers"
-include ReactOnRails::TaskHelpers
+
 namespace :examples do # rubocop:disable Metrics/BlockLength
+  include ReactOnRails::TaskHelpers
   # Loads data from examples_config.yml and instantiates corresponding ExampleType objects
   examples_config_file = File.expand_path("../examples_config.yml", __FILE__)
   examples_config = symbolize_keys(YAML.safe_load(File.read(examples_config_file)))
