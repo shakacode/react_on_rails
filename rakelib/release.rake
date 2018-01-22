@@ -1,11 +1,12 @@
 # frozen_string_literal: true
 
 require_relative "task_helpers"
-include ReactOnRails::TaskHelpers
 require_relative File.join(gem_root, "lib", "react_on_rails", "version_syntax_converter")
 require_relative File.join(gem_root, "lib", "react_on_rails", "git_utils")
 require_relative File.join(gem_root, "lib", "react_on_rails", "utils")
 
+# rubocop:disable Lint/UnneededDisable
+# rubocop:disable Layout/EmptyLinesAroundArguments
 desc("Releases both the gem and node package using the given version.
 
 IMPORTANT: the gem version must be in valid rubygem format (no dashes).
@@ -21,9 +22,13 @@ which are installed via `bundle install` and `yarn`
 2nd argument: Perform a dry run by passing 'true' as a second argument.
 
 Example: `rake release[2.1.0,false]`")
+# rubocop:enable Layout/EmptyLinesAroundArguments
+# rubocop:enable Lint/UnneededDisable
 
 # rubocop:disable Metrics/BlockLength
 task :release, %i[gem_version dry_run tools_install] do |_t, args|
+  include ReactOnRails::TaskHelpers
+
   class MessageHandler
     def add_error(error)
       raise error
@@ -60,9 +65,7 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   sh_in_dir(gem_root, "git add .")
 
   # Will bump the yarn version, commit, tag the commit, push to repo, and release on yarn
-  # rubocop:disable Performance/UnfreezeString
   release_it_command = "$(yarn bin)/release-it --non-interactive --npm.publish".dup
-  # rubocop:enable Performance/UnfreezeString
   release_it_command << " --dry-run --verbose" if is_dry_run
   release_it_command << " #{npm_version}" unless npm_version.strip.empty?
   sh_in_dir(gem_root, release_it_command)
@@ -77,3 +80,4 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
     sh_in_dir(gem_root, "git push")
   end
 end
+# rubocop:enable Metrics/BlockLength

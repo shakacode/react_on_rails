@@ -101,9 +101,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     def self.rails_version_less_than(version)
       @rails_version_less_than ||= {}
 
-      if @rails_version_less_than.key?(version)
-        return @rails_version_less_than[version]
-      end
+      return @rails_version_less_than[version] if @rails_version_less_than.key?(version)
 
       @rails_version_less_than[version] = begin
         Gem::Version.new(Rails.version) < Gem::Version.new(version)
