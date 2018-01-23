@@ -2,7 +2,7 @@
 
 *If this projects helps you, please give us a star!*
 
-[ShakaCode is hiring team members](http://www.shakacode.com/about/#work-with-us) for our own vacation rental listing site app, [Hawaii Chee](https://www.hawaiichee.com).
+[The ShakaCode team has availability to help your project](http://www.shakacode.com/work). If your team might need my help, please [email me](mailto:justin@shakacode.com) for a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products.
 
 # React on Rails v10 is based on Webpacker 3.0!
 
@@ -59,7 +59,7 @@ Thank you for considering using [React on Rails](https://github.com/shakacode/re
 
 We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first application development company. We fund this project by:
 
-* Providing priority support and training for anything related to React + Webpack + Rails in our [Coaching Program](http://www.shakacode.com/work/shakacode-coaching-plan.pdf).
+* Providing priority support and training for anything related to React + Webpack + Rails in our [Pro Support program](http://www.shakacode.com/work/shakacode-pro-support.pdf).
 * Building custom web and mobile (React Native) applications. We typically work with a technical founder or CTO and instantly provide a full development team including designers.
 * Migrating **Angular** + Rails to React + Rails. You can see an example of React on Rails and our work converting Angular to React on Rails at [egghead.io](https://egghead.io/browse/frameworks).
 * Augmenting your team to get your product completed more efficiently and quickly.
@@ -68,7 +68,7 @@ My article "[Why Hire ShakaCode?](https://blog.shakacode.com/can-shakacode-help-
 
 If any of this resonates with you, please email me, [justin@shakacode.com](mailto:justin@shakacode.com). I offer a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products.
 
-We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Friends and Guests](https://www.friendsandguests.com).
+We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Hawaii Chee](https://www.hawaiichee.com).
 
 I appreciate your attention and sharing of these offerings with anybody that we can help. Your support allows me to bring you and your team [front-end happiness in the Rails world](https://www.youtube.com/watch?v=SGkTvKRPYrk).
 
@@ -805,7 +805,7 @@ Thank you for considering using [React on Rails](https://github.com/shakacode/re
 
 We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first application development company. We fund this project by:
 
-* Providing priority support and training for anything related to React + Webpack + Rails in our [Coaching Program](http://www.shakacode.com/work/shakacode-coaching-plan.pdf).
+* Providing priority support and training for anything related to React + Webpack + Rails in our [Pro Support program](http://www.shakacode.com/work/shakacode-pro-support.pdf).
 * Building custom web and mobile (React Native) applications. We typically work with a technical founder or CTO and instantly provide a full development team including designers.
 * Migrating **Angular** + Rails to React + Rails. You can see an example of React on Rails and our work converting Angular to React on Rails at [egghead.io](https://egghead.io/browse/frameworks).
 * Augmenting your team to get your product completed more efficiently and quickly.
@@ -814,7 +814,7 @@ My article "[Why Hire ShakaCode?](https://blog.shakacode.com/can-shakacode-help-
 
 If any of this resonates with you, please email me, [justin@shakacode.com](mailto:justin@shakacode.com). I offer a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products.
 
-We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Friends and Guests](https://www.friendsandguests.com).
+We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Hawaii Chee](https://www.hawaiichee.com).
 
 I appreciate your attention and sharing of these offerings with anybody that we can help. Your support allows me to bring you and your team [front-end happiness in the Rails world](https://www.youtube.com/watch?v=SGkTvKRPYrk).
 
