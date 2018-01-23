@@ -7,10 +7,10 @@ require "pathname"
 require_relative "task_helpers"
 require_relative "example_type"
 
-include ReactOnRails::TaskHelpers
-
 # rubocop:disable Metrics/BlockLength
 namespace :run_rspec do
+  include ReactOnRails::TaskHelpers
+
   spec_dummy_dir = File.join("spec", "dummy")
 
   desc "Run RSpec for top level only"
@@ -82,6 +82,7 @@ namespace :run_rspec do
     puts "Completed all RSpec tests"
   end
 end
+# rubocop:enable Metrics/BlockLength
 
 desc "js tests (same as 'yarn run test')"
 task :js_tests do
@@ -119,9 +120,7 @@ def run_tests_in(dir, options = {})
 
   command_name = options.fetch(:command_name, path.basename)
   rspec_args = options.fetch(:rspec_args, "")
-  # rubocop:disable Performance/UnfreezeString
   env_vars = "#{options.fetch(:env_vars, '')} TEST_ENV_COMMAND_NAME=\"#{command_name}\"".dup
-  # rubocop:enable Performance/UnfreezeString
   env_vars << "COVERAGE=true" if ENV["USE_COVERALLS"]
   sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
 end
