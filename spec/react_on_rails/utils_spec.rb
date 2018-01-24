@@ -1,9 +1,50 @@
 # frozen_string_literal: true
 
+# rubocop:disable Metrics/ModuleLength
+# rubocop:disable Metrics/BlockLength
+
 require_relative "spec_helper"
 
 module ReactOnRails
   RSpec.describe Utils do
+    describe "cache helpers .server_bundle_file_name and .bundle_file_name" do
+      context "and file in manifest", :webpacker do
+        before do
+          allow(Rails).to receive(:root).and_return(Pathname.new("."))
+          allow(ReactOnRails).to receive_message_chain("configuration.generated_assets_dir")
+            .and_return("public/webpack/production")
+          allow(Webpacker).to receive_message_chain("config.public_output_path")
+            .and_return("public/webpack/production")
+          allow(Utils).to receive(:using_webpacker?).and_return(true)
+        end
+        describe ".bundle_file_name" do
+          before do
+            allow(Webpacker).to receive_message_chain("manifest.lookup")
+              .with("client-bundle.js")
+              .and_return("/webpack/production/client-bundle-0123456789abcdef.js")
+          end
+          subject do
+            Utils.bundle_file_name("client-bundle.js")
+          end
+          it { expect(subject).to eq("client-bundle-0123456789abcdef.js") }
+        end
+
+        describe ".server_bundle_file_name" do
+          before do
+            allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+              .and_return("server-bundle.js")
+            allow(Webpacker).to receive_message_chain("manifest.lookup")
+              .with("server-bundle.js")
+              .and_return("/webpack/production/server-bundle-0123456789abcdef.js")
+          end
+          subject do
+            Utils.server_bundle_file_name
+          end
+          it { expect(subject).to eq("server-bundle-0123456789abcdef.js") }
+        end
+      end
+    end
+
     describe ".bundle_js_file_path" do
       before do
         allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
@@ -231,3 +272,6 @@ module ReactOnRails
     end
   end
 end
+
+# rubocop:enable Metrics/ModuleLength
+# rubocop:enable Metrics/BlockLength
