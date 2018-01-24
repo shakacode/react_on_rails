@@ -8,6 +8,33 @@ require "active_support/core_ext/string"
 
 module ReactOnRails
   module Utils
+    ###########################################################
+    # PUBLIC API
+    ###########################################################
+
+    # Returns the hashed file name when using webpacker. Useful for creating cache keys.
+    def self.bundle_file_name(bundle_name)
+      raise "Only call bundle_file_name if using webpacker" unless using_webpacker?
+      full_path = bundle_js_file_path_from_webpacker(bundle_name)
+      pathname = Pathname.new(full_path)
+      pathname.basename.to_s
+    end
+
+    # Returns the hashed file name of the server bundle when using webpacker.
+    # Nececessary fragment-caching keys.
+    def self.server_bundle_file_name
+      return @server_bundle_hash if @server_bundle_hash && !Rails.env.development?
+
+      @server_bundle_hash = begin
+        server_bundle_name = ReactOnRails.configuration.server_bundle_js_file
+        bundle_file_name(server_bundle_name)
+      end
+    end
+
+    ###########################################################
+    # PRIVATE API -- Subject to change
+    ###########################################################
+
     # https://forum.shakacode.com/t/yak-of-the-week-ruby-2-4-pathname-empty-changed-to-look-at-file-size/901
     # return object if truthy, else return nil
     def self.truthy_presence(obj)
