@@ -8,6 +8,9 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+#### Fixed
+- Fixed issue with server-rendering error handler: [PR 1020](https://github.com/shakacode/react_on_rails/pull/1020) by [jblasco3](https://github.com/jblasco3).
+
 ### [10.1.0] - 2018-01-23
 #### Added
 - Added 2 cache helpers: ReactOnRails::Utils.bundle_file_name(bundle_name) and ReactOnRails::Utils.server_bundle_file_name
