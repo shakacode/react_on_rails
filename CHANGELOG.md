@@ -11,7 +11,7 @@ Changes since last non-beta release.
 ### [10.1.0] - 2018-01-23
 #### Added
 - Added 2 cache helpers: ReactOnRails::Utils.bundle_file_name(bundle_name) and ReactOnRails::Utils.server_bundle_file_name
-for easy access to the hashed filenames for use in cache keys by [justin808](https://github.com/justin808).
+for easy access to the hashed filenames for use in cache keys. [PR 1018](https://github.com/shakacode/react_on_rails/pull/1018) by [justin808](https://github.com/justin808).
 
 #### Fixed
 - Use redux component in generated redux Hello World example: [PR 1006](https://github.com/shakacode/react_on_rails/pull/1006) by [lewaabahmad](https://github.com/lewaabahmad).
