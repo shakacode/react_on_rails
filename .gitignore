@@ -32,6 +32,3 @@ npm-debug.*
 /gen-examples
 
 .DS_Store
-*.swp
-*.swo
-
