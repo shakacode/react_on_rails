@@ -8,6 +8,7 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [10.1.1] - 2018-01-26
 #### Fixed
 - Fixed issue with server-rendering error handler: [PR 1020](https://github.com/shakacode/react_on_rails/pull/1020) by [jblasco3](https://github.com/jblasco3).
 
@@ -682,7 +683,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/10.1.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/10.1.1...master
+[10.1.1]: https://github.com/shakacode/react_on_rails/compare/10.1.0...10.1.1
 [10.1.0]: https://github.com/shakacode/react_on_rails/compare/10.0.2...10.1.0
 [10.0.2]: https://github.com/shakacode/react_on_rails/compare/10.0.1...10.0.2
 [10.0.1]: https://github.com/shakacode/react_on_rails/compare/10.0.0...10.0.1
