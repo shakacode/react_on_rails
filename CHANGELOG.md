@@ -8,6 +8,9 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+#### Fixed
+- Improved error reporting on version mismatches between Javascript and Ruby packages.
+
 ### [10.1.2] - 2018-02-27
 #### Fixed
 - Use ReactDOM.hydrate() for hydrating a SSR component if available. ReactDOM.render() has been deprecated for use on SSR components in React 16 and this addresses the warning. [PR 1028](https://github.com/shakacode/react_on_rails/pull/1028) by [theJoeBiz](https://github.com/theJoeBiz).

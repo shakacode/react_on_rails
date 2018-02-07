@@ -82,6 +82,9 @@ module ReactOnRails
       def major_minor_patch
         return if relative_path?
         match = raw.match(MAJOR_MINOR_PATCH_VERSION_REGEX)
+        unless match
+          raise "Cannot parse version number '#{raw}' (wildcard versions are not supported)"
+        end
         [match[1], match[2], match[3]]
       end
 
