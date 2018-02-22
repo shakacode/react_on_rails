@@ -19,6 +19,7 @@ export default function createReactElement({
   railsContext,
   domNodeId,
   trace,
+  shouldHydrate,
 }) {
   const { name, component, generatorFunction } = componentObj;
 
@@ -26,6 +27,9 @@ export default function createReactElement({
     if (railsContext && railsContext.serverSide) {
       console.log(`RENDERED ${name} to dom node with id: ${domNodeId} with railsContext:`,
         railsContext);
+    } else if (shouldHydrate) {
+      console.log(`HYDRATED ${name} in dom node with id: ${domNodeId} using props, railsContext:`,
+        props, railsContext);
     } else {
       console.log(`RENDERED ${name} to dom node with id: ${domNodeId} with props, railsContext:`,
         props, railsContext);
