@@ -121,6 +121,7 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 ------
 
 # NEWS
+* 2018-02-27: **Version 10.1.2** Supports the React API for ReactDOM.hydrate.
 * 2017-09-06: **VERSION 9.0.0 shipped!** This version depends on Webpacker directly. See the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for migration instructions.
 * The Docs here on `master` refer to 9.x including support for [rails/webpacker](https://github.com/rails/webpacker).
 *Use the [7.0.4 docs](https://github.com/shakacode/react_on_rails/tree/7.0.4) to refer to the older asset pipeline way.*

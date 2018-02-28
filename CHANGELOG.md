@@ -7,6 +7,8 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+
+### [10.1.2] - 2018-02-27
 #### Fixed
 - Use ReactDOM.hydrate() for hydrating a SSR component if available. ReactDOM.render() has been deprecated for use on SSR components in React 16 and this addresses the warning. [PR 1028](https://github.com/shakacode/react_on_rails/pull/1028) by [theJoeBiz](https://github.com/theJoeBiz).
 
@@ -685,7 +687,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/10.1.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/10.1.2...master
+[10.1.2]: https://github.com/shakacode/react_on_rails/compare/10.1.1...10.1.2
 [10.1.1]: https://github.com/shakacode/react_on_rails/compare/10.1.0...10.1.1
 [10.1.0]: https://github.com/shakacode/react_on_rails/compare/10.0.2...10.1.0
 [10.0.2]: https://github.com/shakacode/react_on_rails/compare/10.0.1...10.0.2
