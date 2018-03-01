@@ -10,7 +10,7 @@ Changes since last non-beta release.
 
 ### [10.1.3] - 2018-02-28
 #### Fixed
-- Improved error reporting on version mismatches between Javascript and Ruby packages.[PR 1025]((https://github.com/shakacode/react_on_rails/pull/1025) by [theJoeBiz](https://github.com/squadette).
+- Improved error reporting on version mismatches between Javascript and Ruby packages. [PR 1025](https://github.com/shakacode/react_on_rails/pull/1025) by [theJoeBiz](https://github.com/squadette).
 
 ### [10.1.2] - 2018-02-27
 #### Fixed
