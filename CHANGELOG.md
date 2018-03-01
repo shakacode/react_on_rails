@@ -8,8 +8,9 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [10.1.3] - 2018-02-28
 #### Fixed
-- Improved error reporting on version mismatches between Javascript and Ruby packages.
+- Improved error reporting on version mismatches between Javascript and Ruby packages.[PR 1025]((https://github.com/shakacode/react_on_rails/pull/1025) by [theJoeBiz](https://github.com/squadette).
 
 ### [10.1.2] - 2018-02-27
 #### Fixed
@@ -690,7 +691,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/10.1.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/10.1.3...master
+[10.1.3]: https://github.com/shakacode/react_on_rails/compare/10.1.2...10.1.3
 [10.1.2]: https://github.com/shakacode/react_on_rails/compare/10.1.1...10.1.2
 [10.1.1]: https://github.com/shakacode/react_on_rails/compare/10.1.0...10.1.1
 [10.1.0]: https://github.com/shakacode/react_on_rails/compare/10.0.2...10.1.0
