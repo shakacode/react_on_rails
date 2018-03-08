@@ -8,6 +8,8 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+- ComponentRegistry now uses a Map on the global context so multiple webpack bundles can call `ReactOnRails.registerComponents()` multiple times prior to rendering.
+
 ### [10.1.3] - 2018-02-28
 #### Fixed
 - Improved error reporting on version mismatches between Javascript and Ruby packages. [PR 1025](https://github.com/shakacode/react_on_rails/pull/1025) by [theJoeBiz](https://github.com/squadette).
