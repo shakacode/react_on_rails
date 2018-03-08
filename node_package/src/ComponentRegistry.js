@@ -1,8 +1,14 @@
 // key = name used by react_on_rails
 // value = { name, component, generatorFunction: boolean, isRenderer: boolean }
 import generatorFunction from './generatorFunction';
+import context from './context';
 
-const registeredComponents = new Map();
+const ctx = context();
+
+if (!ctx.reactOnRailsRegisteredComponents) {
+  ctx.reactOnRailsRegisteredComponents = new Map();
+}
+const registeredComponents = ctx.reactOnRailsRegisteredComponents;
 
 export default {
   /**
