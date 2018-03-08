@@ -5,11 +5,10 @@ import context from './context';
 
 const ctx = context();
 
-let registeredComponents;
-if(!ctx.reactOnRailsRegisteredComponents) {
+if (!ctx.reactOnRailsRegisteredComponents) {
   ctx.reactOnRailsRegisteredComponents = new Map();
 }
-registeredComponents = ctx.reactOnRailsRegisteredComponents;
+const registeredComponents = ctx.reactOnRailsRegisteredComponents;
 
 export default {
   /**
