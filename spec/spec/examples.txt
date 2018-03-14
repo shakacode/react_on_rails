@@ -1,6 +1,0 @@
-example_id                                        | status | run_time        |
-------------------------------------------------- | ------ | --------------- |
-./react_on_rails/locales_to_js_spec.rb[1:1:1:1:1] | passed | 0.00963 seconds |
-./react_on_rails/locales_to_js_spec.rb[1:1:1:2:1] | passed | 0.00268 seconds |
-./react_on_rails/locales_to_js_spec.rb[1:2:1:1:1] | passed | 0.00256 seconds |
-./react_on_rails/locales_to_js_spec.rb[1:2:1:2:1] | passed | 0.00123 seconds |
