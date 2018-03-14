@@ -6,6 +6,9 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 Changes since last non-beta release.
 
+#### Fixed
+- Changed i18n parsing to convert ruby i18n argument syntax into FormatJS argument syntax. by [sepehr500](https://github.com/sepehr500)  
+
 *Please add entries here for your pull requests that are not yet released.*
 
 ### [10.1.3] - 2018-02-28
