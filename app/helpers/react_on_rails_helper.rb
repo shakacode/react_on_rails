@@ -305,9 +305,9 @@ module ReactOnRailsHelper
     # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
     # rubocop:disable Layout/IndentHeredoc
     <<-HTML.html_safe
+#{rendered_output}
 #{component_specification_tag}
-    #{rendered_output}
-    #{console_script}
+#{console_script}
     HTML
     # rubocop:enable Layout/IndentHeredoc
   end
