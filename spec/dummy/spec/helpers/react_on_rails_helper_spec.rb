@@ -163,6 +163,44 @@ describe ReactOnRailsHelper, type: :helper do
         expect(result).not_to match(/data-trace=/)
       end
     end
+
+    describe "caching", :caching do
+      context "with 'cached' == true" do
+        it "caches the content" do
+          react_component("App", cached: true)
+
+          expect(cache_data.keys).to include(%r{react_on_rails/App/})
+        end
+
+        context "with props" do
+          # INFO: Rails uses Digest::MD5 too
+          it "includes props digest in the cache key" do
+            props = { name: "My Test Name" }
+            digest = Digest::MD5.hexdigest(props.to_s)
+            react_component("App", cached: true, props: props)
+
+            expect(cache_data.keys).to include("react_on_rails/App/props-#{digest}")
+          end
+        end
+
+        context "with 'prerender' == true" do
+          it "includes server bundle hash in the cache key" do
+            react_component("App", cached: true, prerender: true)
+
+            expected_key = /server_bundle-#{ReactOnRails::Utils.server_bundle_file_hash}/
+            expect(cache_data.keys).to include(expected_key)
+          end
+        end
+      end
+
+      context "with 'cached' == false" do
+        it "doesn't caches the content" do
+          react_component("App", cached: false)
+
+          expect(cache_data.keys).to be_empty
+        end
+      end
+    end
   end
 
   describe "#redux_store" do
