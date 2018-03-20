@@ -20,20 +20,28 @@ module ReactOnRails
       pathname.basename.to_s
     end
 
-    # Returns the hashed file name of the server bundle when using webpacker.
-    # Nececessary fragment-caching keys.
     def self.server_bundle_file_name
-      return @server_bundle_hash if @server_bundle_hash && !Rails.env.development?
+      File.join(
+        ReactOnRails.configuration.generated_assets_dir,
+        ReactOnRails.configuration.server_bundle_js_file
+      )
+    end
 
-      @server_bundle_hash = begin
-        server_bundle_name = ReactOnRails.configuration.server_bundle_js_file
-        bundle_file_name(server_bundle_name)
+    def self.server_bundle_file_hash
+      if Rails.env.development?
+        calculate_server_bundle_file_hash
+      else
+        @server_bundle_file_hash ||= calculate_server_bundle_file_hash
       end
     end
 
     ###########################################################
     # PRIVATE API -- Subject to change
     ###########################################################
+
+    def self.calculate_server_bundle_file_hash
+      Digest::MD5.file(server_bundle_file_name)
+    end
 
     # https://forum.shakacode.com/t/yak-of-the-week-ruby-2-4-pathname-empty-changed-to-look-at-file-size/901
     # return object if truthy, else return nil

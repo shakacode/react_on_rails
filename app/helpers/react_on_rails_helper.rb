@@ -101,26 +101,43 @@ module ReactOnRailsHelper
     server_rendered_html = internal_result["result"]["html"]
     console_script = internal_result["result"]["consoleReplayScript"]
 
-    if server_rendered_html.is_a?(String)
-      build_react_component_result_for_server_rendered_string(
-        server_rendered_html: server_rendered_html,
-        component_specification_tag: internal_result["tag"],
-        console_script: console_script,
-        options: internal_result["options"]
-      )
-    elsif server_rendered_html.is_a?(Hash)
-      puts "[DEPRECATION] ReactOnRails: Use react_component_hash to return a Hash to your ruby view code"
-      build_react_component_result_for_server_rendered_hash(
-        server_rendered_html: server_rendered_html,
-        component_specification_tag: internal_result["tag"],
-        console_script: console_script,
-        options: internal_result["options"]
-      )
-    else
-      raise "server_rendered_html is expected to be a String. If you're trying to use a generator function to
+    with_caching(component_name, internal_result["options"]) do
+      if server_rendered_html.is_a?(String)
+        build_react_component_result_for_server_rendered_string(
+          server_rendered_html: server_rendered_html,
+          component_specification_tag: internal_result["tag"],
+          console_script: console_script,
+          options: internal_result["options"]
+        )
+      elsif server_rendered_html.is_a?(Hash)
+        puts "[DEPRECATION] ReactOnRails: Use react_component_hash to return a Hash to your ruby view code"
+        build_react_component_result_for_server_rendered_hash(
+          server_rendered_html: server_rendered_html,
+          component_specification_tag: internal_result["tag"],
+          console_script: console_script,
+          options: internal_result["options"]
+        )
+      else
+        raise "server_rendered_html is expected to be a String. If you're trying to use a generator function to
       return a Hash to your ruby view code, then use react_component_hash instead of react_component and
       see https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
       for an example of the necessary javascript configuration."
+      end
+    end
+  end
+
+  def with_caching(component_name, options, &block)
+    return yield unless options.cached
+
+    props_digest = Digest::MD5.hexdigest(props.to_s)
+    cache_key = "react_on_rails/#{component_name}/props-#{props_digest}"
+
+    if options.prerender
+      cache_key += "/server_bundle-#{ReactOnRails::Utils.server_bundle_file_hash}"
+    end
+
+    Rails.cache.fetch(cache_key) do
+      yield block
     end
   end
 
