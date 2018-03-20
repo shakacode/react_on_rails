@@ -87,6 +87,7 @@ module ReactOnRails
       # generated_assets_dirs is deprecated
       generated_assets_dir: "",
       server_bundle_js_file: "",
+      cached: false,
       prerender: false,
       replay_console: true,
       logging_on_server: true,
@@ -108,7 +109,7 @@ module ReactOnRails
 
   class Configuration
     attr_accessor :node_modules_location, :server_bundle_js_file, :prerender, :replay_console,
-                  :trace, :development_mode,
+                  :trace, :development_mode, :cached,
                   :logging_on_server, :server_renderer_pool_size,
                   :server_renderer_timeout, :skip_display_none, :raise_on_prerender_error,
                   :generated_assets_dirs, :generated_assets_dir,
@@ -119,6 +120,7 @@ module ReactOnRails
 
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
                    replay_console: nil,
+                   cached: nil,
                    trace: nil, development_mode: nil,
                    logging_on_server: nil, server_renderer_pool_size: nil,
                    server_renderer_timeout: nil, raise_on_prerender_error: true,
@@ -145,6 +147,7 @@ module ReactOnRails
                               else
                                 development_mode
                               end
+      self.cached = cached
       self.trace = trace.nil? ? Rails.env.development? : trace
       self.raise_on_prerender_error = raise_on_prerender_error
       self.skip_display_none = skip_display_none
