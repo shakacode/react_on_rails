@@ -8,7 +8,9 @@ describe ReactOnRailsHelper, type: :helper do
     allow(self).to receive(:request) {
       OpenStruct.new(
         original_url: "http://foobar.com/development",
-        env: { "HTTP_ACCEPT_LANGUAGE" => "en" }
+        env: {
+          "HTTP_ACCEPT_LANGUAGE" => "en",
+        }
       )
     }
   end
@@ -167,9 +169,12 @@ describe ReactOnRailsHelper, type: :helper do
     describe "caching", :caching do
       context "with 'cached' == true" do
         it "caches the content" do
+          request.user_agent = "Mozilla/5.0"
+
           react_component("App", cached: true)
 
           expect(cache_data.keys).to include(%r{react_on_rails/App/})
+          expect(cache_data.keys).to include(%r{device-desktop})
           expect(cache_data.first[1].value).to match(/div id="App-react-component-0"/)
         end
 
@@ -180,7 +185,7 @@ describe ReactOnRailsHelper, type: :helper do
             digest = Digest::MD5.hexdigest(props.to_s)
             react_component("App", cached: true, props: props)
 
-            expect(cache_data.keys).to include("react_on_rails/App/props-#{digest}")
+            expect(cache_data.keys).to include(%r{react_on_rails/App/props-#{digest}})
           end
         end
 
