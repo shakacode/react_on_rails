@@ -5,7 +5,7 @@ module ReactOnRails
     class Cache
       class << self
         def cache_if_flagged(component_name, options, &block)
-          return yield unless options.cached
+          return yield block unless options.cached
 
           cache_key = cache_key(component_name, options)
           Rails.cache.fetch(cache_key) { yield block }

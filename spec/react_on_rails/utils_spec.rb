@@ -30,17 +30,11 @@ module ReactOnRails
         end
 
         describe ".server_bundle_file_name" do
-          before do
-            allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-              .and_return("server-bundle.js")
-            allow(Webpacker).to receive_message_chain("manifest.lookup")
-              .with("server-bundle.js")
-              .and_return("/webpack/production/server-bundle-0123456789abcdef.js")
+          it "returns path for server bundle file name " do
+            result = Utils.server_bundle_file_name
+
+            expect(result).to eq("public/webpack/production/server-bundle.js")
           end
-          subject do
-            Utils.server_bundle_file_name
-          end
-          it { expect(subject).to eq("server-bundle-0123456789abcdef.js") }
         end
       end
     end
