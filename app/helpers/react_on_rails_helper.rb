@@ -85,6 +85,7 @@ module ReactOnRailsHelper
   #   props: Ruby Hash or JSON string which contains the properties to pass to the react object. Do
   #      not pass any props if you are separately initializing the store by the `redux_store` helper.
   #   prerender: <true/false> set to false when debugging!
+  #   cached: <true/false> set to true if you want to cache
   #   id: You can optionally set the id, or else a unique one is automatically generated.
   #   html_options: You can set other html attributes that will go on this component
   #   trace: <true/false> set to true to print additional debugging information in the browser
@@ -101,7 +102,7 @@ module ReactOnRailsHelper
     server_rendered_html = internal_result["result"]["html"]
     console_script = internal_result["result"]["consoleReplayScript"]
 
-    with_caching(component_name, internal_result["options"]) do
+    ReactOnRails::ReactComponent::Cache.cache_if_flagged(component_name, internal_result["options"]) do
       if server_rendered_html.is_a?(String)
         build_react_component_result_for_server_rendered_string(
           server_rendered_html: server_rendered_html,
@@ -123,21 +124,6 @@ module ReactOnRailsHelper
       see https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
       for an example of the necessary javascript configuration."
       end
-    end
-  end
-
-  def with_caching(component_name, options, &block)
-    return yield unless options.cached
-
-    props_digest = Digest::MD5.hexdigest(props.to_s)
-    cache_key = "react_on_rails/#{component_name}/props-#{props_digest}"
-
-    if options.prerender
-      cache_key += "/server_bundle-#{ReactOnRails::Utils.server_bundle_file_hash}"
-    end
-
-    Rails.cache.fetch(cache_key) do
-      yield block
     end
   end
 

@@ -170,6 +170,7 @@ describe ReactOnRailsHelper, type: :helper do
           react_component("App", cached: true)
 
           expect(cache_data.keys).to include(%r{react_on_rails/App/})
+          expect(cache_data.first[1].value).to match(/div id="App-react-component-0"/)
         end
 
         context "with props" do
