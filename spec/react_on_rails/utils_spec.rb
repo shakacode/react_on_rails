@@ -31,6 +31,8 @@ module ReactOnRails
 
         describe ".server_bundle_file_name" do
           it "returns path for server bundle file name " do
+            allow(ReactOnRails.configuration)
+              .to receive(:server_bundle_js_file).and_return("server-bundle.js")
             result = Utils.server_bundle_file_name
 
             expect(result).to eq("public/webpack/production/server-bundle.js")
