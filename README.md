@@ -545,6 +545,7 @@ Once the bundled files have been generated in your `app/assets/webpack` folder a
 react_component(component_name,
                 props: {},
                 prerender: nil,
+                cached: false,
                 trace: nil,
                 replay_console: nil,
                 raise_on_prerender_error: nil,
@@ -556,6 +557,7 @@ react_component(component_name,
 + **options:**
   + **props:** Ruby Hash which contains the properties to pass to the react object, or a JSON string. If you pass a string, we'll escape it for you.
   + **prerender:** enable server-side rendering of a component. Set to false when debugging!
+  + **cached:** set to true if you want to cache the component.
   + **id:** Id for the div, will be used to attach the React component. This will get assigned automatically if you do not provide an id. Must be unique.
   + **html_options:** Any other HTML options get placed on the added div for the component. For example, you can set a class (or inline style) on the outer div so that it behaves like a span, with the styling of `display:inline-block`.
   + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise. Note: on the client, you will see both the `railsContext` and your props. On the server, you only see the `railsContext` being logged.
