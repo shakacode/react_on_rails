@@ -4,23 +4,18 @@ module ReactOnRails
   module ReactComponent
     class Cache
       class << self
-        def cache_if_flagged(component_name, options, &block)
-          return yield block unless options.cached
-
+        def call(component_name, options)
           cache_key = cache_key(component_name, options)
-          Rails.cache.fetch(cache_key) { yield block }
+          Rails.cache.fetch(cache_key) { yield }
         end
 
         private
 
         def cache_key(component_name, options)
-          result = "react_on_rails/#{component_name}/#{props_digest(options)}"
-          result += "/#{server_bundle_digest}" if options.prerender
+          cache_keys = Array(options[:cache]).join("/")
+          result = "react_on_rails/#{component_name}/#{cache_keys}}"
+          result += "/#{server_bundle_digest}" if options[:prerender]
           result
-        end
-
-        def props_digest(options)
-          "props-#{Digest::MD5.hexdigest(options.props.to_s)}"
         end
 
         def server_bundle_digest

@@ -34,10 +34,6 @@ module ReactOnRails
         retrieve_key(:prerender)
       end
 
-      def cached
-        retrieve_key(:cached)
-      end
-
       def trace
         retrieve_key(:trace)
       end
