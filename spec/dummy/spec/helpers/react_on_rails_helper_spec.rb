@@ -165,28 +165,36 @@ describe ReactOnRailsHelper, type: :helper do
     end
 
     describe "caching", :caching do
-      context "with 'cached' == true" do
+      context "with 'cache'" do
         it "caches the content" do
-          react_component("App", cached: true)
+          props = { a: 1, b: 2 }
+          react_component("App", cache: "cache-key") do
+            props
+          end
 
-          expect(cache_data.keys).to include(%r{react_on_rails/App/})
+          expect(cache_data.keys).to include(%r{react_on_rails/App/cache-key})
           expect(cache_data.first[1].value).to match(/div id="App-react-component-0"/)
         end
 
-        context "with props" do
-          # INFO: Rails uses Digest::MD5 too
-          it "includes props digest in the cache key" do
-            props = { name: "My Test Name" }
-            digest = Digest::MD5.hexdigest(props.to_s)
-            react_component("App", cached: true, props: props)
+        context "with multiple cache keys" do
+          it "caches the content using cache keys" do
+            props = { a: 1, b: 2 }
+            cache_keys = %w[a b]
+            react_component("App", cache: cache_keys) do
+              props
+            end
 
-            expect(cache_data.keys).to include("react_on_rails/App/props-#{digest}")
+            expect(cache_data.keys).to include(%r{react_on_rails/App/a/b})
+            expect(cache_data.first[1].value).to match(/div id="App-react-component-0"/)
           end
         end
 
         context "with 'prerender' == true" do
           it "includes server bundle hash in the cache key" do
-            react_component("App", cached: true, prerender: true)
+            props = { a: 1, b: 2 }
+            react_component("App", cache: "cache-key", prerender: true) do
+              props
+            end
 
             expected_key = /server_bundle-#{ReactOnRails::Utils.server_bundle_file_hash}/
             expect(cache_data.keys).to include(expected_key)
@@ -194,9 +202,9 @@ describe ReactOnRailsHelper, type: :helper do
         end
       end
 
-      context "with 'cached' == false" do
+      context "without 'cache'" do
         it "doesn't caches the content" do
-          react_component("App", cached: false)
+          react_component("App")
 
           expect(cache_data.keys).to be_empty
         end
