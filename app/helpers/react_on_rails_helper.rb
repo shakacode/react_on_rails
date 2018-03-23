@@ -85,7 +85,7 @@ module ReactOnRailsHelper
   #   props: Ruby Hash or JSON string which contains the properties to pass to the react object. Do
   #      not pass any props if you are separately initializing the store by the `redux_store` helper.
   #   prerender: <true/false> set to false when debugging!
-  #   cached: <true/false> set to true if you want to cache
+  #   cache: TODO: explain
   #   id: You can optionally set the id, or else a unique one is automatically generated.
   #   html_options: You can set other html attributes that will go on this component
   #   trace: <true/false> set to true to print additional debugging information in the browser
@@ -98,32 +98,16 @@ module ReactOnRailsHelper
   #      if the JS code throws
   # Any other options are passed to the content tag, including the id.
   def react_component(component_name, raw_options = {})
-    internal_result = internal_react_component(component_name, raw_options)
-    server_rendered_html = internal_result["result"]["html"]
-    console_script = internal_result["result"]["consoleReplayScript"]
+    sanitized_options = raw_options
+    use_caching = block_given? && raw_options[:cache].present?
 
-    ReactOnRails::ReactComponent::Cache.cache_if_flagged(component_name, internal_result["options"]) do
-      if server_rendered_html.is_a?(String)
-        build_react_component_result_for_server_rendered_string(
-          server_rendered_html: server_rendered_html,
-          component_specification_tag: internal_result["tag"],
-          console_script: console_script,
-          options: internal_result["options"]
-        )
-      elsif server_rendered_html.is_a?(Hash)
-        puts "[DEPRECATION] ReactOnRails: Use react_component_hash to return a Hash to your ruby view code"
-        build_react_component_result_for_server_rendered_hash(
-          server_rendered_html: server_rendered_html,
-          component_specification_tag: internal_result["tag"],
-          console_script: console_script,
-          options: internal_result["options"]
-        )
-      else
-        raise "server_rendered_html is expected to be a String. If you're trying to use a generator function to
-      return a Hash to your ruby view code, then use react_component_hash instead of react_component and
-      see https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
-      for an example of the necessary javascript configuration."
+    if use_caching
+      sanitized_options[:props] = yield
+      ReactOnRails::ReactComponent::Cache.call(component_name, sanitized_options) do
+        build_react_component(component_name, sanitized_options)
       end
+    else
+      build_react_component(component_name, sanitized_options)
     end
   end
 
@@ -230,8 +214,8 @@ module ReactOnRailsHelper
     raw("#{html}#{replay_console_option(options[:replay_console_option]) ? console_log_script : ''}")
   rescue ExecJS::ProgramError => err
     raise ReactOnRails::PrerenderError, component_name: "N/A (server_render_js called)",
-                                        err: err,
-                                        js_code: wrapper_js
+          err: err,
+          js_code: wrapper_js
     # rubocop:enable Style/RaiseArgs
   end
 
@@ -248,6 +232,34 @@ module ReactOnRailsHelper
   end
 
   private
+
+  def build_react_component(component_name, sanitized_options)
+    internal_result = internal_react_component(component_name, sanitized_options)
+    server_rendered_html = internal_result["result"]["html"]
+    console_script = internal_result["result"]["consoleReplayScript"]
+
+    if server_rendered_html.is_a?(String)
+      build_react_component_result_for_server_rendered_string(
+        server_rendered_html: server_rendered_html,
+        component_specification_tag: internal_result["tag"],
+        console_script: console_script,
+        options: internal_result["options"]
+      )
+    elsif server_rendered_html.is_a?(Hash)
+      puts "[DEPRECATION] ReactOnRails: Use react_component_hash to return a Hash to your ruby view code"
+      build_react_component_result_for_server_rendered_hash(
+        server_rendered_html: server_rendered_html,
+        component_specification_tag: internal_result["tag"],
+        console_script: console_script,
+        options: internal_result["options"]
+      )
+    else
+      raise "server_rendered_html is expected to be a String. If you're trying to use a generator function to
+      return a Hash to your ruby view code, then use react_component_hash instead of react_component and
+      see https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+      for an example of the necessary javascript configuration."
+    end
+  end
 
   def build_react_component_result_for_server_rendered_string(
     server_rendered_html: required("server_rendered_html"),
@@ -428,21 +440,21 @@ module ReactOnRailsHelper
     if result["hasErrors"] && raise_on_prerender_error
       # We caught this exception on our backtrace handler
       raise ReactOnRails::PrerenderError, component_name: react_component_name,
-                                          # Sanitize as this might be browser logged
-                                          props: sanitized_props_string(props),
-                                          err: nil,
-                                          js_code: wrapper_js,
-                                          console_messages: result["consoleReplayScript"]
+            # Sanitize as this might be browser logged
+            props: sanitized_props_string(props),
+            err: nil,
+            js_code: wrapper_js,
+            console_messages: result["consoleReplayScript"]
       # rubocop:enable Style/RaiseArgs
     end
     result
   rescue ExecJS::ProgramError => err
     # This error came from execJs
     raise ReactOnRails::PrerenderError, component_name: react_component_name,
-                                        # Sanitize as this might be browser logged
-                                        props: sanitized_props_string(props),
-                                        err: err,
-                                        js_code: wrapper_js
+          # Sanitize as this might be browser logged
+          props: sanitized_props_string(props),
+          err: err,
+          js_code: wrapper_js
     # rubocop:enable Style/RaiseArgs
   end
 
