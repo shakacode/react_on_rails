@@ -1,43 +1,22 @@
-require "browser"
-require "browser/aliases"
-Browser::Base.include(Browser::Aliases)
-
 require "react_on_rails/utils"
 
 module ReactOnRails
   module ReactComponent
     class Cache
       class << self
-        def cache_if_flagged(component_name, request, options, &block)
+        def cache_if_flagged(component_name, options, &block)
           return yield block unless options.cached
 
-          cache_key = cache_key(component_name, request, options)
+          cache_key = cache_key(component_name, options)
           Rails.cache.fetch(cache_key) { yield block }
         end
 
         private
 
-        def cache_key(component_name, request, options)
-          result = [
-            "react_on_rails",
-            component_name,
-            props_digest(options),
-            device_digest(request)
-          ].join("/")
+        def cache_key(component_name, options)
+          result = "react_on_rails/#{component_name}/#{props_digest(options)}"
           result += "/#{server_bundle_digest}" if options.prerender
           result
-        end
-
-        def device_digest(request)
-          browser = Browser.new(request.user_agent)
-          device = if browser.device.mobile?
-                     "mobile"
-                   elsif browser.device.tablet?
-                     "tablet"
-                   else
-                     "desktop"
-                   end
-          "device-#{device}"
         end
 
         def props_digest(options)

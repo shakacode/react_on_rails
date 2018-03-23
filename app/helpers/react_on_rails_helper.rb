@@ -100,16 +100,15 @@ module ReactOnRailsHelper
   def react_component(component_name, raw_options = {})
     internal_result = internal_react_component(component_name, raw_options)
     server_rendered_html = internal_result["result"]["html"]
-    options = internal_result["options"]
     console_script = internal_result["result"]["consoleReplayScript"]
 
-    ReactOnRails::ReactComponent::Cache.cache_if_flagged(component_name, request, options) do
+    ReactOnRails::ReactComponent::Cache.cache_if_flagged(component_name, internal_result["options"]) do
       if server_rendered_html.is_a?(String)
         build_react_component_result_for_server_rendered_string(
           server_rendered_html: server_rendered_html,
           component_specification_tag: internal_result["tag"],
           console_script: console_script,
-          options: options
+          options: internal_result["options"]
         )
       elsif server_rendered_html.is_a?(Hash)
         puts "[DEPRECATION] ReactOnRails: Use react_component_hash to return a Hash to your ruby view code"
@@ -117,7 +116,7 @@ module ReactOnRailsHelper
           server_rendered_html: server_rendered_html,
           component_specification_tag: internal_result["tag"],
           console_script: console_script,
-          options: options
+          options: internal_result["options"]
         )
       else
         raise "server_rendered_html is expected to be a String. If you're trying to use a generator function to
