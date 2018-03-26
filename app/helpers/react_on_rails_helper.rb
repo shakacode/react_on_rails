@@ -214,8 +214,8 @@ module ReactOnRailsHelper
     raw("#{html}#{replay_console_option(options[:replay_console_option]) ? console_log_script : ''}")
   rescue ExecJS::ProgramError => err
     raise ReactOnRails::PrerenderError, component_name: "N/A (server_render_js called)",
-          err: err,
-          js_code: wrapper_js
+                                        err: err,
+                                        js_code: wrapper_js
     # rubocop:enable Style/RaiseArgs
   end
 
@@ -440,21 +440,21 @@ module ReactOnRailsHelper
     if result["hasErrors"] && raise_on_prerender_error
       # We caught this exception on our backtrace handler
       raise ReactOnRails::PrerenderError, component_name: react_component_name,
-            # Sanitize as this might be browser logged
-            props: sanitized_props_string(props),
-            err: nil,
-            js_code: wrapper_js,
-            console_messages: result["consoleReplayScript"]
+                                          # Sanitize as this might be browser logged
+                                          props: sanitized_props_string(props),
+                                          err: nil,
+                                          js_code: wrapper_js,
+                                          console_messages: result["consoleReplayScript"]
       # rubocop:enable Style/RaiseArgs
     end
     result
   rescue ExecJS::ProgramError => err
     # This error came from execJs
     raise ReactOnRails::PrerenderError, component_name: react_component_name,
-          # Sanitize as this might be browser logged
-          props: sanitized_props_string(props),
-          err: err,
-          js_code: wrapper_js
+                                        # Sanitize as this might be browser logged
+                                        props: sanitized_props_string(props),
+                                        err: err,
+                                        js_code: wrapper_js
     # rubocop:enable Style/RaiseArgs
   end
 
