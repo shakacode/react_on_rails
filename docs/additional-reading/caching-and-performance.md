@@ -3,10 +3,22 @@
 
 ## Caching
 
-If you want to cache your component, pass the `cached` option:
+If you want to cache your component, pass the `cache_key` option containing your cache keys.
+Also you should pass `props` as a block so you avoid generating them on each call:
 
 ```ruby
-react_component("App", cached: true)
+react_component("App", cache_key: "cache_key") do
+  { prop1: "a", prop2: "b" }
+end
+```
+
+If passing `prerender: true`, your server bundle digest will be include in the cache key
+too. This will be done automatically for you:
+
+```ruby
+react_component("App", cache_key: "cache_key", prerender: true) do
+  { prop1: "a", prop2: "b" }
+end
 ```
 
 ### HTTP Caching
