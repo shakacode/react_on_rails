@@ -85,7 +85,9 @@ module ReactOnRailsHelper
   #   props: Ruby Hash or JSON string which contains the properties to pass to the react object. Do
   #      not pass any props if you are separately initializing the store by the `redux_store` helper.
   #   prerender: <true/false> set to false when debugging!
-  #   cache: TODO: explain
+  #   cache_key: String or Array containing your cache keys. If using caching you could pass props
+  #              as a block. If prerender is set to true, the server bundle digest will be included
+  #              in the cache key.
   #   id: You can optionally set the id, or else a unique one is automatically generated.
   #   html_options: You can set other html attributes that will go on this component
   #   trace: <true/false> set to true to print additional debugging information in the browser
