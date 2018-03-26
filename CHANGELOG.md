@@ -12,7 +12,7 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 
 #### Added
- - Added `cache_key` option for `react_component` helper. [PR 1048](https://github.com/shakacode/react_on_rails/pull/1048) by [mapreal19](https://github.com/mapreal19)
+ - Added `cache_key` option & block for props in `react_component` helper. [PR 1048](https://github.com/shakacode/react_on_rails/pull/1048) by [mapreal19](https://github.com/mapreal19)
 
 ### [10.1.3] - 2018-02-28
 #### Fixed

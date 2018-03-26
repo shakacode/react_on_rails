@@ -177,6 +177,15 @@ describe ReactOnRailsHelper, type: :helper do
           expect(cache_data.first[1].value).to match(/div id="App-react-component-0"/)
         end
 
+        it "doesn't call the block if content is cached" do
+          props = { a: 1, b: 2 }
+          react_component("App", cache_key: "cache-key") { props }
+
+          expect do |props|
+            react_component("App", cache_key: "cache-key", &props)
+          end.not_to yield_control
+        end
+
         context "with multiple cache keys" do
           it "caches the content using cache keys" do
             props = { a: 1, b: 2 }
@@ -199,6 +208,16 @@ describe ReactOnRailsHelper, type: :helper do
 
             expected_key = /server_bundle-#{ReactOnRails::Utils.server_bundle_file_hash}/
             expect(cache_data.keys).to include(expected_key)
+          end
+        end
+
+        context "when 'props' aren't passed in a block" do
+          it "throws an error" do
+            props = { a: 1, b: 2 }
+
+            expect do
+              react_component("App", cache_key: "cache-key", props: props)
+            end.to raise_error("Pass 'props' as a block if using caching")
           end
         end
       end

@@ -8,7 +8,7 @@ Also you should pass `props` as a block so you avoid generating them on each cal
 
 ```ruby
 react_component("App", cache_key: "cache_key") do
-  { prop1: "a", prop2: "b" }
+  slow_method_to_get_props
 end
 ```
 
@@ -17,7 +17,7 @@ too. This will be done automatically for you:
 
 ```ruby
 react_component("App", cache_key: "cache_key", prerender: true) do
-  { prop1: "a", prop2: "b" }
+  slow_method_to_get_props
 end
 ```
 
