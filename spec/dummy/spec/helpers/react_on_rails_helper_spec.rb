@@ -169,7 +169,7 @@ describe ReactOnRailsHelper, type: :helper do
       context "with 'cache'" do
         it "caches the content" do
           props = { a: 1, b: 2 }
-          react_component("App", cache: "cache-key") do
+          react_component("App", cache_key: "cache-key") do
             props
           end
 
@@ -181,7 +181,7 @@ describe ReactOnRailsHelper, type: :helper do
           it "caches the content using cache keys" do
             props = { a: 1, b: 2 }
             cache_keys = %w[a b]
-            react_component("App", cache: cache_keys) do
+            react_component("App", cache_key: cache_keys) do
               props
             end
 
@@ -193,7 +193,7 @@ describe ReactOnRailsHelper, type: :helper do
         context "with 'prerender' == true" do
           it "includes server bundle hash in the cache key" do
             props = { a: 1, b: 2 }
-            react_component("App", cache: "cache-key", prerender: true) do
+            react_component("App", cache_key: "cache-key", prerender: true) do
               props
             end
 

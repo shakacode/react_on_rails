@@ -98,16 +98,16 @@ module ReactOnRailsHelper
   #      if the JS code throws
   # Any other options are passed to the content tag, including the id.
   def react_component(component_name, raw_options = {})
-    sanitized_options = raw_options
-    use_caching = block_given? && raw_options[:cache].present?
+    use_caching = block_given? && raw_options[:cache_key].present?
 
     if use_caching
+      sanitized_options = raw_options
       sanitized_options[:props] = yield
       ReactOnRails::ReactComponent::Cache.call(component_name, sanitized_options) do
         build_react_component(component_name, sanitized_options)
       end
     else
-      build_react_component(component_name, sanitized_options)
+      build_react_component(component_name, raw_options)
     end
   end
 
