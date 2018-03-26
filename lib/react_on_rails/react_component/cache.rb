@@ -12,7 +12,7 @@ module ReactOnRails
         private
 
         def cache_key(component_name, options)
-          cache_keys = Array(options[:cache]).join("/")
+          cache_keys = Array(options[:cache_key]).join("/")
           result = "react_on_rails/#{component_name}/#{cache_keys}}"
           result += "/#{server_bundle_digest}" if options[:prerender]
           result
