@@ -85,7 +85,7 @@ module ReactOnRailsHelper
   #   props: Ruby Hash or JSON string which contains the properties to pass to the react object. Do
   #      not pass any props if you are separately initializing the store by the `redux_store` helper.
   #   prerender: <true/false> set to false when debugging!
-  #   cache_key: String or Array containing your cache keys. If using caching you could pass props
+  #   cache_key: String or Array containing your cache keys. If using caching you should pass props
   #              as a block. If prerender is set to true, the server bundle digest will be included
   #              in the cache key.
   #   id: You can optionally set the id, or else a unique one is automatically generated.
@@ -99,15 +99,11 @@ module ReactOnRailsHelper
   #   raise_on_prerender_error: <true/false> Default to false. True will raise exception on server
   #      if the JS code throws
   # Any other options are passed to the content tag, including the id.
-  def react_component(component_name, raw_options = {})
-    use_caching = block_given? && raw_options[:cache_key].present?
+  def react_component(component_name, raw_options = {}, &block)
+    use_caching = raw_options[:cache_key].present?
 
     if use_caching
-      sanitized_options = raw_options
-      sanitized_options[:props] = yield
-      ReactOnRails::ReactComponent::Cache.call(component_name, sanitized_options) do
-        build_react_component(component_name, sanitized_options)
-      end
+      build_react_component_cached(component_name, block, raw_options)
     else
       build_react_component(component_name, raw_options)
     end
@@ -234,6 +230,20 @@ module ReactOnRailsHelper
   end
 
   private
+
+  def build_react_component_cached(component_name, block, raw_options)
+    check_caching_options!(raw_options, block)
+
+    ReactOnRails::ReactComponent::Cache.call(component_name, raw_options) do
+      sanitized_options = raw_options
+      sanitized_options[:props] = block.call
+      build_react_component(component_name, sanitized_options)
+    end
+  end
+
+  def check_caching_options!(raw_options, block)
+    raise "Pass 'props' as a block if using caching" if raw_options.key?(:props) || block.nil?
+  end
 
   def build_react_component(component_name, sanitized_options)
     internal_result = internal_react_component(component_name, sanitized_options)
