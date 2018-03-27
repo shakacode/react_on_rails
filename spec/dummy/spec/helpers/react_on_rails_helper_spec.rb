@@ -178,8 +178,9 @@ describe ReactOnRailsHelper, type: :helper do
         end
 
         it "doesn't call the block if content is cached" do
-          props = { a: 1, b: 2 }
-          react_component("App", cache_key: "cache-key") { props }
+          react_component("App", cache_key: "cache-key") do
+            { a: 1, b: 2 }
+          end
 
           expect do |props|
             react_component("App", cache_key: "cache-key", &props)
