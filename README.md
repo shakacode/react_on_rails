@@ -2,9 +2,11 @@
 
 *If this projects helps you, please give us a star!*
 
-[The ShakaCode team has availability to help your project](http://www.shakacode.com/work). If your team might need my help, please [email me](mailto:justin@shakacode.com) for a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products.
+# [The ShakaCode team has availability to help your project as of 2018-03-27](http://www.shakacode.com/services).
 
-# React on Rails v10 is based on Webpacker 3.0!
+If your team might need my help, please [email me](mailto:justin@shakacode.com) for a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products.
+
+## React on Rails v10 is based on Webpacker 3.0!
 
 * See the article [Introducing React on Rails v9 with Webpacker Support](https://blog.shakacode.com/introducing-react-on-rails-v9-with-webpacker-support-f2584c6c8fa4) for an overview of the integration of React on Rails with Webpacker.
 * [Video of running the v9 installer with Webpacker v3](https://youtu.be/M0WUM_XPaII).
