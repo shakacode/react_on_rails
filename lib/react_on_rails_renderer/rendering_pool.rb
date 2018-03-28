@@ -12,7 +12,7 @@ module ReactOnRailsRenderer
     end
 
     def self.reset_pool_if_server_bundle_was_modified
-      bundle_update_time = File.mtime(ReactOnRails::Utils.default_server_bundle_js_file_path)
+      bundle_update_time = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
       @bundle_update_utc_timestamp = (bundle_update_time.utc.to_f * 1000).to_i
     end
 
@@ -107,7 +107,7 @@ module ReactOnRailsRenderer
         response = RestClient.post(
           renderer_url(rendering_request_digest),
           renderingRequest: js_code,
-          bundle: File.new(ReactOnRails::Utils.default_server_bundle_js_file_path),
+          bundle: File.new(ReactOnRails::Utils.server_bundle_js_file_path),
           gemVersion: ReactOnRailsRenderer.const_get("VERSION"),
           password: ReactOnRailsRenderer.configuration.password
         )
