@@ -1,9 +1,11 @@
 # Projects using React on Rails
 
+Here's a search for public sites using React on Rails. [Click here](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com/). As of March 27, 2018, there are 2126 public sites using React on Rails, excluding another 300K+ that are from a domain reseller.
+
 *Please support the project by [emailing Justin Gordon](mailto:justin@shakacode.com) of any projects, yours or others, that use React on Rails. You can confirm a project uses React on Rails as the source will contain **`js-react-on-rails`**.*
 
 ## Commercial Products Live
-* **[Friends and Guests](https://www.friendsandguests.com/)**, the signature product of [ShakaCode](http://www.shakacode.com), which is a "Network Connecting Hosts and Guests".
+* **[Hawaii Chee](https://www.hawaiichee.com/)**, the signature product of [ShakaCode](http://www.shakacode.com), which is a vacation rental site focusing on Hawaii.
 * **[KissKissBankBank](https://www.kisskissbankbank.com/)**, large French crowdfunding platform.
 * **[HVMN](https://hvmn.com)**: Web ecommerce site for "biohacking" products.
 * **[GuavaPass](https://guavapass.com/)**: Coaching client of [ShakaCode](http://www.shakacode.com) and React on Rails fan!
