@@ -1,6 +1,6 @@
 # Projects using React on Rails
 
-Here's a search for public sites using React on Rails. [Click here](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com/). As of March 27, 2018, there are 2126 public sites using React on Rails, excluding another 300K+ that are from a domain reseller.
+[Click here](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com/) for a search for public sites using React on Rails. As of March 27, 2018, there are 2126 public sites using React on Rails, excluding another 300K+ that are from a domain reseller.
 
 *Please support the project by [emailing Justin Gordon](mailto:justin@shakacode.com) of any projects, yours or others, that use React on Rails. You can confirm a project uses React on Rails as the source will contain **`js-react-on-rails`**.*
 
