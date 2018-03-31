@@ -2,9 +2,11 @@
 
 *If this projects helps you, please give us a star!*
 
-[The ShakaCode team has availability to help your project](http://www.shakacode.com/work). If your team might need my help, please [email me](mailto:justin@shakacode.com) for a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products.
+# [The ShakaCode team has availability to help your project as of 2018-03-27](http://www.shakacode.com/services).
 
-# React on Rails v10 is based on Webpacker 3.0!
+If your team might need my help, please [email me](mailto:justin@shakacode.com) for a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products.
+
+## React on Rails v10 is based on Webpacker 3.0!
 
 * See the article [Introducing React on Rails v9 with Webpacker Support](https://blog.shakacode.com/introducing-react-on-rails-v9-with-webpacker-support-f2584c6c8fa4) for an overview of the integration of React on Rails with Webpacker.
 * [Video of running the v9 installer with Webpacker v3](https://youtu.be/M0WUM_XPaII).
@@ -31,9 +33,10 @@ First be sure to run `rails -v` and check that you are using Rails 5.1.3 or abov
 
 1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory.
 2. Add gem version: `gem 'react_on_rails', '10.0.2' # prefer exact gem version to match npm version`
-3. Run the generator: `rails generate react_on_rails:install`
-4. Start the app: `rails s`
-5. Visit http://localhost:3000/hello_world
+3. `bundle install`
+4. Run the generator: `rails generate react_on_rails:install`
+5. Start the app: `rails s`
+6. Visit http://localhost:3000/hello_world
 
 ### Turn on server rendering
 
