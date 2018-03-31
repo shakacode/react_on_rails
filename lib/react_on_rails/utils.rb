@@ -146,7 +146,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.prepend_cd_node_modules_directory(cmd)
-      "cd #{ReactOnRails.configuration.node_modules_location} && #{cmd}"
+      "cd \"#{ReactOnRails.configuration.node_modules_location}\" && #{cmd}"
     end
 
     def self.source_path

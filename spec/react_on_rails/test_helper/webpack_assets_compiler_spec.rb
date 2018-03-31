@@ -24,7 +24,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
         expected_output = <<-MSG.strip_heredoc
           React on Rails FATAL ERROR!
           Error in building webpack assets!
-          cmd: cd #{Rails.root} && #{invalid_command}
+          cmd: cd \"#{Rails.root}\" && #{invalid_command}
         MSG
 
         expect do
