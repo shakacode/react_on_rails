@@ -93,6 +93,7 @@ exports.buildVM = function buildVMNew(filePath) {
   // Save bundle file path for further checkings for bundle updates:
   bundleFilePath = filePath;
 
+  // !isMaster check is required for JS unit testing:
   if (!cluster.isMaster) log.debug(`Built VM for worker #${cluster.worker.id}`);
   log.debug('Required objects now in VM sandbox context:', vm.runInContext('global.ReactOnRails', context) !== undefined);
   log.debug('Required objects should not leak to the global context:', global.ReactOnRails);
