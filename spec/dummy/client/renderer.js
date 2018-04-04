@@ -12,4 +12,11 @@ const config = {
   logLevel: 'debug',                                      // Show all logs
 };
 
+// Renderer detects a total number of CPUs on virtual hostings like Heroky or CircleCI instead
+// of CPUs number allocated for current container. This results in spawning many workers while
+// only 1-2 of them really needed.
+if (process.env.CI) {
+  config.workersCount = 2;
+}
+
 reactOnRailsRenderer(config);

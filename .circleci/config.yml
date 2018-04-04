@@ -1,0 +1,170 @@
+version: 2
+
+aliases:
+  # Print critical data and executables versions.
+  - &print-system-info
+    name: Print system information
+    command: |
+             echo "Linux release: "; cat /etc/issue
+             echo "Current user: "; whoami
+             echo "Current directory: "; pwd
+             echo "Ruby version: "; ruby -v
+             echo "Bundler version: "; bundler -v
+             echo "Node version: "; node -v
+             echo "Yarn version: "; yarn --version
+             echo "Phantomjs version: "; phantomjs -v
+
+  # Install/update Node modules for renderer package unless existing set of modules is satisfying Yarn.
+  - &install-package-mode-modules
+    name: Install Node modules with Yarn for renderer package
+    command: yarn install --no-progress --no-emoji
+
+  # Install/update Node modules for dummy app unless existing set of modules is satisfying Yarn.
+  - &install-dummy-app-mode-modules
+    name: Install Node modules with Yarn for dummy app
+    command: cd spec/dummy && yarn install --no-progress --no-emoji
+
+  # Install ruby gems unless existing set of gems is satisfying bundler.
+  - &install-dummy-app-ruby-gems
+    name: Install Ruby Gems for dummy app
+    command: cd spec/dummy && bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+
+  # Restore node_modules dir from cache using yarn.lock checksum as a key.
+  - &restore-package-node-modules-cache
+    name: Restore cached node_modules directory
+    keys:
+      - v1-package-node-modules-cache-{{ checksum "yarn.lock" }}
+
+  # Restore spec/dummy/client/node_modules dir from cache using yarn.lock checksum as a key.
+  - &restore-dummy-app-node-modules-cache
+    name: Restore cached spec/dummy/client/node_modules directory
+    keys:
+      - v2-dummy-app-node-modules-cache-{{ checksum "spec/dummy/client/yarn.lock" }}
+
+  # Restore vendor/bundle dir from cache using Gemfile.lock checksum as a key.
+  - &restore-dummy-app-gem-cache
+    name: Restore cached Ruby Gems for dummy app
+    keys:
+      - v1-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
+
+jobs:
+  # Install Node modules for Renderer package with Yarn and save them to chache.
+  install-package-node-packages:
+    docker:
+      - image: shakacode/ror-renderer:1.0.2
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-package-node-modules-cache
+      - run: *install-package-mode-modules
+      - save_cache:
+          name: Save root node_modules to cache
+          key: v1-package-node-modules-cache-{{ checksum "yarn.lock" }}
+          paths:
+            - node_modules
+  # Install Node modules for dummy app with Yarn and save them to chache.
+  install-dummy-app-node-packages:
+    docker:
+      - image: shakacode/ror-renderer:1.0.2
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-dummy-app-node-modules-cache
+      - run: *install-dummy-app-mode-modules
+      - save_cache:
+          name: Save spec/dummy/client/node_modules to cache
+          key: v2-dummy-app-node-modules-cache-{{ checksum "spec/dummy/client/yarn.lock" }}
+          paths:
+            - spec/dummy/node_modules
+            - spec/dummy/client/node_modules
+  # Install Ruby gems for dummy app with Bundler and save them to cache.
+  install-dummy-app-ruby-gems:
+    docker:
+      - image: shakacode/ror-renderer:1.0.2
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-dummy-app-gem-cache
+      - run: *install-dummy-app-ruby-gems
+      - save_cache:
+          name: Save dummy app ruby gems to cache
+          key: v1-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
+          paths:
+            - spec/dummy/vendor/bundle
+  # Build client and server bundles for dummy app with Webpack and save them to cache.
+  build-dummy-app-webpack-test-bundles:
+    docker:
+      - image: shakacode/ror-renderer:1.0.2
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-dummy-app-node-modules-cache
+      - run: *install-dummy-app-mode-modules
+      - run:
+          name: Build test bundles for dummy app
+          command: cd spec/dummy/client && yarn run build:test
+      - save_cache:
+          name: Save test webpack bundles to cache (for build number checksum used by rspec job)
+          key: v1-dummy-app-webpack-bundle-{{ .Revision }}
+          paths:
+            - spec/dummy/app/assets/webpack
+  # Run JS unit tests for Renderer package.
+  package-js-tests:
+    docker:
+      - image: shakacode/ror-renderer:1.0.2
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-package-node-modules-cache
+      - run: *install-package-mode-modules
+      - run:
+          name: Run JS unit tests for Renderer package
+          command: yarn test
+  # Start Renderer and run RSpec test suite for dummy app.
+  rspec-dummy-app:
+    docker:
+      - image: shakacode/ror-renderer:1.0.2
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-dummy-app-gem-cache
+      - run: *install-dummy-app-ruby-gems
+      - restore_cache: *restore-dummy-app-node-modules-cache
+      - run: *install-dummy-app-mode-modules
+      - restore_cache:
+          name: Restore cached webpack bundles for dummy app
+          key: v1-dummy-app-webpack-bundle-{{ .Revision }}
+      - run:
+          name: Run Node renderer in a background
+          command: cd spec/dummy && yarn run node-renderer
+          background: true
+      - run:
+          name: Run tests
+          command: |
+            cd spec/dummy && bundle exec rspec --format RspecJunitFormatter \
+                                               --out ~/rspec/rspec.xml \
+                                               --format documentation
+      - store_test_results:
+          path: ~/rspec
+      - store_artifacts:
+          path: tmp/capybara
+      - store_artifacts:
+          path: log/test.log
+
+workflows:
+  version: 2
+  build-and-test:
+    jobs:
+      - install-package-node-packages
+      - install-dummy-app-node-packages
+      - install-dummy-app-ruby-gems
+      - build-dummy-app-webpack-test-bundles:
+          requires:
+            - install-dummy-app-node-packages
+      - package-js-tests:
+          requires:
+            - install-package-node-packages
+      - rspec-dummy-app:
+          requires:
+            - build-dummy-app-webpack-test-bundles
+            - install-dummy-app-ruby-gems
