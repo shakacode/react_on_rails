@@ -34,9 +34,11 @@ require "capybara-screenshot/rspec"
 ActiveRecord::Migration.maintain_test_schema!
 
 RSpec.configure do |config|
-  # Ensure that if we are running js tests, we are using latest webpack assets
-  # This will use the defaults of :js and :server_rendering meta tags
-  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  # Ensure that if we are running js tests, we are using latest webpack assets.
+  # This will use the defaults of :js and :server_rendering meta tags.
+  # We do not want this checking to run on CircleCI since we always pre-build assets manually.
+  # See https://circleci.com/docs/2.0/env-vars/#general-environment-variables for details on ENV["CI"].
+  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config) unless ENV["CI"]
 
   # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
   config.fixture_path = "#{::Rails.root}/spec/fixtures"
