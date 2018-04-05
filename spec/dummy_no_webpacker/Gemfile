@@ -21,9 +21,7 @@ gem "jquery-rails"
 gem "puma"
 
 # Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
-if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
-  gem "turbolinks", "~> 5.0"
-end
+gem "turbolinks", "~> 5.0" if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
 
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
 gem "jbuilder", "~> 2.0"
@@ -53,7 +51,7 @@ group :development, :test do
   gem "pry-rails"
   gem "pry-rescue"
   gem "pry-stack_explorer"
-  gem "rubocop", require: false
+  gem "rubocop", "~> 0.50", require: false
   gem "ruby-lint", require: false
   gem "scss_lint", require: false
 

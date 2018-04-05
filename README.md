@@ -2,9 +2,11 @@
 
 *If this projects helps you, please give us a star!*
 
-[ShakaCode is hiring team members](http://www.shakacode.com/about/#work-with-us) for our own app, [Friends and Guests](https://www.friendsandguests.com).
+# [The ShakaCode team has availability to help your project as of 2018-03-27](http://www.shakacode.com/services).
 
-# React on Rails v10 is based on Webpacker 3.0!
+If your team might need my help, please [email me](mailto:justin@shakacode.com) for a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products.
+
+## React on Rails v10 is based on Webpacker 3.0!
 
 * See the article [Introducing React on Rails v9 with Webpacker Support](https://blog.shakacode.com/introducing-react-on-rails-v9-with-webpacker-support-f2584c6c8fa4) for an overview of the integration of React on Rails with Webpacker.
 * [Video of running the v9 installer with Webpacker v3](https://youtu.be/M0WUM_XPaII).
@@ -23,17 +25,18 @@ Given that Webpacker already provides React integration, why would you add React
 
 ----
 
-## Steps to a New App with rails/webpacker v3 plus React on Rails v9:
+## Steps to a New App with rails/webpacker v3 plus latest React on Rails:
 First be sure to run `rails -v` and check that you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
 
 ### Basic installation for a new Rails App
 *See below for steps on an existing Rails app*
 
 1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory.
-2. Add gem version: `gem 'react_on_rails', '~> 9.0.1'`
-3. Run the generator: `rails generate react_on_rails:install`
-4. Start the app: `rails s`
-5. Visit http://localhost:3000/hello_world
+2. Add gem version: `gem 'react_on_rails', '10.0.2' # prefer exact gem version to match npm version`
+3. `bundle install`
+4. Run the generator: `rails generate react_on_rails:install`
+5. Start the app: `rails s`
+6. Visit http://localhost:3000/hello_world
 
 ### Turn on server rendering
 
@@ -45,7 +48,7 @@ First be sure to run `rails -v` and check that you are using Rails 5.1.3 or abov
 This is the line where you turn server rendering on by setting prerender to true:
 
 ```
-<%%= react_component("HelloWorld", props: @hello_world_props, prerender: false) %>
+<%= react_component("HelloWorld", props: @hello_world_props, prerender: false) %>
 ```
 
 ---------------
@@ -59,7 +62,7 @@ Thank you for considering using [React on Rails](https://github.com/shakacode/re
 
 We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first application development company. We fund this project by:
 
-* Providing priority support and training for anything related to React + Webpack + Rails in our [Coaching Program](http://www.shakacode.com/work/shakacode-coaching-plan.pdf).
+* Providing priority support and training for anything related to React + Webpack + Rails in our [Pro Support program](http://www.shakacode.com/work/shakacode-pro-support.pdf).
 * Building custom web and mobile (React Native) applications. We typically work with a technical founder or CTO and instantly provide a full development team including designers.
 * Migrating **Angular** + Rails to React + Rails. You can see an example of React on Rails and our work converting Angular to React on Rails at [egghead.io](https://egghead.io/browse/frameworks).
 * Augmenting your team to get your product completed more efficiently and quickly.
@@ -68,7 +71,7 @@ My article "[Why Hire ShakaCode?](https://blog.shakacode.com/can-shakacode-help-
 
 If any of this resonates with you, please email me, [justin@shakacode.com](mailto:justin@shakacode.com). I offer a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products.
 
-We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Friends and Guests](https://www.friendsandguests.com).
+We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Hawaii Chee](https://www.hawaiichee.com).
 
 I appreciate your attention and sharing of these offerings with anybody that we can help. Your support allows me to bring you and your team [front-end happiness in the Rails world](https://www.youtube.com/watch?v=SGkTvKRPYrk).
 
@@ -121,6 +124,7 @@ For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 ------
 
 # NEWS
+* 2018-02-27: **Version 10.1.2** Supports the React API for ReactDOM.hydrate.
 * 2017-09-06: **VERSION 9.0.0 shipped!** This version depends on Webpacker directly. See the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for migration instructions.
 * The Docs here on `master` refer to 9.x including support for [rails/webpacker](https://github.com/rails/webpacker).
 *Use the [7.0.4 docs](https://github.com/shakacode/react_on_rails/tree/7.0.4) to refer to the older asset pipeline way.*
@@ -138,21 +142,25 @@ React on Rails integrates Facebook's [React](https://github.com/facebook/react) 
 
 + [Features](#features)
 + [Why Webpack?](#why-webpack)
-+ [Getting Started](#getting-started)
++ [rails/webpacker or custom setup for Webpack?](#webpack-configuration-custom-setup-for-webpack-or-railswebpacker)
++ [Getting Started with an existing Rails app](#getting-started-with-an-existing-rails-app)
     - [Installation Overview](#installation-overview)
     - [Initializer Configuration: config/initializers/react_on_rails.rb](#initializer-configuration)
     - [Including your React Component in your Rails Views](#including-your-react-component-in-your-rails-views)
     - [I18n](#i18n)
+    - [Convert rails-5 API only app to rails app](#convert-rails-5-api-only-app-to-rails-app)
+    - [NPM](#npm)
+    - [Webpacker Configuration](#webpacker-configuration)
 + [How it Works](#how-it-works)
     - [Client-Side Rendering vs. Server-Side Rendering](#client-side-rendering-vs-server-side-rendering)
     - [Building the Bundles](#building-the-bundles)
-    - [Rails Context](#rails-context)
+    - [Rails Context and Generator Functions](#rails-context-and-generator-functions)
     - [Globally Exposing Your React Components](#globally-exposing-your-react-components)
     - [ReactOnRails View Helpers API](#reactonrails-view-helpers-api)
     - [ReactOnRails JavaScript API](#reactonrails-javascript-api)
     - [React-Router](#react-router)
     - [Deployment](#deployment)
-+ [Integration with Node.js for Server Rendering](#user-content-integration-with-nodejs-for-server-rendering)
++ [Integration with Node.js for Server Rendering](#integration-with-nodejs-for-server-rendering)
 + [Additional Documentation](#additional-documentation)
 + [Contributing](#contributing)
 + [License](#license)
@@ -179,6 +187,38 @@ This usage of webpack fits neatly and simply into existing Rails apps. You can i
 Compare this to some alternative approaches for SPAs (Single Page Apps) that utilize Webpack and Rails. They will use a separate node server to distribute web pages, JavaScript assets, CSS, etc., and will still use Rails as an API server. A good example of this is our ShakaCode team member Alex's article [
 Universal React with Rails: Part I](https://medium.com/@alexfedoseev/isomorphic-react-with-rails-part-i-440754e82a59).
 
+## Webpack Configuration: custom setup for Webpack or rails/webpacker?
+
+Version 9 of React on Rails added support for the rails/webpacker view helpers so that Webpack produced assets would no longer pass through the Rails asset pipeline. As part of this change, React on Rails added a configuration option to support customization of the node_modules directory. This allowed React on Rails to support the rails/webpacker configuration of the Webpack configuration.
+
+A key decision in your use React on Rails is whether you go with the rails/webpacker default setup or the traditional React on Rails setup of putting all your client side files under the `/client` directory. While there are technically 2 independent choices involved, the directory structure and the mechanism of Webpack configuration, for simplicity sake we'll assume that these choices go together.
+
+### Traditional React on Rails using the /client directory
+
+Until version 9, all React on Rails apps used the `/client` directory for configuring React on Rails in terms of the configuration of Webpack and location of your JavaScript and Webpack files, including the node_modules directory. Version 9 changed the default to `/` for the `node_modules` location using this value in `config/initializers/react_on_rails.rb`: `config.node_modules_location`. 
+
+The [ShakaCode Team](http://www.shakacode.com) _recommends_ this approach for projects beyond the simplest cases as it provides the greatest transparency in your webpack and overall client-side setup. The *big advantage* to this is that almost everything within the `/client` directory will apply if you wish to convert your client-side code to a pure Single Page Application that runs without Rails. This allows you to google for how to do something with Webpack configuration and what applies to a non-Rails app will apply just as well to a React on Rails app.
+
+The two best examples of this patten are the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) and the integration test example in [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy).
+
+In this case, you don't need to understand the nuances of customization of your Wepback config via the [Webpacker mechanism](https://github.com/rails/webpacker/blob/master/docs/webpack.md).
+
+
+### rails/webpacker Setup
+
+Typical rails/webpacker apps have a standard directory structure as documented [here](https://github.com/rails/webpacker/blob/master/docs/folder-structure.md). If you follow the steps in the the [basic tutorial](https://github.com/shakacode/react_on_rails/blob/master/docs/tutorial.md), you will see this pattern in action. In order to customize the Webpack configuration, you need to consult with the [rails/webpacker Webpack configuration](https://github.com/rails/webpacker/blob/master/docs/webpack.md). 
+
+Version 9 made this the default for generated apps for 2 reasons:
+
+1. It's less code to generate and thus less to explain.
+2. `rails/webpacker` might be viewed as a convention in the Rails community.
+
+The *advantage* of this is that there is very little code needed to get started and you don't need to understand really anything about Webpack customization. The *big disadvantage* to this is that you will need to learn the ins and outs of the [rails/webpacker way to customize Webpack]([Webpacker mechanism](https://github.com/rails/webpacker/blob/master/docs/webpack.md)) (not the plain [Webpack way](https://webpack.js.org/)) if you wish to beyond the basic setup, and this sort of knowledge is not going to be particularly applicable if you eventually want to convert your client-side app to a pure Single Page Application that runs without rails.
+
+Overall, consider carefully if you prefer the `rails/webpacker` directory structure and Webpack configuration, over the placement of all client side files within the `/client` directory along with conventional Webpack configuration.
+
+See [Issue 982: Tutorial Generating Correct Project Structure?](https://github.com/shakacode/react_on_rails/issues/982) to discuss this issue.
+
 ## Upgrade
 
 To upgrade existing apps to React on Rails 8 see the [Installation Overview](docs/basics/installation-overview.md)
@@ -187,6 +227,7 @@ To upgrade existing apps to React on Rails 8 see the [Installation Overview](doc
 
 **For more detailed instructions on a fresh Rails app**, see the [React on Rails Basic Tutorial](docs/tutorial.md).
 
+**If you have rails-5 API only project**, Then [convert rails-5 API only app to rails app](#convert-rails-5-api-only-app-to-rails-app) before [getting started](#getting-started-with-an-existing-rails-app).
 1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `client/package.json` file.
 
   ```ruby
@@ -276,7 +317,28 @@ React on Rails provides an option for automatic conversions of Rails `*.yml` loc
 
 See the [How to add I18n](docs/basics/i18n.md) for a summary of adding I18n.
 
-## NPM
+### Convert rails-5 API only app to rails app
+
+1. Go to the directory where you created your app
+
+```
+rails new your-current-app-name
+```
+
+Rails will start creating the app and will skip the files you have already created. If there is some conflict then it will stop and you need to resolve it manually. be careful at this step as it might replace you current code in conflicted files.
+
+2. Resolve conflicts
+
+```
+1. Press "d" to see the difference
+2. If it is only adding lines then press "y" to continue
+3. If it is removeing some of your code then press "n" and add all additions manually
+```
+
+3. Run `bundle install` and follow [Getting started](#getting-started-with-an-existing-rails-app)
+
+
+### NPM
 All JavaScript in React On Rails is loaded from npm: [react-on-rails](https://www.npmjs.com/package/react-on-rails). To manually install this (you did not use the generator), assuming you have a standard configuration, run this command (assuming you are in the directory where you have your `node_modules`):
 
 ```bash
@@ -285,7 +347,7 @@ yarn add react-on-rails
 
 That will install the latest version and update your package.json.
 
-## Webpacker Configuration
+### Webpacker Configuration
 
 React on Rails users should set configuration value `compile` to false, as React on Rails handles compilation for test and production environments.
 
@@ -621,8 +683,11 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 1. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/ServerRouterApp.jsx).
 1. [Code Splitting docs](./docs/additional-reading/code-splitting.md) for information about how to set up code splitting for server rendered routes.
 
+## Caching and Performance
+Consider fragment and http caching of pages that contain React on Rails components. See [Caching and Performance](./docs/additional-reading/caching-and-performance.md) for more details.
+
 ## Deployment
-* Version 6.0 puts the necessary precompile steps automatically in the rake precompile step. You can, however, disable this by setting certain values to nil in the [config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb).
+* React on Rails puts the necessary precompile steps automatically in the rake precompile step. You can, however, disable this by setting certain values to nil in the [config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb).
   * `config.symlink_non_digested_assets_regex`: Set to nil to turn off the setup of non-js assets.
   * `build_production_command`: Set to nil to turn off the precompilation of the js assets.
 * See the [Heroku Deployment](./docs/additional-reading/heroku-deployment.md) doc for specifics regarding Heroku. The information here should apply to other deployments.
@@ -666,6 +731,7 @@ If you want to use a node server for server rendering, [get in touch](mailto:jus
   + [Hot Reloading of Assets For Rails Development](./docs/additional-reading/hot-reloading-rails-development.md)
   + [Heroku Deployment](./docs/additional-reading/heroku-deployment.md)
   + [Updating Dependencies](./docs/additional-reading/updating-dependencies.md)
+  + [Caching and Performance](./docs/additional-reading/caching-and-performance.md)
 
 + **API**
   + [JavaScript API](./docs/api/javascript-api.md)
@@ -747,7 +813,7 @@ Thank you for considering using [React on Rails](https://github.com/shakacode/re
 
 We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first application development company. We fund this project by:
 
-* Providing priority support and training for anything related to React + Webpack + Rails in our [Coaching Program](http://www.shakacode.com/work/shakacode-coaching-plan.pdf).
+* Providing priority support and training for anything related to React + Webpack + Rails in our [Pro Support program](http://www.shakacode.com/work/shakacode-pro-support.pdf).
 * Building custom web and mobile (React Native) applications. We typically work with a technical founder or CTO and instantly provide a full development team including designers.
 * Migrating **Angular** + Rails to React + Rails. You can see an example of React on Rails and our work converting Angular to React on Rails at [egghead.io](https://egghead.io/browse/frameworks).
 * Augmenting your team to get your product completed more efficiently and quickly.
@@ -756,7 +822,7 @@ My article "[Why Hire ShakaCode?](https://blog.shakacode.com/can-shakacode-help-
 
 If any of this resonates with you, please email me, [justin@shakacode.com](mailto:justin@shakacode.com). I offer a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products.
 
-We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Friends and Guests](https://www.friendsandguests.com).
+We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Hawaii Chee](https://www.hawaiichee.com).
 
 I appreciate your attention and sharing of these offerings with anybody that we can help. Your support allows me to bring you and your team [front-end happiness in the Rails world](https://www.youtube.com/watch?v=SGkTvKRPYrk).
 

@@ -6,6 +6,7 @@ rvm:
   # Rails 5 requires 2.2
   - 2.3.1
   - 2.4.1
+  - 2.5.0
   - 2.2.6
 services:
   - docker
@@ -57,6 +58,8 @@ matrix:
       rvm: 2.3.1
     - gemfile: spec/dummy_no_webpacker/Gemfile.rails32
       rvm: 2.4.1
+    - gemfile: spec/dummy_no_webpacker/Gemfile.rails32
+      rvm: 2.5.0
     - gemfile: spec/dummy/Gemfile
       rvm: 2.2.6
 

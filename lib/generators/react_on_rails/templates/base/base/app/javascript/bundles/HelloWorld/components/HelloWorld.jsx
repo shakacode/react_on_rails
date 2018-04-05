@@ -13,7 +13,7 @@ export default class HelloWorld extends React.Component {
     super(props);
 
     // How to set initial state in ES6 class syntax
-    // https://facebook.github.io/react/docs/reusable-components.html#es6-classes
+    // https://reactjs.org/docs/state-and-lifecycle.html#adding-local-state-to-a-class
     this.state = { name: this.props.name };
   }
 

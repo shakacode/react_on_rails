@@ -1,0 +1,11 @@
+lint:
+  image: dylangrafmyre/docker-lint:latest
+  working_dir: /app/
+  volumes:
+    - '.:/app/'
+tests:
+  build: .
+  dockerfile: Dockerfile_tests
+  working_dir: /app/
+  volumes:
+    - '.:/app/'

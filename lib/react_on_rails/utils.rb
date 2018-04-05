@@ -8,6 +8,33 @@ require "active_support/core_ext/string"
 
 module ReactOnRails
   module Utils
+    ###########################################################
+    # PUBLIC API
+    ###########################################################
+
+    # Returns the hashed file name when using webpacker. Useful for creating cache keys.
+    def self.bundle_file_name(bundle_name)
+      raise "Only call bundle_file_name if using webpacker" unless using_webpacker?
+      full_path = bundle_js_file_path_from_webpacker(bundle_name)
+      pathname = Pathname.new(full_path)
+      pathname.basename.to_s
+    end
+
+    # Returns the hashed file name of the server bundle when using webpacker.
+    # Nececessary fragment-caching keys.
+    def self.server_bundle_file_name
+      return @server_bundle_hash if @server_bundle_hash && !Rails.env.development?
+
+      @server_bundle_hash = begin
+        server_bundle_name = ReactOnRails.configuration.server_bundle_js_file
+        bundle_file_name(server_bundle_name)
+      end
+    end
+
+    ###########################################################
+    # PRIVATE API -- Subject to change
+    ###########################################################
+
     # https://forum.shakacode.com/t/yak-of-the-week-ruby-2-4-pathname-empty-changed-to-look-at-file-size/901
     # return object if truthy, else return nil
     def self.truthy_presence(obj)
@@ -85,8 +112,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.bundle_js_file_path(bundle_name)
-      if using_webpacker?
-        return bundle_name if bundle_name == "manifest.json"
+      if using_webpacker? && bundle_name != "manifest.json"
         bundle_js_file_path_from_webpacker(bundle_name)
       else
         # Default to the non-hashed name in the specified output directory, which, for legacy
@@ -102,9 +128,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     def self.rails_version_less_than(version)
       @rails_version_less_than ||= {}
 
-      if @rails_version_less_than.key?(version)
-        return @rails_version_less_than[version]
-      end
+      return @rails_version_less_than[version] if @rails_version_less_than.key?(version)
 
       @rails_version_less_than[version] = begin
         Gem::Version.new(Rails.version) < Gem::Version.new(version)
@@ -122,8 +146,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.prepend_cd_node_modules_directory(cmd)
-      return cmd if ReactOnRails.configuration.node_modules_location.blank?
-      "cd #{ReactOnRails.configuration.node_modules_location} && #{cmd}"
+      "cd \"#{ReactOnRails.configuration.node_modules_location}\" && #{cmd}"
     end
 
     def self.source_path

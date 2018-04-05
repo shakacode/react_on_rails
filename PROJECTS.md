@@ -1,13 +1,16 @@
 # Projects using React on Rails
 
+[Click here](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com/) for a search for public sites using React on Rails. As of March 27, 2018, there are 2126 public sites using React on Rails, excluding another 300K+ that are from a domain reseller.
+
 *Please support the project by [emailing Justin Gordon](mailto:justin@shakacode.com) of any projects, yours or others, that use React on Rails. You can confirm a project uses React on Rails as the source will contain **`js-react-on-rails`**.*
 
 ## Commercial Products Live
-* **[Friends and Guests](https://www.friendsandguests.com/)**, the signature product of [ShakaCode](http://www.shakacode.com), which is a "Network Connecting Hosts and Guests".
+* **[Hawaii Chee](https://www.hawaiichee.com/)**, the signature product of [ShakaCode](http://www.shakacode.com), which is a vacation rental site focusing on Hawaii.
 * **[KissKissBankBank](https://www.kisskissbankbank.com/)**, large French crowdfunding platform.
-* **[Nootrobox](https://nootrobox.com)**: Web ecommerce site for "biohacking" products.
+* **[HVMN](https://hvmn.com)**: Web ecommerce site for "biohacking" products.
 * **[GuavaPass](https://guavapass.com/)**: Coaching client of [ShakaCode](http://www.shakacode.com) and React on Rails fan!
 * **[Pivotal Tracker](http://www.pivotaltracker.com/)**: The first (and most-loved) agile project management tool built on Rails.  React on Rails has greatly simplified integration and workflow for our React components in Rails!
+* **[Estately](https://www.estately.com)**: Home search.
 * **[Blink Inc](https://www.blinkinc.com)**: Website and more built by [ShakaCode](http://www.shakacode.com).
 * **[Madrone Analytics](http://madroneco.com/)**: The original client of [ShakaCode](http://www.shakacode.com) that led to the development of React on Rails, as described in [Fast Rich Client Rails Development With Webpack and the ES6 Transpiler](http://www.railsonmaui.com/blog/2014/10/03/integrating-webpack-and-the-es6-transpiler-into-an-existing-rails-project/).
 * **[Deliveroo](https://deliveroo.co.uk/)**: The leading food delivery site in Europe has gone live with React on Rails, with multi-lingual JavaScript support!

@@ -108,7 +108,7 @@ module ReactOnRails
         if v.is_a? Hash
           flatten(v).map { |hk, hv| h["#{k}.#{hk}".to_sym] = hv }
         else
-          h[k] = v
+          h[k] = v.gsub("%{", "{")
         end
       end
     end

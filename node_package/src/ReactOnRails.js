@@ -29,7 +29,7 @@ ctx.ReactOnRails = {
   /**
    * Allows registration of store generators to be used by multiple react components on one Rails
    * view. store generators are functions that take one arg, props, and return a store. Note that
-   * the setStore API is different in tha it's the actual store hydrated with props.
+   * the setStore API is different in that it's the actual store hydrated with props.
    * @param stores (keys are store names, values are the store generators)
    */
   registerStore(stores) {

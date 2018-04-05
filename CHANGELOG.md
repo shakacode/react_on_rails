@@ -9,8 +9,39 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 
 Changes since last non-beta release.
 
+#### Fixed
+- Changed i18n parsing to convert ruby i18n argument syntax into FormatJS argument syntax. by [sepehr500](https://github.com/sepehr500)
+
+- Fixed an issue where the spec compiler check would fail if the project path contained spaces. [PR 1045](https://github.com/shakacode/react_on_rails/pull/1045) by [andrewmarkle](https://github.com/andrewmarkle)
+
 *Please add entries here for your pull requests that are not yet released.*
 
+### [10.1.3] - 2018-02-28
+#### Fixed
+- Improved error reporting on version mismatches between Javascript and Ruby packages. [PR 1025](https://github.com/shakacode/react_on_rails/pull/1025) by [theJoeBiz](https://github.com/squadette).
+
+### [10.1.2] - 2018-02-27
+#### Fixed
+- Use ReactDOM.hydrate() for hydrating a SSR component if available. ReactDOM.render() has been deprecated for use on SSR components in React 16 and this addresses the warning. [PR 1028](https://github.com/shakacode/react_on_rails/pull/1028) by [theJoeBiz](https://github.com/theJoeBiz).
+
+### [10.1.1] - 2018-01-26
+#### Fixed
+- Fixed issue with server-rendering error handler: [PR 1020](https://github.com/shakacode/react_on_rails/pull/1020) by [jblasco3](https://github.com/jblasco3).
+
+### [10.1.0] - 2018-01-23
+#### Added
+- Added 2 cache helpers: ReactOnRails::Utils.bundle_file_name(bundle_name) and ReactOnRails::Utils.server_bundle_file_name
+for easy access to the hashed filenames for use in cache keys. [PR 1018](https://github.com/shakacode/react_on_rails/pull/1018) by [justin808](https://github.com/justin808).
+
+#### Fixed
+- Use redux component in generated redux Hello World example: [PR 1006](https://github.com/shakacode/react_on_rails/pull/1006) by [lewaabahmad](https://github.com/lewaabahmad).
+- Fixed `Utils.bundle_js_file_path` generating the incorrect path for `manifest.json` in webpacker projects: [Issue #1011](https://github.com/shakacode/react_on_rails/issues/1011) by [elstgav](https://github.com/elstgav)
+
+### [10.0.2] - 2017-11-10
+#### Fixed
+- Remove unnecessary dependencies from released NPM package: [PR 968](https://github.com/shakacode/react_on_rails/pull/968) by [tricknotes](https://github.com/tricknotes).
+
+### [10.0.1] - 2017-10-28
 #### Fixed
 - Fixed `react_component_hash` functionality in cases of prerendering errors: [PR 960](https://github.com/shakacode/react_on_rails/pull/960) by [Judahmeek](https://github.com/Judahmeek).
 - Fix to add missing dependency to run generator spec individually: [PR 962](https://github.com/shakacode/react_on_rails/pull/962) by [tricknotes](https://github.com/tricknotes).
@@ -44,7 +75,7 @@ Updated React on Rails to depend on [rails/webpacker](https://github.com/rails/w
 
 
 #### 9.0 from 8.x. Upgrade Instructions
-Moved to [our additional reading documentation](https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/upgrading-react-on-rails#from-version-8).
+Moved to [our documentation](docs/basics/upgrading-react-on-rails.md#upgrading-to-version-9).
 
 ### [8.0.7] - 2017-08-16
 #### Fixed
@@ -668,8 +699,14 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/10.0.0...master
-[10.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.3...10.0.o
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/10.1.3...master
+[10.1.3]: https://github.com/shakacode/react_on_rails/compare/10.1.2...10.1.3
+[10.1.2]: https://github.com/shakacode/react_on_rails/compare/10.1.1...10.1.2
+[10.1.1]: https://github.com/shakacode/react_on_rails/compare/10.1.0...10.1.1
+[10.1.0]: https://github.com/shakacode/react_on_rails/compare/10.0.2...10.1.0
+[10.0.2]: https://github.com/shakacode/react_on_rails/compare/10.0.1...10.0.2
+[10.0.1]: https://github.com/shakacode/react_on_rails/compare/10.0.0...10.0.1
+[10.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.3...10.0.0
 [9.0.3]: https://github.com/shakacode/react_on_rails/compare/9.0.2...9.0.3
 [9.0.2]: https://github.com/shakacode/react_on_rails/compare/9.0.1...9.0.2
 [9.0.1]: https://github.com/shakacode/react_on_rails/compare/9.0.0...9.0.1

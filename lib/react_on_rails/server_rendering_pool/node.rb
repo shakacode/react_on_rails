@@ -58,9 +58,7 @@ module ReactOnRails
           @js_context_pool.with do |js_context|
             js_context.send(js_code + eof_symbol, 0)
             result = ""
-            while result[-eof_symbol.length..-1] != eof_symbol
-              result += js_context.recv(max_int)
-            end
+            result[-eof_symbol.length..-1] != eof_symbol while result += js_context.recv(max_int)
             result[0..-eof_symbol.length]
           end
         end

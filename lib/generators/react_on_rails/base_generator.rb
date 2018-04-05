@@ -55,6 +55,8 @@ module ReactOnRails
           if File.exist?(spec_helper)
             add_configure_rspec_to_compile_assets(spec_helper)
           else
+            # rubocop:disable Lint/UnneededDisable
+            # rubocop:disable Layout/EmptyLinesAroundArguments
             GeneratorMessages.add_info(
               <<-MSG.strip_heredoc
 
@@ -67,6 +69,8 @@ module ReactOnRails
               ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
               MSG
             )
+            # rubocop:enable Layout/EmptyLinesAroundArguments
+            # rubocop:enable Lint/UnneededDisable
           end
         end
       end
@@ -95,7 +99,7 @@ module ReactOnRails
             - Visit http://localhost:3000/hello_world and see your React On Rails app running!
 
             - Run bin/webpack-dev-server to start the Webpack dev server for compilation of Webpack
-              assets assets as soon as you save. This default setup with the dev server does not work
+              assets as soon as you save. This default setup with the dev server does not work
               for server rendering
 
             - Alternately, you may turn off compile in config/webpacker.yml and run the foreman
