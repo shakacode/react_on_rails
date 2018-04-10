@@ -6,6 +6,8 @@ const config = {
   port: process.env.PORT,
   logLevel: 'debug',
   password: process.env.AUTH_PASSWORD,
+  // allWorkersRestartInterval: 6 * 60, // in minutes
+  // delayBetweenIndividualWorkersRestarts: 5, // in minutes
 };
 
 reactOnRailsRenderer(config);

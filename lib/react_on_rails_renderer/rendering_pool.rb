@@ -72,6 +72,7 @@ module ReactOnRailsRenderer
           renderer_url(rendering_request_digest),
           renderingRequest: js_code,
           gemVersion: ReactOnRailsRenderer.const_get("VERSION"),
+          protocolVersion: ReactOnRailsRenderer.const_get("PROTOCOL_VERSION"),
           password: ReactOnRailsRenderer.configuration.password
         )
 
@@ -88,7 +89,7 @@ module ReactOnRailsRenderer
         when 410
           update_bundle_and_eval_js(js_code)
         when 412
-          raise "Renderer version does not match gem version"
+          raise "Rendering server doesn't accept gem's protocol version"
         #when 307
         #  eval_js(js_code)
         else
@@ -109,6 +110,7 @@ module ReactOnRailsRenderer
           renderingRequest: js_code,
           bundle: File.new(ReactOnRails::Utils.server_bundle_js_file_path),
           gemVersion: ReactOnRailsRenderer.const_get("VERSION"),
+          protocolVersion: ReactOnRailsRenderer.const_get("PROTOCOL_VERSION"),
           password: ReactOnRailsRenderer.configuration.password
         )
 
