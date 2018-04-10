@@ -8,112 +8,132 @@ const { buildVM } = require('../src/worker/vm');
 // eslint-disable-next-line import/no-dynamic-require
 const packageJson = require(path.join(__dirname, '/../../package.json'));
 
-test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
-     'when password is required but no password was provided', (assert) => {
-  assert.plan(2);
+const gemVersion = packageJson.version;
+const protocolVersion = packageJson.protocolVersion;
 
-  createUploadedBundle();
-  buildVM(getUploadedBundlePath());
+test(
+  'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
+    'when password is required but no password was provided',
+  assert => {
+    assert.plan(2);
 
-  const app = worker.run({
-    bundlePath: path.resolve(__dirname, './tmp'),
-    password: 'password',
-  });
+    createUploadedBundle();
+    buildVM(getUploadedBundlePath());
 
-  request(app)
-    .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
-    .type('json')
-    .send({
-      renderingRequest: 'ReactOnRails.dummy',
-      gemVersion: packageJson.version,
-      password: undefined,
-    })
-    .end((_err, res) => {
-      assert.ok(res.error.status === 401);
-      assert.ok(res.error.text === 'Wrong password');
-      assert.end();
-    });
-});
-
-test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
-     'when password is required but wrong password was provided', (assert) => {
-  assert.plan(2);
-
-  createUploadedBundle();
-  buildVM(getUploadedBundlePath());
-
-  const app = worker.run({
-    bundlePath: path.resolve(__dirname, './tmp'),
-    password: 'password',
-  });
-
-  request(app)
-    .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
-    .type('json')
-    .send({
-      renderingRequest: 'ReactOnRails.dummy',
-      gemVersion: packageJson.version,
-      password: 'wrong',
-    })
-    .end((_err, res) => {
-      assert.ok(res.error.status === 401);
-      assert.ok(res.error.text === 'Wrong password');
-      assert.end();
-    });
-});
-
-test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
-     'when password is required and correct password was provided', (assert) => {
-  assert.plan(3);
-
-  createUploadedBundle();
-  buildVM(getUploadedBundlePath());
-
-  const app = worker.run({
-    bundlePath: path.resolve(__dirname, './tmp'),
-    gemVersion: packageJson.version,
-    password: 'password',
-  });
-
-  request(app)
-    .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
-    .type('json')
-    .send({
-      renderingRequest: 'ReactOnRails.dummy',
-      gemVersion: packageJson.version,
+    const app = worker.run({
+      bundlePath: path.resolve(__dirname, './tmp'),
       password: 'password',
-    })
-    .end((_err, res) => {
-      assert.ok(res.headers['cache-control'] === 'public, max-age=31536000');
-      assert.ok(res.status === 200);
-      assert.deepEqual(res.body, { renderedHtml: 'Dummy Object' });
-      assert.end();
     });
-});
 
-test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
-     'when password is not required and no password was provided', (assert) => {
-  assert.plan(3);
+    request(app)
+      .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
+      .type('json')
+      .send({
+        renderingRequest: 'ReactOnRails.dummy',
+        password: undefined,
+        gemVersion,
+        protocolVersion,
+      })
+      .end((_err, res) => {
+        assert.ok(res.error.status === 401);
+        assert.ok(res.error.text === 'Wrong password');
+        assert.end();
+      });
+  },
+);
 
-  createUploadedBundle();
-  buildVM(getUploadedBundlePath());
+test(
+  'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
+    'when password is required but wrong password was provided',
+  assert => {
+    assert.plan(2);
 
-  const app = worker.run({
-    bundlePath: path.resolve(__dirname, './tmp'),
-  });
+    createUploadedBundle();
+    buildVM(getUploadedBundlePath());
 
-  request(app)
-    .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
-    .type('json')
-    .send({
-      renderingRequest: 'ReactOnRails.dummy',
-      gemVersion: packageJson.version,
-      password: undefined,
-    })
-    .end((_err, res) => {
-      assert.ok(res.headers['cache-control'] === 'public, max-age=31536000');
-      assert.ok(res.status === 200);
-      assert.deepEqual(res.body, { renderedHtml: 'Dummy Object' });
-      assert.end();
+    const app = worker.run({
+      bundlePath: path.resolve(__dirname, './tmp'),
+      password: 'password',
     });
-});
+
+    request(app)
+      .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
+      .type('json')
+      .send({
+        renderingRequest: 'ReactOnRails.dummy',
+        password: 'wrong',
+        gemVersion,
+        protocolVersion,
+      })
+      .end((_err, res) => {
+        assert.ok(res.error.status === 401);
+        assert.ok(res.error.text === 'Wrong password');
+        assert.end();
+      });
+  },
+);
+
+test(
+  'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
+    'when password is required and correct password was provided',
+  assert => {
+    assert.plan(3);
+
+    createUploadedBundle();
+    buildVM(getUploadedBundlePath());
+
+    const app = worker.run({
+      bundlePath: path.resolve(__dirname, './tmp'),
+      password: 'password',
+      gemVersion,
+      protocolVersion,
+    });
+
+    request(app)
+      .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
+      .type('json')
+      .send({
+        renderingRequest: 'ReactOnRails.dummy',
+        password: 'password',
+        gemVersion,
+        protocolVersion,
+      })
+      .end((_err, res) => {
+        assert.ok(res.headers['cache-control'] === 'public, max-age=31536000');
+        assert.ok(res.status === 200);
+        assert.deepEqual(res.body, { renderedHtml: 'Dummy Object' });
+        assert.end();
+      });
+  },
+);
+
+test(
+  'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
+    'when password is not required and no password was provided',
+  assert => {
+    assert.plan(3);
+
+    createUploadedBundle();
+    buildVM(getUploadedBundlePath());
+
+    const app = worker.run({
+      bundlePath: path.resolve(__dirname, './tmp'),
+    });
+
+    request(app)
+      .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
+      .type('json')
+      .send({
+        renderingRequest: 'ReactOnRails.dummy',
+        password: undefined,
+        gemVersion,
+        protocolVersion,
+      })
+      .end((_err, res) => {
+        assert.ok(res.headers['cache-control'] === 'public, max-age=31536000');
+        assert.ok(res.status === 200);
+        assert.deepEqual(res.body, { renderedHtml: 'Dummy Object' });
+        assert.end();
+      });
+  },
+);
