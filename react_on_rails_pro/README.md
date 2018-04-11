@@ -82,6 +82,9 @@ gem "react_on_rails_renderer", git: "https://[your-github-token]:x-oauth-basic@g
 ReactOnRailsRenderer.configure do |config|
   config.renderer_host = "localhost"
   config.renderer_port = 3800
+
+  # Fallback renderer is used when there is no network connection to NodeJSHttp renderer
+  config.fallback_method = "ExecJS" # or NodeJS
 end
 ```
 
@@ -187,6 +190,9 @@ Assuming you did not revoke your **GitHub OAuth token** so you don't need to upd
     config.renderer_host = "renderer-test.herokuapp.com"
     config.renderer_port = 443
     config.password = ENV["RENDERER_PASSWORD"]
+
+    # Fallback renderer is used when there is no network connection to NodeJSHttp renderer
+    config.fallback_method = "ExecJS" # or NodeJS
   end
 ```
 
@@ -214,6 +220,7 @@ Here are the options available for **react_on_rails_renderer** configuration:
 2. **renderer_host** (default: `"localhost"`) - Renderer host name without protocol and port.
 3. **renderer_port** (default: `nil`) - Port that will be used to renderer connection. If not set - default HTTP port will be used.
 4. **password** (default: `nil`) - Password that will be sent to renderer for simple authentication. **Note:** Don't forget to set up **SSL** connection otherwise password will useless since it will be easy to intercept it.
+5. **fallback_method** (default: `nil`) - Fallback renderer ("ExecJS" or "NodeJS") to use when there is no network connection to NodeJSHttp renderer.
 
 ## Local deploy
 
