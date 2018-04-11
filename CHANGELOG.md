@@ -6,12 +6,14 @@ Contributors: please follow the recommendations outlined at [keepachangelog.com]
 ## [Unreleased]
 Changes since last non-beta release.
 
+### [10.1.4] - 2018-04-11
+
 #### Fixed
-- Changed i18n parsing to convert ruby i18n argument syntax into FormatJS argument syntax. by [sepehr500](https://github.com/sepehr500)
+- Changed i18n parsing to convert ruby i18n argument syntax into FormatJS argument syntax. [PR 1046](https://github.com/shakacode/react_on_rails/pull/1046) by [sepehr500](https://github.com/sepehr500).
 
-- Fixed an issue where the spec compiler check would fail if the project path contained spaces. [PR 1045](https://github.com/shakacode/react_on_rails/pull/1045) by [andrewmarkle](https://github.com/andrewmarkle)
+- Fixed an issue where the spec compiler check would fail if the project path contained spaces. [PR 1045](https://github.com/shakacode/react_on_rails/pull/1045) by [andrewmarkle](https://github.com/andrewmarkle).
 
-- Updated the default `build_production_command` that caused production assets to be built with development settings. [PR 1053](https://github.com/shakacode/react_on_rails/pull/1053) by [Roman Kushnir](https://github.com/RKushnir)
+- Updated the default `build_production_command` that caused production assets to be built with development settings. [PR 1053](https://github.com/shakacode/react_on_rails/pull/1053) by [Roman Kushnir](https://github.com/RKushnir).
 
 *Please add entries here for your pull requests that are not yet released.*
 
