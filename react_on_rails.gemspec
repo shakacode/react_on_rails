@@ -49,9 +49,10 @@ Gem::Specification.new do |s|
   s.add_development_dependency "rspec"
   
   s.post_install_message = <<~MSG
+    --------------------------------------------------------------------------------
     Email contact@shakacode.com for access to our slack room and information about our "pro support plan"
     which supports better performance, via caching helpers and our node rendering server.
-
+    --------------------------------------------------------------------------------
   MSG
 end
 # rubocop:enable Metrics/BlockLength
