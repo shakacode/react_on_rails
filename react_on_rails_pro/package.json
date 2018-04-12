@@ -1,12 +1,12 @@
 {
   "name": "react-on-rails-renderer",
   "version": "0.5.4",
-  "protocolVersion": "1",
+  "protocolVersion": "1.0.0",
   "description": "react-on-rails-renderer JavaScript for react_on_rails_renderer Ruby gem",
   "main": "node_package/src/ReactOnRailsRenderer.js",
   "engines": {
-    "node": "6.3.1",
-    "yarn": "1.5.1"
+    "node": "^8.9.4",
+    "yarn": "^1.5.1"
   },
   "directories": {
     "doc": "docs"
@@ -45,7 +45,9 @@
     "tap-spec": "^4.1.1",
     "tape": "^4.6.3"
   },
-  "files": ["node_package/src"],
+  "files": [
+    "node_package/src"
+  ],
   "scripts": {
     "start": "node renderer.js",
     "test": "babel-tape-runner node_package/tests/*.js | tap-spec",
@@ -53,14 +55,20 @@
     "flow": "flow check node_package",
     "lint": "yarn run eslint && yarn run flow",
     "check": "yarn run lint && yarn run flow && yarn run test",
-    "local":
-      "echo 'Be sure to run yarn run dummy:install' && yarn run build && cd spec/dummy && foreman start"
+    "local": "echo 'Be sure to run yarn run dummy:install' && yarn run build && cd spec/dummy && foreman start"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/shakacode/react-on-rails-renderer.git"
   },
-  "keywords": ["react", "webpack", "JavaScript", "Ruby", "on", "Rails"],
+  "keywords": [
+    "react",
+    "webpack",
+    "JavaScript",
+    "Ruby",
+    "on",
+    "Rails"
+  ],
   "author": "justin.gordon@gmail.com",
   "license": "MIT",
   "bugs": {

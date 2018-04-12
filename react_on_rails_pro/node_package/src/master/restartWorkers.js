@@ -1,9 +1,16 @@
+/**
+ * Perform all workers restart with provided delay
+ * @module master/restartWorkers
+ */
+
 'use strict';
 
 const cluster = require('cluster');
 const log = require('winston');
 
-module.exports = function restartWorkers(delayBetweenIndividualWorkersRestarts) {
+const MILLISECONDS_IN_MINUTE = 60000;
+
+module.exports = function restartWorkers(delayBetweenIndividualWorkerRestarts) {
   log.debug('Started scheduled restart of workers');
 
   let delay = 0;
@@ -18,7 +25,7 @@ module.exports = function restartWorkers(delayBetweenIndividualWorkersRestarts) 
 
     setTimeout(killWorker, delay);
 
-    delay += delayBetweenIndividualWorkersRestarts * 60000;
+    delay += delayBetweenIndividualWorkerRestarts * MILLISECONDS_IN_MINUTE;
   }
 
   setTimeout(() => log.debug('Finished scheduled restart of workers'), delay);

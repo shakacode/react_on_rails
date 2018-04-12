@@ -52,6 +52,7 @@ exports.run = function run(config) {
 
     if (typeof protocolVersionCheckingResult === 'object') {
       const { status, data, headers } = protocolVersionCheckingResult;
+      log.warn(data);
       // eslint-disable-next-line guard-for-in, no-restricted-syntax
       for (const key in headers) res.set(key, headers[key]);
       res.status(status);
@@ -64,6 +65,7 @@ exports.run = function run(config) {
 
     if (typeof authResult === 'object') {
       const { status, data, headers } = authResult;
+      log.warn(data);
       // eslint-disable-next-line guard-for-in, no-restricted-syntax
       for (const key in headers) res.set(key, headers[key]);
       res.status(status);

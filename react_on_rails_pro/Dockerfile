@@ -43,8 +43,8 @@ ENV PATH=$PATH:$RUBY_HOME:$RUBY_HOME/bin:$RUBY_HOME/gems/bin:
 # Install Bundler 1.14.6:
 RUN gem install bundler -v 1.14.6
 
-# Install Node 6.3.1 and expose executable paths:
-ENV NODE_VERSION=6.3.1
+# Install Node 8.9.4 and expose executable paths:
+ENV NODE_VERSION=8.9.4
 RUN \
   wget https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz \
   && tar -xvzf node-v$NODE_VERSION-linux-x64.tar.gz \

@@ -71,8 +71,8 @@ module ReactOnRailsRenderer
         response = RestClient.post(
           renderer_url(rendering_request_digest),
           renderingRequest: js_code,
-          gemVersion: ReactOnRailsRenderer.const_get("VERSION"),
-          protocolVersion: ReactOnRailsRenderer.const_get("PROTOCOL_VERSION"),
+          gemVersion: ReactOnRailsRenderer::VERSION,
+          protocolVersion: ReactOnRailsRenderer::PROTOCOL_VERSION,
           password: ReactOnRailsRenderer.configuration.password
         )
 
@@ -89,6 +89,8 @@ module ReactOnRailsRenderer
         when 410
           update_bundle_and_eval_js(js_code)
         when 412
+          puts ReactOnRailsRenderer::VERSION
+          puts ReactOnRailsRenderer::PROTOCOL_VERSION
           raise "Rendering server doesn't accept gem's protocol version"
         #when 307
         #  eval_js(js_code)
@@ -109,8 +111,8 @@ module ReactOnRailsRenderer
           renderer_url(rendering_request_digest),
           renderingRequest: js_code,
           bundle: File.new(ReactOnRails::Utils.server_bundle_js_file_path),
-          gemVersion: ReactOnRailsRenderer.const_get("VERSION"),
-          protocolVersion: ReactOnRailsRenderer.const_get("PROTOCOL_VERSION"),
+          gemVersion: ReactOnRailsRenderer::VERSION,
+          protocolVersion: ReactOnRailsRenderer::PROTOCOL_VERSION,
           password: ReactOnRailsRenderer.configuration.password
         )
 

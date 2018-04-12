@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "example of server rendering",
   "engines": {
-    "node": "6.3.1",
+    "node": "8.9.4",
     "yarn": "1.5.1"
   },
   "repository": {
