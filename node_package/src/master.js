@@ -8,8 +8,14 @@
 const os = require('os');
 const cluster = require('cluster');
 const log = require('winston');
+const path = require('path');
+
 const { buildConfig, getConfig } = require('./shared/configBuilder');
 const restartWorkers = require('./master/restartWorkers');
+// eslint-disable-next-line import/no-dynamic-require
+const packageJson = require(path.join(__dirname, '/../../package.json'));
+
+const MILLISECONDS_IN_MINUTE = 60000;
 
 exports.run = function run(config) {
   // Store config in app state. From now it can be loaded by any module using getConfig():
@@ -18,7 +24,7 @@ exports.run = function run(config) {
     logLevel,
     workersCount,
     allWorkersRestartInterval,
-    delayBetweenIndividualWorkersRestarts,
+    delayBetweenIndividualWorkerRestarts,
   } = getConfig();
 
   // Turn on colorized log:
@@ -27,6 +33,7 @@ exports.run = function run(config) {
 
   // Set log level from config:
   log.level = logLevel;
+  log.info(`Renderer v${packageJson.version}, protocol v${packageJson.protocolVersion}`);
 
   // Count available CPUs for worker processes:
   const workerCpuCount = workersCount || os.cpus().length - 1 || 1;
@@ -45,16 +52,22 @@ exports.run = function run(config) {
   });
 
   // Schedule regular restarts of workers
-  if (allWorkersRestartInterval && delayBetweenIndividualWorkersRestarts) {
+  if (allWorkersRestartInterval && delayBetweenIndividualWorkerRestarts) {
     log.info(
       'Scheduled workers restarts every %d minutes (%d minutes btw each)',
       allWorkersRestartInterval,
-      delayBetweenIndividualWorkersRestarts,
+      delayBetweenIndividualWorkerRestarts,
     );
     setInterval(
-      () => restartWorkers(delayBetweenIndividualWorkersRestarts),
-      allWorkersRestartInterval * 60000,
+      () => restartWorkers(delayBetweenIndividualWorkerRestarts),
+      allWorkersRestartInterval * MILLISECONDS_IN_MINUTE,
     );
+  } else if (allWorkersRestartInterval || delayBetweenIndividualWorkerRestarts) {
+    log.error(
+      "Misconfiguration, please provide both 'allWorkersRestartInterval' and " +
+        "'delayBetweenIndividualWorkerRestarts' to enable scheduled worker restarts",
+    );
+    process.exit();
   } else {
     log.info('No schedule for workers restarts');
   }
