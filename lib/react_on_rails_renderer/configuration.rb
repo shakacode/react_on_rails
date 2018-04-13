@@ -11,7 +11,7 @@ module ReactOnRailsRenderer
   end
 
   class Configuration
-    attr_accessor :renderer_protocol, :renderer_host, :renderer_port, :password, :fallback_method
+    attr_accessor :renderer_protocol, :renderer_host, :renderer_port, :password
 
     def initialize(renderer_protocol: nil, renderer_host: nil, renderer_port: nil, password: nil)
       self.renderer_protocol = renderer_protocol
