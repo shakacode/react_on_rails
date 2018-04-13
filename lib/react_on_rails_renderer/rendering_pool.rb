@@ -89,8 +89,6 @@ module ReactOnRailsRenderer
         when 410
           update_bundle_and_eval_js(js_code)
         when 412
-          puts ReactOnRailsRenderer::VERSION
-          puts ReactOnRailsRenderer::PROTOCOL_VERSION
           raise "Rendering server doesn't accept gem's protocol version"
         #when 307
         #  eval_js(js_code)
