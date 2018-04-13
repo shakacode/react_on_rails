@@ -76,15 +76,12 @@ module ReactOnRailsRenderer
           password: ReactOnRailsRenderer.configuration.password
         )
 
-        p response.headers
         parsed_response = JSON.parse(response.body)
         parsed_response[RENDERED_HTML_KEY]
 
       # rest_client treats non 2xx HTTP status for POST requests as an exception:
       rescue RestClient::ExceptionWithResponse => status_exception
-        p "zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz"
-        p status_exception.response.headers
-        p status_exception.response
+        Rails.logger.debug { exception_debug_message(status_exception) }
         case status_exception.response.code
         when 410
           update_bundle_and_eval_js(js_code)
@@ -116,7 +113,7 @@ module ReactOnRailsRenderer
         parsed_response[RENDERED_HTML_KEY]
 
       rescue RestClient::ExceptionWithResponse => status_exception
-        p "zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz"
+        Rails.logger.debug { exception_debug_message(status_exception) }
 
         case status_exception.response.code
         when 412
@@ -131,16 +128,8 @@ module ReactOnRailsRenderer
       end
 
       def fallback_exec_js(js_code)
-        fallback_method = ReactOnRailsRenderer.configuration.fallback_method
-
-        fallback_renderer = if fallback_method == "ExecJS"
-                              ReactOnRails::ServerRenderingPool::Exec
-                            elsif fallback_method == "NodeJS"
-                              ReactOnRails::ServerRenderingPool::Node
-                            else
-                              raise "Can't connect to NodeJSHttp renderer and no valid fallback method provided"
-                            end
-        Rails.logger.warn "Can't connect to NodeJSHttp renderer, fallback to #{fallback_method}"
+        Rails.logger.warn { "Can't connect to NodeJSHttp renderer, fallback to ExecJS" }
+        fallback_renderer = ReactOnRails::ServerRenderingPool::Exec
 
         # Pool is actually discarded btw requests:
         # 1) not to keep ExecJS in memory once NodeJSHttp is available back
@@ -152,6 +141,10 @@ module ReactOnRailsRenderer
         fallback_pool = ConnectionPool.new(pool_options) { fallback_renderer.send(:create_js_context) }
         fallback_renderer.instance_variable_set(:@js_context_pool, fallback_pool)
         fallback_renderer.send(:eval_js, js_code)
+      end
+
+      def exception_debug_message(exception)
+        "#{exception.response.code}\n#{exception.response.headers}\n#{exception.response}"
       end
     end
   end
