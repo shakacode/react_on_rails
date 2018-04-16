@@ -34,9 +34,10 @@ First be sure to run `rails -v` and check that you are using Rails 5.1.3 or abov
 1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory.
 2. Add gem version: `gem 'react_on_rails', '10.0.2' # prefer exact gem version to match npm version`
 3. `bundle install`
-4. Run the generator: `rails generate react_on_rails:install`
-5. Start the app: `rails s`
-6. Visit http://localhost:3000/hello_world
+4. Commit this to git (or else you cannot run the generator unless you pass the option --ignore-warnings).
+5. Run the generator: `rails generate react_on_rails:install`
+6. Start the app: `rails s`
+7. Visit http://localhost:3000/hello_world
 
 ### Turn on server rendering
 
