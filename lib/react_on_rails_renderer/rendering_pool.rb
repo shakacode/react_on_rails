@@ -144,7 +144,7 @@ module ReactOnRailsRenderer
       end
 
       def exception_debug_message(exception)
-        "#{exception.response.code}\n#{exception.response.headers}\n#{exception.response}"
+        "[ReactOnRails Renderer]: #{exception.response.code}\n#{exception.response.headers}\n#{exception.response}"
       end
     end
   end
