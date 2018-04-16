@@ -4,8 +4,7 @@ require "open-uri"
 
 module ReactOnRails
   module ServerRenderingPool
-    # This implementation of the rendering pool uses ExecJS to execute javasript code
-    class Exec
+    class RubyEmbeddedJavaScript
       def self.reset_pool
         options = {
           size: ReactOnRails.configuration.server_renderer_pool_size,
@@ -19,7 +18,7 @@ module ReactOnRails
 
         server_bundle_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path
 
-        if Utils.using_webpacker? && Webpacker.dev_server.running?
+        if ReactOnRails::WebpackerUtils.using_webpacker? && Webpacker.dev_server.running?
           return if @last_loaded_server_bundle == server_bundle_js_file_path
           @last_loaded_server_bundle = server_bundle_js_file_path
         else

@@ -71,7 +71,7 @@ module ReactOnRails
            parsed_package_contents["dependencies"].key?("react-on-rails")
           parsed_package_contents["dependencies"]["react-on-rails"]
         else
-          raise "no 'react-on-rails' entry in package.json dependencies"
+          raise ReactOnRails::Error, "No 'react-on-rails' entry in package.json dependencies"
         end
       end
 
@@ -82,7 +82,9 @@ module ReactOnRails
       def major_minor_patch
         return if relative_path?
         match = raw.match(MAJOR_MINOR_PATCH_VERSION_REGEX)
-        raise "Cannot parse version number '#{raw}' (wildcard versions are not supported)" unless match
+        unless match
+          raise ReactOnRails::Error, "Cannot parse version number '#{raw}' (wildcard versions are not supported)"
+        end
         [match[1], match[2], match[3]]
       end
 

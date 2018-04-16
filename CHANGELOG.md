@@ -8,6 +8,13 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+
+#### Better Error Messages, Support for React on Rails Pro
+- Errors raised are of type ReactOnRailsError.
+- Unused `server_render_method` was removed from the configuration.
+- Removed ReactOnRails::Utils.server_bundle_file_name and ReactOnRails::Utils.bundle_file_name.
+
+
 ### [10.1.4] - 2018-04-11
 
 #### Fixed

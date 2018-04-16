@@ -26,8 +26,8 @@ module ReactOnRails
       end
 
       def stale_generated_webpack_files
-        manifest_needed = ReactOnRails::Utils.using_webpacker? &&
-                          !ReactOnRails::Utils.manifest_exists?
+        manifest_needed = ReactOnRails::WebpackerUtils.using_webpacker? &&
+                          !ReactOnRails::WebpackerUtils.manifest_exists?
 
         return ["manifest.json"] if manifest_needed
 

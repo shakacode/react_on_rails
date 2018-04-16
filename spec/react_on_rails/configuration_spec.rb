@@ -27,7 +27,7 @@ module ReactOnRails
           ReactOnRails.configure do |config|
             config.i18n_dir = ""
           end
-        end.to raise_error(RuntimeError, /invalid value for `config\.i18n_dir`/)
+        end.to raise_error(ReactOnRails::Error, /invalid value for `config\.i18n_dir`/)
       end
 
       it "fails with not existing directory" do
@@ -35,7 +35,7 @@ module ReactOnRails
           ReactOnRails.configure do |config|
             config.i18n_dir = not_existing_path
           end
-        end.to raise_error(RuntimeError, /invalid value for `config\.i18n_dir`/)
+        end.to raise_error(ReactOnRails::Error, /invalid value for `config\.i18n_dir`/)
       end
     end
 
@@ -59,7 +59,7 @@ module ReactOnRails
           ReactOnRails.configure do |config|
             config.i18n_yml_dir = ""
           end
-        end.to raise_error(RuntimeError, /invalid value for `config\.i18n_yml_dir`/)
+        end.to raise_error(ReactOnRails::Error, /invalid value for `config\.i18n_yml_dir`/)
       end
 
       it "fails with not existing directory" do
@@ -67,7 +67,7 @@ module ReactOnRails
           ReactOnRails.configure do |config|
             config.i18n_yml_dir = not_existing_path
           end
-        end.to raise_error(RuntimeError, /invalid value for `config\.i18n_yml_dir`/)
+        end.to raise_error(ReactOnRails::Error, /invalid value for `config\.i18n_yml_dir`/)
       end
     end
 

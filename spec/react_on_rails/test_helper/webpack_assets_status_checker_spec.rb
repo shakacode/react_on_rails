@@ -35,8 +35,8 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
       let(:fixture_dirname) { "assets_with_manifest_exist" }
       before do
         require "webpacker"
-        allow(ReactOnRails::Utils).to receive(:using_webpacker?).and_return(true)
-        allow(ReactOnRails::Utils).to receive(:manifest_exists?).and_return(true)
+        allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
+        allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(true)
         allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
           .with("client-bundle.js")
           .and_return(File.join(generated_assets_dir, "client-bundle-6bc530d039d96709b68d.js"))
@@ -53,8 +53,8 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
       let(:fixture_dirname) { "assets_with_missing_manifest" }
       before do
         require "webpacker"
-        allow(ReactOnRails::Utils).to receive(:using_webpacker?).and_return(true)
-        allow(ReactOnRails::Utils).to receive(:manifest_exists?).and_return(false)
+        allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
+        allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(false)
       end
 
       specify { expect(checker.stale_generated_webpack_files).to eq(["manifest.json"]) }
