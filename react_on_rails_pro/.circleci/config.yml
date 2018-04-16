@@ -51,7 +51,7 @@ jobs:
   # Install Node modules for Renderer package with Yarn and save them to chache.
   install-package-node-packages:
     docker:
-      - image: shakacode/ror-renderer:1.0.2
+      - image: shakacode/ror-renderer:1.0.3
     steps:
       - checkout
       - run: *print-system-info
@@ -65,7 +65,7 @@ jobs:
   # Install Node modules for dummy app with Yarn and save them to chache.
   install-dummy-app-node-packages:
     docker:
-      - image: shakacode/ror-renderer:1.0.2
+      - image: shakacode/ror-renderer:1.0.3
     steps:
       - checkout
       - run: *print-system-info
@@ -80,7 +80,7 @@ jobs:
   # Install Ruby gems for dummy app with Bundler and save them to cache.
   install-dummy-app-ruby-gems:
     docker:
-      - image: shakacode/ror-renderer:1.0.2
+      - image: shakacode/ror-renderer:1.0.3
     steps:
       - checkout
       - run: *print-system-info
@@ -94,7 +94,7 @@ jobs:
   # Build client and server bundles for dummy app with Webpack and save them to cache.
   build-dummy-app-webpack-test-bundles:
     docker:
-      - image: shakacode/ror-renderer:1.0.2
+      - image: shakacode/ror-renderer:1.0.3
     steps:
       - checkout
       - run: *print-system-info
@@ -111,7 +111,7 @@ jobs:
   # Run JS unit tests for Renderer package.
   package-js-tests:
     docker:
-      - image: shakacode/ror-renderer:1.0.2
+      - image: shakacode/ror-renderer:1.0.3
     steps:
       - checkout
       - run: *print-system-info
@@ -123,14 +123,16 @@ jobs:
   # Start Renderer and run RSpec test suite for dummy app.
   rspec-dummy-app:
     docker:
-      - image: shakacode/ror-renderer:1.0.2
+      - image: shakacode/ror-renderer:1.0.3
     steps:
       - checkout
       - run: *print-system-info
       - restore_cache: *restore-dummy-app-gem-cache
       - run: *install-dummy-app-ruby-gems
       - restore_cache: *restore-dummy-app-node-modules-cache
-      - run: *install-dummy-app-mode-modules
+      # FIXME: Quick-fix caching issue - always need to reinstall fresh package despite same package version
+      # - run: *install-dummy-app-mode-modules
+      - run: cd spec/dummy/client && rm -rf node_modules/react-on-rails-renderer && yarn install --check-files --no-progress --no-emoji
       - restore_cache:
           name: Restore cached webpack bundles for dummy app
           key: v1-dummy-app-webpack-bundle-{{ .Revision }}

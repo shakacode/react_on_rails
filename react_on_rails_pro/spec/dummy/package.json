@@ -4,8 +4,8 @@
   "description": "example of server rendering",
   "main": "server.js",
   "engines": {
-    "node": "6.3.1",
-    "yarn": "1.5.1"
+    "node": "^8.9.4",
+    "yarn": "^1.5.1"
   },
   "scripts": {
     "postinstall": "cd ./client && yarn install",

@@ -11,7 +11,7 @@ const express = require('express');
 const busBoy = require('express-busboy');
 const log = require('winston');
 const { buildConfig, getConfig } = require('./shared/configBuilder');
-const checkGemVersion = require('./worker/checkGemVersionHandler');
+const checkProtocolVersion = require('./worker/checkProtocolVersionHandler');
 const authenticate = require('./worker/authHandler');
 const handleRenderRequest = require('./worker/renderRequestHandlerVm');
 
@@ -47,11 +47,12 @@ exports.run = function run(config) {
 
   //
   app.route('/bundles/:bundleTimestamp/render/:renderRequestDigest').post((req, res) => {
-    // Check gem version:
-    const gemVersionCheckingResult = checkGemVersion(req);
+    // Check protocol version
+    const protocolVersionCheckingResult = checkProtocolVersion(req);
 
-    if (typeof gemVersionCheckingResult === 'object') {
-      const { status, data, headers } = gemVersionCheckingResult;
+    if (typeof protocolVersionCheckingResult === 'object') {
+      const { status, data, headers } = protocolVersionCheckingResult;
+      log.warn(data);
       // eslint-disable-next-line guard-for-in, no-restricted-syntax
       for (const key in headers) res.set(key, headers[key]);
       res.status(status);
@@ -64,6 +65,7 @@ exports.run = function run(config) {
 
     if (typeof authResult === 'object') {
       const { status, data, headers } = authResult;
+      log.warn(data);
       // eslint-disable-next-line guard-for-in, no-restricted-syntax
       for (const key in headers) res.set(key, headers[key]);
       res.status(status);
