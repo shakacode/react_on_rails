@@ -18,7 +18,7 @@ let bundleFilePath;
  */
 function undefinedForExecLogging(functionName) {
   return `
-    console.error('${functionName} is not defined for renderer VM. Note babel-polyfill may call this.');
+    console.error('[ReactOnRails Renderer]: ${functionName} is not defined for VM. Note babel-polyfill may call this.');
     console.error(getStackTrace().join('\\n'));`;
 }
 
