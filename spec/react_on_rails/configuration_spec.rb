@@ -7,6 +7,28 @@ module ReactOnRails
     let(:existing_path) { Pathname.new(Dir.mktmpdir) }
     let(:not_existing_path) { "/path/to/#{SecureRandom.hex(4)}" }
 
+    describe ".server_render_method" do
+      after do
+        ReactOnRails.configure { |config| config.server_render_method = nil }
+      end
+
+      it "does not throw if the server render method is blank" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.server_render_method = ""
+          end
+        end.not_to raise_error
+      end
+
+      it "throws if the server render method is node" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.server_render_method = "node"
+          end
+        end.to raise_error(ReactOnRails::Error, /invalid value for `config.server_render_method`/)
+      end
+    end
+
     describe ".i18n_dir" do
       let(:i18n_dir) { existing_path }
 

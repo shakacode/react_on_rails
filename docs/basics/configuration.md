@@ -1,4 +1,4 @@
-Here is the full set of config options.
+Here is the full set of config options. This file is `/config/initializers/react_on_rails.rb`
 
 ```ruby
 # frozen_string_literal: true
@@ -88,7 +88,14 @@ ReactOnRails.configure do |config|
   # 
   config.raise_on_prerender_error = false
 
-  # Server rendering only (not for render_component helper)
+  ################################################################################
+  # Server Renderer Configuration for ExecJS
+  ################################################################################
+  # The default server rendering is ExecJS, probably using the mini_racer gem
+  # If you wish to use an alternative Node server rendering for higher performance, 
+  # contact justin@shakacode.com for details.
+  # 
+  # For ExecJS:
   # You can configure your pool of JS virtual machines and specify where it should load code:
   # On MRI, use `mini_racer` for the best performance
   # (see [discussion](https://github.com/reactjs/react-rails/pull/290))

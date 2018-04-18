@@ -18,6 +18,19 @@ module ReactOnRails
     ensure_server_bundle_js_file_has_no_path
     check_i18n_directory_exists
     check_i18n_yml_directory_exists
+    check_server_render_method_is_only_execjs
+  end
+
+  def self.check_server_render_method_is_only_execjs
+    return if @configuration.server_render_method.blank? ||
+              @configuration.server_render_method == "ExecJS"
+
+    msg = <<-MSG.strip_heredoc
+      Error configuring /config/react_on_rails.rb: invalid value for `config.server_render_method`.
+      If you wish to use a server render method other than ExecJS, contact justin@shakacode.com
+      for details.
+    MSG
+    raise ReactOnRails::Error, msg
   end
 
   def self.check_i18n_directory_exists
@@ -105,6 +118,7 @@ module ReactOnRails
       # skip_display_none is deprecated
       webpack_generated_files: %w[manifest.json],
       rendering_extension: nil,
+      server_render_method: nil,
       symlink_non_digested_assets_regex: nil,
       build_test_command: "",
       build_production_command: ""
@@ -120,7 +134,7 @@ module ReactOnRails
                   :webpack_generated_files, :rendering_extension, :build_test_command,
                   :build_production_command,
                   :i18n_dir, :i18n_yml_dir,
-                  :symlink_non_digested_assets_regex
+                  :server_render_method, :symlink_non_digested_assets_regex
 
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
                    replay_console: nil,
@@ -132,7 +146,7 @@ module ReactOnRails
                    rendering_extension: nil, build_test_command: nil,
                    build_production_command: nil,
                    i18n_dir: nil, i18n_yml_dir: nil,
-                   symlink_non_digested_assets_regex: nil)
+                   server_render_method: nil, symlink_non_digested_assets_regex: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.server_bundle_js_file = server_bundle_js_file
       self.generated_assets_dirs = generated_assets_dirs
@@ -161,6 +175,7 @@ module ReactOnRails
       self.webpack_generated_files = webpack_generated_files
       self.rendering_extension = rendering_extension
 
+      self.server_render_method = server_render_method
       self.symlink_non_digested_assets_regex = symlink_non_digested_assets_regex
     end
   end
