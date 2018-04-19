@@ -6,7 +6,7 @@ module ReactOnRails
   module Generators
     class ReactWithReduxGenerator < Rails::Generators::Base
       Rails::Generators.hide_namespace(namespace)
-      source_root(File.expand_path("../templates", __FILE__))
+      source_root(File.expand_path("templates", __dir__))
 
       def create_redux_directories
         dirs = %w[actions constants containers reducers store startup]

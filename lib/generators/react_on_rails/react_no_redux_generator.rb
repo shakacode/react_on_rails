@@ -8,7 +8,7 @@ module ReactOnRails
     class ReactNoReduxGenerator < Rails::Generators::Base
       include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
-      source_root(File.expand_path("../templates", __FILE__))
+      source_root(File.expand_path("templates", __dir__))
 
       def copy_base_files
         base_js_path = "base/base"

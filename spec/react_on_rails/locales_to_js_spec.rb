@@ -48,7 +48,7 @@ module ReactOnRails
     end
 
     describe "without i18n_yml_dir" do
-      let(:locale_dir) { File.expand_path("../fixtures/i18n/locales", __FILE__) }
+      let(:locale_dir) { File.expand_path("fixtures/i18n/locales", __dir__) }
       let(:en_path) { "#{locale_dir}/en.yml" }
 
       before do
@@ -68,7 +68,7 @@ module ReactOnRails
     end
 
     describe "with i18n_yml_dir" do
-      let(:locale_dir) { File.expand_path("../fixtures/i18n/locales", __FILE__) }
+      let(:locale_dir) { File.expand_path("fixtures/i18n/locales", __dir__) }
       let(:en_path) { "#{locale_dir}/en.yml" }
 
       before do

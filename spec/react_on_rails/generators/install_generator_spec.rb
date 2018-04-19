@@ -5,7 +5,7 @@ require_relative "../support/version_test_helpers"
 describe InstallGenerator, type: :generator do
   include GeneratorSpec::TestCase
 
-  destination File.expand_path("../../dummy-for-generators/", __FILE__)
+  destination File.expand_path("../dummy-for-generators", __dir__)
 
   context "no args" do
     before(:all) { run_generator_test_with_args(%w[], package_json: true) }

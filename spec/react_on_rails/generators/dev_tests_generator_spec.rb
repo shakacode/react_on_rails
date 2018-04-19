@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
-require File.expand_path("../../support/generator_spec_helper", __FILE__)
+require File.expand_path("../support/generator_spec_helper", __dir__)
 
 describe DevTestsGenerator, type: :generator do
-  destination File.expand_path("../../dummy-for-generators/", __FILE__)
+  destination File.expand_path("../dummy-for-generators", __dir__)
 
   context "without server rendering" do
     before(:all) do

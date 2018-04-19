@@ -10,7 +10,7 @@ module ReactOnRails
       include GeneratorHelper
 
       # fetch USAGE file for details generator description
-      source_root(File.expand_path("../", __FILE__))
+      source_root(File.expand_path(__dir__))
 
       # --redux
       class_option :redux,

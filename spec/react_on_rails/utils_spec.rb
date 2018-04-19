@@ -231,6 +231,3 @@ module ReactOnRails
     end
   end
 end
-
-# rubocop:enable Metrics/ModuleLength
-# rubocop:enable Metrics/BlockLength

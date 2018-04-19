@@ -238,7 +238,6 @@ module ReactOnRails
       raise ReactOnRails::PrerenderError, component_name: "N/A (server_render_js called)",
                                           err: err,
                                           js_code: wrapper_js
-      # rubocop:enable Style/RaiseArgs
     end
 
     def json_safe_and_pretty(hash_or_string)
@@ -439,7 +438,7 @@ module ReactOnRails
                                             err: nil,
                                             js_code: wrapper_js,
                                             console_messages: result["consoleReplayScript"]
-        # rubocop:enable Style/RaiseArgs
+
       end
       result
     rescue ExecJS::ProgramError => err
@@ -449,7 +448,6 @@ module ReactOnRails
                                           props: sanitized_props_string(props),
                                           err: err,
                                           js_code: wrapper_js
-      # rubocop:enable Style/RaiseArgs
     end
 
     def initialize_redux_stores

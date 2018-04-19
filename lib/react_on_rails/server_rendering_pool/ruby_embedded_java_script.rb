@@ -94,14 +94,13 @@ module ReactOnRails
 
           server_js_file = ReactOnRails::Utils.server_bundle_js_file_path
 
-          # bundle_js_code = File.read(server_js_file)
           begin
-            bundle_js_code = open(server_js_file, &:read)
+            bundle_js_code = File.read(server_js_file)
           rescue StandardError => e
             msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
                 "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\
                 "avoid this warning.\nError is: #{e}"
-            raise msg
+            raise ReactOnRails::Error, msg
           end
           # rubocop:disable Layout/IndentHeredoc
           base_js_code = <<-JS
