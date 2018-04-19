@@ -9,12 +9,12 @@ gemspec
 # They must be defined here because of the way Travis CI works, in that it will only
 # bundle install from a single Gemfile. Therefore, all gems that we will need for any dummy/example
 # app have to be manually added to this file.
+gem "bootsnap", ">= 1.1.0", require: false
 gem "bootstrap-sass"
 gem "jbuilder"
 gem "jquery-rails"
 gem "mini_racer"
 gem "puma"
-gem "bootsnap", ">= 1.1.0", require: false
 
 gem "rails_12factor"
 gem "ruby-lint", require: false

@@ -5,8 +5,8 @@ source "https://rubygems.org"
 eval_gemfile File.expand_path("../../react_on_rails.gemspec", __dir__)
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
+gem "bootsnap", ">= 1.1.0", require: false
 gem "rails"
-gem 'bootsnap', '>= 1.1.0', require: false
 
 # Use sqlite3 as the database for Active Record
 gem "sqlite3"
