@@ -67,6 +67,8 @@ GEM
     awesome_print (1.8.0)
     binding_of_caller (0.8.0)
       debug_inspector (>= 0.0.1)
+    bootsnap (1.3.0)
+      msgpack (~> 1.0)
     builder (3.2.3)
     byebug (10.0.2)
     capybara (2.18.0)
@@ -146,6 +148,7 @@ GEM
     mini_racer (0.1.15)
       libv8 (~> 6.3)
     minitest (5.11.3)
+    msgpack (1.2.4)
     multi_json (1.13.1)
     nio4r (2.3.0)
     nokogiri (1.8.2)
@@ -308,6 +311,7 @@ PLATFORMS
 
 DEPENDENCIES
   awesome_print
+  bootsnap (>= 1.1.0)
   capybara
   capybara-screenshot
   chromedriver-helper

@@ -45,6 +45,7 @@ Gem::Specification.new do |s|
   s.add_development_dependency "pry-state"
   s.add_development_dependency "pry-toys"
   s.add_development_dependency "rails", "~> 5.2"
+
   s.add_development_dependency "rake", "~> 10.0"
   s.add_development_dependency "rspec"
   s.add_development_dependency "rubocop", "0.55.0"
