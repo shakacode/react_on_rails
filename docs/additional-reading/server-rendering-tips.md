@@ -17,15 +17,15 @@ The point is that you have separate files for top level client or server side, a
 ## Troubleshooting Server Rendering
 
 1. First be sure your code works with server rendering disabled (`prerender: false`)
-2. `export TRACE_REACT_ON_RAILS=TRUE` Turn this on to get both the invocation code for you component, as well as the whole file used to setup the JavaScript context.
+2. Be sure that `config.trace` is true. You will get the server invocation code that renders your component. If you're not using Webpacker, you will also get the whole file used to setup the JavaScript context.
 
-## setTimeout and setInterval
+## setTimeout, setInterval, and clearTimeout
 
-These methods are polyfilled for server rendering to be no-ops. We don't log calls to these by default as some libraries, namely babel-polyfill, will call setTimout. If you wish to log calls to setTimeout and setInterval, set the ENV value: `export TRACE_REACT_ON_RAILS=TRUE`.
+These methods are polyfilled for server rendering to be no-ops. We log calls to these when in `trace` mode. In the past, some libraries, namely babel-polyfill, did call setTimout. 
 
 Here's an example of this which shows the line numbers that end up calling setTimeout:
 ```
-➜  ~/shakacode/react_on_rails/gen-examples/examples/basic-server-rendering (add-rails-helper-to-generator u=) ✗ export TRACE_REACT_ON_RAILS=TRUE
+➜  ~/shakacode/react_on_rails/gen-examples/examples/basic-server-rendering (add-rails-helper-to-generator u=) ✗ export SERVER_TRACE_REACT_ON_RAILS=TRUE
 ➜  ~/shakacode/react_on_rails/gen-examples/examples/basic-server-rendering (add-rails-helper-to-generator u=) ✗ rspec 
 Hello World
 Building Webpack client-rendering assets...

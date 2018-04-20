@@ -1,0 +1,10 @@
+<%= render "header" %>
+
+<%= react_component("SetTimeoutLoggingApp", prerender: true, trace: true) %>
+
+<hr/>
+
+This page demonstrates logging when the server rendering code calls setTimeout, which is
+not allowed for server rendering.<br/>
+
+Look at the server log and the browser console.

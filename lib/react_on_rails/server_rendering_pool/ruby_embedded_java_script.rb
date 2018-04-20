@@ -41,9 +41,10 @@ module ReactOnRails
       # js_code MUST RETURN json stringify Object
       # Calling code will probably call 'html_safe' on return value before rendering to the view.
       def self.server_render_js_with_console_logging(js_code)
-        if trace_react_on_rails?
+        if ReactOnRails.configuration.trace
           @file_index ||= 1
-          trace_messsage(js_code, "tmp/server-generated-#{@file_index % 10}.js")
+          trace_js_code_used("Evaluating code to server render.", js_code,
+                             "tmp/server-generated-#{@file_index % 10}.js")
           @file_index += 1
         end
         json_string = eval_js(js_code)
@@ -67,18 +68,21 @@ module ReactOnRails
       class << self
         private
 
-        def trace_messsage(js_code, file_name = "tmp/server-generated.js", force = false)
-          return unless trace_react_on_rails? || force
+        def trace_js_code_used(msg, js_code, file_name = "tmp/server-generated.js", force: false)
+          return unless ReactOnRails.configuration.trace || force
           # Set to anything to print generated code.
-          puts "Z" * 80
-          puts "react_renderer.rb: 92"
-          puts "wrote file #{file_name}"
           File.write(file_name, js_code)
-          puts "Z" * 80
-        end
-
-        def trace_react_on_rails?
-          ENV["TRACE_REACT_ON_RAILS"].present?
+          msg = <<-MSG.strip_heredoc
+            #{'Z' * 80}
+            [react_on_rails] #{msg}
+            Wrote file #{file_name}
+            #{'Z' * 80}
+          MSG
+          if force
+            Rails.logger.error(msg)
+          else
+            Rails.logger.info(msg)
+          end
         end
 
         def eval_js(js_code)
@@ -105,22 +109,24 @@ module ReactOnRails
           # rubocop:disable Layout/IndentHeredoc
           base_js_code = <<-JS
 #{console_polyfill}
-          #{execjs_timer_polyfills}
-          #{bundle_js_code};
+#{execjs_timer_polyfills}
+#{bundle_js_code};
           JS
           # rubocop:enable Layout/IndentHeredoc
           file_name = "tmp/base_js_code.js"
           begin
-            trace_messsage(base_js_code, file_name)
+            if ReactOnRails.configuration.trace
+              Rails.logger.info { "[react_on_rails] Created JavaScript context with file #{server_js_file}" }
+            end
             ExecJS.compile(base_js_code)
           rescue StandardError => e
             msg = "ERROR when compiling base_js_code! "\
               "See file #{file_name} to "\
               "correlate line numbers of error. Error is\n\n#{e.message}"\
               "\n\n#{e.backtrace.join("\n")}"
-            puts msg
             Rails.logger.error(msg)
-            trace_messsage(base_js_code, file_name, true)
+            trace_js_code_used("Error when compiling JavaScript code for the context.", base_js_code,
+                               file_name, force: true)
             raise e
           end
         end
@@ -156,10 +162,10 @@ function clearTimeout() {
         end
 
         def undefined_for_exec_js_logging(function_name)
-          if trace_react_on_rails?
-            "console.error('#{function_name} is not defined for execJS. See "\
-          "https://github.com/sstephenson/execjs#faq. Note babel-polyfill may call this.');\n"\
-          "  console.error(getStackTrace().join('\\n'));"
+          if ReactOnRails.configuration.trace
+            "console.error('[React on Rails Rendering] #{function_name} is not defined for execJS. See "\
+            "https://github.com/sstephenson/execjs#faq. Note babel-polyfill may call this.');\n"\
+            "  console.error(getStackTrace().join('\\n'));"
           else
             ""
           end
