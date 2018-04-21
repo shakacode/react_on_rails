@@ -16,18 +16,11 @@ module ReactOnRails
       def self.reset_pool_if_server_bundle_was_modified
         return unless ReactOnRails.configuration.development_mode
 
-        server_bundle_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path
+        file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
+        @server_bundle_timestamp ||= file_mtime
+        return if @server_bundle_timestamp == file_mtime
 
-        if ReactOnRails::WebpackerUtils.using_webpacker? && Webpacker.dev_server.running?
-          return if @last_loaded_server_bundle == server_bundle_js_file_path
-          @last_loaded_server_bundle = server_bundle_js_file_path
-        else
-          # we're not hashing the server name and we can use the mtime
-          file_mtime = File.mtime(server_bundle_js_file_path)
-          @server_bundle_timestamp ||= file_mtime
-          return if @server_bundle_timestamp == file_mtime
-          @server_bundle_timestamp = file_mtime
-        end
+        @server_bundle_timestamp = file_mtime
 
         ReactOnRails::ServerRenderingPool.reset_pool
       end
