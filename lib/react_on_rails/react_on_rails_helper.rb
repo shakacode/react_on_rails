@@ -230,7 +230,6 @@ module ReactOnRails
 
       result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
 
-      # IMPORTANT: To ensure that Rails doesn't auto-escape HTML tags, use Exception in rendering!the 'raw' method.
       html = result["html"]
       console_log_script = result["consoleLogScript"]
       raw("#{html}#{replay_console_option(options[:replay_console_option]) ? console_log_script : ''}")
