@@ -18,12 +18,12 @@ console.error.apply(console, ["[SERVER] Exception in rendering!"]);
 console.error.apply(console, ["[SERVER] message: throw in HelloWorldWithLogAndThrow"]);
 console.error.apply(console, ["[SERVER] stack: Error: throw in HelloWorldWithLogAndThrow\n    at HelloWorldWithLogAndThrow
     JS
+    # rubocop:enable Layout/IndentHeredoc
 
     expected_lines = expected.split("\n")
 
     script_node = html_nodes.css("script#consoleReplayLog")
 
-    # rubocop:enable Layout/IndentHeredoc
     expected_lines.each do |line|
       expect(script_node.text).to include(line)
     end
