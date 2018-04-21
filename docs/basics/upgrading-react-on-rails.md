@@ -1,5 +1,11 @@
 # Upgrading React on Rails
 
+## Upgrading to version 11
+* Remove `server_render_method` from config/initializers/react_on_rails.rb. Alternate server rendering methods are part of React on Rails Pro. If you want to use a custom renderer, contact justin@shakacode.com. We have a custom node rendering solution in production for egghead.io.
+* Remove your usage of ENV["TRACE_REACT_ON_RAILS"] usage. You can get all tracing with either specifying trace at your component or in your config/initializers/react_on_rails.rb file.
+* ReactOnRails::Utils.server_bundle_file_name and ReactOnRails::Utils.bundle_file_name were removed. React on Rails Pro contains upgrades to enable component and other types caching with React on Rails.
+
+
 ## Upgrading to version 10
 
 Pretty simple:
