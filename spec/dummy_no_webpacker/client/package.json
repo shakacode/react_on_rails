@@ -67,7 +67,7 @@
     "fs": false
   },
   "scripts": {
-    "postinstall": "yarn link react-on-rails",
+    "install-react-on-rails": "rm -rf node_modules/react-on-rails && npm i 'file:../../..'",
     "lint": "eslint --ext .js,.jsx .",
     "test": "yarn run build:test && rspec",
     "build:test": "yarn run build:test:client && yarn run build:test:server",
