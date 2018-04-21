@@ -75,7 +75,7 @@ module ReactOnRails
           msg = <<-MSG.strip_heredoc
             #{'Z' * 80}
             [react_on_rails] #{msg}
-            Wrote file #{file_name}
+            JavaScript code used: #{file_name}
             #{'Z' * 80}
           MSG
           if force
