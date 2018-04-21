@@ -72,7 +72,7 @@ module ReactOnRails
                  "or manifest.yml at #{@assets_path}, but found none. Canceling symlinking tasks."
         return -1
       end
-      manifest_path = manifest_glob.first
+      manifest_path = take_most_recent_manifest_path(manifest_glob)
       manifest_file = File.new(manifest_path)
       manifest_data = if File.extname(manifest_file) == ".json"
                         manifest_file_data = File.read(manifest_path)
@@ -127,6 +127,10 @@ module ReactOnRails
     end
 
     private
+
+    def take_most_recent_manifest_path(manifest_glob)
+      manifest_glob.max_by { |name| File.mtime(name) }
+    end
 
     def symlink_and_points_to_existing_file?(symlink_path)
       # File.exist?(symlink_path) will check the file the sym is pointing to is existing
