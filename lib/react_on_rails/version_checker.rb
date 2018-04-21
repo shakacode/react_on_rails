@@ -22,23 +22,37 @@ module ReactOnRails
       return if node_package_version.relative_path?
       node_major_minor_patch = node_package_version.major_minor_patch
       gem_major_minor_patch = gem_major_minor_patch_version
-      return if node_major_minor_patch[0] == gem_major_minor_patch[0] &&
-                node_major_minor_patch[1] == gem_major_minor_patch[1] &&
-                node_major_minor_patch[2] == gem_major_minor_patch[2]
+      versions_match = node_major_minor_patch[0] == gem_major_minor_patch[0] &&
+                       node_major_minor_patch[1] == gem_major_minor_patch[1] &&
+                       node_major_minor_patch[2] == gem_major_minor_patch[2]
 
-      raise_differing_versions_warning
+      raise_differing_versions_warning unless versions_match
+
+      raise_node_semver_version_warning if node_package_version.semver_wildcard?
     end
 
     private
 
+    def common_error_msg
+      <<-MSG.strip_heredoc
+         Detected: #{node_package_version.raw}
+              gem: #{gem_version}
+         Ensure the installed version of the gem is the same as the version of
+         your installed node package. Do not use >= or ~> in your Gemfile for react_on_rails.
+         Do not use ^ or ~ in your package.json for react-on-rails.
+         Run `yarn add react-on-rails --exact` in the directory containing folder node_modules.
+      MSG
+    end
+
     def raise_differing_versions_warning
-      msg = "**ERROR** ReactOnRails: ReactOnRails gem and node package versions do not match\n" \
-            "                     gem: #{gem_version}\n" \
-            "            node package: #{node_package_version.raw}\n" \
-            "Ensure the installed version of the gem is the same as the version of \n"\
-            "your installed node package.\n"\
-            "Run `#{ReactOnRails::Utils.prepend_cd_node_modules_directory('yarn add react-on-rails')}`"
-      raise msg
+      msg = "**ERROR** ReactOnRails: ReactOnRails gem and node package versions do not match\n#{common_error_msg}"
+      raise ReactOnRails::Error, msg
+    end
+
+    def raise_node_semver_version_warning
+      msg = "**ERROR** ReactOnRails: Your node package version for react-on-rails contains a "\
+            "^ or ~\n#{common_error_msg}"
+      raise ReactOnRails::Error, msg
     end
 
     def gem_version
@@ -73,6 +87,10 @@ module ReactOnRails
         else
           raise ReactOnRails::Error, "No 'react-on-rails' entry in package.json dependencies"
         end
+      end
+
+      def semver_wildcard?
+        raw.match(/[~^]/).present?
       end
 
       def relative_path?

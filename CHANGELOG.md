@@ -20,6 +20,13 @@ Changes since last non-beta release.
 - Removed ReactOnRails::Utils.server_bundle_file_name and ReactOnRails::Utils.bundle_file_name.
 - No longer logging the `railsContext` when server logging.
 
+#### Fixes
+- More exact version checking. We keep the react_on_rails gem and the react-on-rails node package at
+the same exact versions so that we can be sure that the interaction between them is precise.
+This is so that if a bug is detected after some update, it's critical that
+both the gem and the node package get the updates. This change ensures that the package.json specification does not use a
+~ or ^ as reported in [#1062](https://github.com/shakacode/react_on_rails/issues/1062). [PR 1063](https://github.com/shakacode/react_on_rails/pull/1063) by [justin808](https://github.com/justin808).
+
 ### [10.1.4] - 2018-04-11
 
 #### Fixed
