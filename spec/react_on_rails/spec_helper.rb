@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-$LOAD_PATH.unshift File.expand_path("../../../lib", __FILE__)
+$LOAD_PATH.unshift File.expand_path("../../lib", __dir__)
 require "react_on_rails"
 # let's us use Rails's generator testing helpers but with RSpec syntax
 require "generator_spec"

@@ -2,7 +2,7 @@
 
 # This file is copied to spec/ when you run 'rails generate rspec:install'
 ENV["RAILS_ENV"] ||= "test"
-SERVER_BUNDLE_PATH = File.expand_path("../../app/assets/webpack/server-bundle.js", __FILE__)
+SERVER_BUNDLE_PATH = File.expand_path("../app/assets/webpack/server-bundle.js", __dir__)
 
 require_relative "simplecov_helper"
 require_relative("../config/environment")

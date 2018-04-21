@@ -2,39 +2,45 @@
 // webpack.client.rails.hot.config and webpack.client.rails.build.config.
 
 const webpack = require('webpack');
-const path = require('path');
-const webpackCommon = require('./webpack.common');
-const { assetLoaderRules } = webpackCommon;
+const { resolve, join } = require('path');
+
+const { assetLoaderRules } = require('./webpack.common.config');
 
 const devBuild = process.env.NODE_ENV !== 'production';
 
 module.exports = {
 
   // the project dir
-  context: __dirname,
+  context: resolve(__dirname),
   entry: {
     // This will contain the app entry points defined by
     // webpack.client.rails.hot.config and webpack.client.rails.build.config
-    app: [
+    'app-bundle': [
       './app/startup/clientRegistration',
     ],
   },
   resolve: {
     extensions: ['.js', '.jsx'],
     alias: {
-      images: path.join(process.cwd(), 'app', 'assets', 'images'),
+      images: join(process.cwd(), 'app', 'assets', 'images'),
     },
   },
 
+
   plugins: [
-    new webpack.EnvironmentPlugin({ NODE_ENV: 'development' }),
+    new webpack.EnvironmentPlugin({
+      NODE_ENV: 'development', // use 'development' unless process.env.NODE_ENV is defined
+      DEBUG: false,
+    }),
     new webpack.DefinePlugin({
       TRACE_TURBOLINKS: devBuild,
     }),
 
     // https://webpack.js.org/guides/code-splitting-libraries/#implicit-common-vendor-chunk
     new webpack.optimize.CommonsChunkPlugin({
-      name: 'vendor',
+      name: 'vendor-bundle',
+      // We don't want the default vendor.js name
+      filename: 'vendor-bundle-[hash].js',
       minChunks(module) {
         // this assumes your vendor imports exist in the node_modules directory
         return module.context && module.context.indexOf('node_modules') !== -1;

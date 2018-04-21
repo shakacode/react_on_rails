@@ -19,7 +19,7 @@ gem 'jquery-rails'
 
 gem 'puma'
 
-gem 'turbolinks', github: "turbolinks/turbolinks-classic"
+gem 'turbolinks', "2.5.4" # github: "turbolinks/turbolinks-classic"
 
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
 gem 'jbuilder', '~> 2.0'

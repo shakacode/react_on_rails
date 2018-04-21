@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require File.expand_path("../boot", __FILE__)
+require File.expand_path("boot", __dir__)
 
 require "rails/all"
 
@@ -20,6 +20,7 @@ if File.basename(ENV["BUNDLE_GEMFILE"] || "") == "Gemfile.rails32"
 else
   module Dummy
     class Application < Rails::Application
+      config.active_record.sqlite3.represent_boolean_as_integer = true
     end
   end
 end

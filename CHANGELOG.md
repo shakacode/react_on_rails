@@ -8,6 +8,18 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+## MIGRATION for v11
+- Unused `server_render_method` was removed from the configuration. If you want to use a custom renderer, contact justin@shakacode.com. We have a custom node rendering solution in production for egghead.io.
+- Removed ReactOnRails::Utils.server_bundle_file_name and ReactOnRails::Utils.bundle_file_name. These are part of the performance features of "React on Rails Pro".
+- Removed ENV["TRACE_REACT_ON_RAILS"] usage and replacing it with config.trace.
+
+#### Enhanchements: Better Error Messages, Support for React on Rails Pro
+- Tracing (debugging) options are simplified with a single `config.trace` setting that defaults to true for development and false otherwise.
+- Calls to setTimeout, setInterval, clearTimeout will now always log some message if config.trace is true. Your JavaScript code should not be calling setTimout when server rendering. 
+- Errors raised are of type ReactOnRailsError, so you can see they came from React on Rails for debugging.
+- Removed ReactOnRails::Utils.server_bundle_file_name and ReactOnRails::Utils.bundle_file_name.
+- No longer logging the `railsContext` when server logging.
+
 ### [10.1.4] - 2018-04-11
 
 #### Fixed

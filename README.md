@@ -273,7 +273,7 @@ See the [Installation Overview](docs/basics/installation-overview.md) for a conc
 
 ### Initializer Configuration
 
-Configure the `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb) for a detailed example of configuration, including comments on the different values to configure.
+Configure the file `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](https://github.com/shakacode/react_on_rails/tree/master/docs/basics/configuration.md) for documentation of all configuration options.
 
 ### Including your React Component in your Rails Views
 

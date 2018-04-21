@@ -223,13 +223,6 @@ Run `rake -T` or `rake -D` to see testing options.
 
 See below for verifying changes to the generators.
 
-### Debugging
-Start the sample app like this for some debug printing:
-
-```sh
-TRACE_REACT_ON_RAILS=true && foreman start
-```
-
 ### Install Generator
 In your Rails app add this gem with a path to your fork.
 

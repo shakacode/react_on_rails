@@ -97,7 +97,7 @@ feature "Pages/server_side_log_throw", :js do
 
   scenario "page has server side throw messages", driver: js_errors_driver do
     expect(subject).to have_text "This example demonstrates server side logging and error handling."
-    expect(subject).to have_text "Exception in rendering!\n\nMessage: throw in HelloWorldContainer"
+    expect(subject).to have_text "Exception in rendering!\n\nMessage: throw in HelloWorldWithLogAndThrow"
   end
 end
 
@@ -106,9 +106,10 @@ feature "Pages/server_side_log_throw_raise" do
   background { visit "/server_side_log_throw_raise" }
 
   scenario "redirects to /client_side_hello_world and flashes an error" do
-    expect(current_path).to eq("/client_side_hello_world")
+    expect(current_path).to eq("/server_side_log_throw_raise_invoker")
     flash_message = page.find(:css, ".flash").text
-    expect(flash_message).to eq("Error prerendering in react_on_rails. See server logs.")
+    expect(flash_message).to eq("Error prerendering in react_on_rails. Redirected back to"\
+      " '/server_side_log_throw_raise_invoker'. See server logs for output.")
   end
 end
 

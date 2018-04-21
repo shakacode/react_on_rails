@@ -4,9 +4,6 @@ require_relative "task_helpers"
 require_relative File.join(gem_root, "lib", "react_on_rails", "version_syntax_converter")
 require_relative File.join(gem_root, "lib", "react_on_rails", "git_utils")
 require_relative File.join(gem_root, "lib", "react_on_rails", "utils")
-
-# rubocop:disable Lint/UnneededDisable
-# rubocop:disable Layout/EmptyLinesAroundArguments
 desc("Releases both the gem and node package using the given version.
 
 IMPORTANT: the gem version must be in valid rubygem format (no dashes).
@@ -22,8 +19,6 @@ which are installed via `bundle install` and `yarn`
 2nd argument: Perform a dry run by passing 'true' as a second argument.
 
 Example: `rake release[2.1.0,false]`")
-# rubocop:enable Layout/EmptyLinesAroundArguments
-# rubocop:enable Lint/UnneededDisable
 
 # rubocop:disable Metrics/BlockLength
 task :release, %i[gem_version dry_run tools_install] do |_t, args|

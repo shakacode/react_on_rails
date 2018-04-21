@@ -91,7 +91,7 @@ module ReactOnRails
       subject(:node_package_version) { VersionChecker::NodePackageVersion.new(package_json) }
 
       context "when package json lists a version of '0.0.2'" do
-        let(:package_json) { File.expand_path("../fixtures/normal_package.json", __FILE__) }
+        let(:package_json) { File.expand_path("fixtures/normal_package.json", __dir__) }
 
         describe "#raw" do
           specify { expect(node_package_version.raw).to eq("0.0.2") }
@@ -107,7 +107,7 @@ module ReactOnRails
       end
 
       context "when package json lists a version of '^14.0.0.beta-2'" do
-        let(:package_json) { File.expand_path("../fixtures/beta_package.json", __FILE__) }
+        let(:package_json) { File.expand_path("fixtures/beta_package.json", __dir__) }
 
         describe "#raw" do
           specify { expect(node_package_version.raw).to eq("^14.0.0.beta-2") }
@@ -123,7 +123,7 @@ module ReactOnRails
       end
 
       context "with node version of '../../..'" do
-        let(:package_json) { File.expand_path("../fixtures/relative_path_package.json", __FILE__) }
+        let(:package_json) { File.expand_path("fixtures/relative_path_package.json", __dir__) }
 
         describe "#raw" do
           specify { expect(node_package_version.raw).to eq("../../..") }
@@ -139,7 +139,7 @@ module ReactOnRails
       end
 
       context "with node version of 'file:///Users/justin/shakacode/react_on_rails'" do
-        let(:package_json) { File.expand_path("../fixtures/absolute_path_package.json", __FILE__) }
+        let(:package_json) { File.expand_path("fixtures/absolute_path_package.json", __dir__) }
 
         describe "#raw" do
           specify { expect(node_package_version.raw).to eq("file:///Users/justin/shakacode/react_on_rails") }

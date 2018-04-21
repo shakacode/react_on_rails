@@ -9,7 +9,7 @@ module ReactOnRails
     class BaseGenerator < Rails::Generators::Base
       include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
-      source_root(File.expand_path("../templates", __FILE__))
+      source_root(File.expand_path("templates", __dir__))
 
       # --redux
       class_option :redux,
@@ -55,7 +55,6 @@ module ReactOnRails
           if File.exist?(spec_helper)
             add_configure_rspec_to_compile_assets(spec_helper)
           else
-            # rubocop:disable Lint/UnneededDisable
             # rubocop:disable Layout/EmptyLinesAroundArguments
             GeneratorMessages.add_info(
               <<-MSG.strip_heredoc
@@ -70,7 +69,7 @@ module ReactOnRails
               MSG
             )
             # rubocop:enable Layout/EmptyLinesAroundArguments
-            # rubocop:enable Lint/UnneededDisable
+
           end
         end
       end

@@ -1,5 +1,5 @@
 # frozen_string_literal: true
 
 module ReactOnRails
-  VERSION = "10.1.4".freeze
+  VERSION = "11.0.0.beta.1".freeze
 end
