@@ -2,10 +2,11 @@
 
 source "https://rubygems.org"
 
-eval_gemfile File.expand_path("../../../react_on_rails.gemspec", __FILE__)
+eval_gemfile File.expand_path("../../react_on_rails.gemspec", __dir__)
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
 gem "rails"
+
 # Use sqlite3 as the database for Active Record
 gem "sqlite3"
 # Use SCSS for stylesheets
@@ -21,12 +22,12 @@ gem "jquery-rails"
 gem "puma"
 
 # Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
-gem "turbolinks", "~> 5.0" if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
+gem "turbolinks" if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
 
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
-gem "jbuilder", "~> 2.0"
+gem "jbuilder"
 # bundle exec rake doc:rails generates the API under doc/api.
-gem "sdoc", "~> 0.4.0", group: :doc
+gem "sdoc", group: :doc
 
 # Use ActiveModel has_secure_password
 # gem 'bcrypt', '~> 3.1.7'
@@ -62,10 +63,8 @@ end
 group :test do
   gem "capybara"
   gem "capybara-screenshot"
-  gem "coveralls", require: false
-  # install trouble with updated
-  # gem "capybara-webkit"
   gem "chromedriver-helper"
+  gem "coveralls", require: false
   gem "equivalent-xml", github: "mbklein/equivalent-xml"
   gem "generator_spec"
   gem "launchy"

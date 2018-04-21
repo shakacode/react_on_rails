@@ -9,12 +9,12 @@
     "lint": "cd client && yarn run lint",
     "install-react-on-rails": "cd client && yarn run install-react-on-rails",
     "build:clean": "rm -r app/assets/webpack/* || true",
-    "build:production:client": "(cd client && yarn run build:production:client --silent)",
-    "build:production:server": "(cd client && yarn run build:production:server --silent)",
-    "build:client": "(cd client && yarn run build:client --silent",
-    "build:server": "(cd client && yarn run build:server --silent)",
-    "build:dev:client": "(cd client && yarn run build:dev:client --silent)",
-    "build:dev:server": "(cd client && yarn run build:dev:server --silent)",
+    "build:production:client": "(cd client && yarn run build:production:client)",
+    "build:production:server": "(cd client && yarn run build:production:server)",
+    "build:client": "(cd client && yarn run build:client",
+    "build:server": "(cd client && yarn run build:server)",
+    "build:dev:client": "(cd client && yarn run build:dev:client)",
+    "build:dev:server": "(cd client && yarn run build:dev:server)",
     "hot-assets": "(cd client && yarn run hot-assets)"
   },
   "repository": {

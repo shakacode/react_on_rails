@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-lib = File.expand_path("../lib", __FILE__)
+lib = File.expand_path("lib", __dir__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require "react_on_rails/version"
 
@@ -32,7 +32,7 @@ Gem::Specification.new do |s|
   s.add_dependency "rainbow", "~> 2.2"
 
   s.add_development_dependency "awesome_print"
-  s.add_development_dependency "bundler", "~> 1.10"
+  s.add_development_dependency "bundler", "~> 1"
   s.add_development_dependency "coveralls"
   s.add_development_dependency "gem-release"
   s.add_development_dependency "generator_spec"
@@ -44,9 +44,11 @@ Gem::Specification.new do |s|
   s.add_development_dependency "pry-stack_explorer"
   s.add_development_dependency "pry-state"
   s.add_development_dependency "pry-toys"
-  s.add_development_dependency "rails", "~> 5.1.2"
+  s.add_development_dependency "rails", "~> 5.2"
+
   s.add_development_dependency "rake", "~> 10.0"
   s.add_development_dependency "rspec"
+  s.add_development_dependency "rubocop", "0.55.0"
 
   s.post_install_message = '
 --------------------------------------------------------------------------------

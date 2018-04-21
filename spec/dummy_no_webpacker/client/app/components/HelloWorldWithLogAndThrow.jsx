@@ -8,7 +8,7 @@ const HelloWorldWithLogAndThrow = (props, context) => {
   console.log('console.log in HelloWorld');
   console.warn('console.warn in HelloWorld');
   console.error('console.error in HelloWorld');
-  throw new Error('throw in HelloWorldContainer');
+  throw new Error('throw in HelloWorldWithLogAndThrow');
 };
 
 export default HelloWorldWithLogAndThrow;

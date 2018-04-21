@@ -18,24 +18,43 @@ module ReactOnRails
     ensure_server_bundle_js_file_has_no_path
     check_i18n_directory_exists
     check_i18n_yml_directory_exists
+    check_server_render_method_is_only_execjs
+  end
+
+  def self.check_server_render_method_is_only_execjs
+    return if @configuration.server_render_method.blank? ||
+              @configuration.server_render_method == "ExecJS"
+
+    msg = <<-MSG.strip_heredoc
+      Error configuring /config/react_on_rails.rb: invalid value for `config.server_render_method`.
+      If you wish to use a server render method other than ExecJS, contact justin@shakacode.com
+      for details.
+    MSG
+    raise ReactOnRails::Error, msg
   end
 
   def self.check_i18n_directory_exists
     return if @configuration.i18n_dir.nil?
     return if Dir.exist?(@configuration.i18n_dir)
 
-    raise "Error configuring /config/react_on_rails.rb: invalid value for `config.i18n_dir`. "\
-        "Directory does not exist: #{@configuration.i18n_dir}. Set to value to nil or comment it "\
-        "out if not using the React on Rails i18n feature."
+    msg = <<-MSG.strip_heredoc
+      Error configuring /config/react_on_rails.rb: invalid value for `config.i18n_dir`.
+      Directory does not exist: #{@configuration.i18n_dir}. Set to value to nil or comment it
+      out if not using the React on Rails i18n feature.
+    MSG
+    raise ReactOnRails::Error, msg
   end
 
   def self.check_i18n_yml_directory_exists
     return if @configuration.i18n_yml_dir.nil?
     return if Dir.exist?(@configuration.i18n_yml_dir)
 
-    raise "Error configuring /config/react_on_rails.rb: invalid value for `config.i18n_yml_dir`. "\
-        "Directory does not exist: #{@configuration.i18n_yml_dir}. Set to value to nil or comment it "\
-        "out if not using this i18n with React on Rails, or if you want to use all translation files."
+    msg = <<-MSG.strip_heredoc
+      Error configuring /config/react_on_rails.rb: invalid value for `config.i18n_yml_dir`.
+      Directory does not exist: #{@configuration.i18n_yml_dir}. Set to value to nil or comment it
+      out if not using this i18n with React on Rails, or if you want to use all translation files.
+    MSG
+    raise ReactOnRails::Error, msg
   end
 
   def self.ensure_generated_assets_dir_present
@@ -99,7 +118,7 @@ module ReactOnRails
       # skip_display_none is deprecated
       webpack_generated_files: %w[manifest.json],
       rendering_extension: nil,
-      server_render_method: "ExecJS",
+      server_render_method: nil,
       symlink_non_digested_assets_regex: nil,
       build_test_command: "",
       build_production_command: ""
@@ -127,7 +146,7 @@ module ReactOnRails
                    rendering_extension: nil, build_test_command: nil,
                    build_production_command: nil,
                    i18n_dir: nil, i18n_yml_dir: nil,
-                   server_render_method: "ExecJS", symlink_non_digested_assets_regex: nil)
+                   server_render_method: nil, symlink_non_digested_assets_regex: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.server_bundle_js_file = server_bundle_js_file
       self.generated_assets_dirs = generated_assets_dirs

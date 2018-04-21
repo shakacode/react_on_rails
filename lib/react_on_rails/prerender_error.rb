@@ -2,7 +2,7 @@
 
 # rubocop:disable: Layout/IndentHeredoc
 module ReactOnRails
-  class PrerenderError < RuntimeError
+  class PrerenderError < StandardError
     # err might be nil if JS caught the error
     def initialize(component_name: nil, err: nil, props: nil,
                    js_code: nil, console_messages: nil)

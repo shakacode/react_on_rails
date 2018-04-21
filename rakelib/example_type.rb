@@ -11,7 +11,7 @@ module ReactOnRails
   module TaskHelpers
     class ExampleType
       def self.all
-        @example_types ||= []
+        @all ||= []
       end
 
       def self.namespace_name

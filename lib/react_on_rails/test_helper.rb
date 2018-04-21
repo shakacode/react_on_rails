@@ -57,7 +57,7 @@ module ReactOnRails
                                     source_path: nil,
                                     generated_assets_dir: nil,
                                     webpack_generated_files: nil)
-      ReactOnRails::Utils.check_manifest_not_cached
+      ReactOnRails::WebpackerUtils.check_manifest_not_cached
       if webpack_assets_status_checker.nil?
         source_path ||= ReactOnRails::Utils.source_path
         generated_assets_dir ||= ReactOnRails::Utils.generated_assets_dir

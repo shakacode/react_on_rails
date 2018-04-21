@@ -4,7 +4,7 @@ module ReactOnRails
   module TaskHelpers
     # Returns the root folder of the react_on_rails gem
     def gem_root
-      File.expand_path("../../.", __FILE__)
+      File.expand_path("..", __dir__)
     end
 
     # Returns the folder where examples are located

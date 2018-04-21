@@ -31,6 +31,8 @@
   <%= content_tag :div, value, class: "flash #{key}" %>
 <% end %>
 
+<%= render "shared/header" %>
+
 <%= yield %>
 
 <!-- This is a placeholder for ReactOnRails to know where to render the store props for

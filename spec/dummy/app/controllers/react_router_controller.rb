@@ -9,8 +9,6 @@ class ReactRouterController < ApplicationController
     redirect_to client_side_hello_world_path, flash: { error: "Error prerendering in react_on_rails. See server logs." }
   end
 
-  # See files in spec/dummy/app/views/pages
-
   private
 
   def data

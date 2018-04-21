@@ -1,4 +1,4 @@
-Here is the full set of config options.
+Here is the full set of config options. This file is `/config/initializers/react_on_rails.rb`
 
 ```ruby
 # frozen_string_literal: true
@@ -7,6 +7,13 @@ Here is the full set of config options.
 # Thus, you only need to pay careful attention to the non-commented settings in this file.
 
 ReactOnRails.configure do |config|
+  # `trace`: General debugging flag.
+  # The default is true for development, off otherwise.
+  # With true, you get detailed logs of rendering and stack traces if you call setTimout, 
+  # setInterval, clearTimout when server rendering.
+  config.trace = Rails.env.development?
+
+
   # defaults to "" (top level)
   #
   config.node_modules_location = ""
@@ -66,6 +73,7 @@ ReactOnRails.configure do |config|
   #
   # While you may configure this to be the same as your client bundle file, this file is typically
   # different.
+  #
   config.server_bundle_js_file = "server-bundle.js"
 
   # If set to true, this forces Rails to reload the server bundle if it is modified
@@ -73,13 +81,15 @@ ReactOnRails.configure do |config|
   #
   config.development_mode = Rails.env.development?
 
-  # For server rendering. This can be set to false so that server side messages are discarded.
+  # For server rendering so that it replays in the browser console.
+  # This can be set to false so that server side messages are not displayed in the browser.
   # Default is true. Be cautious about turning this off.
   # Default value is true
-  #
+  # 
   config.replay_console = true
 
-  # Default is true. Logs server rendering messages to Rails.logger.info
+  # Default is true. Logs server rendering messages to Rails.logger.info. If false, you'll only
+  # see the server rendering messages in the browser console.
   #
   config.logging_on_server = true
 
@@ -88,7 +98,14 @@ ReactOnRails.configure do |config|
   # 
   config.raise_on_prerender_error = false
 
-  # Server rendering only (not for render_component helper)
+  ################################################################################
+  # Server Renderer Configuration for ExecJS
+  ################################################################################
+  # The default server rendering is ExecJS, probably using the mini_racer gem
+  # If you wish to use an alternative Node server rendering for higher performance, 
+  # contact justin@shakacode.com for details.
+  # 
+  # For ExecJS:
   # You can configure your pool of JS virtual machines and specify where it should load code:
   # On MRI, use `mini_racer` for the best performance
   # (see [discussion](https://github.com/reactjs/react-rails/pull/290))
@@ -111,7 +128,7 @@ ReactOnRails.configure do |config|
   # By default(without this option) all yaml files from Rails.root.join("config", "locales")
   # and installed gems are loaded
   config.i18n_yml_dir = Rails.root.join("config", "locales", "client")
-
+  
   ################################################################################
   ################################################################################
   # CLIENT RENDERING OPTIONS
@@ -120,9 +137,6 @@ ReactOnRails.configure do |config|
   ################################################################################
   # default is false
   config.prerender = false
-
-  # default is true for development, off otherwise
-  config.trace = Rails.env.development?
 end
 
 ```

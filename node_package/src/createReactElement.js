@@ -25,8 +25,7 @@ export default function createReactElement({
 
   if (trace) {
     if (railsContext && railsContext.serverSide) {
-      console.log(`RENDERED ${name} to dom node with id: ${domNodeId} with railsContext:`,
-        railsContext);
+      console.log(`RENDERED ${name} to dom node with id: ${domNodeId}`);
     } else if (shouldHydrate) {
       console.log(`HYDRATED ${name} in dom node with id: ${domNodeId} using props, railsContext:`,
         props, railsContext);

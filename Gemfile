@@ -9,39 +9,34 @@ gemspec
 # They must be defined here because of the way Travis CI works, in that it will only
 # bundle install from a single Gemfile. Therefore, all gems that we will need for any dummy/example
 # app have to be manually added to this file.
+gem "bootsnap", ">= 1.1.0", require: false
 gem "bootstrap-sass"
-gem "jbuilder", "~> 2.0"
+gem "jbuilder"
 gem "jquery-rails"
 gem "mini_racer"
 gem "puma"
-gem "rails", "5.1.4"
+
 gem "rails_12factor"
-gem "rubocop", "~> 0.50", require: false
 gem "ruby-lint", require: false
-gem "sass-rails", "~> 5.0"
+gem "sass-rails"
 gem "scss_lint", require: false
 gem "sdoc", group: :doc
 gem "spring"
 gem "sqlite3"
-gem "turbolinks", "~> 5.0"
+gem "turbolinks"
 gem "uglifier"
 gem "web-console", group: :development
 
 # below are copied from spec/dummy/Gemfile
 gem "capybara"
 gem "capybara-screenshot"
-gem "rspec-rails"
-gem "rspec-retry"
-# Trouble installing on Sierra
-# gem "capybara-webkit"
 gem "chromedriver-helper"
 gem "launchy"
 gem "poltergeist"
+gem "rspec-rails"
+gem "rspec-retry"
 gem "selenium-webdriver"
-gem "webpacker", "3.0.2"
-
-# TODO: remove once we get out of beta.
-# gem 'webpacker', path: "../../forks/webpacker"
+gem "webpacker"
 
 gem "equivalent-xml", github: "mbklein/equivalent-xml"
 gem "rainbow"

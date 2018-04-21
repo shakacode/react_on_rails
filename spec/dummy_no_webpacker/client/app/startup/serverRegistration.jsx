@@ -14,6 +14,7 @@ import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 
 // Generator function
 import HelloWorldApp from './HelloWorldApp';
+import BrokenApp from './BrokenApp';
 
 // Example of React + Redux
 import ReduxApp from './ServerReduxApp';
@@ -41,7 +42,10 @@ import ReactHelmetApp from './ReactHelmetServerApp';
 // Demonstrate using Images
 import ImageExample from '../components/ImageExample';
 
+import SetTimeoutLoggingApp from './SetTimeoutLoggingApp';
+
 ReactOnRails.register({
+  BrokenApp,
   HelloWorld,
   HelloWorldWithLogAndThrow,
   HelloWorldES5,
@@ -56,6 +60,7 @@ ReactOnRails.register({
   RenderedHtml,
   ReactHelmetApp,
   ImageExample,
+  SetTimeoutLoggingApp,
 });
 
 ReactOnRails.registerStore({

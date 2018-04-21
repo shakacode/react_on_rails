@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-# For documentation of parameters see:
-# See lib/generators/react_on_rails/templates/base/base/config/initializers/react_on_rails.rb
+# For documentation of parameters see: docs/basics/configuration.md
 module RenderingExtension
   # Return a Hash that contains custom values from the view context that will get passed to
   # all calls to react_component and redux_store for rendering
