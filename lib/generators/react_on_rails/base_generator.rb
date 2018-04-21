@@ -43,7 +43,7 @@ module ReactOnRails
       end
 
       def add_yarn_dependencies
-        run "yarn add react-on-rails"
+        run "yarn add react-on-rails --exact"
       end
 
       def append_to_spec_rails_helper

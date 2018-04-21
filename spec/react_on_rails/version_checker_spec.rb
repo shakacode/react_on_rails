@@ -18,12 +18,24 @@ module ReactOnRails
 
       context "when gem and node package major and minor versions are equal" do
         let(:node_package_version) do
-          double_package_version(raw: "^2.2.5-beta.2", major_minor_patch: %w[2 2 5])
+          double_package_version(raw: "2.2.5-beta.2", major_minor_patch: %w[2 2 5])
         end
         before { stub_gem_version("2.2.5.beta.2") }
 
         it "does not raise" do
           expect { check_version(node_package_version) }.not_to raise_error
+        end
+      end
+
+      context "when major and minor versions are equal BUT node uses semver wildcard" do
+        let(:node_package_version) do
+          double_package_version(raw: "^2.2.5", semver_wildcard: true, major_minor_patch: %w[2 2 5])
+        end
+        before { stub_gem_version("2.2.5") }
+
+        it "does raise" do
+          error = /ReactOnRails: Your node package version for react-on-rails contains a \^ or ~/
+          expect { check_version(node_package_version) }.to raise_error(error)
         end
       end
 
@@ -75,9 +87,11 @@ module ReactOnRails
       end
     end
 
-    def double_package_version(raw: nil, major_minor_patch: nil, relative_path: false)
+    def double_package_version(raw: nil, semver_wildcard: false,
+                               major_minor_patch: nil, relative_path: false)
       instance_double(VersionChecker::NodePackageVersion,
                       raw: raw,
+                      semver_wildcard?: semver_wildcard,
                       major_minor_patch: major_minor_patch,
                       relative_path?: relative_path)
     end
@@ -89,6 +103,26 @@ module ReactOnRails
 
     describe VersionChecker::NodePackageVersion do
       subject(:node_package_version) { VersionChecker::NodePackageVersion.new(package_json) }
+
+      describe "#semver_wildcard?" do
+        context "when package json lists an exact version of '0.0.2'" do
+          let(:package_json) { File.expand_path("fixtures/normal_package.json", __dir__) }
+
+          specify { expect(node_package_version.semver_wildcard?).to be false }
+        end
+
+        context "when package json lists a semver caret version of '^1.2.3'" do
+          let(:package_json) { File.expand_path("fixtures/semver_caret_package.json", __dir__) }
+
+          specify { expect(node_package_version.semver_wildcard?).to be true }
+        end
+
+        context "when package json lists a semver tilde version of '~1.2.3'" do
+          let(:package_json) { File.expand_path("fixtures/semver_tilde_package.json", __dir__) }
+
+          specify { expect(node_package_version.semver_wildcard?).to be true }
+        end
+      end
 
       context "when package json lists a version of '0.0.2'" do
         let(:package_json) { File.expand_path("fixtures/normal_package.json", __dir__) }
