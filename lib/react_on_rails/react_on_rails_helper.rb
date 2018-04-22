@@ -477,6 +477,7 @@ module ReactOnRails
     def rails_context(server_side: required("server_side"))
       @rails_context ||= begin
         result = {
+          railsEnv: Rails.env,
           inMailer: in_mailer?,
           # Locale settings
           i18nLocale: I18n.locale,

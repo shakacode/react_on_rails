@@ -22,6 +22,7 @@ shared_examples "railsContext" do |pathname, id_base|
       port = Capybara.current_session.server.port
       host_port = "#{host}:#{port}"
       keys_to_vals = {
+        railsEnv: Rails.env,
         href: "http://#{host_port}/#{pathname}?ab=cd",
         location: "/#{pathname}?ab=cd",
         port: port,

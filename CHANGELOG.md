@@ -19,6 +19,8 @@ Changes since last non-beta release.
 - Errors raised are of type ReactOnRailsError, so you can see they came from React on Rails for debugging.
 - Removed ReactOnRails::Utils.server_bundle_file_name and ReactOnRails::Utils.bundle_file_name.
 - No longer logging the `railsContext` when server logging.
+- Rails.env is provided in the default railsContext, as suggested in [issue #697](https://github.com/shakacode/react_on_rails/issues/697).
+[PR 1018](https://github.com/shakacode/react_on_rails/pull/1065) by [justin808](https://github.com/justin808).
 
 #### Fixes
 - More exact version checking. We keep the react_on_rails gem and the react-on-rails node package at
