@@ -16,8 +16,9 @@ Aloha, I'm Justin Gordon the creator and maintainer of React on Rails. I offer a
 
 Please [email me](mailto:justin@shakacode.com) for a free half-hour project consultation, on anything from React on Rails to any aspect of web development.
 
-## React on Rails is based on Webpacker!
 ----
+
+## React on Rails is based on Webpacker!
 
 Given that Webpacker already provides React integration, why would you use "React on Rails"? Additional features of React on Rails include:
 
