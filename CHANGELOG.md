@@ -10,6 +10,8 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [11.0.0] - 2018-04-21
+
 ## MIGRATION for v11
 - Unused `server_render_method` was removed from the configuration. If you want to use a custom renderer, contact justin@shakacode.com. We have a custom node rendering solution in production for egghead.io.
 - Removed ReactOnRails::Utils.server_bundle_file_name and ReactOnRails::Utils.bundle_file_name. These are part of the performance features of "React on Rails Pro".
@@ -724,7 +726,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/10.1.4...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.0...master
+[11.0.0]: https://github.com/shakacode/react_on_rails/compare/10.1.4...11.0.0
 [10.1.4]: https://github.com/shakacode/react_on_rails/compare/10.1.3...10.1.4
 [10.1.3]: https://github.com/shakacode/react_on_rails/compare/10.1.2...10.1.3
 [10.1.2]: https://github.com/shakacode/react_on_rails/compare/10.1.1...10.1.2
