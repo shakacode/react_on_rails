@@ -2,26 +2,37 @@
 
 *If this projects helps you, please give us a star!*
 
-# [The ShakaCode team has availability to help your project as of 2018-03-27](http://www.shakacode.com/services).
+# Need Help with Rails + Webpack + React? Want better performance?
+Aloha, I'm Justin Gordon the creator and maintainer of React on Rails. I offer a [React on Rails Pro Support Plan](http://www.shakacode.com/work/shakacode-pro-support.pdf), and I can help you with:
+* Optimizing your webpack setup for React on Rails.
+* Upgrading from older React on Rails to newer versions.
+* Better performance client and server side.
+* Migrating from Angular to React.
+* Best practices based on 4 years of React on Rails experience.
+* Early access to the React on Rails Pro Gem and Node code, including:
+  * ShakaCode's Node.js rendering server for better performance for server rendering (used now at [egghead.io](https://egghead.io/)).
+  * Performance helpers, especially for server rendering
+  * Webpack configuration examples
 
-If your team might need my help, please [email me](mailto:justin@shakacode.com) for a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products.
+Please [email me](mailto:justin@shakacode.com) for a free half-hour project consultation, on anything from React on Rails to any aspect of web development.
 
-## React on Rails v10 is based on Webpacker 3.0!
+## React on Rails is based on Webpacker!
 
-* See the article [Introducing React on Rails v9 with Webpacker Support](https://blog.shakacode.com/introducing-react-on-rails-v9-with-webpacker-support-f2584c6c8fa4) for an overview of the integration of React on Rails with Webpacker.
+* [Introducing React on Rails v9 with Webpacker Support](https://blog.shakacode.com/introducing-react-on-rails-v9-with-webpacker-support-f2584c6c8fa4) for an overview of the integration of React on Rails with Webpacker.
 * [Video of running the v9 installer with Webpacker v3](https://youtu.be/M0WUM_XPaII).
-* See the updated [Tutorial](https://github.com/shakacode/react_on_rails/blob/master/docs/tutorial.md).
-* See the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for migration instructions.
+* [Tutorial](https://github.com/shakacode/react_on_rails/blob/master/docs/tutorial.md).
+* [Front-End Sadness to Happiness: The React on Rails Story](https://www.youtube.com/watch?v=SGkTvKRPYrk): History, motivations, philosophy, and overview.
 
 ----
 
-Given that Webpacker already provides React integration, why would you add React on Rails? Additional features of React on Rails include:
+Given that Webpacker already provides React integration, why would you use "React on Rails"? Additional features of React on Rails include:
 
 1. Server rendering, often for SEO optimization.
 2. Easy passing of props directly from your Rails view to your React components rather than having your Rails view load and then make a separate request to your API.
 3. Redux and React-Router integration
 4. Localization support
 5. Rspec test helpers to ensure your Webpack bundles are ready for tests
+6. A supportive community
 
 ----
 
@@ -32,7 +43,7 @@ First be sure to run `rails -v` and check that you are using Rails 5.1.3 or abov
 *See below for steps on an existing Rails app*
 
 1. New Rails app: `rails new my-app --webpack=react`. `cd` into the directory.
-2. Add gem version: `gem 'react_on_rails', '10.0.2' # prefer exact gem version to match npm version`
+2. Add gem version: `gem 'react_on_rails', '11.0.0' # Use the exact gem version to match npm version`
 3. `bundle install`
 4. Commit this to git (or else you cannot run the generator unless you pass the option --ignore-warnings).
 5. Run the generator: `rails generate react_on_rails:install`
@@ -40,8 +51,6 @@ First be sure to run `rails -v` and check that you are using Rails 5.1.3 or abov
 7. Visit http://localhost:3000/hello_world
 
 ### Turn on server rendering
-
-*The rails/wepbacker default setup does not work with hot or live reloading, yet, per [Webpacker issue #842](https://github.com/rails/webpacker/issues/842). If you want the combination of both server rendering and hot reloading during development, you will need to a custom webpack setup as shown [here](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.client.rails.hot.config.js)*
 
 1. Edit `app/views/hello_world/index.html.erb` and set `prerender` to `true`.
 2. Refresh the page.
@@ -52,42 +61,16 @@ This is the line where you turn server rendering on by setting prerender to true
 <%= react_component("HelloWorld", props: @hello_world_props, prerender: false) %>
 ```
 
----------------
+-----
 
-## Thank you from Justin Gordon and [ShakaCode](http://www.shakacode.com)
-
-Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails).
-
-* **Video:** [Front-End Sadness to Happiness: The React on Rails Story](https://www.youtube.com/watch?v=SGkTvKRPYrk): History, motivations, philosophy, and overview.
-* [Front-End Sadness to Happiness: The React on Rails Story at GORUCO 2017](https://blog.shakacode.com/front-end-sadness-to-happiness-the-react-on-rails-story-at-goruco-2017-d63b8fd26ca4)
-
-We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first application development company. We fund this project by:
-
-* Providing priority support and training for anything related to React + Webpack + Rails in our [Pro Support program](http://www.shakacode.com/work/shakacode-pro-support.pdf).
-* Building custom web and mobile (React Native) applications. We typically work with a technical founder or CTO and instantly provide a full development team including designers.
-* Migrating **Angular** + Rails to React + Rails. You can see an example of React on Rails and our work converting Angular to React on Rails at [egghead.io](https://egghead.io/browse/frameworks).
-* Augmenting your team to get your product completed more efficiently and quickly.
-
-My article "[Why Hire ShakaCode?](https://blog.shakacode.com/can-shakacode-help-you-4a5b1e5a8a63#.jex6tg9w9)" provides additional details about our projects.
-
-If any of this resonates with you, please email me, [justin@shakacode.com](mailto:justin@shakacode.com). I offer a free half-hour project consultation, on anything from React on Rails to any aspect of web or mobile application development for both consumer and enterprise products.
-
-We are **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Hawaii Chee](https://www.hawaiichee.com).
-
-I appreciate your attention and sharing of these offerings with anybody that we can help. Your support allows me to bring you and your team [front-end happiness in the Rails world](https://www.youtube.com/watch?v=SGkTvKRPYrk).
-
-Aloha and best wishes from the ShakaCode team!
-
-------
-
-# Community
+# Community Resources
 Please [**click to subscribe**](https://app.mailerlite.com/webforms/landing/l1d9x5) to keep in touch with Justin Gordon and [ShakaCode](http://www.shakacode.com/). I intend to send announcements of new releases of React on Rails and of our latest [blog articles](https://blog.shakacode.com) and tutorials. Subscribers will also have access to **exclusive content**, including tips and examples.
 
 [![2017-01-31_14-16-56](https://cloud.githubusercontent.com/assets/1118459/22490211/f7a70418-e7bf-11e6-9bef-b3ccd715dbf8.png)](https://app.mailerlite.com/webforms/landing/l1d9x5)
 
 * **Slack Room**: [Contact us](mailto:contact@shakacode.com) for an invite to the ShakaCode Slack room! Let us know if you want to contribute.
 * **[forum.shakacode.com](https://forum.shakacode.com)**: Post your questions
-* **[@ShakaCode on Twitter](https://twitter.com/shakacode)**
+* **[@railsonmaui on Twitter](https://twitter.com/railsonmaui)**
 * For a live, [open source](https://github.com/shakacode/react-webpack-rails-tutorial), example of this gem, see [www.reactrails.com](http://www.reactrails.com).
 
 ------
@@ -830,3 +813,9 @@ I appreciate your attention and sharing of these offerings with anybody that we 
 Aloha and best wishes from the ShakaCode team!
 
 ------
+
+
+
+*The rails/wepbacker default setup does not work with hot or live reloading, yet, per [Webpacker issue #842](https://github.com/rails/webpacker/issues/842). If you want the combination of both server rendering and hot reloading during development, you will need to a custom webpack setup as shown [here](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.client.rails.hot.config.js)*
+
+
