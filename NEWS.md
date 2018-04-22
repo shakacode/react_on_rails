@@ -2,6 +2,8 @@
 
 *We'll keep a history of the news. A few bullets at the top will also show on the [README.md](./README.md).*
 
+* 2018-02-27: **Version 10.1.2** Supports the React API for ReactDOM.hydrate.
+* 2017-09-06: **VERSION 9.0.0 shipped!** This version depends on Webpacker directly. See [Upgrading React on Rails](./docs/basics/upgrading-react-on-rails.md) for more concise instructions on upgrading.
 * Always see the [CHANGELOG.md](./CHANGELOG.md) for the latest project changes.
 * [VERSION 8.1.0](https://rubygems.org/gems/react_on_rails/) shipped with [webpacker_lite](https://github.com/shakacode/webpacker_lite) (soon [**webpacker**](https://github.com/rails/webpacker/issues/464#issuecomment-310986140) support! [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395) shows the changes needed to migrate from the Asset Pipeline to Webpacker Lite. For more information, see my article: [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92). Per recent discussions, we [will merge Webpacker Lite changes back into Webpacker](https://github.com/rails/webpacker/issues/464#issuecomment-310986140). There's no reason to wait for this. The upgrade will eventually be trivial.
 * 2017-04-25: 7.0.0 Shipped! Performance improvements! Please upgrade! Only "breaking" change is that you have to update both the node module and the Ruby gem. 
