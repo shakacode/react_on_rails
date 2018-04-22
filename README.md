@@ -528,7 +528,7 @@ react_component(component_name,
   + **prerender:** enable server-side rendering of a component. Set to false when debugging!
   + **id:** Id for the div, will be used to attach the React component. This will get assigned automatically if you do not provide an id. Must be unique.
   + **html_options:** Any other HTML options get placed on the added div for the component. For example, you can set a class (or inline style) on the outer div so that it behaves like a span, with the styling of `display:inline-block`.
-  + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise. Note: on the client, you will see both the `railsContext` and your props. On the server, you only see the `railsContext` being logged.
+  + **trace:** set to true to print additional debugging information in the browser. Defaults to true for development, off otherwise. Only on the **client side** will you will see the `railsContext` and your props.
   + **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the default configuration of `logging_on_server` set to true, you'll still see the errors on the server.
   + **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
 
