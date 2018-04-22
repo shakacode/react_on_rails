@@ -25,7 +25,8 @@ Changes since last non-beta release.
 the same exact versions so that we can be sure that the interaction between them is precise.
 This is so that if a bug is detected after some update, it's critical that
 both the gem and the node package get the updates. This change ensures that the package.json specification does not use a
-~ or ^ as reported in [#1062](https://github.com/shakacode/react_on_rails/issues/1062). [PR 1063](https://github.com/shakacode/react_on_rails/pull/1063) by [justin808](https://github.com/justin808).
+~ or ^ as reported in [issue #1062](https://github.com/shakacode/react_on_rails/issues/1062). [PR 1063](https://github.com/shakacode/react_on_rails/pull/1063) by [justin808](https://github.com/justin808).
+- Sprockets: Now use the most recent manifest when creating symlinks. See [issue #1023](https://github.com/shakacode/react_on_rails/issues/1023). [PR 1064](https://github.com/shakacode/react_on_rails/pull/1064) by [justin808](https://github.com/justin808).
 
 ### [10.1.4] - 2018-04-11
 
