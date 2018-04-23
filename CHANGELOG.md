@@ -17,7 +17,7 @@ Changes since last non-beta release.
 - Removed ReactOnRails::Utils.server_bundle_file_name and ReactOnRails::Utils.bundle_file_name. These are part of the performance features of "React on Rails Pro".
 - Removed ENV["TRACE_REACT_ON_RAILS"] usage and replacing it with config.trace.
 
-#### Enhanchements: Better Error Messages, Support for React on Rails Pro
+#### Enhancements: Better Error Messages, Support for React on Rails Pro
 - Tracing (debugging) options are simplified with a single `config.trace` setting that defaults to true for development and false otherwise.
 - Calls to setTimeout, setInterval, clearTimeout will now always log some message if config.trace is true. Your JavaScript code should not be calling setTimout when server rendering. 
 - Errors raised are of type ReactOnRailsError, so you can see they came from React on Rails for debugging.
