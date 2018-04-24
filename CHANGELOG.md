@@ -10,7 +10,11 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+#### Fixed
+- Fixed issue with component script initialization when using react_component_hash. [PR 1071](https://github.com/shakacode/react_on_rails/pull/1071) by [jblasco3](https://github.com/jblasco3).
+
 ### [11.0.2] - 2018-04-24
+
 #### Fixed
 - Server rendering error for React on Rails Pro. [PR 1069](https://github.com/shakacode/react_on_rails/pull/1069) by [justin808](https://github.com/justin808).
 
