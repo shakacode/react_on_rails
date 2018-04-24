@@ -4,22 +4,20 @@ require "react_on_rails/utils"
 
 module ReactOnRails
   module ReactComponent
-    class Options
+    class RenderOptions
       include Utils::Required
 
       NO_PROPS = {}.freeze
 
-      def initialize(name: required("name"), options: required("options"))
-        @name = name
+      def initialize(react_component_name: required("react_component_name"), options: required("options"))
+        @react_component_name = react_component_name.camelize
         @options = options
       end
 
+      attr_reader :react_component_name
+
       def props
         options.fetch(:props) { NO_PROPS }
-      end
-
-      def name
-        @name.camelize
       end
 
       def dom_id
@@ -46,12 +44,20 @@ module ReactOnRails
         retrieve_key(:raise_on_prerender_error)
       end
 
+      def logging_on_server
+        retrieve_key(:logging_on_server)
+      end
+
+      def to_s
+        "{ react_component_name = #{react_component_name}, options = #{options}"
+      end
+
       private
 
       attr_reader :options
 
       def generate_unique_dom_id
-        "#{@name}-react-component-#{SecureRandom.uuid}"
+        "#{react_component_name}-react-component-#{SecureRandom.uuid}"
       end
 
       def retrieve_key(key)
