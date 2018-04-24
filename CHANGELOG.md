@@ -10,6 +10,8 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [11.0.3] - 2018-04-24
+
 #### Fixed
 - Fixed issue with component script initialization when using react_component_hash. [PR 1071](https://github.com/shakacode/react_on_rails/pull/1071) by [jblasco3](https://github.com/jblasco3).
 
@@ -742,7 +744,10 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.3...master
+[11.0.3]: https://github.com/shakacode/react_on_rails/compare/11.0.2...11.0.3
+[11.0.2]: https://github.com/shakacode/react_on_rails/compare/11.0.1...11.0.2
+[11.0.1]: https://github.com/shakacode/react_on_rails/compare/11.0.0...11.0.1
 [11.0.0]: https://github.com/shakacode/react_on_rails/compare/10.1.4...11.0.0
 [10.1.4]: https://github.com/shakacode/react_on_rails/compare/10.1.3...10.1.4
 [10.1.3]: https://github.com/shakacode/react_on_rails/compare/10.1.2...10.1.3
