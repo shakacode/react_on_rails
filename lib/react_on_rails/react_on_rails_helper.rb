@@ -142,7 +142,7 @@ module ReactOnRails
       if server_rendered_html.is_a?(Hash)
         build_react_component_result_for_server_rendered_hash(
           server_rendered_html: server_rendered_html,
-          component_specification_tag: internal_result["tag"],
+          component_specification_tag: internal_result[:tag],
           console_script: console_script,
           render_options: internal_result[:render_options]
         )
