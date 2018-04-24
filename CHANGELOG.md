@@ -10,6 +10,14 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [11.0.1] - 2018-04-23
+
+#### Added
+- `react_component` allows logging_on_server specified at the component level. [PR 1068](https://github.com/shakacode/react_on_rails/pull/1068) by [justin808](https://github.com/justin808).
+
+#### Fixed
+- Missing class when throwing some error messages. [PR 1068](https://github.com/shakacode/react_on_rails/pull/1068) by [justin808](https://github.com/justin808).
+
 ### [11.0.0] - 2018-04-21
 
 ## MIGRATION for v11
@@ -24,7 +32,7 @@ Changes since last non-beta release.
 - Removed ReactOnRails::Utils.server_bundle_file_name and ReactOnRails::Utils.bundle_file_name.
 - No longer logging the `railsContext` when server logging.
 - Rails.env is provided in the default railsContext, as suggested in [issue #697](https://github.com/shakacode/react_on_rails/issues/697).
-[PR 1018](https://github.com/shakacode/react_on_rails/pull/1065) by [justin808](https://github.com/justin808).
+[PR 1065](https://github.com/shakacode/react_on_rails/pull/1065) by [justin808](https://github.com/justin808).
 
 #### Fixes
 - More exact version checking. We keep the react_on_rails gem and the react-on-rails node package at

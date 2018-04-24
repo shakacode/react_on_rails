@@ -2,7 +2,7 @@
 
 require_relative "../spec_helper"
 
-describe ReactOnRails::ReactComponent::Options do
+describe ReactOnRails::ReactComponent::RenderOptions do
   CONFIGURABLE_OPTIONS = %i[
     prerender
     trace
@@ -10,9 +10,9 @@ describe ReactOnRails::ReactComponent::Options do
     raise_on_prerender_error
   ].freeze
 
-  def the_attrs(name: "App", options: {})
+  def the_attrs(react_component_name: "App", options: {})
     {
-      name: name,
+      react_component_name: react_component_name,
       options: options
     }
   end
@@ -48,25 +48,25 @@ describe ReactOnRails::ReactComponent::Options do
     end
   end
 
-  describe "#name" do
-    it "returns name with correct format" do
-      name = "some_app"
-      attrs = the_attrs(name: name)
+  describe "#react_component_name" do
+    it "returns react_component_name with correct format" do
+      react_component_name = "some_app"
+      attrs = the_attrs(react_component_name: react_component_name)
 
       opts = described_class.new(attrs)
 
-      expect(opts.name).to eq "SomeApp"
+      expect(opts.react_component_name).to eq "SomeApp"
     end
   end
 
   describe "#dom_id" do
     context "without id option" do
       it "returns a unique identifier" do
-        attrs = the_attrs(name: "some_app")
+        attrs = the_attrs(react_component_name: "SomeApp")
         opts = described_class.new(attrs)
 
         expect(SecureRandom).to receive(:uuid).and_return("123456789")
-        expect(opts.dom_id).to eq "some_app-react-component-123456789"
+        expect(opts.dom_id).to eq "SomeApp-react-component-123456789"
       end
 
       it "is memoized" do

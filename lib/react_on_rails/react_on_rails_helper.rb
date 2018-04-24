@@ -98,17 +98,17 @@ module ReactOnRails
     #   raise_on_prerender_error: <true/false> Default to false. True will raise exception on server
     #      if the JS code throws
     # Any other options are passed to the content tag, including the id.
-    def react_component(component_name, raw_options = {})
-      internal_result = internal_react_component(component_name, raw_options)
-      server_rendered_html = internal_result["result"]["html"]
-      console_script = internal_result["result"]["consoleReplayScript"]
+    def react_component(component_name, options = {})
+      internal_result = internal_react_component(component_name, options)
+      server_rendered_html = internal_result[:result]["html"]
+      console_script = internal_result[:result]["consoleReplayScript"]
 
       if server_rendered_html.is_a?(String)
         build_react_component_result_for_server_rendered_string(
           server_rendered_html: server_rendered_html,
-          component_specification_tag: internal_result["tag"],
+          component_specification_tag: internal_result[:tag],
           console_script: console_script,
-          options: internal_result["options"]
+          render_options: internal_result[:render_options]
         )
       elsif server_rendered_html.is_a?(Hash)
         msg = <<-MSG.strip_heredoc
@@ -116,7 +116,7 @@ module ReactOnRails
         https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
         for an example of the necessary javascript configuration."
         MSG
-        raise ReactOnRailsPro::Error, msg
+        raise ReactOnRails::Error, msg
 
       else
         msg = <<-MSG.strip_heredoc
@@ -126,17 +126,17 @@ module ReactOnRails
         https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
         for an example of the necessary javascript configuration."
         MSG
-        raise ReactOnRailsPro::Error, msg
+        raise ReactOnRails::Error, msg
       end
     end
 
-    def react_component_hash(component_name, raw_options = {})
-      internal_result = internal_react_component(component_name, raw_options)
-      server_rendered_html = internal_result["result"]["html"]
-      console_script = internal_result["result"]["consoleReplayScript"]
+    def react_component_hash(component_name, options = {})
+      internal_result = internal_react_component(component_name, options)
+      server_rendered_html = internal_result[:result]["html"]
+      console_script = internal_result[:result]["consoleReplayScript"]
 
-      if server_rendered_html.is_a?(String) && internal_result["result"]["hasErrors"]
-        server_rendered_html = { COMPONENT_HTML_KEY => internal_result["result"]["html"] }
+      if server_rendered_html.is_a?(String) && internal_result[:result]["hasErrors"]
+        server_rendered_html = { COMPONENT_HTML_KEY => internal_result[:result]["html"] }
       end
 
       if server_rendered_html.is_a?(Hash)
@@ -144,7 +144,7 @@ module ReactOnRails
           server_rendered_html: server_rendered_html,
           component_specification_tag: internal_result["tag"],
           console_script: console_script,
-          options: internal_result["options"]
+          render_options: internal_result[:render_options]
         )
       else
         msg = <<-MSG.strip_heredoc
@@ -152,7 +152,7 @@ module ReactOnRails
         https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
         for an example of the necessary javascript configuration.
         MSG
-        raise ReactOnRailsPro::Error, msg
+        raise ReactOnRails::Error, msg
       end
     end
 
@@ -199,8 +199,12 @@ module ReactOnRails
     # Helper method to take javascript expression and returns the output from evaluating it.
     # If you have more than one line that needs to be executed, wrap it in an IIFE.
     # JS exceptions are caught and console messages are handled properly.
+    # Options include:{ prerender:, trace:, raise_on_prerender_error: }
     def server_render_js(js_expression, options = {})
-      wrapper_js = <<-JS.strip_heredoc
+      render_options = ReactOnRails::ReactComponent::RenderOptions
+                       .new(react_component_name: "generic-js", options: options)
+
+      js_code = <<-JS.strip_heredoc
       (function() {
         var htmlResult = '';
         var consoleReplayScript = '';
@@ -228,15 +232,16 @@ module ReactOnRails
       })()
       JS
 
-      result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
+      result = ReactOnRails::ServerRenderingPool
+               .server_render_js_with_console_logging(js_code, render_options)
 
       html = result["html"]
       console_log_script = result["consoleLogScript"]
-      raw("#{html}#{replay_console_option(options[:replay_console_option]) ? console_log_script : ''}")
+      raw("#{html}#{render_options.replay_console ? console_log_script : ''}")
     rescue ExecJS::ProgramError => err
       raise ReactOnRails::PrerenderError, component_name: "N/A (server_render_js called)",
                                           err: err,
-                                          js_code: wrapper_js
+                                          js_code: js_code
     end
 
     def json_safe_and_pretty(hash_or_string)
@@ -257,16 +262,16 @@ module ReactOnRails
       server_rendered_html: required("server_rendered_html"),
       component_specification_tag: required("component_specification_tag"),
       console_script: required("console_script"),
-      options: required("options")
+      render_options: required("render_options")
     )
-      content_tag_options = options.html_options
-      content_tag_options[:id] = options.dom_id
+      content_tag_options = render_options.html_options
+      content_tag_options[:id] = render_options.dom_id
 
       rendered_output = content_tag(:div,
                                     server_rendered_html.html_safe,
                                     content_tag_options)
 
-      result_console_script = options.replay_console ? console_script : ""
+      result_console_script = render_options.replay_console ? console_script : ""
       result = compose_react_component_html_with_spec_and_console(
         component_specification_tag, rendered_output, result_console_script
       )
@@ -278,20 +283,20 @@ module ReactOnRails
       server_rendered_html: required("server_rendered_html"),
       component_specification_tag: required("component_specification_tag"),
       console_script: required("console_script"),
-      options: required("options")
+      render_options: required("render_options")
     )
-      content_tag_options = options.html_options
-      content_tag_options[:id] = options.dom_id
+      content_tag_options = render_options.html_options
+      content_tag_options[:id] = render_options.dom_id
 
       unless server_rendered_html[COMPONENT_HTML_KEY]
-        raise ReactOnRailsPro::Error, "server_rendered_html hash expected to contain \"#{COMPONENT_HTML_KEY}\" key."
+        raise ReactOnRails::Error, "server_rendered_html hash expected to contain \"#{COMPONENT_HTML_KEY}\" key."
       end
 
       rendered_output = content_tag(:div,
                                     server_rendered_html[COMPONENT_HTML_KEY].html_safe,
                                     content_tag_options)
 
-      result_console_script = options.replay_console ? console_script : ""
+      result_console_script = render_options.replay_console ? console_script : ""
       result = compose_react_component_html_with_spec_and_console(
         component_specification_tag, rendered_output, result_console_script
       )
@@ -335,7 +340,7 @@ module ReactOnRails
       "#{rails_context_content}\n#{render_value}".html_safe
     end
 
-    def internal_react_component(component_name, raw_options = {})
+    def internal_react_component(react_component_name, options = {})
       # Create the JavaScript and HTML to allow either client or server rendering of the
       # react_component.
       #
@@ -343,27 +348,27 @@ module ReactOnRails
       # (re-hydrate the data). This enables react rendered on the client to see that the
       # server has already rendered the HTML.
 
-      options = ReactOnRails::ReactComponent::Options.new(name: component_name, options: raw_options)
+      render_options = ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: react_component_name,
+                                                                       options: options)
 
       # Setup the page_loaded_js, which is the same regardless of prerendering or not!
       # The reason is that React is smart about not doing extra work if the server rendering did its job.
       component_specification_tag = content_tag(:script,
-                                                json_safe_and_pretty(options.props).html_safe,
+                                                json_safe_and_pretty(render_options.props).html_safe,
                                                 type: "application/json",
                                                 class: "js-react-on-rails-component",
-                                                "data-component-name" => options.name,
-                                                "data-trace" => (options.trace ? true : nil),
-                                                "data-dom-id" => options.dom_id)
+                                                "data-component-name" => render_options.react_component_name,
+                                                "data-trace" => (render_options.trace ? true : nil),
+                                                "data-dom-id" => render_options.dom_id)
 
       # Create the HTML rendering part
-      result = server_rendered_react_component_html(options.props,
-                                                    options.name,
-                                                    options.dom_id,
-                                                    prerender: options.prerender,
-                                                    trace: options.trace,
-                                                    raise_on_prerender_error: options.raise_on_prerender_error)
+      result = server_rendered_react_component(render_options)
 
-      { "options" => options, "tag" => component_specification_tag, "result" => result }
+      {
+        render_options: render_options,
+        tag: component_specification_tag,
+        result: result
+      }
     end
 
     def render_redux_store_data(redux_store_data)
@@ -379,15 +384,12 @@ module ReactOnRails
       props.is_a?(String) ? props : props.to_json
     end
 
-    # Returns Array [0]: html, [1]: script to console log
-    # NOTE, these are NOT html_safe!
-    def server_rendered_react_component_html(
-      props, react_component_name, dom_id,
-      prerender: required("prerender"),
-      trace: required("trace"),
-      raise_on_prerender_error: required("raise_on_prerender_error")
-    )
-      return { "html" => "", "consoleReplayScript" => "" } unless prerender
+    # Returns object with values that are NOT html_safe!
+    def server_rendered_react_component(render_options)
+      return { "html" => "", "consoleReplayScript" => "" } unless render_options.prerender
+
+      react_component_name = render_options.react_component_name
+      props = render_options.props
 
       # On server `location` option is added (`location = request.fullpath`)
       # React Router needs this to match the current route
@@ -411,42 +413,44 @@ module ReactOnRails
       # Read more here: http://timelessrepo.com/json-isnt-a-javascript-subset
 
       # rubocop:disable Layout/IndentHeredoc
-      wrapper_js = <<-JS
+      js_code = <<-JS
 (function() {
   var railsContext = #{rails_context(server_side: true).to_json};
 #{initialize_redux_stores}
   var props = #{props_string(props).gsub("\u2028", '\u2028').gsub("\u2029", '\u2029')};
   return ReactOnRails.serverRenderReactComponent({
     name: '#{react_component_name}',
-    domNodeId: '#{dom_id}',
+    domNodeId: '#{render_options.dom_id}',
     props: props,
-    trace: #{trace},
+    trace: #{render_options.trace},
     railsContext: railsContext
   });
 })()
       JS
       # rubocop:enable Layout/IndentHeredoc
 
-      result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(wrapper_js)
+      begin
+        result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(js_code, render_options)
+      rescue StandardError => err
+        # This error came from the renderer
+        raise ReactOnRails::PrerenderError, component_name: react_component_name,
+                                            # Sanitize as this might be browser logged
+                                            props: sanitized_props_string(props),
+                                            err: err,
+                                            js_code: js_code
+      end
 
-      if result["hasErrors"] && raise_on_prerender_error
+      if result["hasErrors"] && render_options.raise_on_prerender_error
         # We caught this exception on our backtrace handler
         raise ReactOnRails::PrerenderError, component_name: react_component_name,
                                             # Sanitize as this might be browser logged
                                             props: sanitized_props_string(props),
                                             err: nil,
-                                            js_code: wrapper_js,
+                                            js_code: js_code,
                                             console_messages: result["consoleReplayScript"]
 
       end
       result
-    rescue ExecJS::ProgramError => err
-      # This error came from execJs
-      raise ReactOnRails::PrerenderError, component_name: react_component_name,
-                                          # Sanitize as this might be browser logged
-                                          props: sanitized_props_string(props),
-                                          err: err,
-                                          js_code: wrapper_js
     end
 
     def initialize_redux_stores

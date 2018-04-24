@@ -5,61 +5,65 @@ require "open-uri"
 module ReactOnRails
   module ServerRenderingPool
     class RubyEmbeddedJavaScript
-      def self.reset_pool
-        options = {
-          size: ReactOnRails.configuration.server_renderer_pool_size,
-          timeout: ReactOnRails.configuration.server_renderer_timeout
-        }
-        @js_context_pool = ConnectionPool.new(options) { create_js_context }
-      end
-
-      def self.reset_pool_if_server_bundle_was_modified
-        return unless ReactOnRails.configuration.development_mode
-
-        file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
-        @server_bundle_timestamp ||= file_mtime
-        return if @server_bundle_timestamp == file_mtime
-
-        @server_bundle_timestamp = file_mtime
-
-        ReactOnRails::ServerRenderingPool.reset_pool
-      end
-
-      # js_code: JavaScript expression that returns a string.
-      # Returns a Hash:
-      #   html: string of HTML for direct insertion on the page by evaluating js_code
-      #   consoleReplayScript: script for replaying console
-      #   hasErrors: true if server rendering errors
-      # Note, js_code does not have to be based on React.
-      # js_code MUST RETURN json stringify Object
-      # Calling code will probably call 'html_safe' on return value before rendering to the view.
-      def self.server_render_js_with_console_logging(js_code)
-        if ReactOnRails.configuration.trace
-          @file_index ||= 1
-          trace_js_code_used("Evaluating code to server render.", js_code,
-                             "tmp/server-generated-#{@file_index % 10}.js")
-          @file_index += 1
+      class << self
+        def reset_pool
+          options = {
+            size: ReactOnRails.configuration.server_renderer_pool_size,
+            timeout: ReactOnRails.configuration.server_renderer_timeout
+          }
+          @js_context_pool = ConnectionPool.new(options) { create_js_context }
         end
-        json_string = eval_js(js_code)
-        result = JSON.parse(json_string)
 
-        if ReactOnRails.configuration.logging_on_server
-          console_script = result["consoleReplayScript"]
-          console_script_lines = console_script.split("\n")
-          console_script_lines = console_script_lines[2..-2]
-          re = /console\.(log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
-          if console_script_lines
-            console_script_lines.each do |line|
-              match = re.match(line)
-              Rails.logger.info { "[react_on_rails] #{match[:msg]}" } if match
+        def reset_pool_if_server_bundle_was_modified
+          return unless ReactOnRails.configuration.development_mode
+
+          file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
+          @server_bundle_timestamp ||= file_mtime
+          return if @server_bundle_timestamp == file_mtime
+
+          @server_bundle_timestamp = file_mtime
+
+          ReactOnRails::ServerRenderingPool.reset_pool
+        end
+
+        # js_code: JavaScript expression that returns a string.
+        # render_options: lib/react_on_rails/react_component/render_options.rb
+        # Using these options:
+        #    trace: saves the executed JS to a file, used in development
+        #    logging_on_server: put on server logs, not just in browser console
+        #
+        # Returns a Hash:
+        #   html: string of HTML for direct insertion on the page by evaluating js_code
+        #   consoleReplayScript: script for replaying console
+        #   hasErrors: true if server rendering errors
+        # Note, js_code does not have to be based on React.
+        # js_code MUST RETURN json stringify Object
+        # Calling code will probably call 'html_safe' on return value before rendering to the view.
+        def exec_server_render_js(js_code, render_options, js_evaluator = nil)
+          js_evaluator ||= self
+          if render_options.trace
+            @file_index ||= 1
+            trace_js_code_used("Evaluating code to server render.", js_code,
+                               "tmp/server-generated-#{@file_index % 10}.js")
+            @file_index += 1
+          end
+          json_string = js_evaluator.eval_js(js_code)
+          result = JSON.parse(json_string)
+
+          if render_options.logging_on_server
+            console_script = result["consoleReplayScript"]
+            console_script_lines = console_script.split("\n")
+            console_script_lines = console_script_lines[2..-2]
+            re = /console\.(log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
+            if console_script_lines
+              console_script_lines.each do |line|
+                match = re.match(line)
+                Rails.logger.info { "[react_on_rails] #{match[:msg]}" } if match
+              end
             end
           end
+          result
         end
-        result
-      end
-
-      class << self
-        private
 
         def trace_js_code_used(msg, js_code, file_name = "tmp/server-generated.js", force: false)
           return unless ReactOnRails.configuration.trace || force
@@ -156,8 +160,7 @@ function clearTimeout() {
 
         def undefined_for_exec_js_logging(function_name)
           if ReactOnRails.configuration.trace
-            "console.error('[React on Rails Rendering] #{function_name} is not defined for execJS. See "\
-            "https://github.com/sstephenson/execjs#faq. Note babel-polyfill may call this.');\n"\
+            "console.error('[React on Rails Rendering] #{function_name} is not defined for server rendering.');\n"\
             "  console.error(getStackTrace().join('\\n'));"
           else
             ""

@@ -114,7 +114,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
 
     module Required
       def required(arg_name)
-        raise ReactOnRailsPro::Error, "#{arg_name} is required"
+        raise ReactOnRails::Error, "#{arg_name} is required"
       end
     end
 

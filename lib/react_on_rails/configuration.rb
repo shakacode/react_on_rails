@@ -9,6 +9,8 @@ module ReactOnRails
   end
 
   DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
+  DEFAULT_SERVER_RENDER_TIMEOUT = 20
+  DEFAULT_POOL_SIZE = 1
 
   def self.setup_config_values
     ensure_webpack_generated_files_exists
@@ -112,8 +114,8 @@ module ReactOnRails
       raise_on_prerender_error: false,
       trace: Rails.env.development?,
       development_mode: Rails.env.development?,
-      server_renderer_pool_size: 1,
-      server_renderer_timeout: 20,
+      server_renderer_pool_size: DEFAULT_POOL_SIZE,
+      server_renderer_timeout: DEFAULT_SERVER_RENDER_TIMEOUT,
       skip_display_none: nil,
       # skip_display_none is deprecated
       webpack_generated_files: %w[manifest.json],
