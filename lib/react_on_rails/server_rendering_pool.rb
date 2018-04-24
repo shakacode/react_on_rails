@@ -21,8 +21,11 @@ module ReactOnRails
                   end
       end
 
-      delegate :server_render_js_with_console_logging, :reset_pool_if_server_bundle_was_modified,
-               :reset_pool, to: :pool
+      delegate :reset_pool_if_server_bundle_was_modified, :reset_pool, to: :pool
+
+      def server_render_js_with_console_logging(js_code, render_options)
+        @pool.exec_server_render_js(js_code, render_options)
+      end
 
       private
 
