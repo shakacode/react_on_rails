@@ -31,7 +31,7 @@ module ReactOnRails
     # Params:
     # config - config for rspec
     # metatags - metatags to add the ensure_assets_compiled check.
-    #            Default is :js, :server_rendering
+    #            Default is :js, :server_rendering, :controller
     def self.configure_rspec_to_compile_assets(config, *metatags)
       metatags = %i[js server_rendering controller] if metatags.empty?
 
@@ -70,8 +70,8 @@ module ReactOnRails
 
         unless @printed_once
           puts
-          puts "====> React On Rails: Checking #{webpack_assets_status_checker.generated_assets_dir} for "\
-          "outdated/missing bundles"
+          puts "====> React On Rails: Checking files in #{webpack_assets_status_checker.generated_assets_dir} for "\
+            "outdated/missing bundles based on source_path #{source_path}"
           puts
           @printed_once = true
         end

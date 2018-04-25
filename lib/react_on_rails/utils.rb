@@ -90,7 +90,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       else
         # Default to the non-hashed name in the specified output directory, which, for legacy
         # React on Rails, this is the output directory picked up by the asset pipeline.
-        File.join(ReactOnRails.configuration.generated_assets_dir, bundle_name)
+        File.join(generated_assets_dir, bundle_name)
       end
     end
 

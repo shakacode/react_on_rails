@@ -8,25 +8,25 @@ RSpec.configure do |config|
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
 ```
 
-You can pass one or more RSpec metatags as an optional second parameter to this helper method if you want this helper to run on examples other than where `:js` or `:server_rendering` (those are the defaults). The helper will compile webpack files at most once per test run. The helper will not compile the webpack files unless they are out of date (stale). The helper is configurable in terms of what command is used to prepare the files.
+You can pass one or more RSpec metatags as an optional second parameter to this helper method if you want this helper to run on examples other than where `:js`, `:server_rendering`, or `:controller` (those are the defaults). The helper will compile webpack files at most once per test run. The helper will not compile the webpack files unless they are out of date (stale). The helper is configurable in terms of what command is used to prepare the files. If you don't specify these metatags for your relevant JavaScript tests, then you'll need to do the following.
 
 If you are using Webpack to build CSS assets, you should do something like this to ensure that you assets are built for any specs under `specs/requests` or `specs/features`:
 
 ```ruby
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :requires_webpack_assets)
-
-  # Because we're using some CSS Webpack files, we need to ensure the webpack files are generated
-  # for all feature specs. https://github.com/shakacode/react_on_rails/issues/792
   config.define_derived_metadata(file_path: %r{spec/(features|requests)}) do |metadata|
     metadata[:requires_webpack_assets] = true
   end
 ```
 
 Please take note of the following:
+- If you are using Webpacker, be **SURE** to configure the `source_path` in your `config/webpacker.yml` unless you are using the defaults for webpacker. If you are not using webpacker, all files in the node_modules_location are used for your test sources.
+
 - This utility uses your `build_test_command` to build the static generated files. This command **must not** include the `--watch` option. If you have different server and client bundle files, this command **must** create all the bundles. If you are using webpacker, the default value will come from the `config/webpacker.yml` value for the `public_output_path` and the `source_path`
+
 - If you add an older file to your source files, that is already older than the produced output files, no new recompilation is done. The solution to this issue is to clear out your directory of webpack generated files when adding new source files that may have older dates. This is actually a common occurrence when you've built your test generated files and then you sync up your repository files.
 
-- By default, the webpack processes look for the `app/assets/webpack` folders (configured as setting `webpack_generated_files` in the `config/react_on_rails.rb`. If this folder is missing, is empty, or contains files in the `config.webpack_generated_files` list with `mtime`s older than any of the files in your `client` folder, the helper will recompile your assets. You can override the location of these files inside of `config/initializers/react_on_rails.rb` by passing a filepath (relative to the root of the app) to the `generated_assets_dir` configuration option.
+- By default, the webpack processes look for the `config.generated_assets_dir` folder for generated files, configured via setting `webpack_generated_files`, in the `config/react_on_rails.rb`. If the `config.generated_assets_dir` folder is missing, is empty, or contains files in the `config.webpack_generated_files` list with `mtime`s older than any of the files in your `client` folder, the helper will recompile your assets. You can override the location of these files inside of `config/initializers/react_on_rails.rb` by passing a filepath (relative to the root of the app) to the `generated_assets_dir` configuration option.
 
 The following `config/react_on_rails.rb` settings **must** match your setup:
 ```ruby

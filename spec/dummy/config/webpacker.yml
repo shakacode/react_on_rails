@@ -5,6 +5,7 @@ default: &default
   custom_compile: true
   # Cache manifest.json for performance
   cache_manifest: false
+  source_path: client/app
 
 development:
   <<: *default

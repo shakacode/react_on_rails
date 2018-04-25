@@ -47,7 +47,8 @@ ReactOnRails.configure do |config|
   # Alternately, you may configure this. It is relative to your Rails root directory.
   # A custom, non-webpacker, config might use something like:
   #
-  config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
+  # config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
+  # This setting should not be used if using webpacker. 
 
   # The test helper needs to know where your JavaScript files exist. The default is configured
   # by your config/webpacker.yml soure_path:

@@ -7,7 +7,7 @@ GIT
 PATH
   remote: ../..
   specs:
-    react_on_rails (11.0.0)
+    react_on_rails (11.0.3)
       addressable
       connection_pool
       execjs (~> 2.5)
