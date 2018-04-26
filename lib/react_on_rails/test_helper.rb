@@ -48,29 +48,29 @@ module ReactOnRails
     #                         defaults to ReactOnRails::TestHelper::WebpackAssetsStatusChecker
     # webpack_assets_compiler: provide one method: `def compile`
     #                         defaults to ReactOnRails::TestHelper::WebpackAssetsCompiler
-    # source_path and generated_assets_dir are passed into the default webpack_assets_status_checker if you
+    # source_path and generated_assets_path are passed into the default webpack_assets_status_checker if you
     #                        don't provide one.
     # webpack_generated_files List of files to check for up-to-date-status, defaulting to
     #                        webpack_generated_files in your configuration
     def self.ensure_assets_compiled(webpack_assets_status_checker: nil,
                                     webpack_assets_compiler: nil,
                                     source_path: nil,
-                                    generated_assets_dir: nil,
+                                    generated_assets_path: nil,
                                     webpack_generated_files: nil)
       ReactOnRails::WebpackerUtils.check_manifest_not_cached
       if webpack_assets_status_checker.nil?
         source_path ||= ReactOnRails::Utils.source_path
-        generated_assets_dir ||= ReactOnRails::Utils.generated_assets_dir
+        generated_assets_path ||= ReactOnRails::Utils.generated_assets_path
         webpack_generated_files ||= ReactOnRails.configuration.webpack_generated_files
 
         webpack_assets_status_checker ||=
           WebpackAssetsStatusChecker.new(source_path: source_path,
-                                         generated_assets_dir: generated_assets_dir,
+                                         generated_assets_path: generated_assets_path,
                                          webpack_generated_files: webpack_generated_files)
 
         unless @printed_once
           puts
-          puts "====> React On Rails: Checking files in #{webpack_assets_status_checker.generated_assets_dir} for "\
+          puts "====> React On Rails: Checking files in #{webpack_assets_status_checker.generated_assets_path} for "\
             "outdated/missing bundles based on source_path #{source_path}"
           puts
           @printed_once = true

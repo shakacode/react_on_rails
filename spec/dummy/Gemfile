@@ -41,11 +41,11 @@ gem "sdoc", group: :doc
 
 # Use Capistrano for deployment
 # gem 'capistrano-rails', group: :development
+gem "awesome_print"
 gem "mini_racer"
 
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console
-  gem "awesome_print"
   gem "listen"
   gem "pry"
   gem "pry-byebug"

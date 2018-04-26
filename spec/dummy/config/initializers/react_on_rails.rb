@@ -20,7 +20,7 @@ ReactOnRails.configure do |config|
   config.build_production_command = "yarn run build:production"
   config.build_test_command = "yarn run build:test"
 
-  # See webpacker.yml public_output_path for generated_assets_dir
+  # See webpacker.yml public_output_path for replacement for generated_assets_dir
   # config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
   config.webpack_generated_files = %w[manifest.json]
   config.server_bundle_js_file = "server-bundle.js"

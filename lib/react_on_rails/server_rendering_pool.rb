@@ -10,7 +10,7 @@ module ReactOnRails
   module ServerRenderingPool
     class << self
       def react_on_rails_pro?
-        @react_on_rails_pro ||= gem_available?("react_on_rails_pro")
+        @react_on_rails_pro ||= ReactOnRails::Utils.gem_available?("react_on_rails_pro")
       end
 
       def pool
@@ -25,16 +25,6 @@ module ReactOnRails
 
       def server_render_js_with_console_logging(js_code, render_options)
         pool.exec_server_render_js(js_code, render_options)
-      end
-
-      private
-
-      def gem_available?(name)
-        Gem::Specification.find_by_name(name)
-      rescue Gem::LoadError
-        false
-      rescue StandardError
-        Gem.available?(name)
       end
     end
   end

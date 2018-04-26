@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-# NOTE: ReactOnRails::Utils.using_webpacker? always will return false when called here.
-
 module ReactOnRails
   def self.configure
     yield(configuration)
@@ -37,7 +35,7 @@ module ReactOnRails
     else
       msg = <<-MSG.strip_heredoc
         Error configuring /config/initializers/react_on_rails.rb: You are using webpacker
-        and you specified value for generated_assets_dir = #{@configuration.generated_assets_dir}
+        and your specified value for generated_assets_dir = #{@configuration.generated_assets_dir}
         that does not match the value for public_output_path specified in
         webpacker.yml = #{webpacker_public_output_path}. You should remove the configuration
         value for "generated_assets_dir" from your config/initializers/react_on_rails.rb file.
@@ -86,19 +84,28 @@ module ReactOnRails
     return if @configuration.generated_assets_dir.present? || ReactOnRails::WebpackerUtils.using_webpacker?
 
     @configuration.generated_assets_dir = DEFAULT_GENERATED_ASSETS_DIR
-    puts "ReactOnRails: Set generated_assets_dir to default: #{DEFAULT_GENERATED_ASSETS_DIR}"
+    Rails.logger.warn "ReactOnRails: Set generated_assets_dir to default: #{DEFAULT_GENERATED_ASSETS_DIR}"
   end
 
   def self.configure_generated_assets_dirs_deprecation
     return if @configuration.generated_assets_dirs.blank?
 
-    puts "[DEPRECATION] ReactOnRails: Use config.generated_assets_dir rather than "\
+    if ReactOnRails::WebpackerUtils.using_webpacker?
+      webpacker_public_output_path = ReactOnRails::WebpackerUtils.webpacker_public_output_path
+      Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the "\
+        "generated_assets_dirs no the generated_assets_dir when using Webpacker. This is defined by "\
+        "public_output_path specified in webpacker.yml = #{webpacker_public_output_path}."
+      return
+    end
+
+    Rails.logger.warn "[DEPRECATION] ReactOnRails: Use config.generated_assets_dir rather than "\
         "generated_assets_dirs"
     if @configuration.generated_assets_dir.blank?
       @configuration.generated_assets_dir = @configuration.generated_assets_dirs
     else
-      puts "[DEPRECATION] ReactOnRails. You have both generated_assets_dirs and "\
-          "generated_assets_dir defined. Define ONLY generated_assets_dir"
+      Rails.logger.warn "[DEPRECATION] ReactOnRails. You have both generated_assets_dirs and "\
+          "generated_assets_dir defined. Define ONLY generated_assets_dir if NOT using Webpacker"\
+          " and define neither if using Webpacker"
     end
   end
 
@@ -114,14 +121,18 @@ module ReactOnRails
   def self.ensure_server_bundle_js_file_has_no_path
     return unless @configuration.server_bundle_js_file.include?(File::SEPARATOR)
 
-    puts "[DEPRECATION] ReactOnRails: remove path from server_bundle_js_file in configuration. "\
-        "All generated files must go in #{@configuration.generated_assets_dir}"
+    assets_dir = ReactOnRails::Utils.generated_assets_path
     @configuration.server_bundle_js_file = File.basename(@configuration.server_bundle_js_file)
+
+    Rails.logger_warn do
+      "[DEPRECATION] ReactOnRails: remove path from server_bundle_js_file in configuration. "\
+      "All generated files must go in #{assets_dir}. Using file basename #{@configuration.server_bundle_js_file}"
+    end
   end
 
   def self.configure_skip_display_none_deprecation
     return if @configuration.skip_display_none.nil?
-    puts "[DEPRECATION] ReactOnRails: remove skip_display_none from configuration."
+    Rails.logger.warn "[DEPRECATION] ReactOnRails: remove skip_display_none from configuration."
   end
 
   def self.configuration

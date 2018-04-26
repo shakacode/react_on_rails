@@ -1,18 +1,26 @@
 module ReactOnRails
   module WebpackerUtils
     def self.using_webpacker?
-      ActionController::Base.helpers.respond_to?(:asset_pack_path)
+      ReactOnRails::Utils.gem_available?("webpacker")
+    end
+
+    # Full absolute path of webpacker output files.
+    def self.public_output_path
+      # This is a pathname
+      Webpacker.config.public_output_path.to_s
     end
 
     def self.bundle_js_file_path_from_webpacker(bundle_name)
-      possible_result = Webpacker.manifest.lookup(bundle_name)
-      hashed_bundle_name = possible_result.nil? ? Webpacker.manifest.lookup!(bundle_name) : possible_result
+      # Note Webpacker 3.4.3 manifest lookup is inside of the public_output_path
+      # [2] (pry) ReactOnRails::WebpackerUtils: 0> Webpacker.manifest.lookup("app-bundle.js")
+      # "/webpack/development/app-bundle-c1d2b6ab73dffa7d9c0e.js"
+      hashed_bundle_name = Webpacker.manifest.lookup!(bundle_name)
+
       if Webpacker.dev_server.running?
-        result = "#{Webpacker.dev_server.protocol}://#{Webpacker.dev_server.host_with_port}#{hashed_bundle_name}"
-        result
+        "#{Webpacker.dev_server.protocol}://#{Webpacker.dev_server.host_with_port}#{hashed_bundle_name}"
       else
         # Next line will throw if the file or manifest does not exist
-        Rails.root.join(File.join("public", hashed_bundle_name)).to_s
+        File.expand_path(File.join("public", hashed_bundle_name)).to_s
       end
     end
 
@@ -20,6 +28,7 @@ module ReactOnRails
       Webpacker.config.source_path
     end
 
+    # As of webpacker 3.4.3, this is a full path
     def self.webpacker_public_output_path
       Webpacker.config.public_output_path
     end
