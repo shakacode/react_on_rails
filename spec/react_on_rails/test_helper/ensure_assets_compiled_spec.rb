@@ -7,6 +7,10 @@ describe ReactOnRails::TestHelper::EnsureAssetsCompiled do
     let(:compiler) { double_assets_compiler }
     after { ReactOnRails::TestHelper::EnsureAssetsCompiled.has_been_run = false }
 
+    before do
+      allow(ReactOnRails::WebpackerUtils).to receive(:check_manifest_not_cached).and_return(nil)
+    end
+
     context "when assets are not up to date" do
       let(:assets_checker) do
         double_assets_checker(stale_generated_webpack_files:
