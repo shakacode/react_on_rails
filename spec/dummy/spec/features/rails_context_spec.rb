@@ -23,6 +23,8 @@ shared_examples "railsContext" do |pathname, id_base|
       host_port = "#{host}:#{port}"
       keys_to_vals = {
         railsEnv: Rails.env,
+        rorVersion: ReactOnRails::VERSION,
+        rorPro: ReactOnRails::Utils.react_on_rails_pro?,
         href: "http://#{host_port}/#{pathname}?ab=cd",
         location: "/#{pathname}?ab=cd",
         port: port,

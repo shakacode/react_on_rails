@@ -121,7 +121,7 @@ module ReactOnRails
   def self.ensure_server_bundle_js_file_has_no_path
     return unless @configuration.server_bundle_js_file.include?(File::SEPARATOR)
 
-    assets_dir = ReactOnRails::Utils.generated_assets_path
+    assets_dir = ReactOnRails::Utils.generated_assets_full_path
     @configuration.server_bundle_js_file = File.basename(@configuration.server_bundle_js_file)
 
     Rails.logger_warn do

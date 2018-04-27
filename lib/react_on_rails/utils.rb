@@ -6,7 +6,6 @@ require "rainbow"
 require "active_support"
 require "active_support/core_ext/string"
 
-# Naming: goal is that path is a full_path and dir means relative to the rails root.
 module ReactOnRails
   module Utils
     # https://forum.shakacode.com/t/yak-of-the-week-ruby-2-4-pathname-empty-changed-to-look-at-file-size/901
@@ -77,7 +76,8 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
                               begin
                                 bundle_js_file_path(bundle_name)
                               rescue Webpacker::Manifest::MissingEntryError
-                                File.join(ReactOnRails::WebpackerUtils.public_output_path, bundle_name)
+                                File.join(ReactOnRails::WebpackerUtils.webpacker_public_output_path,
+                                          bundle_name)
                               end
                             else
                               bundle_js_file_path(bundle_name)
@@ -91,7 +91,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
         # Default to the non-hashed name in the specified output directory, which, for legacy
         # React on Rails, this is the output directory picked up by the asset pipeline.
         # For Webpacker, this is the public output path defined in the webpacker.yml file.
-        File.join(generated_assets_path, bundle_name)
+        File.join(generated_assets_full_path, bundle_name)
       end
     end
 
@@ -131,7 +131,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       end
     end
 
-    def self.generated_assets_path
+    def self.generated_assets_full_path
       if ReactOnRails::WebpackerUtils.using_webpacker?
         ReactOnRails::WebpackerUtils.webpacker_public_output_path
       else
@@ -145,6 +145,10 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       false
     rescue StandardError
       Gem.available?(name)
+    end
+
+    def self.react_on_rails_pro?
+      @react_on_rails_pro ||= gem_available?("react_on_rails_pro")
     end
   end
 end

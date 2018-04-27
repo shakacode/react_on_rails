@@ -9,12 +9,8 @@ require_relative "server_rendering_pool/ruby_embedded_java_script"
 module ReactOnRails
   module ServerRenderingPool
     class << self
-      def react_on_rails_pro?
-        @react_on_rails_pro ||= ReactOnRails::Utils.gem_available?("react_on_rails_pro")
-      end
-
       def pool
-        @pool ||= if react_on_rails_pro?
+        @pool ||= if ReactOnRails::Utils.react_on_rails_pro?
                     ReactOnRailsPro::ServerRenderingPool::ProRendering
                   else
                     ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript

@@ -50,6 +50,8 @@ require "webpacker" unless File.basename(ENV["BUNDLE_GEMFILE"] || "") == "Gemfil
 #
 # See http://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 RSpec.configure do |config|
+  Rails.logger = Logger.new(STDOUT)
+
   config.example_status_persistence_file_path = "spec/examples.txt"
   config.run_all_when_everything_filtered = true
 

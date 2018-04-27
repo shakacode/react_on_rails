@@ -201,11 +201,11 @@ module ReactOnRails
       it "deletes files in ReactOnRails.configuration.generated_assets_dir" do
         allow(Rails).to receive(:root).and_return(Pathname.new(Dir.mktmpdir))
 
-        generated_assets_dir  = "generated_dir"
-        generated_assets_path = Rails.root.join(generated_assets_dir)
-        Dir.mkdir generated_assets_path
+        generated_assets_dir = "generated_dir"
+        generated_assets_full_path = Rails.root.join(generated_assets_dir)
+        Dir.mkdir generated_assets_full_path
 
-        filepath = Pathname.new(Tempfile.new("tempfile", generated_assets_path))
+        filepath = Pathname.new(Tempfile.new("tempfile", generated_assets_full_path))
 
         AssetsPrecompile.new(assets_path: assets_path,
                              generated_assets_dir: generated_assets_dir).clobber
