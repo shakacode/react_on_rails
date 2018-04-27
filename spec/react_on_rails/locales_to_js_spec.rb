@@ -9,6 +9,10 @@ module ReactOnRails
     let(:translations_path) { "#{i18n_dir}/translations.js" }
     let(:default_path) { "#{i18n_dir}/default.js" }
 
+    before do
+      allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(false)
+    end
+
     shared_examples "locale to js" do
       context "with obsolete js files" do
         before do
