@@ -12,39 +12,41 @@ module ReactOnRails
       allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(using_webpacker)
     end
 
-    describe "generated_assets_dir" do
-      let(:using_webpacker) { true }
-      let(:webpacker_public_output_path) do
-        File.expand_path(File.join(Rails.root, "public/webpack/dev"))
-      end
-      before do
-        allow(Rails).to receive(:root).and_return(File.expand_path("."))
-        allow(Webpacker).to receive_message_chain("config.public_output_path")
-          .and_return(webpacker_public_output_path)
-      end
+    unless using_rails32?
+      describe "generated_assets_dir" do
+        let(:using_webpacker) { true }
+        let(:webpacker_public_output_path) do
+          File.expand_path(File.join(Rails.root, "public/webpack/dev"))
+        end
+        before do
+          allow(Rails).to receive(:root).and_return(File.expand_path("."))
+          allow(Webpacker).to receive_message_chain("config.public_output_path")
+            .and_return(webpacker_public_output_path)
+        end
 
-      it "does not throw if the generated assets dir is blank with webpacker" do
-        expect do
-          ReactOnRails.configure do |config|
-            config.generated_assets_dir = ""
-          end
-        end.not_to raise_error
-      end
+        it "does not throw if the generated assets dir is blank with webpacker" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.generated_assets_dir = ""
+            end
+          end.not_to raise_error
+        end
 
-      it "does not throw if the webpacker_public_output_path does match the generated assets dir" do
-        expect do
-          ReactOnRails.configure do |config|
-            config.generated_assets_dir = "public/webpack/dev"
-          end
-        end.not_to raise_error
-      end
+        it "does not throw if the webpacker_public_output_path does match the generated assets dir" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.generated_assets_dir = "public/webpack/dev"
+            end
+          end.not_to raise_error
+        end
 
-      it "does throw if the webpacker_public_output_path does not match the generated assets dir" do
-        expect do
-          ReactOnRails.configure do |config|
-            config.generated_assets_dir = "public/webpack/other"
-          end
-        end.to raise_error(ReactOnRails::Error, /does not match the value for public_output_path/)
+        it "does throw if the webpacker_public_output_path does not match the generated assets dir" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.generated_assets_dir = "public/webpack/other"
+            end
+          end.to raise_error(ReactOnRails::Error, /does not match the value for public_output_path/)
+        end
       end
     end
 
