@@ -11,6 +11,13 @@ April 11, 2018: 2138
 
 ## Commercial Products Live
 * **[Hawaii Chee](https://www.hawaiichee.com/)**, the signature product of [ShakaCode](http://www.shakacode.com), which is a vacation rental site focusing on Hawaii.
+* **[RedFlagDeals](https://www.redflagdeals.com/)**, Canadian shopping site.
+* **[YourMechanic](https://www.yourmechanic.com/)**, home calls for mechanics.
+* **[Suntransfers](https://www.suntransfers.com/)**, airport car rides site.
+* **[Decanter](http://www.decanter.com/)**, wine site.
+* **[LocalWise](https://www.localwise.com/)**, local job site.
+* **[Ellevest](https://www.ellevest.com/)**, investments for women.
+* **[OppenheimerFunds](https://www.oppenheimerfunds.com/)**, investment site.
 * **[KissKissBankBank](https://www.kisskissbankbank.com/)**, large French crowdfunding platform.
 * **[HVMN](https://hvmn.com)**: Web ecommerce site for "biohacking" products.
 * **[GuavaPass](https://guavapass.com/)**: Coaching client of [ShakaCode](http://www.shakacode.com) and React on Rails fan!
@@ -27,7 +34,6 @@ April 11, 2018: 2138
 * **[Undeveloped](https://undeveloped.com/)**: Buy and sell domain names. ![image](https://cloud.githubusercontent.com/assets/1118459/19623703/7c6d63d0-9870-11e6-83f2-8b83ca49daa9.png)
 * **[Foxford.ru](http://foxford.ru/)**: Online School ![2016-12-17_13-23-21](https://cloud.githubusercontent.com/assets/1118459/21290377/1adacdf2-c45c-11e6-97c1-f726ab749b2d.png)
 * **[CareerBuilder for Employers](https://hiring.careerbuilder.com/)**: CareerBuilder's marketing/ecommerce website. We've integrated React on Rails and have deployed the application via Cloud 66, and are busy integrating this into other projects!
-* **[Josephine](https://www.josephine.com)**: The private network for home cooked meals.
 * **[first](https://first.io/)**: Data-driven Relational Marketing for Real Estate.
 
 ## Open Source Projects Live
