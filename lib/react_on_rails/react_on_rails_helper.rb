@@ -485,7 +485,9 @@ module ReactOnRails
           inMailer: in_mailer?,
           # Locale settings
           i18nLocale: I18n.locale,
-          i18nDefaultLocale: I18n.default_locale
+          i18nDefaultLocale: I18n.default_locale,
+          rorVersion: ReactOnRails::VERSION,
+          rorPro: ReactOnRails::Utils.react_on_rails_pro?
         }
         if defined?(request) && request.present?
           # Check for encoding of the request's original_url and try to force-encoding the

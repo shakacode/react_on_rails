@@ -76,8 +76,8 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
                               begin
                                 bundle_js_file_path(bundle_name)
                               rescue Webpacker::Manifest::MissingEntryError
-                                Rails.root.join(File.join(Webpacker.config.public_output_path,
-                                                          bundle_name)).to_s
+                                File.join(ReactOnRails::WebpackerUtils.webpacker_public_output_path,
+                                          bundle_name)
                               end
                             else
                               bundle_js_file_path(bundle_name)
@@ -90,7 +90,8 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       else
         # Default to the non-hashed name in the specified output directory, which, for legacy
         # React on Rails, this is the output directory picked up by the asset pipeline.
-        File.join(ReactOnRails.configuration.generated_assets_dir, bundle_name)
+        # For Webpacker, this is the public output path defined in the webpacker.yml file.
+        File.join(generated_assets_full_path, bundle_name)
       end
     end
 
@@ -130,12 +131,24 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       end
     end
 
-    def self.generated_assets_dir
+    def self.generated_assets_full_path
       if ReactOnRails::WebpackerUtils.using_webpacker?
         ReactOnRails::WebpackerUtils.webpacker_public_output_path
       else
-        ReactOnRails.configuration.generated_assets_dir
+        File.expand_path(ReactOnRails.configuration.generated_assets_dir)
       end
+    end
+
+    def self.gem_available?(name)
+      Gem::Specification.find_by_name(name)
+    rescue Gem::LoadError
+      false
+    rescue StandardError
+      Gem.available?(name)
+    end
+
+    def self.react_on_rails_pro?
+      @react_on_rails_pro ||= gem_available?("react_on_rails_pro")
     end
   end
 end

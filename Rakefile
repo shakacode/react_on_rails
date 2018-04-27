@@ -2,6 +2,9 @@
 
 # Rake will automatically load any *.rake files inside of the "rakelib" folder
 # See rakelib/
+
+require_relative "./spec/react_on_rails/support/rails32_helper"
+
 tasks = %w[run_rspec lint]
 prepare_for_ci = %w[node_package dummy_apps]
 
@@ -11,7 +14,7 @@ if ENV["USE_COVERALLS"] == "TRUE"
   tasks << "coveralls:push"
 end
 
-if File.basename(ENV["BUNDLE_GEMFILE"] || "") == "Gemfile.rails32"
+if using_rails32?
   tasks = %w[run_rspec:gem_rails32 run_rspec:dummy_no_webpacker]
   prepare_for_ci = %w[node_package dummy_apps:dummy_no_webpacker]
 end

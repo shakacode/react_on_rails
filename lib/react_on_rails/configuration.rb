@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-# NOTE: ReactOnRails::Utils.using_webpacker? always will return false when called here.
-
 module ReactOnRails
   def self.configure
     yield(configuration)
@@ -21,6 +19,29 @@ module ReactOnRails
     check_i18n_directory_exists
     check_i18n_yml_directory_exists
     check_server_render_method_is_only_execjs
+    error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
+  end
+
+  def self.error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
+    return unless ReactOnRails::WebpackerUtils.using_webpacker?
+
+    return if @configuration.generated_assets_dir.blank?
+
+    webpacker_public_output_path = ReactOnRails::WebpackerUtils.webpacker_public_output_path
+
+    if File.expand_path(@configuration.generated_assets_dir) == webpacker_public_output_path.to_s
+      Rails.logger.warn("You specified /config/initializers/react_on_rails.rb generated_assets_dir "\
+        "with Webpacker. Remove this line from your configuration file.")
+    else
+      msg = <<-MSG.strip_heredoc
+        Error configuring /config/initializers/react_on_rails.rb: You are using webpacker
+        and your specified value for generated_assets_dir = #{@configuration.generated_assets_dir}
+        that does not match the value for public_output_path specified in
+        webpacker.yml = #{webpacker_public_output_path}. You should remove the configuration
+        value for "generated_assets_dir" from your config/initializers/react_on_rails.rb file.
+      MSG
+      raise ReactOnRails::Error, msg
+    end
   end
 
   def self.check_server_render_method_is_only_execjs
@@ -28,7 +49,7 @@ module ReactOnRails
               @configuration.server_render_method == "ExecJS"
 
     msg = <<-MSG.strip_heredoc
-      Error configuring /config/react_on_rails.rb: invalid value for `config.server_render_method`.
+      Error configuring /config/initializers/react_on_rails.rb: invalid value for `config.server_render_method`.
       If you wish to use a server render method other than ExecJS, contact justin@shakacode.com
       for details.
     MSG
@@ -40,7 +61,7 @@ module ReactOnRails
     return if Dir.exist?(@configuration.i18n_dir)
 
     msg = <<-MSG.strip_heredoc
-      Error configuring /config/react_on_rails.rb: invalid value for `config.i18n_dir`.
+      Error configuring /config/initializers/react_on_rails.rb: invalid value for `config.i18n_dir`.
       Directory does not exist: #{@configuration.i18n_dir}. Set to value to nil or comment it
       out if not using the React on Rails i18n feature.
     MSG
@@ -52,7 +73,7 @@ module ReactOnRails
     return if Dir.exist?(@configuration.i18n_yml_dir)
 
     msg = <<-MSG.strip_heredoc
-      Error configuring /config/react_on_rails.rb: invalid value for `config.i18n_yml_dir`.
+      Error configuring /config/initializers/react_on_rails.rb: invalid value for `config.i18n_yml_dir`.
       Directory does not exist: #{@configuration.i18n_yml_dir}. Set to value to nil or comment it
       out if not using this i18n with React on Rails, or if you want to use all translation files.
     MSG
@@ -60,22 +81,31 @@ module ReactOnRails
   end
 
   def self.ensure_generated_assets_dir_present
-    return if @configuration.generated_assets_dir.present?
+    return if @configuration.generated_assets_dir.present? || ReactOnRails::WebpackerUtils.using_webpacker?
 
     @configuration.generated_assets_dir = DEFAULT_GENERATED_ASSETS_DIR
-    puts "ReactOnRails: Set generated_assets_dir to default: #{DEFAULT_GENERATED_ASSETS_DIR}"
+    Rails.logger.warn "ReactOnRails: Set generated_assets_dir to default: #{DEFAULT_GENERATED_ASSETS_DIR}"
   end
 
   def self.configure_generated_assets_dirs_deprecation
     return if @configuration.generated_assets_dirs.blank?
 
-    puts "[DEPRECATION] ReactOnRails: Use config.generated_assets_dir rather than "\
+    if ReactOnRails::WebpackerUtils.using_webpacker?
+      webpacker_public_output_path = ReactOnRails::WebpackerUtils.webpacker_public_output_path
+      Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the "\
+        "generated_assets_dirs no the generated_assets_dir when using Webpacker. This is defined by "\
+        "public_output_path specified in webpacker.yml = #{webpacker_public_output_path}."
+      return
+    end
+
+    Rails.logger.warn "[DEPRECATION] ReactOnRails: Use config.generated_assets_dir rather than "\
         "generated_assets_dirs"
     if @configuration.generated_assets_dir.blank?
       @configuration.generated_assets_dir = @configuration.generated_assets_dirs
     else
-      puts "[DEPRECATION] ReactOnRails. You have both generated_assets_dirs and "\
-          "generated_assets_dir defined. Define ONLY generated_assets_dir"
+      Rails.logger.warn "[DEPRECATION] ReactOnRails. You have both generated_assets_dirs and "\
+          "generated_assets_dir defined. Define ONLY generated_assets_dir if NOT using Webpacker"\
+          " and define neither if using Webpacker"
     end
   end
 
@@ -91,14 +121,18 @@ module ReactOnRails
   def self.ensure_server_bundle_js_file_has_no_path
     return unless @configuration.server_bundle_js_file.include?(File::SEPARATOR)
 
-    puts "[DEPRECATION] ReactOnRails: remove path from server_bundle_js_file in configuration. "\
-        "All generated files must go in #{@configuration.generated_assets_dir}"
+    assets_dir = ReactOnRails::Utils.generated_assets_full_path
     @configuration.server_bundle_js_file = File.basename(@configuration.server_bundle_js_file)
+
+    Rails.logger_warn do
+      "[DEPRECATION] ReactOnRails: remove path from server_bundle_js_file in configuration. "\
+      "All generated files must go in #{assets_dir}. Using file basename #{@configuration.server_bundle_js_file}"
+    end
   end
 
   def self.configure_skip_display_none_deprecation
     return if @configuration.skip_display_none.nil?
-    puts "[DEPRECATION] ReactOnRails: remove skip_display_none from configuration."
+    Rails.logger.warn "[DEPRECATION] ReactOnRails: remove skip_display_none from configuration."
   end
 
   def self.configuration

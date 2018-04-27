@@ -13,14 +13,14 @@ module ReactOnRails
       # source_path is typically configured in the webpacker.yml file
       # for `source_path`
       # or for legacy React on Rails, it's /client, where all client files go
-      attr_reader :source_path, :generated_assets_dir
+      attr_reader :source_path, :generated_assets_full_path
 
       def initialize(
-        generated_assets_dir: required("generated_assets_dir"),
+        generated_assets_full_path: required("generated_assets_full_path"),
         source_path: required("source_path"),
         webpack_generated_files: required("webpack_generated_files")
       )
-        @generated_assets_dir = generated_assets_dir
+        @generated_assets_full_path = generated_assets_full_path
         @source_path = source_path
         @webpack_generated_files = webpack_generated_files
       end
@@ -59,13 +59,13 @@ module ReactOnRails
           if webpack_generated_files.present?
             webpack_generated_files
           else
-            file_list = make_file_list(make_globs(generated_assets_dir)).to_ary
+            file_list = make_file_list(make_globs(generated_assets_full_path)).to_ary
             puts "V" * 80
             puts "Please define config.webpack_generated_files (array) so the test helper knows "\
             "which files are required. If you are using webpacker, you typically need to only "\
             "include 'manifest.json'."
             puts "Detected the possible following files to check for webpack compilation in "\
-              "#{generated_assets_dir}"
+              "#{generated_assets_full_path}"
             puts file_list.join("\n")
             puts "^" * 80
             file_list

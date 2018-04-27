@@ -207,9 +207,10 @@ feature "generator function returns renderedHtml as an object with additional HT
     subject { page }
     background { visit react_helmet_path }
     scenario "renderedHtmls should not have any errors" do
-      expect(subject).to have_text 'Props: {"hello":"world"}'
+      expect(subject).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
       expect(subject).to have_css "title", text: /\ACustom page title\z/, visible: false
       expect(subject.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
+      change_text_expect_dom_selector("div#react-helmet-0")
     end
   end
 
