@@ -15,6 +15,7 @@ Changes since last non-beta release.
 - Fix the setup for tests for spec/dummy so they automatically rebuild by correctly setting the source_path in the webpacker.yml
 - Updated documentation for the testing setup.
 - Above in [PR 1072](https://github.com/shakacode/react_on_rails/pull/1072) by [justin808](https://github.com/justin808).
+- `react_component_hash` has implicit `prerender: true` because it makes no sense to have react_component_hash not use prerrender. Improved docs on `react_component_hash`. Also, fixed issue where checking gem existence. [PR 1077](https://github.com/shakacode/react_on_rails/pull/1077) by [justin808](https://github.com/justin808).
 
 ### [11.0.3] - 2018-04-24
 

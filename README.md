@@ -357,10 +357,16 @@ You have 2 ways to specify your React components. You can either register the Re
 
 ReactOnRails will automatically detect a registered generator function. Thus, there is no difference between registering a React Component versus a "generator function."
 
+#### react_component_hash for Generator Functions
 Another reason to use a generator function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }. Make sure you use this function with `react_component_hash`. 
 
 For server rendering, if you wish to return multiple HTML strings from a generator function, you may return an Object from your generator function with a single top level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
+
+```js
 { renderedHtml: { componentHtml, customKey1, customKey2} }
+```
+
+For details on using react_component_hash with react-helmet, see the docs below for the helper API and [docs/additional-reading/react-helmet.md](../docs/additional-reading/react-helmet.md).
 
 ### Rails Context and Generator Functions
 When you use a "generator function" to create react components (or renderedHtml on the server), or you used shared redux stores, you get two params passed to your function that creates a React component:
@@ -535,7 +541,44 @@ All options except `props, id, html_options` will inherit from your `react_on_ra
   + **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the configuration of `logging_on_server` set to true, you'll still see the errors on the server.
   + **logging_on_server:** Default is true. True will log JS console messages and errors to the server.
   + **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
+  
+### react_component_hash
+`react_component_hash` is used to return multiple HTML strings for server rendering, such as for
+adding meta-tags to a page. It is exactly like react_component except for the following:
 
+1. `prerender: true` is automatically added to options, as this method doesn't make sense for 
+  client only rendering.
+2. Your JavaScript for server rendering must return an Object for the key `server_rendered_html`.
+3. Your view code must expect an object and not a string.
+
+Here is an example of ERB view code:
+
+```erb
+  <% react_helmet_app = react_component_hash("ReactHelmetApp", prerender: true,
+                                             props: { helloWorldData: { name: "Mr. Server Side Rendering"}},
+                                             id: "react-helmet-0", trace: true) %>
+  <% content_for :title do %>
+    <%= react_helmet_app['title'] %>
+  <% end %>
+  <%= react_helmet_app["componentHtml"] %>
+```
+
+And here is the JavaScript code:
+
+```js
+export default (props, _railsContext) => {
+  const componentHtml = renderToString(<ReactHelmet {...props} />);
+  const helmet = Helmet.renderStatic();
+
+  const renderedHtml = {
+    componentHtml,
+    title: helmet.title.toString(),
+  };
+  return { renderedHtml };
+};
+
+```
+  
 ### redux_store
 #### Controller Extension
 Include the module `ReactOnRails::Controller` in your controller, probably in ApplicationController. This will provide the following controller method, which you can call in your controller actions:

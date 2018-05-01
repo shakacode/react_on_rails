@@ -120,17 +120,35 @@ module ReactOnRails
 
       else
         msg = <<-MSG.strip_heredoc
-        ReactOnRails: server_rendered_html is expected to be a String. If you're trying to
-        use a generator function to return a Hash to your ruby view code, then use
+        ReactOnRails: server_rendered_html is expected to be a String for #{component_name}. If you're
+        trying to use a generator function to return a Hash to your ruby view code, then use
         react_component_hash instead of react_component and see
         https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
-        for an example of the necessary javascript configuration."
+        for an example of the JavaScript code."
         MSG
         raise ReactOnRails::Error, msg
       end
     end
 
+    # react_component_hash is used to return multiple HTML strings for server rendering, such as for
+    # adding meta-tags to a page.
+    # It is exactly like react_component except for the following:
+    # 1. prerender: true is automatically added, as this method doesn't make sense for client only
+    #    rendering.
+    # 2. Your JavaScript for server rendering must return an Object for the key server_rendered_html.
+    # 3. Your view code must expect an object and not a string.
+    #
+    # Here is an example of the view code:
+    #    <% react_helmet_app = react_component_hash("ReactHelmetApp", prerender: true,
+    #                                               props: { helloWorldData: { name: "Mr. Server Side Rendering"}},
+    #                                               id: "react-helmet-0", trace: true) %>
+    #    <% content_for :title do %>
+    #      <%= react_helmet_app['title'] %>
+    #    <% end %>
+    #    <%= react_helmet_app["componentHtml"] %>
+    #
     def react_component_hash(component_name, options = {})
+      options[:prerender] = true
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
@@ -148,9 +166,9 @@ module ReactOnRails
         )
       else
         msg = <<-MSG.strip_heredoc
-        Generator function used by react_component_hash is expected to return an Object. See
-        https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
-        for an example of the necessary javascript configuration.
+          Generator function used by react_component_hash for #{component_name} is expected to return
+          an Object. See https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+          for an example of the JavaScript code."
         MSG
         raise ReactOnRails::Error, msg
       end

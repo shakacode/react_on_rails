@@ -140,11 +140,11 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.gem_available?(name)
-      Gem::Specification.find_by_name(name)
+      Gem::Specification.find_by_name(name).present?
     rescue Gem::LoadError
       false
     rescue StandardError
-      Gem.available?(name)
+      Gem.available?(name).present?
     end
 
     def self.react_on_rails_pro?
