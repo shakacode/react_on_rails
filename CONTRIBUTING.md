@@ -75,7 +75,7 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 # Configuring your test app to use your local fork
 You can test the `react-on-rails` gem using your own external test app or the gem's internal `spec/dummy` app. The `spec/dummy` app is an example of the various setup techniques you can use with the gem.
 ```
-├── test
+├── test_app
 |    └── client
 └── react_on_rails
     └── spec
@@ -98,21 +98,20 @@ In addition to testing the Ruby parts out, you can also test the node package pa
 cd react_on_rails/
 yarn
 yarn run build
+yarn install-react-on-rails
 ```
 
-Install the local package by using a relative path in your test/client app's `package.json`, like this:
+Install the local package by using yarn link, like this:
 ```sh
-cd test/client
-rm -rf node_modules/react-on-rails && npm i 'file:../path-to-react-on-rails-top-package.json'
+cd spec/dummy
+yarn
 ```
-_Note: You must use npm here till yarn stops preferring cached packages over local. see [issue #2649](https://github.com/yarnpkg/yarn/issues/2649)_
 
-When you use a relative path, be sure to run the above `yarn` command whenever you change the node package for react-on-rails.
+Note, yarn will run the `postinstall` script of `spec/dummy/client` which runs `yarn link` to setup a sym link to the parent package.
 
 #### Example: Testing NPM changes with the dummy app
 1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/clientStartup.js#L181) in `react_on_rails/node_package/src/clientStartup.js` to confirm we're getting an update to the node package.
-2. The "postinstall" script of "spec/dummy/client" calls "yarn link react-on-rails" to setup a sym link to the parent package.
-3. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console.
+2. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console.
 
 _Note: running `npm i` automatically builds the npm package before installing. However, when using yarn you will need to run `yarn run build` in the root directory before the install script. This will be updated when [yarn issue #2649](https://github.com/yarnpkg/yarn/issues/2649) (above) is resolved._
 
