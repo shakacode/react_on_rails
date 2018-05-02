@@ -20,7 +20,10 @@ const { buildVM, runInVM, getBundleFilePath } = require('./vm');
  */
 // TODO: Split this function in smaller methods.
 module.exports = function handleRenderRequest(req) {
-  if (!cluster.isMaster) log.debug(`worker #${cluster.worker.id} received render request with with code ${req.body.renderingRequest}`);
+  if (!cluster.isMaster) {
+    log.debug('worker #%s received render request with with code %s',
+      cluster.worker.id, req.body.renderingRequest);
+  }
   const { bundlePath } = getConfig();
   const bundleFilePath = path.join(bundlePath, `${req.params.bundleTimestamp}.js`);
 
@@ -61,6 +64,5 @@ module.exports = function handleRenderRequest(req) {
     headers: { 'Cache-Control': 'public, max-age=31536000' },
     status: 200,
     data: { renderedHtml: result },
-    // data: { renderedHtml: '{ "html": "FAKE" }' },
   };
 };

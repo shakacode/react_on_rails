@@ -1,9 +1,9 @@
 {
-  "name": "react-on-rails-renderer",
+  "name": "react-on-rails-pro",
   "version": "0.6.0",
   "protocolVersion": "1.0.0",
-  "description": "react-on-rails-renderer JavaScript for react_on_rails_renderer Ruby gem",
-  "main": "node_package/src/ReactOnRailsRenderer.js",
+  "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
+  "main": "node_package/src/ReactOnRailsProVmRenderer.js",
   "engines": {
     "node": "^8.9.4",
     "yarn": "^1.5.1"
@@ -49,7 +49,7 @@
     "node_package/src"
   ],
   "scripts": {
-    "start": "node renderer.js",
+    "start": "node vm-renderer.js",
     "test": "babel-tape-runner node_package/tests/*.js | tap-spec",
     "eslint": "eslint .",
     "flow": "flow check node_package",
@@ -69,10 +69,10 @@
     "on",
     "Rails"
   ],
-  "author": "justin.gordon@gmail.com",
+  "author": "justin@shakacode.com",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/shakacode/react_on_rails/issues"
+    "url": "https://github.com/shakacode/react_on_rails_pro/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails#readme"
+  "homepage": "https://github.com/shakacode/react_on_rails_pro#readme"
 }

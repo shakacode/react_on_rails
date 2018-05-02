@@ -1,3 +1,6 @@
+# frozen_string_literal: true
+
+# For documentation of parameters see: docs/basics/configuration.md
 module RenderingExtension
   # Return a Hash that contains custom values from the view context that will get passed to
   # all calls to react_component and redux_store for rendering
@@ -13,25 +16,13 @@ module RenderingExtension
 end
 
 ReactOnRails.configure do |config|
-  config.node_modules_location = "client"
-  config.generated_assets_dir = File.join(%w(app assets webpack))
-  config.webpack_generated_files = %w(app-bundle.css app-bundle.js vendor-bundle.js server-bundle.js)
-  config.server_bundle_js_file = "server-bundle.js"
-  config.build_test_command = "yarn run build:test"
+  config.node_modules_location = "client" # Pre 9.0.0 always used "client"
   config.build_production_command = "yarn run build:production"
-  config.prerender = true
-  config.trace = Rails.env.development?
-  config.development_mode = Rails.env.development?
-  config.replay_console = true
-  config.logging_on_server = true
-  config.raise_on_prerender_error = false
-  config.server_renderer_pool_size = 1
-  config.server_renderer_timeout = 20
+  config.build_test_command = "yarn run build:test"
+  config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
+  config.webpack_generated_files = %w[manifest.json]
+  config.server_bundle_js_file = "server-bundle.js"
   config.rendering_extension = RenderingExtension
-  config.symlink_non_digested_assets_regex = /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/
-
-  # Use Node renderer instead of embeded ExecJS:
-  config.server_render_method = "NodeJSHttp"
 end
 
 # TODO: It is better to add additional condition to react_on_rails gem instead of this monkey patch:
@@ -39,18 +30,11 @@ module ReactOnRails
   module ServerRenderingPool
     class << self
       def pool
-        if ReactOnRails.configuration.server_render_method == "NodeJS"
-          ServerRenderingPool::Node
-        elsif ReactOnRails.configuration.server_render_method == "NodeJSHttp"
-          ReactOnRailsRenderer::RenderingPool
-        else
-          ServerRenderingPool::Exec
-        end
-      end
-
-      # rubocop:disable Style/MethodMissing
-      def method_missing(sym, *args, &block)
-        pool.send sym, *args, &block
+        @pool ||= if ReactOnRailsPro.configuration.server_render_method == "VmRenderer"
+                    ReactOnRailsPro::VmRenderingPool
+                  else
+                    ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript
+                  end
       end
     end
   end

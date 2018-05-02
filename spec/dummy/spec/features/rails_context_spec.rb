@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rails_helper"
 require "support/capybara_utils"
 
@@ -20,6 +22,9 @@ shared_examples "railsContext" do |pathname, id_base|
       port = Capybara.current_session.server.port
       host_port = "#{host}:#{port}"
       keys_to_vals = {
+        railsEnv: Rails.env,
+        rorVersion: ReactOnRails::VERSION,
+        rorPro: ReactOnRails::Utils.react_on_rails_pro?,
         href: "http://#{host_port}/#{pathname}?ab=cd",
         location: "/#{pathname}?ab=cd",
         port: port,
@@ -45,16 +50,26 @@ shared_examples "railsContext" do |pathname, id_base|
   end
 end
 
-feature "rails_context", :server_rendering do
+feature "rails_context" do
   context "client rendering" do
     context "shared store" do
-      include_examples("railsContext", "shared_redux_store", "ReduxSharedStoreApp")
+      include_examples("railsContext",
+                       "client_side_hello_world_shared_store",
+                       "ReduxSharedStoreApp")
     end
   end
 
   context "server rendering" do
     context "shared store" do
-      include_examples("railsContext", "shared_redux_store", "ReduxSharedStoreApp")
+      include_examples("railsContext",
+                       "server_side_hello_world_shared_store",
+                       "ReduxSharedStoreApp")
+    end
+
+    context "generator function for component" do
+      include_examples("railsContext",
+                       "server_side_redux_app",
+                       "ReduxApp")
     end
   end
 end

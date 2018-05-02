@@ -1,5 +1,4 @@
 /* eslint no-var: 0, no-console: 0, import/no-extraneous-dependencies: 0 */
-/* eslint-disable comma-dangle */
 
 // This file is used by the yarn script:
 // "hot-assets": "babel-node server-rails-hot.js"
@@ -14,18 +13,27 @@
 // 2. Make sure you have a hot-assets target in your client/package.json
 // 3. Start up `foreman start -f Procfile.hot` to start both Rails and the hot reload server.
 
-import webpack from 'webpack';
-import WebpackDevServer from 'webpack-dev-server';
+const webpack = require('webpack');
+const WebpackDevServer = require('webpack-dev-server');
+const { resolve } = require('path');
+const webpackConfig = require('./webpack.client.rails.hot.config');
 
-import webpackConfig from './webpack.client.rails.hot.config';
-
-const hotRailsPort = process.env.HOT_RAILS_PORT || 3500;
+const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
+const configPath = resolve('..', 'config');
+const { output, settings } = webpackConfigLoader(configPath);
 
 const compiler = webpack(webpackConfig);
 
 const devServer = new WebpackDevServer(compiler, {
-  contentBase: `http://lvh.me:${hotRailsPort}`,
-  publicPath: webpackConfig.output.publicPath,
+  publicPath: output.publicPath,
+  proxy: {
+    '*': output.publicPathWithHost,
+  },
+  headers: {
+    'Access-Control-Allow-Origin': '*',
+  },
+  disableHostCheck: true,
+  clientLogLevel: 'info',
   hot: true,
   inline: true,
   historyApiFallback: true,
@@ -41,9 +49,9 @@ const devServer = new WebpackDevServer(compiler, {
   },
 });
 
-devServer.listen(hotRailsPort, 'localhost', err => {
+devServer.listen(settings.dev_server.port, settings.dev_server.host, err => {
   if (err) console.error(err);
   console.log(
-    `=> 🔥  Webpack development server is running on port ${hotRailsPort}`
+    `=> 🔥  Webpack development server is running on ${output.publicPathWithHost}`
   );
 });

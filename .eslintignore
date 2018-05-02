@@ -2,8 +2,10 @@ node_modules
 coverage
 spec/react_on_rails/dummy-for-generators
 spec/dummy
+node_package/src/__obsolete
 node_package/lib/
 node_package/tests/node_modules
+node_package/tests/fixtures
 node_package/webpack.config.js
 **/node_modules/**
 **/assets/webpack/**

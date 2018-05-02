@@ -138,7 +138,7 @@ jobs:
           key: v1-dummy-app-webpack-bundle-{{ .Revision }}
       - run:
           name: Run Node renderer in a background
-          command: cd spec/dummy && yarn run node-renderer
+          command: cd spec/dummy && yarn run vm-renderer
           background: true
       - run:
           name: Run tests

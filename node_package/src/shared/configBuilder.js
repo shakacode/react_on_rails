@@ -14,6 +14,14 @@ const defaultConfig = {
 
   workersCount: undefined,         // Let master detect workers count automaticaly
   password: undefined,             // No default for password, means no auth
+
+  // Next 2 params, allWorkersRestartInterval and delayBetweenIndividualWorkerRestarts must both
+  // be set if you wish to have automatic worker restarting, say to clear memory leaks.
+  // time in minutes between restarting all workers
+  allWorkersRestartInterval: undefined,
+
+  // time in minutes between each worker restarting when restarting all workers
+  delayBetweenIndividualWorkerRestarts: undefined,
 };
 
 exports.buildConfig = function buildConfig(userConfig) {

@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "babel": "^6.3.26",
+    "react-on-rails": "file:///Users/justin/shakacode/react_on_rails",
+    "webpack": "^1.12.8"
+  },
+  "devDependencies": {
+    "babel-eslint": "^5.0.0-beta6"
+  }
+}

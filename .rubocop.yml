@@ -22,12 +22,18 @@ AllCops:
     - 'client/node_modules/**/.*'
     - 'bin/**/*'
     - !ruby/regexp /old_and_unused\.rb$/
-    - 'spec/react_on_rails/dummy-for-generators/**/*'
+    - 'spec/dummy/Procfile.*'
     - 'spec/dummy/bin/**/*'
     - 'spec/dummy/client/node_modules/**/*'
     - 'spec/dummy/client/node_modules/**/.*'
     - 'gen-examples/examples/**/.*'
     - 'gen-examples/examples/**/*'
+
+Naming/FileName:
+  Exclude:
+    - 'Gemfile'
+    - 'spec/dummy/Gemfile'
+    - 'spec/dummy_no_webpacker/Gemfile'
 
 Metrics/LineLength:
   Max: 120

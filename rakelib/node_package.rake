@@ -1,5 +1,8 @@
 require_relative "task_helpers"
-include ReactOnRails::TaskHelpers
+
+# rubocop:disable Style/MixinUsage
+include ReactOnRailsPro::TaskHelpers
+# rubocop:enable Style/MixinUsage
 
 namespace :node_package do
   task :build do
