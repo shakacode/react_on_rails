@@ -18,25 +18,26 @@ cd renderer-app
 
 ```sh
 yarn init
-yarn add https://[your-github-token]:x-oauth-basic@github.com/shakacode/react-on-rails-renderer.git
+yarn add https://[your-github-token]:x-oauth-basic@github.com/shakacode/react-on-rails-pro.git
 ```
 
-4. Create entry point to config and launch renderer server, say `renderer.js` with the following content. See **Renderer config** section below for available options.
+4. Create entry point to config and launch renderer server, say `vm-renderer.js` with the following content. See **Renderer config** section below for available options.
 
+TODO: CLEANUP
 ```javascript
 const path = require('path');
-const reactOnRailsRenderer = require('react-on-rails-renderer');
+const reactOnRailsProVmRenderer = require('react-on-rails-renderer');
 
 const config = {
   bundlePath: path.resolve(__dirname, '../tmp/bundles'),
   port: 3800,
 };
 
-reactOnRailsRenderer(config);
+ReactOnRailsPro(config);
 ```
 
-5. Now you can launch your renderer server with `node renderer.js`.
-6. If you do not plan to deploy renderer to **Heroku** or other hosting platforms, **do not forger to revoke your GitHub OAuth token!**
+5. Now you can launch your renderer server with `node vm-renderer.js`.
+6. If you do not plan to deploy renderer to **Heroku** or other hosting platforms, **do not forget to revoke your GitHub OAuth token!**
 
 ## Setup react_on_rails application
 
@@ -45,7 +46,7 @@ Assuming you already have your **Rails** app running on **react_on_rails** gem. 
 1. Add ruby gem to your **Gemfile**. Since the repository is private, you can generate and use **GitHub OAuth** token:
 
 ```ruby
-gem "react_on_rails_renderer", git: "https://[your-github-token]:x-oauth-basic@github.com/shakacode/react-on-rails-renderer.git"
+gem "react_on_rails_pro", git: "https://[your-github-token]:x-oauth-basic@github.com/shakacode/react-on-rails-renderer.git"
 ```
 
 2. Run `bundle install`.
@@ -58,8 +59,8 @@ gem "react_on_rails_renderer", git: "https://[your-github-token]:x-oauth-basic@g
         def pool
           if ReactOnRails.configuration.server_render_method == "NodeJS"
             ServerRenderingPool::Node
-          elsif ReactOnRails.configuration.server_render_method == "NodeJSHttp"
-            ReactOnRailsRenderer::RenderingPool
+          elsif ReactOnRails.configuration.server_render_method == "VmRenderer"
+            ReactOnRailsPro::VMRenderingPool
           else
             ServerRenderingPool::Exec
           end
@@ -74,12 +75,12 @@ gem "react_on_rails_renderer", git: "https://[your-github-token]:x-oauth-basic@g
   end
 ```
 
-4. Set `config.server_render_method = "NodeJSHttp"` in your `ReactOnRails.configure` block.
+4. Set `config.server_render_method = "VmRenderer"` in your `ReactOnRails.configure` block.
 
-5. Create `initializers/react_on_rails_renderer` initializer and configure connection to **renderer server**. See **Rails client config** section below for available options.
+5. Create `initializers/react_on_rails_pro` initializer and configure connection to **renderer server**. See **Rails client config** section below for available options.
 
 ```ruby
-ReactOnRailsRenderer.configure do |config|
+ReactOnRailsPro.configure do |config|
   config.renderer_host = "localhost"
   config.renderer_port = 3800
 end
@@ -156,7 +157,7 @@ sub vcl_backend_fetch {
 4. Point your Rails client to **Varnish** standart port:
 
 ```ruby
-ReactOnRailsRenderer.configure do |config|
+ReactOnRailsPro.configure do |config|
   config.renderer_host = "localhost"
   config.renderer_port = 6081
 end
@@ -169,8 +170,8 @@ Currently Rails client prints response headers to console so you should be able 
 Assuming you did not revoke your **GitHub OAuth token** so you don't need to update your `package.json`:
 
 1. Create your **Heroku** app with **Node.js** buildpack, say `renderer-test.herokuapp.com`.
-2. Change port in your `renderer.js` config to `process.env.PORT` so it will use port number provided by **Heroku** environment.
-3. Set password in your `renderer.js` to something like `process.env.AUTH_PASSWORD` and configure corresponding **ENV variable** on your **Heroku** dyno.
+2. Change port in your `vm-renderer.js` config to `process.env.PORT` so it will use port number provided by **Heroku** environment.
+3. Set password in your `vm-renderer.js` to something like `process.env.AUTH_PASSWORD` and configure corresponding **ENV variable** on your **Heroku** dyno.
 4. Run deployment process (usually by pushing changes to **Git** repo associated with created **Heroku** app).
 5. Once deployment process is finished, renderer should start listening at `renderer-test.herokuapp.com` host.
 
@@ -179,10 +180,10 @@ Assuming you did not revoke your **GitHub OAuth token** so you don't need to upd
 Assuming you did not revoke your **GitHub OAuth token** so you don't need to update your `Gemfile`:
 
 1. Create your **Heroku** app for `react_on_rails`, see [the doc on Heroku deployment](https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/heroku-deployment.md#more-details-on-precompilation-using-webpack-to-create-javascript-assets).
-2. Configure your app to communicate with renderer app you've created above. Put the following to your `initializers/react_on_rails_renderer` (assuming you have **SSL** certificate uploaded to your renderer **Heroku** app or you use **Heroku** wildcard certificate under `*.herokuapp.com`) and configure corresponding **ENV variable** for the password on your **Heroku** dyno.
+2. Configure your app to communicate with renderer app you've created above. Put the following to your `initializers/react_on_rails_pro` (assuming you have **SSL** certificate uploaded to your renderer **Heroku** app or you use **Heroku** wildcard certificate under `*.herokuapp.com`) and configure corresponding **ENV variable** for the password on your **Heroku** dyno.
 
 ```ruby
-  ReactOnRailsRenderer.configure do |config|
+  ReactOnRailsPro.configure do |config|
     config.renderer_protocol = "https"
     config.renderer_host = "renderer-test.herokuapp.com"
     config.renderer_port = 443
@@ -208,7 +209,7 @@ Here are the options available for renderer configuration object:
 
 ## Rails client config
 
-Here are the options available for **react_on_rails_renderer** configuration:
+Here are the options available for **react_on_rails_pro** configuration:
 
 1. **renderer_protocol** (default: `"http"`) - Combined with **renderer_port** defines protocol type that will be used for renderer connection.
 2. **renderer_host** (default: `"localhost"`) - Renderer host name without protocol and port.

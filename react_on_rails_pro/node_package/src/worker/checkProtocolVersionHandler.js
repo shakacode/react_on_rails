@@ -12,9 +12,6 @@ const semver = require('semver');
 const packageJson = require(path.join(__dirname, '/../../../package.json'));
 
 module.exports = function checkProtocolVersion(req) {
-  // TODO: old style gem version comparison, remove after not needed
-  if (semver.lt(req.body.gemVersion, '0.5.4')) return undefined;
-
   if (
     req.body.protocolVersion === undefined ||
     semver.gt(req.body.protocolVersion, packageJson.protocolVersion)

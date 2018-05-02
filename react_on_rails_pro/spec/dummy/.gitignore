@@ -21,3 +21,5 @@
 /app/assets/webpack
 
 /spec/examples.txt
+
+/public/webpack

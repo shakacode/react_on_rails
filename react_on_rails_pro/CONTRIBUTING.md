@@ -62,7 +62,7 @@ yarn run test
 * To run **RSpec** tests on dummy app, first launch renderer server:
 ```sh
   cd react-on-rails-renderer/spec/dummy
-  yarn run node-renderer
+  yarn run vm-renderer
 ```
 and then run **RSpec** in another console  window/tab:
 ```sh
@@ -87,6 +87,8 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 
 # Configuring your test app to use your local fork
 You can test the `react-on-rails-renderer` gem using your own external test app or the gem's internal `spec/dummy` app. The `spec/dummy` app is an example of the various setup techniques you can use with the gem.
+As of 2018-04-28, this directory mirrors the test app spec/dummy on https://github.com/shakacode/react_on_rails plus a few additional tests.
+
 ```
 ├── test
 |    └── client
@@ -99,12 +101,15 @@ You can test the `react-on-rails-renderer` gem using your own external test app 
 If you want to test the ruby parts of the gem with an application before you release a new version of the gem, you can specify the path to your local version via your test app's Gemfile:
 
 ```ruby
-gem "react_on_rails_renderer", path: "../path-to-react-on-rails-renderer"
+gem "react_on_rails_pro", path: "../path-to-react-on-rails-renderer"
 gem "react_on_rails"
 ```
+================================================================================
+TODO: UPDATE
 
 Currently you also need to monkeypatch `ReactOnRails::ServerRenderingPool` module at the end of `initializers/react_on_rails`:
 
+See 
 ```ruby
 module ReactOnRails
   module ServerRenderingPool
@@ -112,8 +117,8 @@ module ReactOnRails
       def pool
         if ReactOnRails.configuration.server_render_method == "NodeJS"
           ServerRenderingPool::Node
-        elsif ReactOnRails.configuration.server_render_method == "NodeJSHttp"
-          ReactOnRailsRenderer::RenderingPool
+        elsif ReactOnRails.configuration.server_render_method == "VmRenderer"
+          ReactOnRailsPro::VMRenderingPool
         else
           ServerRenderingPool::Exec
         end
@@ -128,7 +133,8 @@ module ReactOnRails
 end
 ```
 
-Then set `config.server_render_method = "NodeJSHttp"` in your  `ReactOnRails.configure` block.
+
+Then set `config.server_render_method = "VmRenderer"` in your  `ReactOnRailsRender.configure` block.
 
 Note that you will need to bundle install after making this change, but also that **you will need to restart your Rails application if you make any changes to the gem**.
 
@@ -138,13 +144,13 @@ In addition to testing the Ruby parts out, you can also test the node package pa
 cd test/client
 rm -rf node_modules/react-on-rails && npm i 'file:../path-to-react-on-rails-top-package.json'
 ```
-_Note: You must use npm here till yarn stops preferring cached packages over local. see [issue #2649](https://github.com/yarnpkg/yarn/issues/2649)_
+_Note: You must use npm here till yarn stops preferring cached packages over local. see [issue #2649](https://github.com/yarnpkg/yarn/issues/2649).
 
 When you use a relative path, be sure to run the above `yarn` command whenever you change the node package for react-on-rails.
 
 #### Example: Testing NPM changes with the dummy app
-1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react-on-rails-renderer/blob/more_test_and_docs/node_package/src/ReactOnRailsRenderer.js#L6) in `react_on_rails/node_package/src/ReactOnRailsRenderer.js` to confirm we're getting an update to the node package.
-2. Run the install script `npm run install-react-on-rails` in `react_on_rails_renderer/spec/dummy` to copy over our changes to the dummy app. Alternatively, you can run `rm -rf node_modules/react-on-rails && npm i 'file:../../../'` in `react_on_rails/spec/dummy/client`. Our NPM changes are now available in the dummy app.
+1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react-on-rails-renderer/blob/more_test_and_docs/node_package/src/ReactOnRailsProVmRenderer.js#L6) in `react_on_rails/node_package/src/ReactOnRailsProVmRenderer.js` to confirm we're getting an update to the node package.
+2. Run the install script `npm run install-react-on-rails` in `react_on_rails_pro/spec/dummy` to copy over our changes to the dummy app. Alternatively, you can run `rm -rf node_modules/react-on-rails && npm i 'file:../../../'` in `react_on_rails/spec/dummy/client`. Our NPM changes are now available in the dummy app.
 3. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console.
 
 _Note: you don't have to build the NPM package since it is used only with node runtime and its source code is exactly what is executed when you run it._
@@ -174,7 +180,7 @@ Because the example and dummy apps rely on the `react-on-rails-renderer` node pa
 
 ```sh
 cd react_on_rails/spec/dummy
-yarn run install-react-on-rails-renderer
+yarn run install-pro-package
 ```
 _Note: this runs npm under the hood as explained in **Test NPM for react-on-rails-renderer** section above_
 
@@ -207,9 +213,11 @@ yarn test
 
 ### Run spec/dummy tests
 
+TODO: Figure out how to run the tests on CI.
+
 ```sh
 cd react-on-rails-renderer/spec/dummy
-yarn run node-renderer
+yarn run vm-renderer
 ```
 and in another console window/tab:
 

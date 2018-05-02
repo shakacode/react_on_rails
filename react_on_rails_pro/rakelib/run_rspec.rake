@@ -1,73 +1,36 @@
-if ENV["USE_COVERALLS"] == "TRUE"
-  require "coveralls/rake/task"
-end
+# frozen_string_literal: true
+
+require "coveralls/rake/task" if ENV["USE_COVERALLS"] == "TRUE"
 
 require "pathname"
-
+require "active_support/core_ext/string"
 require_relative "task_helpers"
-require_relative "example_type"
-
-include ReactOnRails::TaskHelpers
-
 namespace :run_rspec do
+  include ReactOnRailsPro::TaskHelpers
+
   spec_dummy_dir = File.join("spec", "dummy")
 
   desc "Run RSpec for top level only"
   task :gem do
-    run_tests_in("", rspec_args: File.join("spec", "react_on_rails"))
+    run_tests_in("", rspec_args: File.join("spec", "react_on_rails_pro"))
   end
 
-  desc "Runs dummy rspec with turbolinks"
+  desc "Runs dummy rspec"
   task dummy: ["dummy_apps:dummy_app"] do
     clean_gen_assets(spec_dummy_dir)
-    run_tests_in(spec_dummy_dir)
-  end
-
-  desc "Runs dummy rspec without turbolinks"
-  task dummy_no_turbolinks: ["dummy_apps:dummy_app"] do
-    clean_gen_assets(spec_dummy_dir)
-    run_tests_in(spec_dummy_dir,
-                 env_vars: "DISABLE_TURBOLINKS=TRUE",
-                 command_name: "dummy_no_turbolinks")
     bundle_install_in(dummy_app_dir)
-  end
-
-  desc "Runs dummy respec with turbolinks 2"
-  task dummy_turbolinks_2: ["dummy_apps:dummy_app_with_turbolinks_2"] do
-    clean_gen_assets(spec_dummy_dir)
-    run_tests_in(spec_dummy_dir, env_vars:
-      "ENABLE_TURBOLINKS_2=TRUE BUNDLE_GEMFILE=#{dummy_app_dir}/Gemfile")
-  end
-
-  # Dynamically define Rake tasks for each example app found in the examples directory
-  ExampleType.all.each do |example_type|
-    desc "Runs RSpec for #{example_type.name_pretty} only"
-    task example_type.rspec_task_name_short => example_type.prepare_task_name do
-      run_tests_in(File.join(examples_dir, example_type.name)) # have to use relative path
-    end
-  end
-
-  desc "Runs Rspec for example apps only"
-  task examples: "examples:prepare_all" do
-    ExampleType.all.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+    run_tests_in(spec_dummy_dir)
   end
 
   desc "(HACK) Run RSpec on spec/empty_spec in order to have SimpleCov generate a coverage report from cache"
   task :empty do
-    sh %(COVERAGE=true rspec spec/empty_spec.rb)
+    sh %(#{ENV['USE_COVERALLS'] ? 'COVERAGE=true' : ''} rspec spec/empty_spec.rb)
   end
 
-  if ENV["USE_COVERALLS"] == "TRUE"
-    Coveralls::RakeTask.new
-  end
-
-  desc "run all tests no examples"
-  task all_but_examples: [:gem, :dummy, :dummy_no_turbolinks, :dummy_turbolinks_2, :empty, :js_tests] do
-    puts "Completed all RSpec tests"
-  end
+  Coveralls::RakeTask.new if ENV["USE_COVERALLS"] == "TRUE"
 
   desc "run all tests"
-  task run_rspec: [:all_but_examples, :examples] do
+  task run_rspec: %i[gem dummy empty js_tests] do
     puts "Completed all RSpec tests"
   end
 end
@@ -77,24 +40,24 @@ task :js_tests do
   sh "yarn run test"
 end
 
-msg = <<-DESC
-Runs all tests, run `rake -D run_rspec` to see all available test options.
-"rake run_rspec:example_basic" is a good way to run only one generator test.
+msg = <<-DESC.strip_heredoc
+  Runs all tests, run `rake -D run_rspec` to see all available test options.
 DESC
 desc msg
 task run_rspec: ["run_rspec:run_rspec"]
 
 private
+
 def calc_path(dir)
-  if dir.is_a?(String)
-    path = if dir.start_with?(File::SEPARATOR)
+  path = if dir.is_a?(String)
+           if dir.start_with?(File::SEPARATOR)
              Pathname.new(dir)
            else
              Pathname.new(File.join(gem_root, dir))
            end
-  else
-    path = dir
-  end
+         else
+           dir
+         end
   path
 end
 
@@ -107,7 +70,8 @@ def run_tests_in(dir, options = {})
 
   command_name = options.fetch(:command_name, path.basename)
   rspec_args = options.fetch(:rspec_args, "")
-  env_vars = %(#{options.fetch(:env_vars, '')} COVERAGE=true TEST_ENV_COMMAND_NAME="#{command_name}")
+  env_vars = "#{options.fetch(:env_vars, '')} TEST_ENV_COMMAND_NAME=\"#{command_name}\"".dup
+  env_vars << "COVERAGE=true" if ENV["USE_COVERALLS"]
   sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
 end
 

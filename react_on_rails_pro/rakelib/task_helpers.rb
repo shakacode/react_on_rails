@@ -1,13 +1,10 @@
-module ReactOnRails
+# frozen_string_literal: true
+
+module ReactOnRailsPro
   module TaskHelpers
     # Returns the root folder of the react_on_rails gem
     def gem_root
-      File.expand_path("../../.", __FILE__)
-    end
-
-    # Returns the folder where examples are located
-    def examples_dir
-      File.join(gem_root, "gen-examples", "examples")
+      File.expand_path("..", __dir__)
     end
 
     def dummy_app_dir
@@ -24,21 +21,9 @@ module ReactOnRails
       sh_in_dir(dir, "bundle install")
     end
 
-    def bundle_install_in_no_turbolinks(dir)
-      sh_in_dir(dir, "DISABLE_TURBOLINKS=TRUE bundle install")
-    end
-
-    def bundle_install_with_turbolinks_2_in(dir)
-      sh_in_dir(dir, "ENABLE_TURBOLINKS_2=TRUE BUNDLE_GEMFILE=#{dir}/Gemfile bundle install")
-    end
-
     # Runs bundle exec using that directory's Gemfile
     def bundle_exec(dir: nil, args: nil, env_vars: "")
       sh_in_dir(dir, "#{env_vars} #{args}")
-    end
-
-    def generators_source_dir
-      File.join(gem_root, "lib/generators/react_on_rails")
     end
 
     def symbolize_keys(hash)
