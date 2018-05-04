@@ -10,6 +10,8 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [11.0.4] - 2018-05-3
+
 #### Changed
 - Throw if configuration.generated_assets_dir specified, and using webpacker, and if that doesn't match the public_output_path. Otherwise, warn if generated_assets_dir is specified
 - Fix the setup for tests for spec/dummy so they automatically rebuild by correctly setting the source_path in the webpacker.yml
@@ -751,7 +753,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.3...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.4...master
+[11.0.4]: https://github.com/shakacode/react_on_rails/compare/11.0.3...11.0.4
 [11.0.3]: https://github.com/shakacode/react_on_rails/compare/11.0.2...11.0.3
 [11.0.2]: https://github.com/shakacode/react_on_rails/compare/11.0.1...11.0.2
 [11.0.1]: https://github.com/shakacode/react_on_rails/compare/11.0.0...11.0.1
