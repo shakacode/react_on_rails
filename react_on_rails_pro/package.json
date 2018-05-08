@@ -1,9 +1,9 @@
 {
-  "name": "react-on-rails-pro",
+  "name": "react-on-rails-pro-vm-renderer",
   "version": "0.6.0",
   "protocolVersion": "1.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
-  "main": "node_package/src/ReactOnRailsProVmRenderer.js",
+  "main": "packages/vm-renderer/lib/ReactOnRailsProVmRenderer.js",
   "engines": {
     "node": "^8.9.4",
     "yarn": "^1.5.1"
@@ -16,22 +16,23 @@
     "express": "^4.15.2",
     "express-busboy": "^6.0.1",
     "fs-extra": "^3.0.1",
+    "semver": "^5.5.0",
     "supertest": "^3.0.0",
     "winston": "^2.3.1"
   },
   "devDependencies": {
     "babel-cli": "^6.24.1",
-    "babel-core": "^6.24.1",
-    "babel-loader": "^6.4.1",
+    "babel-core": "^6.25.0",
+    "babel-loader": "^7.1.1",
     "babel-plugin-react-transform": "^2.0.2",
     "babel-plugin-transform-flow-strip-types": "^6.22.0",
     "babel-plugin-transform-runtime": "^6.23.0",
     "babel-preset-es2015": "^6.24.1",
     "babel-preset-react": "^6.24.1",
     "babel-preset-stage-2": "^6.24.1",
-    "babel-runtime": "^6.23.0",
+    "babel-runtime": "^6.25.0",
     "babel-tape-runner": "^2.0.1",
-    "babel-types": "^6.24.1",
+    "babel-types": "^6.25.0",
     "babelify": "^7.3.0",
     "blue-tape": "^1.0.0",
     "eslint": "^3.19.0",
@@ -46,20 +47,27 @@
     "tape": "^4.6.3"
   },
   "files": [
-    "node_package/src"
+    "packages/vm-renderer/lib"
   ],
   "scripts": {
+    "test": "babel-tape-runner packages/vm-renderer/tests/*.js | tap-spec",
+    "clean": "rm -rf packages/vm-renderer/lib",
+    "babel": "babel --out-dir packages/vm-renderer/lib packages/vm-renderer/src",
+    "build": "yarn run clean && yarn run babel",
+    "build-watch": "babel --watch --out-dir packages/vm-renderer/lib node_package/src",
+    "prepublish": "yarn run build",
+    "prerelease": "yarn run check && yarn run clean && yarn run build",
     "start": "node vm-renderer.js",
-    "test": "babel-tape-runner node_package/tests/*.js | tap-spec",
     "eslint": "eslint .",
-    "flow": "flow check node_package",
+    "flow": "flow check packages/vm-renderer",
     "lint": "yarn run eslint && yarn run flow",
     "check": "yarn run lint && yarn run flow && yarn run test",
-    "local": "echo 'Be sure to run yarn run dummy:install' && yarn run build && cd spec/dummy && foreman start"
+    "local": "echo 'Be sure to run yarn run dummy:install' && yarn run build && cd spec/dummy && foreman start",
+    "link": "yarn link"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shakacode/react-on-rails-renderer.git"
+    "url": "git+https://github.com/shakacode/react_on_rails_pro.git"
   },
   "keywords": [
     "react",

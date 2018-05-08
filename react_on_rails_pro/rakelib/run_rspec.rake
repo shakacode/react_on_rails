@@ -16,7 +16,7 @@ namespace :run_rspec do
   end
 
   desc "Runs dummy rspec"
-  task dummy: ["dummy_apps:dummy_app"] do
+  task dummy: ["dummy_app:dummy_app"] do
     clean_gen_assets(spec_dummy_dir)
     bundle_install_in(dummy_app_dir)
     run_tests_in(spec_dummy_dir)

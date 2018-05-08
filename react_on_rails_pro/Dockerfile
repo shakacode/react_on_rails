@@ -25,9 +25,9 @@ USER renderer
 ENV USER_HOME=/home/renderer
 WORKDIR $USER_HOME
 
-# Install Ruby 2.3.7 from source, set GEM_HOME and expose executable paths:
-ENV RUBY_MAJOR_MINOR=2.3
-ENV RUBY_VERSION=$RUBY_MAJOR_MINOR.7
+# Install Ruby 2.4.3 from source, set GEM_HOME and expose executable paths:
+ENV RUBY_MAJOR_MINOR=2.4
+ENV RUBY_VERSION=$RUBY_MAJOR_MINOR.3
 RUN \
   wget http://ftp.ruby-lang.org/pub/ruby/$RUBY_MAJOR_MINOR/ruby-$RUBY_VERSION.tar.gz \
   && tar -xvzf ruby-$RUBY_VERSION.tar.gz \
@@ -40,10 +40,8 @@ ENV RUBY_HOME=$USER_HOME/ruby-$RUBY_VERSION
 ENV GEM_HOME=$RUBY_HOME/gems
 ENV PATH=$PATH:$RUBY_HOME:$RUBY_HOME/bin:$RUBY_HOME/gems/bin:
 
-# Install Bundler 1.14.6:
-RUN gem install bundler -v 1.14.6
+RUN gem install bundler -v 1.16.1
 
-# Install Node 8.9.4 and expose executable paths:
 ENV NODE_VERSION=8.9.4
 RUN \
   wget https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz \
@@ -52,8 +50,7 @@ RUN \
   && rm node-v$NODE_VERSION-linux-x64.tar.gz
 ENV PATH=$PATH:$USER_HOME/nodejs/bin:
 
-# Install Yarn 1.5.1 and expose executable path:
-ENV YARN_VERSION=1.5.1
+ENV YARN_VERSION=1.6.0
 RUN \
   wget https://github.com/yarnpkg/yarn/releases/download/v$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz \
   && mkdir yarn \

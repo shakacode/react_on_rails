@@ -33,7 +33,7 @@ module ReactOnRailsPro
         ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript.exec_server_render_js(js_code, render_options, self)
       end
 
-      def renderer_url(rendering_request_digest)
+      def renderer_url_base
         port = if ReactOnRailsPro.configuration.renderer_port
                  ":#{ReactOnRailsPro.configuration.renderer_port}"
                else
@@ -42,8 +42,11 @@ module ReactOnRailsPro
 
         "#{ReactOnRailsPro.configuration.renderer_protocol}://" \
         "#{ReactOnRailsPro.configuration.renderer_host}" \
-        "#{port}" \
-        "/bundles/#{@bundle_update_utc_timestamp}/render/#{rendering_request_digest}"
+        "#{port}"
+      end
+
+      def renderer_url(rendering_request_digest)
+        "#{renderer_url_base}/bundles/#{@bundle_update_utc_timestamp}/render/#{rendering_request_digest}"
       end
 
       def eval_js(js_code)
@@ -110,7 +113,11 @@ module ReactOnRailsPro
       end
 
       def fallback_exec_js(js_code)
-        Rails.logger.warn { "Can't connect to VmRenderer renderer, fallback to ExecJS" }
+        unless ReactOnRailsPro.configuration.use_fallback_renderer_exec_js
+          raise ReactOnRailsPro::Error, "Can't connect to VmRenderer renderer at #{renderer_url_base}"
+        end
+
+        Rails.logger.warn { "Can't connect to VmRenderer renderer at #{renderer_url_base}. Falling back to ExecJS" }
         fallback_renderer = ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript
 
         # Pool is actually discarded btw requests:

@@ -1,14 +1,12 @@
 require_relative "task_helpers"
 
-# rubocop:disable Style/MixinUsage
-include ReactOnRailsPro::TaskHelpers
-# rubocop:enable Style/MixinUsage
-
-namespace :node_package do
+namespace :vm_renderer do
+  include ReactOnRailsPro::TaskHelpers
   task :build do
-    sh "yarn run build"
+    puts "Building Node Package and running 'yarn link'"
+    sh "yarn run build && yarn link"
   end
 end
 
-desc "Prepares node_package by building and symlinking any example/dummy apps present"
-task node_package: "node_package:build"
+desc "Prepares vm_renderer by building and symlinking any example/dummy apps present"
+task vm_renderer: "vm_renderer:build"

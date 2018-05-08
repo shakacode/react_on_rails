@@ -1,14 +1,12 @@
 # Tips for Contributors
 
-*WIP on this, copied from https://github.com/shakacode/react_on_rails/blob/master/CONTRIBUTING.md*
-
 ## Install
 
 1. git clone
 
 ```
-cd react-on-rails-renderer
-yarn
+cd react_on_rails_pro
+bundle && yarn
 cd spec/dummy
 bundle && yarn
 
@@ -18,7 +16,7 @@ bundle && yarn
 
 For non-doc fixes:
 
-* Provide changelog entry in the [unreleased section of the CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#unreleased).
+* Provide changelog entry in the [unreleased section of the CHANGELOG.md](https://github.com/shakacode/react_on_rails_pro/blob/master/CHANGELOG.md#unreleased).
 * Ensure CI passes and that you added a test that passes with the fix and fails without the fix.
 * Squash all commits down to one with a nice commit message *ONLY* once final review is given. Make sure this single commit is rebased on top of master.
 * Please address all code review comments.
@@ -55,18 +53,18 @@ When making doc changes, we want the change to work on both the gitbook and the 
 ## To run tests:
 * After updating code via git, to run all **JS** tests for Node package:
 ```sh
-cd react-on-rails-renderer
+cd react_on_rails_pro
 yarn run test
 ```
 
 * To run **RSpec** tests on dummy app, first launch renderer server:
 ```sh
-  cd react-on-rails-renderer/spec/dummy
+  cd react_on_rails_pro/spec/dummy
   yarn run vm-renderer
 ```
 and then run **RSpec** in another console  window/tab:
 ```sh
-  cd react-on-rails-renderer/spec/dummy
+  cd react_on_rails_pro/spec/dummy
   rspec
 ```
 
@@ -86,13 +84,13 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 
 
 # Configuring your test app to use your local fork
-You can test the `react-on-rails-renderer` gem using your own external test app or the gem's internal `spec/dummy` app. The `spec/dummy` app is an example of the various setup techniques you can use with the gem.
+You can test the `react_on_rails_pro` gem using your own external test_app or the gem's internal `spec/dummy` app. The `spec/dummy` app is an example of the various setup techniques you can use with the gem.
 As of 2018-04-28, this directory mirrors the test app spec/dummy on https://github.com/shakacode/react_on_rails plus a few additional tests.
 
 ```
-├── test
+├── test_app
 |    └── client
-└── react-on-rails-renderer
+└── react_on_rails_pro
     └── spec
         └── dummy
 ```
@@ -101,44 +99,16 @@ As of 2018-04-28, this directory mirrors the test app spec/dummy on https://gith
 If you want to test the ruby parts of the gem with an application before you release a new version of the gem, you can specify the path to your local version via your test app's Gemfile:
 
 ```ruby
-gem "react_on_rails_pro", path: "../path-to-react-on-rails-renderer"
+gem "react_on_rails_pro", path: "../path-to-react_on_rails_pro"
 gem "react_on_rails"
 ```
 ================================================================================
-TODO: UPDATE
 
-Currently you also need to monkeypatch `ReactOnRails::ServerRenderingPool` module at the end of `initializers/react_on_rails`:
-
-See 
-```ruby
-module ReactOnRails
-  module ServerRenderingPool
-    class << self
-      def pool
-        if ReactOnRails.configuration.server_render_method == "NodeJS"
-          ServerRenderingPool::Node
-        elsif ReactOnRails.configuration.server_render_method == "VmRenderer"
-          ReactOnRailsPro::VMRenderingPool
-        else
-          ServerRenderingPool::Exec
-        end
-      end
-
-      # rubocop:disable Style/MethodMissing
-      def method_missing(sym, *args, &block)
-        pool.send sym, *args, &block
-      end
-    end
-  end
-end
-```
-
-
-Then set `config.server_render_method = "VmRenderer"` in your  `ReactOnRailsRender.configure` block.
+Set `config.server_render_method = "VmRenderer"` in your  `ReactOnRailsPro.configure` block.
 
 Note that you will need to bundle install after making this change, but also that **you will need to restart your Rails application if you make any changes to the gem**.
 
-## Testing the Node package for react-on-rails-renderer
+## Testing the Node package for react_on_rails_pro
 In addition to testing the Ruby parts out, you can also test the node package parts of the gem with an external application. Install the local package by using a relative path in your test/client app's `package.json`, like this:
 ```sh
 cd test/client
@@ -149,8 +119,8 @@ _Note: You must use npm here till yarn stops preferring cached packages over loc
 When you use a relative path, be sure to run the above `yarn` command whenever you change the node package for react-on-rails.
 
 #### Example: Testing NPM changes with the dummy app
-1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react-on-rails-renderer/blob/more_test_and_docs/node_package/src/ReactOnRailsProVmRenderer.js#L6) in `react_on_rails/node_package/src/ReactOnRailsProVmRenderer.js` to confirm we're getting an update to the node package.
-2. Run the install script `npm run install-react-on-rails` in `react_on_rails_pro/spec/dummy` to copy over our changes to the dummy app. Alternatively, you can run `rm -rf node_modules/react-on-rails && npm i 'file:../../../'` in `react_on_rails/spec/dummy/client`. Our NPM changes are now available in the dummy app.
+1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails_pro/blob/more_test_and_docs/packages/vm-renderer/src/ReactOnRailsProVmRenderer.js#L6) in `react_on_rails/packages/vm-renderer/src/ReactOnRailsProVmRenderer.js` to confirm we're getting an update to the node package.
+2. The "postinstall" script of "spec/dummy/client" calls "yarn link react-on-rails" to setup a sym link to the parent package.
 3. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console.
 
 _Note: you don't have to build the NPM package since it is used only with node runtime and its source code is exactly what is executed when you run it._
@@ -176,20 +146,20 @@ yarn global add phantomjs
 Note this *must* be installed globally for the dummy test project rspec runner to see it properly.
 
 ### Local Node Package
-Because the example and dummy apps rely on the `react-on-rails-renderer` node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the dummy app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)
+Because the example and dummy apps rely on the `react_on_rails_pro` node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the dummy app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)
 
 ```sh
 cd react_on_rails/spec/dummy
 yarn run install-pro-package
 ```
-_Note: this runs npm under the hood as explained in **Test NPM for react-on-rails-renderer** section above_
+_Note: this runs npm under the hood as explained in **Test NPM for react_on_rails_pro** section above_
 
-From now on, the example and dummy apps will use your local node_package folder as the `react-on-rails-renderer` node package.
+From now on, the example and dummy apps will use your local packages/vm-renderer folder as the `react_on_rails_pro` node package.
 
-### Install NPM dependencies and build the NPM package for react-on-rails-renderer
+### Install NPM dependencies and build the NPM package for react_on_rails_pro
 
 ```sh
-cd react-on-rails-renderer
+cd react_on_rails_pro
 yarn install
 ```
 
@@ -200,14 +170,14 @@ spec/dummy.
 ```sh
 # Optionally change default selenium_firefox driver
 export DRIVER=poltergeist
-cd react-on-rails-renderer
+cd react_on_rails_pro
 yarn run dummy:spec
 ```
 
 ### Run NPM JS tests
 
 ```sh
-cd react-on-rails-renderer
+cd react_on_rails_pro
 yarn test
 ```
 
@@ -216,20 +186,20 @@ yarn test
 TODO: Figure out how to run the tests on CI.
 
 ```sh
-cd react-on-rails-renderer/spec/dummy
+cd react_on_rails_pro/spec/dummy
 yarn run vm-renderer
 ```
 and in another console window/tab:
 
 ```sh
-cd react-on-rails-renderer/spec/dummy
+cd react_on_rails_pro/spec/dummy
 rspec
 ```
 
 ### Run most tests and linting
 
 ```sh
-cd react-on-rails-renderer
+cd react_on_rails_pro
 yarn run check
 ```
 

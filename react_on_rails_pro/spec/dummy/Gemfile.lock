@@ -4,17 +4,6 @@ GIT
   specs:
     equivalent-xml (1.0.0)
 
-GIT
-  remote: git://github.com/shakacode/react_on_rails.git
-  revision: 0ab2848093572b6b7c79b5a6d32bdfb494b8ba98
-  specs:
-    react_on_rails (11.0.3)
-      addressable
-      connection_pool
-      execjs (~> 2.5)
-      rails (>= 3.2)
-      rainbow (~> 2.2)
-
 PATH
   remote: ../..
   specs:
@@ -23,7 +12,8 @@ PATH
       connection_pool
       execjs (~> 2.5)
       rails (>= 3.2)
-      rainbow (~> 2.2)
+      rainbow
+      react_on_rails (>= 11.0.4)
       rest-client
 
 GEM
@@ -230,13 +220,18 @@ GEM
       method_source
       rake (>= 0.8.7)
       thor (>= 0.18.1, < 2.0)
-    rainbow (2.2.2)
-      rake
+    rainbow (3.0.0)
     rake (12.3.1)
     rb-fsevent (0.10.3)
     rb-inotify (0.9.10)
       ffi (>= 0.5.0, < 2)
     rdoc (6.0.3)
+    react_on_rails (11.0.4)
+      addressable
+      connection_pool
+      execjs (~> 2.5)
+      rails (>= 3.2)
+      rainbow (~> 3.0)
     rest-client (2.0.2)
       http-cookie (>= 1.0.2, < 2.0)
       mime-types (>= 1.16, < 4.0)
@@ -365,7 +360,7 @@ DEPENDENCIES
   puma
   rails
   rails-controller-testing
-  react_on_rails!
+  react_on_rails (= 11.0.4)
   react_on_rails_pro!
   rspec-rails
   rspec-retry

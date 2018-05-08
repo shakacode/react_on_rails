@@ -5,15 +5,15 @@
 
 'use strict';
 
+import packageJson from './shared/packageJson';
+
 const os = require('os');
 const cluster = require('cluster');
 const log = require('winston');
-const path = require('path');
 
 const { buildConfig, getConfig } = require('./shared/configBuilder');
 const restartWorkers = require('./master/restartWorkers');
 // eslint-disable-next-line import/no-dynamic-require
-const packageJson = require(path.join(__dirname, '/../../package.json'));
 
 const MILLISECONDS_IN_MINUTE = 60000;
 

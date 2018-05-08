@@ -16,7 +16,7 @@ Gem::Specification.new do |s|
 
   s.files         = `git ls-files -z`.split("\x0")
                                      .reject { |f|
-                                       f.match(%r{^(test|spec|features|tmp|node_modules|node_package|coverage)/})
+                                       f.match(%r{^(test|spec|features|tmp|node_modules|packages|coverage)/})
                                      }
   s.bindir        = "exe"
   s.executables   = s.files.grep(%r{^exe/}) { |f| File.basename(f) }
@@ -28,9 +28,9 @@ Gem::Specification.new do |s|
   s.add_dependency "connection_pool"
   s.add_dependency "execjs", "~> 2.5"
   s.add_dependency "rails", ">= 3.2"
-  s.add_dependency "rainbow", "~> 2.2"
+  s.add_dependency "rainbow"
   s.add_dependency "rest-client"
-  # s.add_dependency "react_on_rails", ">= 11.0.3"
+  s.add_dependency "react_on_rails", ">= 11.0.4"
 
   s.add_development_dependency "awesome_print"
   s.add_development_dependency "binding_of_caller"
