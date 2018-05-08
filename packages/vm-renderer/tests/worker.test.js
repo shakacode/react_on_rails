@@ -6,7 +6,7 @@ const { getUploadedBundlePath, createUploadedBundle } = require('./helper');
 const { buildVM } = require('../src/worker/vm');
 
 // eslint-disable-next-line import/no-dynamic-require
-const packageJson = require(path.join(__dirname, '/../../package.json'));
+const packageJson = require(path.join(__dirname, '/../../../package.json'));
 
 const gemVersion = packageJson.version;
 const protocolVersion = packageJson.protocolVersion;

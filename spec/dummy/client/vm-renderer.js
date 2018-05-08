@@ -1,10 +1,7 @@
 const path = require('path');
 
 // Use this for package installation test:
-const ReactOnRailsPro = require('react-on-rails-pro');
-
-// Use this for development:
-// const ReactOnRailsPro = require('../../../node_package/src/ReactOnRailsPro');
+const reactOnRailsProVmRenderer = require('react-on-rails-pro-vm-renderer');
 
 const config = {
   bundlePath: path.resolve(__dirname, '../tmp/bundles'),  // Save bundle to "tmp/" dir of our dummy app
@@ -19,4 +16,4 @@ if (process.env.CI) {
   config.workersCount = 2;
 }
 
-ReactOnRailsPro(config);
+reactOnRailsProVmRenderer(config);

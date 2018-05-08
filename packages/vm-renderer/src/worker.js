@@ -5,6 +5,8 @@
 
 'use strict';
 
+import packageJson from './shared/packageJson';
+
 const path = require('path');
 const cluster = require('cluster');
 const express = require('express');
@@ -15,8 +17,6 @@ const checkProtocolVersion = require('./worker/checkProtocolVersionHandler');
 const authenticate = require('./worker/authHandler');
 const handleRenderRequest = require('./worker/renderRequestHandlerVm');
 
-// eslint-disable-next-line import/no-dynamic-require
-const packageJson = require(path.join(__dirname, '/../../package.json'));
 
 // Turn on colorized log:
 log.remove(log.transports.Console);
@@ -73,7 +73,7 @@ exports.run = function run(config) {
       return;
     }
 
-    // Hahdle rendering request:
+    // Handle rendering request:
     const { status, data, headers, die } = handleRenderRequest(req);
     // eslint-disable-next-line guard-for-in, no-restricted-syntax
     for (const key in headers) res.set(key, headers[key]);

@@ -4,10 +4,10 @@ source "https://rubygems.org"
 gemspec
 
 # Comment out before final commit
-gem "react_on_rails", path: "../react_on_rails"
+# gem "react_on_rails", path: "../react_on_rails"
 gem "webpacker", "3.4.3"
 
-# gem "react_on_rails", ">= 11.0.4"
+gem "react_on_rails", "11.0.4"
 
 # The following gems are dependencies of the gem's dummy/example apps, not the gem itself.
 # They must be defined here because of the way Travis CI works, in that it will only

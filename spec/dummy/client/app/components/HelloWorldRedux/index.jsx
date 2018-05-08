@@ -33,7 +33,7 @@ export default class HelloWorldRedux extends React.Component {
     const { name } = data;
 
     // If this creates an alert, we have a problem!
-    // see file node_package/src/scriptSanitizedVal.js for the fix to this prior issue.
+    // see file packages/vm-renderer/src/scriptSanitizedVal.js for the fix to this prior issue.
 
     /* eslint-disable no-console */
     console.log('This is a script:"</div>"</script> <script>alert(\'WTF1\')</script>');

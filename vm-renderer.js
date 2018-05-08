@@ -1,5 +1,5 @@
 const path = require('path');
-const reactOnRailsProVmRenderer = require('./node_package/src/ReactOnRailsProVmRenderer');
+const reactOnRailsProVmRenderer = require('./packages/vm-renderer/src/ReactOnRailsProVmRenderer');
 
 const config = {
   bundlePath: path.resolve(__dirname, './tmp/bundles'),

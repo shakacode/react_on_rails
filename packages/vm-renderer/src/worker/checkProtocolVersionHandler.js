@@ -5,11 +5,9 @@
 
 'use strict';
 
-const path = require('path');
-const semver = require('semver');
+import packageJson from '../shared/packageJson';
 
-// eslint-disable-next-line import/no-dynamic-require
-const packageJson = require(path.join(__dirname, '/../../../package.json'));
+const semver = require('semver');
 
 module.exports = function checkProtocolVersion(req) {
   if (
