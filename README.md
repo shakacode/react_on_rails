@@ -1,3 +1,5 @@
+[![CircleCI](https://circleci.com/gh/shakacode/react_on_rails_pro.svg?style=svg&circle-token=faed0841684a8e88fcf06945ef2b62ded3b124a8)](https://circleci.com/gh/shakacode/react_on_rails_pro)
+
 # React on Rails Pro
 
 Node rendering and performance enhancements for React on Rails!
