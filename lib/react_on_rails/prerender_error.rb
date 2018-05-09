@@ -2,10 +2,34 @@
 
 # rubocop:disable: Layout/IndentHeredoc
 module ReactOnRails
-  class PrerenderError < StandardError
+  class PrerenderError < ::ReactOnRails::Error
+    attr_reader :component_name, :err, :props, :js_code, :console_messages
+
     # err might be nil if JS caught the error
     def initialize(component_name: nil, err: nil, props: nil,
                    js_code: nil, console_messages: nil)
+      @component_name = component_name
+      @err = err
+      @props = props
+      @js_code = js_code
+      @console_messages = console_messages
+
+      backtrace, message = calc_message(component_name, console_messages, err, js_code, props)
+
+      super([message, backtrace].compact.join("\n"))
+    end
+
+    def to_honeybadger_context
+      to_error_context
+    end
+
+    def raven_context
+      to_error_context
+    end
+
+    private
+
+    def calc_message(component_name, console_messages, err, js_code, props)
       message = "ERROR in SERVER PRERENDERING\n".dup
       if err
         # rubocop:disable Layout/IndentHeredoc
@@ -33,8 +57,17 @@ console messages:
         MSG
         # rubocop:enable Layout/IndentHeredoc
       end
+      [backtrace, message]
+    end
 
-      super([message, backtrace].compact.join("\n"))
+    def to_error_context
+      {
+        component_name: component_name,
+        err: err,
+        props: props,
+        js_code: js_code,
+        console_messages: console_messages
+      }
     end
   end
 end
