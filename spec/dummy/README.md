@@ -9,7 +9,7 @@ Using NPM for react_on_rails
 cd react_on_rails
 yarn link
 cd spec/dummy/client
-yarn link react_on_rails
+yarn link react-on-rails
 ```
 
 ## Run yarn if not done yet
