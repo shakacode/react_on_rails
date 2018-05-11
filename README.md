@@ -206,8 +206,8 @@ See [Issue 982: Tutorial Generating Correct Project Structure?](https://github.c
 
 2. Run the following 2 commands to install Webpacker with React:
    ```
-   bundle exec rails webpacker:install
-   bundle exec rails webpacker:install:react
+   bundle exec rake webpacker:install
+   bundle exec rake webpacker:install:react
 
    ```
 
