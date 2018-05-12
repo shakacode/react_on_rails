@@ -5,7 +5,6 @@ Here is the full set of config options. This file is `/config/initializers/react
 
 # NOTE: you typically will leave the commented out configurations set to their defaults.
 # Thus, you only need to pay careful attention to the non-commented settings in this file.
-
 ReactOnRails.configure do |config|
   # `trace`: General debugging flag.
   # The default is true for development, off otherwise.
@@ -61,6 +60,9 @@ ReactOnRails.configure do |config|
   # The default is `%w( manifest.json )` as will be sufficient for most webpacker builds.
   #
   config.webpack_generated_files = %w( manifest.json )
+  
+  # You can optionally add values to your rails_context. See example below for RenderingExtension
+  # config.rendering_extension = RenderingExtension
 
   ################################################################################
   ################################################################################
@@ -141,3 +143,21 @@ ReactOnRails.configure do |config|
 end
 
 ```
+
+Example of a RenderingExtension for custom values in the `rails_context`:
+
+```ruby
+module RenderingExtension
+
+  # Return a Hash that contains custom values from the view context that will get merged with
+  # the standard rails_context values and passed to all calls to generator functions used by the
+  # react_component and redux_store view helpers
+  def self.custom_context(view_context)
+    {
+     somethingUseful: view_context.session[:something_useful]
+    }
+  end
+end
+```
+
+

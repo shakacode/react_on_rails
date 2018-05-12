@@ -11,6 +11,8 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 
 #### Changed
+
+### [11.0.5] - 2018-05-11
 - More detailed errors for Honeybadger and Sentry. [PR 1081](https://github.com/shakacode/react_on_rails/pull/1081) by [justin808](https://github.com/justin808).
 
 ### [11.0.4] - 2018-05-3
@@ -756,7 +758,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.4...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.5...master
+[11.0.5]: https://github.com/shakacode/react_on_rails/compare/11.0.4...11.0.5
 [11.0.4]: https://github.com/shakacode/react_on_rails/compare/11.0.3...11.0.4
 [11.0.3]: https://github.com/shakacode/react_on_rails/compare/11.0.2...11.0.3
 [11.0.2]: https://github.com/shakacode/react_on_rails/compare/11.0.1...11.0.2

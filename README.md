@@ -697,6 +697,10 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 1. Examples in [spec/dummy/app/views/react_router](./spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](spec/dummy/client/app/startup/ServerRouterApp.jsx).
 1. [Code Splitting docs](./docs/additional-reading/code-splitting.md) for information about how to set up code splitting for server rendered routes.
 
+## Error Handling
+* All errors from ReactOnRails will be of type ReactOnRails::Error.
+* Prerendering (server rendering) errors get context information for HoneyBadger and Sentry for easier debugging.
+
 ## Caching and Performance
 Consider fragment and http caching of pages that contain React on Rails components. See [Caching and Performance](./docs/additional-reading/caching-and-performance.md) for more details.
 
