@@ -53,7 +53,7 @@ Contact [justin@shakacode.com](mailto:justin@shakacode.com) for more information
 
 
 
-## Getting Started
+## Getting Started
 
 If you have an existing Rails app, please follow the instructions in [this guide](docs/basics/getting-started-existing.md).
 
@@ -107,7 +107,7 @@ If you have an existing Rails app, please follow the instructions in [this guide
 
 
 
-## Usage
+## Usage
 
 ### Demos
 
@@ -221,7 +221,7 @@ Please [**click to subscribe**](https://app.mailerlite.com/webforms/landing/l1d9
 
 
 
-##Contributing
+## Contributing
 
 Bug reports and pull requests are welcome. This project is intended to be a welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant Code of Conduct](docs/misc/code_of_conduct.md)).
 
