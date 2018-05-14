@@ -188,7 +188,7 @@ describe ReactOnRailsHelper, type: :helper do
     }
   end
 
-  describe "#server_render_js", :js do
+  describe "#server_render_js", :js, type: :system do
     subject { server_render_js("ReactOnRails.getComponent('HelloString').component.world()") }
 
     let(:hello_world) do
