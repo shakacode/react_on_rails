@@ -48,7 +48,12 @@ module ReactOnRails
             @file_index += 1
           end
           json_string = js_evaluator.eval_js(js_code)
-          result = JSON.parse(json_string)
+          result = nil
+          begin
+            result = JSON.parse(json_string)
+          rescue JSON::ParserError => e
+            raise ReactOnRails::JsonParseError.new(e, json_string)
+          end
 
           if render_options.logging_on_server
             console_script = result["consoleReplayScript"]
