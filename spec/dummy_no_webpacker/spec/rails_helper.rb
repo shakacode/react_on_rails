@@ -63,9 +63,9 @@ RSpec.configure do |config|
   # Capybara config
   #
   # selenium_firefox webdriver only works for Travis-CI builds.
-  default_driver = :poltergeist
+  default_driver = :selenium_chrome_headless
 
-  supported_drivers = %i[ poltergeist poltergeist_errors_ok
+  supported_drivers = %i[ poltergeist poltergeist_errors_ok selenium_chrome_headless
                           selenium_chrome selenium_firefox selenium]
   driver = ENV["DRIVER"].try(:to_sym) || default_driver
 
@@ -85,6 +85,14 @@ RSpec.configure do |config|
       Capybara::Selenium::Driver.new(app, browser: :chrome)
     end
     Capybara::Screenshot.register_driver(:selenium_chrome) do |js_driver, path|
+      js_driver.browser.save_screenshot(path)
+    end
+  when :selenium_chrome_headless
+    Capybara.register_driver :selenium_chrome_headless do |app|
+      capabilities = Selenium::WebDriver::Remote::Capabilities.chrome(chromeOptions: { args: %w[headless disable-gpu] })
+      Capybara::Selenium::Driver.new app, browser: :chrome, desired_capabilities: capabilities
+    end
+    Capybara::Screenshot.register_driver(:selenium_chrome_headless) do |js_driver, path|
       js_driver.browser.save_screenshot(path)
     end
   when :selenium_firefox, :selenium

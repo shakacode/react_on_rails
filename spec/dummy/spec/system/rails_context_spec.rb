@@ -15,7 +15,7 @@ shared_examples "railsContext" do |pathname, id_base|
     visit "/#{pathname}?ab=cd"
   end
 
-  context pathname, :js do
+  context pathname, :js, type: :system do
     scenario "check rails context" do
       expect(current_path).to eq("/#{pathname}")
       host = Capybara.current_session.server.host

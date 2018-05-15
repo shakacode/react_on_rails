@@ -21,7 +21,7 @@ shared_examples "React Component" do |dom_selector|
   end
 end
 
-feature "Pages/Index", :js do
+feature "Pages/Index", :js, type: :system do
   subject { page }
 
   context "All in one page" do
@@ -64,7 +64,7 @@ feature "Pages/Index", :js do
   end
 end
 
-feature "Turbolinks across pages", :js do
+feature "Turbolinks across pages", :js, type: :system do
   subject { page }
 
   scenario "changes name in message according to input" do
@@ -75,7 +75,7 @@ feature "Turbolinks across pages", :js do
   end
 end
 
-feature "Pages/client_side_log_throw", :js do
+feature "Pages/client_side_log_throw", :js, type: :system do
   subject { page }
   background { visit "/client_side_log_throw" }
 
@@ -84,14 +84,14 @@ feature "Pages/client_side_log_throw", :js do
   end
 end
 
-feature "Pages/Pure Component", :js do
+feature "Pages/Pure Component", :js, type: :system do
   subject { page }
   background { visit "/pure_component" }
 
   scenario { is_expected.to have_text "This is a Pure Component!" }
 end
 
-feature "Pages/server_side_log_throw", :js do
+feature "Pages/server_side_log_throw", :js, type: :system do
   subject { page }
   background { visit "/server_side_log_throw" }
 
@@ -113,7 +113,7 @@ feature "Pages/server_side_log_throw_raise" do
   end
 end
 
-feature "Pages/index after using browser's back button", :js do
+feature "Pages/index after using browser's back button", :js, type: :system do
   subject { page }
   background do
     visit root_path
@@ -146,7 +146,7 @@ feature "React Router", js: true, driver: js_errors_driver do
   end
 end
 
-feature "Manual Rendering", :js do
+feature "Manual Rendering", :js, type: :system do
   subject { page }
   background { visit "/client_side_manual_render" }
   scenario "renderer function is called successfully" do
@@ -156,7 +156,7 @@ feature "Manual Rendering", :js do
   end
 end
 
-feature "Code Splitting", :js do
+feature "Code Splitting", :js, type: :system do
   subject { page }
   background { visit "/deferred_render_with_server_rendering" }
   scenario "clicking on async route causes async component to be fetched" do
@@ -171,7 +171,7 @@ feature "Code Splitting", :js do
   end
 end
 
-feature "Code Splitting w/ Server Rendering", :js do
+feature "Code Splitting w/ Server Rendering", :js, type: :system do
   subject { page }
   background { visit "/deferred_render_with_server_rendering/async_page" }
   scenario "loading an asyncronous route should not cause a client/server checksum mismatch" do
@@ -180,7 +180,7 @@ feature "Code Splitting w/ Server Rendering", :js do
   end
 end
 
-feature "renderedHtml from generator function", :js do
+feature "renderedHtml from generator function", :js, type: :system do
   subject { page }
   background { visit "/rendered_html" }
   scenario "renderedHtml should not have any errors" do
@@ -189,7 +189,7 @@ feature "renderedHtml from generator function", :js do
   end
 end
 
-feature "returns hash if hash_result == true even with prerendering error", :js do
+feature "returns hash if hash_result == true even with prerendering error", :js, type: :system do
   subject { page }
   background do
     begin
@@ -218,12 +218,12 @@ feature "generator function returns renderedHtml as an object with additional HT
     include_examples "renderedHtmls should not have any errors and set correct page title"
   end
 
-  describe "with enabled JS", :js do
+  describe "with enabled JS", :js, type: :system do
     include_examples "renderedHtmls should not have any errors and set correct page title"
   end
 end
 
-feature "display images", :js do
+feature "display images", :js, type: :system do
   subject { page }
   background { visit "/image_example" }
   scenario "image_example should not have any errors" do
@@ -261,26 +261,26 @@ shared_examples "React Component Shared Store" do |url|
   end
 end
 
-feature "2 react components, 1 store, client only", :js do
+feature "2 react components, 1 store, client only", :js, type: :system do
   include_examples "React Component Shared Store", "/client_side_hello_world_shared_store"
 end
 
-feature "2 react components, 1 store, server side", :js do
+feature "2 react components, 1 store, server side", :js, type: :system do
   include_examples "React Component Shared Store", "/server_side_hello_world_shared_store"
 end
 
-feature "2 react components, 1 store, client only, controller setup", :js do
+feature "2 react components, 1 store, client only, controller setup", :js, type: :system do
   include_examples "React Component Shared Store", "/client_side_hello_world_shared_store_controller"
 end
 
-feature "2 react components, 1 store, server side, controller setup", :js do
+feature "2 react components, 1 store, server side, controller setup", :js, type: :system do
   include_examples "React Component Shared Store", "/server_side_hello_world_shared_store_controller"
 end
 
-feature "2 react components, 1 store, client only, defer", :js do
+feature "2 react components, 1 store, client only, defer", :js, type: :system do
   include_examples "React Component Shared Store", "/client_side_hello_world_shared_store_defer"
 end
 
-feature "2 react components, 1 store, server side, defer", :js do
+feature "2 react components, 1 store, server side, defer", :js, type: :system do
   include_examples "React Component Shared Store", "/server_side_hello_world_shared_store_defer"
 end
