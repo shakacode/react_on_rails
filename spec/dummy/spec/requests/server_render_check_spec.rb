@@ -13,6 +13,16 @@ describe "Server Rendering", :server_rendering do
       .to eq("Mr. Server Side Rendering")
   end
 
+  it "generates a prerender error if invalid JSON returned" do
+    invalid_json = "{ some invalid JSON"
+    allow(ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript)
+      .to receive(:eval_js).and_return(invalid_json)
+    expect { get server_side_hello_world_with_options_path }.to(raise_error do |error|
+      expect(error.raven_context[:json]).to eq(invalid_json)
+      expect(error.raven_context[:original_error]).to be_instance_of(JSON::ParserError)
+    end)
+  end
+
   it "generates server rendered HTML if server renderering enabled for shared redux" do
     get server_side_hello_world_shared_store_path
     html_nodes = Nokogiri::HTML(response.body)

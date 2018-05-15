@@ -6,6 +6,8 @@ class ApplicationController < ActionController::Base
   protect_from_forgery with: :exception
 
   rescue_from ReactOnRails::PrerenderError do |err|
+    raise err if err.err.is_a?(ReactOnRails::JsonParseError)
+
     Rails.logger.error("Caught ReactOnRails::PrerenderError in ApplicationController error handler.")
     Rails.logger.error(err.message)
     Rails.logger.error(err.backtrace.join("\n"))
