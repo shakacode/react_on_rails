@@ -47,7 +47,7 @@ module ReactOnRails
                                "tmp/server-generated-#{@file_index % 10}.js")
             @file_index += 1
           end
-          json_string = js_evaluator.eval_js(js_code)
+          json_string = js_evaluator.eval_js(js_code, render_options)
           result = nil
           begin
             result = JSON.parse(json_string)
@@ -87,7 +87,7 @@ module ReactOnRails
           end
         end
 
-        def eval_js(js_code)
+        def eval_js(js_code, _render_options)
           @js_context_pool.with do |js_context|
             result = js_context.eval(js_code)
             js_context.eval("console.history = []")
