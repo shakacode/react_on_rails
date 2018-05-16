@@ -7,7 +7,7 @@ GIT
 PATH
   remote: ../..
   specs:
-    react_on_rails (11.0.3)
+    react_on_rails (11.0.6)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -147,7 +147,7 @@ GEM
       libv8 (~> 6.3)
     minitest (5.11.3)
     multi_json (1.13.1)
-    nio4r (2.3.0)
+    nio4r (2.3.1)
     nokogiri (1.8.2)
       mini_portile2 (~> 2.3.0)
     parallel (1.12.1)
@@ -177,7 +177,7 @@ GEM
       pry (>= 0.9.11)
     public_suffix (3.0.2)
     puma (3.11.4)
-    rack (2.0.4)
+    rack (2.0.5)
     rack-test (1.0.0)
       rack (>= 1.0, < 3)
     rails (5.2.0)
