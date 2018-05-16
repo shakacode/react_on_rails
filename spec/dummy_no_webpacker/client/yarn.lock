@@ -5538,9 +5538,9 @@ react-hot-loader@^3.0.0-beta.6:
     redbox-react "^1.3.6"
     source-map "^0.6.1"
 
-react-on-rails@10.1.4:
-  version "10.1.4"
-  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-10.1.4.tgz#50e1b7596928746cff2ef90c00adb8e7cd41fe98"
+react-on-rails@11.0.6:
+  version "11.0.6"
+  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-11.0.6.tgz#edb25ea9a0e3cbacbb517598e21dc0618e1fd7e2"
 
 react-proptypes@^1.0.0:
   version "1.0.0"

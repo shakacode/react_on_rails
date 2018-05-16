@@ -27,6 +27,19 @@ module ReactOnRails
       to_error_context
     end
 
+    def to_error_context
+      result = {
+        component_name: component_name,
+        err: err,
+        props: props,
+        js_code: js_code,
+        console_messages: console_messages
+      }
+
+      result.merge!(err.to_error_context) if err.respond_to?(:to_error_context)
+      result
+    end
+
     private
 
     def calc_message(component_name, console_messages, err, js_code, props)
@@ -58,16 +71,6 @@ console messages:
         # rubocop:enable Layout/IndentHeredoc
       end
       [backtrace, message]
-    end
-
-    def to_error_context
-      {
-        component_name: component_name,
-        err: err,
-        props: props,
-        js_code: js_code,
-        console_messages: console_messages
-      }
     end
   end
 end

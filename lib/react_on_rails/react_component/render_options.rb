@@ -7,6 +7,8 @@ module ReactOnRails
     class RenderOptions
       include Utils::Required
 
+      attr_accessor :request_digest
+
       NO_PROPS = {}.freeze
 
       def initialize(react_component_name: required("react_component_name"), options: required("options"))
@@ -49,7 +51,7 @@ module ReactOnRails
       end
 
       def to_s
-        "{ react_component_name = #{react_component_name}, options = #{options}"
+        "{ react_component_name = #{react_component_name}, options = #{options}, request_digest = #{request_digest}"
       end
 
       private

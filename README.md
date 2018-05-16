@@ -14,7 +14,7 @@ To provide an opinionated and optimal framework for integrating Ruby on Rails wi
 
 
 
-#### Features 
+#### Features
 
 Like the [react-rails](https://github.com/reactjs/react-rails) gem, React on Rails is capable of server-side rendering with fragment caching and is compatible with [turbolinks](https://github.com/turbolinks/turbolinks). While the initial setup is slightly more involved, it allows for advanced functionality such as:
 
@@ -47,7 +47,7 @@ Given that Webpacker already provides React integration, why would you use "Reac
 
 #### Support
 
-The ability to use a standalone Node Rendering server for better performance and tooling is supported for React on Rails Pro. 
+The ability to use a standalone Node Rendering server for better performance and tooling is supported for React on Rails Pro.
 
 Contact [justin@shakacode.com](mailto:justin@shakacode.com) for more information.
 
@@ -176,19 +176,17 @@ Check out our [Deployment Guide](docs/basics/deployment.md).
 
 ## Support
 
-### Need Help with Rails + Webpack + React? Want better performance?
+### Need Help with Rails + Webpack v4 + React? Want better performance?
 
-Aloha, I'm Justin Gordon the creator and maintainer of React on Rails. I offer a React on Rails **Pro Support Plan**, and I can help you with:
-
-- Optimizing your webpack setup for React on Rails.
-- Upgrading from older React on Rails to newer versions.
-- Better performance client and server side.
-- Migrating from Angular to React.
-- Best practices based on 4 years of React on Rails experience.
-- Early access to the React on Rails Pro Gem and Node code, including:
-  - ShakaCode's Node.js rendering server for better performance for server rendering (used now at egghead.io).
-  - Performance helpers, especially for server rendering
-  - Webpack configuration examples
+Aloha, I'm Justin Gordon the creator and maintainer of React on Rails. I offer a [React on Rails Pro Support Plan](http://www.shakacode.com/work/shakacode-pro-support.pdf), and I can help you with:
+* Optimizing your webpack setup to Webpack v4 for React on Rails.
+* Upgrading from older React on Rails to newer versions (are using using the new Webpacker setup that avoids the asset pipeline?)
+* Better performance client and server side.
+* Efficiently migrating from Angular to React.
+* Best practices based on 4 years of React on Rails experience.
+* Early access to the React on Rails Pro Gem and Node code, including:
+  * ShakaCode's Node.js rendering server for better performance for server rendering (live at [egghead.io](https://egghead.io/)).
+  * Performance caching helpers, especially for server rendering
 
 Please email me for a free half-hour project consultation, on anything from React on Rails to any aspect of web development.
 
@@ -239,10 +237,16 @@ The following companies support open source, and ShakaCode uses their products!
 *If you'd like to support React on Rails and have your company listed here, [get in touch](mailto:justin@shakacode.com).*
 
 
+Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails).
 
 ### Thank you from Justin Gordon and [ShakaCode](http://www.shakacode.com)
 
-Thank you for considering using [React on Rails](https://github.com/shakacode/react_on_rails).
+## Error Handling
+* All errors from ReactOnRails will be of type ReactOnRails::Error.
+* Prerendering (server rendering) errors get context information for HoneyBadger and Sentry for easier debugging.
+
+## Caching and Performance
+Consider fragment and http caching of pages that contain React on Rails components. See [Caching and Performance](./docs/additional-reading/caching-and-performance.md) for more details.
 
 We at [ShakaCode](http://www.shakacode.com) are a small, boutique, remote-first application development company. We fund this project by:
 

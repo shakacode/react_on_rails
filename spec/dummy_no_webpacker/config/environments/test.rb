@@ -5,6 +5,7 @@ require_relative "../../../react_on_rails/support/rails32_helper"
 if using_rails32?
   Dummy::Application.configure do
     config.active_support.deprecation = :stderr
+    config.action_dispatch.show_exceptions = false
   end
 else
   Rails.application.configure do
