@@ -11,11 +11,16 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 
 #### Changed
+### [11.0.7] - 2018-05-11
+#### Fixed
+- Fix npm publshing. [PR 1090](https://github.com/shakacode/react_on_rails/pull/1090) by [justin808](https://github.com/justin808).
 
 ### [11.0.6] - 2018-05-11
+#### Changed
 - Even more detailed errors for Honeybadger and Sentry when there's a JSON parse error on server rendering. [PR 1086](https://github.com/shakacode/react_on_rails/pull/1086) by [justin808](https://github.com/justin808).
 
 ### [11.0.5] - 2018-05-11
+#### Changed
 - More detailed errors for Honeybadger and Sentry. [PR 1081](https://github.com/shakacode/react_on_rails/pull/1081) by [justin808](https://github.com/justin808).
 
 ### [11.0.4] - 2018-05-3
@@ -761,7 +766,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.6...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.7...master
+[11.0.7]: https://github.com/shakacode/react_on_rails/compare/11.0.6...11.0.7
 [11.0.6]: https://github.com/shakacode/react_on_rails/compare/11.0.5...11.0.6
 [11.0.5]: https://github.com/shakacode/react_on_rails/compare/11.0.4...11.0.5
 [11.0.4]: https://github.com/shakacode/react_on_rails/compare/11.0.3...11.0.4
