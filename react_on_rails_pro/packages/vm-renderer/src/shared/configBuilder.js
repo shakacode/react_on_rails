@@ -10,7 +10,7 @@ const defaultConfig = {
   port: process.env.PORT || 3700,  // Use env port if we run on Heroku
 
   // Show only important messages by default, https://github.com/winstonjs/winston#logging-levels:
-  logLevel: 'info',
+  logLevel: process.env.LOG_LEVEL || 'info',
 
   workersCount: undefined,         // Let master detect workers count automaticaly
   password: undefined,             // No default for password, means no auth

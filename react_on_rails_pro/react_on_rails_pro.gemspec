@@ -27,10 +27,11 @@ Gem::Specification.new do |s|
   s.add_dependency "addressable"
   s.add_dependency "connection_pool"
   s.add_dependency "execjs", "~> 2.5"
+  s.add_dependency "multipart-post", "~> 2"
+  s.add_dependency "persistent_http", "~> 2"
   s.add_dependency "rails", ">= 3.2"
   s.add_dependency "rainbow"
-  s.add_dependency "rest-client"
-  s.add_dependency "react_on_rails", ">= 11.0.4"
+  s.add_dependency "react_on_rails", "~> 11.0.7"
 
   s.add_development_dependency "awesome_print"
   s.add_development_dependency "binding_of_caller"

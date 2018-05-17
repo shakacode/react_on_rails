@@ -113,6 +113,7 @@ exports.getBundleFilePath = function getBundleFilePath() {
 exports.runInVM = function runInVM(code) {
   vm.runInContext('console.history = []', context);
   const result = vm.runInContext(code, context);
+  log.debug('result from JS:', result);
   replayVmConsole();
   return result;
 };

@@ -24,18 +24,3 @@ ReactOnRails.configure do |config|
   config.server_bundle_js_file = "server-bundle.js"
   config.rendering_extension = RenderingExtension
 end
-
-# TODO: It is better to add additional condition to react_on_rails gem instead of this monkey patch:
-module ReactOnRails
-  module ServerRenderingPool
-    class << self
-      def pool
-        @pool ||= if ReactOnRailsPro.configuration.server_render_method == "VmRenderer"
-                    ReactOnRailsPro::VmRenderingPool
-                  else
-                    ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript
-                  end
-      end
-    end
-  end
-end

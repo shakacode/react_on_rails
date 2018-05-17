@@ -12,7 +12,7 @@ RSpec.configure do |config|
 
   config.before(:each, :caching) do
     cache_store = ActiveSupport::Cache::MemoryStore.new
-    allow(controller).to receive(:cache_store).and_return(cache_store)
+    allow(controller).to receive(:cache_store).and_return(cache_store) if defined?(controller)
     allow(::Rails).to receive(:cache).and_return(cache_store)
     Rails.cache.clear
   end

@@ -29,10 +29,15 @@ module ReactOnRailsPro
         describe ".bundle_hash" do
           context "server bundle with hash in webpack output filename" do
             it "returns path for server bundle file name " do
+              server_bundle_js_file = "/webpack/production/webpack-bundle-0123456789abcdef.js"
+              server_bundle_js_file_path = File.expand_path("./public/#{server_bundle_js_file}")
               allow(Webpacker).to receive_message_chain("manifest.lookup!")
-                .and_return("/webpack/production/webpack-bundle-0123456789abcdef.js")
+                .and_return(server_bundle_js_file)
+              allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
+                .and_return(server_bundle_js_file_path)
               allow(ReactOnRails.configuration)
                 .to receive(:server_bundle_js_file).and_return("webpack-bundle.js")
+              allow(File).to receive(:mtime).with(server_bundle_js_file_path).and_return(123)
 
               result = Utils.bundle_hash
 
@@ -43,13 +48,17 @@ module ReactOnRailsPro
           context "server bundle without hash in webpack output filename" do
             it "returns MD5 for server bundle file name" do
               server_bundle_js_file = "webpack/production/webpack-bundle.js"
+              server_bundle_js_file_path = File.expand_path("./public/#{server_bundle_js_file}")
               allow(Webpacker).to receive_message_chain("manifest.lookup!")
                 .and_return(server_bundle_js_file)
+              allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
+                .and_return(server_bundle_js_file_path)
               allow(ReactOnRails.configuration)
                 .to receive(:server_bundle_js_file).and_return("webpack-bundle.js")
               allow(Digest::MD5).to receive(:file)
-                .with(File.expand_path("./public/#{server_bundle_js_file}"))
+                .with(server_bundle_js_file_path)
                 .and_return("foobarfoobar")
+              allow(File).to receive(:mtime).with(server_bundle_js_file_path).and_return(345)
 
               result = Utils.bundle_hash
 
