@@ -4,10 +4,6 @@
   "protocolVersion": "1.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
   "main": "packages/vm-renderer/lib/ReactOnRailsProVmRenderer.js",
-  "engines": {
-    "node": "^8.9.4",
-    "yarn": "^1.5.1"
-  },
   "directories": {
     "doc": "docs"
   },
@@ -60,7 +56,7 @@
     "start": "node vm-renderer.js",
     "eslint": "eslint .",
     "flow": "flow check packages/vm-renderer",
-    "lint": "yarn run eslint && yarn run flow",
+    "lint": "yarn run eslint",
     "check": "yarn run lint && yarn run flow && yarn run test",
     "local": "echo 'Be sure to run yarn run dummy:install' && yarn run build && cd spec/dummy && foreman start",
     "link": "yarn link"

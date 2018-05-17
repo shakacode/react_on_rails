@@ -11,10 +11,11 @@ PATH
       addressable
       connection_pool
       execjs (~> 2.5)
+      multipart-post (~> 2)
+      persistent_http (~> 2)
       rails (>= 3.2)
       rainbow
-      react_on_rails (>= 11.0.4)
-      rest-client
+      react_on_rails (~> 11.0.7)
 
 GEM
   remote: https://rubygems.org/
@@ -107,18 +108,16 @@ GEM
     debug_inspector (0.0.3)
     diff-lcs (1.3)
     docile (1.1.5)
-    domain_name (0.5.20180417)
-      unf (>= 0.0.5, < 1.0.0)
     erubi (1.7.1)
     execjs (2.7.0)
     ffi (1.9.23)
+    gene_pool (1.4.1)
+      thread_safe
     generator_spec (0.9.4)
       activesupport (>= 3.0.0)
       railties (>= 3.0.0)
     globalid (0.4.1)
       activesupport (>= 4.2.0)
-    http-cookie (1.0.3)
-      domain_name (~> 0.5)
     i18n (1.0.1)
       concurrent-ruby (~> 1.0)
     interception (0.5)
@@ -146,9 +145,6 @@ GEM
     marcel (0.3.2)
       mimemagic (~> 0.3.2)
     method_source (0.9.0)
-    mime-types (3.1)
-      mime-types-data (~> 3.2015)
-    mime-types-data (3.2016.0521)
     mimemagic (0.3.2)
     mini_mime (1.0.0)
     mini_portile2 (2.3.0)
@@ -156,13 +152,17 @@ GEM
       libv8 (~> 6.3)
     minitest (5.11.3)
     multi_json (1.13.1)
-    netrc (0.11.0)
-    nio4r (2.3.0)
+    multipart-post (2.0.0)
+    net-http-persistent (3.0.0)
+      connection_pool (~> 2.2)
+    nio4r (2.3.1)
     nokogiri (1.8.2)
       mini_portile2 (~> 2.3.0)
     parallel (1.12.1)
     parser (2.5.1.0)
       ast (~> 2.4.0)
+    persistent_http (2.0.2)
+      gene_pool (>= 1.3)
     poltergeist (1.17.0)
       capybara (~> 2.1)
       cliver (~> 0.3.1)
@@ -226,16 +226,12 @@ GEM
     rb-inotify (0.9.10)
       ffi (>= 0.5.0, < 2)
     rdoc (6.0.3)
-    react_on_rails (11.0.4)
+    react_on_rails (11.0.7)
       addressable
       connection_pool
       execjs (~> 2.5)
       rails (>= 3.2)
       rainbow (~> 3.0)
-    rest-client (2.0.2)
-      http-cookie (>= 1.0.2, < 2.0)
-      mime-types (>= 1.16, < 4.0)
-      netrc (~> 0.8)
     rspec-core (3.7.1)
       rspec-support (~> 3.7.0)
     rspec-expectations (3.7.0)
@@ -318,9 +314,6 @@ GEM
       thread_safe (~> 0.1)
     uglifier (4.1.10)
       execjs (>= 0.3.0, < 3)
-    unf (0.1.4)
-      unf_ext
-    unf_ext (0.0.7.5)
     unicode-display_width (1.3.2)
     webpacker (3.4.3)
       activesupport (>= 4.2)
@@ -350,6 +343,7 @@ DEPENDENCIES
   launchy
   listen
   mini_racer
+  net-http-persistent (~> 3)
   poltergeist
   pry
   pry-byebug
@@ -360,7 +354,7 @@ DEPENDENCIES
   puma
   rails
   rails-controller-testing
-  react_on_rails (= 11.0.4)
+  react_on_rails (= 11.0.7)
   react_on_rails_pro!
   rspec-rails
   rspec-retry

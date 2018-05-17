@@ -1,3 +1,3 @@
 global.ReactOnRails = {
-  dummy: 'Dummy Object',
+  dummy: { html: 'Dummy Object' },
 };

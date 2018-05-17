@@ -41,6 +41,7 @@ ActiveRecord::Migration.maintain_test_schema!
 # in ./support/ and its subdirectories.
 Dir[Rails.root.join("spec", "support", "**", "*.rb")].each { |f| require f }
 
+require_relative "../../react_on_rails_pro/support/caching.rb"
 RSpec.configure do |config|
   # Ensure that if we are running js tests, we are using latest webpack assets
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :requires_webpack_assets)
@@ -49,12 +50,12 @@ RSpec.configure do |config|
   end
 
   # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
-  config.fixture_path = "#{::Rails.root}/spec/fixtures"
+  # config.fixture_path = "#{::Rails.root}/spec/fixtures"
 
   # If you're not using ActiveRecord, or you'd prefer not to run each of your
   # examples within a transaction, remove the following line or assign false
   # instead of true.
-  config.use_transactional_fixtures = true
+  # config.use_transactional_fixtures = true
 
   # RSpec Rails can automatically mix in different behaviours to your tests
   # based on their file location, for example enabling you to call `get` and

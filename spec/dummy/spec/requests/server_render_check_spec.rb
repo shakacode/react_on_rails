@@ -43,7 +43,7 @@ describe "Server Rendering", :server_rendering do
       ReactOnRails.configure { |config| config.development_mode = false }
     end
 
-    it "reloads the server bundle on a new request if was changed" do
+    it "reloads the server bundle on a new request if was changed", :caching do
       get server_side_hello_world_with_options_path
       html_nodes = Nokogiri::HTML(response.body)
       sentinel = "Say hello to:"

@@ -13,26 +13,17 @@ module ReactOnRailsPro
     ###########################################################
 
     # Returns a string which should be used as a component in any cache key for
-    # react_component or react_component_hash. If server rendering, this value either
+    # react_component or react_component_hash when server rendering. This value is either
     # the server bundle filename with the hash from webpack or an MD5 digest of the
-    # entire bundle. If server rendering is not used, you still need to configure
-    # ReactOnRails.configuration.server_bundle_js_file with a file that contains
-    # any JS code for components that you wish to cache.
+    # entire bundle.
     def self.bundle_hash
-      return @bundle_hash if @bundle_hash && !Rails.env.development?
+      return @bundle_hash if @bundle_hash && !(Rails.env.development? || Rails.env.test?)
 
-      @bundle_hash = begin
-        server_bundle_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path
-        server_bundle_basename = Pathname.new(server_bundle_js_file_path).basename.to_s
+      server_bundle_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path
 
-        if ReactOnRails.configuration.server_bundle_js_file == server_bundle_basename
-          # There is no hash in the name
-          Digest::MD5.file(server_bundle_js_file_path)
-        else
-          # There is a hash already in the name
-          server_bundle_basename
-        end
-      end
+      return @bundle_hash if @bundle_hash && bundle_mtime_same?(server_bundle_js_file_path)
+
+      @bundle_hash = calc_bundle_hash(server_bundle_js_file_path)
     end
 
     # Returns the hashed file name when using webpacker. Useful for creating cache keys.
@@ -54,6 +45,29 @@ module ReactOnRailsPro
         server_bundle_name = ReactOnRails.configuration.server_bundle_js_file
         bundle_file_name(server_bundle_name)
       end
+    end
+
+    def self.calc_bundle_hash(server_bundle_js_file_path)
+      if Rails.env.development? || Rails.env.test?
+        @test_dev_server_bundle_mtime = File.mtime(server_bundle_js_file_path)
+      end
+
+      server_bundle_basename = Pathname.new(server_bundle_js_file_path).basename.to_s
+
+      if contains_hash?(server_bundle_basename)
+        server_bundle_basename
+      else
+        Digest::MD5.file(server_bundle_js_file_path)
+      end
+    end
+
+    def self.bundle_mtime_same?(server_bundle_js_file_path)
+      @test_dev_server_bundle_mtime == File.mtime(server_bundle_js_file_path)
+    end
+
+    def self.contains_hash?(server_bundle_basename)
+      # TODO: Need to consider if the configuration value has the ".js" on the end.
+      ReactOnRails.configuration.server_bundle_js_file != server_bundle_basename
     end
   end
 end

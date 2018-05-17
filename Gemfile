@@ -7,7 +7,7 @@ gemspec
 # gem "react_on_rails", path: "../react_on_rails"
 gem "webpacker", "3.4.3"
 
-gem "react_on_rails", "11.0.4"
+gem "react_on_rails", "11.0.7"
 
 # The following gems are dependencies of the gem's dummy/example apps, not the gem itself.
 # They must be defined here because of the way Travis CI works, in that it will only
@@ -28,12 +28,6 @@ gem "scss_lint", require: false
 gem "sdoc", group: :doc
 gem "spring"
 gem "sqlite3"
-# gem "mini_racer"
-# if ENV["ENABLE_TURBOLINKS_2"].nil? || ENV["ENABLE_TURBOLINKS_2"].strip.empty?
-#   gem "turbolinks", "~> 5.0"
-# else
-#   gem "turbolinks", "2.5.3"
-# end
 gem "uglifier" # , ">= 2.7.2"
 gem "web-console", group: :development
 

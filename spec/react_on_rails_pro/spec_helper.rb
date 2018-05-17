@@ -51,6 +51,9 @@ require "webpacker"
 # users commonly want.
 #
 # See http://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
+#
+Dir[File.join(__dir__, "support", "**", "*.rb")].each { |f| require f }
+
 RSpec.configure do |config|
   config.example_status_persistence_file_path = "spec/examples.txt"
   config.run_all_when_everything_filtered = true

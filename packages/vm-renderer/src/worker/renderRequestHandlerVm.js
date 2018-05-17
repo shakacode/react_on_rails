@@ -20,6 +20,15 @@ const { buildVM, runInVM, getBundleFilePath } = require('./vm');
  */
 // TODO: Split this function in smaller methods.
 module.exports = function handleRenderRequest(req) {
+  const prepareResult = (request) => {
+    const result = runInVM(request.body.renderingRequest);
+    return {
+      headers: { 'Cache-Control': 'public, max-age=31536000' },
+      status: 200,
+      data: result,
+    };
+  };
+
   if (!cluster.isMaster) {
     log.debug('worker #%s received render request with with code %s',
       cluster.worker.id, req.body.renderingRequest);
@@ -32,13 +41,7 @@ module.exports = function handleRenderRequest(req) {
     log.debug('Worker received new bundle');
     fsExtra.copySync(req.files.bundle.file, bundleFilePath);
     buildVM(bundleFilePath);
-    const result = runInVM(req.body.renderingRequest);
-
-    return {
-      headers: { 'Cache-Control': 'public, max-age=31536000' },
-      status: 200,
-      data: { renderedHtml: result },
-    };
+    return prepareResult(req);
   }
 
   // If bundle was updated:
@@ -57,12 +60,5 @@ module.exports = function handleRenderRequest(req) {
     // If there is a fresh bundle, simply update VM:
     buildVM(bundleFilePath);
   }
-
-  const result = runInVM(req.body.renderingRequest);
-
-  return {
-    headers: { 'Cache-Control': 'public, max-age=31536000' },
-    status: 200,
-    data: { renderedHtml: result },
-  };
+  return prepareResult(req);
 };

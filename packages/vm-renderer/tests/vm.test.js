@@ -11,7 +11,7 @@ test('buildVM and runInVM', (assert) => {
 
   assert.deepEqual(
     runInVM('ReactOnRails'),
-    { dummy: 'Dummy Object' },
+    { dummy: { html: 'Dummy Object' } },
     'ReactOnRails object is availble is sandbox');
 
   assert.ok(
@@ -87,7 +87,7 @@ test('resetVM', (assert) => {
 
   assert.deepEqual(
     runInVM('ReactOnRails'),
-    { dummy: 'Dummy Object' },
+    { dummy: { html: 'Dummy Object' } },
     'VM context is created');
 
   resetVM();

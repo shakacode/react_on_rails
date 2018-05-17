@@ -1,0 +1,123 @@
+require "net/http"
+require "net/http/post/multipart"
+require "uri"
+require "persistent_http"
+
+module ReactOnRailsPro
+  module ServerRenderingPool
+    # This implementation of the rendering pool uses NodeJS to execute javasript code
+    class VmRenderingPool
+      RENDERED_HTML_KEY = "renderedHtml".freeze
+
+      class << self
+        def reset_pool
+          Rails.logger.info { "Setting up connection for ReactOnRailsPro VM Renderer at #{renderer_url_base}" }
+
+          # NOTE: there are multiple similar gems
+          # We use https://github.com/bpardee/persistent_http/blob/master/lib/persistent_http.rb
+          # Not: https://github.com/drbrain/net-http-persistent
+          @connection = PersistentHTTP.new(
+            name: "ReactOnRailsProVmRendererClient",
+            logger: Rails.logger,
+            pool_size: ReactOnRailsPro.configuration.http_pool_size,
+            pool_timeout: ReactOnRailsPro.configuration.http_pool_timeout,
+            warn_timeout: ReactOnRailsPro.configuration.http_pool_warn_timeout,
+            force_retry: true,
+            url: ReactOnRailsPro.configuration.renderer_url
+          )
+        end
+
+        def reset_pool_if_server_bundle_was_modified
+          # Resetting the pool for server bundle modifications is accomplished by changing the mtime
+          # of the server bundle in the request to the remote rendering server.
+          # In non-development mode, we don't need to re-read this value.
+          if @bundle_update_utc_timestamp.present? && !ReactOnRails.configuration.development_mode
+            return @bundle_update_utc_timestamp
+          end
+
+          bundle_update_time = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
+          @bundle_update_utc_timestamp = (bundle_update_time.utc.to_f * 1000).to_i
+        end
+
+        def renderer_url_base
+          ReactOnRailsPro.configuration.renderer_url
+        end
+
+        def renderer_url(rendering_request_digest)
+          "#{renderer_url_base}/bundles/#{@bundle_update_utc_timestamp}/render/#{rendering_request_digest}"
+        end
+
+        # js_code: JavaScript expression that returns a string.
+        # Returns a Hash:
+        #   html: string of HTML for direct insertion on the page by evaluating js_code
+        #   consoleReplayScript: script for replaying console
+        #   hasErrors: true if server rendering errors
+        # Note, js_code does not have to be based on React.
+        # js_code MUST RETURN json stringify Object
+        # Calling code will probably call 'html_safe' on return value before rendering to the view.
+        def exec_server_render_js(js_code, render_options)
+          # The secret sauce is passing self as the 3rd param, the js_evaluator
+          ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript
+            .exec_server_render_js(js_code, render_options, self)
+        end
+
+        def eval_js(js_code, render_options, send_bundle: false)
+          request_digest = render_options.request_digest
+          path = "/bundles/#{@bundle_update_utc_timestamp}/render/#{request_digest}"
+
+          form_data = {
+            "renderingRequest" => js_code,
+            "gemVersion" => ReactOnRailsPro::VERSION,
+            "protocolVersion" => "1.0.0".freeze,
+            "password" => ReactOnRailsPro.configuration.password
+          }
+
+          if send_bundle
+            form_data["bundle"] = UploadIO.new(
+              File.new(ReactOnRails::Utils.server_bundle_js_file_path),
+              ReactOnRails::Utils.server_bundle_js_file_path
+            )
+          end
+
+          request = Net::HTTP::Post::Multipart.new(path, form_data)
+
+          response = @connection.request(request)
+
+          case response.code
+          when "200"
+            return response.body
+          when "410"
+            return eval_js(js_code, render_options, send_bundle: true)
+          when "412"
+            raise RenderingError, "Renderer version does not match gem version"
+          else
+            raise RenderingError, "Unknown response code from renderer: #{response.code}: #{response.body}"
+          end
+        rescue Errno::ECONNREFUSED
+          fallback_exec_js(js_code, render_options)
+        end
+
+        def fallback_exec_js(js_code, render_options)
+          unless ReactOnRailsPro.configuration.use_fallback_renderer_exec_js
+            raise ReactOnRailsPro::Error, "Can't connect to VmRenderer renderer at #{renderer_url_base}"
+          end
+
+          Rails.logger.warn { "Can't connect to VmRenderer renderer at #{renderer_url_base}. Falling back to ExecJS" }
+          fallback_renderer = ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript
+
+          # Pool is actually discarded btw requests:
+          # 1) not to keep ExecJS in memory once VmRenderer is available back
+          # 2) to avoid issues with server bundle changes
+          fallback_renderer.reset_pool
+          result = fallback_renderer.eval_js(js_code, render_options)
+          fallback_renderer.instance_variable_set(:@js_context_pool, nil)
+          result
+        end
+
+        def exception_debug_message(exception)
+          "[ReactOnRails Renderer]: #{exception.response.code}\n#{exception.response.headers}\n#{exception.response}"
+        end
+      end
+    end
+  end
+end

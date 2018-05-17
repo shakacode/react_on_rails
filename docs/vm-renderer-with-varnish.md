@@ -1,7 +1,9 @@
+*Note, Varnish caching is probably unnecessary with the addtion of the configuration option `prerender_caching`*
+
 # Using Varnish HTTP cache locally
 
 It is possible to use **Varnish** HTTP cache to avoid repeating rendering requests. It can speed up rendering and reduce load on Node processes.
-Unfortunately **Varnish** does not cache `POST` requests by default and supports `POST` requests caching only starting form v5.x.x. So to use renderer with **Varnish** you need to:
+Unfortunately **Varnish** does not cache `POST` requests by default and supports `POST` requests caching only starting from v5.x.x. So to use renderer with **Varnish** you need to:
 
 1. Install **Varnish v5+**. See [Varnish releases & downloads page](https://varnish-cache.org/releases/index.html) to find installation instructions for your OS.
 2. Since **Varnish** does not cache `POST` requests by default, you have to configure it using [VCL](https://www.varnish-cache.org/docs/5.1/users-guide/vcl.html). See [Changes in Varnish 5.0](https://www.varnish-cache.org/docs/5.0/whats-new/changes-5.0.html#request-body-sent-always-cacheable-post) for additional info. Open your **default.vcl** file (usually at **/etc/varnish/default.vcl**) and put this config (replace matching methods if some empty examples already exist):

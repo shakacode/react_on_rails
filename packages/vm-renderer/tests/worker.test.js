@@ -84,7 +84,7 @@ test(
 
     const app = worker.run({
       bundlePath: path.resolve(__dirname, './tmp'),
-      password: 'password',
+      password: 'my_password',
       gemVersion,
       protocolVersion,
     });
@@ -94,14 +94,14 @@ test(
       .type('json')
       .send({
         renderingRequest: 'ReactOnRails.dummy',
-        password: 'password',
+        password: 'my_password',
         gemVersion,
         protocolVersion,
       })
       .end((_err, res) => {
         assert.ok(res.headers['cache-control'] === 'public, max-age=31536000');
         assert.ok(res.status === 200);
-        assert.deepEqual(res.body, { renderedHtml: 'Dummy Object' });
+        assert.deepEqual(res.body, { html: 'Dummy Object' });
         assert.end();
       });
   },
@@ -132,7 +132,7 @@ test(
       .end((_err, res) => {
         assert.ok(res.headers['cache-control'] === 'public, max-age=31536000');
         assert.ok(res.status === 200);
-        assert.deepEqual(res.body, { renderedHtml: 'Dummy Object' });
+        assert.deepEqual(res.body, { html: 'Dummy Object' });
         assert.end();
       });
   },
