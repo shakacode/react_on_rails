@@ -75,10 +75,10 @@ RSpec.configure do |config|
   # Capybara config
   #
   # selenium_firefox webdriver only works for Travis-CI builds.
-  default_driver = :poltergeist_no_animations
+  default_driver = :selenium_chrome_headless
 
   supported_drivers = %i[ poltergeist poltergeist_errors_ok
-                          poltergeist_no_animations webkit
+                          poltergeist_no_animations webkit selenium_chrome_headless
                           selenium_chrome selenium_firefox selenium]
   driver = ENV["DRIVER"].try(:to_sym) || default_driver
   Capybara.default_driver = driver
@@ -125,6 +125,9 @@ RSpec.configure do |config|
   when :selenium_chrome
     DriverRegistration.register_selenium_chrome
 
+  when :selenium_chrome_headless
+    DriverRegistration.register_selenium_chrome_headless
+
   when :selenium_firefox, :selenium
     DriverRegistration.register_selenium_firefox
     driver = :selenium_firefox
@@ -138,6 +141,10 @@ RSpec.configure do |config|
     Rack::Handler::Puma.run(app, Port: port)
   end
 
+  config.before(:each, type: :system, js: true) do
+    driven_by driver
+  end
+
   # Capybara.default_max_wait_time = 15
   puts "=" * 80
   puts "Capybara using driver: #{Capybara.javascript_driver}"
@@ -145,8 +152,6 @@ RSpec.configure do |config|
 
   Capybara.save_path = Rails.root.join("tmp", "capybara")
   Capybara::Screenshot.prune_strategy = { keep: 10 }
-
-  config.use_transactional_fixtures = false
 
   config.append_after(:each) do
     Capybara.reset_sessions!

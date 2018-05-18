@@ -15,7 +15,7 @@ feature "Shared Redux store example", :server_rendering do
     it_behaves_like "page in initial state"
   end
 
-  context "with enabled JS", :js do
+  context "with enabled JS", :js, type: :system do
     it_behaves_like "page in initial state"
 
     it "updates header in reaction to text input changes" do

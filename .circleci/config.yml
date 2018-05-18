@@ -71,6 +71,17 @@ aliases:
     keys:
       - v3-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
 
+  - &install-latest-chrome
+    # NOTE: Sometimes CI generated docker images are not updated in time to keep up with the minimum required
+    # by chromedriver versions of Chrome. Just bump here Chrome version if chromedriver raises errors
+    name: Ensure minimum required Chrome version
+    command: |
+      wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+      sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+      sudo apt-get update
+      sudo apt-get install google-chrome-stable
+      echo -e "\nInstalled $(google-chrome --version)"
+
 jobs:
   # Install Node modules for Renderer package with Yarn and save them to chache.
   install-package-node-packages:
@@ -167,6 +178,7 @@ jobs:
       - run: *install-dummy-app-ruby-gems
       - run: *install-package-node-modules
       - run: *install-dummy-app-node-modules
+      - run: *install-latest-chrome
       - run: *install-yarn-link-source
       - run: *install-yarn-link-destination
       - run:
