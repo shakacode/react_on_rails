@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-pro-vm-renderer",
-  "version": "0.6.0",
+  "version": "0.9.1",
   "protocolVersion": "1.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
   "main": "packages/vm-renderer/lib/ReactOnRailsProVmRenderer.js",
@@ -8,15 +8,6 @@
     "doc": "docs"
   },
   "dependencies": {
-    "console.history": "^1.5.0",
-    "express": "^4.15.2",
-    "express-busboy": "^6.0.1",
-    "fs-extra": "^3.0.1",
-    "semver": "^5.5.0",
-    "supertest": "^3.0.0",
-    "winston": "^2.3.1"
-  },
-  "devDependencies": {
     "babel-cli": "^6.24.1",
     "babel-core": "^6.25.0",
     "babel-loader": "^7.1.1",
@@ -30,6 +21,15 @@
     "babel-tape-runner": "^2.0.1",
     "babel-types": "^6.25.0",
     "babelify": "^7.3.0",
+    "console.history": "^1.5.0",
+    "express": "^4.15.2",
+    "express-busboy": "^6.0.1",
+    "fs-extra": "^3.0.1",
+    "semver": "^5.5.0",
+    "supertest": "^3.0.0",
+    "winston": "^2.3.1"
+  },
+  "devDependencies": {
     "blue-tape": "^1.0.0",
     "eslint": "^3.19.0",
     "eslint-config-shakacode": "^14.1.1",
@@ -50,6 +50,7 @@
     "clean": "rm -rf packages/vm-renderer/lib",
     "babel": "babel --out-dir packages/vm-renderer/lib packages/vm-renderer/src",
     "build": "yarn run clean && yarn run babel",
+    "postinstall": "yarn run build",
     "build-watch": "babel --watch --out-dir packages/vm-renderer/lib node_package/src",
     "prepublish": "yarn run build",
     "prerelease": "yarn run check && yarn run clean && yarn run build",
