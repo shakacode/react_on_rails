@@ -17,8 +17,8 @@ Node rendering and caching performance enhancements for React on Rails!
 
 * [Caching](./docs/caching.md)
 * [Configuration](./docs/configuration.md)
-* [VM Renderer](./docs/vm-renderer.md)
-* [Using Varnish for HTTP Caching](./docs/vm-renderer-with-varnish.md)
+* [VM Renderer](docs/vm-renderer/basics.md)
+* [Using Varnish for HTTP Caching](docs/vm-renderer/configuring-varnish.md)
 * [HTTP Caching](./docs/http-caching.md)
 
 ## Local deploy

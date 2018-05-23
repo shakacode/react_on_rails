@@ -1,17 +1,13 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/capybara_utils"
 
 shared_examples "railsContext" do |pathname, id_base|
-  include CapybaraUtils
-
   let(:http_accept_language) { "en-US,en;q=0.8" }
 
   subject { page }
 
   background do
-    set_driver_header("ACCEPT-LANGUAGE", http_accept_language)
     visit "/#{pathname}?ab=cd"
   end
 

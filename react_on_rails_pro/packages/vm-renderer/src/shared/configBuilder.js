@@ -5,12 +5,15 @@
 
 let config;
 
+const DEFAULT_PORT = 3800;
+const DEFAULT_LOG_LEVEL = 'info';
+
 const defaultConfig = {
   bundlePath: undefined,           // No defaults for bundlePath
-  port: process.env.PORT || 3700,  // Use env port if we run on Heroku
+  port: process.env.PORT || DEFAULT_PORT,  // Use env port if we run on Heroku
 
   // Show only important messages by default, https://github.com/winstonjs/winston#logging-levels:
-  logLevel: process.env.LOG_LEVEL || 'info',
+  logLevel: process.env.LOG_LEVEL || DEFAULT_LOG_LEVEL,
 
   workersCount: undefined,         // Let master detect workers count automaticaly
   password: undefined,             // No default for password, means no auth

@@ -19,7 +19,6 @@ require "pry-doc"
 
 require "binding_of_caller"
 require "awesome_print"
-require "rspec/retry"
 
 require "action_controller"
 
@@ -70,17 +69,6 @@ RSpec.configure do |config|
     # ...rather than:
     #     # => "be bigger than 2"
     expectations.include_chain_clauses_in_custom_matcher_descriptions = true
-
-    ### Fix Net::ReadTimeout error on first test
-    # Show retry status in spec process
-    config.verbose_retry = true
-
-    # ENV value RSPEC_RETRY_RETRY_COUNT should be set to 1 if you don't want to retry (defined in
-    # rspec/retry)
-    config.default_retry_count = 3
-
-    # Only retry when Selenium raises Net::ReadTimeout
-    # config.exceptions_to_retry = [Net::ReadTimeout]
   end
 
   # rspec-mocks config goes here. You can use an alternate test double

@@ -19,9 +19,9 @@ module ReactOnRailsPro
           @connection = PersistentHTTP.new(
             name: "ReactOnRailsProVmRendererClient",
             logger: Rails.logger,
-            pool_size: ReactOnRailsPro.configuration.http_pool_size,
-            pool_timeout: ReactOnRailsPro.configuration.http_pool_timeout,
-            warn_timeout: ReactOnRailsPro.configuration.http_pool_warn_timeout,
+            pool_size: ReactOnRailsPro.configuration.renderer_http_pool_size,
+            pool_timeout: ReactOnRailsPro.configuration.renderer_http_pool_timeout,
+            warn_timeout: ReactOnRailsPro.configuration.renderer_http_pool_warn_timeout,
             force_retry: true,
             url: ReactOnRailsPro.configuration.renderer_url
           )
@@ -69,7 +69,7 @@ module ReactOnRailsPro
             "renderingRequest" => js_code,
             "gemVersion" => ReactOnRailsPro::VERSION,
             "protocolVersion" => "1.0.0".freeze,
-            "password" => ReactOnRailsPro.configuration.password
+            "password" => ReactOnRailsPro.configuration.renderer_password
           }
 
           if send_bundle
@@ -89,16 +89,16 @@ module ReactOnRailsPro
           when "410"
             return eval_js(js_code, render_options, send_bundle: true)
           when "412"
-            raise RenderingError, "Renderer version does not match gem version"
+            raise ReactOnRailsPro::Error, "Renderer version does not match gem version"
           else
-            raise RenderingError, "Unknown response code from renderer: #{response.code}: #{response.body}"
+            raise ReactOnRailsPro::Error, "Unknown response code from renderer: #{response.code}: #{response.body}"
           end
         rescue Errno::ECONNREFUSED
           fallback_exec_js(js_code, render_options)
         end
 
         def fallback_exec_js(js_code, render_options)
-          unless ReactOnRailsPro.configuration.use_fallback_renderer_exec_js
+          unless ReactOnRailsPro.configuration.renderer_use_fallback_exec_js
             raise ReactOnRailsPro::Error, "Can't connect to VmRenderer renderer at #{renderer_url_base}"
           end
 

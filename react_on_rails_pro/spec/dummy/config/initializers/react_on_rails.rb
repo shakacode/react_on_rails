@@ -19,7 +19,9 @@ ReactOnRails.configure do |config|
   config.node_modules_location = "client" # Pre 9.0.0 always used "client"
   config.build_production_command = "yarn run build:production"
   config.build_test_command = "yarn run build:test"
-  config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
+
+  # TODO: when 11.0.8 of RoR included
+  # config.webpack_generated_files = %w[server-bundle.js manifest.json]
   config.webpack_generated_files = %w[manifest.json]
   config.server_bundle_js_file = "server-bundle.js"
   config.rendering_extension = RenderingExtension

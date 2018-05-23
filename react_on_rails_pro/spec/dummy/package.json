@@ -5,7 +5,7 @@
   "main": "server.js",
   "engines": {
     "node": "^8.9.4",
-    "yarn": "^1.5.1"
+    "yarn": "^1.6"
   },
   "scripts": {
     "postinstall": "cd ./client && yarn install",
