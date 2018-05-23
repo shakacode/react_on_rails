@@ -5,7 +5,7 @@ module ReactOnRailsPro
 
       class << self
         def pool
-          @pool ||= if ReactOnRailsPro.configuration.server_render_method == "VmRenderer"
+          @pool ||= if ReactOnRailsPro.configuration.server_renderer == "VmRenderer"
                       ReactOnRailsPro::ServerRenderingPool::VmRenderingPool
                     else
                       ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript

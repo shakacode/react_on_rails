@@ -35,11 +35,10 @@ gem "web-console", group: :development
 gem "capybara"
 gem "capybara-screenshot"
 gem "rspec-rails"
-gem "rspec-retry"
+gem "rspec_junit_formatter"
 # Trouble installing on Sierra
 # gem "capybara-webkit"
 gem "chromedriver-helper"
 gem "equivalent-xml", github: "mbklein/equivalent-xml"
 gem "launchy"
-gem "poltergeist"
 gem "selenium-webdriver"

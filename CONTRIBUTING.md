@@ -104,7 +104,7 @@ gem "react_on_rails"
 ```
 ================================================================================
 
-Set `config.server_render_method = "VmRenderer"` in your  `ReactOnRailsPro.configure` block.
+Set `config.server_renderer = "VmRenderer"` in your  `ReactOnRailsPro.configure` block.
 
 Note that you will need to bundle install after making this change, but also that **you will need to restart your Rails application if you make any changes to the gem**.
 

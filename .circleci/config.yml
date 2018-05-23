@@ -1,14 +1,6 @@
 version: 2
 
 aliases:
-  - &install-phantomjs
-    name: Install phantomjs
-    command: |
-      if ! [ $(which phantomjs) ]; then
-        sudo curl --output /usr/local/bin/phantomjs https://s3.amazonaws.com/circle-downloads/phantomjs-2.1.1
-      fi
-      sudo chmod ugo+x /usr/local/bin/phantomjs
-
   # Print critical data and executables versions.
   - &print-system-info
     name: Print system information
@@ -19,9 +11,6 @@ aliases:
              echo "Ruby version: "; ruby -v
              echo "Node version: "; node -v
              echo "Yarn version: "; yarn --version
-             if [ $(which phantomjs) ]; then
-               echo "Phantomjs version: "; phantomjs -v
-             fi
 
   # Install/update Node modules for renderer package unless existing set of modules is satisfying Yarn.
   - &install-package-node-modules
@@ -42,16 +31,19 @@ aliases:
     name: Install yarn link for react-on-rails-pro-vm-renderer
     command: cd spec/dummy/client && yarn link react-on-rails-pro-vm-renderer
 
-  #  - &install-react-on-rails-pro-vm-renderer
-  #    name: Install react-on-rails-pro-vm-renderer
-  #    command: cd spec/dummy/client && rm -rf node_modules/react-on-rails-pro-vm-renderer && yarn upgrade react-on-rails-vm-renderer
-
   # Install ruby gems unless existing set of gems is satisfying bundler.
   - &install-dummy-app-ruby-gems
     name: Install Ruby Gems for dummy app
     command: |
       gem install bundler --version 1.16.1
       cd spec/dummy && bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+
+  # Install ruby gems unless existing set of gems is satisfying bundler.
+  - &install-package-ruby-gems
+    name: Install Ruby Gems for package
+    command: |
+      gem install bundler --version 1.16.1
+      bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
 
   # Restore node_modules dir from cache using yarn.lock checksum as a key.
   - &restore-package-node-modules-cache
@@ -71,9 +63,15 @@ aliases:
     keys:
       - v3-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
 
-  - &install-latest-chrome
+  # Restore vendor/bundle dir from cache using react_on_rails_pro.gemspec checksum as a key.
+  - &restore-package-gem-cache
+    name: Restore cached Ruby Gems for package
+    keys:
+      - v3-package-app-gem-cache-{{ checksum "react_on_rails_pro.gemspec" }}
+
     # NOTE: Sometimes CI generated docker images are not updated in time to keep up with the minimum required
     # by chromedriver versions of Chrome. Just bump here Chrome version if chromedriver raises errors
+  - &install-latest-chrome
     name: Ensure minimum required Chrome version
     command: |
       wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
@@ -81,6 +79,8 @@ aliases:
       sudo apt-get update
       sudo apt-get install google-chrome-stable
       echo -e "\nInstalled $(google-chrome --version)"
+
+  -
 
 jobs:
   # Install Node modules for Renderer package with Yarn and save them to chache.
@@ -97,6 +97,7 @@ jobs:
           key: v3-package-node-modules-cache-{{ checksum "yarn.lock" }}
           paths:
             - node_modules
+
   # Install Node modules for dummy app with Yarn and save them to chache.
   install-dummy-app-node-packages:
     docker:
@@ -113,6 +114,22 @@ jobs:
           paths:
             - spec/dummy/node_modules
             - spec/dummy/client/node_modules
+
+  # Install Ruby gems for package with Bundler and save them to cache.
+  install-package-ruby-gems:
+    docker:
+      - image: circleci/ruby:2.4.4-stretch-node
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-package-gem-cache
+      - run: *install-package-ruby-gems
+      - save_cache:
+          name: Save dummy app ruby gems to cache
+          key: v3-package-app-gem-cache-{{ checksum "react_on_rails_pro.gemspec" }}
+          paths:
+            - vendor/bundle
+
   # Install Ruby gems for dummy app with Bundler and save them to cache.
   install-dummy-app-ruby-gems:
     docker:
@@ -127,6 +144,7 @@ jobs:
           key: v3-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
           paths:
             - spec/dummy/vendor/bundle
+
   # Build client and server bundles for dummy app with Webpack and save them to cache.
   # NOTE: keeping around this cache in case we have multiple rspec suites in the future to tests
   # different node renderers.
@@ -159,18 +177,36 @@ jobs:
       - run:
           name: Run JS unit tests for Renderer package
           command: yarn test
+
+  rspec-package-specs:
+    docker:
+      - image: circleci/ruby:2.4.4-stretch-node
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-package-gem-cache
+      - run: *install-package-ruby-gems
+      - run:
+          name: Run rspec tests
+          command: |
+            bundle exec rspec spec/react_on_rails_pro
+      - store_test_results:
+          path: ~/rspec
+      - store_artifacts:
+          path: log/test.log
+
   # Start Renderer and run RSpec test suite for dummy app.
   # NOTES:
   # Seems that we cannot use symlinks (yarn link) with caches for the main renderer package
   # react-on-rails-pro-vm-renderer. Consequently, we just reinstall the top level, renderer, node packages
   # as well as the
-  rspec-dummy-app:
+  rspec-dummy-app-vm-renderer:
     docker:
       - image: circleci/ruby:2.4.4-stretch-node
     steps:
       - checkout
-      - run: *install-phantomjs
       - run: *print-system-info
+      - restore_cache: *restore-package-gem-cache
       - restore_cache: *restore-dummy-app-gem-cache
       - restore_cache:
           name: Restore cached webpack bundles for dummy app
@@ -203,11 +239,45 @@ jobs:
       - store_artifacts:
           path: spec/dummy/client/yarn-error.log
 
+  # Test React on Rails Pro without the VM Renderer
+  rspec-dummy-app:
+    docker:
+      - image: circleci/ruby:2.4.4-stretch-node
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-package-gem-cache
+      - restore_cache: *restore-dummy-app-gem-cache
+      - restore_cache:
+          name: Restore cached webpack bundles for dummy app
+          key: v3-dummy-app-webpack-bundle-{{ .Revision }}
+      - restore_cache: *restore-dummy-app-node-modules-cache
+      - run: *install-dummy-app-ruby-gems
+      - run: *install-latest-chrome
+      - run:
+          name: Touch webpack bundles
+          command:  touch spec/dummy/public/webpack/test/*
+      - run:
+          name: Run rspec tests
+          command: |
+            cd spec/dummy && SERVER_RENDERER=ExecJS bundle exec rspec --format RspecJunitFormatter \
+                                               --out ~/rspec/rspec.xml \
+                                               --format documentation
+      - store_test_results:
+          path: ~/rspec
+      - store_artifacts:
+          path: tmp/capybara
+      - store_artifacts:
+          path: log/test.log
+      - store_artifacts:
+          path: spec/dummy/client/yarn-error.log
+
 workflows:
   version: 2
   build-and-test:
     jobs:
       - install-package-node-packages
+      - install-package-ruby-gems
       - install-dummy-app-node-packages
       - install-dummy-app-ruby-gems
       - build-dummy-app-webpack-test-bundles:
@@ -216,7 +286,19 @@ workflows:
       - package-js-tests:
           requires:
             - install-package-node-packages
+      - rspec-package-specs:
+          requires:
+            - install-package-ruby-gems
+            - build-dummy-app-webpack-test-bundles
+            - install-dummy-app-ruby-gems
       - rspec-dummy-app:
           requires:
+            - install-package-ruby-gems
+            - install-package-ruby-gems
+            - build-dummy-app-webpack-test-bundles
+            - install-dummy-app-ruby-gems
+      - rspec-dummy-app-vm-renderer:
+          requires:
+            - install-package-ruby-gems
             - build-dummy-app-webpack-test-bundles
             - install-dummy-app-ruby-gems

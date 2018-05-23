@@ -194,7 +194,7 @@ feature "returns hash if hash_result == true even with prerendering error", :js,
   background do
     begin
       visit "/broken_app"
-    rescue Capybara::Poltergeist::JavascriptError # rubocop:disable Lint/HandleExceptions
+    rescue Selenium::WebDriver::Error::JavascriptError # rubocop:disable Lint/HandleExceptions
     end
   end
   scenario "react_component should return hash" do

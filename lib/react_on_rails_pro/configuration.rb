@@ -1,37 +1,73 @@
 module ReactOnRailsPro
   def self.configure
     yield(configuration)
+    configuration.setup_config_values
   end
 
   def self.configuration
     @configuration ||= Configuration.new(
-      renderer_url: "http://localhost",
-      server_render_method: "VmRenderer",
-      password: "",
-      use_fallback_renderer_exec_js: true,
-      prerender_caching: false,
-      http_pool_size: 10,
-      http_pool_timeout: 5,
-      http_pool_warn_timeout: 0.25
+      prerender_caching: Configuration::DEFAULT_PRERENDER_CACHING,
+      server_renderer: Configuration::DEFAULT_RENDERER_METHOD,
+      renderer_url: Configuration::DEFAULT_RENDERER_URL,
+      renderer_use_fallback_exec_js: true,
+      renderer_http_pool_size: Configuration::DEFAULT_RENDERER_HTTP_POOL_SIZE,
+      renderer_http_pool_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_TIMEOUT,
+      renderer_http_pool_warn_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_TIMEOUT,
+      renderer_password: nil
     )
   end
 
   class Configuration
-    attr_accessor :renderer_url, :renderer_port, :password,
-                  :server_render_method, :use_fallback_renderer_exec_js, :prerender_caching,
-                  :http_pool_size, :http_pool_timeout, :http_pool_warn_timeout
+    DEFAULT_RENDERER_URL = "http://localhost:3800".freeze
+    DEFAULT_RENDERER_METHOD = "VmRenderer".freeze
+    DEFAULT_RENDERER_HTTP_POOL_SIZE = 10
+    DEFAULT_RENDERER_HTTP_POOL_TIMEOUT = 5
+    DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT = 0.25
+    DEFAULT_PRERENDER_CACHING = true
 
-    def initialize(renderer_url: nil, password: nil, server_render_method: nil,
-                   use_fallback_renderer_exec_js: nil, prerender_caching: nil,
-                   http_pool_size: nil, http_pool_timeout: nil, http_pool_warn_timeout: nil)
+    attr_accessor :renderer_url, :renderer_password,
+                  :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
+                  :renderer_http_pool_size, :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout
+
+    def initialize(renderer_url: nil, renderer_password: nil, server_renderer: nil,
+                   renderer_use_fallback_exec_js: nil, prerender_caching: nil,
+                   renderer_http_pool_size: nil, renderer_http_pool_timeout: nil, renderer_http_pool_warn_timeout: nil)
       self.renderer_url = renderer_url
-      self.password = password
-      self.server_render_method = server_render_method
-      self.use_fallback_renderer_exec_js = use_fallback_renderer_exec_js
+      self.renderer_password = renderer_password
+      self.server_renderer = server_renderer
+      self.renderer_use_fallback_exec_js = renderer_use_fallback_exec_js
       self.prerender_caching = prerender_caching
-      self.http_pool_size = http_pool_size
-      self.http_pool_timeout = http_pool_timeout
-      self.http_pool_warn_timeout = http_pool_warn_timeout
+      self.renderer_http_pool_size = renderer_http_pool_size
+      self.renderer_http_pool_timeout = renderer_http_pool_timeout
+      self.renderer_http_pool_warn_timeout = renderer_http_pool_warn_timeout
+    end
+
+    def setup_config_values
+      configure_default_url_if_not_provided
+      validate_url
+      setup_renderer_password
+    end
+
+    private
+
+    def configure_default_url_if_not_provided
+      self.renderer_url = renderer_url.presence || DEFAULT_RENDERER_URL
+    end
+
+    def validate_url
+      URI(renderer_url)
+    rescue URI::InvalidURIError => e
+      message = "Unparseable ReactOnRailsPro.config.renderer_url #{renderer_url} provided.\n#{e.message}"
+      raise ReactOnRailsPro::Error, message
+    end
+
+    def setup_renderer_password
+      return if renderer_password.present?
+
+      begin
+        uri = URI(renderer_url)
+        self.renderer_password = uri.password
+      end
     end
   end
 end

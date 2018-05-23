@@ -1,6 +1,11 @@
 ReactOnRailsPro.configure do |config|
-  config.renderer_url = "http://localhost:3800"
-  config.server_render_method = "VmRenderer"
-  config.use_fallback_renderer_exec_js = false
+  # See documentation in docs/configuration.md
+  config.server_renderer = ENV["SERVER_RENDERER"].presence || "VmRenderer"
+
+  # Setting the password myPasssword1 after the leading `:` and before the `@`
+  config.renderer_url = "http://:myPassword1@localhost:3800"
+
+  # Set this to false specs fail if remote renderer is not available
+  config.renderer_use_fallback_exec_js = false
   config.prerender_caching = true
 end
