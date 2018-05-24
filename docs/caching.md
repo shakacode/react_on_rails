@@ -1,18 +1,19 @@
 # Caching
+Caching at the React on Rails level can greatly speed up your app and reduce the load on your servers, allowing more requests for a given level of hardware.
 
 ## Overview
 React on Rails Pro has caching at 2 levels:
 
-1. "Fragement caching" view helpers, `cached_react_component` and `cached_react_component_hash`.  
+1. "Fragment caching" view helpers, `cached_react_component` and `cached_react_component_hash`.  
 2. Caching of requests for server rendering. 
 
-### Testing During Development
+### Important: Testing During Development
 **To toggle caching in development**, as explained in [this article](http://guides.rubyonrails.org/caching_with_rails.html#caching-in-development)
 `rails dev:cache`
 
 ## Prerender Caching
 
-To enable caching server rendering requests to the JavaScript calculation engine, set this config
+To enable caching server rendering requests to the JavaScript calculation engine (ExecJS or VM Renderer), set this config
 value in `config/initializers/react_on_rails_pro.rb` to true:
 
 ```rub
@@ -41,9 +42,11 @@ have a race condition overwriting your `manifest.json`. Regardless of which
 case you have React on Rails handles it.
 
 Even when not doing server rendering, caching can be effective as the caching will prevent the
-calculation of the props and the conversion to a string.
+calculation of the props and the conversion to a string of the prop values.
 
-Here is the doc for helper cached_react_component.
+### API
+Here is the doc for helpers `cached_react_component` and `cached_react_component_hash`. Consult the docs
+in React on Rails for the non-cached analogies `react_component` and `react_component_hash`.
 
 ```ruby
   # Provide caching support for react_component in a manner akin to Rails fragment caching.
@@ -56,14 +59,29 @@ Here is the doc for helper cached_react_component.
   # cache_key: String or Array containing your cache keys. If prerender is set to true, the server
   #   bundle digest will be included in the cache key. The cache_key value is the same as used for
   #   conventional Rails fragment caching.
-
 ```
 
-Usage example:
+# Usage examples
 
+The fragment caching for `react_component`:
+```ruby
+<%= cached_react_component("App", cache_key: [@user, @post], prerender: true) do
+  some_slow_method_that_returns_props
+end %>
+```
+
+And a fragment caching version for the `react_component_hash`:
 
 ```ruby
-cached_react_component("App", cache_key: [@user, @post], prerender: true) do
-  some_slow_method_that_returns_props
-end
-```
+<% react_helmet_app = cached_react_component_hash("ReactHelmetApp", cache_key: [@user, @post],
+                                           id: "react-helmet-0") do
+    some_slow_method_that_returns_props
+   end %>
+
+<% content_for :title do %>
+  <%= react_helmet_app['title'] %>
+<% end %>
+
+<%= react_helmet_app["componentHtml"] %>
+
+````

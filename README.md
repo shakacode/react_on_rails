@@ -10,12 +10,12 @@ Node rendering and caching performance enhancements for React on Rails!
 * Fragment caching for react_component, including lazy evaluation of props. See 
 [Caching](./docs/caching.md) for details.
 
-## Node VM Render
-More efficient server rendering:
+## React On Rails Pro VM Render
+The "React on Rails Pro VM Renderer" provides more efficient server rendering on a standalone Node JS server:
 
 1. Configuration option `prerender_caching` which will turn on caching of all requests to evaluation JavaScript code for server rendering.
 2. NodeJS server rendering via a standalone Express server.
-3. Other helpers related to caching in `lib/react_on_rails_pro/utils.rb`
+3. Other helpers related to caching in [`lib/react_on_rails_pro/utils.rb`](./lib/react_on_rails_pro/utils.rb)
 
 See the [VM Renderer Docs](docs/vm-renderer/basics.md)
 
@@ -23,8 +23,8 @@ See the [VM Renderer Docs](docs/vm-renderer/basics.md)
 
 * [Caching](./docs/caching.md)
 * [Configuration](./docs/configuration.md)
-* [VM Renderer](docs/vm-renderer/basics.md)
-* [Using Varnish for HTTP Caching](docs/vm-renderer/configuring-varnish.md)
+* [VM Renderer](./docs/vm-renderer/basics.md)
+* [Using Varnish for HTTP Caching](./docs/vm-renderer/configuring-varnish.md)
 * [HTTP Caching](./docs/http-caching.md)
 
 ## Local deploy

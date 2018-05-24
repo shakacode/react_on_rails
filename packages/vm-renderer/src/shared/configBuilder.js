@@ -27,14 +27,14 @@ function defaultWorkersCount() {
 }
 
 const defaultConfig = {
-  // Use directory DEFAULT_TMP_DIR if none provided
-  bundlePath: env.RENDERER_BUNDLE_PATH || getTmpDir(),
-
   // Use env port if we run on Heroku
   port: env.PORT || DEFAULT_PORT,
 
   // Show only important messages by default, https://github.com/winstonjs/winston#logging-levels:
   logLevel: env.LOG_LEVEL || DEFAULT_LOG_LEVEL,
+
+  // Use directory DEFAULT_TMP_DIR if none provided
+  bundlePath: env.RENDERER_BUNDLE_PATH || getTmpDir(),
 
   // Workers count defaults to number of CPUs minus 1
   workersCount: env.RENDERER_WORKERS_COUNT || defaultWorkersCount(),
@@ -48,8 +48,7 @@ const defaultConfig = {
   allWorkersRestartInterval: env.RENDERER_ALL_WORKERS_RESTART_INTERVAL,
 
   // time in minutes between each worker restarting when restarting all workers
-  delayBetweenIndividualWorkerRestarts: env
-    .RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS,
+  delayBetweenIndividualWorkerRestarts: env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS,
 };
 
 function envValuesUsed() {
