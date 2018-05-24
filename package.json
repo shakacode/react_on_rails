@@ -4,6 +4,9 @@
   "protocolVersion": "1.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
   "main": "packages/vm-renderer/lib/ReactOnRailsProVmRenderer.js",
+  "bin": {
+    "vm-renderer": "./packages/vm-renderer/lib/default-vm-renderer.js"
+  },
   "directories": {
     "doc": "docs"
   },
