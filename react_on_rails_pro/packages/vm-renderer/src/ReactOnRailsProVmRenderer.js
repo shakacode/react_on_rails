@@ -1,13 +1,13 @@
-'use strict';
 
-const cluster = require('cluster');
-const master = require('./master');
-const worker = require('./worker');
+import cluster from 'cluster';
+import master from './master';
+import worker from './worker';
 
-module.exports = function reactOnRailsProRenderer(config) {
+/* eslint-disable import/prefer-default-export */
+export function reactOnRailsProVmRenderer(config = {}) {
   if (cluster.isMaster) {
-    master.run(config);
+    master(config);
   } else {
-    worker.run(config);
+    worker(config);
   }
-};
+}

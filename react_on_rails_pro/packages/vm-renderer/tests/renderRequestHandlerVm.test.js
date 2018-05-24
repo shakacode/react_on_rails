@@ -1,10 +1,10 @@
-const test = require('tape');
-const path = require('path');
-const { setConfig, getTmpUploadedBundlePath, createTmpUploadedBundle,
-        createUploadedBundle, cleanUploadedBundles } = require('./helper');
-const { getBundleFilePath } = require('../src/worker/vm');
-const renderRequestHandler = require('../src/worker/renderRequestHandlerVm');
-const { resetVM } = require('../src/worker/vm');
+import test from 'tape';
+import path from 'path';
+
+import { setConfig, getTmpUploadedBundlePath, createTmpUploadedBundle,
+        createUploadedBundle, cleanUploadedBundles } from './helper';
+import { getBundleFilePath, resetVM } from '../src/worker/vm';
+import renderRequestHandler from '../src/worker/renderRequestHandlerVm';
 
 test('If gem has posted updated bundle', (assert) => {
   assert.plan(2);

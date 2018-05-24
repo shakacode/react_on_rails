@@ -23,11 +23,10 @@ Used in Testing: [spec/dummy/client/vm-renderer.js](../../spec/dummy/client/vm-r
 
 
 ```js
-const path = require('path');
-const { env } = require('process');
+import path from 'path';
+import reactOnRailsProVmRenderer from 'react-on-rails-pro-vm-renderer';
 
-// Use this for package installation test:
-const reactOnRailsProVmRenderer = require('react-on-rails-pro-vm-renderer');
+const env = process.env;
 
 const config = {
   bundlePath: path.resolve(__dirname, '../tmp/bundles'),  // Save bundle to "tmp/" dir of our dummy app

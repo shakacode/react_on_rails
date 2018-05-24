@@ -4,16 +4,14 @@
  * and without async calls.
  * @module worker/renderRequestHandlerVm
  */
+import cluster from 'cluster';
+import path from 'path';
+import fs from 'fs';
+import fsExtra from 'fs-extra';
+import log from 'winston';
 
-'use strict';
-
-const cluster = require('cluster');
-const path = require('path');
-const fs = require('fs');
-const fsExtra = require('fs-extra');
-const log = require('winston');
-const { getConfig } = require('../shared/configBuilder');
-const { buildVM, runInVM, getBundleFilePath } = require('./vm');
+import { getConfig } from '../shared/configBuilder';
+import { buildVM, runInVM, getBundleFilePath } from './vm';
 
 /**
  *

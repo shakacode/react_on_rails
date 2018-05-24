@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+# TODO: This file is not used for CI
 require "coveralls/rake/task" if ENV["USE_COVERALLS"] == "TRUE"
 
 require "pathname"

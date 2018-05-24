@@ -1,13 +1,15 @@
 const path = require('path');
-const { env } = require('process');
+
+const env = process.env;
 
 // Use this for package installation test:
-const reactOnRailsProVmRenderer = require('react-on-rails-pro-vm-renderer');
+const { reactOnRailsProVmRenderer } = require('react-on-rails-pro-vm-renderer');
 
 const config = {
   bundlePath: path.resolve(__dirname, '../tmp/bundles'),  // Save bundle to "tmp/" dir of our dummy app
-  port: 3800,                                             // Listen at port 3800
-  logLevel: env.LOG_LEVEL || 'debug',                     // Show all logs
+  // This is the default
+  port: env.PORT || 3800,                         // Listen at PORT env value or default port 3800
+  logLevel: env.LOG_LEVEL || 'info',              // Show all logs at debug level
 
   // See value in /config/initializers/react_on_rails_pro.rb. Should use env value in real app.
   password: 'myPassword1',
@@ -27,7 +29,7 @@ const config = {
 // Renderer detects a total number of CPUs on virtual hostings like Heroky or CircleCI instead
 // of CPUs number allocated for current container. This results in spawning many workers while
 // only 1-2 of them really needed.
-if (process.env.CI) {
+if (env.CI) {
   config.workersCount = 2;
 }
 

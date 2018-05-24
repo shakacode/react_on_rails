@@ -3,12 +3,10 @@
  * @module worker/vm
  */
 
-'use strict';
-
-const fs = require('fs');
-const vm = require('vm');
-const cluster = require('cluster');
-const log = require('winston');
+import fs from 'fs';
+import vm from 'vm';
+import cluster from 'cluster';
+import log from 'winston';
 
 let context;
 let bundleFilePath;

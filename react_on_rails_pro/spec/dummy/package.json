@@ -1,6 +1,6 @@
 {
-  "name": "react_on_rails",
-  "version": "2.0.0-rc.2",
+  "name": "react_on_rails_pro_dummy",
+  "version": "1.0.0",
   "description": "example of server rendering",
   "main": "server.js",
   "engines": {
