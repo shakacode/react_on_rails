@@ -3,10 +3,8 @@
  * @module master/restartWorkers
  */
 
-'use strict';
-
-const cluster = require('cluster');
-const log = require('winston');
+import cluster from 'cluster';
+import log from 'winston';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 

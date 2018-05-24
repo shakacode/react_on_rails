@@ -2,22 +2,15 @@
  * Entry point for master process that forks workers.
  * @module master
  */
+import cluster from 'cluster';
+import log from 'winston';
 
-'use strict';
-
-import packageJson from './shared/packageJson';
-
-const os = require('os');
-const cluster = require('cluster');
-const log = require('winston');
-
-const { buildConfig, getConfig } = require('./shared/configBuilder');
-const restartWorkers = require('./master/restartWorkers');
-// eslint-disable-next-line import/no-dynamic-require
+import { buildConfig, getConfig, logSanitizedConfig } from './shared/configBuilder';
+import restartWorkers from './master/restartWorkers';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 
-exports.run = function run(config) {
+export default function masterRun(config) {
   // Store config in app state. From now it can be loaded by any module using getConfig():
   buildConfig(config);
   const {
@@ -33,10 +26,10 @@ exports.run = function run(config) {
 
   // Set log level from config:
   log.level = logLevel;
-  log.info(`Renderer v${packageJson.version}, protocol v${packageJson.protocolVersion}`);
+  logSanitizedConfig(log);
 
   // Count available CPUs for worker processes:
-  const workerCpuCount = workersCount || os.cpus().length - 1 || 1;
+  const workerCpuCount = workersCount;
 
   // Create a worker for each CPU except one that used for master process:
   for (let i = 0; i < workerCpuCount; i += 1) {
@@ -71,4 +64,4 @@ exports.run = function run(config) {
   } else {
     log.info('No schedule for workers restarts');
   }
-};
+}

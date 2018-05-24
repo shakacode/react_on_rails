@@ -3,19 +3,16 @@
  * @module worker
  */
 
-'use strict';
-
+import path from 'path';
+import cluster from 'cluster';
+import express from 'express';
+import busBoy from 'express-busboy';
+import log from 'winston';
 import packageJson from './shared/packageJson';
-
-const path = require('path');
-const cluster = require('cluster');
-const express = require('express');
-const busBoy = require('express-busboy');
-const log = require('winston');
-const { buildConfig, getConfig } = require('./shared/configBuilder');
-const checkProtocolVersion = require('./worker/checkProtocolVersionHandler');
-const authenticate = require('./worker/authHandler');
-const handleRenderRequest = require('./worker/renderRequestHandlerVm');
+import { buildConfig, getConfig } from './shared/configBuilder';
+import checkProtocolVersion from './worker/checkProtocolVersionHandler';
+import authenticate from './worker/authHandler';
+import handleRenderRequest from './worker/renderRequestHandlerVm';
 
 
 // Turn on colorized log:
@@ -25,7 +22,7 @@ log.add(log.transports.Console, { colorize: true });
 /**
  *
  */
-exports.run = function run(config) {
+export default function run(config) {
   // Store config in app state. From now it can be loaded by any module using getConfig():
   buildConfig(config);
 
@@ -101,4 +98,4 @@ exports.run = function run(config) {
   }
 
   return app;
-};
+}

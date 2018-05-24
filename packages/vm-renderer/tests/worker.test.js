@@ -1,9 +1,10 @@
-const test = require('tape');
-const request = require('supertest');
-const path = require('path');
-const worker = require('../src/worker');
-const { getUploadedBundlePath, createUploadedBundle } = require('./helper');
-const { buildVM } = require('../src/worker/vm');
+import test from 'tape';
+import request from 'supertest';
+import path from 'path';
+
+import worker from '../src/worker';
+import { getUploadedBundlePath, createUploadedBundle } from './helper';
+import { buildVM } from '../src/worker/vm';
 
 // eslint-disable-next-line import/no-dynamic-require
 const packageJson = require(path.join(__dirname, '/../../../package.json'));
@@ -20,7 +21,7 @@ test(
     createUploadedBundle();
     buildVM(getUploadedBundlePath());
 
-    const app = worker.run({
+    const app = worker({
       bundlePath: path.resolve(__dirname, './tmp'),
       password: 'password',
     });
@@ -51,7 +52,7 @@ test(
     createUploadedBundle();
     buildVM(getUploadedBundlePath());
 
-    const app = worker.run({
+    const app = worker({
       bundlePath: path.resolve(__dirname, './tmp'),
       password: 'password',
     });
@@ -82,7 +83,7 @@ test(
     createUploadedBundle();
     buildVM(getUploadedBundlePath());
 
-    const app = worker.run({
+    const app = worker({
       bundlePath: path.resolve(__dirname, './tmp'),
       password: 'my_password',
       gemVersion,
@@ -116,7 +117,7 @@ test(
     createUploadedBundle();
     buildVM(getUploadedBundlePath());
 
-    const app = worker.run({
+    const app = worker({
       bundlePath: path.resolve(__dirname, './tmp'),
     });
 

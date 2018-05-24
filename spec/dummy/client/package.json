@@ -81,7 +81,7 @@
     "build:production:server": "NODE_ENV=production webpack -p --config webpack.server.rails.build.config.js",
     "build:production": "yarn run build:production:server && yarn run build:production:client",
     "hot-assets": "NODE_ENV=development babel-node server-rails-hot.js",
-    "vm-renderer": "node vm-renderer.js"
+    "vm-renderer": "PORT=3800 node vm-renderer.js"
   },
   "author": "",
   "license": "ISC"

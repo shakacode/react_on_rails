@@ -1,7 +1,7 @@
-const test = require('tape');
-const path = require('path');
-const { getUploadedBundlePath, createUploadedBundle, readRenderingRequest } = require('./helper');
-const { buildVM, runInVM, getBundleFilePath, resetVM } = require('../src/worker/vm');
+import test from 'tape';
+import path from 'path';
+import { getUploadedBundlePath, createUploadedBundle, readRenderingRequest } from './helper';
+import { buildVM, runInVM, getBundleFilePath, resetVM } from '../src/worker/vm';
 
 test('buildVM and runInVM', (assert) => {
   assert.plan(14);

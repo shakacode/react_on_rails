@@ -2,32 +2,90 @@
  * Reads CLI arguments and build the config.
  * @module worker/configBuilder
  */
+import fs from 'fs';
+import os from 'os';
 
-let config;
+import packageJson from './packageJson';
 
+const DEFAULT_TMP_DIR = '/tmp/react-on-rails-pro-vm-renderer-bundles';
 const DEFAULT_PORT = 3800;
 const DEFAULT_LOG_LEVEL = 'info';
+const env = process.env;
+
+let config;
+let userConfig;
+
+function getTmpDir() {
+  if (!fs.existsSync(DEFAULT_TMP_DIR)) {
+    fs.mkdirSync(DEFAULT_TMP_DIR);
+  }
+  return DEFAULT_TMP_DIR;
+}
+
+function defaultWorkersCount() {
+  return os.cpus().length - 1 || 1;
+}
 
 const defaultConfig = {
-  bundlePath: undefined,           // No defaults for bundlePath
-  port: process.env.PORT || DEFAULT_PORT,  // Use env port if we run on Heroku
+  // Use directory DEFAULT_TMP_DIR if none provided
+  bundlePath: env.RENDERER_BUNDLE_PATH || getTmpDir(),
+
+  // Use env port if we run on Heroku
+  port: env.PORT || DEFAULT_PORT,
 
   // Show only important messages by default, https://github.com/winstonjs/winston#logging-levels:
-  logLevel: process.env.LOG_LEVEL || DEFAULT_LOG_LEVEL,
+  logLevel: env.LOG_LEVEL || DEFAULT_LOG_LEVEL,
 
-  workersCount: undefined,         // Let master detect workers count automaticaly
-  password: undefined,             // No default for password, means no auth
+  // Workers count defaults to number of CPUs minus 1
+  workersCount: env.RENDERER_WORKERS_COUNT || defaultWorkersCount(),
+
+  // No default for password, means no auth
+  password: env.RENDERER_PASSWORD,
 
   // Next 2 params, allWorkersRestartInterval and delayBetweenIndividualWorkerRestarts must both
   // be set if you wish to have automatic worker restarting, say to clear memory leaks.
   // time in minutes between restarting all workers
-  allWorkersRestartInterval: undefined,
+  allWorkersRestartInterval: env.RENDERER_ALL_WORKERS_RESTART_INTERVAL,
 
   // time in minutes between each worker restarting when restarting all workers
-  delayBetweenIndividualWorkerRestarts: undefined,
+  delayBetweenIndividualWorkerRestarts: env
+    .RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS,
 };
 
-exports.buildConfig = function buildConfig(userConfig) {
+function envValuesUsed() {
+  return {
+    PORT: !userConfig.port && env.PORT,
+    LOG_LEVEL: !userConfig.logLevel && env.LOG_LEVEL,
+    RENDERER_BUNDLE_PATH: !userConfig.bundlePath && env.RENDERER_BUNDLE_PATH,
+    RENDERER_WORKERS_COUNT: !userConfig.workersCount && env.RENDERER_WORKERS_COUNT,
+    RENDERER_PASSWORD: !userConfig.password && (env.RENDERER_PASSWORD && '<MASKED'),
+    RENDERER_ALL_WORKERS_RESTART_INTERVAL: !userConfig.allWorkersRestartInterval &&
+      env.RENDERER_ALL_WORKERS_RESTART_INTERVAL,
+    RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS:
+      !userConfig.delayBetweenIndividualWorkerRestarts &&
+      env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS,
+  };
+}
+
+function sanitizedSettings(aConfig, defaultValue) {
+  return Object.assign({}, aConfig, {
+    password: (aConfig.password && '<MASKED>') || defaultValue,
+    allWorkersRestartInterval: aConfig.allWorkersRestartInterval || defaultValue,
+    delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts
+      || defaultValue,
+  });
+}
+
+export function logSanitizedConfig(log) {
+  log.info(`VM Renderer v${packageJson.version}, protocol v${packageJson.protocolVersion}`);
+  log.info('Default values for settings', JSON.stringify(defaultConfig));
+  log.info('Customized values for settings', JSON.stringify(sanitizedSettings(userConfig)));
+  log.info('ENV values used for settings', JSON.stringify(envValuesUsed()));
+  log.info('Final settings used', JSON.stringify(sanitizedSettings(config, '<NOT PROVIDED>')));
+}
+
+export function buildConfig(providedUserConfig) {
+  userConfig = providedUserConfig;
   config = Object.assign({}, defaultConfig, userConfig);
 
   let currentArg;
@@ -42,8 +100,8 @@ exports.buildConfig = function buildConfig(userConfig) {
       config.port = val;
     }
   });
-};
+}
 
-exports.getConfig = function getConfig() {
+export function getConfig() {
   return config;
-};
+}

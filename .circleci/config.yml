@@ -11,6 +11,13 @@ aliases:
              echo "Ruby version: "; ruby -v
              echo "Node version: "; node -v
              echo "Yarn version: "; yarn --version
+  - &lint-js
+    name: Linting of JS
+    command: yarn lint
+
+  - &lint-ruby
+    name: Linting of Ruby
+    command: bundle exec rubocop
 
   # Install/update Node modules for renderer package unless existing set of modules is satisfying Yarn.
   - &install-package-node-modules
@@ -80,9 +87,20 @@ aliases:
       sudo apt-get install google-chrome-stable
       echo -e "\nInstalled $(google-chrome --version)"
 
-  -
-
 jobs:
+  # Lint all
+  lint-js-and-ruby:
+    docker:
+      - image: circleci/ruby:2.4.4-stretch-node
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-package-node-modules-cache
+      - restore_cache: *restore-package-gem-cache
+      - run: *install-package-ruby-gems
+      - run: *lint-ruby
+      - run: *lint-js
+
   # Install Node modules for Renderer package with Yarn and save them to chache.
   install-package-node-packages:
     docker:
@@ -280,6 +298,10 @@ workflows:
       - install-package-ruby-gems
       - install-dummy-app-node-packages
       - install-dummy-app-ruby-gems
+      - lint-js-and-ruby:
+          requires:
+            - install-package-node-packages
+            - install-package-ruby-gems
       - build-dummy-app-webpack-test-bundles:
           requires:
             - install-dummy-app-node-packages
@@ -294,9 +316,8 @@ workflows:
       - rspec-dummy-app:
           requires:
             - install-package-ruby-gems
-            - install-package-ruby-gems
-            - build-dummy-app-webpack-test-bundles
             - install-dummy-app-ruby-gems
+            - build-dummy-app-webpack-test-bundles
       - rspec-dummy-app-vm-renderer:
           requires:
             - install-package-ruby-gems

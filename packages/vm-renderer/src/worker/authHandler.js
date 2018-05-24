@@ -5,7 +5,6 @@
  * @module worker/authHandler
  */
 
-'use strict';
 
 const { getConfig } = require('../shared/configBuilder');
 

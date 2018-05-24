@@ -1,6 +1,7 @@
-const path = require('path');
-const fs = require('fs');
-const fsExtra = require('fs-extra');
+import path from 'path';
+import fs from 'fs';
+import fsExtra from 'fs-extra';
+
 const { buildConfig } = require('../src/shared/configBuilder');
 
 /**

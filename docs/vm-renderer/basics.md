@@ -1,8 +1,6 @@
 # Requirements
 * You must React on Rails v11.0.7 or higher.
 
-
-
 # Setup Node VM Renderer Server
 
 **Node.js** server for **react-on-rails-vm-renderer** is a standalone application to serve requests from **Rails** client. You don't need any **Ruby** code to setup and launch it.
@@ -21,8 +19,8 @@
 3. Configure a JavaScript file that will launch the rendering server. See docs in [js-configuration.md](./js-configuration.md). For example, create a file `vm-renderer.js` with the content as described in [VM Renderer JavaScript Configuration](./js-configuration.md). Here is a simple example that uses all the defaults:
 
    ```javascript
-   const path = require('path');
-   const reactOnRailsProVmRenderer = require('react-on-rails-pro-vm-renderer');
+   import path from 'path';
+   import reactOnRailsProVmRenderer from 'react-on-rails-pro-vm-renderer';
 
    const config = {
      bundlePath: path.resolve(__dirname, '../tmp/bundles'),
