@@ -11,7 +11,7 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 
 #### Changed
-- Document how to manually rehydrate XHR-substituted components on client side.
+- Document how to manually rehydrate XHR-substituted components on client side. [PR 1095](https://github.com/shakacode/react_on_rails/pull/1095) by [hchevalier](https://github.com/hchevalier).
 
 ### [11.0.7] - 2018-05-11
 #### Fixed
