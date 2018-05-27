@@ -20,7 +20,7 @@ def wait_for_ajax
 end
 
 def finished_all_ajax_requests?
-  page.evaluate_script('jQuery.active').zero?
+  page.evaluate_script("jQuery.active").zero?
 end
 
 shared_examples "React Component" do |dom_selector|
