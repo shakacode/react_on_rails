@@ -19,12 +19,14 @@ module ReactOnRailsProHelper
   #   bundle digest will be included in the cache key. The cache_key value is the same as used for
   #   conventional Rails fragment caching.
   def cached_react_component(component_name, raw_options = {}, &block)
-    check_caching_options!(raw_options, block)
+    ReactOnRailsPro::Utils.with_trace(component_name) do
+      check_caching_options!(raw_options, block)
 
-    ReactOnRailsPro::Cache.fetch_react_component(component_name, raw_options) do
-      sanitized_options = raw_options
-      sanitized_options[:props] = yield
-      react_component(component_name, sanitized_options)
+      ReactOnRailsPro::Cache.fetch_react_component(component_name, raw_options) do
+        sanitized_options = raw_options
+        sanitized_options[:props] = yield
+        react_component(component_name, sanitized_options)
+      end
     end
   end
 
@@ -39,12 +41,14 @@ module ReactOnRailsProHelper
   #   bundle digest will be included in the cache key. The cache_key value is the same as used for
   #   conventional Rails fragment caching.
   def cached_react_component_hash(component_name, raw_options = {}, &block)
-    check_caching_options!(raw_options, block)
+    ReactOnRailsPro::Utils.with_trace(component_name) do
+      check_caching_options!(raw_options, block)
 
-    ReactOnRailsPro::Cache.fetch_react_component(component_name, raw_options) do
-      sanitized_options = raw_options
-      sanitized_options[:props] = yield
-      react_component_hash(component_name, sanitized_options)
+      ReactOnRailsPro::Cache.fetch_react_component(component_name, raw_options) do
+        sanitized_options = raw_options
+        sanitized_options[:props] = yield
+        react_component_hash(component_name, sanitized_options)
+      end
     end
   end
 

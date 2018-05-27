@@ -68,5 +68,46 @@ module ReactOnRailsPro
         end
       end
     end
+
+    describe ".with_trace" do
+      let(:logger_mock) { double("Rails.logger").as_null_object }
+      context "tracing on" do
+        before do
+          allow(ReactOnRailsPro.configuration)
+            .to receive(:tracing).and_return(true)
+          Rails.stub(:logger).and_return(logger_mock)
+        end
+
+        it "logs the time for the method execution" do
+          msg = "Something"
+          expect(logger_mock).to receive(:info)
+
+          result = ReactOnRailsPro::Utils.with_trace(msg) do
+            1 + 2
+          end
+
+          expect(result).to eq(3)
+        end
+      end
+
+      context "tracing off" do
+        before do
+          allow(ReactOnRailsPro.configuration)
+            .to receive(:tracing).and_return(false)
+          Rails.stub(:logger).and_return(logger_mock)
+        end
+
+        it "does not log the time for the method execution" do
+          msg = "Something"
+          expect(logger_mock).not_to receive(:info)
+
+          result = ReactOnRailsPro::Utils.with_trace(msg) do
+            1 + 2
+          end
+
+          expect(result).to eq(3)
+        end
+      end
+    end
   end
 end

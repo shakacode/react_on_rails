@@ -11,8 +11,8 @@
    yarn global add https://<your-github-token>:x-oauth-basic@github.com/shakacode/react_on_rails_pro.git\#master
    ```
 1. ENV values for the default config are (See [JS Configuration](./js-configuration.md) for more details):
-  * PORT
-  * LOG_LEVEL
+  * RENDERER_PORT
+  * RENDERER_LOG_LEVEL
   * RENDERER_BUNDLE_PATH
   * RENDERER_WORKERS_COUNT
   * RENDERER_PASSWORD
