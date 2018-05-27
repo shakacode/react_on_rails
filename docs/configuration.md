@@ -17,6 +17,10 @@ ReactOnRailsPro.configure do |config|
   # If true, then cache the evaluation of JS for prerendering using the standard Rails cache.
   # Default is true.
   config.prerender_caching = true
+  
+  # If true, then capture timing of React on Rails Pro calls including server rendering and 
+  # component rendering.
+  config.tracing = false
 
   # You may provide a password and/or a port that will be sent to renderer for simple authentication. 
   # `https://:<password>@url:<port>`. For example: https://:myPassword1@renderer:3800. Don't forget

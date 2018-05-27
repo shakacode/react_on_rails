@@ -28,10 +28,10 @@ function defaultWorkersCount() {
 
 const defaultConfig = {
   // Use env port if we run on Heroku
-  port: env.PORT || DEFAULT_PORT,
+  port: env.RENDERER_PORT || DEFAULT_PORT,
 
   // Show only important messages by default, https://github.com/winstonjs/winston#logging-levels:
-  logLevel: env.LOG_LEVEL || DEFAULT_LOG_LEVEL,
+  logLevel: env.RENDERER_LOG_LEVEL || DEFAULT_LOG_LEVEL,
 
   // Use directory DEFAULT_TMP_DIR if none provided
   bundlePath: env.RENDERER_BUNDLE_PATH || getTmpDir(),
@@ -53,8 +53,8 @@ const defaultConfig = {
 
 function envValuesUsed() {
   return {
-    PORT: !userConfig.port && env.PORT,
-    LOG_LEVEL: !userConfig.logLevel && env.LOG_LEVEL,
+    RENDERER_PORT: !userConfig.port && env.RENDERER_PORT,
+    RENDERER_LOG_LEVEL: !userConfig.logLevel && env.RENDERER_LOG_LEVEL,
     RENDERER_BUNDLE_PATH: !userConfig.bundlePath && env.RENDERER_BUNDLE_PATH,
     RENDERER_WORKERS_COUNT: !userConfig.workersCount && env.RENDERER_WORKERS_COUNT,
     RENDERER_PASSWORD: !userConfig.password && (env.RENDERER_PASSWORD && '<MASKED'),

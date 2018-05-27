@@ -13,7 +13,8 @@ module ReactOnRailsPro
       renderer_http_pool_size: Configuration::DEFAULT_RENDERER_HTTP_POOL_SIZE,
       renderer_http_pool_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_TIMEOUT,
       renderer_http_pool_warn_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_TIMEOUT,
-      renderer_password: nil
+      renderer_password: nil,
+      tracing: Configuration::DEFAULT_TRACING
     )
   end
 
@@ -24,14 +25,16 @@ module ReactOnRailsPro
     DEFAULT_RENDERER_HTTP_POOL_TIMEOUT = 5
     DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT = 0.25
     DEFAULT_PRERENDER_CACHING = true
+    DEFAULT_TRACING = false
 
-    attr_accessor :renderer_url, :renderer_password,
+    attr_accessor :renderer_url, :renderer_password, :tracing,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
                   :renderer_http_pool_size, :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout
 
     def initialize(renderer_url: nil, renderer_password: nil, server_renderer: nil,
                    renderer_use_fallback_exec_js: nil, prerender_caching: nil,
-                   renderer_http_pool_size: nil, renderer_http_pool_timeout: nil, renderer_http_pool_warn_timeout: nil)
+                   renderer_http_pool_size: nil, renderer_http_pool_timeout: nil,
+                   renderer_http_pool_warn_timeout: nil, tracing: nil)
       self.renderer_url = renderer_url
       self.renderer_password = renderer_password
       self.server_renderer = server_renderer
@@ -40,6 +43,7 @@ module ReactOnRailsPro
       self.renderer_http_pool_size = renderer_http_pool_size
       self.renderer_http_pool_timeout = renderer_http_pool_timeout
       self.renderer_http_pool_warn_timeout = renderer_http_pool_warn_timeout
+      self.tracing = tracing
     end
 
     def setup_config_values

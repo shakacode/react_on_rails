@@ -11,6 +11,26 @@ React on Rails Pro has caching at 2 levels:
 **To toggle caching in development**, as explained in [this article](http://guides.rubyonrails.org/caching_with_rails.html#caching-in-development)
 `rails dev:cache`
 
+### Tracing
+If tracing is turned on in your config/initializers/react_on_rails_pro.rb, you'll see timing messages like this.
+
+* **exec_server_render_js**: Timing of server rendering, which may have the prerender_caching turned on.
+* **cached_react_component** and **cached_react_component_hash**: Timing of the cached view helper which maybe calling server rendering.
+
+```
+Started GET "/server_side_redux_app_cached" for ::1 at 2018-05-24 22:40:13 -1000
+[ReactOnRailsPro:63422] exec_server_render_js: ReduxApp, 230.7ms
+[ReactOnRailsPro:63422] cached_react_component: ReduxApp, 2483.8ms
+Completed 200 OK in 3613ms (Views: 3407.5ms | ActiveRecord: 0.0ms)
+
+
+Started GET "/server_side_redux_app_cached" for ::1 at 2018-05-24 22:40:36 -1000
+Processing by PagesController#server_side_redux_app_cached as HTML
+  Rendering pages/server_side_redux_app_cached.html.erb within layouts/application
+[ReactOnRailsPro:63422] cached_react_component: ReduxApp, 1.1ms
+Completed 200 OK in 19ms (Views: 16.4ms | ActiveRecord: 0.0ms)
+```
+
 ## Prerender Caching
 
 To enable caching server rendering requests to the JavaScript calculation engine (ExecJS or VM Renderer), set this config

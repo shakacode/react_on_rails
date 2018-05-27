@@ -8,4 +8,7 @@ ReactOnRailsPro.configure do |config|
   # Set this to false specs fail if remote renderer is not available
   config.renderer_use_fallback_exec_js = false
   config.prerender_caching = true
+
+  # Get timing of server render calls
+  config.tracing = true
 end

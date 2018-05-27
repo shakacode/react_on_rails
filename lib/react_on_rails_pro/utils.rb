@@ -69,5 +69,21 @@ module ReactOnRailsPro
       # TODO: Need to consider if the configuration value has the ".js" on the end.
       ReactOnRails.configuration.server_bundle_js_file != server_bundle_basename
     end
+
+    def self.with_trace(message = nil)
+      return yield unless ReactOnRailsPro.configuration.tracing
+
+      start = Time.current
+      result = yield
+      finish = Time.current
+
+      caller_method = caller(1..1).first
+      Rails.logger.info do
+        timing = "#{((finish - start) * 1_000).round(1)}ms"
+        "[ReactOnRailsPro:#{Process.pid}] #{caller_method[/`.*'/][1..-2]}: #{[message, timing].compact.join(', ')}"
+      end
+
+      result
+    end
   end
 end

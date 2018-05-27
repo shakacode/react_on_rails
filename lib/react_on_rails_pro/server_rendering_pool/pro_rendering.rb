@@ -6,22 +6,24 @@ module ReactOnRailsPro
       class << self
         def pool
           @pool ||= if ReactOnRailsPro.configuration.server_renderer == "VmRenderer"
-                      ReactOnRailsPro::ServerRenderingPool::VmRenderingPool
+                      ::ReactOnRailsPro::ServerRenderingPool::VmRenderingPool
                     else
-                      ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript
+                      ::ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript
                     end
         end
 
         delegate :reset_pool_if_server_bundle_was_modified, :reset_pool, to: :pool
 
         def exec_server_render_js(js_code, render_options)
-          render_options.request_digest = request_digest(js_code)
-          if ReactOnRailsPro.configuration.prerender_caching
-            Rails.cache.fetch(cache_key(js_code, render_options)) do
+          ::ReactOnRailsPro::Utils.with_trace(render_options.react_component_name) do
+            render_options.request_digest = request_digest(js_code)
+            if ReactOnRailsPro.configuration.prerender_caching
+              Rails.cache.fetch(cache_key(js_code, render_options)) do
+                render_on_pool(js_code, render_options)
+              end
+            else
               render_on_pool(js_code, render_options)
             end
-          else
-            render_on_pool(js_code, render_options)
           end
         end
 
