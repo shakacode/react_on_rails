@@ -63,16 +63,5 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   release_it_command << " --dry-run --verbose" if is_dry_run
   release_it_command << " #{npm_version}" unless npm_version.strip.empty?
   sh_in_dir(gem_root, release_it_command)
-
-  # Release the new gem version
-  unless is_dry_run
-    # Private gem, so no gem releasing. Eventually, we may use a private gem store.
-    # sh_in_dir(gem_root, "gem release")
-
-    # Update master with new npm version
-    sh_in_dir(File.join(gem_root, "spec", "dummy", "client"), "yarn add react-on-rails-pro@#{npm_version} --exact")
-    sh_in_dir(gem_root, "git commit -am 'Updated spec/dummy/client/package.json to latest version'")
-    sh_in_dir(gem_root, "git push")
-  end
 end
 # rubocop:enable Metrics/BlockLength
