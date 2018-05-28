@@ -49,6 +49,5 @@ Gem::Specification.new do |s|
   s.add_development_dependency "pry-toys"
   s.add_development_dependency "rake", "~> 10.0"
   s.add_development_dependency "rspec"
-  s.add_development_dependency "rspec_junit_formatter"
 end
 # rubocop:enable Metrics/BlockLength

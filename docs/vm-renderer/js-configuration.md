@@ -6,9 +6,10 @@ You can also create a custom configuration file to setup and launch the vm-rende
 
 The values in this file must be kept in sync with with the `config/initializers/react_on_rails_pro.rb` file, as documented in [docs/configuration.md](../configuration.md).
 
-Here are the options available for the JavaScript renderer configuration object, as well as the available default ENV values.
+Here are the options available for the JavaScript renderer configuration object, as well as the available default ENV values if using the command line program vm-renderer.
 
-1. **port** (default: `process.env.RENDERER_PORT || 3800`) - The port renderer should listen to.
+1. **port** (default: `process.env.RENDERER_PORT || 3800`) - The port renderer should listen to. 
+   If setting the port, you might want to ensure the port uses `process.env.PORT` so it will use port number provided by **Heroku** environment. 
 1. **logLevel** (default: `process.env.RENDERER_LOG_LEVEL || 'info'`) - Log lever for renderer. Set it to `'error'` to turn logging off. Available levels are: `{ error: 0, warn: 1, info: 2, verbose: 3, debug: 4, silly: 5 }`
 1. **bundlePath** (default: `process.env.RENDERER_BUNDLE_PATH || '/tmp/react-on-rails-pro-vm-renderer-bundles'` ) - path to temp directory where uploaded bundle files will be stored. For example you can set it to `path.resolve(__dirname, './tmp/bundles')` if you configured renderer from the `/` directory of your app. 
 1. **workersCount** (default: `env.RENDERER_WORKERS_COUNT || defaultWorkersCount()` where default is your CPUs count - 1) - Number of workers that will be forked to serve rendering requests. If you set this manually make sure that value is a **Number** and is `>= 1`.
