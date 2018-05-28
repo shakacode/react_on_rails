@@ -1,5 +1,12 @@
 # Caching
+
 Caching at the React on Rails level can greatly speed up your app and reduce the load on your servers, allowing more requests for a given level of hardware.
+
+Consult the [Rails Guide on Caching](http://guides.rubyonrails.org/caching_with_rails.html#cache-stores) for details on:
+
+* [Cache Stores and Configuration](http://guides.rubyonrails.org/caching_with_rails.html#cache-stores)
+* [Determination of Cache Keys](http://guides.rubyonrails.org/caching_with_rails.html#cache-keys)
+* [Caching in Development](http://guides.rubyonrails.org/caching_with_rails.html#caching-in-development): **To toggle caching in development**, run `rails dev:cache`.
 
 ## Overview
 React on Rails Pro has caching at 2 levels:
@@ -7,16 +14,13 @@ React on Rails Pro has caching at 2 levels:
 1. "Fragment caching" view helpers, `cached_react_component` and `cached_react_component_hash`.  
 2. Caching of requests for server rendering. 
 
-### Important: Testing During Development
-**To toggle caching in development**, as explained in [this article](http://guides.rubyonrails.org/caching_with_rails.html#caching-in-development)
-`rails dev:cache`
-
 ### Tracing
-If tracing is turned on in your config/initializers/react_on_rails_pro.rb, you'll see timing messages like this.
+If tracing is turned on in your config/initializers/react_on_rails_pro.rb, you'll see timing log messages that begin with `[ReactOnRailsPro:1234]: exec_server_render_js` where 1234 is the process id and `exec_server_render_js` could be a different method being traced.
 
 * **exec_server_render_js**: Timing of server rendering, which may have the prerender_caching turned on.
 * **cached_react_component** and **cached_react_component_hash**: Timing of the cached view helper which maybe calling server rendering.
 
+Here's a sample. Note the second request
 ```
 Started GET "/server_side_redux_app_cached" for ::1 at 2018-05-24 22:40:13 -1000
 [ReactOnRailsPro:63422] exec_server_render_js: ReduxApp, 230.7ms

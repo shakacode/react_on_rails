@@ -9,7 +9,7 @@ module ReactOnRailsPro
       prerender_caching: Configuration::DEFAULT_PRERENDER_CACHING,
       server_renderer: Configuration::DEFAULT_RENDERER_METHOD,
       renderer_url: Configuration::DEFAULT_RENDERER_URL,
-      renderer_use_fallback_exec_js: true,
+      renderer_use_fallback_exec_js: Configuration::DEFAULT_RENDERER_FALLBACK_EXEC_JS,
       renderer_http_pool_size: Configuration::DEFAULT_RENDERER_HTTP_POOL_SIZE,
       renderer_http_pool_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_TIMEOUT,
       renderer_http_pool_warn_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_TIMEOUT,
@@ -20,11 +20,12 @@ module ReactOnRailsPro
 
   class Configuration
     DEFAULT_RENDERER_URL = "http://localhost:3800".freeze
-    DEFAULT_RENDERER_METHOD = "VmRenderer".freeze
+    DEFAULT_RENDERER_METHOD = "ExecJS".freeze
+    DEFAULT_RENDERER_FALLBACK_EXEC_JS = true
     DEFAULT_RENDERER_HTTP_POOL_SIZE = 10
     DEFAULT_RENDERER_HTTP_POOL_TIMEOUT = 5
     DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT = 0.25
-    DEFAULT_PRERENDER_CACHING = true
+    DEFAULT_PRERENDER_CACHING = false
     DEFAULT_TRACING = false
 
     attr_accessor :renderer_url, :renderer_password, :tracing,

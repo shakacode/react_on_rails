@@ -36,3 +36,5 @@ spec/dummy/client/npm-debug.log*
 /gen-examples
 
 .DS_Store
+
+/gen-documentation

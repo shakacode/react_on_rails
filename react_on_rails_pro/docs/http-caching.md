@@ -1,3 +1,5 @@
+*This doc requires research.*
+
 # HTTP Caching (with Webpacker)
 
 When creating a HTTP cache, you want the cache key to include the client bundle file
