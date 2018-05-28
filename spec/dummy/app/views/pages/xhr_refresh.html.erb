@@ -18,26 +18,26 @@
 <p>
   This example demonstrates client side manual rehydration after a component replacement through XHR.<br/><br/>
 
-  The "Refresh" button on this page will trigger an asynchrounous refresh of component-container content.<br/>
+  The "Refresh" button on this page will trigger an asynchronous refresh of component-container content.<br/>
   Components will be prerendered by the server and inserted in the DOM (spec/dummy/app/views/pages/xhr_refresh.js.erb)<br/>
   No client rehydration will occur, preventing any event handler to be correctly attached<br/><br/>
 
-  Thus, the onChange handler of the HelloWorld component won't trigger whereas the one from HellowWorldRehydratable will, thanks to the "hydrate" javscript event dispacthed from xhr_refresh.js.erb<br />
+  Thus, the onChange handler of the HelloWorld component won't trigger whereas the one from HellowWorldRehydratable will, thanks to the "hydrate" javascript event dispacthed from xhr_refresh.js.erb<br />
 </p>
 
 <hr/>
 <h2>Setup</h2>
 <ol>
   <li>
-    Create component source: spec/dummy/client/app/components/HelloWorldHydratable.jsx
+    Create component source: spec/dummy/client/app/components/HellowWorldRehydratable.jsx
   </li>
   <li>
-    Expose the HelloWorldHydratable Component: spec/dummy/client/app/startup/serverRegistration.jsx and spec/dummy/client/app/startup/clientRegistration.jsx
+    Expose the HellowWorldRehydratable Component: spec/dummy/client/app/startup/serverRegistration.jsx and spec/dummy/client/app/startup/clientRegistration.jsx
     <br/>
     <pre style='white-space: pre-wrap; word-break: keep-all;'>
-      import HelloWorldHydratable from '../components/HelloWorldHydratable';
+      import HellowWorldRehydratable from '../components/HellowWorldRehydratable';
       import ReactOnRails from 'react-on-rails';
-      ReactOnRails.register({ HelloWorldHydratable });
+      ReactOnRails.register({ HellowWorldRehydratable });
     </pre>
   </li>
   <li>
@@ -45,7 +45,7 @@
     <br/>
     <pre style='white-space: pre-wrap; word-break: keep-all;'>
       <div id='my-component-container'>
-        <%%= react_component("HelloWorldHydratable", props: { helloWorldData: { name: 'HelloWorld' } }, prerender: true, trace: true, id: "HelloWorldHydratable-react-component-0") %>
+        <%%= react_component("HellowWorldRehydratable", props: { helloWorldData: { name: 'HelloWorld' } }, prerender: true, trace: true, id: "HellowWorldRehydratable-react-component-0") %>
       </div>
     </pre>
   </li>
@@ -59,11 +59,11 @@
     </pre>
   </li>
   <li>
-    In your xhr_request.js.erb, replace your container content and dispatch the 'hydrate' event that will be caught by HelloWorldHydratable event handler
+    In your xhr_request.js.erb, replace your container content and dispatch the 'hydrate' event that will be caught by HellowWorldRehydratable event handler
     <br/>
     <pre style='white-space: pre-wrap; word-break: keep-all;'>
       var container = document.getElementById('component-container');
-      <%% new_component = react_component("HelloWorldHydratable", props: { helloWorldData: { name: 'HelloWorld' } }, prerender: true, trace: true, id: "HelloWorldHydratable-react-component-0") %>
+      <%% new_component = react_component("HellowWorldRehydratable", props: { helloWorldData: { name: 'HelloWorld' } }, prerender: true, trace: true, id: "HellowWorldRehydratable-react-component-0") %>
       container.innerHTML = "<%%= escape_javascript(new_component) %>";
 
       var event = document.createEvent('Event');

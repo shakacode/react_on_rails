@@ -543,7 +543,7 @@ All options except `props, id, html_options` will inherit from your `react_on_ra
 
   Note: client hydration will not trigger for components rendered through XHR. You will have to handle it with javascript.
   For an example, see [spec/dummy/app/views/pages/xhr_refresh.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/pages/xhr_refresh.rb). 
-  
+
 ### react_component_hash
 `react_component_hash` is used to return multiple HTML strings for server rendering, such as for
 adding meta-tags to a page. It is exactly like react_component except for the following:

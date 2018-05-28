@@ -38,19 +38,11 @@ class HelloWorldRehydratable extends React.Component {
     // Not all browsers support forEach on NodeList so we go with a classic for-loop
     for (let i = 0; i < match.length; ++i) {
       const component = match[i];
-
       // Get component specification <script> tag
-      let domNode = component;
-      while (domNode && !domNode.classList.contains('js-react-on-rails-component')) {
-        // Before ReactOnRails v11.0.7, component specifications where inserted before the actual component
-        // See https://github.com/shakacode/react_on_rails/commit/912118445f55c6f59664bf2b9f9ed97779ee71c9
-        // You may have to replace "nextElementSibling" by "previousElementSibling" if you use an older version
-        domNode = domNode.nextElementSibling;
-      }
-
-      if (domNode) {
+      const componentSpecificationTag = document.querySelector(`script[data-dom-id=${component.id}]`)
+      if (componentSpecificationTag) {
         // Read props from the component specification tag and merge railsContext
-        const mergedProps = {...JSON.parse(domNode.textContent), railsContext};
+        const mergedProps = {...JSON.parse(componentSpecificationTag.textContent), railsContext};
         // Hydrate
         ReactOnRails.render(registeredComponentName, mergedProps, component.id);
       }
