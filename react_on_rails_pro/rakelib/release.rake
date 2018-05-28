@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-# require_relative "task_helpers"
+require_relative "./task_helpers"
+require "react_on_rails"
 # require_relative File.join(gem_root, "lib", "react_on_rails", "version_syntax_converter")
 # require_relative File.join(gem_root, "lib", "react_on_rails", "git_utils")
 # require_relative File.join(gem_root, "lib", "react_on_rails", "utils")
@@ -22,7 +23,7 @@ Example: `rake release[2.1.0,false]`")
 
 # rubocop:disable Metrics/BlockLength
 task :release, %i[gem_version dry_run tools_install] do |_t, args|
-  include ReactOnRails::TaskHelpers
+  include ReactOnRailsPro::TaskHelpers
 
   class MessageHandler
     def add_error(error)
@@ -44,10 +45,8 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
                   VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
                 end
 
-  # Having the examples prevents publishing
-  Rake::Task["examples:clobber"].invoke
   # Delete any react_on_rails.gemspec except the root one
-  sh_in_dir(gem_root, "find . -mindepth 2 -name 'react_on_rails.gemspec' -delete")
+  sh_in_dir(gem_root, "find . -mindepth 2 -name 'react_on_rails_pro.gemspec' -delete")
 
   # See https://github.com/svenfuchs/gem-release
   sh_in_dir(gem_root, "git pull --rebase")
@@ -60,18 +59,19 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   sh_in_dir(gem_root, "git add .")
 
   # Will bump the yarn version, commit, tag the commit, push to repo, and release on yarn
-  release_it_command = "$(yarn bin)/release-it --non-interactive --npm.publish".dup
+  release_it_command = "$(yarn bin)/release-it --non-interactive --npm.publish false".dup
   release_it_command << " --dry-run --verbose" if is_dry_run
   release_it_command << " #{npm_version}" unless npm_version.strip.empty?
   sh_in_dir(gem_root, release_it_command)
 
   # Release the new gem version
   unless is_dry_run
-    sh_in_dir(gem_root, "gem release")
+    # Private gem, so no gem releasing. Eventually, we may use a private gem store.
+    # sh_in_dir(gem_root, "gem release")
 
     # Update master with new npm version
-    sh_in_dir(File.join(gem_root, "spec", "dummy", "client"), "yarn add react-on-rails@#{npm_version} --exact")
-    sh_in_dir(gem_root, "git commit -am 'Updated spec/dummy/client/package.json latest version'")
+    sh_in_dir(File.join(gem_root, "spec", "dummy", "client"), "yarn add react-on-rails-pro@#{npm_version} --exact")
+    sh_in_dir(gem_root, "git commit -am 'Updated spec/dummy/client/package.json to latest version'")
     sh_in_dir(gem_root, "git push")
   end
 end
