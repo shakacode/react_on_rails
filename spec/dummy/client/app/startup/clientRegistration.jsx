@@ -1,7 +1,5 @@
 import 'babel-polyfill';
 import 'es5-shim';
-import 'jquery'
-import {} from 'jquery-ujs'
 
 import ReactOnRails from 'react-on-rails';
 

@@ -28,7 +28,6 @@ module.exports = {
     extensions: ['.js', '.jsx'],
     alias: {
       images: join(process.cwd(), 'app', 'assets', 'images'),
-      jquery: 'jquery/src/jquery',
     },
   },
 
@@ -64,12 +63,16 @@ module.exports = {
 
       {
         test: require.resolve('jquery'),
-        use: {
-          loader: 'expose-loader',
-          options: {
-            jQuery: true,
+        use: [
+          {
+            loader: 'expose-loader',
+            options: 'jQuery'
           },
-        },
+          {
+            loader: 'expose-loader',
+            options: '$'
+          },
+        ],
       },
     ],
   },

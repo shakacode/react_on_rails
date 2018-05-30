@@ -44,12 +44,10 @@ class HelloWorldRehydratable extends React.Component {
       const component = match[i];
       // Get component specification <script> tag
       const componentSpecificationTag = document.querySelector(`script[data-dom-id=${component.id}]`);
-      if (componentSpecificationTag) {
-        // Read props from the component specification tag and merge railsContext
-        const mergedProps = { ...JSON.parse(componentSpecificationTag.textContent), railsContext };
-        // Hydrate
-        ReactOnRails.render(registeredComponentName, mergedProps, component.id);
-      }
+      // Read props from the component specification tag and merge railsContext
+      const mergedProps = { ...JSON.parse(componentSpecificationTag.textContent), railsContext };
+      // Hydrate
+      ReactOnRails.render(registeredComponentName, mergedProps, component.id);
     }
   }
 
