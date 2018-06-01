@@ -25,6 +25,11 @@ if (devBuild) {
 }
 
 module.exports = merge(config, {
+  entry: {
+    'vendor-bundle': [
+      'jquery-ujs',
+    ],
+  },
 
   output: {
     filename: isHMR ? '[name]-[hash].js' : '[name]-[chunkhash].js',

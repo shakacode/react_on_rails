@@ -540,7 +540,10 @@ All options except `props, id, html_options` will inherit from your `react_on_ra
   + **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the configuration of `logging_on_server` set to true, you'll still see the errors on the server.
   + **logging_on_server:** Default is true. True will log JS console messages and errors to the server.
   + **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
-  
+
+  Note: client hydration will not trigger for components rendered through XHR. You will have to handle it with javascript.
+  For an example, see [spec/dummy/app/views/pages/xhr_refresh.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/pages/xhr_refresh.rb). 
+
 ### react_component_hash
 `react_component_hash` is used to return multiple HTML strings for server rendering, such as for
 adding meta-tags to a page. It is exactly like react_component except for the following:

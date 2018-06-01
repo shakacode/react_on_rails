@@ -1,0 +1,6 @@
+var container = document.getElementById('component-container');
+container.innerHTML = "<%= escape_javascript(render partial: 'xhr_refresh_partial') %>";
+
+var event = document.createEvent('Event');
+event.initEvent('hydrate', true, true);
+document.dispatchEvent(event);

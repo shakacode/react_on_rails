@@ -13,6 +13,16 @@ def change_text_expect_dom_selector(dom_selector)
   end
 end
 
+def wait_for_ajax
+  Timeout.timeout(Capybara.default_max_wait_time) do
+    loop until finished_all_ajax_requests?
+  end
+end
+
+def finished_all_ajax_requests?
+  page.evaluate_script("jQuery.active").zero?
+end
+
 shared_examples "React Component" do |dom_selector|
   scenario { is_expected.to have_css dom_selector }
 
@@ -186,6 +196,23 @@ feature "renderedHtml from generator function", :js, type: :system do
   scenario "renderedHtml should not have any errors" do
     expect(subject).to have_text 'Props: {"hello":"world"}'
     expect(subject.html).to include("[SERVER] RENDERED RenderedHtml to dom node with id")
+  end
+end
+
+feature "Manual client hydration", :js, type: :system do
+  subject { page }
+  background { visit "/xhr_refresh" }
+  scenario "HelloWorldRehydratable onChange should trigger" do
+    within("form") do
+      click_button "refresh"
+    end
+    wait_for_ajax
+    within("#HelloWorldRehydratable-react-component-1") do
+      find("input").set "Should update"
+      within("h3") do
+        is_expected.to have_content "Should update"
+      end
+    end
   end
 end
 
