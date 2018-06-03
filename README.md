@@ -2,16 +2,15 @@
 
 *If this projects helps you, please give us a star!*
 
-## Need Help with Rails + Webpack v4 + React? Want better performance?
+## React on Rails Pro Released!
+React on Rails Pro provides Node server rendering and other performance enhancements for React on Rails. It's live at [egghead.io](https://egghead.io). See the [React on Rails Pro Docs](https://github.com/shakacode/react_on_rails/wiki).
+
 Aloha, I'm Justin Gordon the creator and maintainer of React on Rails. I offer a [React on Rails Pro Support Plan](http://www.shakacode.com/work/shakacode-pro-support.pdf), and I can help you with:
 * Optimizing your webpack setup to Webpack v4 for React on Rails.
 * Upgrading from older React on Rails to newer versions (are using using the new Webpacker setup that avoids the asset pipeline?)
 * Better performance client and server side.
 * Efficiently migrating from Angular to React.
 * Best practices based on 4 years of React on Rails experience.
-* Early access to the React on Rails Pro Gem and Node code, including:
-  * ShakaCode's Node.js rendering server for better performance for server rendering (live at [egghead.io](https://egghead.io/)).
-  * Performance caching helpers, especially for server rendering
 
 Please [email me](mailto:justin@shakacode.com) for a free half-hour project consultation, on anything from React on Rails to any aspect of web development.
 
