@@ -12,7 +12,18 @@ Aloha, I'm Justin Gordon the creator and maintainer of React on Rails. I offer a
 * Efficiently migrating from Angular to React.
 * Best practices based on 4 years of React on Rails experience.
 
+From Kyle Maune of Cooper Aerial, May 4, 2018
+
+![image](https://user-images.githubusercontent.com/1118459/40891236-9b0b406e-671d-11e8-80ee-c026dbd1d5a2.png)
+
+From Joel Hooks, Co-Founder, Chief Nerd at [egghead.io](https://egghead.io/), January 30, 2017:
+
+![2017-01-30_11-33-59](https://cloud.githubusercontent.com/assets/1118459/22443635/b3549fb4-e6e3-11e6-8ea2-6f589dc93ed3.png)
+
 Please [email me](mailto:justin@shakacode.com) for a free half-hour project consultation, on anything from React on Rails to any aspect of web development.
+
+For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
+
 
 ----
 
@@ -67,15 +78,6 @@ Please [**click to subscribe**](https://app.mailerlite.com/webforms/landing/l1d9
 * For a live, [open source](https://github.com/shakacode/react-webpack-rails-tutorial), example of this gem, see [www.reactrails.com](http://www.reactrails.com).
 * See [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
 * *See [NEWS.md](NEWS.md) for more notes over time.*
-
-------
-
-# Testimonials
-From Joel Hooks, Co-Founder, Chief Nerd at [egghead.io](https://egghead.io/), January 30, 2017:
-
-![2017-01-30_11-33-59](https://cloud.githubusercontent.com/assets/1118459/22443635/b3549fb4-e6e3-11e6-8ea2-6f589dc93ed3.png)
-
-For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 
 -------
 
