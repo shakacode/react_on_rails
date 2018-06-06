@@ -84,7 +84,7 @@ module ReactOnRails
           allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
         end
 
-        it { expect(subject).to eq("public/webpack/development/webpack-bundle.js") }
+        it { expect(subject).to end_with("public/webpack/development/webpack-bundle.js") }
       end
 
       context "With Webpacker 3.0.2 enabled and server file not in manifest", :webpacker do
@@ -103,7 +103,7 @@ module ReactOnRails
           allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
         end
 
-        it { expect(subject).to eq("public/webpack/development/webpack-bundle.js") }
+        it { expect(subject).to end_with("public/webpack/development/webpack-bundle.js") }
       end
     end
 
