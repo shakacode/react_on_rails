@@ -10,6 +10,8 @@ module ReactOnRails
   DEFAULT_SERVER_RENDER_TIMEOUT = 20
   DEFAULT_POOL_SIZE = 1
 
+  # TODO: Move this inside of the class Configuration so as not to put all these methods
+  # on ReactOnRails
   def self.setup_config_values
     ensure_webpack_generated_files_exists
     configure_generated_assets_dirs_deprecation

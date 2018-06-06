@@ -41,7 +41,7 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   npm_version = if gem_version.strip.empty?
                   ""
                 else
-                  VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
+                  ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
                 end
 
   # Having the examples prevents publishing

@@ -10,6 +10,10 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [11.0.8] - 2018-05-22
+#### Fixed
+- Fix test helper determination of stale assets. [PR 1093](https://github.com/shakacode/react_on_rails/pull/1093) by [justin808](https://github.com/justin808).
+
 #### Changed
 - Document how to manually rehydrate XHR-substituted components on client side. [PR 1095](https://github.com/shakacode/react_on_rails/pull/1095) by [hchevalier](https://github.com/hchevalier).
 
@@ -768,7 +772,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.7...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.8...master
+[11.0.8]: https://github.com/shakacode/react_on_rails/compare/11.0.7...11.0.8
 [11.0.7]: https://github.com/shakacode/react_on_rails/compare/11.0.6...11.0.7
 [11.0.6]: https://github.com/shakacode/react_on_rails/compare/11.0.5...11.0.6
 [11.0.5]: https://github.com/shakacode/react_on_rails/compare/11.0.4...11.0.5

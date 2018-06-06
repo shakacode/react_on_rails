@@ -8,6 +8,10 @@ module ReactOnRails
     let(:not_existing_path) { "/path/to/#{SecureRandom.hex(4)}" }
     let(:using_webpacker) { false }
 
+    after do
+      ReactOnRails.instance_variable_set(:@configuration, nil)
+    end
+
     before do
       allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(using_webpacker)
     end
@@ -51,10 +55,6 @@ module ReactOnRails
     end
 
     describe ".server_render_method" do
-      after do
-        ReactOnRails.configure { |config| config.server_render_method = nil }
-      end
-
       it "does not throw if the server render method is blank" do
         expect do
           ReactOnRails.configure do |config|
@@ -74,10 +74,6 @@ module ReactOnRails
 
     describe ".i18n_dir" do
       let(:i18n_dir) { existing_path }
-
-      after do
-        ReactOnRails.configure { |config| config.i18n_dir = nil }
-      end
 
       it "passes if directory exists" do
         expect do
@@ -106,10 +102,6 @@ module ReactOnRails
 
     describe ".i18n_yml_dir" do
       let(:i18n_yml_dir) { existing_path }
-
-      after do
-        ReactOnRails.configure { |config| config.i18n_yml_dir = nil }
-      end
 
       it "passes if directory exists" do
         expect do

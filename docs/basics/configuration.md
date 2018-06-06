@@ -58,8 +58,10 @@ ReactOnRails.configure do |config|
 
   # Define the files we need to check for webpack compilation when running tests.
   # The default is `%w( manifest.json )` as will be sufficient for most webpacker builds.
+  # However, if you are generated a server bundle that is NOT hashed (present in manifest.json),
+  # then include the file in this list like this: 
   #
-  config.webpack_generated_files = %w( manifest.json )
+  config.webpack_generated_files = %w( server-bundle.js manifest.json )
   
   # You can optionally add values to your rails_context. See example below for RenderingExtension
   # config.rendering_extension = RenderingExtension
@@ -75,8 +77,10 @@ ReactOnRails.configure do |config|
   # JavaScript execution instances which should handle any component requested.
   #
   # While you may configure this to be the same as your client bundle file, this file is typically
-  # different.
-  #
+  # different. Note, be sure to include the exact file name with the ".js" if you are not hashing this file.
+  # If you are hashing this file (supposing you are using the same file for client rendering), then
+  # 
+  # you should include a name that matches your bundle name in your webpack config.
   config.server_bundle_js_file = "server-bundle.js"
 
   # If set to true, this forces Rails to reload the server bundle if it is modified

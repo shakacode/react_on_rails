@@ -37,7 +37,13 @@ The following `config/react_on_rails.rb` settings **must** match your setup:
 
   # Define the files we need to check for webpack compilation when running tests.
   # Generally, the manifest.json is good enough for this check if using webpacker
-  config.webpack_generated_files = %w( hello-world-bundle.js )
+  config.webpack_generated_files = %w( manifest.json )
+  
+  # OR if you're not hashing the server-bundle.js, then you should include your server-bundle.js in the list.
+  # config.webpack_generated_files = %w( server-bundle.js manifest.json )
+  
+  # OR if you're not using webpacker, your setup might look like.
+  # config.webpack_generated_files = %w( client-bundle.js server-bundle.js )
   
   # If you are using the ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
   # with rspec then this controls what yarn command is run

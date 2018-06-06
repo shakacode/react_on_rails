@@ -25,10 +25,10 @@ Reason for doing this: This enables your webpack bundles to bypass the Rails ass
 #### From version 7 or lower
 
 ##### ...while keeping your `client` directory
-Unfortunately, this requires quite a few steps:
 *   `.gitignore`: add `/public/webpack/*`
 *   `Gemfile`: bump `react_on_rails` and add `webpacker`
-*   layout views: anything bundled by webpack will need to be requested by a `javascript_pack_tag` or `stylesheet_pack_tag`
+*   layout views: anything bundled by webpack will need to be requested by a `javascript_pack_tag` or `stylesheet_pack_tag`. 
+  * Search your codebase for javascript_include_tag. Use the 
 *   `config/initializers/assets.rb`: we no longer need to modify `Rails.application.config.assets.paths` or append anything to `Rails.application.config.assets.precompile`.
 *   `config/initializers/react_on_rails.rb`:
     *   Delete `config.generated_assets_dir`. Webpacker's config now supplies this information
