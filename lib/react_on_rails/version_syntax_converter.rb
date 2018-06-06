@@ -13,9 +13,9 @@ module ReactOnRails
 
     def npm_to_rubygem(npm_version)
       match = npm_version
-                .tr("-", ".")
-                .strip
-                .match(/(\d.*)/)
+              .tr("-", ".")
+              .strip
+              .match(/(\d.*)/)
       match.present? ? match[0] : nil
     end
   end
