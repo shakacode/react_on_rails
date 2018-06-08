@@ -9,6 +9,7 @@ See [Upgrading React on Rails](./docs/basics/upgrading-react-on-rails.md) for mo
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+- Handle <script async> for Webpack bundle transparently. Closes [issue #290](https://github.com/shakacode/react_on_rails/issues/290) [PR 1099](https://github.com/shakacode/react_on_rails/pull/1099) by [squadette](https://github.com/squadette).
 
 #### Changed
 - Document how to manually rehydrate XHR-substituted components on client side. [PR 1095](https://github.com/shakacode/react_on_rails/pull/1095) by [hchevalier](https://github.com/hchevalier).
@@ -87,7 +88,7 @@ both the gem and the node package get the updates. This change ensures that the 
 
 ### [10.1.3] - 2018-02-28
 #### Fixed
-- Improved error reporting on version mismatches between Javascript and Ruby packages. [PR 1025](https://github.com/shakacode/react_on_rails/pull/1025) by [theJoeBiz](https://github.com/squadette).
+- Improved error reporting on version mismatches between Javascript and Ruby packages. [PR 1025](https://github.com/shakacode/react_on_rails/pull/1025) by [squadette](https://github.com/squadette).
 
 ### [10.1.2] - 2018-02-27
 #### Fixed
