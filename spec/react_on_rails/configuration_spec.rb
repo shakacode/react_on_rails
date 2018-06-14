@@ -8,12 +8,12 @@ module ReactOnRails
     let(:not_existing_path) { "/path/to/#{SecureRandom.hex(4)}" }
     let(:using_webpacker) { false }
 
-    after do
-      ReactOnRails.instance_variable_set(:@configuration, nil)
-    end
-
     before do
       allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(using_webpacker)
+    end
+
+    after do
+      ReactOnRails.instance_variable_set(:@configuration, nil)
     end
 
     unless using_rails32?

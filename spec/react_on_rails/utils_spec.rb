@@ -67,6 +67,12 @@ module ReactOnRails
     end
 
     describe ".server_bundle_js_file_path" do
+      before do
+        allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
+      end
+
+      let(:server_bundle_name) { "server-bundle.js" }
+
       subject do
         Utils.server_bundle_js_file_path
       end
@@ -75,35 +81,33 @@ module ReactOnRails
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-            .and_return("webpack-bundle.js")
+            .and_return(server_bundle_name)
           allow(Webpacker).to receive_message_chain("config.public_output_path")
             .and_return("public/webpack/development")
           allow(Webpacker).to receive_message_chain("manifest.lookup!")
-            .with("webpack-bundle.js")
+            .with(server_bundle_name)
             .and_raise(Webpacker::Manifest::MissingEntryError)
-          allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
         end
 
-        it { expect(subject).to end_with("public/webpack/development/webpack-bundle.js") }
+        it { expect(subject).to end_with("public/webpack/development/#{server_bundle_name}") }
       end
 
       context "With Webpacker 3.0.2 enabled and server file not in manifest", :webpacker do
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-            .and_return("webpack-bundle.js")
+            .and_return(server_bundle_name)
           allow(Webpacker).to receive_message_chain("config.public_output_path")
             .and_return("public/webpack/development")
           allow(Webpacker).to receive_message_chain("manifest.lookup")
-            .with("webpack-bundle.js")
+            .and_return(server_bundle_name)
             .and_return(nil)
           allow(Webpacker).to receive_message_chain("manifest.lookup!")
-            .with("webpack-bundle.js")
+            .with(server_bundle_name)
             .and_raise(Webpacker::Manifest::MissingEntryError)
-          allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
         end
 
-        it { expect(subject).to end_with("public/webpack/development/webpack-bundle.js") }
+        it { expect(subject).to end_with("public/webpack/development/#{server_bundle_name}") }
       end
     end
 
