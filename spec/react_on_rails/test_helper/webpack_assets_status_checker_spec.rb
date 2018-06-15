@@ -9,7 +9,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     let(:generated_assets_full_path) do
       compiled_js_dir_for(fixture_dirname)
     end
-    let(:webpack_generated_files) { %w[client-bundle.js server-bundle.js] }
+    let(:webpack_generated_files) { %w[manifest.json] }
     let(:server_bundle_js_file) { File.join(generated_assets_full_path, "server-bundle.js") }
     let(:client_bundle_js_file) { File.join(generated_assets_full_path, "client-bundle.js") }
     before do
@@ -24,48 +24,79 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
              webpack_generated_files: webpack_generated_files)
     end
 
-    context "when compiled assets exist and are up-to-date" do
-      let(:fixture_dirname) { "assets_exist" }
+    context "With Webpacker" do
       before do
-        allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(false)
-        touch_files_in_dir(generated_assets_full_path)
-      end
-
-      specify { expect(checker.stale_generated_webpack_files).to eq([]) }
-    end
-
-    context "when compiled assets with manifest exist and are up-to-date" do
-      let(:fixture_dirname) { "assets_with_manifest_exist" }
-      before do
-        require "webpacker"
         allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
-        allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(true)
-        allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
-          .with("client-bundle.js")
-          .and_return(File.join(generated_assets_full_path, "client-bundle-6bc530d039d96709b68d.js"))
-        allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
-          .with("server-bundle.js")
-          .and_return(File.join(generated_assets_full_path, "server-bundle-6bc530d039d96702268d.js"))
-        touch_files_in_dir(generated_assets_full_path)
       end
 
-      specify { expect(checker.stale_generated_webpack_files).to eq([]) }
-    end
+      context "when compiled assets with manifest exist and are up-to-date" do
+        let(:fixture_dirname) { "assets_with_manifest_exist" }
+        before do
+          require "webpacker"
+          allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(true)
+          allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
+            .with("manifest.json")
+            .and_return(File.join(generated_assets_full_path, "manifest.json"))
+          allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
+            .with("server-bundle.js")
+            .and_return(File.join(generated_assets_full_path, "server-bundle.js"))
+          touch_files_in_dir(generated_assets_full_path)
+        end
 
-    context "when using webpacker and manifest is missing" do
-      let(:fixture_dirname) { "assets_with_missing_manifest" }
-      before do
-        require "webpacker"
-        allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
-        allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(false)
+        specify { expect(checker.stale_generated_webpack_files).to eq([]) }
       end
 
-      specify { expect(checker.stale_generated_webpack_files).to eq(["manifest.json"]) }
+      context "when using webpacker and manifest is missing" do
+        let(:fixture_dirname) { "assets_with_missing_manifest" }
+        before do
+          require "webpacker"
+          allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(false)
+        end
+
+        specify { expect(checker.stale_generated_webpack_files).to eq(["manifest.json"]) }
+      end
+
+      context "when using webpacker, a missing server bundle without hash, and manifest is current" do
+        let(:webpack_generated_files) { %w[manifest.json server-bundle.js] }
+        let(:fixture_dirname) { "assets_with_manifest_exist_server_bundle_separate" }
+
+        before do
+          require "webpacker"
+          allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(true)
+          allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_public_output_path)
+            .and_return(generated_assets_full_path)
+          allow(ReactOnRails.configuration).to receive(:server_bundle_js_file).and_return("server-bundle.js")
+          allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
+            .with("manifest.json")
+            .and_return(File.join(generated_assets_full_path, "manifest.json"))
+          allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
+            .with("server-bundle.js")
+            .and_raise(Webpacker::Manifest::MissingEntryError)
+          touch_files_in_dir(generated_assets_full_path)
+        end
+
+        specify do
+          expect(checker.stale_generated_webpack_files.first)
+            .to match(/server-bundle\.js$/)
+        end
+      end
     end
 
     context "No Webpacker" do
+      let(:webpack_generated_files) { %w[client-bundle.js server-bundle.js] }
+
       before do
         allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(false)
+      end
+
+      context "When compiled assets exist and are up-to-date" do
+        let(:fixture_dirname) { "assets_exist" }
+
+        before do
+          touch_files_in_dir(generated_assets_full_path)
+        end
+
+        specify { expect(checker.stale_generated_webpack_files).to eq([]) }
       end
 
       context "when compiled assets don't exist" do
