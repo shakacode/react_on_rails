@@ -76,8 +76,10 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
                               begin
                                 bundle_js_file_path(bundle_name)
                               rescue Webpacker::Manifest::MissingEntryError
-                                File.join(ReactOnRails::WebpackerUtils.webpacker_public_output_path,
-                                          bundle_name)
+                                File.expand_path(
+                                  File.join(ReactOnRails::WebpackerUtils.webpacker_public_output_path,
+                                            bundle_name)
+                                )
                               end
                             else
                               bundle_js_file_path(bundle_name)

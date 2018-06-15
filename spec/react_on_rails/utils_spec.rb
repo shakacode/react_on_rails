@@ -68,46 +68,39 @@ module ReactOnRails
 
     describe ".server_bundle_js_file_path" do
       before do
+        allow(Rails).to receive(:root).and_return(Pathname.new("."))
         allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
+        allow(Webpacker).to receive_message_chain("config.public_output_path")
+          .and_return(Pathname.new("public/webpack/development"))
       end
 
-      let(:server_bundle_name) { "server-bundle.js" }
-
-      subject do
-        Utils.server_bundle_js_file_path
-      end
-
-      context "With Webpacker 3.0.1 enabled and server file not in manifest", :webpacker do
-        before do
-          allow(Rails).to receive(:root).and_return(Pathname.new("."))
+      context "With Webpacker enabled and server file not in manifest", :webpacker do
+        it "returns the unhashed server path" do
+          server_bundle_name = "server-bundle.js"
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
             .and_return(server_bundle_name)
-          allow(Webpacker).to receive_message_chain("config.public_output_path")
-            .and_return("public/webpack/development")
           allow(Webpacker).to receive_message_chain("manifest.lookup!")
             .with(server_bundle_name)
             .and_raise(Webpacker::Manifest::MissingEntryError)
-        end
 
-        it { expect(subject).to end_with("public/webpack/development/#{server_bundle_name}") }
+          path = Utils.server_bundle_js_file_path
+
+          expect(path).to end_with("public/webpack/development/#{server_bundle_name}")
+        end
       end
 
-      context "With Webpacker 3.0.2 enabled and server file not in manifest", :webpacker do
-        before do
-          allow(Rails).to receive(:root).and_return(Pathname.new("."))
+      context "With Webpacker enabled and server file in the manifest", :webpacker do
+        it "returns the correct path hashed server path" do
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-            .and_return(server_bundle_name)
-          allow(Webpacker).to receive_message_chain("config.public_output_path")
-            .and_return("public/webpack/development")
-          allow(Webpacker).to receive_message_chain("manifest.lookup")
-            .and_return(server_bundle_name)
-            .and_return(nil)
+            .and_return("webpack-bundle.js")
           allow(Webpacker).to receive_message_chain("manifest.lookup!")
-            .with(server_bundle_name)
-            .and_raise(Webpacker::Manifest::MissingEntryError)
-        end
+            .with("webpack-bundle.js")
+            .and_return("webpack/development/webpack-bundle-123456.js")
 
-        it { expect(subject).to end_with("public/webpack/development/#{server_bundle_name}") }
+          path = Utils.server_bundle_js_file_path
+
+          expect(path).to end_with("public/webpack/development/webpack-bundle-123456.js")
+        end
       end
     end
 
