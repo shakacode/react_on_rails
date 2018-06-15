@@ -53,7 +53,11 @@ module ReactOnRails
       def all_compiled_assets
         @all_compiled_assets ||= begin
           webpack_generated_files = @webpack_generated_files.map do |bundle_name|
-            ReactOnRails::Utils.bundle_js_file_path(bundle_name)
+            if bundle_name == ReactOnRails.configuration.server_bundle_js_file
+              ReactOnRails::Utils.server_bundle_js_file_path
+            else
+              ReactOnRails::Utils.bundle_js_file_path(bundle_name)
+            end
           end
 
           if webpack_generated_files.present?
