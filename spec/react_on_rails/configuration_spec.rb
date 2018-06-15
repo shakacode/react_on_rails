@@ -12,6 +12,10 @@ module ReactOnRails
       allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(using_webpacker)
     end
 
+    after do
+      ReactOnRails.instance_variable_set(:@configuration, nil)
+    end
+
     unless using_rails32?
       describe "generated_assets_dir" do
         let(:using_webpacker) { true }
@@ -51,10 +55,6 @@ module ReactOnRails
     end
 
     describe ".server_render_method" do
-      after do
-        ReactOnRails.configure { |config| config.server_render_method = nil }
-      end
-
       it "does not throw if the server render method is blank" do
         expect do
           ReactOnRails.configure do |config|
@@ -74,10 +74,6 @@ module ReactOnRails
 
     describe ".i18n_dir" do
       let(:i18n_dir) { existing_path }
-
-      after do
-        ReactOnRails.configure { |config| config.i18n_dir = nil }
-      end
 
       it "passes if directory exists" do
         expect do
@@ -106,10 +102,6 @@ module ReactOnRails
 
     describe ".i18n_yml_dir" do
       let(:i18n_yml_dir) { existing_path }
-
-      after do
-        ReactOnRails.configure { |config| config.i18n_yml_dir = nil }
-      end
 
       it "passes if directory exists" do
         expect do

@@ -3,6 +3,8 @@
 # rubocop:disable: Layout/IndentHeredoc
 module ReactOnRails
   class PrerenderError < ::ReactOnRails::Error
+    # TODO: Consider remove providing original `err` as already have access to `self.cause`
+    # http://blog.honeybadger.io/nested-errors-in-ruby-with-exception-cause/
     attr_reader :component_name, :err, :props, :js_code, :console_messages
 
     # err might be nil if JS caught the error
