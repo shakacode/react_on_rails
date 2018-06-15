@@ -89,7 +89,7 @@ module ReactOnRails
             .and_raise(Webpacker::Manifest::MissingEntryError)
         end
 
-        it { expect(subject).to end_with("#{server_bundle_name}") }
+        it { expect(subject).to end_with(server_bundle_name.to_s) }
       end
 
       context "With Webpacker 3.0.2 enabled and server file not in manifest", :webpacker do
@@ -107,7 +107,7 @@ module ReactOnRails
             .and_raise(Webpacker::Manifest::MissingEntryError)
         end
 
-        it { expect(subject).to end_with("#{server_bundle_name}") }
+        it { expect(subject).to end_with(server_bundle_name.to_s) }
       end
     end
 
