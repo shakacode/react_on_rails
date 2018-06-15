@@ -1,4 +1,4 @@
-# Table of Content
+# Table of Contents
 
 ### **Rails**
   + [Rails Assets](./docs/additional-reading/rails-assets.md)
