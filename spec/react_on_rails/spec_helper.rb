@@ -1,7 +1,6 @@
 # frozen_string_literal: true
-#
+
 ENV["RAILS_ENV"] ||= "test"
-SERVER_BUNDLE_PATH = File.expand_path("../../public/webpack/" + ENV["RAILS_ENV"] + "/server-bundle.js", __FILE__)
 
 $LOAD_PATH.unshift File.expand_path("../../lib", __dir__)
 require "react_on_rails"
