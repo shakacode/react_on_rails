@@ -9,6 +9,10 @@ See [Upgrading React on Rails](./docs/basics/upgrading-react-on-rails.md) for mo
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+### [11.0.9] - 2018-05-22
+#### Fixed
+- HashWithIndifferent access for props threw if used for props. [PR 1100](https://github.com/shakacode/react_on_rails/pull/1100) by [justin808](https://github.com/justin808).
+- Test helper for detecting stale bundles did not properly handle the case of a server-bundle.js without a hash.[PR 1102](https://github.com/shakacode/react_on_rails/pull/1102) by [justin808](https://github.com/justin808).
 
 ### [11.0.8] - 2018-05-22
 #### Fixed
@@ -772,7 +776,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.8...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.9...master
+[11.0.8]: https://github.com/shakacode/react_on_rails/compare/11.0.8...11.0.9
 [11.0.8]: https://github.com/shakacode/react_on_rails/compare/11.0.7...11.0.8
 [11.0.7]: https://github.com/shakacode/react_on_rails/compare/11.0.6...11.0.7
 [11.0.6]: https://github.com/shakacode/react_on_rails/compare/11.0.5...11.0.6
