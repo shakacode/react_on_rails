@@ -10,6 +10,7 @@ module ReactOnRails
 
     before do
       allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(using_webpacker)
+      ReactOnRails.instance_variable_set(:@configuration, nil)
     end
 
     after do
