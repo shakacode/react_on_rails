@@ -8,6 +8,11 @@ module ReactOnRails
     describe ".bundle_js_file_path" do
       before do
         allow(Rails).to receive(:root).and_return(File.expand_path("."))
+        ReactOnRails::Utils.class_variable_set(:@server_bundle_path, nil)
+      end
+
+      after do
+        ReactOnRails::Utils.class_variable_set(:@server_bundle_path, nil)
       end
 
       subject do

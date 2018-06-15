@@ -61,6 +61,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.server_bundle_js_file_path
+      binding.pry
       # Either:
       # 1. Using same bundle for both server and client, so server bundle will be hashed in manifest
       # 2. Using a different bundle (different Webpack config), so file is not hashed, and
