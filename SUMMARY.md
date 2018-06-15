@@ -15,13 +15,9 @@
   + [React & Redux](./docs/additional-reading/react-and-redux.md)
   + [Webpack](./docs/additional-reading/webpack.md)
   + [Webpack Configuration](./docs/additional-reading/webpack.md)
-  + [Webpack Cookbook](https://christianalfoni.github.io/react-webpack-cookbook/index.html)
-  + [Developing with the Webpack Dev Server](docs/additional-reading/webpack-dev-server.md)
-  + [Node Server Rendering](./docs/additional-reading/node-server-rendering.md)
   + [Server Rendering Tips](./docs/additional-reading/server-rendering-tips.md)
   + [Code Splitting](./docs/additional-reading/code-splitting.md)
   + [AngularJS Integration and Migration to React on Rails](./docs/additional-reading/angular-js-integration-migration.md)
-  + [Webpack, the Asset Pipeline, and Using Assets w/ React](./docs/additional-reading/rails-assets-relative-paths.md)
 
 ### **Development**
   + [React on Rails Basic Installation Tutorial](./docs/tutorial.md)
@@ -36,8 +32,13 @@
 
 ### **API**
   + [JavaScript API](./docs/api/javascript-api.md)
-  + [Ruby API](./docs/api/ruby-api.md)
+  - [View Helpers API](./docs/api/view-helpers-api.md)
+  - [Redux Store API](./docs/api/redux-store-api.md)
+
+### Older, Non-Webpack Docs
   + [Setting up Hot Reloading during Rails Development, API docs](./docs/api/ruby-api-hot-reload-view-helpers.md)
+  + [Developing with the Webpack Dev Server](docs/additional-reading/webpack-dev-server.md)
+  + [Webpack, the Asset Pipeline, and Using Assets w/ React](./docs/additional-reading/rails-assets-relative-paths.md)
 
 ### **[CONTRIBUTING](CONTRIBUTING.md)**
   + [Generator Testing](./docs/contributor-info/generator-testing.md)
