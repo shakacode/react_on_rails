@@ -5,16 +5,16 @@ require_relative "spec_helper"
 # rubocop:disable Metrics/ModuleLength, Metrics/BlockLength
 module ReactOnRails
   RSpec.describe Utils do
+    before do
+      allow(Rails).to receive(:root).and_return(File.expand_path("."))
+      ReactOnRails::Utils.instance_variable_set(:@server_bundle_path, nil)
+    end
+
+    after do
+      ReactOnRails::Utils.instance_variable_set(:@server_bundle_path, nil)
+    end
+
     describe ".bundle_js_file_path" do
-      before do
-        allow(Rails).to receive(:root).and_return(File.expand_path("."))
-        ReactOnRails::Utils.instance_variable_set(:@server_bundle_path, nil)
-      end
-
-      after do
-        ReactOnRails::Utils.instance_variable_set(:@server_bundle_path, nil)
-      end
-
       subject do
         Utils.bundle_js_file_path("webpack-bundle.js")
       end
