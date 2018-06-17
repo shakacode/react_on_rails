@@ -9,6 +9,7 @@ React on Rails integrates Facebook's [React](https://github.com/facebook/react) 
 To provide an opinionated and optimal framework for integrating Ruby on Rails with React via the [**Webpacker**](https://github.com/rails/webpacker) gem.
 
 #### React on Rails Pro Released!
+
 React on Rails Pro provides Node server rendering and other performance enhancements for React on Rails. It's live at [egghead.io](https://egghead.io). See the [React on Rails Pro Docs](https://github.com/shakacode/react_on_rails/wiki).
 
 Aloha, I'm Justin Gordon the creator and maintainer of React on Rails. I offer a [React on Rails Pro Support Plan](http://www.shakacode.com/work/shakacode-pro-support.pdf), and I can help you with:
@@ -41,6 +42,7 @@ Like the [react-rails](https://github.com/reactjs/react-rails) gem, React on Rai
 See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
 
 ----
+
 #### How it Works
 
 Check our [docs](docs/basics/HOW_IT_WORKS.md) to see how it works.
@@ -68,7 +70,7 @@ Contact [justin@shakacode.com](mailto:justin@shakacode.com) for more information
 
 If you have an existing Rails app, please follow the instructions in [this guide](docs/basics/installation-into-an-existing-rails-app.md).
 
-## Getting Started with a Fresh Rails App 
+## Getting Started with a Fresh Rails App
 
 ### Prerequisites
 
@@ -159,14 +161,16 @@ Check out our [Webpack Configuration Guide](docs/basics/webpack-configuration.md
 2. Examples in [spec/dummy/app/views/react_router](./spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](spec/dummy/client/app/startup/ServerRouterApp.jsx).
 3. [Code Splitting docs](docs/additional-reading/code-splitting.md) for information about how to set up code splitting for server rendered routes.
 
-# Caching and Performance
+## Caching and Performance
+
 Caching and performance optimizations are now part of [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
 
-### Deployment
+## Deployment
 
 Check out our [Deployment Guide](docs/basics/deployment.md).
 
 ## Error Handling
+
 * All errors from ReactOnRails will be of type ReactOnRails::Error.
 * Prerendering (server rendering) errors get context information for HoneyBadger and Sentry for easier debugging.
 
@@ -209,7 +213,7 @@ Please [**click to subscribe**](https://app.mailerlite.com/webforms/landing/l1d9
 - See [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
 - *See [NEWS.md](NEWS.md) for more notes over time.*
 
-##Contributing
+## Contributing
 
 Bug reports and pull requests are welcome. This project is intended to be a welcoming space for collaboration, and contributors are expected to adhere to our version of the [Contributor Covenant Code of Conduct](docs/misc/code_of_conduct.md)).
 
