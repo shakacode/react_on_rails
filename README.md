@@ -4,11 +4,34 @@
 
 React on Rails integrates Facebook's [React](https://github.com/facebook/react) front-end framework with Rails. React v0.14.x and greater is supported, with server rendering. [Redux](https://github.com/reactjs/redux) and [React-Router](https://github.com/reactjs/react-router) are supported as well, also with server rendering, using **execJS**.
 
-#### Project Objective
+# Intro
+
+## Project Objective
 
 To provide an opinionated and optimal framework for integrating Ruby on Rails with React via the [**Webpacker**](https://github.com/rails/webpacker) gem.
 
-#### React on Rails Pro Released!
+## Features
+
+Like the [react-rails](https://github.com/reactjs/react-rails) gem, React on Rails is capable of server-side rendering with fragment caching and is compatible with [turbolinks](https://github.com/turbolinks/turbolinks). While the initial setup is slightly more involved, it allows for advanced functionality such as:
+
+- [Redux](https://github.com/reactjs/redux)
+- [Webpack optimization functionality](https://github.com/webpack/docs/wiki/optimization)
+- [React Router](https://github.com/reactjs/react-router)
+
+See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
+
+## Why React on Rails?
+
+Given that Webpacker already provides React integration, why would you use "React on Rails"? Additional features of React on Rails include:
+
+1. Server rendering, often for SEO optimization.
+2. Easy passing of props directly from your Rails view to your React components rather than having your Rails view load and then make a separate request to your API.
+3. Redux and React-Router integration
+4. Localization support
+5. Rspec test helpers to ensure your Webpack bundles are ready for tests
+6. A supportive community
+
+## React on Rails Pro Released!
 
 React on Rails Pro provides Node server rendering and other performance enhancements for React on Rails. It's live at [egghead.io](https://egghead.io). See the [React on Rails Pro Docs](https://github.com/shakacode/react_on_rails/wiki).
 
@@ -27,54 +50,33 @@ From Joel Hooks, Co-Founder, Chief Nerd at [egghead.io](https://egghead.io/), Ja
 
 ![2017-01-30_11-33-59](https://cloud.githubusercontent.com/assets/1118459/22443635/b3549fb4-e6e3-11e6-8ea2-6f589dc93ed3.png)
 
-Please [email me](mailto:justin@shakacode.com) for a free half-hour project consultation, on anything from React on Rails to any aspect of web development.
-
 For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
-
-#### Features
-
-Like the [react-rails](https://github.com/reactjs/react-rails) gem, React on Rails is capable of server-side rendering with fragment caching and is compatible with [turbolinks](https://github.com/turbolinks/turbolinks). While the initial setup is slightly more involved, it allows for advanced functionality such as:
-
-- [Redux](https://github.com/reactjs/redux)
-- [Webpack optimization functionality](https://github.com/webpack/docs/wiki/optimization)
-- [React Router](https://github.com/reactjs/react-router)
-
-See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
-
-----
-
-#### How it Works
-
-Check our [docs](docs/basics/HOW_IT_WORKS.md) to see how it works.
-
-#### Why React on Rails?
-
-Given that Webpacker already provides React integration, why would you use "React on Rails"? Additional features of React on Rails include:
-
-1. Server rendering, often for SEO optimization.
-2. Easy passing of props directly from your Rails view to your React components rather than having your Rails view load and then make a separate request to your API.
-3. Redux and React-Router integration
-4. Localization support
-5. Rspec test helpers to ensure your Webpack bundles are ready for tests
-6. A supportive community
-
-#### Support
-
-The ability to use a standalone Node Rendering server for better performance and tooling is supported for React on Rails Pro.
 
 Contact [justin@shakacode.com](mailto:justin@shakacode.com) for more information.
 
-**Try out our [Documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) for improved readability & reference.**
+----
 
-## Getting Started with an Existing Rails App
+# Docs
+
+**You may read the docs via our [Documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/).**
+
+Check our [docs](docs/basics/how-react-on-rails-works.md) to see how it works.
+
+## Installation
+
+You may wish to learn about React on Rails by doing a quick demo setup, either on your existing app or on a new Rails app.
+
+### Getting Started with an Existing Rails App
 
 If you have an existing Rails app, please follow the instructions in [this guide](docs/basics/installation-into-an-existing-rails-app.md).
 
-## Getting Started with a Fresh Rails App
+### Getting Started with a Fresh Rails App
 
-### Prerequisites
+A more detailed version of the below steps can be found in the simple [Tutorial](./docs/tutorial.md).
 
-* Rails 5.13+
+#### Prerequisites for the Generator
+
+* Rails 5.13+ (older versions of Rails are supported).
   * If you are using an older version of Rails, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
 * Ruby 2.1+
 * Node 5.5+
@@ -116,7 +118,6 @@ If you have an existing Rails app, please follow the instructions in [this guide
 
 7. Visit http://localhost:3000/hello_world.
 
-## Usage
 
 ### Demos
 
@@ -129,10 +130,10 @@ If you have an existing Rails app, please follow the instructions in [this guide
   $ bundle && yarn
   $ foreman start
   ```
+  
+#### Turning on server rendering
 
-### Server Rendering
-
-#### Turn on server rendering
+With the code from running the React on Rails generator, per the [tutorial](docs/tutorial.md):
 
 1. Edit `app/views/hello_world/index.html.erb` and set `prerender` to `true`.
 2. Refresh the page.
@@ -149,30 +150,14 @@ For more information on view helpers check our [View Helpers API](docs/api/view-
 
 If you want to use a Node.js server for better performing server rendering, [get in touch](mailto:justin@shakacode.com). ShakaCode has built a premium Node rendering server that is part of [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
 
-### Webpack
+## Basics
 
-Check out our [Webpack Configuration Guide](docs/basics/webpack-configuration.md) for more information.
-
-### React Router
-
-[React Router](https://github.com/reactjs/react-router) is supported, including server-side rendering! See:
-
-1. [React on Rails docs for react-router](docs/additional-reading/react-router.md)
-2. Examples in [spec/dummy/app/views/react_router](./spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](spec/dummy/client/app/startup/ServerRouterApp.jsx).
-3. [Code Splitting docs](docs/additional-reading/code-splitting.md) for information about how to set up code splitting for server rendered routes.
-
-## Caching and Performance
-
-Caching and performance optimizations are now part of [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
-
-## Deployment
-
-Check out our [Deployment Guide](docs/basics/deployment.md).
-
-## Error Handling
-
-* All errors from ReactOnRails will be of type ReactOnRails::Error.
-* Prerendering (server rendering) errors get context information for HoneyBadger and Sentry for easier debugging.
+1. [How React on Rails Works](./docs/basics/how-react-on-rails-works.md)
+1. [Webpack Configuration](./docs/basics/webpack-configuration.md)
+1. [Recommended Project Structure](./docs/basics/recommended-project-structure.md)
+1. [View Helpers API](./docs/view-helpers-api.md) 
+1. [Caching and Performance: React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
+1. [Deployment](docs/basics/deployment.md).
 
 ## Support
 
@@ -191,10 +176,6 @@ Aloha, I'm Justin Gordon the creator and maintainer of React on Rails. I offer a
   - Webpack configuration examples
 
 Please email me for a free half-hour project consultation, on anything from React on Rails to any aspect of web development.
-
-### Testimonials
-
-Check our [testimonials](docs/testimonials.md).
 
 ## Additional Documentation
 

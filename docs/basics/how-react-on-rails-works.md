@@ -1,26 +1,24 @@
-## How It Works
+# How React on Rails Works
 
-The generator installs your webpack files in the `client` folder. Foreman uses webpack to compile your code and output the bundled results to `app/assets/webpack`, which are then loaded by sprockets. These generated bundle files have been added to your `.gitignore` for your convenience.
+Webpack is used to generate JavaScript and CSS "bundles" directly to your `/public` directory. [webpacker](https://github.com/rails/webpacker) provides view helpers to access the Webpack generated (and fingerprinted) JS and CSS. These files totally skip the Rails asset pipeline. You are responsible for properly processing your Webpack output via the Webpack config files. These generated bundle files should have een added to your `.gitignore` for your convenience.
 
 Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the react component helper. You can also initialize a Redux store with view or controller helper `redux_store` so that the store can be shared amongst multiple React components. See the docs for `redux_store` below and scan the code inside of the [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) sample app.
 
-### Client-Side Rendering vs. Server-Side Rendering
+## Client-Side Rendering vs. Server-Side Rendering
 
-In most cases, you should use the `prerender: false` (default behavior) with the provided helper method to render the React component from your Rails views. In some cases, such as when SEO is vital, or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
+In most cases, you should use the `prerender: false` (default behavior) with the provided `react_component` helper method to render the React component from your Rails views. In some cases, such as when SEO is vital, or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
 
-Now the server will interpret your JavaScript using [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. We recommend using [mini_racer](https://github.com/discourse/mini_racer) as ExecJS's runtime. The generator will automatically add it to your Gemfile for you (once we complete [#501](https://github.com/shakacode/react_on_rails/issues/501)).
+Now the server will interpret your JavaScript. The default is to use [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. If you want to maximize the perfomance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
+ 
+## HTML Source Code
 
 If you open the HTML source of any web page using React on Rails, you'll see the 3 parts of React on Rails rendering:
 
 1. A script tag containing the properties of the React component, such as the registered name and any props. A JavaScript function runs after the page loads, using this data to build and initialize your React components.
-2. The wrapper div `<div id="HelloWorld-react-component-0">` specifies the div where to place the React rendering. It encloses the server-rendered HTML for the React component.
+2. The wrapper div `<div id="HelloWorld-react-component-0">` specifies the div where to place the React rendering. It encloses the server-rendered HTML for the React component. If server rendering is not used (prerender: false), then the major difference is that the HTML rendered for the React component only contains the outer div: `<div id="HelloWorld-react-component-0"/>`. The first specification of the React component is just the same.
 3. Additional JavaScript is placed to console-log any messages, such as server rendering errors. Note: these server side logs can be configured only to be sent to the server logs.
 
-**Note**:
-
-- If server rendering is not used (prerender: false), then the major difference is that the HTML rendered for the React component only contains the outer div: `<div id="HelloWorld-react-component-0"/>`. The first specification of the React component is just the same.
-
-### Building the Bundles
+## Building the Bundles
 
 Each time you change your client code, you will need to re-generate the bundles (the webpack-created JavaScript files included in application.js). The included Foreman `Procfile.dev` will take care of this for you by starting a webpack process with the watch flag. This will watch your JavaScript code files for changes. Simply run `foreman start -f Procfile.dev`.
 
@@ -28,7 +26,28 @@ On production deployments that use asset precompilation, such as Heroku deployme
 
 If you have used the provided generator, these bundles will automatically be added to your `.gitignore` to prevent extraneous noise from re-generated code in your pull requests. You will want to do this manually if you do not use the provided generator.
 
-### Generator Functions
+## Globally Exposing Your React Components
+
+In order for the React on Rails view helper `react_component` to use your React components, you will have to **register** them in your JavaScript code.
+
+Use modules just as you would when using Webpack and React without Rails. The difference is that instead of mounting React components directly to an element using `React.render`, you **register your components to ReactOnRails and then mount them with helpers inside of your Rails views**.
+
+This is how to expose a component to the `react_component` view helper.
+
+```javascript
+  // app/javascript/packs/hello-world-bundle.js
+  import HelloWorld from '../components/HelloWorld';
+  import ReactOnRails from 'react-on-rails';
+  ReactOnRails.register({ HelloWorld });
+```
+
+#### Different Server-Side Rendering Code (and a Server Specific Bundle)
+
+You may want different initialization for your server-rendered components. For example, if you have an animation that runs when a component is displayed, you might need to turn that off when server rendering. However, the `railsContext` will tell you if your JavaScript code is running client side or server side. So code that required a different server bundle previously may no longer require this. Note, check if `window` is defined has a similar effect.
+
+If you want different code to run, you'd set up a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverHelloWorld.jsx'. Note: you might be initializing HelloWorld with version specialized for server rendering.
+
+## Specifying Your React Components: Direct or Generator Functions
 
 You have 2 ways to specify your React components. You can either register the React component directly, or you can create a function that returns a React component. Creating a function has the following benefits:
 
@@ -38,7 +57,7 @@ You have 2 ways to specify your React components. You can either register the Re
 
 ReactOnRails will automatically detect a registered generator function. Thus, there is no difference between registering a React Component versus a "generator function."
 
-#### react_component_hash for Generator Functions
+## react_component_hash for Generator Functions
 
 Another reason to use a generator function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }. Make sure you use this function with `react_component_hash`. 
 
@@ -50,7 +69,9 @@ For server rendering, if you wish to return multiple HTML strings from a generat
 
 For details on using react_component_hash with react-helmet, see the docs below for the helper API and [docs/additional-reading/react-helmet.md](docs/additional-reading/react-helmet.md).
 
-### Rails Context and Generator Functions
+
+
+## Rails Context and Generator Functions
 
 When you use a "generator function" to create react components (or renderedHtml on the server), or you used shared redux stores, you get two params passed to your function that creates a React component:
 
@@ -114,7 +135,7 @@ The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](h
   }
 ```
 
-#### Why the railsContext is only passed to generator functions
+## Why the railsContext is only passed to generator functions
 
 There's no reason that the railsContext would ever get passed to your React component unless the value is explicitly put into the props used for rendering. If you create a react component, rather than a generator function, for use by React on Rails, then you get whatever props are passed in from the view helper, which **does not include the Rails Context**. It's trivial to wrap your component in a "generator function" to return a new component that takes both:
 
@@ -135,17 +156,17 @@ Consider this line in depth:
 
 The outer `{...` is for the [JSX spread operator for attributes](https://facebook.github.io/react/docs/jsx-in-depth.html#spread-attributes) and the innner `{...` is for the [Spread in object literals](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_operator#Spread_in_object_literals).
 
-#### Use Cases
+### Use Cases
 
-##### Heroku Preboot Considerations
+#### Heroku Preboot Considerations
 
 [Heroku Preboot](https://devcenter.heroku.com/articles/preboot) is a feature on Heroku that allows for faster deploy times. When you promote your staging app to production, Preboot simply switches the production server to point at the staging app's container. This means it can deploy much faster since it doesn't have to rebuild anything. However, this means that if you use the [Define Plugin](https://github.com/webpack/docs/wiki/list-of-plugins#defineplugin) to provide the rails environment to your client code as a variable, that variable will erroneously still have a value of `Staging` instead of `Production`. The `Rails.env` provided at runtime in the railsContext is, however, accurate.
 
-##### Needing the current URL path for server rendering
+#### Needing the current URL path for server rendering
 
 Suppose you want to display a nav bar with the current navigation link highlighted by the URL. When you server-render the code, your code will need to know the current URL/path. The new `railsContext` has this information. Your application will apply something like an "active" class on the server rendering.
 
-##### Configuring different code for server side rendering
+#### Configuring different code for server side rendering
 
 Suppose you want to turn off animation when doing server side rendering. The `serverSide` value is just what you need.
 
@@ -179,27 +200,7 @@ end
 
 In this case, a prop and value for `somethingUseful` will go into the railsContext passed to all react_component and redux_store calls. You may set any values available in the view rendering context.
 
-### Globally Exposing Your React Components
+## Error Handling
 
-Place your JavaScript code inside of the default `app/javascript` folder. Use modules just as you would when using webpack alone. The difference here is that instead of mounting React components directly to an element using `React.render`, you **register your components to ReactOnRails and then mount them with helpers inside of your Rails views**.
-
-This is how to expose a component to the `react_component` view helper.
-
-```javascript
-  // app/javascript/packs/hello-world-bundle.js
-  import HelloWorld from '../components/HelloWorld';
-  import ReactOnRails from 'react-on-rails';
-  ReactOnRails.register({ HelloWorld });
-```
-
-#### Different Server-Side Rendering Code (and a Server Specific Bundle)
-
-You may want different initialization for your server-rendered components. For example, if you have an animation that runs when a component is displayed, you might need to turn that off when server rendering. However, the `railsContext` will tell you if your JavaScript code is running client side or server side. So code that required a different server bundle previously may no longer require this. Note, check if `window` is defined has a similar effect.
-
-If you want different code to run, you'd set up a separate webpack compilation file and you'd specify a different, server side entry file. ex. 'serverHelloWorld.jsx'. Note: you might be initializing HelloWorld with version specialized for server rendering.
-
-#### Renderer Functions
-
-A renderer function is a generator function that accepts three arguments: `(props, railsContext, domNodeId) => { ... }`. Instead of returning a React component, a renderer is responsible for calling `ReactDOM.render` to render a React component into the dom. Why would you want to call `ReactDOM.render` yourself? One possible use case is [code splitting](docs/additional-reading/code-splitting.md).
-
-Renderer functions are not meant to be used on the server since there's no DOM on the server. Instead, use a generator function. Attempting to server render with a renderer function will cause an error.
+* All errors from ReactOnRails will be of type ReactOnRails::Error.
+* Prerendering (server rendering) errors get context information for HoneyBadger and Sentry for easier debugging.

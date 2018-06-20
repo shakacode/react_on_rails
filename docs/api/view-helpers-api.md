@@ -67,6 +67,20 @@ export default (props, _railsContext) => {
 
 ```
 
+### Renderer Functions
+
+A renderer function is a generator function that accepts three arguments: `(props, railsContext, domNodeId) => { ... }`. Instead of returning a React component, a renderer is responsible for calling `ReactDOM.render` to render a React component into the dom. Why would you want to call `ReactDOM.render` yourself? One possible use case is [code splitting](docs/additional-reading/code-splitting.md).
+
+Renderer functions are not meant to be used on the server since there's no DOM on the server. Instead, use a generator function. Attempting to server render with a renderer function will throw an error.
+
+### React Router
+
+[React Router](https://github.com/reactjs/react-router) is supported, including server-side rendering! See:
+
+1. [React on Rails docs for react-router](docs/additional-reading/react-router.md)
+2. Examples in [spec/dummy/app/views/react_router](./spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](spec/dummy/client/app/startup/ServerRouterApp.jsx).
+3. [Code Splitting docs](docs/additional-reading/code-splitting.md) for information about how to set up code splitting for server rendered routes.
+
 ## server_render_js
 
 `server_render_js(js_expression, options = {})`
@@ -75,7 +89,6 @@ export default (props, _railsContext) => {
 - Currently, the only option you may pass is `replay_console` (boolean)
 
 This is a helper method that takes any JavaScript expression and returns the output from evaluating it. If you have more than one line that needs to be executed, wrap it in an IIFE. JS exceptions will be caught and console messages handled properly.
-
 
 # More details
 

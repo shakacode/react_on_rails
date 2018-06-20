@@ -1,8 +1,32 @@
-# Project structure
+# Recommended Project structure
 
 While React On Rails does not *enforce* a specific project structure, we do *recommend* a standard organization. The more we follow standards as a community, the easier it will be for all of us to move between various Rails projects that include React On Rails.
 
-The best way to understand these standards is to follow this example: [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)
+The React on Rails generator uses the standard `rails/webpacker` convention of this structure:
+
+```yml
+app/javascript:
+  ├── bundles:
+  │   # Logical groups of files that can be used for code splitting
+  │   └── hello-world-bundle.js
+  ├── packs:
+  │   # only webpack entry files here
+  │   └── hello-world-bundle.js
+```
+
+The problems with this structure and using rails/webpacker to configure Webpack for you:
+
+1. No support for different entry points for server rendering.
+2. Webpacker adds an ex``tra layer of abstraction over Webpack, which you probably don't want.
+
+This default rails/webpacker configuration is used for the generator because:
+
+1. Minimizes the amount of generated code to get up and running with React on Rails.
+2. Good enough for very simple projects.
+3. Configuration of Webpack is not the goal of this library, React on Rails.
+
+
+Thus, the generator structure and using rails/webpacker for Webpack configuration **is not recommended** for any commercial projects, especially those that will use server rendering. Instead, the recommended structure is shown in this example app: [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) and described below.
 
 ## JavaScript Assets
 1. `/client`: All client side JavaScript goes under the `/client` directory. Place all the major domains of the client side app under client.
@@ -45,5 +69,3 @@ This technique involves customization of the webpack config files to generate CS
 
 #### Updates 2017-03-04 Regarding CSS handled by Webpack
 * See article [Best practices for CSS and CSS Modules using Webpack](https://forum.shakacode.com/t/best-practices-for-css-and-css-modules-using-webpack/799).
-* In the near future, all docs will be updated to Webpack v2 and probably recommended to move all CSS handling to Webpack v2 for advanced users. In the near term, global CSS handled by Rails will be best for simple projects. Another data point is that Rails is moving in direction of handling JavaScript, but not CSS, with [Webpacker](https://github.com/rails/webpacker).
-
