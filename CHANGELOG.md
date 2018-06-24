@@ -9,23 +9,24 @@ See [Upgrading React on Rails](./docs/basics/upgrading-react-on-rails.md) for mo
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
-### [11.0.9] - 2018-05-22
+
+### [11.0.9] - 2018-06-24
+- Handle <script async> for Webpack bundle transparently. Closes [issue #290](https://github.com/shakacode/react_on_rails/issues/290) [PR 1099](https://github.com/shakacode/react_on_rails/pull/1099) by [squadette](https://github.com/squadette).
+
+### [11.0.8] - 2018-06-15
 #### Fixed
 - HashWithIndifferent access for props threw if used for props. [PR 1100](https://github.com/shakacode/react_on_rails/pull/1100) by [justin808](https://github.com/justin808).
 - Test helper for detecting stale bundles did not properly handle the case of a server-bundle.js without a hash.[PR 1102](https://github.com/shakacode/react_on_rails/pull/1102) by [justin808](https://github.com/justin808).
-
-### [11.0.8] - 2018-05-22
-#### Fixed
 - Fix test helper determination of stale assets. [PR 1093](https://github.com/shakacode/react_on_rails/pull/1093) by [justin808](https://github.com/justin808).
 
 #### Changed
 - Document how to manually rehydrate XHR-substituted components on client side. [PR 1095](https://github.com/shakacode/react_on_rails/pull/1095) by [hchevalier](https://github.com/hchevalier).
 
-### [11.0.7] - 2018-05-11
+### [11.0.7] - 2018-05-16
 #### Fixed
 - Fix npm publshing. [PR 1090](https://github.com/shakacode/react_on_rails/pull/1090) by [justin808](https://github.com/justin808).
 
-### [11.0.6] - 2018-05-11
+### [11.0.6] - 2018-05-15
 #### Changed
 - Even more detailed errors for Honeybadger and Sentry when there's a JSON parse error on server rendering. [PR 1086](https://github.com/shakacode/react_on_rails/pull/1086) by [justin808](https://github.com/justin808).
 
@@ -777,7 +778,7 @@ Best done with Object destructing:
 - Fix several generator related issues.
 
 [Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.9...master
-[11.0.8]: https://github.com/shakacode/react_on_rails/compare/11.0.8...11.0.9
+[11.0.9]: https://github.com/shakacode/react_on_rails/compare/11.0.8...11.0.9
 [11.0.8]: https://github.com/shakacode/react_on_rails/compare/11.0.7...11.0.8
 [11.0.7]: https://github.com/shakacode/react_on_rails/compare/11.0.6...11.0.7
 [11.0.6]: https://github.com/shakacode/react_on_rails/compare/11.0.5...11.0.6

@@ -196,6 +196,27 @@ export function clientStartup(context) {
 
   debugTurbolinks('Adding DOMContentLoaded event to install event listeners.');
 
+  window.setTimeout(() => {
+    if (!turbolinksInstalled() || !turbolinksSupported()) {
+      if (document.readyState === 'complete' ||
+                                   (document.readyState !== 'loading' && !document.documentElement.doScroll)
+      ) {
+        debugTurbolinks(
+          'NOT USING TURBOLINKS: DOM is already loaded, calling reactOnRailsPageLoaded',
+        );
+
+        reactOnRailsPageLoaded();
+      } else {
+        document.addEventListener('DOMContentLoaded', () => {
+          debugTurbolinks(
+            'NOT USING TURBOLINKS: DOMContentLoaded event, calling reactOnRailsPageLoaded',
+          );
+          reactOnRailsPageLoaded();
+        });
+      }
+    }
+  });
+
   document.addEventListener('DOMContentLoaded', () => {
     // Install listeners when running on the client (browser).
     // We must do this check for turbolinks AFTER the document is loaded because we load the
@@ -216,11 +237,6 @@ export function clientStartup(context) {
         document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
         document.addEventListener('page:change', reactOnRailsPageLoaded);
       }
-    } else {
-      debugTurbolinks(
-        'NOT USING TURBOLINKS: DOMContentLoaded event, calling reactOnRailsPageLoaded',
-      );
-      reactOnRailsPageLoaded();
     }
   });
 }
