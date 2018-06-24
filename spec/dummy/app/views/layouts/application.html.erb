@@ -14,7 +14,9 @@
                           'data-turbolinks-track': true) %>
 
   <%= javascript_pack_tag('vendor-bundle', 'data-turbolinks-track': true) %>
-  <%= javascript_pack_tag('app-bundle', 'data-turbolinks-track': true) %>
+
+  <!--  NOTE: Must set vendor-bundle to async false, as it must load before app-bundle  -->
+  <%= javascript_pack_tag('app-bundle', 'data-turbolinks-track': true, async: true) %>
 
   <%= csrf_meta_tags %>
 </head>
