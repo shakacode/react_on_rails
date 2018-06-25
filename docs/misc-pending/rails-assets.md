@@ -1,5 +1,7 @@
 # Rails assets and the Extract Text Plugin
 
+*This doc needs updating for the use of rails/webpacker with React on Rails*
+
 The [Webpack file loader](https://github.com/webpack/file-loader) copies referenced files to
 the destination output directory, with an MD5 hash. The other term for this is a "digest".
 
@@ -28,7 +30,7 @@ will have the Webpack digested name (MD5 hash). Since the Webpack generated CSS 
 just one level of "digesting", this "double-digesting" from Rails will cause such these assets
 fail to load.
 
-_If you are interested in learning how to use assets in your React components, read this doc: [Webpack, the Asset Pipeline, and Using Assets w/ React](./rails-assets-relative-paths.md)._
+_If you are interested in learning how to use assets in your React components, read this doc: [Webpack, the Asset Pipeline, and Using Assets w/ React](../additional-reading/rails-assets-relative-paths.md)._
 
 ## The Solution: Symlink Original File Names to New File Names
 React on Rails creates symlinks of non-digested versions (original webpack digested file names) 

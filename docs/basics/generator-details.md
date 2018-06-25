@@ -1,7 +1,4 @@
-- [Generator](#generator)
-  - [Understanding the Organization of the Generated Client Code](#understanding-the-organization-of-the-generated-client-code)
-  - [Redux](#redux)
-  - [Using Images and Fonts](#using-images-and-fonts)
+# Generator Details
 
 The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating Webpack with Rails. Defaults for options are such that the default is for the flag to be off. For example, the default for `-R` is that `redux` is off, and the default of `-b` is that `skip-bootstrap` is off.
 
@@ -41,12 +38,12 @@ Then you may run
 
 More Details:
 
-    `https://github.com/shakacode/react_on_rails/blob/master/docs/basics/generator.md`
+    `https://github.com/shakacode/react_on_rails/blob/master/docs/basics/generator-details.md`
 ```
 
 Another good option is to create a simple test app per the [Tutorial](../tutorial.md).
 
-### Understanding the Organization of the Generated Client Code
+# Understanding the Organization of the Generated Client Code
 The generated client code follows our organization scheme. Each unique set of functionality, is given its own folder inside of `client/app/bundles`. This encourages for modularity of *domains*.
 
 Inside of the generated "HelloWorld" domain you will find the following folders:
@@ -57,7 +54,7 @@ Inside of the generated "HelloWorld" domain you will find the following folders:
 
 You may also notice the `app/lib` folder. This is for any code that is common between bundles and therefore needs to be shared (for example, middleware).
 
-### Redux
+## Redux
 If you have used the `--redux` generator option, you will notice the familiar additional redux folders in addition to the aforementioned folders. The Hello World example has also been modified to use Redux.
 
 Note the organizational paradigm of "bundles". These are like application domains and are used for grouping your code into webpack bundles, in case you decide to create different bundles for deployment. This is also useful for separating out logical parts of your application. The concept is that each bundle will have it's own Redux store. If you have code that you want to reuse across bundles, including components and reducers, place them under `/client/app/lib`.

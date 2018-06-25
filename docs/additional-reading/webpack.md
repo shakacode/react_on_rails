@@ -18,5 +18,5 @@ Webpack v2 makes this very convenient! See:
 * [Implicit Common Vendor Chunk](https://webpack.js.org/guides/code-splitting-libraries/#implicit-common-vendor-chunk)
 * [Manifest File](https://webpack.js.org/guides/code-splitting-libraries/#manifest-file)
 
-
-
+## Webpack v4
+Webpack v4 is heartily recommended. If you need help with migrating your project to Webpack v4, please contact me, [justin@shakacode.com](mailto:justin@shakacode.com).
