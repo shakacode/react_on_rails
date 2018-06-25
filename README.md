@@ -71,9 +71,9 @@ React on Rails supports older versions of Rails back to 3.x. Rails/webpacker req
 
 Note, the best way to understand how to use ReactOnRails is to study a few simple examples. You can do a quick demo setup, either on your existing app or on a new Rails app. 
 
-1. Do the quick [tutorial](../tutorial.md).
+1. Do the quick [tutorial](docs/tutorial.md).
 2. Add React on Rails to an existing Rails app per [the instructions](docs/basics/installation-into-an-existing-rails-app.md).
-3. Look at [spec/dummy](../../spec/dummy), a simple, no DB example.
+3. Look at [spec/dummy](spec/dummy), a simple, no DB example.
 3. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full featured example live at [www.reactrails.com](http://www.reactrails.com).
 
 ## Basic Installation
@@ -133,7 +133,7 @@ Below is the line where you turn server rendering on by setting `prerender` to t
 
 ### Configuration
 
-* Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](../../docs/basics/configuration.md) for documentation of all configuration options.
+* Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](docs/basics/configuration.md) for documentation of all configuration options.
 * Configure `config/webpacker.yml`. If you used the generator and the default webpacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/webpacker.yml](./spec/dummy/config/webpacker.yml) example
   * Set `compile: false` for all envs
   * Your `public_output_path` must match your Webpack configuration for `output` of your bundles.
@@ -230,7 +230,7 @@ For details on using react_component_hash with react-helmet, see the docs below 
 
 ## I18n
 
-You can enable the i18n functionality with [react-intl](https://github.com/yahoo/react-intl). React on Rails provides an option for automatic conversions of Rails `*.yml` locale files into `*.js` files for `react-intl`. See the [How to add I18n](../../docs/basics/i18n.md) for a summary of adding I18n.
+You can enable the i18n functionality with [react-intl](https://github.com/yahoo/react-intl). React on Rails provides an option for automatic conversions of Rails `*.yml` locale files into `*.js` files for `react-intl`. See the [How to add I18n](docs/basics/i18n.md) for a summary of adding I18n.
 
 ## More Details
 
