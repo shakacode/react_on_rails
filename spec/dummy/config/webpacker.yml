@@ -2,10 +2,10 @@
 default: &default
   # Critical to set compile as false for React on Rails projects
   compile: false
-  custom_compile: true
   # Cache manifest.json for performance
   cache_manifest: false
-  source_path: client/app
+  # souce_path is unused if using a custom configuration
+  # source_path: client/app
 
 development:
   <<: *default

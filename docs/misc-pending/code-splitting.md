@@ -62,7 +62,7 @@ ReactOnRails.register({
   RouterApp,
 });
 ```
-Note that you should not register a renderer on the server, since there won't be a domNodeId when we're server rendering. Note that the `RouterApp` imported by `serverRegistration.js` is from a different file. For an example of how to set up an app for server rendering, see the [react router docs](react-router.md).
+Note that you should not register a renderer on the server, since there won't be a domNodeId when we're server rendering. Note that the `RouterApp` imported by `serverRegistration.js` is from a different file. For an example of how to set up an app for server rendering, see the [react router docs](../additional-reading/react-router.md).
 
 #### RouterAppRenderer.jsx
 ```jsx
@@ -140,7 +140,7 @@ config = {
 
 This causes Webpack to prepend the code chunk filename with `/assets/` in the request url. The react on rails sets up the webpack config to put webpack bundles in `app/assets/javascripts/webpack`, and modifies `config/initializers/assets.rb` so that rails detects the bundles. This means that when we prepend the request url with `/assets/`, rails will know what webpack is asking for.
 
-See [rails-assets.md](./rails-assets.md) to learn more about static assets.
+See [rails-assets.md](rails-assets.md) to learn more about static assets.
 
 If you forget to set the public path, webpack will request the code chunk at `/{filename}`. This will cause the request to be handled by the Rails router, which will send back a 404 response, assuming that you don't have a catch-all route. In your javascript console, you'll get the following error:
 

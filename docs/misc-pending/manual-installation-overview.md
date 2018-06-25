@@ -1,16 +1,11 @@
-# Installation Overview
+# Manual Installation Overview
 
-Here's an overview of installation if you're not using the generator.
+TODO: Review this file
 
-Note, the best way to understand how to use ReactOnRails is to study the examples:
 
-1. Run the generator per the [Tutorial](../tutorial.md).
-2. [spec/dummy](../../spec/dummy): Simple, no DB example.
-3. [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial): Full featured example.
+This file summarizes what the React on Rails generator does.
 
 ## Configure the `/client` Directory
-
-Note, version 9.0 of React on Rails removed the requirement to place all client side files in the `/client` directory.
 
 This directory has no references to Rails outside of the destination directory for the files created by the various Webpack config files.
 

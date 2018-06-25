@@ -9,10 +9,8 @@ Be sure to use mini_racer. See [issues/428](https://github.com/shakacode/react_o
 - You can conditionally avoid running code that references document by passing in a boolean prop to your top level react
   component. Since the passed in props Hash from the view helper applies to client and server side code, the best way to
   do this is to use a generator function.
-- If you're serious about server rendering, it's worth the effort to have different entry points for client and server rendering. It's worth the extra complexity.
-- You can enable node server rendering if you want. See more information here: https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/node-server-rendering.md
-
-The point is that you have separate files for top level client or server side, and you pass some extra option indicating that rendering is happening server side.
+- If you're serious about server rendering, it's worth the effort to have different entry points for client and server rendering. It's worth the extra complexity. The point is that you have separate files for top level client or server side, and you pass some extra option indicating that rendering is happening server side.
+- You can enable Node.js server rendering via [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
 
 ## Troubleshooting Server Rendering
 
