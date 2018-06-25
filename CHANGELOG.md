@@ -11,7 +11,7 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 
 ### [11.0.9] - 2018-06-24
-- Handle <script async> for Webpack bundle transparently. Closes [issue #290](https://github.com/shakacode/react_on_rails/issues/290) [PR 1099](https://github.com/shakacode/react_on_rails/pull/1099) by [squadette](https://github.com/squadette).
+- Handle <script async> for Webpack bundle transparently. Closes [issue #290](https://github.com/shakacode/react_on_rails/issues/290) [PR 1099](https://github.com/shakacode/react_on_rails/pull/1099) by [squadette](https://github.com/squadette). Merged in [PR 1107]( https://github.com/shakacode/react_on_rails/pull/1107).
 
 ### [11.0.8] - 2018-06-15
 #### Fixed
