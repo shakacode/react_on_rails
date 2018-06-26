@@ -45,7 +45,7 @@ The article [Why Hire ShakaCode?](https://blog.shakacode.com/can-shakacode-help-
   
 Please [email me (Justin Gordon), the creator of React on Rails](mailto:justin@shakacode.com), to see if I can help you or if you want an invite to our private Slack room for ShakaCode.
 
-## Testimonials
+## Testimonials for Hiring ShakaCode and our "Pro Support"
 
 From Kyle Maune of Cooper Aerial, May 4, 2018
 
