@@ -29,6 +29,7 @@ react_component(component_name,
   - **logging_on_server:** Default is true. True will log JS console messages and errors to the server.
   - **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
 
+
 ### react_component_hash
 
 `react_component_hash` is used to return multiple HTML strings for server rendering, such as for
@@ -65,6 +66,18 @@ export default (props, _railsContext) => {
   return { renderedHtml };
 };
 
+```
+
+### cached_react_component and cached_react_component_hash
+Fragment caching is a [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki) feature. The API is the same as the above, but for 2 differences:
+
+1. The `cache_key` takes the same parameters as any Rails `cache` view helper.
+1. The **props** are passed via a block so that evaluation of the props is not done unless the cache is broken. Suppose you put your props calculation into some method called `some_slow_method_that_returns_props`:
+
+```ruby
+<%= cached_react_component("App", cache_key: [@user, @post], prerender: true) do
+  some_slow_method_that_returns_props
+end %>
 ```
 
 ### Renderer Functions

@@ -7,7 +7,7 @@
   + [Webpack Configuration](./docs/basics/webpack-configuration.md)
   + [How React on Rails Works](./docs/basics/how-react-on-rails-works.md)
   + [Recommended Project Structure](./docs/basics/recommended-project-structure.md)
-  + [Rails Context](./docs/basics/rails-context-generator-functions.md)
+  + [Generator Functions and the RailsContext](docs/basics/generator-functions-and-railscontext.md)
   + [Caching and Performance: React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
   + [Deployment](docs/basics/deployment.md).
   + [React on Rails Internationalization (I18n, localization)](docs/basics/i18n.md)

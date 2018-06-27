@@ -141,13 +141,13 @@ Below is the line where you turn server rendering on by setting `prerender` to t
 
 ## Including your React Component on your Rails Views
 
-- Normal Mode, React component will be rendered on the client:
+- React component are rendered via your Rails Views. Here's an ERB sample:
 
   ```erb
   <%= react_component("HelloWorld", props: @some_props) %>
   ```
 
-- **Server-Side Rendering**, React component is first rendered into HTML on the server, use the **prerender** option:
+- **Server-Side Rendering**: Your react component is first rendered into HTML on the server. Use the **prerender** option:
 
   ```erb
   <%= react_component("HelloWorld", props: @some_props, prerender: true) %>
@@ -169,12 +169,45 @@ Below is the line where you turn server rendering on by setting `prerender` to t
     # Rails View
     <%= react_component("HelloWorld", props: { name: "Stranger" }) %>
   ```
+  
+- This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://reactjs.org/docs/context.html). See [Generator Functions and the RailsContext](docs/basics/generator-functions-and-railscontext.md) for more details on this topic.
+  
+  ```js
+  import React from 'react';
 
-  ```javascript
-    // inside your React component
-    this.props.name // "Stranger"
-  ```
-See the [View Helpers API](./docs/api/view-helpers-api.md) for more details on `react_component`.
+  export default (props, railsContext) => {
+    return (
+      <div>
+        Your locale is {railsContext.i18nLocale}.<br/>
+        Hello, {props.name}!
+      </div>
+    );
+  };
+  ``` 
+  
+See the [View Helpers API](./docs/api/view-helpers-api.md) for more details on `react_component` and its sibling function `react_component_hash`.
+
+## Fragment Caching
+
+Fragment caching is a [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki) feature. Fragment caching is a **HUGE** performance booster for your apps. Use the `cached_react_component` and `cached_react_component_hash`. The API is the same as `react_component` and `react_component_hash`, but for 2 differences:
+
+1. The `cache_key` takes the same parameters as any Rails `cache` view helper.
+1. The **props** are passed via a block so that evaluation of the props is not done unless the cache is broken. Suppose you put your props calculation into some method called `some_slow_method_that_returns_props`:
+
+```ruby
+<%= cached_react_component("App", cache_key: [@user, @post], prerender: true) do
+  some_slow_method_that_returns_props
+end %>
+```
+
+Such fragment caching saves a ton of CPU work for your web server and greatly reduces the request time. It completely skips the evaluation costs of:
+
+1. Database calls to compute the props.
+2. Serialization the props values hash into a JSON string for evaluating JavaScript to server render.
+3. Costs associated with evaluating JavaScript from your Ruby code.
+4. Creating the HTML string containing the props and the server-rendered JavaScript code.
+
+Note, even without server rendering (without step 3 above), fragment caching is still effective.
   
 ## Integration with Node.js for Server Rendering
 

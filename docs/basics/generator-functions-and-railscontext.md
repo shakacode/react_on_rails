@@ -1,6 +1,6 @@
-# Rails Context and Generator Functions
+# Generator Functions and Rails Context 
 
-## Usage
+## Generator Functions
 
 When you use a "generator function" to create react components (or renderedHtml on the server), or you used shared redux stores, you get two params passed to your function that creates a React component:
 
@@ -63,6 +63,32 @@ The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](h
      # server version!
   }
 ```
+
+## Rails Context
+
+The `railsContext` is a second param passed to your generator functions for React components. This is in addition to the props that are passed from the `react_component` Rails helper. For example:
+
+ERB view file: 
+
+```ruby
+  # Rails View
+  <%= react_component("HelloWorld", props: { name: "Stranger" }) %>
+```
+
+This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://reactjs.org/docs/context.html).
+
+```js
+import React from 'react';
+
+export default (props, railsContext) => {
+  return (
+    <div>
+      Your locale is {railsContext.i18nLocale}.<br/>
+      Hello, {props.name}!
+    </div>
+  );
+};
+``` 
 
 ## Why is the railsContext is only passed to generator functions?
 
