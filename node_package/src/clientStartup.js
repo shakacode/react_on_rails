@@ -101,7 +101,7 @@ function domNodeIdForEl(el) {
  */
 function render(el, railsContext) {
   const context = findContext();
-  // This must match app/helpers/react_on_rails_helper.rb:113
+  // This must match lib/react_on_rails/helper.rb
   const name = el.getAttribute('data-component-name');
   const domNodeId = domNodeIdForEl(el);
   const props = JSON.parse(el.textContent);

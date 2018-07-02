@@ -5,7 +5,6 @@ require_relative "server_rendering_pool/ruby_embedded_java_script"
 
 # Based on the react-rails gem.
 # None of these methods should be called directly.
-# See app/helpers/react_on_rails_helper.rb
 module ReactOnRails
   module ServerRenderingPool
     class << self
