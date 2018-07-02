@@ -97,4 +97,4 @@ Place this view helper (no parameters) at the end of your shared layout so React
 # More Details
 
 * [lib/react_on_rails/controller.rb](../../lib/react_on_rails/controller.rb) source
-* [lib/react_on_rails/react_on_rails_helper.rb](../../lib/react_on_rails/react_on_rails_helper.rb) source
+* [lib/react_on_rails/helper.rb](../../lib/react_on_rails/helper.rb) source

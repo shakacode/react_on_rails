@@ -105,5 +105,5 @@ This is a helper method that takes any JavaScript expression and returns the out
 
 # More details
 
-See the [lib/react_on_rails/react_on_rails_helper.rb](../../lib/react_on_rails/react_on_rails_helper.rb) source.
+See the [lib/react_on_rails/helper.rb](../../lib/react_on_rails/helper.rb) source.
 
