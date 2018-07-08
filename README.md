@@ -2,7 +2,7 @@
 
 # React on Rails Pro
 
-Node rendering and caching performance enhancements for React on Rails.
+Node rendering and caching performance enhancements for [React on Rails](https://github.com/shakacode/react_on_rails).
 
 # Features
 
