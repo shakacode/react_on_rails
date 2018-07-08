@@ -20,15 +20,17 @@ Now the server will interpret your JavaScript. The default is to use [ExecJS](ht
 
 If you open the HTML source of any web page using React on Rails, you'll see the 3 parts of React on Rails rendering:
 
-2. The wrapper div `<div id="HelloWorld-react-component-0">` specifies the div where to place the React rendering. It encloses the server-rendered HTML for the React component. If server rendering is not used (prerender: false), then the major difference is that the HTML rendered for the React component only contains the outer div: `<div id="HelloWorld-react-component-0"/>`. The first specification of the React component is just the same.
+1. The wrapper div `<div id="HelloWorld-react-component-0">` specifies the div where to place the React rendering. It encloses the server-rendered HTML for the React component. If server rendering is not used (prerender: false), then the major difference is that the HTML rendered for the React component only contains the outer div: `<div id="HelloWorld-react-component-0"/>`. The first specification of the React component is just the same.
 1. A script tag containing the properties of the React component, such as the registered name and any props. A JavaScript function runs after the page loads, using this data to build and initialize your React components.
-3. Additional JavaScript is placed to console-log any messages, such as server rendering errors. Note: these server side logs can be configured only to be sent to the server logs.
+1. Additional JavaScript is placed to console-log any messages, such as server rendering errors. Note: these server side logs can be configured only to be sent to the server logs.
 
 You can see all this on the source for [reactrails.com](https://www.reactrails.com/)
 
 ## Building the Bundles
 
-Each time you change your client code, you will need to re-generate the bundles (the webpack-created JavaScript files included in application.js). The included example Foreman `Procfile.dev` files will take care of this for you by starting a webpack process with the watch flag. This will watch your JavaScript code files for changes. Simply run `foreman start -f Procfile.dev`. [Example](spec/dummy/Procfile.static).
+Each time you change your client code, you will need to re-generate the bundles (the webpack-created JavaScript files included in application.js). The included example Foreman `Procfile.dev` files will take care of this for you by starting a webpack process with the watch flag. This will watch your JavaScript code files for changes. 
+
+Simply run `foreman start -f Procfile.dev`. [Example](spec/dummy/Procfile.static).
 
 On production deployments that use asset precompilation, such as Heroku deployments, React on Rails, by default, will automatically run webpack to build your JavaScript bundles. You configure the command used as `config.build_production_command` in your [config/initializers/react_on_rails.rb](./configuration.md).
 
