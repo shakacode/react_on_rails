@@ -1,5 +1,7 @@
 # Code Splitting
 
+*Note: This document needs updating for Webpack v4, React-Router v4, and using webpacker.*
+
 What is code splitting? From the webpack documentation:
 
 > For big web apps it’s not efficient to put all code into a single file, especially if some blocks of code are only required under some circumstances. Webpack has a feature to split your codebase into “chunks” which are loaded on demand. Some other bundlers call them “layers”, “rollups”, or “fragments”. This feature is called “code splitting”.
@@ -117,6 +119,10 @@ See:
 - [spec/dummy/client/app/startup/DeferredRenderAppServer.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/DeferredRenderAppServer.jsx)
 - [spec/dummy/client/app/components/DeferredRender.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/components/DeferredRender.jsx)
 - [spec/dummy/client/app/components/DeferredRenderAsyncPage.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/components/DeferredRenderAsyncPage.jsx)
+
+### Comparison of Server vs. Client Code
+
+![image](https://user-images.githubusercontent.com/1118459/42479546-2296f794-8375-11e8-85ff-52629fcaf657.png)
 
 ### Caveats
 
