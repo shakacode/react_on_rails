@@ -79,6 +79,10 @@ Fragment caching is a [React on Rails Pro](https://github.com/shakacode/react_on
   some_slow_method_that_returns_props
 end %>
 ```
+### rails_context
+
+You can call `rails_context(server_side: true | false)` from your controller or view to see what values are are in the Rails Context. Pass true or false depending on whether you want to see the server side or the client side rails_context.
+
 
 ### Renderer Functions (function that will call ReactDOM.render or ReactDOM.hydrate)
 
