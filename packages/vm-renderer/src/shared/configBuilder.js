@@ -77,10 +77,11 @@ function sanitizedSettings(aConfig, defaultValue) {
 
 export function logSanitizedConfig(log) {
   log.info(`VM Renderer v${packageJson.version}, protocol v${packageJson.protocolVersion}`);
+  log.info('NOTE: renderer settings names do not have prefix "RENDERER_"');
   log.info('Default values for settings', JSON.stringify(defaultConfig));
-  log.info('Customized values for settings', JSON.stringify(sanitizedSettings(userConfig)));
-  log.info('ENV values used for settings', JSON.stringify(envValuesUsed()));
-  log.info('Final settings used', JSON.stringify(sanitizedSettings(config, '<NOT PROVIDED>')));
+  log.info('Customized values for settings from config object', JSON.stringify(sanitizedSettings(userConfig)));
+  log.info('ENV values used for settings (uses "RENDERER_" prefix)', JSON.stringify(envValuesUsed()));
+  log.info('Final renderer settings used', JSON.stringify(sanitizedSettings(config, '<NOT PROVIDED>')));
 }
 
 export function buildConfig(providedUserConfig) {

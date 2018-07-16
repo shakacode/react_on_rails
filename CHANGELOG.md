@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 - nothing
 
+## [1.2.0]
+### Added
+- Added `serializer_globs` configuration value to add a MD5 of serializer files to the cache key for fragment caching.
+
 ## [1.1.0]
 ### Added
 - Added `tracing` configuration flag to time server rendering calls

@@ -44,16 +44,53 @@ describe ReactOnRailsPro::Cache, :caching do
   end
 
   describe ".react_component_cache_key" do
-    it "properly expands cache keys" do
+    it "properly expands cache keys without the serializers" do
       cacheable = double("cacheable")
       allow(cacheable).to receive(:cache_key) { "the_cache_key" }
       allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
 
-      result = ReactOnRailsPro::Cache.react_component_cache_key("Foobar", cache_key: cacheable,
-                                                                          prerender: true)
+      result = ReactOnRailsPro::Cache.react_component_cache_key("Foobar",
+                                                                cache_key: cacheable, prerender: true)
 
       expect(result).to eq(["ror_component", ReactOnRails::VERSION, ReactOnRailsPro::VERSION, "123456", "Foobar",
                             cacheable])
+    end
+
+    it "properly expands cache keys with the serializers" do
+      cacheable = double("cacheable")
+      allow(cacheable).to receive(:cache_key) { "the_cache_key" }
+      allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
+      allow(ReactOnRailsPro::Cache).to receive(:serializers_cache_key).and_return("abc")
+
+      result = ReactOnRailsPro::Cache.react_component_cache_key("Foobar", cache_key: cacheable,
+                                                                          prerender: true)
+
+      expect(result).to eq(["ror_component", ReactOnRails::VERSION, ReactOnRailsPro::VERSION,
+                            "123456", "abc", "Foobar", cacheable])
+    end
+  end
+
+  describe ".serializers_cache_key" do
+    context "serializer_files is defined" do
+      it "returns an MD5 based on the files" do
+        serializer_glob = File.join(FixturesHelper.fixtures_dir, "app", "views", "**", "*.jbuilder")
+        allow(ReactOnRailsPro.configuration).to receive(:serializer_globs).and_return(serializer_glob)
+        allow_any_instance_of(Digest::MD5).to receive(:hexdigest).and_return("eb3dc8ec96886ec81203c9e13f0277a7")
+
+        result = ReactOnRailsPro::Cache.serializers_cache_key
+
+        expect(result).to eq("eb3dc8ec96886ec81203c9e13f0277a7")
+      end
+    end
+
+    context "serializer_files is not defined" do
+      it "returns nil" do
+        allow(ReactOnRailsPro.configuration).to receive(:serializer_globs).and_return(nil)
+
+        result = ReactOnRailsPro::Cache.serializers_cache_key
+
+        expect(result).to be_nil
+      end
     end
   end
 end

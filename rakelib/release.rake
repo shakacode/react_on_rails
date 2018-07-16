@@ -20,8 +20,6 @@ which are installed via `bundle install` and `yarn`
 2nd argument: Perform a dry run by passing 'true' as a second argument.
 
 Example: `rake release[2.1.0,false]`")
-
-# rubocop:disable Metrics/BlockLength
 task :release, %i[gem_version dry_run tools_install] do |_t, args|
   include ReactOnRailsPro::TaskHelpers
 
@@ -64,4 +62,3 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   release_it_command << " #{npm_version}" unless npm_version.strip.empty?
   sh_in_dir(gem_root, release_it_command)
 end
-# rubocop:enable Metrics/BlockLength

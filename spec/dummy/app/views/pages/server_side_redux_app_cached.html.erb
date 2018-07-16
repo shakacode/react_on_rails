@@ -1,6 +1,7 @@
 <!-- print statements to show when server rendering is happening -->
-<%= cached_react_component("ReduxApp", cache_key: "A", prerender: true, trace: true, id: "ReduxApp-react-component-0") do
-   calc_app_props_server_render
+<%= cached_react_component("ReduxApp", cache_key: "A", prerender: true,
+                           trace: true, id: "ReduxApp-react-component-0") do
+   calc_slow_app_props_server_render
 end %>
 
 <hr/>
@@ -40,7 +41,5 @@ Note the cache block.
       calling slow calc_app_props_server_render
       XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
     </pre>
-  </li>
-  <li>
   </li>
 </ol>
