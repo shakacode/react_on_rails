@@ -4,6 +4,8 @@
 
 React on Rails integrates Rails with (server rendering of) Facebook's [React](https://github.com/facebook/react) front-end framework.
 
+Intersted in optimizing your webpack setup for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable? [Contact me](mailto:justin@shakacode.com).
+
 ShakaCode is **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Hawaii Chee](https://www.hawaiichee.com). Your main coding interview will be pairing with us on our open source! We're getting into [Reason](https://reasonml.github.io/)!
 
 # Intro
@@ -32,7 +34,7 @@ React on Rails Pro provides Node server rendering and other performance enhancem
 
 The [React on Rails Pro Support Plan](http://www.shakacode.com/work/shakacode-pro-support.pdf) can help you with:
 
-* Optimizing your webpack setup to Webpack v4 for React on Rails.
+* Optimizing your webpack setup to Webpack v4 for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable.
 * Upgrading your app to use the current Webpack setup that skips the Sprockets asset pipeline.
 * Better performance client and server side.
 * Efficiently migrating from [Angular to React](https://www.shakacode.com/services/angular-to-react/).
