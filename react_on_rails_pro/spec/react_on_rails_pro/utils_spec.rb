@@ -73,9 +73,8 @@ module ReactOnRailsPro
       let(:logger_mock) { double("Rails.logger").as_null_object }
       context "tracing on" do
         before do
-          allow(ReactOnRailsPro.configuration)
-            .to receive(:tracing).and_return(true)
-          Rails.stub(:logger).and_return(logger_mock)
+          allow(ReactOnRailsPro.configuration).to receive(:tracing).and_return(true)
+          allow(Rails).to receive(:logger).and_return(logger_mock)
         end
 
         it "logs the time for the method execution" do

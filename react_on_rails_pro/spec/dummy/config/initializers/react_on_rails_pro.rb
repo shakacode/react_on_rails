@@ -13,5 +13,13 @@ ReactOnRailsPro.configure do |config|
   # that the remote renderer works for CI.
   config.renderer_use_fallback_exec_js = false
 
+  # If true, then cache the evaluation of JS for prerendering using the standard Rails cache.
+  # Applies to all rendering engines.
+  # Default for `prerender_caching` is false.
   config.prerender_caching = true
+
+  # Array of globs to find any files for which changes should bust the fragment cache for
+  # cached_react_component and cached_react_component_hash. This should
+  # include any files used to generate the JSON props.
+  config.serializer_globs = [File.join(Rails.root, "app", "views", "**", "*.jbuilder")]
 end

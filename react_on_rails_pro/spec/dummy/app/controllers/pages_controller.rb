@@ -2,9 +2,10 @@
 
 class PagesController < ApplicationController
   XSS_PAYLOAD = { "<script>window.alert('xss1');</script>" => '<script>window.alert("xss2");</script>' }.freeze
+  PROPS_NAME = "Mr. Server Side Rendering".freeze
   APP_PROPS_SERVER_RENDER = {
     helloWorldData: {
-      name: "Mr. Server Side Rendering"
+      name: PROPS_NAME
     }.merge(XSS_PAYLOAD)
   }.freeze
 
@@ -21,15 +22,19 @@ class PagesController < ApplicationController
 
   # See files in spec/dummy/app/views/pages
 
-  helper_method :calc_app_props_server_render
+  helper_method :calc_slow_app_props_server_render
 
   private
 
-  def calc_app_props_server_render
-    puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-    puts "calling slow calc_app_props_server_render"
-    puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-    APP_PROPS_SERVER_RENDER
+  def calc_slow_app_props_server_render
+    msg = <<-MSG.strip_heredoc
+      XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      calling slow calc_slow_app_props_server_render
+      XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    MSG
+    Rails.logger.info msg
+    render_to_string(template: "/pages/serialize_props.json.jbuilder",
+                     locals: { name: PROPS_NAME }, format: :json)
   end
 
   def initialize_shared_store

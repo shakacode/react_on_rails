@@ -25,16 +25,26 @@ module ReactOnRailsPro
         keys
       end
 
-      def react_component_cache_key(component_name, options)
-        # TODO: [CACHE] Add option for hash of serializers
+      def serializers_cache_key
         # https://github.com/shakacode/react_on_rails_pro/issues/32
+        # https://github.com/shakacode/react_on_rails/issues/39#issuecomment-143472325
+        return @serializer_checksum if @serializer_checksum.present? && !Rails.env.development?
+        return nil unless ReactOnRailsPro.configuration.serializer_globs.present?
 
+        serializer_files = Dir.glob(ReactOnRailsPro.configuration.serializer_globs)
+        digest = Digest::MD5.new
+        serializer_files.each { |f| digest.file(f) }
+        @serializer_checksum = digest.hexdigest
+      end
+
+      def react_component_cache_key(component_name, options)
         # NOTE: Rails seems to do this automatically: ActiveSupport::Cache.expand_cache_key(keys)
         [
           *base_cache_key("ror_component", prerender: options[:prerender]),
+          serializers_cache_key,
           component_name,
           options[:cache_key]
-        ]
+        ].compact
       end
     end
   end

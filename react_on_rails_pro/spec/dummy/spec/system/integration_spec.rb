@@ -62,6 +62,22 @@ feature "Pages/Index", :js, type: :system do
 
     include_examples "React Component", "div#my-hello-world-id"
   end
+
+  context "Server Rendering Cached", :caching do
+    let(:serializers_cache_key) { ReactOnRailsPro::Cache.serializers_cache_key }
+    let(:base_component_cache_key) { "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}" }
+
+    background do
+      visit server_side_redux_app_cached_path
+    end
+
+    include_examples "React Component", "div#ReduxApp-react-component-0"
+
+    it "adds a value to the cache" do
+      base_cache_key_with_prerender = "#{base_component_cache_key}/#{ReactOnRailsPro::Utils.bundle_hash}/#{serializers_cache_key}"
+      expect(cache_data.keys[1]).to match(%r{#{base_cache_key_with_prerender}/ReduxApp})
+    end
+  end
 end
 
 feature "Turbolinks across pages", :js, type: :system do
