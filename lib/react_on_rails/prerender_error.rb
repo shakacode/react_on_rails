@@ -3,6 +3,7 @@
 # rubocop:disable: Layout/IndentHeredoc
 module ReactOnRails
   class PrerenderError < ::ReactOnRails::Error
+    MAX_ERROR_SNIPPET_TO_LOG = 1000
     # TODO: Consider remove providing original `err` as already have access to `self.cause`
     # http://blog.honeybadger.io/nested-errors-in-ruby-with-exception-cause/
     attr_reader :component_name, :err, :props, :js_code, :console_messages
@@ -58,9 +59,9 @@ Encountered error: \"#{err}\"
       end
       # rubocop:disable Layout/IndentHeredoc
       message << <<-MSG
-when prerendering #{component_name} with props: #{props}
+when prerendering #{component_name} with props (truncated): #{props.to_s[0, MAX_ERROR_SNIPPET_TO_LOG]}
 js_code was:
-#{js_code}
+#{js_code[0, MAX_ERROR_SNIPPET_TO_LOG]}
       MSG
       # rubocop:enable Layout/IndentHeredoc
 
