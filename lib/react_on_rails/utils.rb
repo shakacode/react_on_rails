@@ -8,6 +8,8 @@ require "active_support/core_ext/string"
 
 module ReactOnRails
   module Utils
+    TRUNCATION_FILLER = "\n... TRUNCATED ...\n"
+
     # https://forum.shakacode.com/t/yak-of-the-week-ruby-2-4-pathname-empty-changed-to-look-at-file-size/901
     # return object if truthy, else return nil
     def self.truthy_presence(obj)
@@ -151,6 +153,21 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
 
     def self.react_on_rails_pro?
       @react_on_rails_pro ||= gem_available?("react_on_rails_pro")
+    end
+
+    def self.smart_trim(str, max_length = 1000)
+      # From https://stackoverflow.com/a/831583/1009332
+      str = str.to_s
+      return str unless str.present? && max_length >= 1
+      return str if str.length <= max_length
+
+      return str[0, 1] + TRUNCATION_FILLER if max_length == 1
+
+      midpoint = (str.length / 2.0).ceil;
+      to_remove = str.length - max_length;
+      lstrip = (to_remove / 2.0).ceil;
+      rstrip = to_remove - lstrip;
+      str[0..(midpoint - lstrip - 1)] + TRUNCATION_FILLER + str[(midpoint + rstrip)..-1]
     end
   end
 end

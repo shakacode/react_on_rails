@@ -59,9 +59,12 @@ Encountered error: \"#{err}\"
       end
       # rubocop:disable Layout/IndentHeredoc
       message << <<-MSG
-when prerendering #{component_name} with props (truncated): #{props.to_s[0, MAX_ERROR_SNIPPET_TO_LOG]}
-js_code was:
-#{js_code[0, MAX_ERROR_SNIPPET_TO_LOG]}
+when prerendering #{component_name} with props: #{Utils.smart_trim(props, MAX_ERROR_SNIPPET_TO_LOG)}
+
+code:
+
+#{Utils.smart_trim(js_code, MAX_ERROR_SNIPPET_TO_LOG)}
+
       MSG
       # rubocop:enable Layout/IndentHeredoc
 
