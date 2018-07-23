@@ -10,7 +10,8 @@ import packageJson from './packageJson';
 const DEFAULT_TMP_DIR = '/tmp/react-on-rails-pro-vm-renderer-bundles';
 const DEFAULT_PORT = 3800;
 const DEFAULT_LOG_LEVEL = 'info';
-const env = process.env;
+const { env } = process;
+const MAX_DEBUG_SNIPPET_LENGTH = 1000;
 
 let config;
 let userConfig;
@@ -49,6 +50,8 @@ const defaultConfig = {
 
   // time in minutes between each worker restarting when restarting all workers
   delayBetweenIndividualWorkerRestarts: env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS,
+
+  maxDebugSnippetLength: MAX_DEBUG_SNIPPET_LENGTH,
 };
 
 function envValuesUsed() {

@@ -37,9 +37,14 @@ export default function run(config) {
 
   const app = express();
 
+  const fieldSizeLimit = 1024 * 1024 * 10; // 10 MB limit for code including props
+
   busBoy.extend(app, {
     upload: true,
     path: path.join(bundlePath, 'uploads'),
+    limits: {
+      fieldSize: fieldSizeLimit,
+    },
   });
 
   //
@@ -47,11 +52,14 @@ export default function run(config) {
     // Check protocol version
     const protocolVersionCheckingResult = checkProtocolVersion(req);
 
+    function setHeaders(headers) {
+      Object.keys(headers).forEach(key => res.set(key, headers[key]));
+    }
+
     if (typeof protocolVersionCheckingResult === 'object') {
       const { status, data, headers } = protocolVersionCheckingResult;
       log.warn(data);
-      // eslint-disable-next-line guard-for-in, no-restricted-syntax
-      for (const key in headers) res.set(key, headers[key]);
+      setHeaders(headers);
       res.status(status);
       res.send(data);
       return;
@@ -63,17 +71,18 @@ export default function run(config) {
     if (typeof authResult === 'object') {
       const { status, data, headers } = authResult;
       log.warn(data);
-      // eslint-disable-next-line guard-for-in, no-restricted-syntax
-      for (const key in headers) res.set(key, headers[key]);
+      setHeaders(headers);
       res.status(status);
       res.send(data);
       return;
     }
 
     // Handle rendering request:
-    const { status, data, headers, die } = handleRenderRequest(req);
-    // eslint-disable-next-line guard-for-in, no-restricted-syntax
-    for (const key in headers) res.set(key, headers[key]);
+    const {
+      status, data, headers, die,
+    } = handleRenderRequest(req);
+
+    setHeaders(headers);
     res.status(status);
     res.send(data);
 

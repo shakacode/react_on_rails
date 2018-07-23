@@ -56,10 +56,8 @@ export default function masterRun(config) {
       allWorkersRestartInterval * MILLISECONDS_IN_MINUTE,
     );
   } else if (allWorkersRestartInterval || delayBetweenIndividualWorkerRestarts) {
-    log.error(
-      "Misconfiguration, please provide both 'allWorkersRestartInterval' and " +
-        "'delayBetweenIndividualWorkerRestarts' to enable scheduled worker restarts",
-    );
+    log.error("Misconfiguration, please provide both 'allWorkersRestartInterval' and " +
+        "'delayBetweenIndividualWorkerRestarts' to enable scheduled worker restarts");
     process.exit();
   } else {
     log.info('No schedule for workers restarts');

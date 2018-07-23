@@ -45,8 +45,8 @@ function createUploadedBundle() {
  *
  */
 function cleanUploadedBundles() {
-  if (fs.existsSync(getUploadedBundlePath())) fs.unlink(getUploadedBundlePath());
-  if (fs.existsSync(getTmpUploadedBundlePath())) fs.unlink(getTmpUploadedBundlePath());
+  if (fs.existsSync(getUploadedBundlePath())) fs.unlinkSync(getUploadedBundlePath());
+  if (fs.existsSync(getTmpUploadedBundlePath())) fs.unlinkSync(getTmpUploadedBundlePath());
 }
 
 /**

@@ -86,12 +86,14 @@ module ReactOnRailsPro
           case response.code
           when "200"
             return response.body
+          when "400"
+            raise ReactOnRailsPro::Error, "Renderer unhandled error at the VM level: #{response.code}:\n#{response.body}"
           when "410"
             return eval_js(js_code, render_options, send_bundle: true)
           when "412"
             raise ReactOnRailsPro::Error, "Renderer version does not match gem version"
           else
-            raise ReactOnRailsPro::Error, "Unknown response code from renderer: #{response.code}: #{response.body}"
+            raise ReactOnRailsPro::Error, "Unknown response code from renderer: #{response.code}:\n#{response.body}"
           end
         rescue Errno::ECONNREFUSED
           fallback_exec_js(js_code, render_options)

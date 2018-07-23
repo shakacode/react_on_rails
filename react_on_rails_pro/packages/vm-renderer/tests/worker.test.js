@@ -10,7 +10,7 @@ import { buildVM } from '../src/worker/vm';
 const packageJson = require(path.join(__dirname, '/../../../package.json'));
 
 const gemVersion = packageJson.version;
-const protocolVersion = packageJson.protocolVersion;
+const { protocolVersion } = packageJson;
 
 test(
   'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
