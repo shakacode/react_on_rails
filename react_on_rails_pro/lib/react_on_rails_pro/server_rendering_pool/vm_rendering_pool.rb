@@ -11,7 +11,7 @@ module ReactOnRailsPro
 
       class << self
         def reset_pool
-          Rails.logger.info { "Setting up connection for ReactOnRailsPro VM Renderer at #{renderer_url_base}" }
+          Rails.logger.info { "[ReactOnRailsPro] Setting up connection VM Renderer at #{renderer_url_base}" }
 
           # NOTE: there are multiple similar gems
           # We use https://github.com/bpardee/persistent_http/blob/master/lib/persistent_http.rb
@@ -62,8 +62,9 @@ module ReactOnRailsPro
         end
 
         def eval_js(js_code, render_options, send_bundle: false)
-          request_digest = render_options.request_digest
-          path = "/bundles/#{@bundle_update_utc_timestamp}/render/#{request_digest}"
+          ReactOnRailsPro::ServerRenderingPool::ProRendering.set_request_digest_on_render_options(js_code, render_options)
+
+          path = "/bundles/#{@bundle_update_utc_timestamp}/render/#{render_options.request_digest}"
 
           form_data = {
             "renderingRequest" => js_code,
@@ -104,7 +105,7 @@ module ReactOnRailsPro
             raise ReactOnRailsPro::Error, "Can't connect to VmRenderer renderer at #{renderer_url_base}"
           end
 
-          Rails.logger.warn { "Can't connect to VmRenderer renderer at #{renderer_url_base}. Falling back to ExecJS" }
+          Rails.logger.warn { "[ReactOnRailsPro] Can't connect to VmRenderer renderer at #{renderer_url_base}. Falling back to ExecJS" }
           fallback_renderer = ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript
 
           # Pool is actually discarded btw requests:

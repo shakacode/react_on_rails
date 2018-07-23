@@ -53,7 +53,7 @@ describe ReactOnRailsProHelper, type: :helper do
 
           expect(cache_data.keys)
             .to include(%r{/App/cache-key})
-          expect(cache_data.first[1].value).to match(/div id="App-react-component-0"/)
+          expect(cache_data.first[1].value).to match(/div id="App-react-component"/)
         end
 
         it "uses 'cache_key' method if available" do
@@ -88,7 +88,7 @@ describe ReactOnRailsProHelper, type: :helper do
             end
 
             expect(cache_data.keys).to include(%r{/App/a/b})
-            expect(cache_data.first[1].value).to match(/div id="App-react-component-0"/)
+            expect(cache_data.first[1].value).to match(/div id="App-react-component"/)
           end
         end
 
@@ -128,7 +128,7 @@ describe ReactOnRailsProHelper, type: :helper do
             expect(cache_data.keys[0]).to match(%r{#{base_js_eval_cache_key}/})
             expect(cache_data.keys[1]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
             expect(cache_data.values[0].value.keys).to match_array(%w[html consoleReplayScript hasErrors])
-            expect(cache_data.values[1].value["componentHtml"]).to match(/div id="ReactHelmetApp-react-component-0"/)
+            expect(cache_data.values[1].value["componentHtml"]).to match(/div id="ReactHelmetApp-react-component"/)
           end
         end
 
@@ -144,7 +144,7 @@ describe ReactOnRailsProHelper, type: :helper do
             end
 
             expect(cache_data.keys[0]).to match(%r{#{base_cache_key_without_prerender}/ReactHelmetApp/cache-key})
-            expect(cache_data.values[0].value["componentHtml"]).to match(/div id="ReactHelmetApp-react-component-0"/)
+            expect(cache_data.values[0].value["componentHtml"]).to match(/div id="ReactHelmetApp-react-component"/)
           end
 
           context "without 'cache'", :caching do
