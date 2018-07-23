@@ -36,6 +36,14 @@ module ReactOnRails
         end
       end
 
+      def has_random_dom_id?
+        return false if options[:id]
+
+        return false unless random_dom_id
+
+        true
+      end
+
       def html_options
         options[:html_options].to_h
       end
