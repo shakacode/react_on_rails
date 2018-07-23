@@ -143,10 +143,19 @@ module ReactOnRails
       ReactOnRails.configure do |config|
         config.server_bundle_js_file = "something.js"
         config.prerender = true
+        config.random_dom_id = false
       end
 
       expect(ReactOnRails.configuration.server_bundle_js_file).to eq("something.js")
       expect(ReactOnRails.configuration.prerender).to eq(true)
+      expect(ReactOnRails.configuration.random_dom_id).to eq(false)
+    end
+
+    it "has a default configuration of the gem" do
+      ReactOnRails.configure do |_config|
+      end
+
+      expect(ReactOnRails.configuration.random_dom_id).to eq(true)
     end
   end
 end

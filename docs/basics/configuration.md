@@ -12,6 +12,15 @@ ReactOnRails.configure do |config|
   # setInterval, clearTimout when server rendering.
   config.trace = Rails.env.development?
 
+  # Configure if default DOM IDs have a random value or are fixed.
+  # false ==> Sets the dom id to "#{react_component_name}-react-component"
+  # true ==> Adds "-#{SecureRandom.uuid}" to that ID
+  # If you might use multiple instances of the same React component on a Rails page, then
+  # it is convenient to set this to true or else you have to either manually set the ids to 
+  # avoid collisions. Most newer apps will have only one instance of a component on a page,
+  # so this should be false in most cases.
+  # This value can be overrident for a given call to react_component
+  config.random_dom_id = false # default is true
 
   # defaults to "" (top level)
   #

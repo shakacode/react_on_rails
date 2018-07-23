@@ -98,6 +98,7 @@ module ReactOnRails
     #   raise_on_prerender_error: <true/false> Default to false. True will raise exception on server
     #      if the JS code throws
     # Any other options are passed to the content tag, including the id.
+    # random_dom_id can be set to override the global default.
     def react_component(component_name, options = {})
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]

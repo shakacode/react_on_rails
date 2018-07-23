@@ -7,7 +7,7 @@ GIT
 PATH
   remote: ../..
   specs:
-    react_on_rails (11.0.9)
+    react_on_rails (11.0.10)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -352,4 +352,4 @@ DEPENDENCIES
   webpacker
 
 BUNDLED WITH
-   1.16.2
+   1.16.3

@@ -9,6 +9,7 @@ module ReactOnRails
   DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
   DEFAULT_SERVER_RENDER_TIMEOUT = 20
   DEFAULT_POOL_SIZE = 1
+  DEFAULT_RANDOM_DOM_ID = TRUE # for backwards compatability
 
   def self.configuration
     @configuration ||= Configuration.new(
@@ -32,7 +33,8 @@ module ReactOnRails
       server_render_method: nil,
       symlink_non_digested_assets_regex: nil,
       build_test_command: "",
-      build_production_command: ""
+      build_production_command: "",
+      random_dom_id: DEFAULT_RANDOM_DOM_ID
     )
   end
 
@@ -45,7 +47,7 @@ module ReactOnRails
                   :webpack_generated_files, :rendering_extension, :build_test_command,
                   :build_production_command,
                   :i18n_dir, :i18n_yml_dir,
-                  :server_render_method, :symlink_non_digested_assets_regex
+                  :server_render_method, :symlink_non_digested_assets_regex, :random_dom_id
 
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
                    replay_console: nil,
@@ -56,7 +58,7 @@ module ReactOnRails
                    generated_assets_dir: nil, webpack_generated_files: nil,
                    rendering_extension: nil, build_test_command: nil,
                    build_production_command: nil,
-                   i18n_dir: nil, i18n_yml_dir: nil,
+                   i18n_dir: nil, i18n_yml_dir: nil, random_dom_id: nil,
                    server_render_method: nil, symlink_non_digested_assets_regex: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.server_bundle_js_file = server_bundle_js_file
@@ -67,6 +69,7 @@ module ReactOnRails
       self.i18n_dir = i18n_dir
       self.i18n_yml_dir = i18n_yml_dir
 
+      self.random_dom_id = random_dom_id
       self.prerender = prerender
       self.replay_console = replay_console
       self.logging_on_server = logging_on_server
