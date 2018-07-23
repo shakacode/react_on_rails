@@ -1,8 +1,10 @@
 import test from 'tape';
 import path from 'path';
 
-import { setConfig, getTmpUploadedBundlePath, createTmpUploadedBundle,
-        createUploadedBundle, cleanUploadedBundles } from './helper';
+import {
+  setConfig, getTmpUploadedBundlePath, createTmpUploadedBundle,
+  createUploadedBundle, cleanUploadedBundles,
+} from './helper';
 import { getBundleFilePath, resetVM } from '../src/worker/vm';
 import renderRequestHandler from '../src/worker/renderRequestHandlerVm';
 
@@ -26,11 +28,13 @@ test('If gem has posted updated bundle', (assert) => {
   assert.deepEqual(
     result,
     { status: 200, headers: { 'Cache-Control': 'public, max-age=31536000' }, data: { html: 'Dummy Object' } },
-    'renderRequestHandler returns status 200 and correct rendered renderedHtmls');
+    'renderRequestHandler returns status 200 and correct rendered renderedHtmls',
+  );
   assert.equal(
     getBundleFilePath(),
     path.resolve(__dirname, './tmp/1495063024898.js'),
-    'getBundleFilePath() should return file path of the bundle loaded to VM');
+    'getBundleFilePath() should return file path of the bundle loaded to VM',
+  );
 
   cleanUploadedBundles();
 });
@@ -55,10 +59,13 @@ test('If bundle was not uploaded yet', (assert) => {
 
   assert.deepEqual(
     result,
-    { status: 410,
+    {
+      status: 410,
       headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
-      data: 'No bundle uploaded' },
-    'renderRequestHandler returns status 410 with "No bundle uploaded"');
+      data: 'No bundle uploaded',
+    },
+    'renderRequestHandler returns status 410 with "No bundle uploaded"',
+  );
 });
 
 test('If bundle was already uppdated by another thread', (assert) => {
@@ -81,5 +88,6 @@ test('If bundle was already uppdated by another thread', (assert) => {
   assert.deepEqual(
     result,
     { status: 200, headers: { 'Cache-Control': 'public, max-age=31536000' }, data: { html: 'Dummy Object' } },
-    'renderRequestHandler returns status 200 and correct rendered renderedHtmls');
+    'renderRequestHandler returns status 200 and correct rendered renderedHtmls',
+  );
 });

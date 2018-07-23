@@ -4,9 +4,13 @@
  */
 
 import fs from 'fs';
+import path from 'path';
 import vm from 'vm';
 import cluster from 'cluster';
 import log from 'winston';
+
+import { getConfig } from '../shared/configBuilder';
+import smartTrim from '../shared/smartTrim';
 
 let context;
 let bundleFilePath;
@@ -46,7 +50,7 @@ function replayVmConsole() {
 /**
  *
  */
-exports.buildVM = function buildVMNew(filePath) {
+export function buildVM(filePath) {
   context = vm.createContext();
 
   // Create explicit reference to global context, just in case (some libs can use it):
@@ -96,30 +100,63 @@ exports.buildVM = function buildVMNew(filePath) {
   log.debug('Required objects now in VM sandbox context:', vm.runInContext('global.ReactOnRails', context) !== undefined);
   log.debug('Required objects should not leak to the global context:', global.ReactOnRails);
   return vm;
-};
+}
 
 /**
  *
  */
-exports.getBundleFilePath = function getBundleFilePath() {
+export function getBundleFilePath() {
   return bundleFilePath;
-};
+}
 
 /**
  *
  */
-exports.runInVM = function runInVM(code) {
-  vm.runInContext('console.history = []', context);
-  const result = vm.runInContext(code, context);
-  log.debug('result from JS:', result);
-  replayVmConsole();
-  return result;
-};
+export function runInVM(code, vmCluster) {
+  const { bundlePath } = getConfig();
+
+  try {
+    if (log.level === 'debug') {
+      const clusterWorkerId = vmCluster && vmCluster.worker ? `worker ${vmCluster.worker.id} ` : '';
+      log.debug(`worker ${clusterWorkerId}received render request with code
+${smartTrim(code)}`);
+      const debugOutputPathCode = path.join(bundlePath, 'code.js');
+      log.debug(`Full code executed written to: ${debugOutputPathCode}`);
+      fs.writeFileSync(debugOutputPathCode, code);
+    }
+
+    vm.runInContext('console.history = []', context);
+    const result = vm.runInContext(code, context);
+
+    if (log.level === 'debug') {
+      log.debug(`result from JS:
+${smartTrim(result)}`);
+      const debugOutputPathResult = path.join(bundlePath, 'result.json');
+      log.debug(`Wrote result to file: ${debugOutputPathResult}`);
+      fs.writeFileSync(debugOutputPathResult, result);
+    }
+
+    replayVmConsole();
+    return result;
+  } catch (e) {
+    const exceptionMessage = `
+JS code was:
+${smartTrim(code)}
+    
+EXCEPTION MESSAGE:
+${e.message}
+
+STACK:
+${e.stack}`;
+    log.error(`Caught execution error:\n${exceptionMessage}`);
+    return { exceptionMessage };
+  }
+}
 
 /**
  *
  */
-exports.resetVM = function resetVM() {
+export function resetVM() {
   context = undefined;
   bundleFilePath = undefined;
-};
+}

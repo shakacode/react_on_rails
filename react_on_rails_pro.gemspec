@@ -24,6 +24,7 @@ Gem::Specification.new do |s|
 
   s.required_ruby_version = ">= 2.1.0"
 
+  s.add_dependency "react_on_rails", "11.1.0.beta.1"
   s.add_dependency "addressable"
   s.add_dependency "connection_pool"
   s.add_dependency "execjs", "~> 2.5"
@@ -31,8 +32,6 @@ Gem::Specification.new do |s|
   s.add_dependency "persistent_http", "~> 2"
   s.add_dependency "rails", ">= 3.2"
   s.add_dependency "rainbow"
-  s.add_dependency "react_on_rails", "~> 11.0.7"
-
   s.add_development_dependency "awesome_print"
   s.add_development_dependency "binding_of_caller"
   s.add_development_dependency "bundler", "~> 1.10"

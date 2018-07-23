@@ -12,72 +12,113 @@ test('buildVM and runInVM', (assert) => {
   assert.deepEqual(
     runInVM('ReactOnRails'),
     { dummy: { html: 'Dummy Object' } },
-    'ReactOnRails object is availble is sandbox');
+    'ReactOnRails object is availble is sandbox',
+  );
 
   assert.ok(
     global.ReactOnRails === undefined,
-    'ReactOnRails object did not leak to global context');
+    'ReactOnRails object did not leak to global context',
+  );
 
   assert.ok(
     runInVM('typeof global !== undefined'),
-    'global object is defined in VM context');
+    'global object is defined in VM context',
+  );
 
   assert.ok(
     runInVM('Math === global.Math'),
-    'global object points to global VM context');
+    'global object points to global VM context',
+  );
 
   assert.ok(
     runInVM('ReactOnRails === global.ReactOnRails'),
-    'New objects added to global context are accessible by global reference');
+    'New objects added to global context are accessible by global reference',
+  );
 
   runInVM('global.testVar = "test"');
   assert.ok(
     runInVM('this.testVar === "test"'),
-    'Variable added through global reference is availble though global "this"');
+    'Variable added through global reference is availble though global "this"',
+  );
 
   assert.ok(
     runInVM('testVar === "test"'),
-    'Variable added through global reference is availble directly in global context');
+    'Variable added through global reference is availble directly in global context',
+  );
 
   assert.ok(
     runInVM('console') !== console,
-    'VM context has its own console');
+    'VM context has its own console',
+  );
 
   assert.ok(
     console.history === undefined,
-    'Building VM does not mutate console in master code');
+    'Building VM does not mutate console in master code',
+  );
 
   assert.ok(
     runInVM('console.history !== undefined'),
-    'VM has patched console with history');
+    'VM has patched console with history',
+  );
 
   assert.ok(
     runInVM('getStackTrace !== undefined'),
-    'getStackTrace function is availble is sandbox');
+    'getStackTrace function is availble is sandbox',
+  );
 
   assert.ok(
     runInVM('setInterval !== undefined'),
-    'setInterval function is availble is sandbox');
+    'setInterval function is availble is sandbox',
+  );
 
   assert.ok(
     runInVM('setTimeout !== undefined'),
-    'setTimeout function is availble is sandbox');
+    'setTimeout function is availble is sandbox',
+  );
 
   assert.ok(
     runInVM('clearTimeout !== undefined'),
-    'clearTimeout function is availble is sandbox');
+    'clearTimeout function is availble is sandbox',
+  );
 });
 
-test('VM security', (assert) => {
+test('VM security and captured exceptions', (assert) => {
   assert.plan(1);
   createUploadedBundle();
   buildVM(getUploadedBundlePath());
-
   // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
-  assert.throws(
-    () => runInVM('process.exit()'),
-    'process is not defined',
-    'VM prevents global access');
+  const result = runInVM('process.exit()');
+  assert.ok(
+    result.exceptionMessage.match(/process is not defined/),
+    'Expected captured exception b/c VM prevents global access',
+  );
+});
+
+test('Captured exceptions for a long message', (assert) => {
+  assert.plan(4);
+  createUploadedBundle();
+  buildVM(getUploadedBundlePath());
+  // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
+  const code = `process.exit()${
+    '\n// 1234567890123456789012345678901234567890'.repeat(50)
+  }\n// Finishing Comment`;
+  const { exceptionMessage } = runInVM(code);
+  assert.ok(
+    exceptionMessage.match(/process is not defined/),
+    'Expected error message in error result',
+  );
+  assert.ok(
+    exceptionMessage.match(/process.exit/),
+    'Expected captured code to contain beginning',
+  );
+  assert.ok(
+    exceptionMessage.match(/Finishing Comment/),
+    'Expected captured code to contain end',
+  );
+  assert.ok(
+    exceptionMessage.match(/\.\.\./),
+    'Expected captured code to contain ...',
+  );
 });
 
 test('resetVM', (assert) => {
@@ -88,13 +129,15 @@ test('resetVM', (assert) => {
   assert.deepEqual(
     runInVM('ReactOnRails'),
     { dummy: { html: 'Dummy Object' } },
-    'VM context is created');
+    'VM context is created',
+  );
 
   resetVM();
 
   assert.ok(
     getBundleFilePath() === undefined,
-    'resetVM() drops file path of the bundle loaded to VM');
+    'resetVM() drops file path of the bundle loaded to VM',
+  );
 });
 
 test('VM console history', (assert) => {
@@ -108,7 +151,8 @@ test('VM console history', (assert) => {
   assert.deepEqual(
     vmResult,
     consoleHistory,
-    'Console logging from VM changes history for console inside VM');
+    'Console logging from VM changes history for console inside VM',
+  );
 });
 
 test('getBundleFilePath', (assert) => {
@@ -119,7 +163,8 @@ test('getBundleFilePath', (assert) => {
   assert.equal(
     getBundleFilePath(),
     path.resolve(__dirname, './tmp/1495063024898.js'),
-    'getBundleFilePath() should return file path of the bundle loaded to VM');
+    'getBundleFilePath() should return file path of the bundle loaded to VM',
+  );
 });
 
 test('FriendsAndGuestst bundle for commit 1a7fe417', (assert) => {
@@ -135,7 +180,8 @@ test('FriendsAndGuestst bundle for commit 1a7fe417', (assert) => {
   const welcomePageRenderingResult = runInVM(welcomePageComponentRenderingRequest);
   assert.ok(
     welcomePageRenderingResult.includes('data-react-checksum=\\"800299790\\"'),
-    'WelcomePage component has correct checksum');
+    'WelcomePage component has correct checksum',
+  );
 
   // LayoutNavbar component:
   const layoutNavbarComponentRenderingRequest =
@@ -143,7 +189,8 @@ test('FriendsAndGuestst bundle for commit 1a7fe417', (assert) => {
   const layoutNavbarRenderingResult = runInVM(layoutNavbarComponentRenderingRequest);
   assert.ok(
     layoutNavbarRenderingResult.includes('data-react-checksum=\\"-667058792\\"'),
-    'LayoutNavbar component has correct checksum');
+    'LayoutNavbar component has correct checksum',
+  );
 
   // ListingIndex component:
   const listingIndexComponentRenderingRequest =
@@ -151,21 +198,24 @@ test('FriendsAndGuestst bundle for commit 1a7fe417', (assert) => {
   const listingIndexRenderingResult = runInVM(listingIndexComponentRenderingRequest);
   assert.ok(
     listingIndexRenderingResult.includes('data-react-checksum=\\"452252439\\"'),
-    'ListingIndex component has correct checksum');
+    'ListingIndex component has correct checksum',
+  );
 
   // ListingShow component:
   const listingShowComponentRenderingRequest = readRenderingRequest(project, commit, 'listingsShowRenderingRequest.js');
   const listingShowRenderingResult = runInVM(listingShowComponentRenderingRequest);
   assert.ok(
     listingShowRenderingResult.includes('data-react-checksum=\\"-324043796\\"'),
-    'ListingShow component has correct checksum');
+    'ListingShow component has correct checksum',
+  );
 
   // UserShow component:
   const userShowComponentRenderingRequest = readRenderingRequest(project, commit, 'userShowRenderingRequest.js');
   const userShowRenderingResult = runInVM(userShowComponentRenderingRequest);
   assert.ok(
     userShowRenderingResult.includes('data-react-checksum=\\"-1039690194\\"'),
-    'UserShow component has correct checksum');
+    'UserShow component has correct checksum',
+  );
 });
 
 test('ReactWebpackRailsTutorial bundle for commit ec974491', (assert) => {
@@ -182,21 +232,24 @@ test('ReactWebpackRailsTutorial bundle for commit ec974491', (assert) => {
   const navigationBarRenderingResult = runInVM(navigationBarComponentRenderingRequest);
   assert.ok(
     navigationBarRenderingResult.includes('data-react-checksum=\\"-472831860\\"'),
-    'NavigationBar component has correct checksum');
+    'NavigationBar component has correct checksum',
+  );
 
   // RouterApp component:
   const routerAppComponentRenderingRequest = readRenderingRequest(project, commit, 'routerAppRenderingRequest.js');
   const routerAppRenderingResult = runInVM(routerAppComponentRenderingRequest);
   assert.ok(
     routerAppRenderingResult.includes('data-react-checksum=\\"-1777286250\\"'),
-    'RouterApp component has correct checksum');
+    'RouterApp component has correct checksum',
+  );
 
   // App component:
   const appComponentRenderingRequest = readRenderingRequest(project, commit, 'appRenderingRequest.js');
   const appRenderingResult = runInVM(appComponentRenderingRequest);
   assert.ok(
     appRenderingResult.includes('data-react-checksum=\\"-490396040\\"'),
-    'App component has correct checksum');
+    'App component has correct checksum',
+  );
 });
 
 test('BionicWorkshop bundle for commit fa6ccf6b', (assert) => {
@@ -214,26 +267,30 @@ test('BionicWorkshop bundle for commit fa6ccf6b', (assert) => {
   // We don't put checksum here since it changes for every request with Rails auth token:
   assert.ok(
     signInPageWithFlashRenderingResult.includes('data-react-checksum='),
-    'SignIn page with flash component has correct checksum');
+    'SignIn page with flash component has correct checksum',
+  );
 
   // Landing page component:
   const landingPageRenderingRequest = readRenderingRequest(project, commit, 'landingPageRenderingRequest.js');
   const landingPageRenderingResult = runInVM(landingPageRenderingRequest);
   assert.ok(
     landingPageRenderingResult.includes('data-react-checksum=\\"-1899958456\\"'),
-    'Landing page component has correct checksum');
+    'Landing page component has correct checksum',
+  );
 
   // Post page component:
   const postPageRenderingRequest = readRenderingRequest(project, commit, 'postPageRenderingRequest.js');
   const postPageRenderingResult = runInVM(postPageRenderingRequest);
   assert.ok(
     postPageRenderingResult.includes('data-react-checksum=\\"-1296077150\\"'),
-    'Post page component has correct checksum');
+    'Post page component has correct checksum',
+  );
 
   // Authors page component:
   const authorsPageRenderingRequest = readRenderingRequest(project, commit, 'authorsPageRenderingRequest.js');
   const authorsPageRenderingResult = runInVM(authorsPageRenderingRequest);
   assert.ok(
     authorsPageRenderingResult.includes('data-react-checksum=\\"-1066737665\\"'),
-    'Authors page component has correct checksum');
+    'Authors page component has correct checksum',
+  );
 });
