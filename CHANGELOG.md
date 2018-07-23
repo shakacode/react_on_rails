@@ -10,6 +10,11 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [11.0.10] - 2018-07-22
+#### Fixed
+- Much better logging of rendering errors when there are lots of props. Only the a 1,000 chars are logged, and the center is indicated to be truncated. [PR 1117](https://github.com/shakacode/react_on_rails/pull/1117) and [PR 1118](https://github.com/shakacode/react_on_rails/pull/1117) by [justin808](https://github.com/justin808).
+- Properly clearing hydrated stores when server rendering. [PR 1120](https://github.com/shakacode/react_on_rails/pull/1120) by [squadette](https://github.com/squadette).
+
 ### [11.0.9] - 2018-06-24
 - Handle <script async> for Webpack bundle transparently. Closes [issue #290](https://github.com/shakacode/react_on_rails/issues/290) [PR 1099](https://github.com/shakacode/react_on_rails/pull/1099) by [squadette](https://github.com/squadette). Merged in [PR 1107]( https://github.com/shakacode/react_on_rails/pull/1107).
 
@@ -777,7 +782,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.9...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.10...master
+[11.0.10]: https://github.com/shakacode/react_on_rails/compare/11.0.9...11.0.10
 [11.0.9]: https://github.com/shakacode/react_on_rails/compare/11.0.8...11.0.9
 [11.0.8]: https://github.com/shakacode/react_on_rails/compare/11.0.7...11.0.8
 [11.0.7]: https://github.com/shakacode/react_on_rails/compare/11.0.6...11.0.7
