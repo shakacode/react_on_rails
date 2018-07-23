@@ -54,7 +54,7 @@
     "test": "babel-tape-runner -r node_package/tests/helpers/test_helper.js node_package/tests/*.js | tap-spec",
     "clean": "rm -rf node_package/lib",
     "prepare": "yarn run build",
-    "prepublish": "check-node-version --npm \">=4\" || npm run prepare",
+    "prepublish": "npm run prepare",
     "babel": "babel --out-dir node_package/lib node_package/src",
     "build": "yarn run clean && yarn run babel",
     "build-watch": "babel --watch --out-dir node_package/lib node_package/src",
