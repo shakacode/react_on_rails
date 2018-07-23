@@ -80,7 +80,7 @@ module ReactOnRailsPro
       caller_method = caller(1..1).first
       Rails.logger.info do
         timing = "#{((finish - start) * 1_000).round(1)}ms"
-        "[ReactOnRailsPro:#{Process.pid}] #{caller_method[/`.*'/][1..-2]}: #{[message, timing].compact.join(', ')}"
+        "[ReactOnRailsPro] PID:#{Process.pid} #{caller_method[/`.*'/][1..-2]}: #{[message, timing].compact.join(', ')}"
       end
 
       result

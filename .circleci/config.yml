@@ -116,7 +116,7 @@ jobs:
           paths:
             - node_modules
 
-  # Install Node modules for dummy app with Yarn and save them to chache.
+  # Install Node modules for dummy app with Yarn and save them to cache.
   install-dummy-app-node-packages:
     docker:
       - image: circleci/ruby:2.4.4-stretch-node

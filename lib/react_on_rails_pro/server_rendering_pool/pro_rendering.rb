@@ -16,7 +16,7 @@ module ReactOnRailsPro
 
         def exec_server_render_js(js_code, render_options)
           ::ReactOnRailsPro::Utils.with_trace(render_options.react_component_name) do
-            render_options.request_digest = request_digest(js_code)
+            set_request_digest_on_render_options(js_code, render_options)
             if ReactOnRailsPro.configuration.prerender_caching
               Rails.cache.fetch(cache_key(js_code, render_options)) do
                 render_on_pool(js_code, render_options)
@@ -27,8 +27,18 @@ module ReactOnRailsPro
           end
         end
 
-        def request_digest(js_code)
-          Digest::MD5.hexdigest(without_random_values(js_code))
+        def set_request_digest_on_render_options(js_code, render_options)
+          return unless render_options.request_digest.blank?
+
+          digest = if render_options.has_random_dom_id?
+                     Rails.logger.info { "[ReactOnRailsPro] Rendering #{render_options.react_component_name}. "\
+              "Suggest setting `id` on react_component or setting react_on_rails.rb initializer "\
+              "config.random_dom_id to false for BETTER performance." }
+                     Digest::MD5.hexdigest(without_random_values(js_code))
+                   else
+                     Digest::MD5.hexdigest(js_code)
+                   end
+          render_options.request_digest = digest
         end
 
         private
@@ -40,10 +50,12 @@ module ReactOnRailsPro
         end
 
         def cache_key(js_code, render_options)
+          set_request_digest_on_render_options(js_code, render_options )
+
           [
             *ReactOnRailsPro::Cache.base_cache_key("ror_pro_rendered_html",
                                                    prerender: render_options.prerender),
-            request_digest(js_code)
+            render_options.request_digest
           ]
         end
 
