@@ -8,6 +8,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     trace
     replay_console
     raise_on_prerender_error
+    random_dom_id
   ].freeze
 
   def the_attrs(react_component_name: "App", options: {})
@@ -61,18 +62,30 @@ describe ReactOnRails::ReactComponent::RenderOptions do
 
   describe "#dom_id" do
     context "without id option" do
-      it "returns a unique identifier" do
-        attrs = the_attrs(react_component_name: "SomeApp")
-        opts = described_class.new(attrs)
+      context "with random_dom_id set to true" do
+        it "returns a unique identifier" do
+          attrs = the_attrs(react_component_name: "SomeApp", options: { random_dom_id: true })
+          opts = described_class.new(attrs)
 
-        expect(SecureRandom).to receive(:uuid).and_return("123456789")
-        expect(opts.dom_id).to eq "SomeApp-react-component-123456789"
+          expect(SecureRandom).to receive(:uuid).and_return("123456789")
+          expect(opts.dom_id).to eq "SomeApp-react-component-123456789"
+          expect(opts.has_random_dom_id?).to eq(true)
+        end
+
+        it "is memoized" do
+          opts = described_class.new(the_attrs)
+
+          expect(opts.dom_id).to eq opts.dom_id
+        end
       end
 
-      it "is memoized" do
-        opts = described_class.new(the_attrs)
-
-        expect(opts.dom_id).to eq opts.dom_id
+      context "with random_dom_id set to false" do
+        it "returns a default identifier" do
+          attrs = the_attrs(react_component_name: "SomeApp", options: { random_dom_id: false})
+          opts = described_class.new(attrs)
+          expect(opts.dom_id).to eq "SomeApp-react-component"
+          expect(opts.has_random_dom_id?).to eq(false)
+        end
       end
     end
 
@@ -84,6 +97,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         opts = described_class.new(attrs)
 
         expect(opts.dom_id).to eq "im-an-id"
+        expect(opts.has_random_dom_id?).to eq(false)
       end
     end
   end

@@ -22,8 +22,26 @@ module ReactOnRails
         options.fetch(:props) { NO_PROPS }
       end
 
+      def random_dom_id
+        retrieve_key(:random_dom_id)
+      end
+
       def dom_id
-        @dom_id ||= options.fetch(:id) { generate_unique_dom_id }
+        @dom_id ||= options.fetch(:id) do
+          if random_dom_id
+            generate_unique_dom_id
+          else
+            base_dom_id
+          end
+        end
+      end
+
+      def has_random_dom_id?
+        return false if options[:id]
+
+        return false unless random_dom_id
+
+        true
       end
 
       def html_options
@@ -58,8 +76,12 @@ module ReactOnRails
 
       attr_reader :options
 
+      def base_dom_id
+       "#{react_component_name}-react-component"
+      end
+
       def generate_unique_dom_id
-        "#{react_component_name}-react-component-#{SecureRandom.uuid}"
+        "#{base_dom_id}-#{SecureRandom.uuid}"
       end
 
       def retrieve_key(key)
