@@ -210,7 +210,7 @@ module ReactOnRails
       assets_dir = ReactOnRails::Utils.generated_assets_full_path
       self.server_bundle_js_file = File.basename(server_bundle_js_file)
 
-      Rails.logger_warn do
+      Rails.logger.warn do
         "[DEPRECATION] ReactOnRails: remove path from server_bundle_js_file in configuration. "\
       "All generated files must go in #{assets_dir}. Using file basename #{server_bundle_js_file}"
       end
