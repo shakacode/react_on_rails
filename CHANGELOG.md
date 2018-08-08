@@ -9,10 +9,17 @@ See [Upgrading React on Rails](./docs/basics/upgrading-react-on-rails.md) for mo
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+### [11.1.0] - 2018-08-07
+#### Added
+- Add random dom id option. This new global and react_component helper option allows configuring whether or not React on Rails will automatically add a random id to the DOM node ID. (https://github.com/shakacode/react_on_rails/pull/1121) by [justin808](https://github.com/justin808)
+  * Added configuration option random_dom_id
+  * Added method RenderOptions has_random_dom_id?
+#### Fixed
+- Fix invalid warn directive. (https://github.com/shakacode/react_on_rails/pull/1123) by [mustangostang](https://github.com/mustangostang).
 
 ### [11.0.10] - 2018-07-22
 #### Fixed
-- Much better logging of rendering errors when there are lots of props. Only the a 1,000 chars are logged, and the center is indicated to be truncated. [PR 1117](https://github.com/shakacode/react_on_rails/pull/1117) and [PR 1118](https://github.com/shakacode/react_on_rails/pull/1117) by [justin808](https://github.com/justin808).
+- Much better logging of rendering errors when there are lots of props. Only the a 1,000 chars are logged, and the center is indicated to be truncated. [PR 1117](https://github.com/shakacode/react_on_rails/pull/1117) and [PR 1118](https://github.com/shakacode/react_on_rails/pull/1118) by [justin808](https://github.com/justin808).
 - Properly clearing hydrated stores when server rendering. [PR 1120](https://github.com/shakacode/react_on_rails/pull/1120) by [squadette](https://github.com/squadette).
 
 ### [11.0.9] - 2018-06-24
