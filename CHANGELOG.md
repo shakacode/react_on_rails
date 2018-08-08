@@ -789,7 +789,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.0.10...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.1.0...master
+[11.1.0]: https://github.com/shakacode/react_on_rails/compare/11.0.10...11.1.0
 [11.0.10]: https://github.com/shakacode/react_on_rails/compare/11.0.9...11.0.10
 [11.0.9]: https://github.com/shakacode/react_on_rails/compare/11.0.8...11.0.9
 [11.0.8]: https://github.com/shakacode/react_on_rails/compare/11.0.7...11.0.8
