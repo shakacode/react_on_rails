@@ -9,7 +9,7 @@ module ReactOnRails
   DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
   DEFAULT_SERVER_RENDER_TIMEOUT = 20
   DEFAULT_POOL_SIZE = 1
-  DEFAULT_RANDOM_DOM_ID = TRUE # for backwards compatability
+  DEFAULT_RANDOM_DOM_ID = true # for backwards compatability
 
   def self.configuration
     @configuration ||= Configuration.new(
