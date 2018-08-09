@@ -9,13 +9,17 @@ See [Upgrading React on Rails](./docs/basics/upgrading-react-on-rails.md) for mo
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+### [11.1.1] - 2018-08-09
+#### Fixed
+- `TRUE` was deprecated in ruby 2.4, using `true` instead. [PR 1128](https://github.com/shakacode/react_on_rails/pull/1128) by [Aguardientico](https://github.com/Aguardientico).
+
 ### [11.1.0] - 2018-08-07
 #### Added
-- Add random dom id option. This new global and react_component helper option allows configuring whether or not React on Rails will automatically add a random id to the DOM node ID. (https://github.com/shakacode/react_on_rails/pull/1121) by [justin808](https://github.com/justin808)
+- Add random dom id option. This new global and react_component helper option allows configuring whether or not React on Rails will automatically add a random id to the DOM node ID. [PR 1121](https://github.com/shakacode/react_on_rails/pull/1121) by [justin808](https://github.com/justin808)
   * Added configuration option random_dom_id
   * Added method RenderOptions has_random_dom_id?
 #### Fixed
-- Fix invalid warn directive. (https://github.com/shakacode/react_on_rails/pull/1123) by [mustangostang](https://github.com/mustangostang).
+- Fix invalid warn directive. [PR 1123](https://github.com/shakacode/react_on_rails/pull/1123) by [mustangostang](https://github.com/mustangostang).
 
 ### [11.0.10] - 2018-07-22
 #### Fixed
@@ -789,7 +793,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.1.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.1.1...master
+[11.1.1]: https://github.com/shakacode/react_on_rails/compare/11.1.0...11.1.
 [11.1.0]: https://github.com/shakacode/react_on_rails/compare/11.0.10...11.1.0
 [11.0.10]: https://github.com/shakacode/react_on_rails/compare/11.0.9...11.0.10
 [11.0.9]: https://github.com/shakacode/react_on_rails/compare/11.0.8...11.0.9
