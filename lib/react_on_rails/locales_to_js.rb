@@ -107,6 +107,8 @@ module ReactOnRails
       translations.each_with_object({}) do |(k, v), h|
         if v.is_a? Hash
           flatten(v).map { |hk, hv| h["#{k}.#{hk}".to_sym] = hv }
+        elsif v.is_a? Array
+          # Arrays are not supported by react-intl
         else
           h[k] = v.gsub("%{", "{")
         end

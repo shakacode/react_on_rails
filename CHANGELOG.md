@@ -8,6 +8,8 @@ See [Upgrading React on Rails](./docs/basics/upgrading-react-on-rails.md) for mo
 ## [Unreleased]
 Changes since last non-beta release.
 
+- Ignore Arrays in Rails i18n yml files
+
 *Please add entries here for your pull requests that are not yet released.*
 ### [11.1.1] - 2018-08-09
 #### Fixed
