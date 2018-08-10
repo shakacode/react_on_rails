@@ -1,3 +1,4 @@
 en:
   hello: "Hello world"
   argument: "I am %{age} years old."
+  day_names: [Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday]
