@@ -27,8 +27,9 @@ Given that rails/webpacker gem already provides basic React integration, why wou
 
 See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
 
-
 ## React on Rails Pro and ShakaCode Pro Support
+
+![image](https://user-images.githubusercontent.com/1118459/44008223-9b29d1b8-9e3c-11e8-90a8-9d38dc241ef9.png)
 
 React on Rails Pro provides Node server rendering and other performance enhancements for React on Rails. It's live at [egghead.io](https://egghead.io). See the [React on Rails Pro Docs](https://github.com/shakacode/react_on_rails/wiki).
 
@@ -44,7 +45,6 @@ ShakaCode can also help you with your Rails, JavaScript, and React-Native develo
 
 The article [Why Hire ShakaCode?](https://blog.shakacode.com/can-shakacode-help-you-4a5b1e5a8a63#.jex6tg9w9) provides additional details about our projects.
 
-  
 Please [email me (Justin Gordon), the creator of React on Rails](mailto:justin@shakacode.com), to see if I can help you or if you want an invite to our private Slack room for ShakaCode.
 
 ## Testimonials for Hiring ShakaCode and our "Pro Support"
