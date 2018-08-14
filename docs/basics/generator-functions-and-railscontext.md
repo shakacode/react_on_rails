@@ -43,11 +43,18 @@ Note: you never make these calls. React on Rails makes these calls when it does 
 
 (Note: see below [section](#multiple-react-components-on-a-page-with-one-store) on how to setup redux stores that allow multiple components to talk to the same store.)
 
-The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](https://github.com/shakacode/react_on_rails/tree/master/app/helpers/react_on_rails_helper.rb), method `rails_context` for the definitive list).
+The `railsContext` has: (see implementation in file [ReactOnRails::Helper](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/helper.rb), method `rails_context` for the definitive list).
 
 ```ruby
   {
     railsEnv: Rails.env
+    inMailer: in_mailer?,
+    # Locale settings
+    i18nLocale: I18n.locale,
+    i18nDefaultLocale: I18n.default_locale,
+    rorVersion: ReactOnRails::VERSION,
+    rorPro: ReactOnRails::Utils.react_on_rails_pro?
+    
     # URL settings
     href: request.original_url,
     location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}": ""}",
@@ -56,6 +63,7 @@ The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](h
     port: uri.port,
     pathname: uri.path, # /posts
     search: uri.query, # id=30&limit=5
+    httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"]
 
     # Other
     serverSide: boolean # Are we being called on the server or client? Note: if you conditionally
@@ -63,6 +71,8 @@ The `railsContext` has: (see implementation in file [react_on_rails_helper.rb](h
      # server version!
   }
 ```
+
+Plus, you can add your customizations to this. See "rendering extension" below.
 
 ## Rails Context
 
