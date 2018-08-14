@@ -59,6 +59,18 @@ describe ReactOnRailsHelper, type: :helper do
       escaped_json = helper.json_safe_and_pretty(json_string_unsanitized)
       expect(escaped_json).to eq(json_string_sanitized)
     end
+
+    context "when json is an instance of ActiveSupport::SafeBuffer" do
+      it "converts to escaped JSON" do
+        json = ActiveSupport::SafeBuffer.new(
+          "{\"hello\":\"world\"}"
+        )
+
+        result = helper.json_safe_and_pretty(json)
+
+        expect(result).to eq('{"hello":"world"}')
+      end
+    end
   end
 
   describe "#sanitized_props_string(props)" do
