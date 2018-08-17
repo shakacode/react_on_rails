@@ -7,8 +7,9 @@ const registeredComponents = new Map();
 export default {
   /**
    * @param components { component1: component1, component2: component2, etc. }
+   * @param isGeneratorFunction boolean
    */
-  register(components) {
+  register(components, isGeneratorFunction) {
     Object.keys(components).forEach(name => {
       if (registeredComponents.has(name)) {
         console.warn('Called register for component that is already registered', name);
@@ -19,7 +20,7 @@ export default {
         throw new Error(`Called register with null component named ${name}`);
       }
 
-      const isGeneratorFunction = generatorFunction(component);
+      const isGeneratorFunction = isGeneratorFunction || generatorFunction(component);
       const isRenderer = isGeneratorFunction && component.length === 3;
 
       registeredComponents.set(name, {
