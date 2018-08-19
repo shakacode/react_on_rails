@@ -3,6 +3,7 @@
 require "rails_helper"
 require "support/script_tag_utils"
 
+# rubocop:disable Metrics/BlockLength
 describe ReactOnRailsHelper, type: :helper do
   before do
     allow(self).to receive(:request) {
@@ -298,3 +299,4 @@ describe ReactOnRailsHelper, type: :helper do
     end
   end
 end
+# rubocop:enable Metrics/BlockLength

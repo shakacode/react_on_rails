@@ -7,7 +7,7 @@ GIT
 PATH
   remote: ../..
   specs:
-    react_on_rails (11.1.0.beta.1)
+    react_on_rails (11.1.1)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -235,7 +235,7 @@ GEM
     rspec-retry (0.6.1)
       rspec-core (> 3.3)
     rspec-support (3.7.1)
-    rubocop (0.58.1)
+    rubocop (0.58.2)
       jaro_winkler (~> 1.5.1)
       parallel (~> 1.10)
       parser (>= 2.5, != 2.5.1.1)
@@ -246,7 +246,7 @@ GEM
     ruby-lint (2.3.1)
       parser (~> 2.2)
       slop (~> 3.4, >= 3.4.7)
-    ruby-progressbar (1.9.0)
+    ruby-progressbar (1.10.0)
     ruby_dep (1.5.0)
     rubyzip (1.2.1)
     sass (3.5.6)

@@ -9,6 +9,17 @@ See [Upgrading React on Rails](./docs/basics/upgrading-react-on-rails.md) for mo
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+
+### [11.1.2] - 2018-08-18
+
+#### Fixed
+- Tests now properly exist if the config.build_test_command fails
+- Source path for project using Webpacker would default to "app/javascript" even if when the node_modules 
+  directory was set to "client". Fix now makes the configuration of this crystal clear.
+- renamed method RenderOptions.has_random_dom_id? to RenderOptions.random_dom_id? for rubocop rule.
+
+
+
 ### [11.1.1] - 2018-08-09
 #### Fixed
 - `TRUE` was deprecated in ruby 2.4, using `true` instead. [PR 1128](https://github.com/shakacode/react_on_rails/pull/1128) by [Aguardientico](https://github.com/Aguardientico).

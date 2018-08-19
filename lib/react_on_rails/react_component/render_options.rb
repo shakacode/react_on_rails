@@ -36,7 +36,7 @@ module ReactOnRails
         end
       end
 
-      def has_random_dom_id?
+      def random_dom_id?
         return false if options[:id]
 
         return false unless random_dom_id
@@ -77,7 +77,7 @@ module ReactOnRails
       attr_reader :options
 
       def base_dom_id
-       "#{react_component_name}-react-component"
+        "#{react_component_name}-react-component"
       end
 
       def generate_unique_dom_id
