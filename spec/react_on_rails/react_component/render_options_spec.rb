@@ -69,7 +69,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
 
           expect(SecureRandom).to receive(:uuid).and_return("123456789")
           expect(opts.dom_id).to eq "SomeApp-react-component-123456789"
-          expect(opts.has_random_dom_id?).to eq(true)
+          expect(opts.random_dom_id?).to eq(true)
         end
 
         it "is memoized" do
@@ -81,10 +81,10 @@ describe ReactOnRails::ReactComponent::RenderOptions do
 
       context "with random_dom_id set to false" do
         it "returns a default identifier" do
-          attrs = the_attrs(react_component_name: "SomeApp", options: { random_dom_id: false})
+          attrs = the_attrs(react_component_name: "SomeApp", options: { random_dom_id: false })
           opts = described_class.new(attrs)
           expect(opts.dom_id).to eq "SomeApp-react-component"
-          expect(opts.has_random_dom_id?).to eq(false)
+          expect(opts.random_dom_id?).to eq(false)
         end
       end
     end
@@ -97,7 +97,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         opts = described_class.new(attrs)
 
         expect(opts.dom_id).to eq "im-an-id"
-        expect(opts.has_random_dom_id?).to eq(false)
+        expect(opts.random_dom_id?).to eq(false)
       end
     end
   end

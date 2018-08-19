@@ -25,11 +25,11 @@ module ReactOnRails
         end
         before do
           allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
-                                   .and_return("")
+            .and_return("")
           allow(Webpacker).to receive_message_chain("dev_server.running?")
-                                .and_return(false)
+            .and_return(false)
           allow(Webpacker).to receive_message_chain("config.public_output_path")
-                                .and_return(webpacker_public_output_path)
+            .and_return(webpacker_public_output_path)
           allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
         end
 
@@ -39,8 +39,8 @@ module ReactOnRails
             # [2] (pry) ReactOnRails::WebpackerUtils: 0> Webpacker.manifest.lookup("app-bundle.js")
             # "/webpack/development/app-bundle-c1d2b6ab73dffa7d9c0e.js"
             allow(Webpacker).to receive_message_chain("manifest.lookup!")
-                                  .with("webpack-bundle.js")
-                                  .and_return("/webpack/dev/webpack-bundle-0123456789abcdef.js")
+              .with("webpack-bundle.js")
+              .and_return("/webpack/dev/webpack-bundle-0123456789abcdef.js")
           end
 
           it { expect(subject).to eq("#{webpacker_public_output_path}/webpack-bundle-0123456789abcdef.js") }
@@ -58,15 +58,15 @@ module ReactOnRails
       context "Without Webpacker enabled" do
         before do
           allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
-                                   .and_return("public/webpack/dev")
+            .and_return("public/webpack/dev")
           allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(false)
         end
 
         it {
           expect(subject).to eq(File.expand_path(
-            File.join(Rails.root,
-                      "public/webpack/dev/webpack-bundle.js")
-          ))
+                                  File.join(Rails.root,
+                                            "public/webpack/dev/webpack-bundle.js")
+                                ))
         }
       end
     end
@@ -76,17 +76,17 @@ module ReactOnRails
         allow(Rails).to receive(:root).and_return(Pathname.new("."))
         allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
         allow(Webpacker).to receive_message_chain("config.public_output_path")
-                              .and_return(Pathname.new("public/webpack/development"))
+          .and_return(Pathname.new("public/webpack/development"))
       end
 
       context "With Webpacker enabled and server file not in manifest", :webpacker do
         it "returns the unhashed server path" do
           server_bundle_name = "server-bundle.js"
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                                   .and_return(server_bundle_name)
+            .and_return(server_bundle_name)
           allow(Webpacker).to receive_message_chain("manifest.lookup!")
-                                .with(server_bundle_name)
-                                .and_raise(Webpacker::Manifest::MissingEntryError)
+            .with(server_bundle_name)
+            .and_raise(Webpacker::Manifest::MissingEntryError)
 
           path = Utils.server_bundle_js_file_path
 
@@ -97,10 +97,10 @@ module ReactOnRails
       context "With Webpacker enabled and server file in the manifest", :webpacker do
         it "returns the correct path hashed server path" do
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                                   .and_return("webpack-bundle.js")
+            .and_return("webpack-bundle.js")
           allow(Webpacker).to receive_message_chain("manifest.lookup!")
-                                .with("webpack-bundle.js")
-                                .and_return("webpack/development/webpack-bundle-123456.js")
+            .with("webpack-bundle.js")
+            .and_return("webpack/development/webpack-bundle-123456.js")
 
           path = Utils.server_bundle_js_file_path
 
@@ -250,10 +250,10 @@ module ReactOnRails
 
     describe ".smart_trim" do
       it "trims smartly" do
-        s = '1234567890'
+        s = "1234567890"
 
-        expect(Utils.smart_trim(s, -1)).to eq('1234567890')
-        expect(Utils.smart_trim(s, 0)).to eq('1234567890')
+        expect(Utils.smart_trim(s, -1)).to eq("1234567890")
+        expect(Utils.smart_trim(s, 0)).to eq("1234567890")
         expect(Utils.smart_trim(s, 1)).to eq("1#{Utils::TRUNCATION_FILLER}")
         expect(Utils.smart_trim(s, 2)).to eq("1#{Utils::TRUNCATION_FILLER}0")
         expect(Utils.smart_trim(s, 3)).to eq("1#{Utils::TRUNCATION_FILLER}90")
@@ -263,15 +263,16 @@ module ReactOnRails
         expect(Utils.smart_trim(s, 7)).to eq("123#{Utils::TRUNCATION_FILLER}7890")
         expect(Utils.smart_trim(s, 8)).to eq("1234#{Utils::TRUNCATION_FILLER}7890")
         expect(Utils.smart_trim(s, 9)).to eq("1234#{Utils::TRUNCATION_FILLER}67890")
-        expect(Utils.smart_trim(s, 10)).to eq('1234567890')
-        expect(Utils.smart_trim(s, 11)).to eq('1234567890')
+        expect(Utils.smart_trim(s, 10)).to eq("1234567890")
+        expect(Utils.smart_trim(s, 11)).to eq("1234567890")
       end
 
       it "trims handles a hash" do
-        s = { a: '1234567890' }
+        s = { a: "1234567890" }
 
         expect(Utils.smart_trim(s, 9)).to eq(
-                                            "{:a=#{Utils::TRUNCATION_FILLER}890\"}")
+          "{:a=#{Utils::TRUNCATION_FILLER}890\"}"
+        )
       end
     end
   end
