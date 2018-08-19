@@ -137,7 +137,9 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       end
     end
 
-    def self.source_path_is_not_defined_and_custom_node_modules?
+    def self.using_webpacker_source_path_is_not_defined_and_custom_node_modules?
+      return false unless ReactOnRails::WebpackerUtils.using_webpacker?
+
       !ReactOnRails::WebpackerUtils.webpacker_source_path_explicit? &&
         ReactOnRails.configuration.node_modules_location.present?
     end

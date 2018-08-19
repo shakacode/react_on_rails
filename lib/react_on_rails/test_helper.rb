@@ -76,7 +76,8 @@ module ReactOnRails
           puts
           @printed_once = true
 
-          if ReactOnRails::Utils.source_path_is_not_defined_and_custom_node_modules?
+          if ReactOnRails::WebpackerUtils.using_webpacker? &&
+             ReactOnRails::Utils.using_webpacker_source_path_is_not_defined_and_custom_node_modules?
             msg = <<-MSG.strip_heredoc
               WARNING: Define config.webpacker.yml to include sourcePath to configure
               the location of your JavaScript source for React on Rails.

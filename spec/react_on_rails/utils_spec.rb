@@ -71,32 +71,34 @@ module ReactOnRails
       end
     end
 
-    describe ".source_path_is_not_defined_and_custom_node_modules?" do
-      it "returns false if node_modules is blank" do
-        allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
-          .and_return("")
-        allow(Webpacker).to receive_message_chain("config.send").with(:data)
-                                                                .and_return({})
+    if ReactOnRails::WebpackerUtils.using_webpacker?
+      describe ".source_path_is_not_defined_and_custom_node_modules?" do
+        it "returns false if node_modules is blank" do
+          allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
+            .and_return("")
+          allow(Webpacker).to receive_message_chain("config.send").with(:data)
+                                                                  .and_return({})
 
-        expect(ReactOnRails::Utils.source_path_is_not_defined_and_custom_node_modules?).to eq(false)
-      end
+          expect(ReactOnRails::Utils.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to eq(false)
+        end
 
-      it "returns false if source_path is defined in the config/webpacker.yml and node_modules defined" do
-        allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
-          .and_return("client")
-        allow(Webpacker).to receive_message_chain("config.send").with(:data)
-                                                                .and_return(source_path: "client/app")
+        it "returns false if source_path is defined in the config/webpacker.yml and node_modules defined" do
+          allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
+            .and_return("client")
+          allow(Webpacker).to receive_message_chain("config.send").with(:data)
+                                                                  .and_return(source_path: "client/app")
 
-        expect(ReactOnRails::Utils.source_path_is_not_defined_and_custom_node_modules?).to eq(false)
-      end
+          expect(ReactOnRails::Utils.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to eq(false)
+        end
 
-      it "returns true if node_modules is not blank and the source_path is not defined in config/webpacker.yml" do
-        allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
-          .and_return("node_modules")
-        allow(Webpacker).to receive_message_chain("config.send").with(:data)
-                                                                .and_return({})
+        it "returns true if node_modules is not blank and the source_path is not defined in config/webpacker.yml" do
+          allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
+            .and_return("node_modules")
+          allow(Webpacker).to receive_message_chain("config.send").with(:data)
+                                                                  .and_return({})
 
-        expect(ReactOnRails::Utils.source_path_is_not_defined_and_custom_node_modules?).to eq(true)
+          expect(ReactOnRails::Utils.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to eq(true)
+        end
       end
     end
 
