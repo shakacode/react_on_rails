@@ -1,5 +1,40 @@
 Here is the full set of config options. This file is `/config/initializers/react_on_rails.rb`
 
+First, you should have a `/config/webpacker.yml` setup.
+
+Here is the setup when using the recommended `/client` directory for your node_modules and source files:
+
+```yaml
+# Note: Base output directory of /public is assumed for static files
+default: &default
+  compile: false
+  # Used in your webpack configuration. Must be created in the
+  # public_output_path folder
+  manifest: manifest.json
+  cache_manifest: false
+  source_path: client/app
+
+development:
+  <<: *default
+  # generated files for development, in /public/webpack/dev
+  public_output_path: webpack/dev
+
+test:
+  <<: *default
+  # generated files for tests, in /public/webpack/test
+  public_output_path: webpack/test
+
+production:
+  <<: *default
+  # generated files for tests, in /public/webpack/production
+  public_output_path: webpack/production
+  cache_manifest: true
+```
+
+Here's a representative `/config/initializers/react_on_rails.rb` setup when using this `/client` directory
+for all client files, including your sources and node_modules.
+
+
 ```ruby
 # frozen_string_literal: true
 
@@ -24,7 +59,7 @@ ReactOnRails.configure do |config|
 
   # defaults to "" (top level)
   #
-  config.node_modules_location = ""
+  config.node_modules_location = "client" # Recommended!
 
   # This configures the script to run to build the production assets by webpack. Set this to nil
   # if you don't want react_on_rails building this file for you.
@@ -52,17 +87,18 @@ ReactOnRails.configure do |config|
   #   public_output_path: packs-test
   # which means files in /public/packs-test
   #
-  # Alternately, you may configure this. It is relative to your Rails root directory.
-  # A custom, non-webpacker, config might use something like:
+  # Alternately, you may configure this if you are NOT using webpacker. It is relative to your Rails 
+  # root directory. A custom, non-webpacker, config might use something like:
   #
   # config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
   # This setting should not be used if using webpacker. 
 
+  # CONFIGURE YOUR SOURCE FILES 
   # The test helper needs to know where your JavaScript files exist. The default is configured
   # by your config/webpacker.yml soure_path:
-  # source_path: app/javascript
+  # source_path: client/app/javascript # if using recommended /client directory
   #
-  # If you have a non-default `node_modules_location`, that is assumed to be the location of your source
+  # If you are not using webpacker, the `node_modules_location` is assumed to be the location of your source
   # files.
 
   # Define the files we need to check for webpack compilation when running tests.

@@ -31,6 +31,12 @@ module ReactOnRails
       Webpacker.config.public_manifest_path.exist?
     end
 
+    def self.webpacker_source_path_explicit?
+      # WARNING: Calling private method `data` on Webpacker::Configuration, lib/webpacker/configuration.rb
+      config_webpacker_yml = Webpacker.config.send(:data)
+      config_webpacker_yml[:source_path].present?
+    end
+
     def self.check_manifest_not_cached
       return unless using_webpacker? && Webpacker.config.cache_manifest?
       msg = <<-MSG.strip_heredoc
