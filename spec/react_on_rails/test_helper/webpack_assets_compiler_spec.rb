@@ -10,6 +10,9 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
         allow(ReactOnRails.configuration)
           .to receive(:build_test_command)
           .and_return(invalid_command)
+
+        # Mock this out or else it quits the test suite!
+        allow(ReactOnRails::Utils).to receive(:exit!).and_raise(SystemExit)
       end
 
       it "exits immediately" do

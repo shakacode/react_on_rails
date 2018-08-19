@@ -116,7 +116,7 @@ module ReactOnRails
       webpacker_public_output_path = ReactOnRails::WebpackerUtils.webpacker_public_output_path
 
       if File.expand_path(generated_assets_dir) == webpacker_public_output_path.to_s
-        Rails.logger.warn("You specified /config/initializers/react_on_rails.rb generated_assets_dir "\
+        Rails.logger.warn("You specified generated_assets_dir in `config/initializers/react_on_rails.rb` "\
         "with Webpacker. Remove this line from your configuration file.")
       else
         msg = <<-MSG.strip_heredoc
