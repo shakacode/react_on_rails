@@ -13,12 +13,11 @@ Changes since last non-beta release.
 ### [11.1.2] - 2018-08-18
 
 #### Fixed
-- Tests now properly exist if the config.build_test_command fails
+- Tests now properly exit if the config.build_test_command fails!
 - Source path for project using Webpacker would default to "app/javascript" even if when the node_modules 
   directory was set to "client". Fix now makes the configuration of this crystal clear.
 - renamed method RenderOptions.has_random_dom_id? to RenderOptions.random_dom_id? for rubocop rule.
-
-
+[PR 1133](https://github.com/shakacode/react_on_rails/pull/1133) by [justin808](https://github.com/justin808)
 
 ### [11.1.1] - 2018-08-09
 #### Fixed
