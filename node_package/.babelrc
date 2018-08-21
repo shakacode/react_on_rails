@@ -2,6 +2,5 @@
   "presets": ["es2015", "stage-2", "react"],
   "plugins": [
     "transform-flow-strip-types",
-    "transform-runtime"
   ]
 }
