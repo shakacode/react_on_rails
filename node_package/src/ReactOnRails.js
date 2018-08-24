@@ -22,8 +22,8 @@ ctx.ReactOnRails = {
    * find you components for rendering.
    * @param components (key is component name, value is component)
    */
-  register(components) {
-    ComponentRegistry.register(components);
+  register(components, componentsAreGeneratorFunctions) {
+    ComponentRegistry.register(components, componentsAreGeneratorFunctions);
   },
 
   /**
