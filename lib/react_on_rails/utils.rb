@@ -153,7 +153,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
     end
 
     def self.gem_available?(name)
-      Gem::Specification.find_by_name(name).present?
+      Gem::Specification.find_all_by_name(name).present?
     rescue Gem::LoadError
       false
     rescue StandardError
