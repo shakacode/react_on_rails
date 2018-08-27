@@ -8,6 +8,10 @@ Because the renderer communicates over a port to the server, you can start a ren
 1. Reload the browser page that causes the renderer issue. You can then update the JS code, and restart the `yarn start` to run the renderer with the new code.
 1. Be sure to restart the rails server if you change any ruby code in loaded gems.
 
+# Debugging Tape Tests
+## Using Webstorm
+See [this article](https://medium.com/nmc-techblog/how-to-debug-tape-tests-in-jetbrains-ide-webstorm-idea-etc-1979aa99c490). Be sure to notice the 4th tab for the Debugger Console.
+
 # Debugging the Ruby gem
 
 Open the gemfile in the problematic app.

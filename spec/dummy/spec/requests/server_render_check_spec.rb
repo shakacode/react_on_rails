@@ -49,7 +49,7 @@ describe "Server Rendering", :server_rendering do
       sentinel = "Say hello to:"
       expect(html_nodes.css("div#my-hello-world-id p").text).to eq(sentinel)
       original_mtime = File.mtime(server_bundle)
-      replacement_text = "ZZZZZZZZZZZZZZZZZZZ"
+      replacement_text = "Z" * 20
       new_bundle_text = original_bundle_text.gsub(sentinel, replacement_text)
       File.open(server_bundle, "w") { |f| f.puts new_bundle_text }
       new_mtime = File.mtime(server_bundle)

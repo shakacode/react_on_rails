@@ -51,7 +51,7 @@ export default class HelloWorldRedux extends React.Component {
           <input
             type="text"
             ref={this.setNameDomRef}
-            value={name}
+            value={name || ''}
             onChange={this.handleChange}
           />
         </p>

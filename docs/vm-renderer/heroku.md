@@ -16,6 +16,67 @@
 3. Run deployment process (usually by pushing changes to **Git** repo associated with created **Heroku** app).
 4. Once deployment process is finished, all rendering requests form your `react_on_rails` app should be served by `<your-heroku-app>.herokuapp.com` app via **HTTPS**.
 
+## Deploying to the Same Server As Your App Server
+
+[buildpack for runit](https://github.com/danp/heroku-buildpack-runit)
+
+### Procfile
+
+`/Procfile`
+
+```
+web: bin/runsvdir-dyno
+```
+
+### Procfile.web
+
+`/Procfile.web`
+
+```
+puma: bundle exec puma -C config/puma.rb
+vm-renderer: bin/vm-renderer
+```
+
+### bin/vm-renderer
+
+```
+#!/bin/bash
+cd client
+yarn run vm-renderer
+```
+
+### vm-renderer
+Any task in client/package.json that starts the vm-renderer
+
+### Modifying Precompile Task
+
+To avoid the initial round trip to get a bundle on the renderer, you can do something like this to copy the file during precompile:
+
+Create `lib/tasks/assets.rake`:
+
+```ruby
+Rake::Task["assets:precompile"]
+    .clear_prerequisites
+    .enhance([:environment, "react_on_rails:assets:compile_environment"])
+    .enhance do
+  Rake::Task["react_on_rails:assets:symlink_non_digested_assets"].invoke
+  Rake::Task["react_on_rails:assets:delete_broken_symlinks"].invoke
+  Rake::Task["react_on_rails:assets:pre_stage_bundle_for_vm_renderer"].invoke
+end
+
+namespace :react_on_rails do
+  namespace :assets do
+    task :pre_stage_bundle_for_vm_renderer => :environment do
+      update_time = ReactOnRails::ServerRenderingPool::VmRenderingPool.renderer_bundle_file_name
+      dest_path = Rails.root.join("tmp", "bundles", "#{update_time}.js").to_s
+      mkdir_p Rails.root.join("tmp", "bundles")
+
+      cp src_bundle_path, dest_path
+    end
+  end
+end
+```
+
 ## References
 
 * [Heroku Node Settings](https://github.com/damianmr/heroku-node-settings)

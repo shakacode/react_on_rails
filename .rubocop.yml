@@ -8,6 +8,8 @@ AllCops:
   Include:
     - '**/Rakefile'
     - '**/config.ru'
+    - 'Gemfile'
+    - '**/*.rb'
 
   Exclude:
     - 'vendor/**/*'

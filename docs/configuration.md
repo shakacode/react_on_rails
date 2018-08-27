@@ -6,7 +6,7 @@
 
 # Example of Configuration
 
-Also see [spec/dummy/config/initializers/react_on_rails_pro.rb](../../master/spec/dummy/config/initializers/react_on_rails_pro.rb) for how the testing app is setup.
+Also see [spec/dummy/config/initializers/react_on_rails_pro.rb](../../spec/dummy/config/initializers/react_on_rails_pro.rb) for how the testing app is setup.
 
 The below example is a typical production setup, using the separate `VmRenderer`, where development takes the defaults when the ENV values are not specified.
 

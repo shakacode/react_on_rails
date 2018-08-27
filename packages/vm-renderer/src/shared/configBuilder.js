@@ -5,6 +5,7 @@
 import fs from 'fs';
 import os from 'os';
 
+import log, { configureLogger } from './log';
 import packageJson from './packageJson';
 
 const DEFAULT_TMP_DIR = '/tmp/react-on-rails-pro-vm-renderer-bundles';
@@ -15,6 +16,14 @@ const MAX_DEBUG_SNIPPET_LENGTH = 1000;
 
 let config;
 let userConfig;
+
+export function getConfig() {
+  if (!config) {
+    throw Error('Call buildConfig before calling getConfig');
+  }
+
+  return config;
+}
 
 function getTmpDir() {
   if (!fs.existsSync(DEFAULT_TMP_DIR)) {
@@ -31,7 +40,8 @@ const defaultConfig = {
   // Use env port if we run on Heroku
   port: env.RENDERER_PORT || DEFAULT_PORT,
 
-  // Show only important messages by default, https://github.com/winstonjs/winston#logging-levels:
+  // Show only important messages by default, https://github.com/winstonjs/
+  // winston#logging-levels:
   logLevel: env.RENDERER_LOG_LEVEL || DEFAULT_LOG_LEVEL,
 
   // Use directory DEFAULT_TMP_DIR if none provided
@@ -78,17 +88,22 @@ function sanitizedSettings(aConfig, defaultValue) {
   });
 }
 
-export function logSanitizedConfig(log) {
+export function logSanitizedConfig() {
   log.info(`VM Renderer v${packageJson.version}, protocol v${packageJson.protocolVersion}`);
   log.info('NOTE: renderer settings names do not have prefix "RENDERER_"');
-  log.info('Default values for settings', JSON.stringify(defaultConfig));
-  log.info('Customized values for settings from config object', JSON.stringify(sanitizedSettings(userConfig)));
-  log.info('ENV values used for settings (uses "RENDERER_" prefix)', JSON.stringify(envValuesUsed()));
-  log.info('Final renderer settings used', JSON.stringify(sanitizedSettings(config, '<NOT PROVIDED>')));
+  log.info('Default values for settings:\n%O', defaultConfig);
+  log.info('Customized values for settings from config object:\n%O', sanitizedSettings(getConfig()));
+  log.info('ENV values used for settings (use "RENDERER_" prefix):\n%O', envValuesUsed());
+  log.info('Final renderer settings used:\n%O', sanitizedSettings(config, '<NOT PROVIDED>'));
 }
 
+/**
+ * Lazily create the config
+ * @param providedUserConfig
+ * @returns {*}
+ */
 export function buildConfig(providedUserConfig) {
-  userConfig = providedUserConfig;
+  userConfig = providedUserConfig || {};
   config = Object.assign({}, defaultConfig, userConfig);
 
   let currentArg;
@@ -103,8 +118,7 @@ export function buildConfig(providedUserConfig) {
       config.port = val;
     }
   });
-}
 
-export function getConfig() {
+  configureLogger(log, config.logLevel);
   return config;
 }

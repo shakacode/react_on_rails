@@ -7,26 +7,35 @@ import fs from 'fs';
 import path from 'path';
 import vm from 'vm';
 import cluster from 'cluster';
-import log from 'winston';
+import { promisify } from 'util';
 
+import log from '../shared/log';
 import { getConfig } from '../shared/configBuilder';
-import smartTrim from '../shared/smartTrim';
+import { formatExceptionMessage, smartTrim } from '../shared/utils';
 
+const readFileAsync = promisify(fs.readFile); // (A)
+
+// Both are set when the VM is ready.
 let context;
-let bundleFilePath;
+
+// vmBundleFilePath is cleared at the beginning of creating the context and set only when the
+// context is properly created.
+let vmBundleFilePath;
 
 /**
- *
+ * Value is set after VM created from the bundleFilePath. This value is null if the context is
+ * not ready.
  */
+export function getVmBundleFilePath() {
+  return vmBundleFilePath;
+}
+
 function undefinedForExecLogging(functionName) {
   return `
     console.error('[ReactOnRails Renderer]: ${functionName} is not defined for VM. No-op for server rendering.');
     console.error(getStackTrace().join('\\n'));`;
 }
 
-/**
- *
- */
 function replayVmConsole() {
   if (log.level !== 'debug') return;
   const consoleHistoryFromVM = vm.runInContext('console.history', context);
@@ -49,15 +58,22 @@ function replayVmConsole() {
 
 /**
  *
+ * @param filePath
+ * @returns {Promise<void>}
  */
-export function buildVM(filePath) {
-  context = vm.createContext();
+export async function buildVM(filePath) {
+  if (filePath === vmBundleFilePath && context) {
+    return Promise.resolve(true);
+  }
 
-  // Create explicit reference to global context, just in case (some libs can use it):
-  vm.runInContext('global = this', context);
+  try {
+    vmBundleFilePath = undefined;
+    context = vm.createContext();
+    // Create explicit reference to global context, just in case (some libs can use it):
+    vm.runInContext('global = this', context);
 
-  // Reimplement console methods for replaying on the client:
-  vm.runInContext(`
+    // Reimplement console methods for replaying on the client:
+    vm.runInContext(`
     console = { history: [] };
     ['error', 'log', 'info', 'warn'].forEach(function (level) {
       console[level] = function () {
@@ -69,8 +85,8 @@ export function buildVM(filePath) {
       };
     });`, context);
 
-  // Define global getStackTrace() function:
-  vm.runInContext(`
+    // Define global getStackTrace() function:
+    vm.runInContext(`
     function getStackTrace() {
       var stack;
       try {
@@ -83,50 +99,67 @@ export function buildVM(filePath) {
       return stack.splice(stack[0] == 'Error' ? 2 : 1);
     }`, context);
 
-  // Define timer polyfills:
-  vm.runInContext(`function setInterval() { ${undefinedForExecLogging('setInterval')} }`, context);
-  vm.runInContext(`function setTimeout() { ${undefinedForExecLogging('setTimeout')} }`, context);
-  vm.runInContext(`function clearTimeout() { ${undefinedForExecLogging('clearTimeout')} }`, context);
+    // Define timer polyfills:
+    vm.runInContext(
+      `function setInterval() { ${undefinedForExecLogging('setInterval')} }`,
+      context,
+    );
+    vm.runInContext(`function setTimeout() { ${undefinedForExecLogging('setTimeout')} }`, context);
+    vm.runInContext(
+      `function clearTimeout() { ${undefinedForExecLogging('clearTimeout')} }`,
+      context,
+    );
 
-  // Run bundle code in created context:
-  const bundleContents = fs.readFileSync(filePath, 'utf8');
-  vm.runInContext(bundleContents, context);
+    // Run bundle code in created context:
+    const bundleContents = await readFileAsync(filePath, 'utf8');
+    vm.runInContext(bundleContents, context);
 
-  // Save bundle file path for further checkings for bundle updates:
-  bundleFilePath = filePath;
+    // !isMaster check is required for JS unit testing:
+    if (!cluster.isMaster) {
+      log.debug(`Built VM for worker #${cluster.worker.id}`);
+    }
 
-  // !isMaster check is required for JS unit testing:
-  if (!cluster.isMaster) log.debug(`Built VM for worker #${cluster.worker.id}`);
-  log.debug('Required objects now in VM sandbox context:', vm.runInContext('global.ReactOnRails', context) !== undefined);
-  log.debug('Required objects should not leak to the global context:', global.ReactOnRails);
-  return vm;
+    if (log.level === 'debug') {
+      log.debug(
+        'Required objects now in VM sandbox context: %s',
+        vm.runInContext('global.ReactOnRails', context) !== undefined,
+      );
+      log.debug(
+        'Required objects should not leak to the global context (true means OK): %s',
+        !!global.ReactOnRails,
+      );
+    }
+
+    vmBundleFilePath = filePath;
+
+    return Promise.resolve(true);
+  } catch (error) {
+    log.error('Caught Error when creating context in buildVM, %O', error);
+    return Promise.reject(error);
+  }
 }
 
 /**
  *
+ * @param renderingRequest JS Code to execute for SSR
+ * @param vmCluster
+ * @returns {{exceptionMessage: string}}
  */
-export function getBundleFilePath() {
-  return bundleFilePath;
-}
-
-/**
- *
- */
-export function runInVM(code, vmCluster) {
+export async function runInVM(renderingRequest, vmCluster) {
   const { bundlePath } = getConfig();
 
   try {
     if (log.level === 'debug') {
       const clusterWorkerId = vmCluster && vmCluster.worker ? `worker ${vmCluster.worker.id} ` : '';
       log.debug(`worker ${clusterWorkerId}received render request with code
-${smartTrim(code)}`);
+${smartTrim(renderingRequest)}`);
       const debugOutputPathCode = path.join(bundlePath, 'code.js');
       log.debug(`Full code executed written to: ${debugOutputPathCode}`);
-      fs.writeFileSync(debugOutputPathCode, code);
+      fs.writeFileSync(debugOutputPathCode, renderingRequest);
     }
 
     vm.runInContext('console.history = []', context);
-    const result = vm.runInContext(code, context);
+    const result = vm.runInContext(renderingRequest, context);
 
     if (log.level === 'debug') {
       log.debug(`result from JS:
@@ -137,19 +170,11 @@ ${smartTrim(result)}`);
     }
 
     replayVmConsole();
-    return result;
+    return Promise.resolve(result);
   } catch (e) {
-    const exceptionMessage = `
-JS code was:
-${smartTrim(code)}
-    
-EXCEPTION MESSAGE:
-${e.message}
-
-STACK:
-${e.stack}`;
-    log.error(`Caught execution error:\n${exceptionMessage}`);
-    return { exceptionMessage };
+    const exceptionMessage = formatExceptionMessage(renderingRequest, e);
+    log.error(` Caught execution error:\n${exceptionMessage}`);
+    return Promise.resolve({ exceptionMessage });
   }
 }
 
@@ -158,5 +183,5 @@ ${e.stack}`;
  */
 export function resetVM() {
   context = undefined;
-  bundleFilePath = undefined;
+  vmBundleFilePath = undefined;
 }

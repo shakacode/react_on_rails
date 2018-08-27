@@ -15,4 +15,5 @@ packages/vm-renderer/webpack.config.js
 **/app/assets/javascripts/application.js
 **/coverage/**
 **/cable.js
+**/tmp/**
 vendor

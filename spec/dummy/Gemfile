@@ -2,7 +2,7 @@ source "https://rubygems.org"
 
 eval_gemfile File.expand_path("../../react_on_rails_pro.gemspec", __dir__)
 
-gem "react_on_rails", "11.1.1"
+gem "react_on_rails", "11.1.2"
 # gem "react_on_rails", path: "../../../react_on_rails"
 # gem "react_on_rails", github: "shakacode/react_on_rails"
 
