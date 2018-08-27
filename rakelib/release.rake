@@ -5,7 +5,9 @@ require "react_on_rails"
 # require_relative File.join(gem_root, "lib", "react_on_rails", "version_syntax_converter")
 # require_relative File.join(gem_root, "lib", "react_on_rails", "git_utils")
 # require_relative File.join(gem_root, "lib", "react_on_rails", "utils")
-desc("Simple task to release both the gem and node package using the given version.
+desc("TODO -- see releasing.md for now.
+
+Simple task to release both the gem and node package using the given version.
 
 IMPORTANT: the gem version must be in valid rubygem format (no dashes).
 It will be automatically converted to a valid yarn semver by the rake task
@@ -22,6 +24,8 @@ which are installed via `bundle install` and `yarn`
 Example: `rake release[2.1.0,false]`")
 task :release, %i[gem_version dry_run tools_install] do |_t, args|
   include ReactOnRailsPro::TaskHelpers
+
+  raise "See releasing.md for current steps"
 
   class MessageHandler
     def add_error(error)
