@@ -10,8 +10,11 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [11.1.3] - 2018-08-26
+
 #### Fixed
-- Don't apply babel-plugin-transform-runtime inside react-on-rails to work with babel 7. [PR 1136](https://github.com/shakacode/react_on_rails/pull/1136) by [Ryunosuke Sato](https://github.com/tricknotes)
+- Don't apply babel-plugin-transform-runtime inside react-on-rails to work with babel 7. [PR 1136](https://github.com/shakacode/react_on_rails/pull/1136) by [Ryunosuke Sato](https://github.com/tricknotes).
+- Add support for webpacker 4 prereleases. [PR 1134](https://github.com/shakacode/react_on_rails/pull/1134) by [Judahmeek](https://github.com/Judahmeek))
 
 ### [11.1.2] - 2018-08-18
 
@@ -806,7 +809,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.1.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.1.3...master
+[11.1.3]: https://github.com/shakacode/react_on_rails/compare/11.1.2...11.1.3
 [11.1.2]: https://github.com/shakacode/react_on_rails/compare/11.1.1...11.1.2
 [11.1.1]: https://github.com/shakacode/react_on_rails/compare/11.1.0...11.1.1
 [11.1.0]: https://github.com/shakacode/react_on_rails/compare/11.0.10...11.1.0
