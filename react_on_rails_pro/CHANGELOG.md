@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [1.2.1] 2018-08-26
+### Fixed
+* Major overhaul of the vm-renderer. Improved logging and error handling, ready for async
+* Fixed race conditions with init of renderer
+* Improved logging
+* Ensuring all places that an error will result in a 400 sent to the rails server.
+* Handle threading issue with writing the bundle by using a lockfile.
+* Change internals so that async rendering is ready.
+* Add debugging instructions
+* Promisified some node APIs and wrote everything with careful async/await syntax, ensuring that errors are always caught and that promises are always returned from the async functions.
+
+Above are in Above are in Above are in Above are in Above are in Above are in Above are in Above are in [PR 65](https://github.com/shakacode/react_on_rails_pro/pull/65) by [justin808](https://github.com/justin808).
+
 ## [1.2.0]
 * **Migration:** react_on_rails must be updated to version 11.1.x+.
 
@@ -30,7 +43,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/shakacode/react_on_rails_pro/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/shakacode/react_on_rails_pro/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/shakacode/react_on_rails_pro/releases/tag/1.0.0
