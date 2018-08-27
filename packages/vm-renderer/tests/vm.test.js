@@ -1,4 +1,3 @@
-import test from 'tape';
 import path from 'path';
 import {
   uploadedBundlePath,
@@ -8,111 +7,65 @@ import {
 } from './helper';
 import { buildVM, runInVM, getVmBundleFilePath, resetVM } from '../src/worker/vm';
 
-test('buildVM and runInVM', async (assert) => {
-  assert.plan(14);
+test('buildVM and runInVM', async () => {
+  expect.assertions(14);
 
   createUploadedBundle();
   await buildVM(uploadedBundlePath());
 
   let result = await runInVM('ReactOnRails');
-  assert.deepEqual(
-    result,
-    { dummy: { html: 'Dummy Object' } },
-    'ReactOnRails object is availble is sandbox',
-  );
+  expect(result).toEqual({ dummy: { html: 'Dummy Object' } });
 
-  assert.ok(
-    global.ReactOnRails === undefined,
-    'ReactOnRails object did not leak to global context',
-  );
+  expect(global.ReactOnRails === undefined).toBeTruthy();
 
   result = await runInVM('typeof global !== undefined');
-  assert.ok(
-    result,
-    'global object is defined in VM context',
-  );
+  expect(result).toBeTruthy();
 
   result = await runInVM('Math === global.Math');
-  assert.ok(
-    result,
-    'global object points to global VM context',
-  );
+  expect(result).toBeTruthy();
 
   result = await runInVM('ReactOnRails === global.ReactOnRails');
-  assert.ok(
-    result,
-    'New objects added to global context are accessible by global reference',
-  );
+  expect(result).toBeTruthy();
 
   await runInVM('global.testVar = "test"');
   result = await runInVM('this.testVar === "test"');
-  assert.ok(
-    result,
-    'Variable added through global reference is available though global "this"',
-  );
+  expect(result).toBeTruthy();
 
   result = await runInVM('testVar === "test"');
-  assert.ok(
-    result,
-    'Variable added through global reference is availble directly in global context',
-  );
+  expect(result).toBeTruthy();
 
   result = await runInVM('console');
-  assert.ok(
-    result !== console,
-    'VM context has its own console',
-  );
+  expect(result !== console).toBeTruthy();
 
-  assert.ok(
-    console.history === undefined,
-    'Building VM does not mutate console in master code',
-  );
+  expect(console.history === undefined).toBeTruthy();
 
   result = await runInVM('console.history !== undefined');
-  assert.ok(
-    result,
-    'VM has patched console with history',
-  );
+  expect(result).toBeTruthy();
 
   result = await runInVM('getStackTrace !== undefined');
-  assert.ok(
-    result,
-    'getStackTrace function is availble is sandbox',
-  );
+  expect(result).toBeTruthy();
 
   result = await runInVM('setInterval !== undefined');
-  assert.ok(
-    result,
-    'setInterval function is availble is sandbox',
-  );
+  expect(result).toBeTruthy();
 
   result = await runInVM('setTimeout !== undefined');
-  assert.ok(
-    result,
-    'setTimeout function is availble is sandbox',
-  );
+  expect(result).toBeTruthy();
 
   result = await runInVM('clearTimeout !== undefined');
-  assert.ok(
-    result,
-    'clearTimeout function is availble is sandbox',
-  );
+  expect(result).toBeTruthy();
 });
 
-test('VM security and captured exceptions', async (assert) => {
-  assert.plan(1);
+test('VM security and captured exceptions', async () => {
+  expect.assertions(1);
   createUploadedBundle();
   await buildVM(uploadedBundlePath());
   // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
   const result = await runInVM('process.exit()');
-  assert.ok(
-    result.exceptionMessage.match(/process is not defined/),
-    'Expected captured exception b/c VM prevents global access',
-  );
+  expect(result.exceptionMessage.match(/process is not defined/)).toBeTruthy();
 });
 
-test('Captured exceptions for a long message', async (assert) => {
-  assert.plan(4);
+test('Captured exceptions for a long message', async () => {
+  expect.assertions(4);
   createUploadedBundle();
   await buildVM(uploadedBundlePath());
   // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
@@ -120,72 +73,45 @@ test('Captured exceptions for a long message', async (assert) => {
     '\n// 1234567890123456789012345678901234567890'.repeat(50)
   }\n// Finishing Comment`;
   const { exceptionMessage } = await runInVM(code);
-  assert.ok(
-    exceptionMessage.match(/process is not defined/),
-    'Expected error message in error result',
-  );
-  assert.ok(
-    exceptionMessage.match(/process.exit/),
-    'Expected captured code to contain beginning',
-  );
-  assert.ok(
-    exceptionMessage.match(/Finishing Comment/),
-    'Expected captured code to contain end',
-  );
-  assert.ok(
-    exceptionMessage.match(/\.\.\./),
-    'Expected captured code to contain ...',
-  );
+  expect(exceptionMessage.match(/process is not defined/)).toBeTruthy();
+  expect(exceptionMessage.match(/process.exit/)).toBeTruthy();
+  expect(exceptionMessage.match(/Finishing Comment/)).toBeTruthy();
+  expect(exceptionMessage.match(/\.\.\./)).toBeTruthy();
 });
 
-test('resetVM', async (assert) => {
-  assert.plan(2);
+test('resetVM', async () => {
+  expect.assertions(2);
   createUploadedBundle();
   buildVM(uploadedBundlePath());
 
   const result = await runInVM('ReactOnRails');
-  assert.deepEqual(
-    result,
-    { dummy: { html: 'Dummy Object' } },
-    'VM context is created',
-  );
+  expect(result).toEqual({ dummy: { html: 'Dummy Object' } });
 
   resetVM();
 
-  assert.ok(
-    getVmBundleFilePath() === undefined,
-    'resetVM() drops file path of the bundle loaded to VM',
-  );
+  expect(getVmBundleFilePath() === undefined).toBeTruthy();
 });
 
-test('VM console history', async (assert) => {
-  assert.plan(1);
+test('VM console history', async () => {
+  expect.assertions(1);
   createUploadedBundle();
   buildVM(uploadedBundlePath());
 
   const vmResult = await runInVM('console.log("Console message inside of VM") || console.history;');
   const consoleHistory = [{ level: 'log', arguments: ['[SERVER] Console message inside of VM'] }];
 
-  assert.deepEqual(
-    vmResult,
-    consoleHistory,
-    'Console logging from VM changes history for console inside VM',
-  );
+  expect(vmResult).toEqual(consoleHistory);
 });
 
-test('getVmBundleFilePath', async (assert) => {
-  assert.plan(1);
+test('getVmBundleFilePath', async () => {
+  expect.assertions(1);
   await createVmBundle();
 
-  assert.equal(
-    getVmBundleFilePath(),
-    path.resolve(__dirname, './tmp/1495063024898.js'),
-    'getVmBundleFilePath() should return file path of the bundle loaded to VM',
-  );
+  expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, './tmp/1495063024898.js'));
 });
 
-test('FriendsAndGuests bundle for commit 1a7fe417', async (assert) => {
-  assert.plan(5);
+test('FriendsAndGuests bundle for commit 1a7fe417', async () => {
+  expect.assertions(5);
 
   const project = 'friendsandguests';
   const commit = '1a7fe417';
@@ -195,48 +121,33 @@ test('FriendsAndGuests bundle for commit 1a7fe417', async (assert) => {
   // WelcomePage component:
   const welcomePageComponentRenderingRequest = readRenderingRequest(project, commit, 'welcomePageRenderingRequest.js');
   const welcomePageRenderingResult = await runInVM(welcomePageComponentRenderingRequest);
-  assert.ok(
-    welcomePageRenderingResult.includes('data-react-checksum=\\"800299790\\"'),
-    'WelcomePage component has correct checksum',
-  );
+  expect(welcomePageRenderingResult.includes('data-react-checksum=\\"800299790\\"')).toBeTruthy();
 
   // LayoutNavbar component:
   const layoutNavbarComponentRenderingRequest =
     readRenderingRequest(project, commit, 'layoutNavbarRenderingRequest.js');
   const layoutNavbarRenderingResult = await runInVM(layoutNavbarComponentRenderingRequest);
-  assert.ok(
-    layoutNavbarRenderingResult.includes('data-react-checksum=\\"-667058792\\"'),
-    'LayoutNavbar component has correct checksum',
-  );
+  expect(layoutNavbarRenderingResult.includes('data-react-checksum=\\"-667058792\\"')).toBeTruthy();
 
   // ListingIndex component:
   const listingIndexComponentRenderingRequest =
     readRenderingRequest(project, commit, 'listingIndexRenderingRequest.js');
   const listingIndexRenderingResult = await runInVM(listingIndexComponentRenderingRequest);
-  assert.ok(
-    listingIndexRenderingResult.includes('data-react-checksum=\\"452252439\\"'),
-    'ListingIndex component has correct checksum',
-  );
+  expect(listingIndexRenderingResult.includes('data-react-checksum=\\"452252439\\"')).toBeTruthy();
 
   // ListingShow component:
   const listingShowComponentRenderingRequest = readRenderingRequest(project, commit, 'listingsShowRenderingRequest.js');
   const listingShowRenderingResult = await runInVM(listingShowComponentRenderingRequest);
-  assert.ok(
-    listingShowRenderingResult.includes('data-react-checksum=\\"-324043796\\"'),
-    'ListingShow component has correct checksum',
-  );
+  expect(listingShowRenderingResult.includes('data-react-checksum=\\"-324043796\\"')).toBeTruthy();
 
   // UserShow component:
   const userShowComponentRenderingRequest = readRenderingRequest(project, commit, 'userShowRenderingRequest.js');
   const userShowRenderingResult = await runInVM(userShowComponentRenderingRequest);
-  assert.ok(
-    userShowRenderingResult.includes('data-react-checksum=\\"-1039690194\\"'),
-    'UserShow component has correct checksum',
-  );
+  expect(userShowRenderingResult.includes('data-react-checksum=\\"-1039690194\\"')).toBeTruthy();
 });
 
-test('ReactWebpackRailsTutorial bundle for commit ec974491', async (assert) => {
-  assert.plan(3);
+test('ReactWebpackRailsTutorial bundle for commit ec974491', async () => {
+  expect.assertions(3);
 
   const project = 'react-webpack-rails-tutorial';
   const commit = 'ec974491';
@@ -247,30 +158,21 @@ test('ReactWebpackRailsTutorial bundle for commit ec974491', async (assert) => {
   const navigationBarComponentRenderingRequest =
     readRenderingRequest(project, commit, 'navigationBarAppRenderingRequest.js');
   const navigationBarRenderingResult = await runInVM(navigationBarComponentRenderingRequest);
-  assert.ok(
-    navigationBarRenderingResult.includes('data-react-checksum=\\"-472831860\\"'),
-    'NavigationBar component has correct checksum',
-  );
+  expect(navigationBarRenderingResult.includes('data-react-checksum=\\"-472831860\\"')).toBeTruthy();
 
   // RouterApp component:
   const routerAppComponentRenderingRequest = readRenderingRequest(project, commit, 'routerAppRenderingRequest.js');
   const routerAppRenderingResult = await runInVM(routerAppComponentRenderingRequest);
-  assert.ok(
-    routerAppRenderingResult.includes('data-react-checksum=\\"-1777286250\\"'),
-    'RouterApp component has correct checksum',
-  );
+  expect(routerAppRenderingResult.includes('data-react-checksum=\\"-1777286250\\"')).toBeTruthy();
 
   // App component:
   const appComponentRenderingRequest = readRenderingRequest(project, commit, 'appRenderingRequest.js');
   const appRenderingResult = await runInVM(appComponentRenderingRequest);
-  assert.ok(
-    appRenderingResult.includes('data-react-checksum=\\"-490396040\\"'),
-    'App component has correct checksum',
-  );
+  expect(appRenderingResult.includes('data-react-checksum=\\"-490396040\\"')).toBeTruthy();
 });
 
-test('BionicWorkshop bundle for commit fa6ccf6b', async (assert) => {
-  assert.plan(4);
+test('BionicWorkshop bundle for commit fa6ccf6b', async () => {
+  expect.assertions(4);
 
   const project = 'bionicworkshop';
   const commit = 'fa6ccf6b';
@@ -282,32 +184,20 @@ test('BionicWorkshop bundle for commit fa6ccf6b', async (assert) => {
   const signInPageWithFlashRenderingResult = await runInVM(signInPageWithFlashRenderingRequest);
 
   // We don't put checksum here since it changes for every request with Rails auth token:
-  assert.ok(
-    signInPageWithFlashRenderingResult.includes('data-react-checksum='),
-    'SignIn page with flash component has correct checksum',
-  );
+  expect(signInPageWithFlashRenderingResult.includes('data-react-checksum=')).toBeTruthy();
 
   // Landing page component:
   const landingPageRenderingRequest = readRenderingRequest(project, commit, 'landingPageRenderingRequest.js');
   const landingPageRenderingResult = await runInVM(landingPageRenderingRequest);
-  assert.ok(
-    landingPageRenderingResult.includes('data-react-checksum=\\"-1899958456\\"'),
-    'Landing page component has correct checksum',
-  );
+  expect(landingPageRenderingResult.includes('data-react-checksum=\\"-1899958456\\"')).toBeTruthy();
 
   // Post page component:
   const postPageRenderingRequest = readRenderingRequest(project, commit, 'postPageRenderingRequest.js');
   const postPageRenderingResult = await runInVM(postPageRenderingRequest);
-  assert.ok(
-    postPageRenderingResult.includes('data-react-checksum=\\"-1296077150\\"'),
-    'Post page component has correct checksum',
-  );
+  expect(postPageRenderingResult.includes('data-react-checksum=\\"-1296077150\\"')).toBeTruthy();
 
   // Authors page component:
   const authorsPageRenderingRequest = readRenderingRequest(project, commit, 'authorsPageRenderingRequest.js');
   const authorsPageRenderingResult = await runInVM(authorsPageRenderingRequest);
-  assert.ok(
-    authorsPageRenderingResult.includes('data-react-checksum=\\"-1066737665\\"'),
-    'Authors page component has correct checksum',
-  );
+  expect(authorsPageRenderingResult.includes('data-react-checksum=\\"-1066737665\\"')).toBeTruthy();
 });

@@ -77,3 +77,5 @@ export const createResponse = (validate) => {
     },
   };
 };
+
+setConfig();

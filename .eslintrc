@@ -5,13 +5,21 @@ globals:
   __DEBUG_SERVER_ERRORS__: true
   __SERVER_ERRORS__: true
 
+plugins:
+  - jest
 env:
   browser: true
   node: true
-  mocha: true
+  jest/globals: true
 
 rules:
   no-console: 0
 
   # https://github.com/benmosher/eslint-plugin-import/issues/340
   import/no-extraneous-dependencies: 0
+
+  jest/no-disabled-tests: "warn"
+  jest/no-focused-tests: "error"
+  jest/no-identical-title: "error"
+  jest/prefer-to-have-length: "warn"
+  jest/valid-expect: "error"

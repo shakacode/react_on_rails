@@ -1,4 +1,3 @@
-import test from 'tape';
 import path from 'path';
 import touch from 'touch';
 import lockfile from 'lockfile';
@@ -16,8 +15,8 @@ import {
 import { getVmBundleFilePath } from '../src/worker/vm';
 import handleRenderRequest from '../src/worker/handleRenderRequest';
 
-test('If gem has posted updated bundle and no prior bundle', async (assert) => {
-  assert.plan(2);
+test('If gem has posted updated bundle and no prior bundle', async () => {
+  expect.assertions(2);
   resetForTest();
   createUploadedBundle();
 
@@ -27,24 +26,16 @@ test('If gem has posted updated bundle and no prior bundle', async (assert) => {
     providedNewBundle: { file: uploadedBundlePath() },
   });
 
-  assert.deepEqual(
-    result,
-    {
-      status: 200,
-      headers: { 'Cache-Control': 'public, max-age=31536000' },
-      data: { html: 'Dummy Object' },
-    },
-    'handleRenderRequest returns status 200 and correct rendered renderedHtmls',
-  );
-  assert.equal(
-    getVmBundleFilePath(),
-    path.resolve(__dirname, './tmp/1495063024898.js'),
-    'getVmBundleFilePath() should return file path of the bundle loaded to VM',
-  );
+  expect(result).toEqual({
+    status: 200,
+    headers: { 'Cache-Control': 'public, max-age=31536000' },
+    data: { html: 'Dummy Object' },
+  });
+  expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, './tmp/1495063024898.js'));
 });
 
-test('If bundle was not uploaded yet and not provided ', async (assert) => {
-  assert.plan(1);
+test('If bundle was not uploaded yet and not provided ', async () => {
+  expect.assertions(1);
   resetForTest();
   createUploadedBundle();
 
@@ -53,19 +44,15 @@ test('If bundle was not uploaded yet and not provided ', async (assert) => {
     bundleTimestamp: BUNDLE_TIMESTAMP,
   });
 
-  assert.deepEqual(
-    result,
-    {
-      status: 410,
-      headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
-      data: 'No bundle uploaded',
-    },
-    'handleRenderRequest returns status 410 with "No bundle uploaded"',
-  );
+  expect(result).toEqual({
+    status: 410,
+    headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+    data: 'No bundle uploaded',
+  });
 });
 
-test('If bundle was already uploaded by another thread', async (assert) => {
-  assert.plan(1);
+test('If bundle was already uploaded by another thread', async () => {
+  expect.assertions(1);
   resetForTest();
   await createVmBundle();
 
@@ -74,24 +61,20 @@ test('If bundle was already uploaded by another thread', async (assert) => {
     bundleTimestamp: BUNDLE_TIMESTAMP,
   });
 
-  assert.deepEqual(
-    result,
-    {
-      status: 200,
-      headers: { 'Cache-Control': 'public, max-age=31536000' },
-      data: { html: 'Dummy Object' },
-    },
-    'handleRenderRequest returns status 200 and correct rendered renderedHtmls',
-  );
+  expect(result).toEqual({
+    status: 200,
+    headers: { 'Cache-Control': 'public, max-age=31536000' },
+    data: { html: 'Dummy Object' },
+  });
 });
 
-test('If lockfile exists, and is stale', async (assert) => {
+test('If lockfile exists, and is stale', async () => {
   // We're using a lockfile with an artificially old date,
   // so make it use that instead of ctime.
   // Probably you should never do this in production!
   lockfile.filetime = 'mtime';
 
-  assert.plan(2);
+  expect.assertions(2);
   resetForTest();
   touch.sync(lockfilePath(), { time: '1979-07-01T19:10:00.000Z' });
   createUploadedBundle();
@@ -102,27 +85,18 @@ test('If lockfile exists, and is stale', async (assert) => {
     providedNewBundle: { file: uploadedBundlePath() },
   });
 
-  assert.deepEqual(
-    result,
-    {
-      status: 200,
-      headers: { 'Cache-Control': 'public, max-age=31536000' },
-      data: { html: 'Dummy Object' },
-    },
-    'handleRenderRequest returns status 200 and correct rendered renderedHtmls',
-  );
-  assert.equal(
-    getVmBundleFilePath(),
-    path.resolve(__dirname, './tmp/1495063024898.js'),
-    'getVmBundleFilePath() should return file path of the bundle loaded to VM',
-  );
+  expect(result).toEqual({
+    status: 200,
+    headers: { 'Cache-Control': 'public, max-age=31536000' },
+    data: { html: 'Dummy Object' },
+  });
+  expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, './tmp/1495063024898.js'));
 });
 
 test(
   'If lockfile exists from another thread and bundle provided.',
-  { timeout: 1000 },
-  async (assert) => {
-    assert.plan(2);
+  async () => {
+    expect.assertions(2);
     resetForTest();
     createUploadedBundle();
 
@@ -145,20 +119,12 @@ test(
       providedNewBundle: { file: uploadedBundlePath() },
     });
 
-    assert.deepEqual(
-      result,
-      {
-        status: 200,
-        headers: { 'Cache-Control': 'public, max-age=31536000' },
-        data: { html: 'Dummy Object' },
-      },
-      'handleRenderRequest returns status 200 and correct rendered renderedHtmls',
-    );
-    assert.equal(
-      getVmBundleFilePath(),
-      path.resolve(__dirname, './tmp/1495063024898.js'),
-      'getVmBundleFilePath() should return file path of the bundle loaded to VM',
-    );
+    expect(result).toEqual({
+      status: 200,
+      headers: { 'Cache-Control': 'public, max-age=31536000' },
+      data: { html: 'Dummy Object' },
+    });
+    expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, './tmp/1495063024898.js'));
   },
 );
 
