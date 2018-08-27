@@ -10,6 +10,8 @@ module ReactOnRailsPro
       RENDERED_HTML_KEY = "renderedHtml".freeze
 
       class << self
+        attr_accessor :bundle_update_utc_timestamp
+
         def reset_pool
           Rails.logger.info { "[ReactOnRailsPro] Setting up connection VM Renderer at #{renderer_url_base}" }
 
@@ -35,8 +37,16 @@ module ReactOnRailsPro
             return @bundle_update_utc_timestamp
           end
 
+          @bundle_update_utc_timestamp = bundle_utc_timestamp
+        end
+
+        def renderer_bundle_file_name
+          "#{bundle_utc_timestamp}.js"
+        end
+
+        def bundle_utc_timestamp
           bundle_update_time = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
-          @bundle_update_utc_timestamp = (bundle_update_time.utc.to_f * 1000).to_i
+          (bundle_update_time.utc.to_f * 1000).to_i
         end
 
         def renderer_url_base
@@ -62,7 +72,8 @@ module ReactOnRailsPro
         end
 
         def eval_js(js_code, render_options, send_bundle: false)
-          ReactOnRailsPro::ServerRenderingPool::ProRendering.set_request_digest_on_render_options(js_code, render_options)
+          ReactOnRailsPro::ServerRenderingPool::ProRendering
+            .set_request_digest_on_render_options(js_code, render_options)
 
           path = "/bundles/#{@bundle_update_utc_timestamp}/render/#{render_options.request_digest}"
 
@@ -88,7 +99,8 @@ module ReactOnRailsPro
           when "200"
             return response.body
           when "400"
-            raise ReactOnRailsPro::Error, "Renderer unhandled error at the VM level: #{response.code}:\n#{response.body}"
+            raise ReactOnRailsPro::Error,
+                  "Renderer unhandled error at the VM level: #{response.code}:\n#{response.body}"
           when "410"
             return eval_js(js_code, render_options, send_bundle: true)
           when "412"
@@ -105,7 +117,10 @@ module ReactOnRailsPro
             raise ReactOnRailsPro::Error, "Can't connect to VmRenderer renderer at #{renderer_url_base}"
           end
 
-          Rails.logger.warn { "[ReactOnRailsPro] Can't connect to VmRenderer renderer at #{renderer_url_base}. Falling back to ExecJS" }
+          Rails.logger.warn do
+            "[ReactOnRailsPro] Can't connect to VmRenderer renderer at #{renderer_url_base}."\
+            " Falling back to ExecJS"
+          end
           fallback_renderer = ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript
 
           # Pool is actually discarded btw requests:

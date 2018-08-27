@@ -7,37 +7,39 @@ import path from 'path';
 import cluster from 'cluster';
 import express from 'express';
 import busBoy from 'express-busboy';
-import log from 'winston';
+import log from './shared/log';
 import packageJson from './shared/packageJson';
 import { buildConfig, getConfig } from './shared/configBuilder';
 import checkProtocolVersion from './worker/checkProtocolVersionHandler';
 import authenticate from './worker/authHandler';
-import handleRenderRequest from './worker/renderRequestHandlerVm';
+import handleRenderRequest from './worker/handleRenderRequest';
+import { errorResponseResult, formatExceptionMessage } from './shared/utils';
 
+function setHeaders(headers, res) {
+  Object.keys(headers).forEach(key => res.set(key, headers[key]));
+}
 
-// Turn on colorized log:
-log.remove(log.transports.Console);
-log.add(log.transports.Console, { colorize: true });
+const setResponse = (result, res) => {
+  const { status, data, headers } = result;
+  if (status !== 200 && status !== 410) {
+    log.info(data);
+  }
+  setHeaders(headers, res);
+  res.status(status);
+  res.send(data);
+};
 
-/**
- *
- */
 export default function run(config) {
-  // Store config in app state. From now it can be loaded by any module using getConfig():
+  // Store config in app state. From now it can be loaded by any module using
+  // getConfig():
   buildConfig(config);
 
-  const { bundlePath, port, logLevel } = getConfig();
-
-  // Turn on colorized log:
-  log.remove(log.transports.Console);
-  log.add(log.transports.Console, { colorize: true });
-
-  // Set log level from config:
-  log.level = logLevel;
+  const { bundlePath, port } = getConfig();
 
   const app = express();
 
-  const fieldSizeLimit = 1024 * 1024 * 10; // 10 MB limit for code including props
+  // 10 MB limit for code including props
+  const fieldSizeLimit = 1024 * 1024 * 10;
 
   busBoy.extend(app, {
     upload: true,
@@ -52,46 +54,43 @@ export default function run(config) {
     // Check protocol version
     const protocolVersionCheckingResult = checkProtocolVersion(req);
 
-    function setHeaders(headers) {
-      Object.keys(headers).forEach(key => res.set(key, headers[key]));
-    }
-
     if (typeof protocolVersionCheckingResult === 'object') {
-      const { status, data, headers } = protocolVersionCheckingResult;
-      log.warn(data);
-      setHeaders(headers);
-      res.status(status);
-      res.send(data);
+      setResponse(protocolVersionCheckingResult, res);
       return;
     }
 
-    // Authenticate Ruby client:
+    // Authenticate Ruby client
     const authResult = authenticate(req);
 
     if (typeof authResult === 'object') {
-      const { status, data, headers } = authResult;
-      log.warn(data);
-      setHeaders(headers);
-      res.status(status);
-      res.send(data);
+      setResponse(authResult, res);
       return;
     }
 
-    // Handle rendering request:
-    const {
-      status, data, headers, die,
-    } = handleRenderRequest(req);
+    const { renderingRequest } = req.body;
+    const { bundleTimestamp } = req.params;
+    const { bundle: providedNewBundle } = req.files;
 
-    setHeaders(headers);
-    res.status(status);
-    res.send(data);
-
-    if (die) {
-      cluster.worker.disconnect();
+    try {
+      handleRenderRequest({ renderingRequest, bundleTimestamp, providedNewBundle })
+        .then((result) => {
+          setResponse(result, res);
+        })
+        .catch((err) => {
+          const exceptionMessage = formatExceptionMessage(
+            renderingRequest, err,
+            'UNHANDLED error in handleRenderRequest',
+          );
+          log.error(exceptionMessage);
+          setResponse(errorResponseResult(exceptionMessage), res);
+        });
+    } catch (theErr) {
+      const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
+      log.error(` UNHANDLED TOP LEVEL error ${exceptionMessage}`);
+      setResponse(errorResponseResult(exceptionMessage), res);
     }
   });
 
-  //
   app.get('/info', (_req, res) => {
     res.send({
       node_version: process.version,
@@ -99,7 +98,8 @@ export default function run(config) {
     });
   });
 
-  // In tests we will run worker in master thread, so we need to ensure server will not listen:
+  // In tests we will run worker in master thread, so we need to ensure server
+  // will not listen:
   if (!cluster.isMaster) {
     app.listen(port, () => {
       log.info(`Node renderer worker #${cluster.worker.id} listening on port ${port}!`);

@@ -4,12 +4,12 @@
  */
 
 import cluster from 'cluster';
-import log from 'winston';
+import log from '../shared/log';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 
 module.exports = function restartWorkers(delayBetweenIndividualWorkerRestarts) {
-  log.debug('Started scheduled restart of workers');
+  log.info('Started scheduled restart of workers');
 
   let delay = 0;
   Object.keys(cluster.workers).forEach((id) => {
@@ -23,5 +23,5 @@ module.exports = function restartWorkers(delayBetweenIndividualWorkerRestarts) {
     delay += delayBetweenIndividualWorkerRestarts * MILLISECONDS_IN_MINUTE;
   });
 
-  setTimeout(() => log.debug('Finished scheduled restart of workers'), delay);
+  setTimeout(() => log.info('Finished scheduled restart of workers'), delay);
 };

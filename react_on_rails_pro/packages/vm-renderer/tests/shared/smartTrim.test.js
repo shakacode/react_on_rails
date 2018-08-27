@@ -1,6 +1,6 @@
 import test from 'tape';
 
-import smartTrim, { TRUNCATION_FILLER } from '../../src/shared/smartTrim';
+import smartTrim, { TRUNCATION_FILLER } from '../../src/shared/utils';
 
 test('If gem has posted updated bundle', (assert) => {
   assert.plan(13);

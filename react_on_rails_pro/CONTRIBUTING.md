@@ -137,13 +137,25 @@ _Note: you don't have to build the NPM package since it is used only with node r
 ### Prereqs
 After checking out the repo, making sure you have rvm and nvm setup (setup ruby and node), cd to `spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
-Additionally, our RSpec tests use the poltergeist web driver. You will need to install the phantomjs node module:
 
-```sh
-yarn global add phantomjs
+### Building the Node Package for Development
+
+```
+yarn run build:dev
 ```
 
-Note this *must* be installed globally for the dummy test project rspec runner to see it properly.
+### Modifying the startup for testing
+
+
+This is a possible update to package.json to debug the lockfile. Notice the `NODE_DEBUG=LOCKFILE`
+
+```json
+    "developing": "rm -rf /tmp/react-on-rails-pro-vm-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=LOCKFILE,ROR node  -r source-map-support/register --experimental-modules packages/vm-renderer/lib/default-vm-renderer.js",
+```
+
+Notice the 2 "debug" settings of LOCKFILE and ROR.
+
+See https://nodejs.org/api/util.html#util_util_debuglog_section for details on `debuglog`.
 
 ### Local Node Package
 Because the example and dummy apps rely on the `react_on_rails_pro` node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the dummy app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)

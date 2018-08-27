@@ -24,7 +24,7 @@ Gem::Specification.new do |s|
 
   s.required_ruby_version = ">= 2.1.0"
 
-  s.add_dependency "react_on_rails", "~> 11.1"
+  s.add_dependency "react_on_rails", "11.1.2"
   s.add_dependency "addressable"
   s.add_dependency "connection_pool"
   s.add_dependency "execjs", "~> 2.5"

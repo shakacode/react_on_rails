@@ -3,30 +3,22 @@
  * @module master
  */
 import cluster from 'cluster';
-import log from 'winston';
-
-import { buildConfig, getConfig, logSanitizedConfig } from './shared/configBuilder';
+import log from './shared/log';
+import { buildConfig, logSanitizedConfig } from './shared/configBuilder';
 import restartWorkers from './master/restartWorkers';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 
-export default function masterRun(config) {
+export default function masterRun(runningConfig) {
   // Store config in app state. From now it can be loaded by any module using getConfig():
-  buildConfig(config);
+  const config = buildConfig(runningConfig);
   const {
-    logLevel,
     workersCount,
     allWorkersRestartInterval,
     delayBetweenIndividualWorkerRestarts,
-  } = getConfig();
+  } = config;
 
-  // Turn on colorized log:
-  log.remove(log.transports.Console);
-  log.add(log.transports.Console, { colorize: true });
-
-  // Set log level from config:
-  log.level = logLevel;
-  logSanitizedConfig(log);
+  logSanitizedConfig();
 
   // Count available CPUs for worker processes:
   const workerCpuCount = workersCount;
@@ -38,8 +30,9 @@ export default function masterRun(config) {
 
   // Listen for dying workers:
   cluster.on('exit', worker => {
-    if (worker.isScheduledRestart) log.debug('Restarting worker #%d on schedule', worker.id);
-    else log.warn('Worker #%d died :(, restarting', worker.id);
+    if (worker.isScheduledRestart) {
+      log.info('Restarting worker #%d on schedule', worker.id);
+    } else { log.warn('Worker #%d died UNEXPECTEDLY :(, restarting', worker.id); }
     // Replace the dead worker:
     cluster.fork();
   });
@@ -57,7 +50,7 @@ export default function masterRun(config) {
     );
   } else if (allWorkersRestartInterval || delayBetweenIndividualWorkerRestarts) {
     log.error("Misconfiguration, please provide both 'allWorkersRestartInterval' and " +
-        "'delayBetweenIndividualWorkerRestarts' to enable scheduled worker restarts");
+      "'delayBetweenIndividualWorkerRestarts' to enable scheduled worker restarts");
     process.exit();
   } else {
     log.info('No schedule for workers restarts');

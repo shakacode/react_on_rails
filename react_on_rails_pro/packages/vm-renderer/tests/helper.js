@@ -2,65 +2,78 @@ import path from 'path';
 import fs from 'fs';
 import fsExtra from 'fs-extra';
 
+import { buildVM, resetVM } from '../src/worker/vm';
+
 const { buildConfig } = require('../src/shared/configBuilder');
+
+function getFixtureBundle() {
+  return path.resolve(__dirname, './fixtures/bundle.js');
+}
+
+export const BUNDLE_TIMESTAMP = 1495063024898;
 
 /**
  *
  */
-function setConfig() {
+export function setConfig() {
   buildConfig({
     bundlePath: path.resolve(__dirname, './tmp'),
   });
 }
 
-/**
- *
- */
-function getTmpUploadedBundlePath() {
-  return path.resolve(__dirname, './tmp/uploads/bundle.js');
+export function vmBundlePath() {
+  return path.resolve(__dirname, `./tmp/${BUNDLE_TIMESTAMP}.js`);
 }
 
 /**
  *
+ * @returns {Promise<void>}
  */
-function getUploadedBundlePath() {
-  return path.resolve(__dirname, './tmp/1495063024898.js');
+export async function createVmBundle() {
+  fsExtra.copySync(getFixtureBundle(), vmBundlePath());
+  await buildVM(vmBundlePath());
 }
 
-/**
- *
- */
-function createTmpUploadedBundle() {
-  fsExtra.copySync(path.resolve(__dirname, './fixtures/bundle.js'), getTmpUploadedBundlePath());
+export function lockfilePath() {
+  return `${vmBundlePath()}.lock`;
 }
 
-/**
- *
- */
-function createUploadedBundle() {
-  fsExtra.copySync(path.resolve(__dirname, './fixtures/bundle.js'), getUploadedBundlePath());
+export function uploadedBundlePath() {
+  return path.resolve(__dirname, `./tmp/uploads/${BUNDLE_TIMESTAMP}.js`);
 }
 
-/**
- *
- */
-function cleanUploadedBundles() {
-  if (fs.existsSync(getUploadedBundlePath())) fs.unlinkSync(getUploadedBundlePath());
-  if (fs.existsSync(getTmpUploadedBundlePath())) fs.unlinkSync(getTmpUploadedBundlePath());
+export function createUploadedBundle() {
+  fsExtra.copySync(getFixtureBundle(), uploadedBundlePath());
 }
 
-/**
- *
- */
-function readRenderingRequest(projectName, commit, requestDumpFileName) {
+export function resetForTest() {
+  if (fs.existsSync(uploadedBundlePath())) fs.unlinkSync(uploadedBundlePath());
+  if (fs.existsSync(vmBundlePath())) fs.unlinkSync(vmBundlePath());
+  if (fs.existsSync(lockfilePath())) fs.unlinkSync(lockfilePath());
+  resetVM();
+  setConfig();
+}
+
+export function readRenderingRequest(projectName, commit, requestDumpFileName) {
   const renderingRequestRelativePath = path.join('./fixtures/projects/', projectName, commit, requestDumpFileName);
   return fs.readFileSync(path.resolve(__dirname, renderingRequestRelativePath), 'utf8');
 }
 
-exports.setConfig = setConfig;
-exports.getTmpUploadedBundlePath = getTmpUploadedBundlePath;
-exports.getUploadedBundlePath = getUploadedBundlePath;
-exports.createTmpUploadedBundle = createTmpUploadedBundle;
-exports.createUploadedBundle = createUploadedBundle;
-exports.cleanUploadedBundles = cleanUploadedBundles;
-exports.readRenderingRequest = readRenderingRequest;
+export const createResponse = (validate) => {
+  const result = {
+    headers: {},
+    data: '',
+    status: null,
+  };
+
+  return {
+    set: (key, value) => {
+      result.headers[key] = value;
+    },
+    status: (value) => { result.status = value; },
+    send: (data) => {
+      result.data = data;
+      validate(result);
+    },
+  };
+};

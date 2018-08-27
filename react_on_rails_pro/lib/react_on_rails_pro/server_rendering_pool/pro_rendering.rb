@@ -30,10 +30,12 @@ module ReactOnRailsPro
         def set_request_digest_on_render_options(js_code, render_options)
           return unless render_options.request_digest.blank?
 
-          digest = if render_options.has_random_dom_id?
-                     Rails.logger.info { "[ReactOnRailsPro] Rendering #{render_options.react_component_name}. "\
-              "Suggest setting `id` on react_component or setting react_on_rails.rb initializer "\
-              "config.random_dom_id to false for BETTER performance." }
+          digest = if render_options.random_dom_id?
+                     Rails.logger.info do
+                       "[ReactOnRailsPro] Rendering #{render_options.react_component_name}. "\
+                                   "Suggest setting `id` on react_component or setting react_on_rails.rb initializer "\
+                                   "config.random_dom_id to false for BETTER performance."
+                     end
                      Digest::MD5.hexdigest(without_random_values(js_code))
                    else
                      Digest::MD5.hexdigest(js_code)
@@ -50,7 +52,7 @@ module ReactOnRailsPro
         end
 
         def cache_key(js_code, render_options)
-          set_request_digest_on_render_options(js_code, render_options )
+          set_request_digest_on_render_options(js_code, render_options)
 
           [
             *ReactOnRailsPro::Cache.base_cache_key("ror_pro_rendered_html",
