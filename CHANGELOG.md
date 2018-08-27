@@ -10,6 +10,9 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+#### Fixed
+- Don't apply babel-plugin-transform-runtime inside react-on-rails to work with babel 7. [PR 1136](https://github.com/shakacode/react_on_rails/pull/1136) by [Ryunosuke Sato](https://github.com/tricknotes)
+
 ### [11.1.2] - 2018-08-18
 
 #### Fixed
