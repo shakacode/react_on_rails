@@ -32,6 +32,7 @@
     "fs-extra": "^3.0.1",
     "lockfile": "^1.0.4",
     "semver": "^5.5.0",
+    "sleep-promise": "^8.0.1",
     "source-map-support": "^0.5.9",
     "winston": "^3.0.0"
   },
@@ -52,7 +53,6 @@
     "jest": "^23.5.0",
     "jsdom": "^9.12.0",
     "release-it": "^2.7.1",
-    "sleep-promise": "^8.0.1",
     "supertest": "^3.0.0",
     "tap-diff": "^0.1.1",
     "tap-spec": "^4.1.1",
