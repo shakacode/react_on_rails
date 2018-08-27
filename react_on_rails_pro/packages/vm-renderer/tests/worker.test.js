@@ -1,4 +1,3 @@
-import test from 'tape';
 import request from 'supertest';
 import path from 'path';
 
@@ -14,8 +13,8 @@ const { protocolVersion } = packageJson;
 test(
   'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
   'when bundle is provided',
-  async (assert) => {
-    assert.plan(3);
+  async done => {
+    expect.assertions(3);
 
     resetForTest();
     createUploadedBundle();
@@ -32,10 +31,10 @@ test(
       .field('protocolVersion', protocolVersion)
       .attach('bundle', uploadedBundlePath())
       .end((_err, res) => {
-        assert.equal(res.headers['cache-control'], 'public, max-age=31536000');
-        assert.equal(res.status, 200);
-        assert.deepEqual(res.body, { html: 'Dummy Object' });
-        assert.end();
+        expect(res.headers['cache-control']).toBe('public, max-age=31536000');
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ html: 'Dummy Object' });
+        done();
       });
   },
 );
@@ -43,8 +42,8 @@ test(
 test(
   'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
     'when password is required but no password was provided',
-  async (assert) => {
-    assert.plan(2);
+  async done => {
+    expect.assertions(2);
     resetForTest();
     await createVmBundle();
 
@@ -63,9 +62,9 @@ test(
         protocolVersion,
       })
       .end((_err, res) => {
-        assert.equals(res.error.status, 401);
-        assert.equals(res.error.text, 'Wrong password');
-        assert.end();
+        expect(res.error.status).toBe(401);
+        expect(res.error.text).toBe('Wrong password');
+        done();
       });
   },
 );
@@ -73,8 +72,8 @@ test(
 test(
   'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
     'when password is required but wrong password was provided',
-  async (assert) => {
-    assert.plan(2);
+  async done => {
+    expect.assertions(2);
     resetForTest();
 
     await createVmBundle();
@@ -95,9 +94,9 @@ test(
       })
       .end((_err, res) => {
         console.log('res', JSON.stringify(res));
-        assert.equal(res.error.status, 401);
-        assert.equal(res.error.text, 'Wrong password');
-        assert.end();
+        expect(res.error.status).toBe(401);
+        expect(res.error.text).toBe('Wrong password');
+        done();
       });
   },
 );
@@ -105,8 +104,8 @@ test(
 test(
   'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
     'when password is required and correct password was provided',
-  async (assert) => {
-    assert.plan(3);
+  async done => {
+    expect.assertions(3);
     resetForTest();
 
     await createVmBundle();
@@ -128,10 +127,10 @@ test(
         protocolVersion,
       })
       .end((_err, res) => {
-        assert.equal(res.headers['cache-control'], 'public, max-age=31536000');
-        assert.equal(res.status, 200);
-        assert.deepEqual(res.body, { html: 'Dummy Object' });
-        assert.end();
+        expect(res.headers['cache-control']).toBe('public, max-age=31536000');
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ html: 'Dummy Object' });
+        done();
       });
   },
 );
@@ -139,8 +138,8 @@ test(
 test(
   'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
     'when password is not required and no password was provided',
-  async (assert) => {
-    assert.plan(3);
+  async done => {
+    expect.assertions(3);
     resetForTest();
 
     await createVmBundle();
@@ -159,10 +158,10 @@ test(
         protocolVersion,
       })
       .end((_err, res) => {
-        assert.equal(res.headers['cache-control'], 'public, max-age=31536000');
-        assert.equal(res.status, 200);
-        assert.deepEqual(res.body, { html: 'Dummy Object' });
-        assert.end();
+        expect(res.headers['cache-control']).toBe('public, max-age=31536000');
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ html: 'Dummy Object' });
+        done();
       });
   },
 );
