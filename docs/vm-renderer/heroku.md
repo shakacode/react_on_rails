@@ -50,7 +50,9 @@ Any task in client/package.json that starts the vm-renderer
 
 ### Modifying Precompile Task
 
-To avoid the initial round trip to get a bundle on the renderer, you can do something like this to copy the file during precompile:
+To avoid the initial round trip to get a bundle on the renderer, you can do something like this to copy the file during precompile.
+
+Note, this is a sample. You'll have to configure for your paths used in your renderer setup.
 
 Create `lib/tasks/assets.rake`:
 
@@ -67,10 +69,9 @@ end
 namespace :react_on_rails do
   namespace :assets do
     task :pre_stage_bundle_for_vm_renderer => :environment do
-      update_time = ReactOnRails::ServerRenderingPool::VmRenderingPool.renderer_bundle_file_name
-      dest_path = Rails.root.join("tmp", "bundles", "#{update_time}.js").to_s
-      mkdir_p Rails.root.join("tmp", "bundles")
-
+      renderer_bundle_file_name = ReactOnRailsPro::ServerRenderingPool::VmRenderingPool.renderer_bundle_file_name
+      dest_path = Rails.root.join('tmp', 'vm-renderer-bundles', "#{renderer_bundle_file_name}").to_s
+      mkdir_p Rails.root.join("tmp", "vm-renderer-bundles")
       cp src_bundle_path, dest_path
     end
   end
