@@ -10,6 +10,7 @@ Changes since last non-beta release.
 
 #### Fixed
 - Ignore Arrays in Rails i18n yml files. [PR 1129](https://github.com/shakacode/react_on_rails/pull/1129) by [vcarel](https://github.com/vcarel).
+- Fix to apply transform-runtime. And work with Babel 6 and 7. (Include revert of [PR 1136](https://github.com/shakacode/react_on_rails/pull/1136)) [PR 1140](https://github.com/shakacode/react_on_rails/pull/1140) by [Ryunosuke Sato](https://github.com/tricknotes).
 
 *Please add entries here for your pull requests that are not yet released.*
 
