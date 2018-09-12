@@ -7,17 +7,15 @@
     "doc": "docs"
   },
   "devDependencies": {
-    "babel-cli": "^6.24.1",
-    "babel-core": "^6.25.0",
-    "babel-loader": "^7.1.1",
-    "babel-plugin-react-transform": "^2.0.2",
-    "babel-plugin-transform-flow-strip-types": "^6.22.0",
-    "babel-plugin-transform-runtime": "^6.23.0",
-    "babel-preset-es2015": "^6.24.1",
-    "babel-preset-react": "^6.24.1",
-    "babel-preset-stage-2": "^6.24.1",
-    "babel-tape-runner": "^2.0.1",
-    "babel-types": "^6.25.0",
+    "@babel/cli": "^7.0.0",
+    "@babel/core": "^7.0.0",
+    "@babel/plugin-transform-flow-strip-types": "^7.0.0",
+    "@babel/plugin-transform-runtime": "^7.0.0",
+    "@babel/preset-env": "^7.0.0",
+    "@babel/preset-react": "^7.0.0",
+    "@babel/types": "^7.0.0",
+    "babel-loader": "^8.0.2",
+    "babel-tape-runner": "^3.0.0",
     "babelify": "^7.3.0",
     "blue-tape": "^1.0.0",
     "create-react-class": "^15.6.0",
@@ -87,6 +85,6 @@
   },
   "homepage": "https://github.com/shakacode/react_on_rails#readme",
   "dependencies": {
-    "babel-runtime": "6"
+    "@babel/runtime-corejs2": "^7.0.0"
   }
 }
