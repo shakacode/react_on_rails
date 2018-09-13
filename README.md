@@ -12,7 +12,7 @@ ShakaCode is **[currently looking to hire](http://www.shakacode.com/about/#work-
 
 ## Project Objective
 
-To provide an opinionated and optimal framework for integrating Ruby on Rails with React via the [**Webpacker**](https://github.com/rails/webpacker) gem.
+To provide an opinionated and optimal framework for integrating Ruby on Rails with React via the [**Webpacker**](https://github.com/rails/webpacker) gem especially in regards to React Server Rendering.
 
 ## Features and Why React on Rails?
 
