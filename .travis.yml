@@ -40,7 +40,6 @@ install:
   - travis_retry nvm install 8.11.3
   - node -v
   - travis_retry npm i -g yarn
-  - travis_retry yarn global add babel-cli
   - travis_retry bundle install
   - travis_retry yarn
   - travis_retry yarn run build
