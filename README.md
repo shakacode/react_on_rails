@@ -33,7 +33,7 @@ React on Rails Pro provides Node server rendering and other performance enhancem
 
 ![2018-09-11_10-31-11](https://user-images.githubusercontent.com/1118459/45467845-5bcc7400-b6bd-11e8-91e1-e0cf806d4ea4.png)
 
-* [HVMN’s 90% Reduction in Server Response Time from React on Rails Pro](https://medium.com/@railsonmaui/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db)
+* [HVMN’s 90% Reduction in Server Response Time from React on Rails Pro](https://blog.shakacode.com/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db)
 * [Egghead React on Rails Pro Deployment Highlights](https://github.com/shakacode/react_on_rails/wiki/Egghead-React-on-Rails-Pro-Deployment-Highlights)
 
 For more information, see the [React on Rails Pro Docs](https://github.com/shakacode/react_on_rails/wiki).
