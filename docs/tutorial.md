@@ -1,6 +1,6 @@
 # React on Rails Basic Tutorial
 
-This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering. It is updated to 11.1.0.
+This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering. It is updated to 11.1.4.
 
 After finishing this tutorial you will get an application that can do the following (live on Heroku):
 
@@ -27,7 +27,7 @@ nvm alias default node          # make it default version
 nvm list                        # check
 
 brew install yarn               # you can use other installer if desired
-
+11\.\d+\.\d+
 rvm install 2.5.0               # download and install latest stable Ruby (update to exact version)
 rvm use 2.5.0 --default         # use it and make it default
 rvm list                        # check
@@ -59,7 +59,7 @@ bundle exec rails webpacker:install:react
 Add the **React On Rails** gem to your Gemfile:
 
 ```
-gem 'react_on_rails', '11.1.8'         # prefer exact gem version to match npm version
+gem 'react_on_rails', '11.1.4'         # prefer exact gem version to match npm version
 ```
 
 Note: Latest released React On Rails version is considered stable. Please use the latest version to ensure you get all the security patches and the best support.

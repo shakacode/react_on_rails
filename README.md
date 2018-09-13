@@ -29,19 +29,26 @@ See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpac
 
 ## React on Rails Pro and ShakaCode Pro Support
 
-![image](https://user-images.githubusercontent.com/1118459/44008223-9b29d1b8-9e3c-11e8-90a8-9d38dc241ef9.png)
+React on Rails Pro provides Node server rendering and other performance enhancements for React on Rails. 
 
-React on Rails Pro provides Node server rendering and other performance enhancements for React on Rails. It's live at [egghead.io](https://egghead.io). See the [React on Rails Pro Docs](https://github.com/shakacode/react_on_rails/wiki).
+![2018-09-11_10-31-11](https://user-images.githubusercontent.com/1118459/45467845-5bcc7400-b6bd-11e8-91e1-e0cf806d4ea4.png)
 
-The [React on Rails Pro Support Plan](http://www.shakacode.com/work/shakacode-pro-support.pdf) can help you with:
+* [HVMN’s 90% Reduction in Server Response Time from React on Rails Pro](https://medium.com/@railsonmaui/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db)
+Improvements at egghead.io hvmn.com
+* [Egghead React on Rails Pro Deployment Highlights](https://github.com/shakacode/react_on_rails/wiki/Egghead-React-on-Rails-Pro-Deployment-Highlights)
+
+For more information, see the [React on Rails Pro Docs](https://github.com/shakacode/react_on_rails/wiki).
+
+The [ShakaCode Pro Support Plan](http://www.shakacode.com/work/shakacode-pro-support.pdf) can help you with:
 
 * Optimizing your webpack setup to Webpack v4 for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable.
 * Upgrading your app to use the current Webpack setup that skips the Sprockets asset pipeline.
 * Better performance client and server side.
 * Efficiently migrating from [Angular to React](https://www.shakacode.com/services/angular-to-react/).
-* Best practices based on four years of React on Rails experience.
+* Best practices based on over four years of React on Rails experience.
+* Using [Reason](https://reasonml.github.io/) with (or without) React on Rails.
 
-ShakaCode can also help you with your Rails, JavaScript, and React-Native development needs. We build custom web and mobile applications. Because we own [HawaiiChee.com](https://www.hawaiichee.com), we can leverage that code for your app! 
+ShakaCode can also help you with your custom software development needs. We specialize in marketplace and e-commerce applications that utilize both Rails and React. Because we own [HawaiiChee.com](https://www.hawaiichee.com), we can leverage that code for your app! 
 
 The article [Why Hire ShakaCode?](https://blog.shakacode.com/can-shakacode-help-you-4a5b1e5a8a63#.jex6tg9w9) provides additional details about our projects.
 
@@ -92,7 +99,7 @@ Note, the best way to understand how to use ReactOnRails is to study a few simpl
 2. Add the `react_on_rails` gem to Gemfile:
 
    ```ruby
-   gem 'react_on_rails', '11.0.9' # Use the exact gem version to match npm version
+   gem 'react_on_rails', '11.1.4' # Use the exact gem version to match npm version
    ```
 
 3. Install the `react_on_rails` gem:

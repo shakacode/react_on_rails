@@ -8,12 +8,14 @@ See [Upgrading React on Rails](./docs/basics/upgrading-react-on-rails.md) for mo
 ## [Unreleased]
 Changes since last non-beta release.
 
+*Please add entries here for your pull requests that are not yet released.*
+
+### [11.1.4] - 2018-09-12
+
 #### Fixed
 - Ignore Arrays in Rails i18n yml files. [PR 1129](https://github.com/shakacode/react_on_rails/pull/1129) by [vcarel](https://github.com/vcarel).
 - Fix to apply transform-runtime. And work with Babel 6 and 7. (Include revert of [PR 1136](https://github.com/shakacode/react_on_rails/pull/1136)) [PR 1140](https://github.com/shakacode/react_on_rails/pull/1140) by [Ryunosuke Sato](https://github.com/tricknotes).
 - Upgrade Babel version to 7 [PR 1141](https://github.com/shakacode/react_on_rails/pull/1141) by [Ryunosuke Sato](https://github.com/tricknotes).
-
-*Please add entries here for your pull requests that are not yet released.*
 
 ### [11.1.3] - 2018-08-26
 

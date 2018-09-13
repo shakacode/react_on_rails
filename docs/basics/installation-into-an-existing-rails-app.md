@@ -7,7 +7,7 @@
 1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `client/package.json` file.
 
    ```ruby
-   gem "react_on_rails", "11.0.0" # Update to the current version
+   gem "react_on_rails", "11.1.4" # Update to the current version
    gem "webpacker", "~> 3" # Newer versions might be supported
    ```
 
