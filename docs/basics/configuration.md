@@ -147,7 +147,7 @@ ReactOnRails.configure do |config|
   # Default is to false to NOT raise exception on server if the JS code throws.
   # Reason is that it's easier to debug this when you get the error over to the client.
   # 
-  config.raise_on_prerender_error = false
+  config.raise_on_prerender_error = Rails.env.development? 
 
   ################################################################################
   # Server Renderer Configuration for ExecJS
