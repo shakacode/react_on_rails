@@ -7,13 +7,13 @@ Node rendering and caching performance enhancements for [React on Rails](https:/
 # Features
 
 ## Caching
-See [Caching](./docs/caching.md) for details.
 
 ### Server Rendering
 Server rendering JavaScript evaluation is cached if `prerender_caching` is turned on in your Rails config. This applies to all JavaScript evaluation methods.
 
 ### Fragment Caching View Helpers
-* Fragment caching for `react_component` and `react_component_hash`, including lazy evaluation of props. 
+* Fragment caching for `react_component` and `react_component_hash`, including lazy evaluation of props.
+* See [Caching](./docs/caching.md) for details.
 
 ## React On Rails Pro VM Render
 The "React on Rails Pro VM Renderer" provides more efficient server rendering on a standalone Node JS server.
