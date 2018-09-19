@@ -1,5 +1,10 @@
 # Upgrading React on Rails
 
+## Need Help Migrating?
+If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for information about our [ShakaCode Pro Support](https://www.shakacode.com/work/shakacode-pro-support.pdf).
+
+We specialize in helping companies to quickly and efficiently move from versions before 9 to current. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4 for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
+
 ## Upgrading to version 11
 * Remove `server_render_method` from config/initializers/react_on_rails.rb. Alternate server rendering methods are part of React on Rails Pro. If you want to use a custom renderer, contact justin@shakacode.com. We have a custom node rendering solution in production for egghead.io.
 * Remove your usage of ENV["TRACE_REACT_ON_RAILS"] usage. You can get all tracing with either specifying **`trace`** at your component or in your config/initializers/react_on_rails.rb file.
