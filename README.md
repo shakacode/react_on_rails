@@ -24,6 +24,7 @@ See the [Ruby API](docs/ruby-api.md).
 
 # References
 
+* [Installation](./docs/installation.md)
 * [Caching](./docs/caching.md)
 * [Rails Configuration](./docs/configuration.md)
 * [VM Renderer Docs](./docs/vm-renderer/basics.md)
