@@ -27,6 +27,10 @@ Given that rails/webpacker gem already provides basic React integration, why wou
 
 See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
 
+## ShakaCode Forum Premium Content
+_Requires creating a free account._ 
+* [How to use different versions of a file for client and server rendering](https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352)
+
 ## React on Rails Pro and ShakaCode Pro Support
 
 React on Rails Pro provides Node server rendering and other performance enhancements for React on Rails. 
@@ -238,9 +242,11 @@ This is how to expose a component to the `react_component` view helper.
 
 #### Different Server-Side Rendering Code (and a Server-Specific Bundle)
 
-You may want different initialization for your server-rendered components. For example, if you have an animation that runs when a component is displayed, you might need to turn that off when server rendering. However, the `railsContext` will tell you if your JavaScript code is running client side or server side. So code that required a different server bundle previously may no longer require this. Note, checking if `window` is defined has a similar effect.
+You may want different code for your server-rendered components running server side versus client side. For example, if you have an animation that runs when a component is displayed, you might need to turn that off when server rendering. One way to handle this is conditional code like `if (window) { doClientOnlyCode() }`. 
 
-If you want different code to run, you will set up a separate webpack compilation file and you will specify a different, server side entry file. ex. 'serverHelloWorld.jsx'. Note: you might be initializing HelloWorld with version specialized for server rendering.
+Another way is to use a separate webpack configuration file that can use a different server side entry file, like  'serverRegistration.js' as opposed to 'clientRegistration.js.' That would set up different code for server rendering.
+
+For details on techniques to use different code for client and server rendering, see: [How to use different versions of a file for client and server rendering](https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352). (_Requires creating a free account._)
 
 ## Specifying Your React Components: Direct or Generator Functions
 
