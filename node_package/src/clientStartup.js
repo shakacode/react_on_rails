@@ -198,9 +198,7 @@ export function clientStartup(context) {
 
   window.setTimeout(() => {
     if (!turbolinksInstalled() || !turbolinksSupported()) {
-      if (document.readyState === 'complete' ||
-                                   (document.readyState !== 'loading' && !document.documentElement.doScroll)
-      ) {
+      if (document.readyState === 'complete') {
         debugTurbolinks(
           'NOT USING TURBOLINKS: DOM is already loaded, calling reactOnRailsPageLoaded',
         );

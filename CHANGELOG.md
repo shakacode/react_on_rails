@@ -15,6 +15,7 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+- Fix client startup invoking render prematurely.  Closes [issue #1150](https://github.com/shakacode/react_on_rails/issues/1150).
 
 ### [11.1.4] - 2018-09-12
 
