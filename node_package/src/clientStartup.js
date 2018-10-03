@@ -177,6 +177,32 @@ function reactOnRailsPageUnloaded() {
   forEachComponent(unmount);
 }
 
+function renderInit() {
+  // Install listeners when running on the client (browser).
+  // We must do this check for turbolinks AFTER the document is loaded because we load the
+  // Webpack bundles first.
+  if (!turbolinksInstalled() || !turbolinksSupported()) {
+    debugTurbolinks('NOT USING TURBOLINKS: calling reactOnRailsPageLoaded');
+    reactOnRailsPageLoaded();
+    return;
+  }
+
+  if (turbolinksVersion5()) {
+    debugTurbolinks(
+      'USING TURBOLINKS 5: document added event listeners ' +
+      'turbolinks:before-render and turbolinks:render.');
+    document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
+    document.addEventListener('turbolinks:render', reactOnRailsPageLoaded);
+    reactOnRailsPageLoaded();
+  } else {
+    debugTurbolinks(
+      'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +
+      'page:change.');
+    document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
+    document.addEventListener('page:change', reactOnRailsPageLoaded);
+  }
+}
+
 export function clientStartup(context) {
   const document = context.document;
 
@@ -196,45 +222,9 @@ export function clientStartup(context) {
 
   debugTurbolinks('Adding DOMContentLoaded event to install event listeners.');
 
-  window.setTimeout(() => {
-    if (!turbolinksInstalled() || !turbolinksSupported()) {
-      if (document.readyState === 'complete') {
-        debugTurbolinks(
-          'NOT USING TURBOLINKS: DOM is already loaded, calling reactOnRailsPageLoaded',
-        );
-
-        reactOnRailsPageLoaded();
-      } else {
-        document.addEventListener('DOMContentLoaded', () => {
-          debugTurbolinks(
-            'NOT USING TURBOLINKS: DOMContentLoaded event, calling reactOnRailsPageLoaded',
-          );
-          reactOnRailsPageLoaded();
-        });
-      }
-    }
-  });
-
-  document.addEventListener('DOMContentLoaded', () => {
-    // Install listeners when running on the client (browser).
-    // We must do this check for turbolinks AFTER the document is loaded because we load the
-    // Webpack bundles first.
-
-    if (turbolinksInstalled() && turbolinksSupported()) {
-      if (turbolinksVersion5()) {
-        debugTurbolinks(
-          'USING TURBOLINKS 5: document added event listeners ' +
-          'turbolinks:before-render and turbolinks:render.');
-        document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
-        document.addEventListener('turbolinks:render', reactOnRailsPageLoaded);
-        reactOnRailsPageLoaded();
-      } else {
-        debugTurbolinks(
-          'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +
-          'page:change.');
-        document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
-        document.addEventListener('page:change', reactOnRailsPageLoaded);
-      }
-    }
-  });
+  if (document.readyState === 'complete') {
+    window.setTimeout(renderInit);
+  } else {
+    document.addEventListener('DOMContentLoaded', renderInit);
+  }
 }

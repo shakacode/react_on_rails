@@ -15,6 +15,7 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+- Fix additional cases of client startup failing during interactive readyState
 
 ### [11.1.5] - 2018-09-12
 #### Fixed
