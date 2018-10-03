@@ -15,7 +15,10 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
-- Fix client startup invoking render prematurely.  Closes [issue #1150](https://github.com/shakacode/react_on_rails/issues/1150).
+
+### [11.1.5] - 2018-09-12
+#### Fixed
+- Fix client startup invoking render prematurely.  Closes [issue #1150](https://github.com/shakacode/react_on_rails/issues/1150). [PR 1151](https://github.com/shakacode/react_on_rails/pull/1151) by [rakelley](https://github.com/rakelley).
 
 ### [11.1.4] - 2018-09-12
 
@@ -823,7 +826,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.1.4...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.1.5...master
+[11.1.5]: https://github.com/shakacode/react_on_rails/compare/11.1.4...11.1.5
 [11.1.4]: https://github.com/shakacode/react_on_rails/compare/11.1.3...11.1.4
 [11.1.3]: https://github.com/shakacode/react_on_rails/compare/11.1.2...11.1.3
 [11.1.2]: https://github.com/shakacode/react_on_rails/compare/11.1.1...11.1.2
