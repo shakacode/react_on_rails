@@ -10,12 +10,16 @@ Once the bundled files have been generated in your `app/assets/webpack` folder a
 ```ruby
 react_component(component_name,
                 props: {},
-                prerender: nil,
-                trace: nil,
-                replay_console: nil,
-                raise_on_prerender_error: nil,
-                id: nil,
+                prerender: nil)
                 html_options: {})
+```
+
+Uncommonly used options:
+```
+  trace: nil,
+  replay_console: nil,
+  raise_on_prerender_error: nil,
+  id: nil,
 ```
 
 - **component_name:** Can be a React component, created using an ES6 class or a generator function that returns a React component (or, only on the server side, an object with shape { redirectLocation, error, renderedHtml }), or a "renderer function" that manually renders a React component to the dom (client side only).
