@@ -15,9 +15,13 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
-- Fix additional cases of client startup failing during interactive readyState
 
-### [11.1.5] - 2018-09-12
+
+### [11.1.6] - 2018-10-05
+#### Fixed
+- Fix client startup invoking render prematurely, **AGAIN**. Fix additional cases of client startup failing during interactive readyState". Closes [issue #1150](https://github.com/shakacode/react_on_rails/issues/1150). [PR 1152](https://github.com/shakacode/react_on_rails/pull/1152) by [rakelley](https://github.com/rakelley).
+
+### [11.1.5] - 2018-10-03
 #### Fixed
 - Fix client startup invoking render prematurely.  Closes [issue #1150](https://github.com/shakacode/react_on_rails/issues/1150). [PR 1151](https://github.com/shakacode/react_on_rails/pull/1151) by [rakelley](https://github.com/rakelley).
 
@@ -827,7 +831,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.1.5...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.1.6...master
+[11.1.6]: https://github.com/shakacode/react_on_rails/compare/11.1.5...11.1.6
 [11.1.5]: https://github.com/shakacode/react_on_rails/compare/11.1.4...11.1.5
 [11.1.4]: https://github.com/shakacode/react_on_rails/compare/11.1.3...11.1.4
 [11.1.3]: https://github.com/shakacode/react_on_rails/compare/11.1.2...11.1.3
