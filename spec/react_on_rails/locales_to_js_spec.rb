@@ -31,6 +31,7 @@ module ReactOnRails
           expect(default).to include('{"hello":{"id":"hello","defaultMessage":"Hello world"}')
           expect(default).to include('"argument":{"id":"argument","defaultMessage":"I am {age} years old."}}')
           expect(default).not_to include("day_names:")
+          expect(default).not_to include("blank:")
 
           expect(File.mtime(translations_path)).to be >= File.mtime(en_path)
         end
