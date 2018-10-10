@@ -3,3 +3,4 @@ en:
   argument: "I am %{age} years old."
   day_names: [Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday]
   blank:
+  number: 2
