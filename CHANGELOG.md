@@ -16,9 +16,9 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [11.1.7] - 2018-10-10
 #### Fixed
 - Fixed bug where intl parsing would fail when trying to parse integers or blank entries. by [sepehr500](https://github.com/sepehr500)
-
 
 ### [11.1.6] - 2018-10-05
 #### Fixed
@@ -834,7 +834,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.1.6...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.1.7...master
+[11.1.7]: https://github.com/shakacode/react_on_rails/compare/11.1.6...11.1.7
 [11.1.6]: https://github.com/shakacode/react_on_rails/compare/11.1.5...11.1.6
 [11.1.5]: https://github.com/shakacode/react_on_rails/compare/11.1.4...11.1.5
 [11.1.4]: https://github.com/shakacode/react_on_rails/compare/11.1.3...11.1.4
