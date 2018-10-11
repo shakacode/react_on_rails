@@ -29,7 +29,11 @@ module ReactOnRails
           expect(translations).to include('{"hello":"Hallo welt"')
           expect(default).to include("const defaultLocale = 'en';")
           expect(default).to include('{"hello":{"id":"hello","defaultMessage":"Hello world"}')
-          expect(default).to include('"argument":{"id":"argument","defaultMessage":"I am {age} years old."}}')
+          expect(default).to include('"argument":{"id":"argument","defaultMessage":"I am {age} years old."}')
+          expect(default).to include('"blank":{"id":"blank","defaultMessage":null}')
+          expect(default).to include("number")
+          expect(default).to include("bool")
+          expect(default).to include("float")
           expect(default).not_to include("day_names:")
 
           expect(File.mtime(translations_path)).to be >= File.mtime(en_path)
