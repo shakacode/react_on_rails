@@ -5215,9 +5215,9 @@ react-lifecycles-compat@^3.0.4:
   version "3.0.4"
   resolved "https://registry.yarnpkg.com/react-lifecycles-compat/-/react-lifecycles-compat-3.0.4.tgz#4f1a273afdfc8f3488a8c516bfda78f872352362"
 
-react-on-rails@11.1.7:
-  version "11.1.7"
-  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-11.1.7.tgz#bd69f8d51921495f945c6412982388f2f940be18"
+react-on-rails@11.1.8:
+  version "11.1.8"
+  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-11.1.8.tgz#6d5ba72a514cac4ea4efddd8a80f61909d3e9bd7"
   dependencies:
     "@babel/runtime-corejs2" "^7.0.0"
 
