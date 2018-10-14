@@ -1,8 +1,15 @@
 # Testimonials
+[HVMN Testimonial, Written by Paul Benigeri, October 12, 2018](./testimonials/hvmn.md)
+
+> The price we paid for the consultation + the React on Rails pro license has already been made back a couple of times from hosting fees alone. The entire process was super hands off, and our core team was able to focus on shipping new feature during that sprint.
+
+---
 
 From Joel Hooks, Co-Founder, Chief Nerd at [egghead.io](https://egghead.io/), January 30, 2017:
 
 ![2017-01-30_11-33-59](https://cloud.githubusercontent.com/assets/1118459/22443635/b3549fb4-e6e3-11e6-8ea2-6f589dc93ed3.png)
+
+---
 
 From Kyle Maune of Cooper Aerial, May 4, 2018
 
