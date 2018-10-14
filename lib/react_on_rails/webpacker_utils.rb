@@ -4,6 +4,11 @@ module ReactOnRails
       ReactOnRails::Utils.gem_available?("webpacker")
     end
 
+    def self.dev_server_running?
+      return false unless using_webpacker?
+      Webpacker.dev_server.running?
+    end
+
     def self.bundle_js_file_path_from_webpacker(bundle_name)
       # Note Webpacker 3.4.3 manifest lookup is inside of the public_output_path
       # [2] (pry) ReactOnRails::WebpackerUtils: 0> Webpacker.manifest.lookup("app-bundle.js")
