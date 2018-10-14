@@ -17,7 +17,7 @@ app/javascript:
 The problems with this structure and using rails/webpacker to configure Webpack for you:
 
 1. No support for different entry points for server rendering.
-2. Webpacker adds an ex``tra layer of abstraction over Webpack, which you probably don't want.
+2. Webpacker adds an extra layer of abstraction over Webpack, which you probably don't want.
 
 This default rails/webpacker configuration is used for the generator because:
 
@@ -27,6 +27,29 @@ This default rails/webpacker configuration is used for the generator because:
 
 
 Thus, the generator structure and using rails/webpacker for Webpack configuration **is not recommended** for any commercial projects, especially those that will use server rendering. Instead, the recommended structure is shown in this example app: [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) and described below.
+
+## Steps to convert from the generator defaults to use the recommended `/client` directory structure.
+
+1. Move the directory:
+
+```
+mv app/javascript client
+```
+
+2. Edit your `/config/webpacker.yml` file. Change the `default/source_path`:
+
+```yml
+  source_path: client
+```
+
+## Moving node_modules from `/` to `/client` with a custom webpack setup.
+
+`rails/webpacker` probably doesn't support having your main node_modules directory under `/client`, so only follow these steps if you want to use your own webpack configuration (which is highly recommended!).
+
+1. Move the `/package.json` to `/client/package.json`
+2. Create a `/pacage.json` that delegates to `/client/package.json`. See the example in [spec/dummy/package.json](../../spec/dummy/package.json).
+3. See the webpack configuration in [spec/dummy/client](../../spec/dummy/client) for a webpack configuration example.
+
 
 ## JavaScript Assets
 1. `/client`: All client side JavaScript goes under the `/client` directory. Place all the major domains of the client side app under client.

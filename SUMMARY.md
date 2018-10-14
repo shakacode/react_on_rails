@@ -6,6 +6,8 @@
   + [React on Rails Basic Installation Tutorial](./docs/tutorial.md)
   + [Webpack Configuration](./docs/basics/webpack-configuration.md)
   + [How React on Rails Works](./docs/basics/how-react-on-rails-works.md)
+  + [Client vs. Server Rendering](./docs/basics/client-vs-server-rendering.md)
+  + [React Server Rendering](./docs/basics/react-server-rendering.md)
   + [Recommended Project Structure](./docs/basics/recommended-project-structure.md)
   + [Generator Functions and the RailsContext](docs/basics/generator-functions-and-railscontext.md)
   + [Caching and Performance: React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).

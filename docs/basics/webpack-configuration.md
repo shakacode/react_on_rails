@@ -1,5 +1,16 @@
 # Webpack Configuration: custom setup for Webpack or rails/webpacker?
 
+## Webpack vs. rails/webpacker 
+
+[Webpack](https://webpack.js.org) is the JavaScript npm package that prepares all your client-side assets. The Rails asset pipeline used to be the preferable way to prepare client-side assets. 
+
+[rails/webpacker](https://github.com/rails/webpacker) is the Ruby gem that mainly gives us 2 things:
+
+1. View helpers for placing the Webpack bundles on your Rails views. React on Rails depends on these view helpers.
+2. A layer of abstraction on top of Webpack customization. This is great for demo projects, but most real world projects will want a customized version of Webpack.
+
+# React on Rails
+
 Version 9 of React on Rails added support for the rails/webpacker view helpers so that Webpack produced assets would no longer pass through the Rails asset pipeline. As part of this change, React on Rails added a configuration option to support customization of the node_modules directory. This allowed React on Rails to support the rails/webpacker configuration of the Webpack configuration.
 
 A key decision in your use React on Rails is whether you go with the rails/webpacker default setup or the traditional React on Rails setup of putting all your client side files under the `/client` directory. While there are technically 2 independent choices involved, the directory structure and the mechanism of Webpack configuration, for simplicity sake we'll assume that these choices go together.
