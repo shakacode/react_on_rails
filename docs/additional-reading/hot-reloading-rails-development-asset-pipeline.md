@@ -1,19 +1,9 @@
-# Live Reloading vs. Hot Reloading (aka HMR)
-
-The use of the [webpack-dev-server](https://webpack.js.org/configuration/dev-server/) provides "Live Reloading" by default. The difference between live and hot reloading is that live reloading will act similarly to hitting refresh in the browser. Hot reloading will attempt to preserve the state of any props.
-
-See the Webpack document [Hot Module Replacement](https://webpack.js.org/concepts/hot-module-replacement/) for more details on the concepts of live vs. hot reloading.
-
-The remainder of this document discusses HMR.
-
-# Using the Webpacker Webpack setup
-
-If you are using the default Webpacker setup of running the dev server with `bin/webpack-dev-server`, see the [Webpacker Webpack Dev Server discussion of HMR](https://github.com/rails/webpacker/blob/master/docs/webpack-dev-server.md#hot-module-replacement).
+*This document should only be referenced if you're **NOT** using the current technique of the rails/webpacker helpers to place your client-side assets in your `/public` directory.*
 
 
 # Hot Reloading of Assets For Rails Development
 
-_Note, this document is not yet updated for React on Rails v8+. See [PR #865](https://github.com/shakacode/react_on_rails/pull/865) for a detailed example of doing hot reloading using V8+ with Webpack v2. Any volunteers to update this page? See [#772](https://github.com/shakacode/react_on_rails/issues/772) and [#361](https://github.com/shakacode/react-webpack-rails-tutorial/issues/361)._
+_See [PR #865](https://github.com/shakacode/react_on_rails/pull/865) for a detailed example of doing hot reloading using V8+ with Webpack v2. See [#772](https://github.com/shakacode/react_on_rails/issues/772) and [#361](https://github.com/shakacode/react-webpack-rails-tutorial/issues/361)._
 
 ------
 

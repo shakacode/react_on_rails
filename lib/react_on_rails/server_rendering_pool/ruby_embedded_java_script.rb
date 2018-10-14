@@ -95,19 +95,21 @@ module ReactOnRails
           end
         end
 
+        def read_bundle_js_code
+          server_js_file = ReactOnRails::Utils.server_bundle_js_file_path
+          File.read(server_js_file)
+        rescue StandardError => e
+          msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
+                "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\
+                "avoid this warning.\nError is: #{e}"
+          raise ReactOnRails::Error, msg
+        end
+
         def create_js_context
           return if ReactOnRails.configuration.server_bundle_js_file.blank?
 
-          server_js_file = ReactOnRails::Utils.server_bundle_js_file_path
+          bundle_js_code = read_bundle_js_code
 
-          begin
-            bundle_js_code = File.read(server_js_file)
-          rescue StandardError => e
-            msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
-                "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\
-                "avoid this warning.\nError is: #{e}"
-            raise ReactOnRails::Error, msg
-          end
           # rubocop:disable Layout/IndentHeredoc
           base_js_code = <<-JS
 #{console_polyfill}
@@ -118,7 +120,10 @@ module ReactOnRails
           file_name = "tmp/base_js_code.js"
           begin
             if ReactOnRails.configuration.trace
-              Rails.logger.info { "[react_on_rails] Created JavaScript context with file #{server_js_file}" }
+              Rails.logger.info do
+                "[react_on_rails] Created JavaScript context with file "\
+                "#{ReactOnRails::Utils.server_bundle_js_file_path}"
+              end
             end
             ExecJS.compile(base_js_code)
           rescue StandardError => e
