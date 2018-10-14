@@ -47,9 +47,10 @@ cd <directory where you want to create your new Rails app>
 rails new test-react-on-rails --webpack=react 
 
 cd test-react-on-rails
+bundle
 ```
 
-Note: if you are installing React On Rails in an existing app or an app that uses Rails pre 5.1.3, you will need to run these two commands as well:
+Note: if you are installing React On Rails in an existing app or an app that uses **Rails pre 5.1.3** (*not for Rails > 5.2*), you will need to run these two commands as well:
 
 ```
 bundle exec rails webpacker:install
@@ -59,7 +60,7 @@ bundle exec rails webpacker:install:react
 Add the **React On Rails** gem to your Gemfile:
 
 ```
-gem 'react_on_rails', '11.1.4'         # prefer exact gem version to match npm version
+gem 'react_on_rails', '11.1.7'         # prefer exact gem version to match npm version
 ```
 
 Note: Latest released React On Rails version is considered stable. Please use the latest version to ensure you get all the security patches and the best support.
@@ -89,7 +90,7 @@ and then run server with
 foreman start -f Procfile.dev
 ```
 
-Visit http://localhost:3000/hello_world and see your **React On Rails** app running!
+Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) and see your **React On Rails** app running!
 Note, foreman defaults to PORT 5000 unless you set the value of PORT in your environment or in the Procfile.
 
 ### Custom IP & PORT setup (Cloud9 example)
@@ -115,7 +116,7 @@ It's super important to exclude certain directories from RubyMine or else it wil
 ### Create Your Heroku App
 *Assuming you can login to heroku.com and have logged into to your shell for heroku.*
 
-1. Visit https://dashboard.heroku.com/new and create an app, say named `my-name-react-on-rails`:
+1. Visit [https://dashboard.heroku.com/new](https://dashboard.heroku.com/new) and create an app, say named `my-name-react-on-rails`:
 
 ![06](https://cloud.githubusercontent.com/assets/20628911/17465014/1f29bf3c-5cf4-11e6-869f-4215987ae854.png)
 
@@ -137,10 +138,11 @@ Set heroku to use multiple buildpacks:
    gem 'pg'
 ```
 
+2. Run `bundle`
+
 ![07](https://cloud.githubusercontent.com/assets/20628911/17465015/1f2f4042-5cf4-11e6-8287-2fb077550809.png)
 
-
-2. Replace your `database.yml` file with this (assuming your app name is "ror").
+3. Replace your `database.yml` file with this (assuming your app name is "ror").
 
 ```yml
 default: &default
@@ -185,10 +187,14 @@ root "hello_world#index"
 
 Next, configure your app for Puma, per the [instructions on Heroku](https://devcenter.heroku.com/articles/deploying-rails-applications-with-the-puma-web-server).
 
+Create `/Procfile`. This is what Heroku uses to start your app.
+
 `Procfile`
 ```
 web: bundle exec puma -C config/puma.rb
 ```
+
+Note, newer versions of Rails create this file automatically. However, the [docs on Heroku](https://devcenter.heroku.com/articles/deploying-rails-applications-with-the-puma-web-server#config) have something a bit different, so please make it conform to those docs. As of 2018-10-13, the docs looked like this:
 
 `config/puma.rb`
 ```rb
@@ -212,9 +218,72 @@ end
 Then after all changes are done don't forget to commit them with git and finally you can push your app to Heroku!
 
 ```
-git add -A
-git commit -m "Latest changes"
+git add -a
+git commit -m "Changes for Heroku"
 git push heroku master
 ```
+
+Then run:
+
+```
+heroku open
+```
+
+and you will see your live app and you can share this URL with your friends. Congrats!
+
+
+## Turning on Server Rendering
+
+You can turn on server rendering by simply changing the `prerender` option to `true`:
+
+```erb
+<%= react_component("HelloWorld", props: @hello_world_props, prerender: true) %>
+```
+
+Then push to Heroku:
+
+```
+git add -a
+git commit -m "Enable server rendering"
+git push heroku master
+```
+
+When you look at the source code for the page (right click, view source in Chrome), you can see the difference between non-server rendering, where your DIV containing your React looks like this:
+
+```html
+<div id="HelloWorld-react-component-b7ae1dc6-396c-411d-886a-269633b3f604"></div>
+```
+
+versus with server rendering:
+
+```html
+<div id="HelloWorld-react-component-d846ce53-3b82-4c4a-8f32-ffc347c8444a"><div data-reactroot=""><h3>Hello, <!-- -->Stranger<!-- -->!</h3><hr/><form><label for="name">Say hello to:</label><input type="text" id="name" value="Stranger"/></form></div></div>
+```
+
+For more details on server rendering, see:
+
+  + [Client vs. Server Rendering](./basics/client-vs-server-rendering.md)
+  + [React Server Rendering](./basics/react-server-rendering.md)
+
+## Moving from the Rails default `/app/javascript` to the recommended `/client` structure
+
+ShakaCode recommends that you use `/client` for your client side app. This way a non-Rails, front-end developer can be at home just by opening up the `/client` directory.
+
+
+1. Move the directory:
+
+```
+mv app/javascript client
+```
+
+2. Edit your `/config/webpacker.yml` file. Change the `default/source_path`:
+
+```yml
+  source_path: client
+```
+
+At this point, you can optionally turn off server rendering and use `foreman start -f Procfile.dev-server`.
+
+Hot reloading using default rails/webpacker configuration with server rendering is not supported.
 
 Feedback is greatly appreciated! As are stars on github! If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com).

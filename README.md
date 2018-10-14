@@ -6,8 +6,6 @@ React on Rails integrates Rails with (server rendering of) Facebook's [React](ht
 
 Intersted in optimizing your webpack setup for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable? [Contact me](mailto:justin@shakacode.com).
 
-ShakaCode is **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded developers that wish to work on our projects, including [Hawaii Chee](https://www.hawaiichee.com). Your main coding interview will be pairing with us on our open source! We're getting into [Reason](https://reasonml.github.io/)!
-
 # Intro
 
 ## Project Objective
@@ -16,8 +14,9 @@ To provide an opinionated and optimal framework for integrating Ruby on Rails wi
 
 ## Features and Why React on Rails?
 
-Given that rails/webpacker gem already provides basic React integration, why would you use "React on Rails"? Server rendering, often used for SEO and performance, is not offered by rails/webpacker.
+Given that rails/webpacker gem already provides basic React integration, why would you use "React on Rails"? 
 
+1. Server rendering, often used for SEO crawler indexing and UX performance, is not offered by rails/webpacker.
 1. The easy passing of props directly from your Rails view to your React components rather than having your Rails view load and then make a separate 1request to your API.
 1. [Redux](https://github.com/reactjs/redux) and [React Router](https://github.com/reactjs/react-router) integration.
 1. [Internationalization (I18n) and (localization)](https://github.com/shakacode/react_on_rails/blob/master/docs/basics/i18n.md)
@@ -37,6 +36,7 @@ React on Rails Pro provides Node server rendering and other performance enhancem
 
 ![2018-09-11_10-31-11](https://user-images.githubusercontent.com/1118459/45467845-5bcc7400-b6bd-11e8-91e1-e0cf806d4ea4.png)
 
+* [HVMN Testimonial, Written by Paul Benigeri, October 12, 2018](./docs/testimonials/hvmn.md)
 * [HVMN’s 90% Reduction in Server Response Time from React on Rails Pro](https://blog.shakacode.com/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db)
 * [Egghead React on Rails Pro Deployment Highlights](https://github.com/shakacode/react_on_rails/wiki/Egghead-React-on-Rails-Pro-Deployment-Highlights)
 
@@ -58,6 +58,10 @@ The article [Why Hire ShakaCode?](https://blog.shakacode.com/can-shakacode-help-
 Please [email me (Justin Gordon), the creator of React on Rails](mailto:justin@shakacode.com), to see if I can help you or if you want an invite to our private Slack room for ShakaCode.
 
 ## Testimonials for Hiring ShakaCode and our "Pro Support"
+
+[HVMN Testimonial, Written by Paul Benigeri, October 12, 2018](./docs/testimonials/hvmn.md)
+
+> The price we paid for the consultation + the React on Rails pro license has already been made back a couple of times from hosting fees alone. The entire process was super hands off, and our core team was able to focus on shipping new feature during that sprint.
 
 From Kyle Maune of Cooper Aerial, May 4, 2018
 
@@ -288,7 +292,7 @@ Here are some highly recommended next articles to read:
 1. [How React on Rails Works](./docs/basics/how-react-on-rails-works.md)
 1. [Recommended Project Structure](./docs/basics/recommended-project-structure.md)
 1. [Webpack Configuration](./docs/basics/webpack-configuration.md)
-1. [View Helpers API](./docs/view-helpers-api.md) 
+1. [View Helpers API](./docs/api/view-helpers-api.md) 
 1. [Caching and Performance: React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
 1. [Deployment](docs/basics/deployment.md).
 
@@ -325,6 +329,9 @@ The following companies support this open source project, and ShakaCode uses the
 *If you'd like to support React on Rails and have your company listed here, [get in touch](mailto:justin@shakacode.com).*
 
 Aloha and best wishes from Justin and the ShakaCode team!
+
+# Work with Us
+ShakaCode is **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded, remote-first, developers that wish to work on our projects, including [Hawaii Chee](https://www.hawaiichee.com). Your main coding interview will be pairing with us on our open source! We're getting into [Reason](https://reasonml.github.io/)!
 
 # License
 

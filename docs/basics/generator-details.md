@@ -44,7 +44,7 @@ More Details:
 Another good option is to create a simple test app per the [Tutorial](../tutorial.md).
 
 # Understanding the Organization of the Generated Client Code
-The generated client code follows our organization scheme. Each unique set of functionality, is given its own folder inside of `client/app/bundles`. This encourages for modularity of *domains*.
+The generated client code follows our organization scheme. Each unique set of functionality, is given its own folder inside of `app/javascript/app/bundles`. Note, the recommended for bigger projects is `client/app/bundles`. This encourages for modularity of *domains*.
 
 Inside of the generated "HelloWorld" domain you will find the following folders:
 
