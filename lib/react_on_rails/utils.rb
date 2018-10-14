@@ -64,6 +64,10 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
       [stdout, stderr, status]
     end
 
+    def self.server_bundle_path_is_http?
+      server_bundle_js_file_path =~ %r{https?://}
+    end
+
     def self.server_bundle_js_file_path
       # Either:
       # 1. Using same bundle for both server and client, so server bundle will be hashed in manifest

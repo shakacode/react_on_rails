@@ -16,6 +16,11 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [11.1.8] - 2018-10-14
+
+#### Improved
+- Improved tutorial and support for HMR when using `rails/webpacker` for Webpack configuration. [PR 1156](https://github.com/shakacode/react_on_rails/pull/1156) by [justin808](https://github.com/justin808).
+
 ### [11.1.7] - 2018-10-10
 #### Fixed
 - Fixed bug where intl parsing would fail when trying to parse integers or blank entries. by [sepehr500](https://github.com/sepehr500)
@@ -834,7 +839,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.1.7...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.1.8...master
+[11.1.8]: https://github.com/shakacode/react_on_rails/compare/11.1.7...11.1.8
 [11.1.7]: https://github.com/shakacode/react_on_rails/compare/11.1.6...11.1.7
 [11.1.6]: https://github.com/shakacode/react_on_rails/compare/11.1.5...11.1.6
 [11.1.5]: https://github.com/shakacode/react_on_rails/compare/11.1.4...11.1.5

@@ -405,7 +405,7 @@ module ReactOnRails
 
     # Returns object with values that are NOT html_safe!
     def server_rendered_react_component(render_options)
-      if !render_options.prerender || ReactOnRails::WebpackerUtils.dev_server_running?
+      if !render_options.prerender || ReactOnRails::Utils.server_bundle_path_is_http?
         return { "html" => "", "consoleReplayScript" => "" }
       end
 

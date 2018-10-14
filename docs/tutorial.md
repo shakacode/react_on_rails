@@ -282,8 +282,26 @@ mv app/javascript client
   source_path: client
 ```
 
-At this point, you can optionally turn off server rendering and use `foreman start -f Procfile.dev-server`.
+## Using HMR with the rails/webpacker setup
 
-Hot reloading using default rails/webpacker configuration with server rendering is not supported.
+Start the app using `foreman start -f Procfile.dev-server`.
 
-Feedback is greatly appreciated! As are stars on github! If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com).
+When you change a JSX file and save, the browser will automatically refresh!
+
+So you get some basics from HMR with no code changes. If you want to go further, take a look at these links:
+
+* https://github.com/rails/webpacker/blob/master/docs/webpack-dev-server.md
+* https://webpack.js.org/configuration/dev-server/
+* https://webpack.js.org/concepts/hot-module-replacement/
+* https://gaearon.github.io/react-hot-loader/getstarted/
+* https://github.com/gaearon/react-hot-loader
+
+React on Rails will automatically handle disabling server rendering if there is only one bundle file created by the Webpack development server by rails/webpacker.
+
+## Conclusion
+
+* Browse the docs either on the [gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) or in the [docs directory on github](https://github.com/shakacode/react_on_rails/tree/master/docs)
+
+Feedback is greatly appreciated! As are stars on github! 
+
+If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com). We offer [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki) and consulting so you can focus on your app and not on how to make Webpack plus Rails work optimally.
