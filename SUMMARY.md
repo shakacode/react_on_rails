@@ -26,6 +26,7 @@
   + [Generator Details](docs/basics/generator-details.md)
   + [Updating Dependencies](./docs/additional-reading/updating-dependencies.md)
   + [Manual Installation Overview](docs/misc-pending/manual-installation-overview.md)
+  + [Upgrading from rails/webpacker v3 to v4](docs/additional-reading/upgrade-webpacker-v3-to-v4.md)
   
 ## **Rails**
   + [Rails Engine Integration](./docs/additional-reading/rails-engine-integration.md)

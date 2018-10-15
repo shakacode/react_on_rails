@@ -84,14 +84,39 @@ rails generate react_on_rails:install
 bundle && yarn
 ```
 
-and then run server with
+Then run server with static client side files:
 
 ```
 foreman start -f Procfile.dev
 ```
 
+To run with the webpack-dev-server:
+```
+foreman start -f Procfile.dev-server
+```
+
 Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) and see your **React On Rails** app running!
 Note, foreman defaults to PORT 5000 unless you set the value of PORT in your environment or in the Procfile.
+
+## Using a pre-release of rails/webpacker
+Until `rails/webpacker` v4 ships, or if you ever want to try out the master branch, you can modify the React on Rails tutorial instructions slightly. You can see the sequence of commits here. To summarize:
+
+Don't `run rails new with the --webpack=react option`. Instead, add the webpacker gem to the Gemfile such that it points to master, like this if `11.1.8` is the version you want.
+
+```ruby
+gem 'webpacker', github: "rails/webpacker"
+gem 'react_on_rails', '11.1.8' # always use exact version
+```
+
+Then run these commands:
+
+```sh
+bundle exec rails webpacker:install
+yarn add "rails/webpacker" # because the installer has a bug that puts in an invalid version in your package.json.
+bundle exec rails webpacker:install:react
+yarn add --dev webpack-dev-server
+run rails generate react_on_rails:install && bundle && yarn
+```
 
 ### Custom IP & PORT setup (Cloud9 example)
 
