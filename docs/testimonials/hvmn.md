@@ -16,9 +16,9 @@ The price we paid for the consultation + the React on Rails pro license has alre
 
 If you have any questions, please reach out.
 
-Paul Benigeri
-[paul@hvmn.com](mailto:paul@hvmn.com)
-[LinkedIn](https://www.linkedin.com/in/benigeri/)
+Paul Benigeri, Head of E-Commerce
+
+[paul@hvmn.com](mailto:paul@hvmn.com), [LinkedIn](https://www.linkedin.com/in/benigeri/)
 
 Related Article: [HVMN’s 90% Reduction in Server Response Time from React on Rails Pro](https://blog.shakacode.com/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db)
 
