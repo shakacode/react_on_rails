@@ -7,7 +7,7 @@ GIT
 PATH
   remote: ../..
   specs:
-    react_on_rails (11.1.1)
+    react_on_rails (11.1.8)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -130,7 +130,7 @@ GEM
     json (2.1.0)
     launchy (2.4.3)
       addressable (~> 2.3)
-    libv8 (6.3.292.48.1)
+    libv8 (6.7.288.46.1)
     listen (3.1.5)
       rb-fsevent (~> 0.9, >= 0.9.4)
       rb-inotify (~> 0.9, >= 0.9.7)
@@ -146,8 +146,8 @@ GEM
     mimemagic (0.3.2)
     mini_mime (1.0.0)
     mini_portile2 (2.3.0)
-    mini_racer (0.1.15)
-      libv8 (~> 6.3)
+    mini_racer (0.2.3)
+      libv8 (>= 6.3)
     minitest (5.11.3)
     msgpack (1.2.4)
     multi_json (1.13.1)
@@ -326,7 +326,7 @@ DEPENDENCIES
   jquery-rails
   launchy
   listen
-  mini_racer
+  mini_racer (~> 0.2.3)
   poltergeist
   pry
   pry-byebug
@@ -352,4 +352,4 @@ DEPENDENCIES
   webpacker
 
 BUNDLED WITH
-   1.16.3
+   1.16.4
