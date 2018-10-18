@@ -31,8 +31,8 @@
     "react-dom": "^16.5.2",
     "react-transform-hmr": "^1.0.4",
     "redux": "^4.0.1",
-    "release-it": "^2.8.2",
-    "tap-spec": "^4.1.1",
+    "release-it": "^7.6.2",
+    "tap-spec": "^5.0.0",
     "tape": "^4.7.0",
     "webpack": "^3.4.1",
     "webpack-manifest-plugin": "^1.2.1"
