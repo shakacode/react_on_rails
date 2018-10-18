@@ -42,7 +42,7 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
 
       if (reactElementOrRouterResult.redirectLocation) {
         if (trace) {
-          const redirectLocation = reactElementOrRouterResult.redirectLocation;
+          const { redirectLocation } = reactElementOrRouterResult;
           const redirectPath = redirectLocation.pathname + redirectLocation.search;
           console.log(`\
 ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redirectPath}`,

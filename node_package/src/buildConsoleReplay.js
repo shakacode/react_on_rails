@@ -5,6 +5,7 @@ import scriptSanitizedVal from './scriptSanitizedVal';
 
 export function consoleReplay() {
   // console.history is a global polyfill used in server rendering.
+  // $FlowFixMe
   if (!(console.history instanceof Array)) {
     return '';
   }

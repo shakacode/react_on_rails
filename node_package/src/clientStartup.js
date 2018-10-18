@@ -204,7 +204,7 @@ function renderInit() {
 }
 
 export function clientStartup(context) {
-  const document = context.document;
+  const { document } = context;
 
   // Check if server rendering
   if (!document) {
