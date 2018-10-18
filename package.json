@@ -30,7 +30,7 @@
     "react": "^16.5.2",
     "react-dom": "^16.5.2",
     "react-transform-hmr": "^1.0.4",
-    "redux": "^3.7.2",
+    "redux": "^4.0.1",
     "release-it": "^2.8.2",
     "tap-spec": "^4.1.1",
     "tape": "^4.7.0",
