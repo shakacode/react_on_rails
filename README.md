@@ -34,7 +34,7 @@ _Requires creating a free account._
 
 React on Rails Pro provides Node server rendering and other performance enhancements for React on Rails. 
 
-![2018-09-11_10-31-11](https://user-images.githubusercontent.com/1118459/45467845-5bcc7400-b6bd-11e8-91e1-e0cf806d4ea4.png)
+[![2018-09-11_10-31-11](https://user-images.githubusercontent.com/1118459/45467845-5bcc7400-b6bd-11e8-91e1-e0cf806d4ea4.png)](https://blog.shakacode.com/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db)
 
 * [HVMN Testimonial, Written by Paul Benigeri, October 12, 2018](./docs/testimonials/hvmn.md)
 * [HVMN’s 90% Reduction in Server Response Time from React on Rails Pro](https://blog.shakacode.com/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db)
