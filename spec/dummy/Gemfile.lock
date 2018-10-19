@@ -326,7 +326,7 @@ DEPENDENCIES
   jquery-rails
   launchy
   listen
-  mini_racer (~> 0.2.3)
+  mini_racer
   poltergeist
   pry
   pry-byebug

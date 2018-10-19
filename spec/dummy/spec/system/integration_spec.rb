@@ -181,12 +181,12 @@ feature "Code Splitting", :js, type: :system do
   end
 end
 
-feature "Code Splitting w/ Server Rendering", :js, type: :system do
+feature "Deferred Rendering of Async Routes", :js, type: :system do
   subject { page }
   background { visit "/deferred_render_with_server_rendering/async_page" }
-  scenario "loading an asyncronous route should not cause a client/server checksum mismatch" do
+  scenario "when loading an asyncronous route, deferring the initial render should prevent a client/server checksum mismatch error" do
     root = page.find(:xpath, "//div[@data-reactroot]")
-    expect(root["data-react-checksum"].present?).to be(true)
+    expect(root["data-react-checksum"].present?).to be(false)
   end
 end
 
