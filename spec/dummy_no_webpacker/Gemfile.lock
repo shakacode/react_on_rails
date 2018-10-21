@@ -7,7 +7,7 @@ GIT
 PATH
   remote: ../..
   specs:
-    react_on_rails (11.0.6)
+    react_on_rails (11.1.8)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -84,7 +84,6 @@ GEM
     chromedriver-helper (1.2.0)
       archive-zip (~> 0.10)
       nokogiri (~> 1.8)
-    cliver (0.3.2)
     coderay (1.1.2)
     coffee-rails (4.2.2)
       coffee-script (>= 2.2.0)
@@ -94,7 +93,7 @@ GEM
       execjs
     coffee-script-source (1.12.2)
     concurrent-ruby (1.0.5)
-    connection_pool (2.2.1)
+    connection_pool (2.2.2)
     coveralls (0.8.21)
       json (>= 1.8, < 3)
       simplecov (~> 0.14.1)
@@ -153,10 +152,6 @@ GEM
     parallel (1.12.1)
     parser (2.5.1.0)
       ast (~> 2.4.0)
-    poltergeist (1.17.0)
-      capybara (~> 2.1)
-      cliver (~> 0.3.1)
-      websocket-driver (>= 0.2.0)
     powerpack (0.1.1)
     pry (0.11.3)
       coderay (~> 1.1.0)
@@ -319,7 +314,6 @@ DEPENDENCIES
   launchy
   listen
   mini_racer
-  poltergeist
   pry
   pry-byebug
   pry-doc
@@ -344,4 +338,4 @@ DEPENDENCIES
   uglifier
 
 BUNDLED WITH
-   1.16.1
+   1.16.4

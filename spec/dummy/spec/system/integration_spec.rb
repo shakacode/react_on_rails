@@ -185,6 +185,8 @@ feature "Deferred Rendering of Async Routes", :js, type: :system do
   subject { page }
   background { visit "/deferred_render_with_server_rendering/async_page" }
   scenario "deferring the initial render should prevent a client/server checksum mismatch error" do
+    binding.pry
+    # Nokogiri::HTML(page.body)
     root = page.find(:xpath, "//div[@data-reactroot]")
     expect(root["data-react-checksum"].present?).to be(false)
   end

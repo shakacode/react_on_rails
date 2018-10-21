@@ -65,7 +65,6 @@ group :test do
   gem "chromedriver-helper"
   gem "generator_spec"
   gem "launchy"
-  gem "poltergeist"
   gem "rspec-rails"
   gem "rspec-retry"
   gem "selenium-webdriver"

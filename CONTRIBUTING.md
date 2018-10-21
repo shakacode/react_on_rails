@@ -171,7 +171,7 @@ spec/dummy.
 
 ```sh
 # Optionally change default selenium_firefox driver
-export DRIVER=poltergeist
+export DRIVER=selenium_firefox
 cd react_on_rails/
 yarn run dummy:spec
 ```

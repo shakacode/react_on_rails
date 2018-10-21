@@ -71,7 +71,6 @@ group :test do
   gem "equivalent-xml", github: "mbklein/equivalent-xml"
   gem "generator_spec"
   gem "launchy"
-  gem "poltergeist"
   gem "rspec-rails"
   gem "rspec-retry"
   gem "selenium-webdriver"

@@ -65,21 +65,13 @@ RSpec.configure do |config|
   # selenium_firefox webdriver only works for Travis-CI builds.
   default_driver = :selenium_chrome_headless
 
-  supported_drivers = %i[ poltergeist poltergeist_errors_ok selenium_chrome_headless
+  supported_drivers = %i[ selenium_chrome_headless
                           selenium_chrome selenium_firefox selenium]
   driver = ENV["DRIVER"].try(:to_sym) || default_driver
 
   raise "Unsupported driver: #{driver} (supported = #{supported_drivers})" unless supported_drivers.include?(driver)
 
   case driver
-  when :poltergeist, :poltergeist_errors_ok
-    require "capybara/poltergeist"
-    Capybara.register_driver :poltergeist_errors_ok do |app|
-      Capybara::Poltergeist::Driver.new(app, js_errors: false)
-    end
-    config.after :each do |_example|
-      page.driver.restart if defined?(page.driver.restart)
-    end
   when :selenium_chrome
     Capybara.register_driver :selenium_chrome do |app|
       Capybara::Selenium::Driver.new(app, browser: :chrome)
@@ -118,6 +110,6 @@ RSpec.configure do |config|
   Capybara.asset_host = "http://localhost:3000"
 
   def js_errors_driver
-    Capybara.javascript_driver == :poltergeist ? :poltergeist_errors_ok : Capybara.javascript_driver
+    Capybara.javascript_driver
   end
 end
