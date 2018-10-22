@@ -21,7 +21,7 @@ const assetLoaderRules = [
 
         // NO leading slash
         name: 'images/[name]-[hash].[ext]',
-      }
+      },
     },
   },
 ];

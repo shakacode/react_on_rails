@@ -1,7 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 
-export default (_props, _railsContext, domNodeId) => {
+export default (props, _railsContext, domNodeId) => {
+  const render = props.prerender ? ReactDOM.hydrate : ReactDOM.render;
+
   const reactElement = (
     <div>
       <h1>Manual Render Example</h1>
@@ -9,5 +11,5 @@ export default (_props, _railsContext, domNodeId) => {
     </div>
   );
 
-  ReactDOM.render(reactElement, document.getElementById(domNodeId));
+  render(reactElement, document.getElementById(domNodeId));
 };

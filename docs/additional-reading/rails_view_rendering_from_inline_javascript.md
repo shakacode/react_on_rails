@@ -12,9 +12,10 @@ You can easily render React components in your JavaScript with `render` method t
  * @param name Name of your registered component
  * @param props Props to pass to your component
  * @param domNodeId
+ * @param hydrate [optional] Pass truthy to update server rendered html. Default is falsy
  * @returns {virtualDomElement} Reference to your component's backing instance
  */
-ReactOnRails.render(componentName, props, elementId)
+ReactOnRails.render(componentName, props, domNodeId)
 ```
 
 ## Why do we need this?

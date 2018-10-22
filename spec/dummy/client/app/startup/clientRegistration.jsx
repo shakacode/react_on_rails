@@ -17,7 +17,7 @@ import PureComponent from '../components/PureComponent';
 import CacheDisabled from '../components/CacheDisabled';
 import CssModulesImagesFontsExample from '../components/CssModulesImagesFontsExample';
 import ManualRenderApp from './ManualRenderAppRenderer';
-import DeferredRenderApp from './DeferredRenderAppRenderer';
+import DeferredRenderApp from './DeferredRenderAppClient';
 
 import SharedReduxStore from '../stores/SharedReduxStore';
 

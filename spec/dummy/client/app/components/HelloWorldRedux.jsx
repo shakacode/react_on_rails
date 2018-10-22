@@ -4,7 +4,6 @@ import RailsContext from './RailsContext';
 
 // Super simple example of the simplest possible React component
 export default class HelloWorldRedux extends React.Component {
-
   static propTypes = {
     actions: PropTypes.object.isRequired,
     data: PropTypes.object.isRequired,

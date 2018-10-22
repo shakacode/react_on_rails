@@ -1,13 +1,14 @@
 import React from 'react';
 
-const SetTimeoutLoggingApp = (props) => {
-  setTimeout(() => console.error("*****TIMEOUT DONE!*****"), 5000);
+const SetTimeoutLoggingApp = (_props) => {
+  // eslint-disable-next-line no-console
+  setTimeout(() => console.error('*****TIMEOUT DONE!*****'), 5000);
 
   return (
-      <div>
+    <div>
         Called setTimeout.
-      </div>
-    );
-}
+    </div>
+  );
+};
 
 export default SetTimeoutLoggingApp;

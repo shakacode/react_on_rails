@@ -8,6 +8,7 @@ const { resolve, join } = require('path');
 const { assetLoaderRules } = require('./webpack.common.config');
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
+
 const configPath = resolve('..', 'config');
 const { output } = webpackConfigLoader(configPath);
 
@@ -52,9 +53,9 @@ module.exports = {
       },
     }),
     new ManifestPlugin({
-        publicPath: output.publicPath,
-        writeToFileEmit: true
-      }),
+      publicPath: output.publicPath,
+      writeToFileEmit: true,
+    }),
   ],
 
   module: {
@@ -66,7 +67,7 @@ module.exports = {
         use: [
           {
             loader: 'expose-loader',
-            options: 'jQuery'
+            options: 'jQuery',
           },
         ],
       },

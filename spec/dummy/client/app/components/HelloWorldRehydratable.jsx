@@ -4,7 +4,6 @@ import ReactOnRails from 'react-on-rails';
 import RailsContext from './RailsContext';
 
 class HelloWorldRehydratable extends React.Component {
-
   static propTypes = {
     helloWorldData: PropTypes.shape({
       name: PropTypes.string,
@@ -47,7 +46,7 @@ class HelloWorldRehydratable extends React.Component {
       // Read props from the component specification tag and merge railsContext
       const mergedProps = { ...JSON.parse(componentSpecificationTag.textContent), railsContext };
       // Hydrate
-      ReactOnRails.render(registeredComponentName, mergedProps, component.id);
+      ReactOnRails.render(registeredComponentName, mergedProps, component.id, true);
     }
   }
 

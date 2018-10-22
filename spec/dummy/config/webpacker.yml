@@ -5,7 +5,7 @@ default: &default
   # Cache manifest.json for performance
   cache_manifest: false
   # souce_path is unused if using a custom configuration
-  # source_path: client/app
+  source_path: client
 
 development:
   <<: *default

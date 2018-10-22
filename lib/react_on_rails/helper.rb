@@ -136,7 +136,7 @@ module ReactOnRails
     # It is exactly like react_component except for the following:
     # 1. prerender: true is automatically added, as this method doesn't make sense for client only
     #    rendering.
-    # 2. Your JavaScript for server rendering must return an Object for the key server_rendered_html.
+    # 2. Your JavaScript generator function for server rendering must return an Object rather than a React component.
     # 3. Your view code must expect an object and not a string.
     #
     # Here is an example of the view code:

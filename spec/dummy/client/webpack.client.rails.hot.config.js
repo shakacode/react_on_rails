@@ -11,16 +11,15 @@ const webpack = require('webpack');
 const merge = require('webpack-merge');
 const config = require('./webpack.client.base.config');
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
+
 const configPath = resolve('..', 'config');
 const { output, settings } = webpackConfigLoader(configPath);
 
 // entry is prepended because 'react-hot-loader/patch' must be the very first entry
 // for hot reloading to work.
-module.exports = merge.strategy(
-  {
-    entry: 'prepend'
-  }
-)(config, {
+module.exports = merge.strategy({
+  entry: 'prepend',
+})(config, {
 
   devtool: 'eval-source-map',
 
@@ -31,7 +30,7 @@ module.exports = merge.strategy(
     'app-bundle': [
       'react-hot-loader/patch',
       `webpack-dev-server/client?http://${settings.dev_server.host}:${settings.dev_server.port}`,
-      'webpack/hot/only-dev-server'
+      'webpack/hot/only-dev-server',
     ],
   },
 
@@ -57,16 +56,16 @@ module.exports = merge.strategy(
             options: {
               modules: true,
               importLoaders: 0,
-              localIdentName: '[name]__[local]__[hash:base64:5]'
-            }
+              localIdentName: '[name]__[local]__[hash:base64:5]',
+            },
           },
           {
             loader: 'postcss-loader',
             options: {
-              plugins: 'autoprefixer'
-            }
-          }
-        ]
+              plugins: 'autoprefixer',
+            },
+          },
+        ],
       },
       {
         test: /\.scss$/,
@@ -78,23 +77,23 @@ module.exports = merge.strategy(
               modules: true,
               importLoaders: 3,
               localIdentName: '[name]__[local]__[hash:base64:5]',
-            }
+            },
           },
           {
             loader: 'postcss-loader',
             options: {
-              plugins: 'autoprefixer'
-            }
+              plugins: 'autoprefixer',
+            },
           },
           {
-            loader: 'sass-loader'
+            loader: 'sass-loader',
           },
           {
             loader: 'sass-resources-loader',
             options: {
-              resources: './app/assets/styles/app-variables.scss'
+              resources: './app/assets/styles/app-variables.scss',
             },
-          }
+          },
         ],
       },
       {
@@ -103,15 +102,16 @@ module.exports = merge.strategy(
           loader: 'imports-loader',
           options: {
             jQuery: 'jquery',
-          }
-        }
+          },
+        },
       },
     ],
   },
 
-// webpack.NamedModulesPlugin() is an optional module that is great for HMR debugging
-// since it transform module IDs (112, 698, etc...) into their respective paths,
-// but it can conflict with other libraries that expect global references. When in doubt, throw it out.
+  // webpack.NamedModulesPlugin() is an optional module that is great for HMR debugging
+  // since it transform module IDs (112, 698, etc...) into their respective paths,
+  // but it can conflict with other libraries that expect global references.
+  // When in doubt, throw it out.
 
   plugins: [
     new webpack.HotModuleReplacementPlugin(),

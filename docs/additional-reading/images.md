@@ -39,7 +39,7 @@ const assetLoaderRules = [
 
 
 
-A full example can be found at [spec/dummy/client/app/components/ImageExample/ImageExample.js](../../spec/dummy/client/app/components/ImageExample/ImageExample.js)
+A full example can be found at [spec/dummy/client/app/components/ImageExample/ImageExample.jsx](../../spec/dummy/client/app/components/ImageExample/ImageExample.jsx)
 
 You are free to use images either in image tags or as background images in SCSS files. You can 
 use a "global" location of /client/app/assets/images or a relative path to your JS or SCSS file, as
