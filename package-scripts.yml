@@ -1,0 +1,46 @@
+scripts:
+  lint:
+    description: Run all linters (eslint, flow)
+    script: concurrently --prefix "[{name}]" --names "ESLINT" -c "blue,yellow,magenta,orange" "nps eslint"
+
+  eslint:
+    default:
+      description: Run eslint.
+      script: eslint . --ext ".js,.jsx"
+    fix:
+      description: Run eslint and auto-fix.
+      script: nps "eslint --fix"
+    debug:
+      description: Run eslint in debug mode.
+      script: DEBUG=eslint:cli-engine nps eslint
+
+  format:
+    default:
+      description: Format files using prettier.
+      script: concurrently --prefix "[{name}]" --names "js,json" -c "yellow,magenta,green" "nps format.js" "nps format.json"
+    listDifferent:
+      description: Check that all files were formatted using prettier.
+      script: |
+        concurrently \
+          --prefix "[{name}]" \
+          --names "js,css,json" \
+          -c "yellow,magenta,green" \
+          "nps format.js.listDifferent" \
+          "nps format.json.listDifferent"
+    js:
+      default:
+        description: Run prettier-eslint on JS.
+        script: prettier "packages/**/*.@(js|jsx)" "spec/dummy/client/app/**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --write
+      listDifferent:
+        description: Check if any JS files would change by running prettier-eslint.
+        script: prettier "**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --list-different
+    json:
+      default:
+        description: Run prettier on JSON files.
+        script: rm -rf packages/vm-renderer/tests/tmp && prettier "**/*.json" --write
+      listDifferent:
+        description: Check if any JSON files would change by running prettier-eslint.
+        script: prettier "**/*.json" "../spec/**/*.json" --list-different
+  renderer:
+    description: Starts the node renderer.
+    script: node renderer.js
