@@ -170,6 +170,9 @@ module ReactOnRails
           Generator function used by react_component_hash for #{component_name} is expected to return
           an Object. See https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
           for an example of the JavaScript code."
+
+          Return value type: #{server_rendered_html.class.name}, value: #{server_rendered_html}
+
         MSG
         raise ReactOnRails::Error, msg
       end

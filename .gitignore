@@ -32,3 +32,5 @@ npm-debug.*
 /gen-examples
 
 .DS_Store
+
+.generators

@@ -43,7 +43,7 @@ install:
   - travis_retry npm i -g yarn
   - travis_retry bundle install
   - travis_retry yarn
-  - travis_retry yarn run build
+  - travis_retry yarn start build
   - bundle exec rake prepare_for_ci
 
 before_script:

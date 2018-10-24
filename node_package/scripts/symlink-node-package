@@ -1,8 +1,8 @@
 #!/bin/bash
 # Update the example rails node packages
 
-yarn run clean
-yarn run build
+yarn start clean
+yarn start build
 
 # Ensure the paths will work no matter where we run the script from
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

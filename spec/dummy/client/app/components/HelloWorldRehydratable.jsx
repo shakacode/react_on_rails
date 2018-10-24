@@ -61,19 +61,12 @@ class HelloWorldRehydratable extends React.Component {
 
     return (
       <div>
-        <h3>
-          Hello, {name}!
-        </h3>
+        <h3>Hello, {name}!</h3>
         <p>
           Say hello to:
-          <input
-            type="text"
-            ref={this.setNameDomRef}
-            defaultValue={name}
-            onChange={this.handleChange}
-          />
+          <input type="text" ref={this.setNameDomRef} defaultValue={name} onChange={this.handleChange} />
         </p>
-        { railsContext && <RailsContext {...{ railsContext }} /> }
+        {railsContext && <RailsContext {...{ railsContext }} />}
       </div>
     );
   }

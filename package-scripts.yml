@@ -1,11 +1,16 @@
 scripts:
   lint:
     description: Run all linters (eslint, flow)
-    script: concurrently --prefix "[{name}]" --names "ESLINT" -c "blue,yellow,magenta,orange" "nps eslint"
+    script: concurrently --prefix "[{name}]" --names "ESLINT,FLOW" -c "blue,yellow" "nps eslint" "nps flow"
+
+  flow:
+    default:
+      description: Run flow on node_package
+      script: flow check node_package
 
   eslint:
     default:
-      description: Run eslint.
+      description: Run eslint .
       script: eslint . --ext ".js,.jsx"
     fix:
       description: Run eslint and auto-fix.
@@ -33,14 +38,35 @@ scripts:
         script: prettier "packages/**/*.@(js|jsx)" "spec/dummy/client/app/**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --write
       listDifferent:
         description: Check if any JS files would change by running prettier-eslint.
-        script: prettier "**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --list-different
+        script: prettier "packages/**/*.@(js|jsx)" "spec/dummy/client/app/**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --list-different
     json:
       default:
         description: Run prettier on JSON files.
-        script: rm -rf packages/vm-renderer/tests/tmp && prettier "**/*.json" --write
+        script: prettier "**/*.json" --write
       listDifferent:
         description: Check if any JSON files would change by running prettier-eslint.
-        script: prettier "**/*.json" "../spec/**/*.json" --list-different
-  renderer:
-    description: Starts the node renderer.
-    script: node renderer.js
+        script: prettier "**/*.json" --list-different
+
+  test:
+    default:
+      description: All JS tests
+      script: babel-tape-runner -r node_package/tests/helpers/test_helper.js node_package/tests/*.js | tap-spec
+
+  clean:
+    description: Remove build files
+    script: rm -rf node_package/lib
+
+
+  babel:
+    script: babel --out-dir node_package/lib node_package/src
+
+  build:
+    default:
+      script: nps clean && nps babel
+
+    watch:
+      script: babel --watch --out-dir node_package/lib node_package/src
+
+  check:
+    description: Run all linters (eslint, flow), format checks, and JS tests
+    script: concurrently --prefix "[{name}]" --names "ESLINT,FLOW,TEST" -c "blue,yellow,green,magenta" "nps eslint" "nps flow" "nps test" "nps format.listDifferent"

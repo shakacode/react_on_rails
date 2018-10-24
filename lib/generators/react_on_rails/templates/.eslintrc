@@ -1,5 +1,8 @@
 ---
-extends: eslint-config-shakacode
+extends:
+  - eslint-config-shakacode
+  - prettier
+  - prettier/react
 
 plugins:
   - react
@@ -23,3 +26,6 @@ rules:
   import/no-unresolved: 0
 
   semi: 0
+
+  # Deprecated
+  jsx-a11y/label-has-for: 0

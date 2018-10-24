@@ -21,6 +21,8 @@ rules:
   function-paren-newline: 0
   object-curly-newline: 0
 
+  # Deprecated
+  jsx-a11y/label-has-for: 0
 
   # https://github.com/benmosher/eslint-plugin-import/issues/340
   import/no-extraneous-dependencies: 0

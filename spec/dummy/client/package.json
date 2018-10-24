@@ -7,6 +7,10 @@
     "url": "https://github.com/shakacode/react_on_rails.git"
   },
   "main": "js/app.js",
+  "comments": {
+    "1": "The dependencies here MUST match the root level package.json because",
+    "2": "the symlink for react-on-rails will pull in packages installed at that level"
+  },
   "dependencies": {
     "@babel/cli": "^7.0.0",
     "@babel/core": "^7.0.0",
@@ -73,6 +77,7 @@
     "fs": false
   },
   "scripts": {
+    "start": "nps",
     "postinstall": "yarn link react-on-rails",
     "lint": "eslint --ext .js,.jsx .",
     "test": "yarn run build:test && rspec",

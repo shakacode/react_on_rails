@@ -2,7 +2,7 @@ import React from 'react';
 import { Helmet } from 'react-helmet';
 import HelloWorld from './HelloWorld';
 
-const ReactHelmet = (props) => (
+const ReactHelmet = props => (
   <div>
     <Helmet>
       <title>Custom page title</title>

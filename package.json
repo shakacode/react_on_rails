@@ -50,26 +50,13 @@
     "react": ">= 0.14",
     "react-dom": ">= 0.14"
   },
-  "files": [
-    "node_package/lib",
-    "webpackConfigLoader.js"
-  ],
+  "files": ["node_package/lib", "webpackConfigLoader.js"],
   "scripts": {
-    "test": "babel-tape-runner -r node_package/tests/helpers/test_helper.js node_package/tests/*.js | tap-spec",
-    "clean": "rm -rf node_package/lib",
-    "prepare": "yarn run build",
+    "start": "nps",
+    "test": "nps test",
+    "prepare": "nps build",
     "prepublish": "npm run prepare",
-    "babel": "babel --out-dir node_package/lib node_package/src",
-    "build": "yarn run clean && yarn run babel",
-    "build-watch": "babel --watch --out-dir node_package/lib node_package/src",
-    "eslint": "eslint .",
-    "flow": "flow check node_package",
-    "lint": "yarn run eslint && yarn run flow",
-    "check": "yarn run lint && yarn run flow && yarn run test",
-    "prerelease": "yarn run check && yarn run clean && yarn run build",
-    "release:patch": "node_package/scripts/release patch",
-    "release:minor": "node_package/scripts/release minor",
-    "release:major": "node_package/scripts/release major",
+    "prerelease": "nps check && nps build",
     "dummy:install": "rake dummy_apps",
     "dummy:spec": "rake run_rspec:dummy",
     "install-react-on-rails": "yarn link"
@@ -78,18 +65,19 @@
     "type": "git",
     "url": "git+https://github.com/shakacode/react_on_rails.git"
   },
-  "keywords": [
-    "react",
-    "webpack",
-    "JavaScript",
-    "Ruby",
-    "on",
-    "Rails"
-  ],
+  "keywords": ["react", "webpack", "JavaScript", "Ruby", "on", "Rails"],
   "author": "justin.gordon@gmail.com",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
+  },
+  "homepage": "https://github.com/shakacode/react_on_rails#readme",
+  "dependencies": {
+    "@babel/runtime-corejs2": "^7.0.0",
+    "concurrently": "^4.0.1",
+    "nps": "^5.9.3",
+    "prettier": "^1.14.3",
+    "prettier-eslint-cli": "^4.7.1"
   },
   "jest": {
     "verbose": true,

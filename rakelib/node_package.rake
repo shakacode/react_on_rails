@@ -7,7 +7,7 @@ namespace :node_package do
 
   task :build do
     puts "Building Node Package and running 'yarn link'"
-    sh "yarn run build && yarn link"
+    sh "yarn start build && yarn link"
   end
 end
 

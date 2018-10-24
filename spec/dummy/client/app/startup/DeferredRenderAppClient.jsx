@@ -9,22 +9,24 @@ const DeferredRenderAppClient = (_props, _railsContext, domNodeId) => {
   const routes = {
     path: '/deferred_render_with_server_rendering',
     component: DeferredRender,
-    childRoutes: [{
-      path: '/deferred_render_with_server_rendering/async_page',
-      getComponent(_nextState, callback) {
-        require.ensure([], (require) => {
-          // https://webpack.js.org/api/module-methods/#require-ensure
-          // callback: A function that webpack will execute once the dependencies are loaded. An
-          // implementation of the require function is sent as a parameter to this function. The
-          // function body can use this to further require() modules it needs for execution.
-          // This is supeseded by import for Wepback v4
-          const component = require('../components/DeferredRenderAsyncPage').default;
+    childRoutes: [
+      {
+        path: '/deferred_render_with_server_rendering/async_page',
+        getComponent(_nextState, callback) {
+          require.ensure([], require => {
+            // https://webpack.js.org/api/module-methods/#require-ensure
+            // callback: A function that webpack will execute once the dependencies are loaded. An
+            // implementation of the require function is sent as a parameter to this function. The
+            // function body can use this to further require() modules it needs for execution.
+            // This is supeseded by import for Wepback v4
+            const component = require('../components/DeferredRenderAsyncPage').default;
 
-          // The first argument of the getComponent callback is error
-          callback(null, component);
-        });
+            // The first argument of the getComponent callback is error
+            callback(null, component);
+          });
+        },
       },
-    }],
+    ],
   };
 
   // This match is potentially asyncronous, because one of the routes

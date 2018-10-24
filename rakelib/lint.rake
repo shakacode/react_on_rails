@@ -10,29 +10,18 @@ namespace :lint do # rubocop:disable Metrics/BlockLength
     sh_in_dir(gem_root, "bundle exec rubocop .")
   end
 
-  desc "Run ruby-lint as shell"
-  task :ruby do
-    puts "See /ruby-lint.yml for what directories are included."
-    sh_in_dir(gem_root, "bundle exec ruby-lint .")
-  end
-
   desc "Run scss-lint as shell"
   task :scss do
     sh_in_dir(gem_root, "bundle exec scss-lint spec/dummy/app/assets/stylesheets/")
   end
 
-  desc "Run eslint as shell"
-  task :eslint do
-    sh_in_dir(gem_root, "yarn run eslint")
-  end
-
-  desc "Run flow from shell"
-  task :flow do
-    sh_in_dir(gem_root, "yarn run flow")
+  desc "Run linters and flow from shell"
+  task :js_checks do
+    sh_in_dir(gem_root, "yarn start check")
   end
 
   desc "Run all eslint, flow, rubocop linters. Skip ruby-lint and scss"
-  task lint: %i[eslint flow rubocop] do
+  task lint: %i[js_checks rubocop] do
     puts "Completed all linting"
   end
 end

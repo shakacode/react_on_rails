@@ -2,6 +2,4 @@
 import React from 'react';
 import ReactHelmet from '../components/ReactHelmet';
 
-export default (props, _railsContext) => (
-  <ReactHelmet {...props} />
-);
+export default (props, _railsContext) => <ReactHelmet {...props} />;

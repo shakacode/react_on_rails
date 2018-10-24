@@ -1,1 +1,7 @@
 node_modules
+coverage
+tmp
+packages/vm-renderer/tests/tmp
+spec/dummy_no_webpacker/app/assets/webpack
+spec/dummy/public/webpack
+gen-examples/examples

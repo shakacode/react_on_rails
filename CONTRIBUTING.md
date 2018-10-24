@@ -97,7 +97,7 @@ In addition to testing the Ruby parts out, you can also test the node package pa
 ```sh
 cd react_on_rails/
 yarn
-yarn run build
+yarn start build
 yarn install-react-on-rails
 ```
 

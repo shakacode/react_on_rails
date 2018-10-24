@@ -17,8 +17,8 @@ class DeferredRenderAsyncPage extends React.Component {
         <p>Noice! It works.</p>
         <p>Mounted: {this.state.mounted}</p>
         <p>
-          Now, try reloading this page and looking at the developer console.
-          There shouldn&apos;t be any client/server mismatch error from React.
+          Now, try reloading this page and looking at the developer console. There shouldn&apos;t be any
+          client/server mismatch error from React.
         </p>
       </div>
     );
