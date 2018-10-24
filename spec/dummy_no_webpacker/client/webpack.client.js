@@ -2,8 +2,8 @@ const path = require('path');
 
 module.exports = {
   entry: [
-    'es5-shim/es5-shim', // for poltergeist
-    'es5-shim/es5-sham', // for poltergeist
+    'es5-shim/es5-shim', // for older browsers
+    'es5-shim/es5-sham', // for older browsers
     '@babel/polyfill',
     'jquery',
     'jquery-ujs',

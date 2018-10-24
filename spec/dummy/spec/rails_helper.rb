@@ -13,7 +13,6 @@ abort("The Rails environment is running in production mode!") if Rails.env.produ
 
 require "rspec/rails"
 require "capybara/rspec"
-require "capybara/poltergeist"
 require "capybara-screenshot/rspec"
 
 # Add additional requires below this line. Rails is not loaded until this point!
@@ -76,8 +75,7 @@ RSpec.configure do |config|
   # selenium_firefox webdriver only works for Travis-CI builds.
   default_driver = :selenium_chrome_headless
 
-  supported_drivers = %i[ poltergeist poltergeist_errors_ok
-                          poltergeist_no_animations webkit selenium_chrome_headless
+  supported_drivers = %i[ selenium_chrome_headless
                           selenium_chrome selenium_firefox selenium]
   driver = ENV["DRIVER"].try(:to_sym) || default_driver
   Capybara.default_driver = driver
@@ -85,41 +83,6 @@ RSpec.configure do |config|
   raise "Unsupported driver: #{driver} (supported = #{supported_drivers})" unless supported_drivers.include?(driver)
 
   case driver
-  when :poltergeist, :poltergeist_errors_ok, :poltergeist_no_animations
-    basic_opts = {
-      window_size: [1300, 1800],
-      screen_size: [1400, 1900],
-      phantomjs_options: ["--load-images=no", "--ignore-ssl-errors=true"],
-      timeout: 180
-    }
-
-    Capybara.register_driver :poltergeist do |app|
-      Capybara::Poltergeist::Driver.new(app, basic_opts)
-    end
-
-    no_animation_opts = basic_opts.merge( # Leaving animations off, as a sleep was still needed.
-      extensions: ["#{Rails.root}/spec/support/phantomjs-disable-animations.js"]
-    )
-
-    Capybara.register_driver :poltergeist_no_animations do |app|
-      Capybara::Poltergeist::Driver.new(app, no_animation_opts)
-    end
-
-    Capybara.register_driver :poltergeist_errors_ok do |app|
-      Capybara::Poltergeist::Driver.new(app, no_animation_opts.merge(js_errors: false))
-    end
-
-    Capybara::Screenshot.register_driver(:poltergeist) do |js_driver, path|
-      js_driver.browser.save_screenshot(path)
-    end
-
-    Capybara::Screenshot.register_driver(:poltergeist_no_animations) do |js_driver, path|
-      js_driver.render(path, full: true)
-    end
-
-    Capybara::Screenshot.register_driver(:poltergeist_errors_ok) do |js_driver, path|
-      js_driver.render(path, full: true)
-    end
 
   when :selenium_chrome
     DriverRegistration.register_selenium_chrome
@@ -177,7 +140,7 @@ RSpec.configure do |config|
   Capybara.asset_host = "http://localhost:3000"
 
   def js_errors_driver
-    Capybara.javascript_driver =~ /^poltergeist/ ? :poltergeist_errors_ok : Capybara.javascript_driver
+    Capybara.javascript_driver
   end
 
   def js_selenium_driver

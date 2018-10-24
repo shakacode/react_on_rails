@@ -153,14 +153,16 @@ ctx.ReactOnRails = {
    * @param name Name of your registered component
    * @param props Props to pass to your component
    * @param domNodeId
+   * @param hydrate Pass truthy to update server rendered html. Default is falsy
    * @returns {virtualDomElement} Reference to your component's backing instance
    */
-  render(name, props, domNodeId) {
+  render(name, props, domNodeId, hydrate) {
     const componentObj = ComponentRegistry.get(name);
     const reactElement = createReactElement({ componentObj, props, domNodeId });
 
+    const render = hydrate ? ReactDOM.hydrate : ReactDOM.render;
     // eslint-disable-next-line react/no-render-return-value
-    return ReactDOM.render(reactElement, document.getElementById(domNodeId));
+    return render(reactElement, document.getElementById(domNodeId));
   },
 
   /**

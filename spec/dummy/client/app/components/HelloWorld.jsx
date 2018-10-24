@@ -7,7 +7,6 @@ import css from './HelloWorld.scss';
 
 // Super simple example of the simplest possible React component
 class HelloWorld extends React.Component {
-
   static propTypes = {
     helloWorldData: PropTypes.shape({
       name: PropTypes.string,

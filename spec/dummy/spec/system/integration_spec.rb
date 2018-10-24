@@ -89,7 +89,7 @@ feature "Pages/client_side_log_throw", :js, type: :system do
   subject { page }
   background { visit "/client_side_log_throw" }
 
-  scenario "client side logging and error handling", driver: js_errors_driver do
+  scenario "client side logging and error handling", :ignore_js_errors do
     is_expected.to have_text "This example demonstrates client side logging and error handling."
   end
 end
@@ -105,7 +105,7 @@ feature "Pages/server_side_log_throw", :js, type: :system do
   subject { page }
   background { visit "/server_side_log_throw" }
 
-  scenario "page has server side throw messages", driver: js_errors_driver do
+  scenario "page has server side throw messages", :ignore_js_errors do
     expect(subject).to have_text "This example demonstrates server side logging and error handling."
     expect(subject).to have_text "Exception in rendering!\n\nMessage: throw in HelloWorldWithLogAndThrow"
   end
@@ -134,7 +134,7 @@ feature "Pages/index after using browser's back button", :js, type: :system do
   include_examples "React Component", "div#ReduxApp-react-component-0"
 end
 
-feature "React Router", js: true, driver: js_errors_driver do
+feature "React Router", :js, :ignore_js_errors do
   subject { page }
   background do
     visit "/"
@@ -181,12 +181,12 @@ feature "Code Splitting", :js, type: :system do
   end
 end
 
-feature "Code Splitting w/ Server Rendering", :js, type: :system do
+feature "Example of Code Splitting with Rendering of Async Routes", :js, type: :system do
   subject { page }
   background { visit "/deferred_render_with_server_rendering/async_page" }
-  scenario "loading an asyncronous route should not cause a client/server checksum mismatch" do
-    root = page.find(:xpath, "//div[@data-reactroot]")
-    expect(root["data-react-checksum"].present?).to be(true)
+  scenario "deferring the initial render should prevent a client/server checksum mismatch error" do
+    # Wait for client rendering to finish
+    expect(subject).to have_text("Mounted: true")
   end
 end
 
@@ -216,14 +216,10 @@ feature "Manual client hydration", :js, type: :system do
   end
 end
 
-feature "returns hash if hash_result == true even with prerendering error", :js, type: :system do
+feature "returns hash if hash_result == true even with prerendering error", :js, :ignore_js_errors,
+        type: :system do
   subject { page }
-  background do
-    begin
-      visit "/broken_app"
-    rescue Capybara::Poltergeist::JavascriptError # rubocop:disable Lint/HandleExceptions
-    end
-  end
+  background { visit "/broken_app" }
   scenario "react_component should return hash" do
     expect(subject.html).to include("Exception in rendering!")
   end

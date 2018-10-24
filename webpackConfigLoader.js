@@ -18,8 +18,8 @@ function removeOuterSlashes(string) {
 
 function formatPublicPath(settings) {
   if (settings.dev_server) {
-    const host = settings.dev_server.host;
-    const port = settings.dev_server.port;
+    const { host } = settings.dev_server;
+    const { port } = settings.dev_server;
     const path = settings.public_output_path;
     const hostWithHttp = `http://${host}:${port}`;
 

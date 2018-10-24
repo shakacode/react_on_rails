@@ -1,8 +1,11 @@
 ---
-extends: eslint-config-shakacode
+extends:
+  - eslint-config-shakacode
+  - prettier
+  - prettier/react
 
 plugins:
-  - react
+  - prettier
 
 globals:
   __DEBUG_SERVER_ERRORS__: true
@@ -15,6 +18,9 @@ env:
 
 rules:
   no-console: 0
+  function-paren-newline: 0
+  object-curly-newline: 0
+
 
   # https://github.com/benmosher/eslint-plugin-import/issues/340
   import/no-extraneous-dependencies: 0

@@ -13,7 +13,10 @@ const DeferredRender = ({ children }) => (
     {
       children ||
       <p>
-        <Link to="/deferred_render_with_server_rendering/async_page">
+        <Link
+          to="/deferred_render_with_server_rendering/async_page"
+          href="/deferred_render_with_server_rendering/async_page"
+        >
           Test Async Route
         </Link>
       </p>

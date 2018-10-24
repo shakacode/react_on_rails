@@ -21,7 +21,7 @@ Different markup is generated on the client than on the server. Why does this ha
 
 ### The solution
 
-To prevent this, you have to wait until the code chunk is fetched before doing the initial render on the client side. To accomplish this, react on rails allows you to register a renderer. This works just like registering a generator function, except that the function you pass takes three arguments: `renderer(props, railsContext, domNodeId)`, and is responsible for calling `ReactDOM.render` to render the component to the DOM. React on rails will automatically detect when a generator function takes three arguments, and will not call `ReactDOM.render`, instead allowing you to control the initial render yourself.
+To prevent this, you have to wait until the code chunk is fetched before doing the initial render on the client side. To accomplish this, react on rails allows you to register a renderer. This works just like registering a generator function, except that the function you pass takes three arguments: `renderer(props, railsContext, domNodeId)`, and is responsible for calling `ReactDOM.render` or `ReactDOM.hydrate` to render the component to the DOM. React on rails will automatically detect when a generator function takes three arguments, and will not call `ReactDOM.render` or `ReactDOM.hydrate`, instead allowing you to control the initial render yourself. Note, you have to be careful to call `ReactDOM.hydrate` rather than `ReactDOM.render` if you are are server rendering.
 
 Here's an example of how you might use this in practice:
 
@@ -115,7 +115,7 @@ See:
 
 - [spec/dummy/client/app/startup/clientRegistration.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/clientRegistration.jsx)
 - [spec/dummy/client/app/startup/serverRegistration.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/serverRegistration.jsx)
-- [spec/dummy/client/app/startup/DeferredRenderAppRenderer.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/DeferredRenderAppRenderer.jsx) <-- Code splitting implemented here
+- [spec/dummy/client/app/startup/DeferredRenderAppClient](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/DeferredRenderAppClient.jsx)<-- Code splitting implemented here
 - [spec/dummy/client/app/startup/DeferredRenderAppServer.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/DeferredRenderAppServer.jsx)
 - [spec/dummy/client/app/components/DeferredRender.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/components/DeferredRender.jsx)
 - [spec/dummy/client/app/components/DeferredRenderAsyncPage.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/components/DeferredRenderAsyncPage.jsx)

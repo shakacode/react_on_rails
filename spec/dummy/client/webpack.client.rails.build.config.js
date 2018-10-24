@@ -10,9 +10,10 @@ const { resolve } = require('path');
 
 // Webpacker specific
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
+
 const configPath = resolve('..', 'config');
 const { output, settings } = webpackConfigLoader(configPath);
-const isHMR = settings.dev_server && settings.dev_server.hmr
+const isHMR = settings.dev_server && settings.dev_server.hmr;
 
 const devBuild = env.NODE_ENV !== 'production';
 
@@ -40,7 +41,8 @@ module.exports = merge(config, {
     pathinfo: devBuild,
   },
 
-  // See webpack.client.base.config for adding modules common to both the webpack dev server and rails
+  // See webpack.client.base.config for adding modules common to both the webpack
+  // dev server and rails
 
   module: {
     rules: [
@@ -84,16 +86,16 @@ module.exports = merge(config, {
             {
               loader: 'postcss-loader',
               options: {
-                plugins: 'autoprefixer'
-              }
+                plugins: 'autoprefixer',
+              },
             },
             'sass-loader',
             {
               loader: 'sass-resources-loader',
               options: {
-                resources: './app/assets/styles/app-variables.scss'
+                resources: './app/assets/styles/app-variables.scss',
               },
-            }
+            },
           ],
         }),
       },
@@ -104,8 +106,8 @@ module.exports = merge(config, {
           options: {
             shim: 'es5-shim/es5-shim',
             sham: 'es5-shim/es5-sham',
-          }
-        }
+          },
+        },
       },
       {
         test: require.resolve('jquery-ujs'),
@@ -113,16 +115,16 @@ module.exports = merge(config, {
           loader: 'imports-loader',
           options: {
             jQuery: 'jquery',
-          }
-        }
-      }
+          },
+        },
+      },
     ],
   },
 
   plugins: [
     new ExtractTextPlugin({
       filename: '[name]-[contenthash].css',
-      allChunks: true
+      allChunks: true,
     }),
   ],
 });

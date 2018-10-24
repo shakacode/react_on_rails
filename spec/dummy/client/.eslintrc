@@ -1,6 +1,12 @@
 ---
 
-extends: eslint-config-shakacode
+extends:
+  - eslint-config-shakacode
+  - prettier
+  - prettier/react
+
+plugins:
+  - prettier
 
 rules:
   react/forbid-prop-types: 0

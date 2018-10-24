@@ -127,14 +127,6 @@ _Note: running `npm i` automatically builds the npm package before installing. H
 ### Prereqs
 After checking out the repo, making sure you have rvm and nvm setup (setup ruby and node), cd to `spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
-Additionally, our RSpec tests use the poltergeist web driver. You will need to install the phantomjs node module:
-
-```sh
-yarn global add phantomjs-prebuilt
-```
-
-Note this *must* be installed globally for the dummy test project rspec runner to see it properly.
-
 ### Local Node Package
 Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the dummy app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)
 
@@ -171,7 +163,7 @@ spec/dummy.
 
 ```sh
 # Optionally change default selenium_firefox driver
-export DRIVER=poltergeist
+export DRIVER=selenium_firefox
 cd react_on_rails/
 yarn run dummy:spec
 ```

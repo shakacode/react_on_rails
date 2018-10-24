@@ -19,6 +19,7 @@ const { resolve } = require('path');
 const webpackConfig = require('./webpack.client.rails.hot.config');
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
+
 const configPath = resolve('..', 'config');
 const { output, settings } = webpackConfigLoader(configPath);
 
@@ -51,7 +52,5 @@ const devServer = new WebpackDevServer(compiler, {
 
 devServer.listen(settings.dev_server.port, settings.dev_server.host, err => {
   if (err) console.error(err);
-  console.log(
-    `=> 🔥  Webpack development server is running on ${output.publicPathWithHost}`
-  );
+  console.log(`=> 🔥  Webpack development server is running on ${output.publicPathWithHost}`);
 });
