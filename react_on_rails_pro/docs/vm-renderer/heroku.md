@@ -69,6 +69,7 @@ end
 namespace :react_on_rails do
   namespace :assets do
     task :pre_stage_bundle_for_vm_renderer => :environment do
+      src_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
       renderer_bundle_file_name = ReactOnRailsPro::ServerRenderingPool::VmRenderingPool.renderer_bundle_file_name
       dest_path = Rails.root.join('tmp', 'vm-renderer-bundles', "#{renderer_bundle_file_name}").to_s
       mkdir_p Rails.root.join("tmp", "vm-renderer-bundles")
