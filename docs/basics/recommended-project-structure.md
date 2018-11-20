@@ -47,7 +47,7 @@ mv app/javascript client
 `rails/webpacker` probably doesn't support having your main node_modules directory under `/client`, so only follow these steps if you want to use your own webpack configuration (which is highly recommended!).
 
 1. Move the `/package.json` to `/client/package.json`
-2. Create a `/pacage.json` that delegates to `/client/package.json`. See the example in [spec/dummy/package.json](../../spec/dummy/package.json).
+2. Create a `/package.json` that delegates to `/client/package.json`. See the example in [spec/dummy/package.json](../../spec/dummy/package.json).
 3. See the webpack configuration in [spec/dummy/client](../../spec/dummy/client) for a webpack configuration example.
 
 
