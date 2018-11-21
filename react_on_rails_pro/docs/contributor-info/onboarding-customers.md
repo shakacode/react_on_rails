@@ -8,7 +8,7 @@ Justin Gordon, justin@shakacode.com, should do the following:
 4. Open an incognito browser and login as this machine user and accept any pending invites.
 5. For the machine user, [create a personal access token](https://github.com/settings/tokens/new). Name the token `RORP` and click the top checkbox `repo  Full control of private repositories`. Save the token.
 6. Update the Gemfile to have a line like `gem "react_on_rails_pro", git: "https://<OAUTH_TOKEN>:x-oauth-basic@github.com/shakacode/react_on_rails_pro.git", tag: "1.1.0"` where OAUTH_TOKEn is the one generated for the machine user.
-7. Update the package.json to have a line like `"react-on-rails-pro-vm-renderer": "https://<OAUTH_TOKEN>:x-oauth-basic@github.com/shakacode/react_on_rails_pro.git#master",
+7. Update the package.json to have a line like `"react-on-rails-pro-vm-renderer": "https://<OAUTH_TOKEN>:x-oauth-basic@github.com/shakacode/react_on_rails_pro.git#master",`
 
 # Customer Steps
 See [Installation](../installation.md).
