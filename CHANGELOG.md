@@ -1,7 +1,7 @@
 # Change Log
 All notable changes to this project's source code will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version. NOTE: major versions of the npm module and the gem must be kept in sync.
 
-Migration instructions for the major updates can be found [here](docs/basics/upgrading-react-on-rails.md#upgrading-to-version-9.md). Some smaller migration information can be found here. 
+Migration instructions for the major updates can be found [here](docs/basics/upgrading-react-on-rails.md#upgrading-to-version-9.md). Some smaller migration information can be found here.
 
 ## Need Help Migrating?
 If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for information about our [ShakaCode Pro Support](https://www.shakacode.com/work/shakacode-pro-support.pdf).
@@ -19,6 +19,8 @@ Changes since last non-beta release.
 ### [11.2.0] - 2018-10-25
 #### Improved
 - To support React v16, updated API for manually calling `ReactOnRails.render(name, props, domNodeId, hydrate)`. Added 3rd @param hydrate Pass truthy to update server rendered html. Default is falsey Any truthy values calls hydrate rather than render. (https://github.com/shakacode/react_on_rails/pull/1159) by [justin808](https://github.com/justin808) and [coopersamuel](https://github.com/coopersamuel).
+
+- Enabled the use of webpack-dev-server with Server-side rendering. (https://github.com/shakacode/react_on_rails/pull/1173) by [justin808](https://github.com/justin808) and [judahmeek](https://github.com/judahmeek).
 
 ### [11.1.8] - 2018-10-14
 
@@ -54,7 +56,7 @@ Changes since last non-beta release.
 
 #### Fixed
 - Tests now properly exit if the config.build_test_command fails!
-- Source path for project using Webpacker would default to "app/javascript" even if when the node_modules 
+- Source path for project using Webpacker would default to "app/javascript" even if when the node_modules
   directory was set to "client". Fix now makes the configuration of this crystal clear.
 - renamed method RenderOptions.has_random_dom_id? to RenderOptions.random_dom_id? for rubocop rule.
 [PR 1133](https://github.com/shakacode/react_on_rails/pull/1133) by [justin808](https://github.com/justin808)
