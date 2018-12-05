@@ -17,12 +17,16 @@ module ReactOnRails
         def reset_pool_if_server_bundle_was_modified
           return unless ReactOnRails.configuration.development_mode
 
-          file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
-          @server_bundle_timestamp ||= file_mtime
-          return if @server_bundle_timestamp == file_mtime
+          if ReactOnRails::Utils.server_bundle_path_is_http?
+            return if @server_bundle_url == ReactOnRails::Utils.server_bundle_js_file_path
+            @server_bundle_url = ReactOnRails::Utils.server_bundle_js_file_path
+          else
+            file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
+            @server_bundle_timestamp ||= file_mtime
+            return if @server_bundle_timestamp == file_mtime
 
-          @server_bundle_timestamp = file_mtime
-
+            @server_bundle_timestamp = file_mtime
+          end
           ReactOnRails::ServerRenderingPool.reset_pool
         end
 
@@ -97,7 +101,7 @@ module ReactOnRails
 
         def read_bundle_js_code
           server_js_file = ReactOnRails::Utils.server_bundle_js_file_path
-          File.read(server_js_file)
+          open(server_js_file) { |f| f.read }
         rescue StandardError => e
           msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
                 "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\
