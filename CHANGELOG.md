@@ -31,7 +31,7 @@ Changes since last non-beta release.
   Thus, developers will need to fix server rendering errors before continuing.
   [PR 1145](https://github.com/shakacode/react_on_rails/pull/1145) by [justin808](https://github.com/justin808).
 
-### [11.2.0] - 2018-12-06
+### 11.2.0 - 2018-12-06
 Do not use. Unpublished. Caused by an issue with the release script.
 
 ### [11.1.8] - 2018-10-14
