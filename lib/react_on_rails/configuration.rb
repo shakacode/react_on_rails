@@ -21,7 +21,7 @@ module ReactOnRails
       prerender: false,
       replay_console: true,
       logging_on_server: true,
-      raise_on_prerender_error: false,
+      raise_on_prerender_error: Rails.env.development?,
       trace: Rails.env.development?,
       development_mode: Rails.env.development?,
       server_renderer_pool_size: DEFAULT_POOL_SIZE,
