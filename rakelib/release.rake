@@ -57,7 +57,8 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   bundle_install_in(dummy_app_dir)
 
   # Stage changes so far
-  sh_in_dir(gem_root, "git add .")
+  sh_in_dir(gem_root, "git add . && git commit -m \"Bump version\" ")
+  sh_in_dir(gem_root, "git pull --rebase")
 
   # Will bump the yarn version, commit, tag the commit, push to repo, and release on yarn
   release_it_command = "$(yarn bin)/release-it --non-interactive --npm.publish".dup
