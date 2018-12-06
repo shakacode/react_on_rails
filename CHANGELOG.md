@@ -16,7 +16,7 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
-### [11.2.0] - 2018-10-25
+### [11.2.1] - 2018-12-06
 #### Improved
 - To support React v16, updated API for manually calling `ReactOnRails.render(name, props, domNodeId, hydrate)`. Added 3rd @param hydrate Pass truthy to update server rendered html. Default is falsey Any truthy values calls hydrate rather than render. (https://github.com/shakacode/react_on_rails/pull/1159) by [justin808](https://github.com/justin808) and [coopersamuel](https://github.com/coopersamuel).
 
@@ -30,7 +30,10 @@ Changes since last non-beta release.
   
   Thus, developers will need to fix server rendering errors before continuing.
   [PR 1145](https://github.com/shakacode/react_on_rails/pull/1145) by [justin808](https://github.com/justin808).
-  
+
+### [11.2.0] - 2018-12-06
+Do not use. Unpublished. Caused by an issue with the release script.
+
 ### [11.1.8] - 2018-10-14
 
 #### Improved
@@ -854,8 +857,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.2.0...master
-[11.2.0]: https://github.com/shakacode/react_on_rails/compare/11.1.8...11.2.0
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.2.1...master
+[11.2.0]: https://github.com/shakacode/react_on_rails/compare/11.1.8...11.2.1
 [11.1.8]: https://github.com/shakacode/react_on_rails/compare/11.1.7...11.1.8
 [11.1.7]: https://github.com/shakacode/react_on_rails/compare/11.1.6...11.1.7
 [11.1.6]: https://github.com/shakacode/react_on_rails/compare/11.1.5...11.1.6
