@@ -432,11 +432,11 @@ module ReactOnRails
       # Read more here: http://timelessrepo.com/json-isnt-a-javascript-subset
 
       js_code = ReactOnRails::ServerRenderingJsCode.server_rendering_component_js_code(
-        props_string(props).gsub("\u2028", '\u2028').gsub("\u2029", '\u2029'),
-        rails_context(server_side: true).to_json,
-        initialize_redux_stores,
-        react_component_name,
-        render_options
+        props_string: props_string(props).gsub("\u2028", '\u2028').gsub("\u2029", '\u2029'),
+        rails_context: rails_context(server_side: true).to_json,
+        redux_stores: initialize_redux_stores,
+        react_component_name: react_component_name,
+        render_options: render_options
       )
 
       begin

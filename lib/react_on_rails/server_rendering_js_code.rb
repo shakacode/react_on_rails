@@ -12,11 +12,11 @@ module ReactOnRails
       end
 
       def server_rendering_component_js_code(
-        props_string,
-        rails_context,
-        redux_stores,
-        react_component_name,
-        render_options
+        props_string: nil,
+        rails_context: nil,
+        redux_stores: nil,
+        react_component_name: nil,
+        render_options: nil
       )
         js_code_renderer.render(props_string, rails_context, redux_stores, react_component_name, render_options)
       end
