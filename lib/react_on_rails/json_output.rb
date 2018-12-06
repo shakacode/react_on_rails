@@ -11,7 +11,7 @@ module ReactOnRails
       "\u2028" => '\u2028',
       "\u2029" => '\u2029'
     }.freeze
-    ESCAPE_REGEXP = /[\u2028\u2029&><]/u
+    ESCAPE_REGEXP = /[\u2028\u2029&><]/u.freeze
 
     def self.escape(json)
       return escape_without_erb_util(json) if Utils.rails_version_less_than_4_1_1

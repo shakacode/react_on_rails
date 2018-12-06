@@ -21,6 +21,7 @@ module ReactOnRails
 
           if ReactOnRails::Utils.server_bundle_path_is_http?
             return if @server_bundle_url == ReactOnRails::Utils.server_bundle_js_file_path
+
             @server_bundle_url = ReactOnRails::Utils.server_bundle_js_file_path
           else
             file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
@@ -78,6 +79,7 @@ module ReactOnRails
 
         def trace_js_code_used(msg, js_code, file_name = "tmp/server-generated.js", force: false)
           return unless ReactOnRails.configuration.trace || force
+
           # Set to anything to print generated code.
           File.write(file_name, js_code)
           msg = <<-MSG.strip_heredoc

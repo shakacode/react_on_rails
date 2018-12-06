@@ -48,7 +48,7 @@ Gem::Specification.new do |s|
 
   s.add_development_dependency "rake", "~> 10.0"
   s.add_development_dependency "rspec"
-  s.add_development_dependency "rubocop", "~> 0.58.1"
+  s.add_development_dependency "rubocop", "~> 0.61.1"
 
   s.post_install_message = '
 --------------------------------------------------------------------------------
