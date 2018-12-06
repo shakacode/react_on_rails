@@ -9,7 +9,8 @@ module ReactOnRails
       Webpacker.dev_server.running?
     end
 
-    def self.bundle_js_file_path_from_webpacker(bundle_name)
+    # This returns either a URL for the webpack-dev-server or a file path
+    def self.bundle_js_uri_from_webpacker(bundle_name)
       # Note Webpacker 3.4.3 manifest lookup is inside of the public_output_path
       # [2] (pry) ReactOnRails::WebpackerUtils: 0> Webpacker.manifest.lookup("app-bundle.js")
       # "/webpack/development/app-bundle-c1d2b6ab73dffa7d9c0e.js"
