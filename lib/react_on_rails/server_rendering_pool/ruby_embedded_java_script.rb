@@ -104,7 +104,7 @@ module ReactOnRails
         def read_bundle_js_code
           server_js_file = ReactOnRails::Utils.server_bundle_js_file_path
           if ReactOnRails::Utils.server_bundle_path_is_http?
-            Net::HTTP.get(URI.parse(server_js_file)).force_encoding("UTF-8")
+            file_url_to_string(server_js_file)
           else
             File.read(server_js_file)
           end
@@ -203,6 +203,19 @@ var console = { history: [] };
 });
           JS
           # rubocop:enable Layout/IndentHeredoc
+        end
+
+        private
+
+        def file_url_to_string(url)
+          response = Net::HTTP.get_response(URI.parse(url))
+          content_type_header = response["content-type"]
+          match = content_type_header.match(/\A.*; charset=(?<encoding>.*)\z/)
+          encoding_type = match[:encoding]
+          response.body.force_encoding(encoding_type)
+        rescue StandardError => e
+          msg = "file_url_to_string #{url} failed\nError is: #{e}"
+          raise ReactOnRails::Error, msg
         end
       end
     end

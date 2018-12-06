@@ -124,7 +124,6 @@ ReactOnRails.configure do |config|
   # While you may configure this to be the same as your client bundle file, this file is typically
   # different. Note, be sure to include the exact file name with the ".js" if you are not hashing this file.
   # If you are hashing this file (supposing you are using the same file for client rendering), then
-  # 
   # you should include a name that matches your bundle name in your webpack config.
   config.server_bundle_js_file = "server-bundle.js"
 
