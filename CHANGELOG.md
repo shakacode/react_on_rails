@@ -22,6 +22,15 @@ Changes since last non-beta release.
 
 - Enabled the use of webpack-dev-server with Server-side rendering. (https://github.com/shakacode/react_on_rails/pull/1173) by [justin808](https://github.com/justin808) and [judahmeek](https://github.com/judahmeek).
 
+#### Changed
+- Changed the default for:
+  ```rb
+  config.raise_on_prerender_error = Rails.env.development? 
+  ```
+  
+  Thus, developers will need to fix server rendering errors before continuing.
+  [PR 1145](https://github.com/shakacode/react_on_rails/pull/1145) by [justin808](https://github.com/justin808).
+  
 ### [11.1.8] - 2018-10-14
 
 #### Improved
