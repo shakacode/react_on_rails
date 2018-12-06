@@ -96,7 +96,7 @@ exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
 
     def self.bundle_js_file_path(bundle_name)
       if ReactOnRails::WebpackerUtils.using_webpacker? && bundle_name != "manifest.json"
-        ReactOnRails::WebpackerUtils.bundle_js_file_path_from_webpacker(bundle_name)
+        ReactOnRails::WebpackerUtils.bundle_js_uri_from_webpacker(bundle_name)
       else
         # Default to the non-hashed name in the specified output directory, which, for legacy
         # React on Rails, this is the output directory picked up by the asset pipeline.

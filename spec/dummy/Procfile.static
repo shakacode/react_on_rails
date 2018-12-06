@@ -1,4 +1,7 @@
 # Run Rails without hot reloading (static assets).
+# For debugging with Pry:
+#   Tab 1: `foreman start -f Procfile.dev -m puma=0,all=1`
+#   Tab 2: `rails s webrick`
 rails: rails s -b 0.0.0.0
 
 # Build client assets, watching for changes.

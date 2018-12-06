@@ -4,7 +4,9 @@ require "open-uri"
 
 module ReactOnRails
   module ServerRenderingPool
+    # rubocop:disable Metrics/ClassLength
     class RubyEmbeddedJavaScript
+      # rubocop:enable Metrics/ClassLength
       class << self
         def reset_pool
           options = {
@@ -17,12 +19,16 @@ module ReactOnRails
         def reset_pool_if_server_bundle_was_modified
           return unless ReactOnRails.configuration.development_mode
 
-          file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
-          @server_bundle_timestamp ||= file_mtime
-          return if @server_bundle_timestamp == file_mtime
+          if ReactOnRails::Utils.server_bundle_path_is_http?
+            return if @server_bundle_url == ReactOnRails::Utils.server_bundle_js_file_path
+            @server_bundle_url = ReactOnRails::Utils.server_bundle_js_file_path
+          else
+            file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
+            @server_bundle_timestamp ||= file_mtime
+            return if @server_bundle_timestamp == file_mtime
 
-          @server_bundle_timestamp = file_mtime
-
+            @server_bundle_timestamp = file_mtime
+          end
           ReactOnRails::ServerRenderingPool.reset_pool
         end
 
@@ -97,7 +103,11 @@ module ReactOnRails
 
         def read_bundle_js_code
           server_js_file = ReactOnRails::Utils.server_bundle_js_file_path
-          File.read(server_js_file)
+          if ReactOnRails::Utils.server_bundle_path_is_http?
+            file_url_to_string(server_js_file)
+          else
+            File.read(server_js_file)
+          end
         rescue StandardError => e
           msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
                 "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\
@@ -193,6 +203,19 @@ var console = { history: [] };
 });
           JS
           # rubocop:enable Layout/IndentHeredoc
+        end
+
+        private
+
+        def file_url_to_string(url)
+          response = Net::HTTP.get_response(URI.parse(url))
+          content_type_header = response["content-type"]
+          match = content_type_header.match(/\A.*; charset=(?<encoding>.*)\z/)
+          encoding_type = match[:encoding]
+          response.body.force_encoding(encoding_type)
+        rescue StandardError => e
+          msg = "file_url_to_string #{url} failed\nError is: #{e}"
+          raise ReactOnRails::Error, msg
         end
       end
     end
