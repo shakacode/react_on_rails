@@ -1,6 +1,7 @@
 import { JSDOM } from 'jsdom';
 
-const { document } = (new JSDOM('<div id="root"></div>')).window;
+const url = 'http://localhost';
+const { document } = (new JSDOM('<div id="root"></div>', { url })).window;
 global.document = document;
 global.window = document.defaultView;
 

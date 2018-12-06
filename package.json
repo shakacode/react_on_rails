@@ -91,5 +91,9 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
+  "jest": {
+    "verbose": true,
+    "testURL": "http://localhost/"
+  },
   "homepage": "https://github.com/shakacode/react_on_rails#readme"
 }
