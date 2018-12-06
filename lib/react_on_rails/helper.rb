@@ -206,6 +206,7 @@ module ReactOnRails
     # that contains a data props.
     def redux_store_hydration_data
       return if @registered_stores_defer_render.blank?
+
       @registered_stores_defer_render.reduce("".dup) do |accum, redux_store_data|
         accum << render_redux_store_data(redux_store_data)
       end.html_safe
@@ -265,6 +266,7 @@ module ReactOnRails
 
     def json_safe_and_pretty(hash_or_string)
       return "{}" if hash_or_string.nil?
+
       unless hash_or_string.is_a?(String) || hash_or_string.is_a?(Hash)
         raise ReactOnRails::Error, "#{__method__} only accepts String or Hash as argument "\
             "(#{hash_or_string.class} given)."
@@ -469,6 +471,7 @@ module ReactOnRails
       JS
 
       return result unless @registered_stores.present? || @registered_stores_defer_render.present?
+
       declarations = "var reduxProps, store, storeGenerator;\n".dup
       all_stores = (@registered_stores || []) + (@registered_stores_defer_render || [])
 

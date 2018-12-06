@@ -5,7 +5,7 @@ module ReactOnRails
   # against each otherat runtime.
   class VersionChecker
     attr_reader :node_package_version
-    MAJOR_MINOR_PATCH_VERSION_REGEX = /(\d+)\.(\d+)\.(\d+)/
+    MAJOR_MINOR_PATCH_VERSION_REGEX = /(\d+)\.(\d+)\.(\d+)/.freeze
 
     def self.build
       new(NodePackageVersion.build)
@@ -20,6 +20,7 @@ module ReactOnRails
     # warning if they do not.
     def raise_if_gem_and_node_package_versions_differ
       return if node_package_version.relative_path?
+
       node_major_minor_patch = node_package_version.major_minor_patch
       gem_major_minor_patch = gem_major_minor_patch_version
       versions_match = node_major_minor_patch[0] == gem_major_minor_patch[0] &&
@@ -99,10 +100,12 @@ module ReactOnRails
 
       def major_minor_patch
         return if relative_path?
+
         match = raw.match(MAJOR_MINOR_PATCH_VERSION_REGEX)
         unless match
           raise ReactOnRails::Error, "Cannot parse version number '#{raw}' (wildcard versions are not supported)"
         end
+
         [match[1], match[2], match[3]]
       end
 

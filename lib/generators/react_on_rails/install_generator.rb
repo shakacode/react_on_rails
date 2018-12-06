@@ -62,6 +62,7 @@ module ReactOnRails
 
       def missing_yarn?
         return false unless ReactOnRails::Utils.running_on_windows? ? `where yarn`.blank? : `which yarn`.blank?
+
         error = "yarn is required. Please install it before continuing. https://yarnpkg.com/en/docs/install"
         GeneratorMessages.add_error(error)
         true
@@ -69,6 +70,7 @@ module ReactOnRails
 
       def missing_node?
         return false unless ReactOnRails::Utils.running_on_windows? ? `where node`.blank? : `which node`.blank?
+
         error = "** nodejs is required. Please install it before continuing. https://nodejs.org/en/"
         GeneratorMessages.add_error(error)
         true

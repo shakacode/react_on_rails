@@ -36,6 +36,7 @@ module ReactOnRails
 
       def replace_prerender_if_server_rendering
         return unless options.example_server_rendering
+
         hello_world_index = File.join(destination_root, "app", "views", "hello_world", "index.html.erb")
         hello_world_contents = File.read(hello_world_index)
         new_hello_world_contents = hello_world_contents.gsub(/prerender: false/,

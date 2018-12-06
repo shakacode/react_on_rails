@@ -1,6 +1,7 @@
 RSpec.configure do |config|
   config.after(:each, :js) do |example|
     next unless %i[selenium_chrome selenium_chrome_headless].include?(Capybara.current_driver)
+
     # As of 2018-10-21, traping errors does not work for firefox
 
     log_only_list = %w[DEBUG INFO]

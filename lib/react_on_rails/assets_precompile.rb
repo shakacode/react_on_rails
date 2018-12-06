@@ -64,6 +64,7 @@ module ReactOnRails
       # references from webpack's CSS would be invalid. The fix is to symlink the double-digested
       # file back to the original digested name, and make a similar symlink for the gz version.
       return unless @symlink_non_digested_assets_regex
+
       manifest_glob = Dir.glob(@assets_path.join(".sprockets-manifest-*.json")) +
                       Dir.glob(@assets_path.join("manifest-*.json")) +
                       Dir.glob(@assets_path.join("manifest.yml"))
@@ -86,6 +87,7 @@ module ReactOnRails
       manifest_data.each do |original_filename, rails_digested_filename|
         # TODO: we should remove any original_filename that is NOT in the webpack deploy folder.
         next unless original_filename =~ @symlink_non_digested_assets_regex
+
         # We're symlinking from the digested filename back to the original filename which has
         # already been symlinked by Webpack
         symlink_file(rails_digested_filename, original_filename)
@@ -100,6 +102,7 @@ module ReactOnRails
     def delete_broken_symlinks
       Dir.glob(@assets_path.join("*")).each do |filename|
         next unless File.lstat(filename).symlink?
+
         begin
           target = File.readlink(filename)
         rescue StandardError

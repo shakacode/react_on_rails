@@ -218,6 +218,7 @@ module ReactOnRails
 
     def configure_skip_display_none_deprecation
       return if skip_display_none.nil?
+
       Rails.logger.warn "[DEPRECATION] ReactOnRails: remove skip_display_none from configuration."
     end
   end

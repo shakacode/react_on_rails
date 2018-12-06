@@ -6,6 +6,7 @@ module ReactOnRails
 
     def self.dev_server_running?
       return false unless using_webpacker?
+
       Webpacker.dev_server.running?
     end
 
@@ -45,6 +46,7 @@ module ReactOnRails
 
     def self.check_manifest_not_cached
       return unless using_webpacker? && Webpacker.config.cache_manifest?
+
       msg = <<-MSG.strip_heredoc
           ERROR: you have enabled cache_manifest in the #{Rails.env} env when using the
           ReactOnRails::TestHelper.configure_rspec_to_compile_assets helper

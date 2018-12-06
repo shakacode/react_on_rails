@@ -7,6 +7,7 @@ module ReactOnRails
     def initialize
       return if i18n_dir.nil?
       return unless obsolete?
+
       @translations, @defaults = generate_translations
       convert
     end
@@ -15,6 +16,7 @@ module ReactOnRails
 
     def obsolete?
       return true if exist_js_files.empty?
+
       js_files_are_outdated
     end
 
