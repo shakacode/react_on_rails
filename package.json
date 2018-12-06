@@ -9,6 +9,8 @@
   "devDependencies": {
     "@babel/cli": "^7.0.0",
     "@babel/core": "^7.0.0",
+    "@babel/runtime-corejs2": "^7.0.0",
+    "release-it": "^8.2.0",
     "@babel/plugin-transform-flow-strip-types": "^7.0.0",
     "@babel/plugin-transform-runtime": "^7.0.0",
     "@babel/preset-env": "^7.0.0",
@@ -28,12 +30,14 @@
     "eslint-plugin-react": "^7.1.0",
     "flow-bin": "^0.83.0",
     "jsdom": "^11.1.0",
+    "nps": "^5.9.3",
+    "prettier": "^1.14.3",
+    "prettier-eslint-cli": "^4.7.1",
     "prop-types": "^15.5.10",
     "react": "^16.5.2",
     "react-dom": "^16.5.2",
     "react-transform-hmr": "^1.0.4",
     "redux": "^4.0.1",
-    "release-it": "^7.6.2",
     "tap-spec": "^5.0.0",
     "tape": "^4.7.0",
     "webpack": "^3.4.1",
@@ -85,11 +89,5 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails#readme",
-  "dependencies": {
-    "@babel/runtime-corejs2": "^7.0.0",
-    "nps": "^5.9.3",
-    "prettier": "^1.14.3",
-    "prettier-eslint-cli": "^4.7.1"
-  }
+  "homepage": "https://github.com/shakacode/react_on_rails#readme"
 }
