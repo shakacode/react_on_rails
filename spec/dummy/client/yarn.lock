@@ -579,13 +579,6 @@
     "@babel/plugin-transform-react-jsx-self" "^7.0.0"
     "@babel/plugin-transform-react-jsx-source" "^7.0.0"
 
-"@babel/runtime-corejs2@^7.0.0":
-  version "7.1.2"
-  resolved "https://registry.yarnpkg.com/@babel/runtime-corejs2/-/runtime-corejs2-7.1.2.tgz#8695811a3fd8091f54f274b9320334e5e8c62200"
-  dependencies:
-    core-js "^2.5.7"
-    regenerator-runtime "^0.12.0"
-
 "@babel/runtime@^7.0.0":
   version "7.1.2"
   resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.1.2.tgz#81c89935f4647706fc54541145e6b4ecfef4b8e3"
@@ -5455,11 +5448,10 @@ react-lifecycles-compat@^3.0.4:
   version "3.0.4"
   resolved "https://registry.yarnpkg.com/react-lifecycles-compat/-/react-lifecycles-compat-3.0.4.tgz#4f1a273afdfc8f3488a8c516bfda78f872352362"
 
-react-on-rails@11.1.8:
-  version "11.1.8"
-  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-11.1.8.tgz#6d5ba72a514cac4ea4efddd8a80f61909d3e9bd7"
-  dependencies:
-    "@babel/runtime-corejs2" "^7.0.0"
+react-on-rails@11.2.0:
+  version "11.2.0"
+  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-11.2.0.tgz#8ff8599ac41f3cee610cdc754c75b6d9344cf65f"
+  integrity sha512-vSrX1Dr8lKsy6Tvro8+s9horbuixBxoAJ4MdS4Yis0Hj61iRk/LfrMkXBRBjqpS9CgzMPr9D0yN8pENRpYtGaQ==
 
 react-proptypes@^1.0.0:
   version "1.0.0"

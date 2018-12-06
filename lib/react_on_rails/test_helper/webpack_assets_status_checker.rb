@@ -78,7 +78,11 @@ module ReactOnRails
       end
 
       def client_files
-        @client_files ||= make_file_list(make_globs(source_path)).to_ary
+        globs = make_globs(source_path)
+        @client_files ||= begin
+          file_list = make_file_list(globs)
+          file_list.to_ary
+        end
       end
 
       def make_globs(dirs)

@@ -101,11 +101,11 @@ Note, foreman defaults to PORT 5000 unless you set the value of PORT in your env
 ## Using a pre-release of rails/webpacker
 Until `rails/webpacker` v4 ships, or if you ever want to try out the master branch, you can modify the React on Rails tutorial instructions slightly. You can see the sequence of commits here. To summarize:
 
-Don't `run rails new with the --webpack=react option`. Instead, add the webpacker gem to the Gemfile such that it points to master, like this if `11.1.8` is the version you want.
+Don't `run rails new with the --webpack=react option`. Instead, add the webpacker gem to the Gemfile such that it points to master, like this if `11.2.0` is the version you want.
 
 ```ruby
 gem 'webpacker', github: "rails/webpacker"
-gem 'react_on_rails', '11.1.8' # always use exact version
+gem 'react_on_rails', '11.2.0' # always use exact version
 ```
 
 Then run these commands:
