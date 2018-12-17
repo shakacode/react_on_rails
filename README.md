@@ -36,7 +36,7 @@ React on Rails Pro provides Node server rendering and other performance enhancem
 
 [![2018-09-11_10-31-11](https://user-images.githubusercontent.com/1118459/45467845-5bcc7400-b6bd-11e8-91e1-e0cf806d4ea4.png)](https://blog.shakacode.com/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db)
 
-* [HVMN Testimonial, Written by Paul Benigeri, October 12, 2018](./docs/testimonials/hvmn.md)
+* [HVMN Testimonial, by Paul Benigeri, October 12, 2018](./docs/testimonials/hvmn.md)
 * [HVMN’s 90% Reduction in Server Response Time from React on Rails Pro](https://blog.shakacode.com/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db)
 * [Egghead React on Rails Pro Deployment Highlights](https://github.com/shakacode/react_on_rails/wiki/Egghead-React-on-Rails-Pro-Deployment-Highlights)
 
@@ -62,6 +62,10 @@ Please [email me (Justin Gordon), the creator of React on Rails](mailto:justin@s
 [HVMN Testimonial, Written by Paul Benigeri, October 12, 2018](./docs/testimonials/hvmn.md)
 
 > The price we paid for the consultation + the React on Rails pro license has already been made back a couple of times from hosting fees alone. The entire process was super hands off, and our core team was able to focus on shipping new feature during that sprint.
+
+[ResortPass Testimonial, by Leora Juster, December 10, 2018](./docs/testimonials/resortpass.md)
+
+> Justin and his team were instrumental in assisting us in setting design foundations and standards for our transition to a react on rails application. Just three months of work with the team at Shaka code and we have a main page of our application server-side rendering at exponentially improved speeds.
 
 From Kyle Maune of Cooper Aerial, May 4, 2018
 
