@@ -107,7 +107,7 @@ cd spec/dummy
 yarn
 ```
 
-Note, yarn will run the `postinstall` script of `spec/dummy/client` which runs `yarn link` to setup a sym link to the parent package.
+Note, yarn will run the `postinstall` script of `spec/dummy/client` which runs `yarn link` to set up a sym link to the parent package.
 
 #### Example: Testing NPM changes with the dummy app
 1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/clientStartup.js#L181) in `react_on_rails/node_package/src/clientStartup.js` to confirm we're getting an update to the node package.
