@@ -17,6 +17,9 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 
 ### [11.2.1] - 2018-12-06
+## MIGRATION for v11.2
+- If using **React on Rails Pro**, upgrade react_on_rails_pro to a version >= 1.3.
+
 #### Improved
 - To support React v16, updated API for manually calling `ReactOnRails.render(name, props, domNodeId, hydrate)`. Added 3rd @param hydrate Pass truthy to update server rendered html. Default is falsey Any truthy values calls hydrate rather than render. (https://github.com/shakacode/react_on_rails/pull/1159) by [justin808](https://github.com/justin808) and [coopersamuel](https://github.com/coopersamuel).
 
