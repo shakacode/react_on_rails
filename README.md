@@ -4,7 +4,7 @@
 
 React on Rails integrates Rails with (server rendering of) Facebook's [React](https://github.com/facebook/react) front-end framework.
 
-Intersted in optimizing your webpack setup for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable? [Contact me](mailto:justin@shakacode.com).
+Interested in optimizing your webpack setup for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable? [Contact me](mailto:justin@shakacode.com).
 
 # Intro
 
@@ -94,7 +94,7 @@ Note, the best way to understand how to use ReactOnRails is to study a few simpl
 1. Do the quick [tutorial](docs/tutorial.md).
 2. Add React on Rails to an existing Rails app per [the instructions](docs/basics/installation-into-an-existing-rails-app.md).
 3. Look at [spec/dummy](spec/dummy), a simple, no DB example.
-3. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full featured example live at [www.reactrails.com](http://www.reactrails.com).
+3. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full-featured example live at [www.reactrails.com](http://www.reactrails.com).
 
 ## Basic Installation
 
@@ -270,7 +270,7 @@ ReactOnRails will automatically detect a registered generator function. Thus, th
 
 Another reason to use a generator function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }. Make sure you use this function with `react_component_hash`. 
 
-For server rendering, if you wish to return multiple HTML strings from a generator function, you may return an Object from your generator function with a single top level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
+For server rendering, if you wish to return multiple HTML strings from a generator function, you may return an Object from your generator function with a single top-level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
 
 ```js
 { renderedHtml: { componentHtml, customKey1, customKey2} }
