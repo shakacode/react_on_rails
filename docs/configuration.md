@@ -70,5 +70,13 @@ ReactOnRailsPro.configure do |config|
   # warn_timeout  - Displays an error message if a checkout takes longer that the given time in seconds
   # (used to give hints to increase the pool size). Default is 0.25
   config.renderer_http_pool_warn_timeout = 0.25 # seconds
+  
+  # Snippet of JavaScript to be run right at the beginning of the server rendering process. The code
+  # to be executed must either be self contained or reference some globally exposed module.  
+  # For example, suppose that we had to call `SomeLibrary.clearCache()`between every call to server
+  # renderer to ensure no leakage of state between calls. Note, SomeLibrary needs to be globally 
+  # exposed in the server rendering webpack bundle. This code is visible in the tracing of the calls
+  # to do server rendering. Default is nil.
+  config.ssr_pre_hook_js = "SomeLibrary.clearCache();" 
 end
 ```

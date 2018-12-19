@@ -31,7 +31,8 @@ module ReactOnRailsPro
       unless ReactOnRails::WebpackerUtils.using_webpacker?
         raise ReactOnRailsPro::Error, "Only call bundle_file_name if using webpacker"
       end
-      full_path = ReactOnRails::WebpackerUtils.bundle_js_file_path_from_webpacker(bundle_name)
+
+      full_path = ReactOnRails::WebpackerUtils.bundle_js_uri_from_webpacker(bundle_name)
       pathname = Pathname.new(full_path)
       pathname.basename.to_s
     end

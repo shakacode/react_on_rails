@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [1.3.0] 2018-12-18
+* **Migration:** react_on_rails must be updated to version >= 11.2.1.
+
+### Added
+- Added `config.ssr_pre_hook_js` to call some JavaScript to clear out state from libraries that 
+  misbehave during server Rendering. For example, suppose that we had to call `SomeLibrary.clearCache()`
+  between calls to server renderer. Note, SomeLibrary needs to be globally exposed in the server
+  rendering webpack bundle.
+
 ## [1.2.1] 2018-08-26
 ### Fixed
 * Major overhaul of the vm-renderer. Improved logging and error handling, ready for async
