@@ -24,7 +24,7 @@ All notable changes to this project will be documented in this file. Items under
 * Add debugging instructions
 * Promisified some node APIs and wrote everything with careful async/await syntax, ensuring that errors are always caught and that promises are always returned from the async functions.
 
-Above are in Above are in Above are in Above are in Above are in Above are in Above are in Above are in [PR 65](https://github.com/shakacode/react_on_rails_pro/pull/65) by [justin808](https://github.com/justin808).
+Above are in [PR 65](https://github.com/shakacode/react_on_rails_pro/pull/65) by [justin808](https://github.com/justin808).
 
 ## [1.2.0]
 * **Migration:** react_on_rails must be updated to version 11.1.x+.
