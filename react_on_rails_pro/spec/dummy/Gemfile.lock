@@ -7,7 +7,7 @@ GIT
 PATH
   remote: ../..
   specs:
-    react_on_rails_pro (1.2.0)
+    react_on_rails_pro (1.2.1)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -15,7 +15,7 @@ PATH
       persistent_http (~> 2)
       rails (>= 3.2)
       rainbow
-      react_on_rails (= 11.1.2)
+      react_on_rails (>= 11.2)
 
 GEM
   remote: https://rubygems.org/
@@ -222,7 +222,7 @@ GEM
     rb-inotify (0.9.10)
       ffi (>= 0.5.0, < 2)
     rdoc (6.0.4)
-    react_on_rails (11.1.2)
+    react_on_rails (11.2.1)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -348,7 +348,7 @@ DEPENDENCIES
   puma
   rails
   rails-controller-testing
-  react_on_rails (= 11.1.2)
+  react_on_rails (= 11.2.1)
   react_on_rails_pro!
   rspec-rails
   rspec_junit_formatter
@@ -365,4 +365,4 @@ DEPENDENCIES
   webpacker
 
 BUNDLED WITH
-   1.16.3
+   1.16.4

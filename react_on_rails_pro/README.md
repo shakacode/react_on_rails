@@ -8,6 +8,11 @@ Node rendering and caching performance enhancements for [React on Rails](https:/
 
 ## Caching
 
+## Clearing of Global State
+If you detect that some library used in server-rendering is leaking state between calls to server render, then you can set the `config.ssr_pre_hook_js` in your `config/initializers/react_on_rails_pro.rb` to run some JavaScript to clear the globally leaked state at the beginning of each call to server render.
+
+For more details, see [Rails Configuration](./docs/configuration.md).
+
 ### Server Rendering
 Server rendering JavaScript evaluation is cached if `prerender_caching` is turned on in your Rails config. This applies to all JavaScript evaluation methods.
 
