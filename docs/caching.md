@@ -97,10 +97,13 @@ The reasons "why" and "why not" are the same as for basic Rails fragment caching
 2. If your React code depends on any values from the [Rails Context](https://github.com/shakacode/react_on_rails/blob/master/docs/basics/generator-functions-and-railscontext.md#rails-context), such as the `locale` or the URL `location`, then be sure to include such values in your cache key. In other words, if you are using some JavaScript such as `react-router` that depends on your URL, or on a call to `toLocalString(locale)`, then be sure to include such values in your cache key. To find the values that React on Rails uses, use some code like this:
 
 ```ruby
-the_rails_context = rails_context(server_side: true) # pass true for server side
+the_rails_context = rails_context
 i18nLocale = the_rails_context[:i18nLocale]
 location = the_rails_context[:location]
 ```
+
+If you are calling `rails_context` from your controller method, then prefix it like this: `helpers.rails_context` so long as you have react_on_rails > 11.2.2. If less than that, call `helpers.send(:rails_context, server_side: true)`
+
 
 If performance is particulary sensitive, consult the view helper definition for `rails_context`. For example, you can save the cost of calculating the rails_context by directly getting a value:
 
