@@ -10,13 +10,13 @@ module ReactOnRails
 
       def create_redux_directories
         dirs = %w[actions constants containers reducers store startup]
-        dirs.each { |name| empty_directory("app/javascript/bundles/HelloWorld/#{name}") }
+        dirs.each { |name| empty_directory("client/app/bundles/HelloWorld/#{name}") }
       end
 
       def copy_base_files
-        base_js_path = "redux/base"
-        base_files = %w[app/javascript/bundles/HelloWorld/components/HelloWorld.jsx]
-        base_files.each { |file| copy_file("#{base_js_path}/#{file}", file) }
+        base_js_path = "redux/base/app/javascript"
+        base_files = %w[bundles/HelloWorld/components/HelloWorld.jsx]
+        base_files.each { |file| copy_file("#{base_js_path}/#{file}", "client/app/#{file}") }
       end
 
       def copy_base_redux_files
@@ -28,7 +28,7 @@ module ReactOnRails
            store/helloWorldStore.js
            startup/HelloWorldApp.jsx].each do |file|
              copy_file("#{base_hello_world_path}/#{file}",
-                       "app/javascript/bundles/HelloWorld/#{file}")
+                       "client/app/bundles/HelloWorld/#{file}")
            end
       end
 
@@ -40,7 +40,7 @@ module ReactOnRails
           app_relative_path: "../bundles/HelloWorld/startup/HelloWorldApp"
         }
 
-        template("#{base_js_path}/packs/registration.js.tt", "app/javascript/packs/hello-world-bundle.js", config)
+        template("#{base_js_path}/packs/registration.js.tt", "client/app/packs/hello-world-bundle.js", config)
         template("#{base_path}/app/views/hello_world/index.html.erb.tt", "app/views/hello_world/index.html.erb", config)
       end
 

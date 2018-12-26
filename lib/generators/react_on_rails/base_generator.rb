@@ -18,13 +18,19 @@ module ReactOnRails
                    desc: "Install Redux gems and Redux version of Hello World Example",
                    aliases: "-R"
 
+      def change_webpacker_source_path
+        webpacker_yml = File.join(destination_root, "config/webpacker.yml")
+        contents = File.read(webpacker_yml).gsub(/source_path:.*/, "source_path: client/app")
+        File.open(webpacker_yml, "wb") { |file| file.wirte(contents) }
+      end
+
       def add_hello_world_route
         route "get 'hello_world', to: 'hello_world#index'"
       end
 
       def create_react_directories
         dirs = %w[components]
-        dirs.each { |name| empty_directory("app/javascript/bundles/HelloWorld/#{name}") }
+        dirs.each { |name| empty_directory("client/app/bundles/HelloWorld/#{name}") }
       end
 
       def copy_base_files
