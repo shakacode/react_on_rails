@@ -93,7 +93,7 @@ end %>
 
 ### rails_context
 
-You can call `rails_context(server_side: true | false)` from your controller or view to see what values are are in the Rails Context. Pass true or false depending on whether you want to see the server side or the client side rails_context.
+You can call `rails_context` or `rails_context(server_side: true|false)` from your controller or view to see what values are are in the Rails Context. Pass true or false depending on whether you want to see the server side or the client side rails_context. Typically, for computing cache keys, you should leave server_side as the default true. When calling this from a controller method, use `helpers.rails_context`.
 
 ------------
 

@@ -4,10 +4,11 @@ language: ruby
 
 rvm:
   # Rails 5 requires 2.2
-  - 2.3.1
-  - 2.4.1
-  - 2.5.0
-  - 2.2.6
+  - 2.3.8
+  - 2.4.5
+  - 2.5.3
+  - 2.5.3
+  - 2.2.10
 services:
   - docker
 
@@ -54,13 +55,13 @@ script:
 matrix:
   exclude:
     - gemfile: spec/dummy_no_webpacker/Gemfile.rails32
-      rvm: 2.3.1
+      rvm: 2.3.8
     - gemfile: spec/dummy_no_webpacker/Gemfile.rails32
-      rvm: 2.4.1
+      rvm: 2.4.5
     - gemfile: spec/dummy_no_webpacker/Gemfile.rails32
-      rvm: 2.5.0
+      rvm: 2.5.3
     - gemfile: spec/dummy/Gemfile
-      rvm: 2.2.6
+      rvm: 2.2.10
 
 notifications:
   slack:

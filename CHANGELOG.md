@@ -16,6 +16,10 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [11.2.2] - 2018-12-24
+#### Improved
+- rails_context can more easily be called from controller methods. The mandatory param of server_side has been made optional.
+
 ### [11.2.1] - 2018-12-06
 ## MIGRATION for v11.2
 - If using **React on Rails Pro**, upgrade react_on_rails_pro to a version >= 1.3.
@@ -860,7 +864,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.2.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.2.2...master
+[11.2.2]: https://github.com/shakacode/react_on_rails/compare/11.2.1...11.2.2
 [11.2.1]: https://github.com/shakacode/react_on_rails/compare/11.1.8...11.2.1
 [11.1.8]: https://github.com/shakacode/react_on_rails/compare/11.1.7...11.1.8
 [11.1.7]: https://github.com/shakacode/react_on_rails/compare/11.1.6...11.1.7
