@@ -5461,10 +5461,10 @@ react-lifecycles-compat@^3.0.4:
   version "3.0.4"
   resolved "https://registry.yarnpkg.com/react-lifecycles-compat/-/react-lifecycles-compat-3.0.4.tgz#4f1a273afdfc8f3488a8c516bfda78f872352362"
 
-react-on-rails@11.2.1:
-  version "11.2.1"
-  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-11.2.1.tgz#b25637bb3d5c6cebd89f4697eb021ede332a3000"
-  integrity sha512-GY8if/w3JkrQNun1xB8O2GG0J8BCB66xranGk7o4TFQyfyeHIEhXbgDEfRM7Xmme4SHFjz1SUY+Oa73WgUcT9g==
+react-on-rails@11.2.2:
+  version "11.2.2"
+  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-11.2.2.tgz#e5cc062e41832f548d9d40dfc2aebd586b932f95"
+  integrity sha512-ZTS69giZDxVxwnraFNKujHpzK9GO5be+ISyGw5v3rKs4VlLKJ7BTVDtT22Fn0iEMe6x817s/cwGwepkAEEwA9A==
   dependencies:
     "@babel/runtime-corejs2" "^7.0.0"
 
