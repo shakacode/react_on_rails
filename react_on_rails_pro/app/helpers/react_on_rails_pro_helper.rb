@@ -18,6 +18,8 @@ module ReactOnRailsProHelper
   # cache_key: String or Array containing your cache keys. If prerender is set to true, the server
   #   bundle digest will be included in the cache key. The cache_key value is the same as used for
   #   conventional Rails fragment caching.
+  # 3. Optionally provide the cache_options value, a hash including values such as
+  #    :compress, :expires_in, :race_condition_ttl
   def cached_react_component(component_name, raw_options = {}, &block)
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
@@ -40,6 +42,9 @@ module ReactOnRailsProHelper
   # cache_key: String or Array containing your cache keys. If prerender is set to true, the server
   #   bundle digest will be included in the cache key. The cache_key value is the same as used for
   #   conventional Rails fragment caching.
+  #
+  # 3. Optionally provide the cache_options value, a hash including values such as
+  #    :compress, :expires_in, :race_condition_ttl
   def cached_react_component_hash(component_name, raw_options = {}, &block)
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)

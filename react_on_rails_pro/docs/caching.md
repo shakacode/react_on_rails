@@ -121,11 +121,16 @@ Here is the doc for helpers `cached_react_component` and `cached_react_component
   # 1. You must pass the props as a block. This is so that the evaluation of the props is not done
   #    if the cache can be used.
   # 2. Provide the cache_key option
-  #
-  # cache_key: String or Array containing your cache keys. If prerender is set to true, the server
-  #   bundle digest will be included in the cache key. The cache_key value is the same as used for
-  #   conventional Rails fragment caching.
+  #    cache_key: String or Array containing your cache keys. If prerender is set to true, the server
+  #      bundle digest will be included in the cache key. The cache_key value is the same as used for
+  #      conventional Rails fragment caching.
+  # 3. Optionally provide the `:cache_options` key with a value of a hash including as 
+  #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
 ```
+
+See the [Rails Guides docs for ActiveSupport::Cache::Store for :cache_options](https://guides.rubyonrails.org/caching_with_rails.html#activesupport-cache-store).
+
+You can find the `:cache_options` documented in the [Rails docs for ActiveSupport cache store](https://guides.rubyonrails.org/caching_with_rails.html#activesupport-cache-store).
 
 #### API Usage examples
 
