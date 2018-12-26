@@ -277,6 +277,59 @@ module ReactOnRails
       ReactOnRails::JsonOutput.escape(json_value)
     end
 
+    # This is the definitive list of the default values used for the rails_context, which is the
+    # second parameter passed to both component and store generator functions.
+    # This method can be called from views and from the controller, as `helpers.rails_context`
+    #
+    # rubocop:disable Metrics/AbcSize
+    def rails_context(server_side: true)
+      @rails_context ||= begin
+        result = {
+          railsEnv: Rails.env,
+          inMailer: in_mailer?,
+          # Locale settings
+          i18nLocale: I18n.locale,
+          i18nDefaultLocale: I18n.default_locale,
+          rorVersion: ReactOnRails::VERSION,
+          rorPro: ReactOnRails::Utils.react_on_rails_pro?
+        }
+        if defined?(request) && request.present?
+          # Check for encoding of the request's original_url and try to force-encoding the
+          # URLs as UTF-8. This situation can occur in browsers that do not encode the
+          # entire URL as UTF-8 already, mostly on the Windows platform (IE11 and lower).
+          original_url_normalized = request.original_url
+          if original_url_normalized.encoding.to_s == "ASCII-8BIT"
+            original_url_normalized = original_url_normalized.force_encoding("ISO-8859-1").encode("UTF-8")
+          end
+
+          # Using Addressable instead of standard URI to better deal with
+          # non-ASCII characters (see https://github.com/shakacode/react_on_rails/pull/405)
+          uri = Addressable::URI.parse(original_url_normalized)
+          # uri = Addressable::URI.parse("http://foo.com:3000/posts?id=30&limit=5#time=1305298413")
+
+          result.merge!(
+            # URL settings
+            href: uri.to_s,
+            location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}" : ''}",
+            scheme: uri.scheme, # http
+            host: uri.host, # foo.com
+            port: uri.port,
+            pathname: uri.path, # /posts
+            search: uri.query, # id=30&limit=5
+            httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"]
+          )
+        end
+        if ReactOnRails.configuration.rendering_extension
+          custom_context = ReactOnRails.configuration.rendering_extension.custom_context(self)
+          result.merge!(custom_context) if custom_context
+        end
+        result
+      end
+
+      @rails_context.merge(serverSide: server_side)
+    end
+    # rubocop:enable Metrics/AbcSize
+
     private
 
     def build_react_component_result_for_server_rendered_string(
@@ -487,58 +540,6 @@ module ReactOnRails
       end
       result
     end
-
-    # This is the definitive list of the default values used for the rails_context, which is the
-    # second parameter passed to both component and store generator functions.
-    # rubocop:disable Metrics/AbcSize
-    def rails_context(server_side: required("server_side"))
-      @rails_context ||= begin
-        result = {
-          railsEnv: Rails.env,
-          inMailer: in_mailer?,
-          # Locale settings
-          i18nLocale: I18n.locale,
-          i18nDefaultLocale: I18n.default_locale,
-          rorVersion: ReactOnRails::VERSION,
-          rorPro: ReactOnRails::Utils.react_on_rails_pro?
-        }
-        if defined?(request) && request.present?
-          # Check for encoding of the request's original_url and try to force-encoding the
-          # URLs as UTF-8. This situation can occur in browsers that do not encode the
-          # entire URL as UTF-8 already, mostly on the Windows platform (IE11 and lower).
-          original_url_normalized = request.original_url
-          if original_url_normalized.encoding.to_s == "ASCII-8BIT"
-            original_url_normalized = original_url_normalized.force_encoding("ISO-8859-1").encode("UTF-8")
-          end
-
-          # Using Addressable instead of standard URI to better deal with
-          # non-ASCII characters (see https://github.com/shakacode/react_on_rails/pull/405)
-          uri = Addressable::URI.parse(original_url_normalized)
-          # uri = Addressable::URI.parse("http://foo.com:3000/posts?id=30&limit=5#time=1305298413")
-
-          result.merge!(
-            # URL settings
-            href: uri.to_s,
-            location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}" : ''}",
-            scheme: uri.scheme, # http
-            host: uri.host, # foo.com
-            port: uri.port,
-            pathname: uri.path, # /posts
-            search: uri.query, # id=30&limit=5
-            httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"]
-          )
-        end
-        if ReactOnRails.configuration.rendering_extension
-          custom_context = ReactOnRails.configuration.rendering_extension.custom_context(self)
-          result.merge!(custom_context) if custom_context
-        end
-        result
-      end
-
-      @rails_context.merge(serverSide: server_side)
-    end
-
-    # rubocop:enable Metrics/AbcSize
 
     def replay_console_option(val)
       val.nil? ? ReactOnRails.configuration.replay_console : val
