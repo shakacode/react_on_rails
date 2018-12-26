@@ -4,7 +4,17 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
-## [1.3.0] - 2018-12-18
+### Added
+- Added option `cache_options:` to the cached_react_component_hash and cached_react_component
+  a hash including values such as :compress, :expires_in, :race_condition_ttl
+- Added option `:if`, `:unless` to the cached_react_component_hash and cached_react_component
+  to skip or use caching
+- option `cache_keys:` can be passed as a lambda now to delay evaluation when passing the :if or 
+  :unless options
+
+Above are in [PR 82](https://github.com/shakacode/react_on_rails_pro/pull/82) by [justin808](https://github.com/justin808) 
+
+## [1.3.0] 2018-12-18
 * **Migration:** react_on_rails must be updated to version >= 11.2.1.
 
 ### Added
