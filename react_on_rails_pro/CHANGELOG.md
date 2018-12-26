@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [1.3.1] - 2018-12-26
 ### Added
 - Added option `cache_options:` to the cached_react_component_hash and cached_react_component
   a hash including values such as :compress, :expires_in, :race_condition_ttl
@@ -14,7 +15,7 @@ All notable changes to this project will be documented in this file. Items under
 
 Above are in [PR 82](https://github.com/shakacode/react_on_rails_pro/pull/82) by [justin808](https://github.com/justin808) 
 
-## [1.3.0] 2018-12-18
+## [1.3.0] - 2018-12-18
 * **Migration:** react_on_rails must be updated to version >= 11.2.1.
 
 ### Added
@@ -62,7 +63,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.3.0...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.3.1...HEAD
+[1.3.1]: https://github.com/shakacode/react_on_rails_pro/compare/1.3.0...1.3.1
 [1.3.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.2.1...1.3.0
 [1.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/1.2.0...1.2.1
 [1.2.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.1.0...1.2.0
