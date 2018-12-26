@@ -3,9 +3,13 @@ require "react_on_rails/utils"
 module ReactOnRailsPro
   class Cache
     class << self
+      # options[:cache_options] can include :compress, :expires_in, :race_condition_ttl and
+      # other options
       def fetch_react_component(component_name, options)
         cache_key = react_component_cache_key(component_name, options)
-        Rails.cache.fetch(cache_key) { yield }
+
+        cache_options = options[:cache_options]
+        Rails.cache.fetch(cache_key, cache_options) { yield }
       end
 
       # Cache keys by React on Rails Pro should build upon this base
