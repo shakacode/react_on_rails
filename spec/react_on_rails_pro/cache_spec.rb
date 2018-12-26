@@ -10,10 +10,12 @@ describe ReactOnRailsPro::Cache, :caching do
       allow(create_component_code).to receive(:call) { result }
 
       react_component_string1 = ReactOnRailsPro::Cache.fetch_react_component("MyComponent",
+                                                                             if: true,
                                                                              cache_key: "the_cache_key") do
         create_component_code.call
       end
       react_component_string2 = ReactOnRailsPro::Cache.fetch_react_component("MyComponent",
+                                                                             if: true,
                                                                              cache_key: "the_cache_key") do
         create_component_code.call
       end
@@ -24,6 +26,73 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(cache_data.keys.first)
         .to eq("ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/the_cache_key")
       expect(cache_data.values.first.value).to eq(result)
+    end
+
+    it "fetches the value from the cache if cache_key is a lambda" do
+      result = "<div>Something</div>"
+      create_component_code = double("create_component_code")
+      allow(create_component_code).to receive(:call) { result }
+
+      react_component_string1 = ReactOnRailsPro::Cache.fetch_react_component("MyComponent",
+                                                                             unless: false,
+                                                                             cache_key: -> { "the_cache_key" }) do
+        create_component_code.call
+      end
+      react_component_string2 = ReactOnRailsPro::Cache.fetch_react_component("MyComponent",
+                                                                             unless: false,
+                                                                             cache_key: -> { "the_cache_key" }) do
+        create_component_code.call
+      end
+
+      expect(react_component_string1).to eq(result)
+      expect(react_component_string2).to eq(result)
+      expect(create_component_code).to have_received(:call).once
+      expect(cache_data.keys.first)
+        .to eq("ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/the_cache_key")
+      expect(cache_data.values.first.value).to eq(result)
+    end
+    it "skips the cache if option :if is false" do
+      result = "<div>Something</div>"
+      create_component_code = double("create_component_code")
+      allow(create_component_code).to receive(:call) { result }
+
+      react_component_string1 = ReactOnRailsPro::Cache.fetch_react_component("MyComponent",
+                                                                             if: false,
+                                                                             cache_key: -> { "the_cache_key" }) do
+        create_component_code.call
+      end
+      react_component_string2 = ReactOnRailsPro::Cache.fetch_react_component("MyComponent",
+                                                                             if: false,
+                                                                             cache_key: -> { "the_cache_key" }) do
+        create_component_code.call
+      end
+
+      expect(react_component_string1).to eq(result)
+      expect(react_component_string2).to eq(result)
+      expect(create_component_code).to have_received(:call).twice
+      expect(cache_data.keys.size).to eq(0)
+    end
+
+    it "skips the cache if option :unless is true" do
+      result = "<div>Something</div>"
+      create_component_code = double("create_component_code")
+      allow(create_component_code).to receive(:call) { result }
+
+      react_component_string1 = ReactOnRailsPro::Cache.fetch_react_component("MyComponent",
+                                                                             unless: true,
+                                                                             cache_key: -> { "the_cache_key" }) do
+        create_component_code.call
+      end
+      react_component_string2 = ReactOnRailsPro::Cache.fetch_react_component("MyComponent",
+                                                                             unless: true,
+                                                                             cache_key: -> { "the_cache_key" }) do
+        create_component_code.call
+      end
+
+      expect(react_component_string1).to eq(result)
+      expect(react_component_string2).to eq(result)
+      expect(create_component_code).to have_received(:call).twice
+      expect(cache_data.keys.size).to eq(0)
     end
   end
 
