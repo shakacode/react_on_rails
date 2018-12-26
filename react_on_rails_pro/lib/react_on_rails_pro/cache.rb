@@ -6,10 +6,23 @@ module ReactOnRailsPro
       # options[:cache_options] can include :compress, :expires_in, :race_condition_ttl and
       # other options
       def fetch_react_component(component_name, options)
-        cache_key = react_component_cache_key(component_name, options)
+        if use_cache?(options)
+          cache_key = react_component_cache_key(component_name, options)
+          cache_options = options[:cache_options]
+          Rails.cache.fetch(cache_key, cache_options) { yield }
+        else
+          yield
+        end
+      end
 
-        cache_options = options[:cache_options]
-        Rails.cache.fetch(cache_key, cache_options) { yield }
+      def use_cache?(options)
+        if options.key?(:if)
+          options[:if]
+        elsif options.key?(:unless)
+          !options[:unless]
+        else
+          true
+        end
       end
 
       # Cache keys by React on Rails Pro should build upon this base
@@ -42,12 +55,19 @@ module ReactOnRailsPro
       end
 
       def react_component_cache_key(component_name, options)
+        cache_key_option = options[:cache_key]
+        cache_key_value = if cache_key_option.respond_to?(:call)
+                            cache_key_option.call
+                          else
+                            cache_key_option
+                          end
+
         # NOTE: Rails seems to do this automatically: ActiveSupport::Cache.expand_cache_key(keys)
         [
           *base_cache_key("ror_component", prerender: options[:prerender]),
           serializers_cache_key,
           component_name,
-          options[:cache_key]
+          cache_key_value
         ].compact
       end
     end

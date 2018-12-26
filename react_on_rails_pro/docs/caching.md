@@ -112,7 +112,7 @@ i18nLocale = I18n.locale
 ```
  
 ### How: API
-Here is the doc for helpers `cached_react_component` and `cached_react_component_hash`. Consult the [docs in React on Rails](https://github.com/shakacode/react_on_rails/blob/master/docs/api/view-helpers-api.md) for the non-cached analogies `react_component` and `react_component_hash`. 
+Here is the doc for helpers `cached_react_component` and `cached_react_component_hash`. Consult the [docs in React on Rails](https://github.com/shakacode/react_on_rails/blob/master/docs/api/view-helpers-api.md) for the non-cached analogies `react_component` and `react_component_hash`. These docs only show the differences.
 
 ```ruby
   # Provide caching support for react_component in a manner akin to Rails fragment caching.
@@ -121,14 +121,13 @@ Here is the doc for helpers `cached_react_component` and `cached_react_component
   # 1. You must pass the props as a block. This is so that the evaluation of the props is not done
   #    if the cache can be used.
   # 2. Provide the cache_key option
-  #    cache_key: String or Array containing your cache keys. If prerender is set to true, the server
-  #      bundle digest will be included in the cache key. The cache_key value is the same as used for
-  #      conventional Rails fragment caching.
+  #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys. 
+  #    If prerender is set to true, the server bundle digest will be included in the cache key. 
+  #    The cache_key value is the same as used for conventional Rails fragment caching.
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as 
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
+  # 4. Provide boolean values for `:if` or `:unless` to conditionally use caching.
 ```
-
-See the [Rails Guides docs for ActiveSupport::Cache::Store for :cache_options](https://guides.rubyonrails.org/caching_with_rails.html#activesupport-cache-store).
 
 You can find the `:cache_options` documented in the [Rails docs for ActiveSupport cache store](https://guides.rubyonrails.org/caching_with_rails.html#activesupport-cache-store).
 
@@ -137,6 +136,13 @@ You can find the `:cache_options` documented in the [Rails docs for ActiveSuppor
 The fragment caching for `react_component`:
 ```ruby
 <%= cached_react_component("App", cache_key: [@user, @post], prerender: true) do
+  some_slow_method_that_returns_props
+end %>
+```
+
+Suppose you only want to cache when `current_user.nil?`. Use the `:if` option (`unless:` is analogous):
+```ruby
+<%= cached_react_component("App", cache_key: [@user, @post], prerender: true, if: current_user.nil?) do
   some_slow_method_that_returns_props
 end %>
 ```
