@@ -12,12 +12,12 @@ shared_examples "base_generator" do
 
   it "creates react directories" do
     dirs = %w[components]
-    dirs.each { |dirname| assert_directory "app/javascript/bundles/HelloWorld/#{dirname}" }
+    dirs.each { |dirname| assert_directory "client/app/bundles/HelloWorld/#{dirname}" }
   end
 
   it "copies react files" do
     %w[app/controllers/hello_world_controller.rb
-       app/javascript/bundles/HelloWorld/components/HelloWorld.jsx
+       client/app/bundles/HelloWorld/components/HelloWorld.jsx
        config/initializers/react_on_rails.rb
        Procfile.dev
        Procfile.dev-server].each { |file| assert_file(file) }

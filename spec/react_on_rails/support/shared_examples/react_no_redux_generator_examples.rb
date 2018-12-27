@@ -2,7 +2,7 @@
 
 shared_examples "no_redux_generator" do
   it "creates appropriate templates" do
-    assert_file("app/javascript/packs/hello-world-bundle.js") do |contents|
+    assert_file("client/app/packs/hello-world-bundle.js") do |contents|
       assert_match("import HelloWorld from '../bundles/HelloWorld/components/HelloWorld';", contents)
     end
 
