@@ -22,7 +22,7 @@ module ReactOnRails
         webpacker_yml = File.join(destination_root, "config/webpacker.yml")
         return unless File.exist?(webpacker_yml)
 
-        contents = File.read(webpacker_yml).gsub(/source_path:\s*app\/javascript/, "source_path: #{CLIENT_BASE_PATH}")
+        contents = File.read(webpacker_yml).gsub(%r{source_path:\s*app\/javascript}, "source_path: #{CLIENT_BASE_PATH}")
         File.open(webpacker_yml, "wb") { |file| file.write(contents) }
       end
 
