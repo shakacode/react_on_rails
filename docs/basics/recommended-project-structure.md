@@ -5,7 +5,7 @@ While React On Rails does not *enforce* a specific project structure, we do *rec
 The React on Rails generator uses the standard `rails/webpacker` convention of this structure:
 
 ```yml
-app/javascript:
+client/app:
   ├── bundles:
   │   # Logical groups of files that can be used for code splitting
   │   └── hello-world-bundle.js
@@ -28,18 +28,18 @@ This default rails/webpacker configuration is used for the generator because:
 
 Thus, the generator structure and using rails/webpacker for Webpack configuration **is not recommended** for any commercial projects, especially those that will use server rendering. Instead, the recommended structure is shown in this example app: [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) and described below.
 
-## Steps to convert from the generator defaults to use the recommended `/client` directory structure.
+## Steps to convert from the generator defaults to use the Rails default `/app/javascript` directory structure.
 
 1. Move the directory:
 
 ```
-mv app/javascript client
+cp -r client/app/* app/javascript && rm -R client/app/*
 ```
 
 2. Edit your `/config/webpacker.yml` file. Change the `default/source_path`:
 
 ```yml
-  source_path: client
+  source_path: app/javascript
 ```
 
 ## Moving node_modules from `/` to `/client` with a custom webpack setup.

@@ -290,21 +290,21 @@ For more details on server rendering, see:
   + [Client vs. Server Rendering](./basics/client-vs-server-rendering.md)
   + [React Server Rendering](./basics/react-server-rendering.md)
 
-## Moving from the Rails default `/app/javascript` to the recommended `/client` structure
+## Moving from the recommended `/client/app` to the Rails default `/app/javascript` structure
 
-ShakaCode recommends that you use `/client` for your client side app. This way a non-Rails, front-end developer can be at home just by opening up the `/client` directory.
+ShakaCode recommends that you use `/client/app` for your client side app. This way a non-Rails, front-end developer can be at home just by opening up the `/client/app` directory.
 
 
 1. Move the directory:
 
 ```
-mv app/javascript client
+cp -r client/app/* app/javascript && rm -R client/app/*
 ```
 
 2. Edit your `/config/webpacker.yml` file. Change the `default/source_path`:
 
 ```yml
-  source_path: client
+  source_path: app/javascript
 ```
 
 ## Using HMR with the rails/webpacker setup

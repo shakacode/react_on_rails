@@ -242,7 +242,7 @@ Use modules just as you would when using Webpack and React without Rails. The di
 This is how to expose a component to the `react_component` view helper.
 
 ```javascript
-  // app/javascript/packs/hello-world-bundle.js
+  // client/app/packs/hello-world-bundle.js
   import HelloWorld from '../components/HelloWorld';
   import ReactOnRails from 'react-on-rails';
   ReactOnRails.register({ HelloWorld });
