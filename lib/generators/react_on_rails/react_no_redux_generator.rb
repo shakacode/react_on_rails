@@ -11,9 +11,9 @@ module ReactOnRails
       source_root(File.expand_path("templates", __dir__))
 
       def copy_base_files
-        base_js_path = "base/base/app/javascript"
+        base_js_path = "base/base/#{CLIENT_BASE_PATH}"
         base_files = %w[bundles/HelloWorld/components/HelloWorld.jsx]
-        base_files.each { |file| copy_file("#{base_js_path}/#{file}", "client/app/#{file}") }
+        base_files.each { |file| copy_file("#{base_js_path}/#{file}", "#{CLIENT_BASE_PATH}/#{file}") }
       end
 
       def create_appropriate_templates
@@ -23,8 +23,8 @@ module ReactOnRails
           app_relative_path: "../bundles/HelloWorld/components/HelloWorld"
         }
 
-        template("#{base_path}/app/javascript/packs/registration.js.tt",
-                 "client/app/packs/hello-world-bundle.js", config)
+        template("#{base_path}/#{CLIENT_BASE_PATH}/packs/registration.js.tt",
+                 "#{CLIENT_BASE_PATH}/packs/hello-world-bundle.js", config)
         template("#{base_path}/app/views/hello_world/index.html.erb.tt",
                  "app/views/hello_world/index.html.erb", config)
       end

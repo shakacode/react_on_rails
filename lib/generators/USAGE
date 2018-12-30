@@ -2,6 +2,11 @@ Description:
 
 The react_on_rails:install generator integrates webpack with rails with ease. You
 can pass the redux option if you'd like to have redux setup for you automatically.
+The team at ShakaCode prefers to have all client side development files in a top-
+-level directory called `/client`. This more cleanly separates the front-end code
+from the back-end code.
+To change back to the default, change the default source_path in config/webpacker
+.yml to `client\app`.
 
 * Redux
 

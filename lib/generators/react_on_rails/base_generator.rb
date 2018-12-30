@@ -22,7 +22,7 @@ module ReactOnRails
         webpacker_yml = File.join(destination_root, "config/webpacker.yml")
         return unless File.exist?(webpacker_yml)
 
-        contents = File.read(webpacker_yml).gsub(/source_path:.*/, "source_path: client/app")
+        contents = File.read(webpacker_yml).gsub(/source_path:\s*app\/javascript/, "source_path: #{CLIENT_BASE_PATH}")
         File.open(webpacker_yml, "wb") { |file| file.write(contents) }
       end
 
@@ -32,7 +32,7 @@ module ReactOnRails
 
       def create_react_directories
         dirs = %w[components]
-        dirs.each { |name| empty_directory("client/app/bundles/HelloWorld/#{name}") }
+        dirs.each { |name| empty_directory("#{CLIENT_BASE_PATH}/bundles/HelloWorld/#{name}") }
       end
 
       def copy_base_files
@@ -96,6 +96,9 @@ module ReactOnRails
 
             - See the documentation on https://github.com/rails/webpacker/blob/master/docs/webpack.md
               for how to customize the default webpack configuration.
+
+            - The generator has changed the default source_path in config/webpacker.yml to `client\app`
+              which is more recommended structure for bigger projects.
 
             - Include your webpack assets to your application layout.
 

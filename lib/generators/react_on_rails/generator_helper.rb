@@ -3,6 +3,7 @@
 require "rainbow"
 
 module GeneratorHelper
+  CLIENT_BASE_PATH = "client/app"
   # Takes a relative path from the destination root, such as `.gitignore` or `app/assets/javascripts/application.js`
   def dest_file_exists?(file)
     dest_file = File.join(destination_root, file)
