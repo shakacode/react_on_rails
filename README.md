@@ -1,10 +1,10 @@
 # ReactOnRails
 
-[![License](https://img.shields.io/badge/license-mit-green.svg)](./LICENSE.md) [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Codeship Status for shakacode/react_on_rails](https://app.codeship.com/projects/cec6c040-971f-0134-488f-0a5146246bd8/status?branch=master)](https://app.codeship.com/projects/187011) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
+[![License](https://img.shields.io/badge/license-mit-green.svg)](./LICENSE.md) [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master)
 
 React on Rails integrates Rails with (server rendering of) Facebook's [React](https://github.com/facebook/react) front-end framework.
 
-Interested in optimizing your webpack setup for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable? [Contact me](mailto:justin@shakacode.com).
+Interested in optimizing your webpack setup for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable with server side rendering? [Contact me](mailto:justin@shakacode.com).
 
 # Intro
 
@@ -17,12 +17,13 @@ To provide an opinionated and optimal framework for integrating Ruby on Rails wi
 Given that rails/webpacker gem already provides basic React integration, why would you use "React on Rails"? 
 
 1. Server rendering, often used for SEO crawler indexing and UX performance, is not offered by rails/webpacker.
-1. The easy passing of props directly from your Rails view to your React components rather than having your Rails view load and then make a separate 1request to your API.
-1. [Redux](https://github.com/reactjs/redux) and [React Router](https://github.com/reactjs/react-router) integration.
+1. The easy passing of props directly from your Rails view to your React components rather than having your Rails view load and then make a separate request to your API.
+1. [Redux](https://github.com/reactjs/redux) and [React Router](https://github.com/reactjs/react-router) integration with server-side-rendering.
 1. [Internationalization (I18n) and (localization)](https://github.com/shakacode/react_on_rails/blob/master/docs/basics/i18n.md)
-1. [RSpec Test Helpers Configuration](docs/basics/rspec-configuration.md) to ensure your Webpack bundles are ready for tests.
+1. [RSpec Test Helpers Configuration](docs/basics/rspec-configuration.md) to ensure your Webpack bundles are ready for tests. _(and for [Minitest](docs/basics/minitest-configuration.md))._
 1. A supportive community. This [web search shows how live public sites are using React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com/).
-1. [Reason ML Support](https://github.com/shakacode/reason-react-on-rails-example)
+1. [Reason ML Support](https://github.com/shakacode/reason-react-on-rails-example).
+
 
 See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
 
