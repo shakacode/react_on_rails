@@ -1,4 +1,6 @@
 # RSpec Configuration
+_Click [here for minitest](./minitest-configuration.md)_
+
 Because you will probably want to run RSpec tests that rely on compiled webpack assets (typically, your integration/feature specs where `js: true`), you will want to ensure you don't accidentally run tests on missing or stale webpack assets. If you did use stale Webpack assets, you will get invalid test results as your tests do not use the very latest JavaScript code.
 
 ReactOnRails provides a helper method called `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`. Call this method from inside of the `RSpec.configure` block in your `spec/rails_helper.rb` file, passing the config as an argument. See file [lib/react_on_rails/test_helper.rb](../../lib/react_on_rails/test_helper.rb) for more details. You can customize this to your particular needs by replacing any of the default components used by `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`.
@@ -54,8 +56,6 @@ The following `config/react_on_rails.rb` settings **must** match your setup:
 If you want to speed up the re-compiling process so you don't wait to run your tests to build the files, you can run your test compilation with the "watch" flags.
 
 [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) contains examples of how to set the proc files for this purpose.
-
-If you want to use a testing framework other than RSpec, please submit let us know on the changes you need to do and we'll update the docs.
 
 ![2016-01-27_02-36-43](https://cloud.githubusercontent.com/assets/1118459/12611951/7c56d070-c4a4-11e5-8a80-9615f99960d9.png)
 
