@@ -96,10 +96,8 @@ ReactOnRails.configure do |config|
   # CONFIGURE YOUR SOURCE FILES 
   # The test helper needs to know where your JavaScript files exist. The default is configured
   # by your config/webpacker.yml soure_path:
-  # source_path: client/app # if using recommended /client directory
+  # source_path: client/app/javascript # if using recommended /client directory
   #
-  # If you are not using webpacker, the `node_modules_location` is assumed to be the location of your source
-  # files.
 
   # Define the files we need to check for webpack compilation when running tests.
   # The default is `%w( manifest.json )` as will be sufficient for most webpacker builds.
