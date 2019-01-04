@@ -14,6 +14,7 @@
   + [Deployment](docs/basics/deployment.md).
   + [React on Rails Internationalization (I18n, localization)](docs/basics/i18n.md)
   + [RSpec Test Helpers Configuration](docs/basics/rspec-configuration.md)
+  + [Minitest Configuration](docs/basics/minitest-configuration.md)
   + [Upgrading React on Rails](docs/basics/upgrading-react-on-rails.md)
   
 ## **API**
