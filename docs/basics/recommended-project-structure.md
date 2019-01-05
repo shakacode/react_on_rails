@@ -34,6 +34,7 @@ Thus, the generator structure and using rails/webpacker for Webpack configuratio
 1. Move the directory:
 
 ```
+mkdir client
 mv app/javascript client/app
 ```
 
