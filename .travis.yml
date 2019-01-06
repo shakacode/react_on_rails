@@ -7,7 +7,7 @@ rvm:
   - 2.3.8
   - 2.4.5
   - 2.5.3
-  - 2.5.3
+  - 2.6.0
   - 2.2.10
 services:
   - docker
@@ -37,7 +37,7 @@ before_install:
   - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen scn 1600x1200x16"
 
 install:
-  - travis_retry gem install bundler
+  - travis_retry gem install bundler -v '<2' # Ruby 2.2 and Rails 3.2 & 4.2 depend on bundler 1.x.
   - travis_retry nvm install 8.11.3
   - node -v
   - travis_retry npm i -g yarn
@@ -60,6 +60,8 @@ matrix:
       rvm: 2.4.5
     - gemfile: spec/dummy_no_webpacker/Gemfile.rails32
       rvm: 2.5.3
+    - gemfile: spec/dummy_no_webpacker/Gemfile.rails32
+      rvm: 2.6.0
     - gemfile: spec/dummy/Gemfile
       rvm: 2.2.10
 
