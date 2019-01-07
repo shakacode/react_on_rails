@@ -22,7 +22,13 @@ module ReactOnRails
         webpacker_yml = File.join(destination_root, "config/webpacker.yml")
         return unless File.exist?(webpacker_yml)
 
-        contents = File.read(webpacker_yml).gsub(%r{source_path:\s*app\/javascript}, "source_path: #{CLIENT_BASE_PATH}")
+        contents = File.read(webpacker_yml)
+        if contents.match?(%r{source_path:\s*app\/javascript})
+          @is_default_changed = true
+        else
+          return
+        end
+        contents = contents.gsub(%r{source_path:\s*app\/javascript}, "source_path: #{CLIENT_BASE_PATH}")
         File.open(webpacker_yml, "wb") { |file| file.write(contents) }
       end
 
@@ -95,10 +101,10 @@ module ReactOnRails
           What to do next:
 
             - See the documentation on https://github.com/rails/webpacker/blob/master/docs/webpack.md
-              for how to customize the default webpack configuration.
+              for how to customize the default webpack configuration.<optional>
 
             - The generator has changed the default source_path in config/webpacker.yml to `client\app`
-              which is more recommended structure for bigger projects.
+              which is more recommended structure for bigger projects.</optional>
 
             - Include your webpack assets to your application layout.
 
@@ -128,7 +134,12 @@ module ReactOnRails
       end
 
       def print_helpful_message
-        GeneratorMessages.add_info(self.class.helpful_message)
+        if @is_default_changed
+          message = self.class.helpful_message.sub("<optional>", "").sub("</optional>", "")
+        else
+          message = self.class.helpful_message.gsub(%r{<optional>.*</optional>}m, "")
+        end
+        GeneratorMessages.add_info(message)
       end
 
       private

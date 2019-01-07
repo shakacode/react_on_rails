@@ -14,7 +14,7 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ## [Unreleased]
 Changes since last non-beta release.
 
-*Please add entries here for your pull requests that are not yet released.*
+- Changed the default generator output directory to `client/app`
 
 ### [11.2.2] - 2018-12-24
 #### Improved
