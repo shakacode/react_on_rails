@@ -32,7 +32,7 @@ const DeferredRenderAppRenderer = (_props, _railsContext, domNodeId) => {
     }
 
     const reactElement = <Router {...routerProps} />;
-    ReactDOM.render(reactElement, document.getElementById(domNodeId));
+    ReactDOM.hydrate(reactElement, document.getElementById(domNodeId));
   });
 };
 
