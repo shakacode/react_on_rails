@@ -192,8 +192,8 @@ feature "Code Splitting w/ Server Rendering", :js, type: :system do
   subject { page }
   background { visit "/deferred_render_with_server_rendering/async_page" }
   scenario "loading an asyncronous route should not cause a client/server checksum mismatch" do
-    root = page.find(:xpath, "//div[@data-reactroot]")
-    expect(root["data-react-checksum"].present?).to be(true)
+    expect(current_path).to eq("/deferred_render_with_server_rendering/async_page")
+    expect(subject).to have_text "Noice!"
   end
 end
 

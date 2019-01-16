@@ -9,5 +9,5 @@ export default (_props, _railsContext, domNodeId) => {
     </div>
   );
 
-  ReactDOM.render(reactElement, document.getElementById(domNodeId));
+  ReactDOM.hydrate(reactElement, document.getElementById(domNodeId));
 };

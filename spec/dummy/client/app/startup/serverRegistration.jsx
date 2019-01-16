@@ -44,6 +44,8 @@ import ImageExample from '../components/ImageExample';
 
 import SetTimeoutLoggingApp from './SetTimeoutLoggingApp';
 
+import ComponentWithLodashApp from './ComponentWithLodashApp';
+
 ReactOnRails.register({
   BrokenApp,
   HelloWorld,
@@ -61,6 +63,7 @@ ReactOnRails.register({
   ReactHelmetApp,
   ImageExample,
   SetTimeoutLoggingApp,
+  ComponentWithLodashApp,
 });
 
 ReactOnRails.registerStore({
