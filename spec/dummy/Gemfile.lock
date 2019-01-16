@@ -148,7 +148,7 @@ GEM
     mimemagic (0.3.2)
     mini_mime (1.0.1)
     mini_portile2 (2.3.0)
-    mini_racer (0.2.0)
+    mini_racer (0.2.4)
       libv8 (>= 6.3)
     minitest (5.11.3)
     multi_json (1.13.1)
@@ -365,4 +365,4 @@ DEPENDENCIES
   webpacker
 
 BUNDLED WITH
-   1.16.4
+   1.17.1

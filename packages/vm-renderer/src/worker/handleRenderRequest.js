@@ -18,6 +18,7 @@ import debug from '../shared/debug';
 import log from '../shared/log';
 import { formatExceptionMessage, workerIdLabel } from '../shared/utils';
 import { getConfig } from '../shared/configBuilder';
+import errorReporter from '../shared/errorReporter';
 import { buildVM, getVmBundleFilePath, runInVM } from './vm';
 
 const lockfileLockAsync = promisify(lockfile.lock);
@@ -94,6 +95,7 @@ function getRequestBundleFilePath(bundleTimestamp) {
 }
 
 function errorResult(msg) {
+  errorReporter.notify(msg);
   log.error(` error ${msg}`);
   return {
     headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
@@ -260,6 +262,7 @@ export default async function handleRenderRequest({
       'Caught top level error in handleRenderRequest',
     );
     log.error(msg);
+    errorReporter.notify(msg);
     return Promise.reject(error);
   }
 }

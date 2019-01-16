@@ -12,6 +12,7 @@ import { promisify } from 'util';
 import log from '../shared/log';
 import { getConfig } from '../shared/configBuilder';
 import { formatExceptionMessage, smartTrim } from '../shared/utils';
+import errorReporter from '../shared/errorReporter';
 
 const readFileAsync = promisify(fs.readFile); // (A)
 
@@ -135,6 +136,7 @@ export async function buildVM(filePath) {
     return Promise.resolve(true);
   } catch (error) {
     log.error('Caught Error when creating context in buildVM, %O', error);
+    errorReporter.notify(error);
     return Promise.reject(error);
   }
 }
@@ -159,6 +161,7 @@ ${smartTrim(renderingRequest)}`);
     }
 
     vm.runInContext('console.history = []', context);
+
     const result = vm.runInContext(renderingRequest, context);
 
     if (log.level === 'debug') {
@@ -173,7 +176,8 @@ ${smartTrim(result)}`);
     return Promise.resolve(result);
   } catch (e) {
     const exceptionMessage = formatExceptionMessage(renderingRequest, e);
-    log.error(` Caught execution error:\n${exceptionMessage}`);
+    log.error(`Caught execution error:\n${exceptionMessage}`);
+    errorReporter.notify(exceptionMessage);
     return Promise.resolve({ exceptionMessage });
   }
 }
