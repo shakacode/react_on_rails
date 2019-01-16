@@ -24,6 +24,9 @@ const config = {
 
   // time in minutes between each worker restarting when restarting all workers
   delayBetweenIndividualWorkerRestarts: (env.CI && 0.01) || 1,
+
+  // Uncomment and change value for testing the honeybadger API integration
+  honeybadgerApiKey: 'a602365c',
 };
 
 // Renderer detects a total number of CPUs on virtual hostings like Heroky or CircleCI instead

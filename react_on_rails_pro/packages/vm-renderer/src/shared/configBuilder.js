@@ -6,6 +6,7 @@ import fs from 'fs';
 import os from 'os';
 
 import log, { configureLogger } from './log';
+import errorReporter from './errorReporter';
 import packageJson from './packageJson';
 
 const DEFAULT_TMP_DIR = '/tmp/react-on-rails-pro-vm-renderer-bundles';
@@ -62,6 +63,10 @@ const defaultConfig = {
   delayBetweenIndividualWorkerRestarts: env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS,
 
   maxDebugSnippetLength: MAX_DEBUG_SNIPPET_LENGTH,
+
+  honeybadgerApiKey: env.HONEYBADGER_API_KEY || null,
+
+  sentryDsn: env.SENTRY_DSN || null,
 };
 
 function envValuesUsed() {
@@ -118,6 +123,14 @@ export function buildConfig(providedUserConfig) {
       config.port = val;
     }
   });
+
+  if (config.honeybadgerApiKey) {
+    errorReporter.addHoneybadgerApiKey(config.honeybadgerApiKey);
+  }
+
+  if (config.sentryDsn) {
+    errorReporter.addSentryDsn(config.sentryDsn);
+  }
 
   configureLogger(log, config.logLevel);
   return config;

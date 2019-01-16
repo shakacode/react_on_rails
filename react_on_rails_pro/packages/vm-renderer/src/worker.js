@@ -14,6 +14,7 @@ import checkProtocolVersion from './worker/checkProtocolVersionHandler';
 import authenticate from './worker/authHandler';
 import handleRenderRequest from './worker/handleRenderRequest';
 import { errorResponseResult, formatExceptionMessage } from './shared/utils';
+import errorReporter from './shared/errorReporter';
 
 function setHeaders(headers, res) {
   Object.keys(headers).forEach(key => res.set(key, headers[key]));
@@ -82,11 +83,13 @@ export default function run(config) {
             'UNHANDLED error in handleRenderRequest',
           );
           log.error(exceptionMessage);
+          errorReporter.notify(exceptionMessage);
           setResponse(errorResponseResult(exceptionMessage), res);
         });
     } catch (theErr) {
       const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
       log.error(` UNHANDLED TOP LEVEL error ${exceptionMessage}`);
+      errorReporter.notify(exceptionMessage);
       setResponse(errorResponseResult(exceptionMessage), res);
     }
   });
