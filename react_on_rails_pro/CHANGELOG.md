@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [1.4.1] - 2019-01-15
+### Added
+- Added config option `honeybadgerApiKey` or ENV value `HONEYBADGER_API_KEY` so that errors can flow to HoneyBadger.
+
 ## [1.3.1] - 2018-12-26
 ### Added
 - Added option `cache_options:` to the cached_react_component_hash and cached_react_component
