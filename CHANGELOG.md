@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
-## [1.4.1] - 2019-01-15
+## [1.4.0] - 2019-01-15
 ### Added
 - Added config option `honeybadgerApiKey` or ENV value `HONEYBADGER_API_KEY` so that errors can flow to HoneyBadger.
 
@@ -67,7 +67,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.3.1...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.0...HEAD
+[1.4.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.3.1...1.4.0
 [1.3.1]: https://github.com/shakacode/react_on_rails_pro/compare/1.3.0...1.3.1
 [1.3.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.2.1...1.3.0
 [1.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/1.2.0...1.2.1
