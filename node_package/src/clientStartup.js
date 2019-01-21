@@ -10,7 +10,9 @@ const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 function findContext() {
   if (typeof window.ReactOnRails !== 'undefined') {
     return window;
-  } else if (typeof ReactOnRails !== 'undefined') {
+  }
+
+  if (typeof ReactOnRails !== 'undefined') {
     return global;
   }
 

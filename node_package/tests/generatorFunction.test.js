@@ -58,7 +58,7 @@ test('generatorFunction: pure component recognized as React.Component', (assert)
   assert.plan(1);
 
   /* eslint-disable react/prop-types */
-  const pureComponent = (props) => <h1>{ props.title }</h1>;
+  const pureComponent = ({title}) => <h1>{ title }</h1>;
   /* eslint-enable react/prop-types */
 
   assert.equal(generatorFunction(pureComponent), true,

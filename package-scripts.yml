@@ -35,10 +35,10 @@ scripts:
     js:
       default:
         description: Run prettier-eslint on JS.
-        script: prettier "packages/**/*.@(js|jsx)" "spec/dummy/client/app/**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --write
+        script: prettier "lib/**/*.@(js|jsx)" "packages/**/*.@(js|jsx)" "spec/dummy/client/app/**/*.@(js|jsx)" "**/webpack.config.babel.js" "**/webpack/**/*.js" --write
       listDifferent:
         description: Check if any JS files would change by running prettier-eslint.
-        script: prettier "packages/**/*.@(js|jsx)" "spec/dummy/client/app/**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --list-different
+        script: prettier "lib/**/*.@(js|jsx)" "packages/**/*.@(js|jsx)" "spec/dummy/client/app/**/*.@(js|jsx)" "**/webpack.config.babel.js" "**/webpack/**/*.js" --list-different
     json:
       default:
         description: Run prettier on JSON files.
@@ -55,7 +55,6 @@ scripts:
   clean:
     description: Remove build files
     script: rm -rf node_package/lib
-
 
   babel:
     script: babel --out-dir node_package/lib node_package/src
