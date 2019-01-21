@@ -30,7 +30,6 @@
     "eslint-plugin-react": "7.12.4",
     "flow-bin": "0.91.0",
     "jsdom": "13.1.0",
-    "nps": "^5.9.3",
     "prettier": "1.16.0",
     "prettier-eslint-cli": "4.7.1",
     "prop-types": "15.6.2",
