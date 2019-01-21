@@ -70,8 +70,8 @@
   "scripts": {
     "lint": "eslint --ext .js,.jsx .",
     "test": "yarn run build:test && rspec",
-    "preinstall": "cd ../../.. && yarn link",
-    "postinstall": "yarn link react-on-rails-pro-vm-renderer",
+    "preinstall": "cd ../../.. && yalc publish",
+    "postinstall": "yalc link react-on-rails-pro-vm-renderer",
     "build:test": "yarn run build:test:client && yarn run build:test:server",
     "build:test:client": "NODE_ENV=test webpack --config webpack.client.rails.build.config.js",
     "build:test:server": "NODE_ENV=test webpack --config webpack.server.rails.build.config.js",

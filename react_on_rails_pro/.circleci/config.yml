@@ -91,7 +91,7 @@ jobs:
   # Lint all
   lint-js-and-ruby:
     docker:
-      - image: circleci/ruby:2.4.4-stretch-node
+      - image: &docker_image circleci/ruby:2.4.4-stretch-node
     steps:
       - checkout
       - run: *print-system-info
@@ -101,10 +101,22 @@ jobs:
       - run: *lint-ruby
       - run: *lint-js
 
+  prettier:
+    docker:
+      - image: *docker_image
+    parallelism: 1
+    steps:
+      - checkout
+      - restore_cache: *restore-package-node-modules-cache
+      - run:
+          name: prettier
+          command: yarn start format.listDifferent
+
+
   # Install Node modules for Renderer package with Yarn and save them to chache.
   install-package-node-packages:
     docker:
-      - image: circleci/ruby:2.4.4-stretch-node
+      - image: *docker_image
     steps:
       - checkout
       - run: *print-system-info
@@ -119,7 +131,7 @@ jobs:
   # Install Node modules for dummy app with Yarn and save them to cache.
   install-dummy-app-node-packages:
     docker:
-      - image: circleci/ruby:2.4.4-stretch-node
+      - image: *docker_image
     steps:
       - checkout
       - run: *print-system-info
@@ -136,7 +148,7 @@ jobs:
   # Install Ruby gems for package with Bundler and save them to cache.
   install-package-ruby-gems:
     docker:
-      - image: circleci/ruby:2.4.4-stretch-node
+      - image: *docker_image
     steps:
       - checkout
       - run: *print-system-info
@@ -151,7 +163,7 @@ jobs:
   # Install Ruby gems for dummy app with Bundler and save them to cache.
   install-dummy-app-ruby-gems:
     docker:
-      - image: circleci/ruby:2.4.4-stretch-node
+      - image: *docker_image
     steps:
       - checkout
       - run: *print-system-info
@@ -168,7 +180,7 @@ jobs:
   # different node renderers.
   build-dummy-app-webpack-test-bundles:
     docker:
-      - image: circleci/ruby:2.4.4-stretch-node
+      - image: *docker_image
     steps:
       - checkout
       - run: *print-system-info
@@ -186,7 +198,7 @@ jobs:
   # Run JS unit tests for Renderer package.
   package-js-tests:
     docker:
-      - image: circleci/ruby:2.4.4-stretch-node
+      - image: *docker_image
     steps:
       - checkout
       - run: *print-system-info
@@ -198,7 +210,7 @@ jobs:
 
   rspec-package-specs:
     docker:
-      - image: circleci/ruby:2.4.4-stretch-node
+      - image: *docker_image
     steps:
       - checkout
       - run: *print-system-info
@@ -220,7 +232,7 @@ jobs:
   # as well as the
   rspec-dummy-app-vm-renderer:
     docker:
-      - image: circleci/ruby:2.4.4-stretch-node
+      - image: *docker_image
     steps:
       - checkout
       - run: *print-system-info
@@ -260,7 +272,7 @@ jobs:
   # Test React on Rails Pro without the VM Renderer
   rspec-dummy-app:
     docker:
-      - image: circleci/ruby:2.4.4-stretch-node
+      - image: *docker_image
     steps:
       - checkout
       - run: *print-system-info
@@ -302,6 +314,12 @@ workflows:
           requires:
             - install-package-node-packages
             - install-package-ruby-gems
+      - prettier:
+          filters:
+            branches:
+              ignore: master
+          requires:
+            - install-package-node-packages
       - build-dummy-app-webpack-test-bundles:
           requires:
             - install-dummy-app-node-packages

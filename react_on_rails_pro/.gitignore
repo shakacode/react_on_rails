@@ -38,3 +38,7 @@ spec/dummy/client/npm-debug.log*
 .DS_Store
 
 /gen-documentation
+
+.yalc
+yalc.lock
+

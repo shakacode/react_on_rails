@@ -9,17 +9,19 @@ const DeferredRenderAppRenderer = (_props, _railsContext, domNodeId) => {
   const routes = {
     path: '/deferred_render_with_server_rendering',
     component: DeferredRender,
-    childRoutes: [{
-      path: '/deferred_render_with_server_rendering/async_page',
-      getComponent(_nextState, callback) {
-        require.ensure([], (require) => {
-          const component = require('../components/DeferredRenderAsyncPage').default;
+    childRoutes: [
+      {
+        path: '/deferred_render_with_server_rendering/async_page',
+        getComponent(_nextState, callback) {
+          require.ensure([], require => {
+            const component = require('../components/DeferredRenderAsyncPage').default;
 
-          // The first argument of the getComponent callback is error
-          callback(null, component);
-        });
+            // The first argument of the getComponent callback is error
+            callback(null, component);
+          });
+        },
       },
-    }],
+    ],
   };
 
   // This match is potentially asyncronous, because one of the routes

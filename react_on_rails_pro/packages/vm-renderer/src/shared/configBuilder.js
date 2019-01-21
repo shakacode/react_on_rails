@@ -76,8 +76,8 @@ function envValuesUsed() {
     RENDERER_BUNDLE_PATH: !userConfig.bundlePath && env.RENDERER_BUNDLE_PATH,
     RENDERER_WORKERS_COUNT: !userConfig.workersCount && env.RENDERER_WORKERS_COUNT,
     RENDERER_PASSWORD: !userConfig.password && (env.RENDERER_PASSWORD && '<MASKED'),
-    RENDERER_ALL_WORKERS_RESTART_INTERVAL: !userConfig.allWorkersRestartInterval &&
-      env.RENDERER_ALL_WORKERS_RESTART_INTERVAL,
+    RENDERER_ALL_WORKERS_RESTART_INTERVAL:
+      !userConfig.allWorkersRestartInterval && env.RENDERER_ALL_WORKERS_RESTART_INTERVAL,
     RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS:
       !userConfig.delayBetweenIndividualWorkerRestarts &&
       env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS,
@@ -88,8 +88,7 @@ function sanitizedSettings(aConfig, defaultValue) {
   return Object.assign({}, aConfig, {
     password: (aConfig.password && '<MASKED>') || defaultValue,
     allWorkersRestartInterval: aConfig.allWorkersRestartInterval || defaultValue,
-    delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts
-      || defaultValue,
+    delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts || defaultValue,
   });
 }
 
@@ -113,7 +112,7 @@ export function buildConfig(providedUserConfig) {
 
   let currentArg;
 
-  process.argv.forEach((val) => {
+  process.argv.forEach(val => {
     if (val[0] === '-') {
       currentArg = val.slice(1);
       return;

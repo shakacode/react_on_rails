@@ -55,11 +55,16 @@ export function resetForTest() {
 }
 
 export function readRenderingRequest(projectName, commit, requestDumpFileName) {
-  const renderingRequestRelativePath = path.join('./fixtures/projects/', projectName, commit, requestDumpFileName);
+  const renderingRequestRelativePath = path.join(
+    './fixtures/projects/',
+    projectName,
+    commit,
+    requestDumpFileName,
+  );
   return fs.readFileSync(path.resolve(__dirname, renderingRequestRelativePath), 'utf8');
 }
 
-export const createResponse = (validate) => {
+export const createResponse = validate => {
   const result = {
     headers: {},
     data: '',
@@ -70,8 +75,10 @@ export const createResponse = (validate) => {
     set: (key, value) => {
       result.headers[key] = value;
     },
-    status: (value) => { result.status = value; },
-    send: (data) => {
+    status: value => {
+      result.status = value;
+    },
+    send: data => {
       result.data = data;
       validate(result);
     },

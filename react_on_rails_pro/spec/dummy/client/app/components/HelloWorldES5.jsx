@@ -28,17 +28,10 @@ const HelloWorldES5 = createReactClass({
 
     return (
       <div>
-        <h3>
-          Hello ES5, {name}!
-        </h3>
+        <h3>Hello ES5, {name}!</h3>
         <p>
           Say hello to:
-          <input
-            type="text"
-            ref={this.setNameDomRef}
-            defaultValue={name}
-            onChange={this.handleChange}
-          />
+          <input type="text" ref={this.setNameDomRef} defaultValue={name} onChange={this.handleChange} />
         </p>
       </div>
     );

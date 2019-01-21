@@ -5,7 +5,6 @@
  * @module worker/authHandler
  */
 
-
 const { getConfig } = require('../shared/configBuilder');
 
 /**
