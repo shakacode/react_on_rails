@@ -24,17 +24,14 @@
     "type": "git",
     "url": "https://github.com/shakacode/react_on_rails.git"
   },
-  "keywords": [
-    "react",
-    "rails",
-    "server",
-    "rendering"
-  ],
+  "keywords": ["react", "rails", "server", "rendering"],
   "author": "justin808",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "yalc": "^1.0.0-pre.27"
+  },
   "dependencies": {}
 }

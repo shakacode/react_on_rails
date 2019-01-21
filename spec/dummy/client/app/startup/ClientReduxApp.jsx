@@ -6,8 +6,8 @@ import React from 'react';
 import { combineReducers, applyMiddleware, createStore } from 'redux';
 import { Provider } from 'react-redux';
 import thunkMiddleware from 'redux-thunk';
-import { AppContainer } from "react-hot-loader";
-import { render } from "react-dom";
+import { AppContainer } from 'react-hot-loader';
+import { render } from 'react-dom';
 
 import reducers from '../reducers/reducersIndex';
 import composeInitialState from '../store/composeInitialState';
@@ -33,16 +33,16 @@ export default (props, railsContext, domNodeId) => {
 
   // Provider uses this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
-  const renderApp = (Komponent) => {
+  const renderApp = Komponent => {
     const element = (
       <AppContainer>
         <Provider store={store}>
           <Komponent />
         </Provider>
       </AppContainer>
-    )
+    );
     render(element, document.getElementById(domNodeId));
-  }
+  };
 
   renderApp(HelloWorldContainer);
 
@@ -50,6 +50,6 @@ export default (props, railsContext, domNodeId) => {
     module.hot.accept(['../reducers/reducersIndex', '../components/HelloWorldContainer'], () => {
       store.replaceReducer(combineReducers(reducers));
       renderApp(HelloWorldContainer);
-    })
+    });
   }
 };

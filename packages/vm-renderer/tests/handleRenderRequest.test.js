@@ -93,38 +93,34 @@ test('If lockfile exists, and is stale', async () => {
   expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, './tmp/1495063024898.js'));
 });
 
-test(
-  'If lockfile exists from another thread and bundle provided.',
-  async () => {
-    expect.assertions(2);
-    resetForTest();
-    createUploadedBundle();
+test('If lockfile exists from another thread and bundle provided.', async () => {
+  expect.assertions(2);
+  resetForTest();
+  createUploadedBundle();
 
-    const lockfileOptions = { pollPeriod: 100, stale: 10000 };
-    lockfile.lockSync(lockfilePath(), lockfileOptions);
+  const lockfileOptions = { pollPeriod: 100, stale: 10000 };
+  lockfile.lockSync(lockfilePath(), lockfileOptions);
 
-    sleep(5).then(() => {
-      console.log('TEST building VM from sleep');
-      createVmBundle().then(() => {
-        console.log('TEST DONE building VM from sleep');
-        lockfile.unlock(lockfilePath(), (err) => {
-          console.log('TEST unlocked lockfile', err);
-        });
+  sleep(5).then(() => {
+    console.log('TEST building VM from sleep');
+    createVmBundle().then(() => {
+      console.log('TEST DONE building VM from sleep');
+      lockfile.unlock(lockfilePath(), err => {
+        console.log('TEST unlocked lockfile', err);
       });
     });
+  });
 
-    const result = await handleRenderRequest({
-      renderingRequest: 'ReactOnRails.dummy',
-      bundleTimestamp: BUNDLE_TIMESTAMP,
-      providedNewBundle: { file: uploadedBundlePath() },
-    });
+  const result = await handleRenderRequest({
+    renderingRequest: 'ReactOnRails.dummy',
+    bundleTimestamp: BUNDLE_TIMESTAMP,
+    providedNewBundle: { file: uploadedBundlePath() },
+  });
 
-    expect(result).toEqual({
-      status: 200,
-      headers: { 'Cache-Control': 'public, max-age=31536000' },
-      data: { html: 'Dummy Object' },
-    });
-    expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, './tmp/1495063024898.js'));
-  },
-);
-
+  expect(result).toEqual({
+    status: 200,
+    headers: { 'Cache-Control': 'public, max-age=31536000' },
+    data: { html: 'Dummy Object' },
+  });
+  expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, './tmp/1495063024898.js'));
+});

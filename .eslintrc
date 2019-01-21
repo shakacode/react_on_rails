@@ -1,5 +1,8 @@
 ---
-extends: eslint-config-shakacode
+extends:
+  - eslint-config-shakacode
+  - prettier
+  - prettier/react
 
 globals:
   __DEBUG_SERVER_ERRORS__: true
@@ -7,6 +10,7 @@ globals:
 
 plugins:
   - jest
+  - prettier
 env:
   browser: true
   node: true
@@ -23,3 +27,6 @@ rules:
   jest/no-identical-title: "error"
   jest/prefer-to-have-length: "warn"
   jest/valid-expect: "error"
+
+  # incompatible with prettier
+  no-mixed-operators: 0

@@ -41,11 +41,11 @@ function replayVmConsole() {
   if (log.level !== 'debug') return;
   const consoleHistoryFromVM = vm.runInContext('console.history', context);
 
-  consoleHistoryFromVM.forEach((msg) => {
+  consoleHistoryFromVM.forEach(msg => {
     const stringifiedList = msg.arguments.map(arg => {
       let val;
       try {
-        val = (typeof arg === 'string' || arg instanceof String) ? arg : JSON.stringify(arg);
+        val = typeof arg === 'string' || arg instanceof String ? arg : JSON.stringify(arg);
       } catch (e) {
         val = `${e.message}: ${arg}`;
       }
@@ -74,7 +74,8 @@ export async function buildVM(filePath) {
     vm.runInContext('global = this', context);
 
     // Reimplement console methods for replaying on the client:
-    vm.runInContext(`
+    vm.runInContext(
+      `
     console = { history: [] };
     ['error', 'log', 'info', 'warn'].forEach(function (level) {
       console[level] = function () {
@@ -84,10 +85,13 @@ export async function buildVM(filePath) {
         }
         console.history.push({level: level, arguments: argArray});
       };
-    });`, context);
+    });`,
+      context,
+    );
 
     // Define global getStackTrace() function:
-    vm.runInContext(`
+    vm.runInContext(
+      `
     function getStackTrace() {
       var stack;
       try {
@@ -98,18 +102,14 @@ export async function buildVM(filePath) {
       }
       stack = stack.split('\\n').map(function (line) { return line.trim(); });
       return stack.splice(stack[0] == 'Error' ? 2 : 1);
-    }`, context);
+    }`,
+      context,
+    );
 
     // Define timer polyfills:
-    vm.runInContext(
-      `function setInterval() { ${undefinedForExecLogging('setInterval')} }`,
-      context,
-    );
+    vm.runInContext(`function setInterval() { ${undefinedForExecLogging('setInterval')} }`, context);
     vm.runInContext(`function setTimeout() { ${undefinedForExecLogging('setTimeout')} }`, context);
-    vm.runInContext(
-      `function clearTimeout() { ${undefinedForExecLogging('clearTimeout')} }`,
-      context,
-    );
+    vm.runInContext(`function clearTimeout() { ${undefinedForExecLogging('clearTimeout')} }`, context);
 
     // Run bundle code in created context:
     const bundleContents = await readFileAsync(filePath, 'utf8');

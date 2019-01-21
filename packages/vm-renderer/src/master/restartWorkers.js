@@ -12,7 +12,7 @@ module.exports = function restartWorkers(delayBetweenIndividualWorkerRestarts) {
   log.info('Started scheduled restart of workers');
 
   let delay = 0;
-  Object.keys(cluster.workers).forEach((id) => {
+  Object.keys(cluster.workers).forEach(id => {
     const worker = cluster.workers[id];
     const killWorker = () => {
       log.debug('Kill worker #%d', worker.id);

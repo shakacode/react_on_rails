@@ -74,12 +74,13 @@ export default function run(config) {
 
     try {
       handleRenderRequest({ renderingRequest, bundleTimestamp, providedNewBundle })
-        .then((result) => {
+        .then(result => {
           setResponse(result, res);
         })
-        .catch((err) => {
+        .catch(err => {
           const exceptionMessage = formatExceptionMessage(
-            renderingRequest, err,
+            renderingRequest,
+            err,
             'UNHANDLED error in handleRenderRequest',
           );
           log.error(exceptionMessage);

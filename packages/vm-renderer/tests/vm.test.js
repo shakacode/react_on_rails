@@ -1,10 +1,5 @@
 import path from 'path';
-import {
-  uploadedBundlePath,
-  createUploadedBundle,
-  readRenderingRequest,
-  createVmBundle,
-} from './helper';
+import { uploadedBundlePath, createUploadedBundle, readRenderingRequest, createVmBundle } from './helper';
 import { buildVM, runInVM, getVmBundleFilePath, resetVM } from '../src/worker/vm';
 
 test('buildVM and runInVM', async () => {
@@ -69,9 +64,9 @@ test('Captured exceptions for a long message', async () => {
   createUploadedBundle();
   await buildVM(uploadedBundlePath());
   // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
-  const code = `process.exit()${
-    '\n// 1234567890123456789012345678901234567890'.repeat(50)
-  }\n// Finishing Comment`;
+  const code = `process.exit()${'\n// 1234567890123456789012345678901234567890'.repeat(
+    50,
+  )}\n// Finishing Comment`;
   const { exceptionMessage } = await runInVM(code);
   expect(exceptionMessage.match(/process is not defined/)).toBeTruthy();
   expect(exceptionMessage.match(/process.exit/)).toBeTruthy();
@@ -119,29 +114,47 @@ test('FriendsAndGuests bundle for commit 1a7fe417', async () => {
   await buildVM(path.resolve(__dirname, './fixtures/projects/friendsandguests/1a7fe417/server-bundle.js'));
 
   // WelcomePage component:
-  const welcomePageComponentRenderingRequest = readRenderingRequest(project, commit, 'welcomePageRenderingRequest.js');
+  const welcomePageComponentRenderingRequest = readRenderingRequest(
+    project,
+    commit,
+    'welcomePageRenderingRequest.js',
+  );
   const welcomePageRenderingResult = await runInVM(welcomePageComponentRenderingRequest);
   expect(welcomePageRenderingResult.includes('data-react-checksum=\\"800299790\\"')).toBeTruthy();
 
   // LayoutNavbar component:
-  const layoutNavbarComponentRenderingRequest =
-    readRenderingRequest(project, commit, 'layoutNavbarRenderingRequest.js');
+  const layoutNavbarComponentRenderingRequest = readRenderingRequest(
+    project,
+    commit,
+    'layoutNavbarRenderingRequest.js',
+  );
   const layoutNavbarRenderingResult = await runInVM(layoutNavbarComponentRenderingRequest);
   expect(layoutNavbarRenderingResult.includes('data-react-checksum=\\"-667058792\\"')).toBeTruthy();
 
   // ListingIndex component:
-  const listingIndexComponentRenderingRequest =
-    readRenderingRequest(project, commit, 'listingIndexRenderingRequest.js');
+  const listingIndexComponentRenderingRequest = readRenderingRequest(
+    project,
+    commit,
+    'listingIndexRenderingRequest.js',
+  );
   const listingIndexRenderingResult = await runInVM(listingIndexComponentRenderingRequest);
   expect(listingIndexRenderingResult.includes('data-react-checksum=\\"452252439\\"')).toBeTruthy();
 
   // ListingShow component:
-  const listingShowComponentRenderingRequest = readRenderingRequest(project, commit, 'listingsShowRenderingRequest.js');
+  const listingShowComponentRenderingRequest = readRenderingRequest(
+    project,
+    commit,
+    'listingsShowRenderingRequest.js',
+  );
   const listingShowRenderingResult = await runInVM(listingShowComponentRenderingRequest);
   expect(listingShowRenderingResult.includes('data-react-checksum=\\"-324043796\\"')).toBeTruthy();
 
   // UserShow component:
-  const userShowComponentRenderingRequest = readRenderingRequest(project, commit, 'userShowRenderingRequest.js');
+  const userShowComponentRenderingRequest = readRenderingRequest(
+    project,
+    commit,
+    'userShowRenderingRequest.js',
+  );
   const userShowRenderingResult = await runInVM(userShowComponentRenderingRequest);
   expect(userShowRenderingResult.includes('data-react-checksum=\\"-1039690194\\"')).toBeTruthy();
 });
@@ -152,16 +165,25 @@ test('ReactWebpackRailsTutorial bundle for commit ec974491', async () => {
   const project = 'react-webpack-rails-tutorial';
   const commit = 'ec974491';
 
-  await buildVM(path.resolve(__dirname, './fixtures/projects/react-webpack-rails-tutorial/ec974491/server-bundle.js'));
+  await buildVM(
+    path.resolve(__dirname, './fixtures/projects/react-webpack-rails-tutorial/ec974491/server-bundle.js'),
+  );
 
   // NavigationBar component:
-  const navigationBarComponentRenderingRequest =
-    readRenderingRequest(project, commit, 'navigationBarAppRenderingRequest.js');
+  const navigationBarComponentRenderingRequest = readRenderingRequest(
+    project,
+    commit,
+    'navigationBarAppRenderingRequest.js',
+  );
   const navigationBarRenderingResult = await runInVM(navigationBarComponentRenderingRequest);
   expect(navigationBarRenderingResult.includes('data-react-checksum=\\"-472831860\\"')).toBeTruthy();
 
   // RouterApp component:
-  const routerAppComponentRenderingRequest = readRenderingRequest(project, commit, 'routerAppRenderingRequest.js');
+  const routerAppComponentRenderingRequest = readRenderingRequest(
+    project,
+    commit,
+    'routerAppRenderingRequest.js',
+  );
   const routerAppRenderingResult = await runInVM(routerAppComponentRenderingRequest);
   expect(routerAppRenderingResult.includes('data-react-checksum=\\"-1777286250\\"')).toBeTruthy();
 
@@ -180,7 +202,11 @@ test('BionicWorkshop bundle for commit fa6ccf6b', async () => {
   await buildVM(path.resolve(__dirname, './fixtures/projects/bionicworkshop/fa6ccf6b/server-bundle.js'));
 
   // SignIn page with flash component:
-  const signInPageWithFlashRenderingRequest = readRenderingRequest(project, commit, 'signInPageWithFlashRenderingRequest.js');
+  const signInPageWithFlashRenderingRequest = readRenderingRequest(
+    project,
+    commit,
+    'signInPageWithFlashRenderingRequest.js',
+  );
   const signInPageWithFlashRenderingResult = await runInVM(signInPageWithFlashRenderingRequest);
 
   // We don't put checksum here since it changes for every request with Rails auth token:

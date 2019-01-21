@@ -5,7 +5,6 @@ import css from './index.scss';
 
 // Super simple example of the simplest possible React component
 export default class HelloWorldRedux extends React.Component {
-
   static propTypes = {
     actions: PropTypes.object.isRequired,
     data: PropTypes.object.isRequired,
@@ -44,17 +43,10 @@ export default class HelloWorldRedux extends React.Component {
 
     return (
       <div>
-        <h3 className={css.greetings}>
-          Redux Hello, {name}!
-        </h3>
+        <h3 className={css.greetings}>Redux Hello, {name}!</h3>
         <p>
           With Redux, say hello to:
-          <input
-            type="text"
-            ref={this.setNameDomRef}
-            value={name}
-            onChange={this.handleChange}
-          />
+          <input type="text" ref={this.setNameDomRef} value={name} onChange={this.handleChange} />
         </p>
         <RailsContext {...{ railsContext }} />
       </div>

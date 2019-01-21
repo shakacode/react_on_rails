@@ -2,7 +2,13 @@ import request from 'supertest';
 import path from 'path';
 
 import worker from '../src/worker';
-import { BUNDLE_TIMESTAMP, createVmBundle, resetForTest, uploadedBundlePath, createUploadedBundle } from './helper';
+import {
+  BUNDLE_TIMESTAMP,
+  createVmBundle,
+  resetForTest,
+  uploadedBundlePath,
+  createUploadedBundle,
+} from './helper';
 
 // eslint-disable-next-line import/no-dynamic-require
 const packageJson = require(path.join(__dirname, '/../../../package.json'));
@@ -10,34 +16,30 @@ const packageJson = require(path.join(__dirname, '/../../../package.json'));
 const gemVersion = packageJson.version;
 const { protocolVersion } = packageJson;
 
-test(
-  'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
-  'when bundle is provided',
-  async done => {
-    expect.assertions(3);
+test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest when bundle is provided', async done => {
+  expect.assertions(3);
 
-    resetForTest();
-    createUploadedBundle();
+  resetForTest();
+  createUploadedBundle();
 
-    const app = worker({
-      bundlePath: path.resolve(__dirname, './tmp'),
+  const app = worker({
+    bundlePath: path.resolve(__dirname, './tmp'),
+  });
+
+  request(app)
+    .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+    .type('json')
+    .field('renderingRequest', 'ReactOnRails.dummy')
+    .field('gemVersion', gemVersion)
+    .field('protocolVersion', protocolVersion)
+    .attach('bundle', uploadedBundlePath())
+    .end((_err, res) => {
+      expect(res.headers['cache-control']).toBe('public, max-age=31536000');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ html: 'Dummy Object' });
+      done();
     });
-
-    request(app)
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
-      .type('json')
-      .field('renderingRequest', 'ReactOnRails.dummy')
-      .field('gemVersion', gemVersion)
-      .field('protocolVersion', protocolVersion)
-      .attach('bundle', uploadedBundlePath())
-      .end((_err, res) => {
-        expect(res.headers['cache-control']).toBe('public, max-age=31536000');
-        expect(res.status).toBe(200);
-        expect(res.body).toEqual({ html: 'Dummy Object' });
-        done();
-      });
-  },
-);
+});
 
 test(
   'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +

@@ -14,8 +14,6 @@ import EchoProps from '../components/EchoProps';
  *
  */
 export default (props, _railsContext) => {
-  const renderedHtml = renderToString(
-    <EchoProps {...props} />,
-  );
+  const renderedHtml = renderToString(<EchoProps {...props} />);
   return { renderedHtml };
 };
