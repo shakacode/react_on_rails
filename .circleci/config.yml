@@ -13,7 +13,7 @@ aliases:
              echo "Yarn version: "; yarn --version
   - &lint-js
     name: Linting of JS
-    command: yarn lint
+    command: yarn start lint
 
   - &lint-ruby
     name: Linting of Ruby
