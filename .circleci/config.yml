@@ -70,11 +70,11 @@ aliases:
     keys:
       - v3-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
 
-  # Restore vendor/bundle dir from cache using react_on_rails_pro.gemspec checksum as a key.
+  # Restore vendor/bundle dir from cache using react_on_rails.gemspec checksum as a key.
   - &restore-package-gem-cache
     name: Restore cached Ruby Gems for package
     keys:
-      - v3-package-app-gem-cache-{{ checksum "react_on_rails_pro.gemspec" }}
+      - v3-package-app-gem-cache-{{ checksum "react_on_rails.gemspec" }}
 
     # NOTE: Sometimes CI generated docker images are not updated in time to keep up with the minimum required
     # by chromedriver versions of Chrome. Just bump here Chrome version if chromedriver raises errors
@@ -156,7 +156,7 @@ jobs:
       - run: *install-package-ruby-gems
       - save_cache:
           name: Save dummy app ruby gems to cache
-          key: v3-package-app-gem-cache-{{ checksum "react_on_rails_pro.gemspec" }}
+          key: v3-package-app-gem-cache-{{ checksum "react_on_rails.gemspec" }}
           paths:
             - vendor/bundle
 
@@ -219,7 +219,7 @@ jobs:
       - run:
           name: Run rspec tests
           command: |
-            bundle exec rspec spec/react_on_rails_pro
+            bundle exec rspec spec/react_on_rails
       - store_test_results:
           path: ~/rspec
       - store_artifacts:

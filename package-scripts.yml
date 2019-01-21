@@ -68,4 +68,4 @@ scripts:
 
   check:
     description: Run all linters (eslint, flow), format checks, and JS tests
-    script: concurrently --prefix "[{name}]" --names "ESLINT,FLOW,TEST" -c "blue,yellow,green,magenta" "nps eslint" "nps flow" "nps test" "nps format.listDifferent"
+    script: concurrently --prefix "[{name}]" --names "ESLINT,FLOW,TEST,PRETTIER" -c "blue,yellow,green,magenta" "nps eslint" "nps flow" "nps test" "nps format.listDifferent"
