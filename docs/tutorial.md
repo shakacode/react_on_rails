@@ -243,7 +243,7 @@ end
 Then after all changes are done don't forget to commit them with git and finally you can push your app to Heroku!
 
 ```
-git add -a
+git add -A
 git commit -m "Changes for Heroku"
 git push heroku master
 ```
@@ -268,7 +268,7 @@ You can turn on server rendering by simply changing the `prerender` option to `t
 Then push to Heroku:
 
 ```
-git add -a
+git add -A
 git commit -m "Enable server rendering"
 git push heroku master
 ```
