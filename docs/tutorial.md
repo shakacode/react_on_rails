@@ -57,7 +57,7 @@ bundle exec rails webpacker:install
 bundle exec rails webpacker:install:react
 ```
 
-Add the **React On Rails** gem to your Gemfile:
+Add the **React On Rails** gem to your `Gemfile`:
 
 ```
 gem 'react_on_rails', '11.2.1'         # prefer exact gem version to match npm version
@@ -101,7 +101,7 @@ Note, foreman defaults to PORT 5000 unless you set the value of PORT in your env
 ## Using a pre-release of rails/webpacker
 Until `rails/webpacker` v4 ships, or if you ever want to try out the master branch, you can modify the React on Rails tutorial instructions slightly. You can see the sequence of commits here. To summarize:
 
-Don't `run rails new with the --webpack=react option`. Instead, add the webpacker gem to the Gemfile such that it points to master, like this if `11.2.1` is the version you want.
+**Don't run `rails new` with the `--webpack=react` option**. Instead, add the webpacker gem to the Gemfile such that it points to master, like this if `11.2.1` is the version you want.
 
 ```ruby
 gem 'webpacker', github: "rails/webpacker"
@@ -243,7 +243,7 @@ end
 Then after all changes are done don't forget to commit them with git and finally you can push your app to Heroku!
 
 ```
-git add -a
+git add -A
 git commit -m "Changes for Heroku"
 git push heroku master
 ```
@@ -268,7 +268,7 @@ You can turn on server rendering by simply changing the `prerender` option to `t
 Then push to Heroku:
 
 ```
-git add -a
+git add -A
 git commit -m "Enable server rendering"
 git push heroku master
 ```
