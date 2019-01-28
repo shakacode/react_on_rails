@@ -5,11 +5,11 @@
 const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const merge = require('webpack-merge');
 const { env } = require('process');
-const config = require('./webpack.client.base.config');
 const { resolve } = require('path');
 
 // Webpacker specific
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
+const config = require('./webpack.client.base.config');
 
 const configPath = resolve('..', 'config');
 const { output, settings } = webpackConfigLoader(configPath);
