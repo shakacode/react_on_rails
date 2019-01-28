@@ -16,3 +16,4 @@ node_package/webpack.config.js
 **/public/packs*/*
 packs/hello_react.jsx
 gen-examples/examples/**/app/javascript/packs/hello_react.jsx
+vendor/bundle

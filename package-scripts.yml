@@ -14,10 +14,10 @@ scripts:
       script: eslint . --ext ".js,.jsx"
     fix:
       description: Run eslint and auto-fix.
-      script: nps "eslint --fix"
+      script: nps "eslint . --fix"
     debug:
       description: Run eslint in debug mode.
-      script: DEBUG=eslint:cli-engine nps eslint
+      script: DEBUG=eslint:cli-engine nps eslint .
 
   format:
     default:
