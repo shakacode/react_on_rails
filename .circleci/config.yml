@@ -34,10 +34,6 @@ aliases:
     name: Install yarn link for react-on-rails-pro-vm-renderer
     command: yarn link
 
-  - &install-yarn-link-destination
-    name: Install yarn link for react-on-rails-pro-vm-renderer
-    command: cd spec/dummy/client && yarn link react-on-rails-pro-vm-renderer
-
   # Install ruby gems unless existing set of gems is satisfying bundler.
   - &install-dummy-app-ruby-gems
     name: Install Ruby Gems for dummy app
@@ -135,7 +131,6 @@ jobs:
     steps:
       - checkout
       - run: *print-system-info
-      - restore_cache: *restore-dummy-app-node-modules-cache
       - run: *install-yarn-link-source
       - run: *install-dummy-app-node-modules
       - save_cache:
