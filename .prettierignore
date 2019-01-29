@@ -4,4 +4,5 @@ tmp
 packages/vm-renderer/tests/tmp
 spec/dummy_no_webpacker/app/assets/webpack
 spec/dummy/public/webpack
+spec/react_on_rails/dummy-for-generators
 gen-examples/examples
