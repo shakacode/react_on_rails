@@ -26,3 +26,6 @@ rules:
 
   # Deprecated
   jsx-a11y/label-has-for: 0
+
+  # https://github.com/yannickcr/eslint-plugin-react/issues/1848
+  react/jsx-one-expression-per-line: 0
