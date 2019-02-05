@@ -7,7 +7,7 @@ Full writeup [here](./testimonials/hvmn.md).
 
 ---
 
-# [Leora from ResortPass](./testimonials/resortpass.md), December 10, 2018
+# [Leora from ResortPass](./resortpass.md), December 10, 2018
 
 Justin and his team were instrumental in assisting us in setting design foundations and standards for our transition to a react on rails application. Just three months of work with the team at Shaka code and we have a main page of our application server-side rendering at exponentially improved speeds. 
 
