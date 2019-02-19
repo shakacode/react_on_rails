@@ -1,9 +1,9 @@
 # Testimonials
-# [HVMN Testimonial, Written by Paul Benigeri, October 12, 2018](./testimonials/hvmn.md)
+# [HVMN Testimonial, Written by Paul Benigeri, October 12, 2018](./hvmn.md)
 
 > The price we paid for the consultation + the React on Rails pro license has already been made back a couple of times from hosting fees alone. The entire process was super hands off, and our core team was able to focus on shipping new feature during that sprint.
 
-Full writeup [here](./testimonials/hvmn.md).
+Full writeup [here](./hvmn.md).
 
 ---
 
