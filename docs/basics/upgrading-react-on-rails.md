@@ -5,11 +5,21 @@ If you would like help in migrating between React on Rails versions or help with
 
 We specialize in helping companies to quickly and efficiently move from versions before 9 to current. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4 for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
 
+## Upgrading rails/webpacker from v3 to v4
+### Custom Webpack build file
+The default value for `extract_css` is **false** in `config/webpack.yml`. Custom webpack builds should set this value to true or else no CSS link tags are generated. You have a custom webpack build if you are not using [rails/webpacker](https://github.com/rails/webpacker to setup your Webpack configuration.
+
+  ```yml
+  default: &default
+     # other stuff
+     extract_css: true
+     # by default, extract and emit a css file. The default is false
+  ```
+
 ## Upgrading to version 11
 * Remove `server_render_method` from config/initializers/react_on_rails.rb. Alternate server rendering methods are part of React on Rails Pro. If you want to use a custom renderer, contact justin@shakacode.com. We have a custom node rendering solution in production for egghead.io.
 * Remove your usage of ENV["TRACE_REACT_ON_RAILS"] usage. You can get all tracing with either specifying **`trace`** at your component or in your config/initializers/react_on_rails.rb file.
 * ReactOnRails::Utils.server_bundle_file_name and ReactOnRails::Utils.bundle_file_name were removed. React on Rails Pro contains upgrades to enable component and other types caching with React on Rails.
-
 
 ## Upgrading to version 10
 
