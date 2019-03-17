@@ -22,7 +22,9 @@ gem "sass-rails"
 gem "scss_lint", require: false
 gem "sdoc", group: :doc
 gem "spring"
-gem "sqlite3"
+
+# depends on Rails 6 to go to sqlite4
+gem "sqlite3", '~> 1.3.6'
 gem "turbolinks"
 gem "uglifier"
 gem "web-console", group: :development
