@@ -6,6 +6,8 @@ default: &default
   cache_manifest: false
   # souce_path is unused if using a custom configuration
   source_path: client
+  # The only time to not extract CSS is when running the dev server
+  extract_css: true
 
 development:
   <<: *default
@@ -16,6 +18,7 @@ development:
     host: localhost
     port: 3035
     hmr: true
+    extract_css: false
 
 test:
   <<: *default
