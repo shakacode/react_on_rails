@@ -22,7 +22,7 @@ gem "sass-rails"
 gem "scss_lint", require: false
 gem "sdoc", group: :doc
 gem "spring"
-gem "sqlite3"
+gem "sqlite3", "~> 1.3.6"
 gem "turbolinks"
 gem "uglifier"
 gem "web-console", group: :development
@@ -35,7 +35,7 @@ gem "launchy"
 gem "rspec-rails"
 gem "rspec-retry"
 gem "selenium-webdriver"
-gem "webpacker"
+gem "webpacker", ">= 4.0.0"
 
 gem "equivalent-xml", github: "mbklein/equivalent-xml"
 gem "rainbow"
