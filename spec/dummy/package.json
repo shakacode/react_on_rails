@@ -1,36 +1,54 @@
 {
   "name": "react_on_rails",
   "description": "example of server rendering",
-  "main": "server.js",
-  "scripts": {
-    "postinstall": "cd ./client && yarn install",
-    "test": "yarn run build:test && yarn run lint && rspec",
-    "lint": "cd client && yarn run lint",
-    "build:clean": "rm -rf public/webpack || true",
-    "build:test": "(cd client && yarn run build:test)",
-    "build:production:client": "(cd client && yarn run build:production:client)",
-    "build:production:server": "(cd client && yarn run build:production:server)",
-    "build:client": "(cd client && yarn run build:client)",
-    "build:server": "(cd client && yarn run build:server)",
-    "build:dev:client": "(cd client && yarn run build:dev:client)",
-    "build:dev:server": "(cd client && yarn run build:dev:server)",
-    "hot-assets": "(cd client && yarn run hot-assets)"
-  },
   "repository": {
     "type": "git",
     "url": "https://github.com/shakacode/react_on_rails.git"
   },
-  "keywords": [
-    "react",
-    "rails",
-    "server",
-    "rendering"
-  ],
-  "author": "justin808",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/shakacode/react_on_rails/issues"
+  "main": "js/app.js",
+  "dependencies": {
+    "@babel/preset-react": "^7.0.0",
+    "@rails/webpacker": "^4.0.2",
+    "babel-plugin-module-resolver": "^3.2.0",
+    "babel-plugin-transform-react-remove-prop-types": "^0.4.24",
+    "history": "^4.6.3",
+    "lodash": "^4.17.4",
+    "nps": "^5.9.3",
+    "prop-types": "^15.6.2",
+    "react": "^16.5.2",
+    "react-dom": "^16.5.2",
+    "react-helmet": "^5.1.3",
+    "react-on-rails": "11.2.2",
+    "react-proptypes": "^1.0.0",
+    "react-redux": "^5.0.5",
+    "react-router": "^3.2.1",
+    "redux": "^4.0.1",
+    "redux-thunk": "^2.2.0",
+    "sass-resources-loader": "^2.0.0",
+    "webpack-merge": "^4.1.5"
   },
-  "devDependencies": {},
-  "dependencies": {}
+  "devDependencies": {
+    "eslint": "^5.7.0",
+    "eslint-config-prettier": "^3.1.0",
+    "eslint-config-shakacode": "^16.0.1",
+    "eslint-plugin-import": "^2.2.0",
+    "eslint-plugin-jsx-a11y": "^6.1.2",
+    "eslint-plugin-react": "^7.11.1",
+    "fbjs": "^1.0.0",
+    "jsdom": "^12.2.0",
+    "prettier": "^1.14.3",
+    "prettier-eslint-cli": "^4.7.1",
+    "tape": "^4.7.0",
+    "webpack-dev-server": "^3.2.1"
+  },
+  "browser": {
+    "fs": false
+  },
+  "scripts": {
+    "postinstall": "yarn link react-on-rails",
+    "lint": "cd client && yarn run lint",
+    "test": "yarn run build:test && yarn run lint && rspec",
+    "build:test": "yarn run build:test:client && yarn run build:test:server",
+    "build:clean": "rm -rf public/webpack || true"
+  }
 }

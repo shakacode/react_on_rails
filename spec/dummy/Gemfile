@@ -6,7 +6,7 @@ eval_gemfile File.expand_path("../../react_on_rails.gemspec", __dir__)
 
 gem "react_on_rails", path: "../.."
 
-gem "webpacker"
+gem "webpacker", ">= 4.0.0"
 
 gem "bootsnap", ">= 1.1.0", require: false
 gem "rails"
