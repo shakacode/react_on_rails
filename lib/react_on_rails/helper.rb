@@ -15,7 +15,7 @@ module ReactOnRails
   module Helper
     include ReactOnRails::Utils::Required
 
-    COMPONENT_HTML_KEY = "componentHtml".freeze
+    COMPONENT_HTML_KEY = "componentHtml"
 
     # The env_javascript_include_tag and env_stylesheet_link_tag support the usage of a webpack
     # dev server for providing the JS and CSS assets during development mode. See
@@ -258,9 +258,9 @@ module ReactOnRails
       html = result["html"]
       console_log_script = result["consoleLogScript"]
       raw("#{html}#{render_options.replay_console ? console_log_script : ''}")
-    rescue ExecJS::ProgramError => err
+    rescue ExecJS::ProgramError => e
       raise ReactOnRails::PrerenderError, component_name: "N/A (server_render_js called)",
-                                          err: err,
+                                          err: e,
                                           js_code: js_code
     end
 
@@ -395,13 +395,11 @@ module ReactOnRails
 
     def compose_react_component_html_with_spec_and_console(component_specification_tag, rendered_output, console_script)
       # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
-      # rubocop:disable Layout/IndentHeredoc
-      <<-HTML.html_safe
-#{rendered_output}
-      #{component_specification_tag}
-      #{console_script}
+      <<~HTML.html_safe
+        #{rendered_output}
+              #{component_specification_tag}
+              #{console_script}
       HTML
-      # rubocop:enable Layout/IndentHeredoc
     end
 
     # prepend the rails_context if not yet applied
@@ -502,12 +500,12 @@ module ReactOnRails
 
       begin
         result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(js_code, render_options)
-      rescue StandardError => err
+      rescue StandardError => e
         # This error came from the renderer
         raise ReactOnRails::PrerenderError, component_name: react_component_name,
                                             # Sanitize as this might be browser logged
                                             props: sanitized_props_string(props),
-                                            err: err,
+                                            err: e,
                                             js_code: js_code
       end
 

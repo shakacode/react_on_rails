@@ -9,13 +9,12 @@
 
   <%= yield :head %>
 
-  <%= stylesheet_pack_tag('app-bundle',
+  <%= stylesheet_pack_tag('clientRegistration',
                           media: 'all',
                           'data-turbolinks-track': true) %>
 
   <!--  NOTE: Must use defer and not async to keep async scripts loading in correct order  -->
-  <%= javascript_pack_tag('vendor-bundle', 'data-turbolinks-track': true, defer: true) %>
-  <%= javascript_pack_tag('app-bundle', 'data-turbolinks-track': true, defer: true) %>
+  <%= javascript_packs_with_chunks_tag('clientRegistration', 'vendor-bundle', 'data-turbolinks-track': true, defer: true) %>
 
   <%= csrf_meta_tags %>
 </head>

@@ -60,7 +60,7 @@ bundle exec rails webpacker:install:react
 Add the **React On Rails** gem to your `Gemfile`:
 
 ```
-gem 'react_on_rails', '11.2.1'         # prefer exact gem version to match npm version
+gem 'react_on_rails', '11.2.2'         # prefer exact gem version to match npm version
 ```
 
 Note: Latest released React On Rails version is considered stable. Please use the latest version to ensure you get all the security patches and the best support.

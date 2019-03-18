@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 RSpec.configure do |config|
   config.after(:each, :js) do |example|
     next unless %i[selenium_chrome selenium_chrome_headless].include?(Capybara.current_driver)
@@ -21,6 +23,8 @@ RSpec.configure do |config|
       log_only_list.include?(entry.level) ? puts(entry.message) : errors << entry.message
     end
 
-    raise("Java Script Error(s) on the page:\n\n" + errors.join("\n")) if errors.present?
+    # We may skip componentWillReceiveProps & componentWillUpdate deprecation warning for now.
+    raise("Java Script Error(s) on the page:\n\n" + errors.join("\n")) if errors.present? &&
+                                                                          !errors.all? { |e| e.match?("Warning") }
   end
 end
