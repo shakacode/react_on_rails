@@ -30,7 +30,9 @@ module DriverRegistration
 
     Capybara.register_driver :selenium_chrome_headless do |app|
       capabilities = Selenium::WebDriver::Remote::Capabilities.chrome(chromeOptions: { args: %w[headless disable-gpu] })
-      Capybara::Selenium::Driver.new app, browser: :chrome, desired_capabilities: capabilities
+      client = Selenium::WebDriver::Remote::Http::Default.new
+      client.timeout = 250
+      Capybara::Selenium::Driver.new app, browser: :chrome, desired_capabilities: capabilities, http_client: client
     end
     Capybara::Screenshot.register_driver(:selenium_chrome_headless) do |js_driver, path|
       js_driver.browser.save_screenshot(path)

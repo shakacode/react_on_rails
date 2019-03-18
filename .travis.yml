@@ -38,7 +38,7 @@ before_install:
 
 install:
   - travis_retry gem install bundler -v '<2' # Ruby 2.2 and Rails 3.2 & 4.2 depend on bundler 1.x.
-  - travis_retry nvm install 8.11.3
+  - travis_retry nvm install 8.16.0
   - node -v
   - travis_retry npm i -g yarn
   - travis_retry bundle install

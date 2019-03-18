@@ -4,9 +4,9 @@ require_relative "../spec_helper"
 require_relative "../simplecov_helper"
 require "generator_spec/test_case"
 
-Dir[File.expand_path("../support/shared_examples", __dir__) + "/*.rb"].each { |file| require file }
+Dir[File.expand_path("../support/shared_examples", __dir__) + "/*.rb"].sort.each { |file| require file }
 generators_glob = File.expand_path("../../../lib/generators/react_on_rails/*_generator.rb", __dir__)
-Dir[generators_glob.to_s].each { |file| require file }
+Dir[generators_glob.to_s].sort.each { |file| require file }
 include ReactOnRails::Generators # rubocop:disable Style/MixinUsage
 
 RSpec.configure do |config|
