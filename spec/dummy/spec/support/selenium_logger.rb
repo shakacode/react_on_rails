@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 RSpec.configure do |config|
   config.after(:each, :js) do |example|
     next unless %i[selenium_chrome selenium_chrome_headless].include?(Capybara.current_driver)

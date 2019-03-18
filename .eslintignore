@@ -14,3 +14,4 @@ node_package/webpack.config.js
 **/coverage/**
 **/cable.js
 **/public/packs*/*
+gen-examples

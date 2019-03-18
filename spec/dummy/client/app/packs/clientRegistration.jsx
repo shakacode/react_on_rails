@@ -4,34 +4,34 @@ import 'es5-shim';
 import ReactOnRails from 'react-on-rails';
 
 import HelloWorld from '../components/HelloWorld';
+
 import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 import HelloWorldES5 from '../components/HelloWorldES5';
 import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
-import HelloWorldApp from './HelloWorldApp';
-import BrokenApp from './BrokenApp';
+import HelloWorldApp from '../startup/HelloWorldApp';
+import BrokenApp from '../startup/BrokenApp';
 
-import ReduxApp from './ClientReduxApp';
-import ReduxSharedStoreApp from './ClientReduxSharedStoreApp';
-import RouterApp from './ClientRouterApp';
+import ReduxApp from '../startup/ClientReduxApp';
+import ReduxSharedStoreApp from '../startup/ClientReduxSharedStoreApp';
+import RouterApp from '../startup/ClientRouterApp';
 import PureComponent from '../components/PureComponent';
 import CacheDisabled from '../components/CacheDisabled';
 import CssModulesImagesFontsExample from '../components/CssModulesImagesFontsExample';
-import ManualRenderApp from './ManualRenderAppRenderer';
-import DeferredRenderApp from './DeferredRenderAppClient';
+import ManualRenderApp from '../startup/ManualRenderAppRenderer';
+import DeferredRenderApp from '../startup/DeferredRenderAppClient';
 
 import SharedReduxStore from '../stores/SharedReduxStore';
 
 // Deferred render on the client side w/ server render
-import RenderedHtml from './ClientRenderedHtml';
+import RenderedHtml from '../startup/ClientRenderedHtml';
 
 // Deferred render on the client side w/ server render with additional HTML strings:
-import ReactHelmetApp from './ReactHelmetClientApp';
+import ReactHelmetApp from '../startup/ReactHelmetClientApp';
 
 // Demonstrate using Images
 import ImageExample from '../components/ImageExample';
 
-import SetTimeoutLoggingApp from './SetTimeoutLoggingApp';
-
+import SetTimeoutLoggingApp from '../startup/SetTimeoutLoggingApp';
 ReactOnRails.setOptions({
   traceTurbolinks: true,
 });
