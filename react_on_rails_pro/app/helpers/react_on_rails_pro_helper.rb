@@ -33,18 +33,20 @@ module ReactOnRailsProHelper
   end
 
   # Provide caching support for react_component_hash in a manner akin to Rails fragment caching.
-  # All the same options as react_component apply with the following difference:
+  # All the same options as react_component_hash apply with the following difference:
   #
   # 1. You must pass the props as a block. This is so that the evaluation of the props is not done
   #    if the cache can be used.
   # 2. Provide the cache_key option
   #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys.
-  #    If prerender is set to true, the server bundle digest will be included in the cache key.
+  #    Since prerender is automatically set to true, the server bundle digest will be included in the cache key.
   #    The cache_key value is the same as used for conventional Rails fragment caching.
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
   # 4. Provide boolean values for `:if` or `:unless` to conditionally use caching.
   def cached_react_component_hash(component_name, raw_options = {}, &block)
+    raw_options[:prerender] = true
+
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
 

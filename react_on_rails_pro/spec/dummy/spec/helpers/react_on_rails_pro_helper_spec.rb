@@ -124,41 +124,32 @@ describe ReactOnRailsProHelper, type: :helper do
       end
 
       describe "ReactOnRailsProHelper.cached_react_component_hash" do
-        context "with prerender" do
-          it "caches the content" do
-            props = { helloWorldData: { name: "Mr. Server Side Rendering" } }
+        it "caches the content" do
+          props = { helloWorldData: { name: "Mr. Server Side Rendering" } }
 
-            cached_react_component_hash("ReactHelmetApp", cache_key: "cache-key", prerender: true) do
-              props
-            end
-
-            expect(cache_data.keys[0]).to match(%r{#{base_js_eval_cache_key}/})
-            expect(cache_data.keys[1]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
-            expect(cache_data.values[0].value.keys).to match_array(%w[html consoleReplayScript hasErrors])
-            expect(cache_data.values[1].value["componentHtml"]).to match(/div id="ReactHelmetApp-react-component"/)
+          cached_react_component_hash("ReactHelmetApp", cache_key: "cache-key") do
+            props
           end
+
+          expect(cache_data.keys[0]).to match(%r{#{base_js_eval_cache_key}/})
+          expect(cache_data.keys[1]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
+          expect(cache_data.values[0].value.keys).to match_array(%w[html consoleReplayScript hasErrors])
+          expect(cache_data.values[1].value["componentHtml"]).to match(/div id="ReactHelmetApp-react-component"/)
         end
 
-        context "without prerender" do
+        context "with prerender_caching off" do
           before { ReactOnRailsPro.configuration.prerender_caching = false }
           after { ReactOnRailsPro.configuration.prerender_caching = true }
 
           it "caches the content" do
             props = { helloWorldData: { name: "Mr. Server Side Rendering" } }
 
-            cached_react_component_hash("ReactHelmetApp", cache_key: "cache-key", prerender: false) do
+            cached_react_component_hash("ReactHelmetApp", cache_key: "cache-key") do
               props
             end
 
-            expect(cache_data.keys[0]).to match(%r{#{base_cache_key_without_prerender}/ReactHelmetApp/cache-key})
+            expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
             expect(cache_data.values[0].value["componentHtml"]).to match(/div id="ReactHelmetApp-react-component"/)
-          end
-
-          context "without 'cache'", :caching do
-            it "doesn't caches the content" do
-              react_component("App", prerender: true)
-              expect(cache_data.keys).to be_empty
-            end
           end
         end
       end
