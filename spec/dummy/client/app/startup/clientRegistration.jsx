@@ -57,7 +57,6 @@ ReactOnRails.register({
   ReactHelmetApp,
   ImageExample,
   SetTimeoutLoggingApp,
-  Com,
   ComponentWithHook
 });
 

@@ -22,6 +22,8 @@ export default {
       const isGeneratorFunction = generatorFunction(component);
       const isRenderer = isGeneratorFunction && component.length === 3;
 
+      // TODO: Add error check here and suggest wrap component into fuction
+
       registeredComponents.set(name, {
         name,
         component,
