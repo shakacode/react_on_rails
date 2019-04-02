@@ -38,4 +38,5 @@ Rails.application.routes.draw do
   get "broken_app" => "pages#broken_app"
   get "image_example" => "pages#image_example"
   get "server_render_with_timeout" => "pages#server_render_with_timeout"
+  get "component_with_hook" =>  "pages#component_with_hook"
 end

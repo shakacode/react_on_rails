@@ -255,6 +255,21 @@ feature "display images", :js, type: :system do
   end
 end
 
+feature "component with hook", :js, type: :system  do
+  subject { page }
+  background { visit "/component_with_hook" }
+
+  scenario "it render clickable component" do
+    expect(subject).to have_text 'You clicked 0 times'
+
+    click_link 'Click me'
+    expect(subject).to have_text 'You clicked 1 times'
+
+    click_link 'Click me'
+    expect(subject).to have_text 'You clicked 2 times'
+  end
+end
+
 shared_examples "React Component Shared Store" do |url|
   subject { page }
   background { visit url }

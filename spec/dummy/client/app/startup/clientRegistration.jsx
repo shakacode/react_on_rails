@@ -32,6 +32,8 @@ import ImageExample from '../components/ImageExample';
 
 import SetTimeoutLoggingApp from './SetTimeoutLoggingApp';
 
+import ComponentWithHook from '../components/ComponentWithHook';
+
 ReactOnRails.setOptions({
   traceTurbolinks: true,
 });
@@ -55,6 +57,8 @@ ReactOnRails.register({
   ReactHelmetApp,
   ImageExample,
   SetTimeoutLoggingApp,
+  Com,
+  ComponentWithHook
 });
 
 ReactOnRails.registerStore({
