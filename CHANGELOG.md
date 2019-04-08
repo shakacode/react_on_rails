@@ -15,6 +15,9 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+### [11.2.3] - 2019-04-08
+#### Improved
+- html_options can now has option for 'tag' to add dynamically html element. like this : html_options{tag:'span'}.
 
 ### [11.2.2] - 2018-12-24
 #### Improved
