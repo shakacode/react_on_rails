@@ -6,6 +6,8 @@
 # Also see example_type.rb
 
 require "yaml"
+require 'rails/version'
+
 require_relative "example_type"
 require_relative "task_helpers"
 
@@ -28,6 +30,7 @@ namespace :examples do # rubocop:disable Metrics/BlockLength
     desc "Generates #{example_type.name_pretty}"
     task example_type.gen_task_name_short => example_type.clobber_task_name do
       mkdir_p(example_type.dir)
+      example_type.rails_options += " --webpack" if Rails.version >= "5.1" && Rails.version < "6"
       sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options}")
       sh_in_dir(example_type.dir, "touch .gitignore")
       sh_in_dir(example_type.dir, "rake webpacker:install")
