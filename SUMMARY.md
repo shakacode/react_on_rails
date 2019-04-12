@@ -41,7 +41,7 @@
   + [Babel](./docs/additional-reading/babel.md)
   + [React Router](./docs/additional-reading/react-router.md)
   + [React & Redux](./docs/additional-reading/react-and-redux.md)
-  + [Webpack Tips](./docs/additional-reading/webpack-tips.md)
+  + [Webpack Tips](./docs/additional-reading/webpack.md)
   + [Server Rendering Tips](./docs/additional-reading/server-rendering-tips.md)
   + [Code Splitting](docs/misc-pending/code-splitting.md)
   + [AngularJS Integration and Migration to React on Rails](./docs/additional-reading/angular-js-integration-migration.md)
