@@ -243,17 +243,10 @@ describe ReactOnRailsHelper, type: :helper do
       end
     end
 
-    context "with 'html_option' tag option" do
+    context "with 'html_options' tag option" do
       subject { react_component("App", html_options: {tag:'span'}) }
 
-      let(:react_definition_script) do
-        <<-SCRIPT.strip_heredoc
-          <script type="application/json" class="js-react-on-rails-component" data-component-name="App" data-dom-id="App-react-component"></script>
-        SCRIPT
-      end
-
-      it { is_expected.to include '<span id="App-react-component"></span>' }
-      it { expect(is_expected.target).to script_tag_be_included(react_definition_script) }
+      it { is_expected.to include 'span' }
     end
   end
 
