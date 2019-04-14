@@ -248,6 +248,12 @@ describe ReactOnRailsHelper, type: :helper do
 
       it { is_expected.to include "span" }
     end
+
+    context "without 'html_options' tag option" do
+      subject { react_component("App") }
+
+      it { is_expected.to include "div" }
+    end
   end
 
   describe "#redux_store" do
