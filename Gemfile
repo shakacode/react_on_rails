@@ -30,10 +30,10 @@ gem "web-console", group: :development
 # below are copied from spec/dummy/Gemfile
 gem "capybara"
 gem "capybara-screenshot"
-gem "chromedriver-helper"
 gem "launchy"
 gem "rspec-rails"
 gem "rspec-retry"
+gem "webdrivers", "~> 3.0"
 gem "selenium-webdriver"
 gem "webpacker"
 

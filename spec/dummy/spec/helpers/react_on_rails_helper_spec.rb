@@ -244,9 +244,9 @@ describe ReactOnRailsHelper, type: :helper do
     end
 
     context "with 'html_options' tag option" do
-      subject { react_component("App", html_options: {tag:'span'}) }
+      subject { react_component("App", html_options: { tag: "span" }) }
 
-      it { is_expected.to include 'span' }
+      it { is_expected.to include "span" }
     end
   end
 

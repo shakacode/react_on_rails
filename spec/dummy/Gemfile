@@ -67,11 +67,11 @@ group :test do
   gem "coveralls", require: false
   # install trouble with updated
   # gem "capybara-webkit"
-  gem 'webdrivers', '~> 3.0'
   gem "equivalent-xml", github: "mbklein/equivalent-xml"
   gem "generator_spec"
   gem "launchy"
   gem "rspec-rails"
   gem "rspec-retry"
+  gem "webdrivers", "~> 3.0"
   gem "selenium-webdriver"
 end
