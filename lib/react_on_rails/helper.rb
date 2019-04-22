@@ -347,7 +347,7 @@ module ReactOnRails
       end
       content_tag_options[:id] = render_options.dom_id
 
-      rendered_output = content_tag(:"#{content_tag_options_html_tag}",
+      rendered_output = content_tag(content_tag_options_html_tag.to_sym,
                                     server_rendered_html.html_safe,
                                     content_tag_options)
 
