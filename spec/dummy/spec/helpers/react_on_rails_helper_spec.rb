@@ -246,15 +246,15 @@ describe ReactOnRailsHelper, type: :helper do
     context "with 'html_options' tag option" do
       subject { react_component("App", html_options: { tag: "span" }) }
 
-      it { is_expected.to have_tag('span', :with => {:id=>"App-react-component-0"}) }
-      it { is_expected.not_to have_tag('div', :with => {:id=>"App-react-component-0"}) }
+      it { is_expected.to include '<span id="App-react-component-0"></span>' }
+      it { is_expected.not_to include '<div id="App-react-component-0"></div>' }
     end
 
     context "without 'html_options' tag option" do
       subject { react_component("App") }
 
-      it { is_expected.to have_tag('div', :with => {:id=>"App-react-component-0"}) }
-      it { is_expected.not_to have_tag('span', :with => {:id=>"App-react-component-0"}) }
+      it { is_expected.not_to include '<span id="App-react-component-0"></span>' }
+      it { is_expected.to include '<div id="App-react-component-0"></div>' }
     end
   end
 
