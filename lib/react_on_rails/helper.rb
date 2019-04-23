@@ -339,9 +339,15 @@ module ReactOnRails
       render_options: required("render_options")
     )
       content_tag_options = render_options.html_options
+      if content_tag_options.key?(:tag)
+        content_tag_options_html_tag = content_tag_options[:tag]
+        content_tag_options.delete(:tag)
+      else
+        content_tag_options_html_tag = "div"
+      end
       content_tag_options[:id] = render_options.dom_id
 
-      rendered_output = content_tag(:div,
+      rendered_output = content_tag(content_tag_options_html_tag.to_sym,
                                     server_rendered_html.html_safe,
                                     content_tag_options)
 

@@ -242,6 +242,20 @@ describe ReactOnRailsHelper, type: :helper do
         expect(result).not_to match(/data-trace=/)
       end
     end
+
+    context "with 'html_options' tag option" do
+      subject { react_component("App", html_options: { tag: "span" }) }
+
+      it { is_expected.to include '<span id="App-react-component-0"></span>' }
+      it { is_expected.not_to include '<div id="App-react-component-0"></div>' }
+    end
+
+    context "without 'html_options' tag option" do
+      subject { react_component("App") }
+
+      it { is_expected.not_to include '<span id="App-react-component-0"></span>' }
+      it { is_expected.to include '<div id="App-react-component-0"></div>' }
+    end
   end
 
   describe "#redux_store" do

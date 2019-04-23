@@ -15,6 +15,10 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+### [11.3.0] - 2019-04-20
+#### Added
+- html_options can now has option for 'tag' to add dynamically html element. like this : html_options{tag:'span'}.
+[PR 1208](https://github.com/shakacode/react_on_rails/pull/1208) by [tahsin352](https://github.com/tahsin352).
 
 ### [11.2.2] - 2018-12-24
 #### Improved
