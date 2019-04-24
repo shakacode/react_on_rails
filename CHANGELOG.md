@@ -17,7 +17,7 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 ### [11.3.0] - 2019-04-20
 #### Added
-- html_options can now has option for 'tag' to add dynamically html element. like this : html_options{tag:'span'}.
+- html_options can now has option for 'tag' to add dynamically html element. like this: `html_options: { tag: "span" }`.
 [PR 1208](https://github.com/shakacode/react_on_rails/pull/1208) by [tahsin352](https://github.com/tahsin352).
 
 ### [11.2.2] - 2018-12-24
@@ -29,9 +29,9 @@ Changes since last non-beta release.
 - If using **React on Rails Pro**, upgrade react_on_rails_pro to a version >= 1.3.
 
 #### Improved
-- To support React v16, updated API for manually calling `ReactOnRails.render(name, props, domNodeId, hydrate)`. Added 3rd @param hydrate Pass truthy to update server rendered html. Default is falsey Any truthy values calls hydrate rather than render. (https://github.com/shakacode/react_on_rails/pull/1159) by [justin808](https://github.com/justin808) and [coopersamuel](https://github.com/coopersamuel).
+- To support React v16, updated API for manually calling `ReactOnRails.render(name, props, domNodeId, hydrate)`. Added 3rd @param hydrate Pass truthy to update server rendered html. Default is falsey Any truthy values calls hydrate rather than render. [PR 1159](https://github.com/shakacode/react_on_rails/pull/1159) by [justin808](https://github.com/justin808) and [coopersamuel](https://github.com/coopersamuel).
 
-- Enabled the use of webpack-dev-server with Server-side rendering. (https://github.com/shakacode/react_on_rails/pull/1173) by [justin808](https://github.com/justin808) and [judahmeek](https://github.com/judahmeek).
+- Enabled the use of webpack-dev-server with Server-side rendering. [PR 1173](https://github.com/shakacode/react_on_rails/pull/1173) by [justin808](https://github.com/justin808) and [judahmeek](https://github.com/judahmeek).
 
 #### Changed
 - Changed the default for:
@@ -868,7 +868,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.2.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.3.0...master
+[11.3.0]: https://github.com/shakacode/react_on_rails/compare/11.2.2...11.3.0
 [11.2.2]: https://github.com/shakacode/react_on_rails/compare/11.2.1...11.2.2
 [11.2.1]: https://github.com/shakacode/react_on_rails/compare/11.1.8...11.2.1
 [11.1.8]: https://github.com/shakacode/react_on_rails/compare/11.1.7...11.1.8
