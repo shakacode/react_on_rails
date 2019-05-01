@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+### Fixed
+- Added check to skip pre-render cache for components rendered by `cache_react_component` and `cache_react_component_hash` because this saves on cache storage, thus improving overall performance.
+
 ## [1.4.2] - 2019-05-26
 ### Changed
 - Removed babel processing. Node v12 recommended.
@@ -85,4 +88,3 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 [1.2.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/shakacode/react_on_rails_pro/releases/tag/1.0.0
-

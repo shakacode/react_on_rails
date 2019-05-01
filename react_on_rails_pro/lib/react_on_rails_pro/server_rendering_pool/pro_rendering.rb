@@ -19,7 +19,8 @@ module ReactOnRailsPro
         def exec_server_render_js(js_code, render_options)
           ::ReactOnRailsPro::Utils.with_trace(render_options.react_component_name) do
             set_request_digest_on_render_options(js_code, render_options)
-            if ReactOnRailsPro.configuration.prerender_caching
+            if ReactOnRailsPro.configuration.prerender_caching &&
+               render_options.internal_option(:skip_prerender_cache).nil?
               Rails.cache.fetch(cache_key(js_code, render_options)) do
                 render_on_pool(js_code, render_options)
               end
