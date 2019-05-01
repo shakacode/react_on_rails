@@ -76,7 +76,7 @@ feature "Pages/Index", :js, type: :system do
     it "adds a value to the cache" do
       base_cache_key_with_prerender = "#{base_component_cache_key}/"\
         "#{ReactOnRailsPro::Utils.bundle_hash}/#{serializers_cache_key}"
-      expect(cache_data.keys[1]).to match(%r{#{base_cache_key_with_prerender}/ReduxApp})
+      expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReduxApp})
     end
   end
 end

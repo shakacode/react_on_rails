@@ -131,10 +131,8 @@ describe ReactOnRailsProHelper, type: :helper do
             props
           end
 
-          expect(cache_data.keys[0]).to match(%r{#{base_js_eval_cache_key}/})
-          expect(cache_data.keys[1]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
-          expect(cache_data.values[0].value.keys).to match_array(%w[html consoleReplayScript hasErrors])
-          expect(cache_data.values[1].value["componentHtml"]).to match(/div id="ReactHelmetApp-react-component"/)
+          expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
+          expect(cache_data.values[0].value["componentHtml"]).to match(/div id="ReactHelmetApp-react-component"/)
         end
 
         context "with prerender_caching off" do
@@ -150,6 +148,18 @@ describe ReactOnRailsProHelper, type: :helper do
 
             expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
             expect(cache_data.values[0].value["componentHtml"]).to match(/div id="ReactHelmetApp-react-component"/)
+          end
+        end
+
+        context "with prerender_caching on" do
+          it "creates only one cache entity" do
+            props = { helloWorldData: { name: "Mr. Server Side Rendering" } }
+
+            cached_react_component_hash("ReactHelmetApp", cache_key: "cache-key") do
+              props
+            end
+
+            expect(cache_data.keys.count).to eq(1)
           end
         end
       end
