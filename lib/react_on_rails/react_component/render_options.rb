@@ -72,6 +72,10 @@ module ReactOnRails
         "{ react_component_name = #{react_component_name}, options = #{options}, request_digest = #{request_digest}"
       end
 
+      def option(key)
+        options.fetch(key) { nil }
+      end
+
       private
 
       attr_reader :options

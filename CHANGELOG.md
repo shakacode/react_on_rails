@@ -14,6 +14,8 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ## [Unreleased]
 Changes since last non-beta release.
 
+- Added method for retrieving any option from `render_options` [PR 1213](https://github.com/shakacode/react_on_rails/pull/1213)
+
 *Please add entries here for your pull requests that are not yet released.*
 ### [11.3.0] - 2019-04-20
 #### Added
