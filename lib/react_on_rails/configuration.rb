@@ -34,7 +34,8 @@ module ReactOnRails
       symlink_non_digested_assets_regex: nil,
       build_test_command: "",
       build_production_command: "",
-      random_dom_id: DEFAULT_RANDOM_DOM_ID
+      random_dom_id: DEFAULT_RANDOM_DOM_ID,
+      camel_case_props: false
     )
   end
 
@@ -47,7 +48,7 @@ module ReactOnRails
                   :webpack_generated_files, :rendering_extension, :build_test_command,
                   :build_production_command,
                   :i18n_dir, :i18n_yml_dir,
-                  :server_render_method, :symlink_non_digested_assets_regex, :random_dom_id
+                  :server_render_method, :symlink_non_digested_assets_regex, :random_dom_id, :camel_case_props
 
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
                    replay_console: nil,
@@ -59,7 +60,7 @@ module ReactOnRails
                    rendering_extension: nil, build_test_command: nil,
                    build_production_command: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, random_dom_id: nil,
-                   server_render_method: nil, symlink_non_digested_assets_regex: nil)
+                   server_render_method: nil, symlink_non_digested_assets_regex: nil, camel_case_props: false)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.server_bundle_js_file = server_bundle_js_file
       self.generated_assets_dirs = generated_assets_dirs
@@ -91,6 +92,7 @@ module ReactOnRails
 
       self.server_render_method = server_render_method
       self.symlink_non_digested_assets_regex = symlink_non_digested_assets_regex
+      self.camel_case_props = camel_case_props
     end
 
     # on ReactOnRails

@@ -13,7 +13,12 @@ module ReactOnRails
 
       def initialize(react_component_name: required("react_component_name"), options: required("options"))
         @react_component_name = react_component_name.camelize
-        @options = options
+
+        @options = if ReactOnRails.configuration.camel_case_props
+                     camel_case_props(options)
+                   else
+                     options
+                   end
       end
 
       attr_reader :react_component_name
@@ -88,6 +93,11 @@ module ReactOnRails
         options.fetch(key) do
           ReactOnRails.configuration.public_send(key)
         end
+      end
+
+      def camel_case_props(options)
+        options[:props] = options[:props].deep_transform_keys! { |key| key.to_s.camelize(:lower).to_sym }
+        options
       end
     end
   end

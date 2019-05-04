@@ -47,6 +47,29 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         expect(opts.props).to eq(props)
       end
     end
+
+    context "when camel_case_props is set to true" do
+      before do
+        ReactOnRails.configuration.camel_case_props = true
+      end
+
+      after do 
+        ReactOnRails.configuration.camel_case_props = false
+      end
+
+      it "converts all prop keys to camelCase" do
+
+        props = { snake_case: "foo", alreadyCamelCase: "bar", deeply_nested: { snake_case: "baz" } }
+
+        attrs = the_attrs(options: { props: props })
+
+        opts = described_class.new(attrs)
+
+        expected_props = { snakeCase: "foo", alreadyCamelCase: "bar", deeplyNested: { snakeCase: "baz" } }
+
+        expect(opts.props).to eq(expected_props)
+      end
+    end
   end
 
   describe "#react_component_name" do
