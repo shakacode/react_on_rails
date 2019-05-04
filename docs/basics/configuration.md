@@ -183,6 +183,13 @@ ReactOnRails.configure do |config|
   
   ################################################################################
   ################################################################################
+  # CAMELCASE PROPS
+  # This option will automatically convert any props with snake_case keys to camelCase
+  # The default is false
+  config.camel_case_props = false
+
+  ################################################################################
+  ################################################################################
   # CLIENT RENDERING OPTIONS
   # Below options can be overriden by passing options to the react_on_rails
   # `render_component` view helper method.
