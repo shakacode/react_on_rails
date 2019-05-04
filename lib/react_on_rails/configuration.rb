@@ -57,8 +57,7 @@ module ReactOnRails
                    server_renderer_timeout: nil, raise_on_prerender_error: true,
                    skip_display_none: nil, generated_assets_dirs: nil,
                    generated_assets_dir: nil, webpack_generated_files: nil,
-                   rendering_extension: nil, build_test_command: nil,
-                   build_production_command: nil,
+                   rendering_extension: nil, build_test_command: nil, build_production_command: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, random_dom_id: nil,
                    server_render_method: nil, symlink_non_digested_assets_regex: nil, camel_case_props: false)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root

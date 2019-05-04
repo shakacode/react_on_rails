@@ -53,12 +53,11 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         ReactOnRails.configuration.camel_case_props = true
       end
 
-      after do 
+      after do
         ReactOnRails.configuration.camel_case_props = false
       end
 
       it "converts all prop keys to camelCase" do
-
         props = { snake_case: "foo", alreadyCamelCase: "bar", deeply_nested: { snake_case: "baz" } }
 
         attrs = the_attrs(options: { props: props })
