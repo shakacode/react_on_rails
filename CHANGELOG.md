@@ -14,11 +14,12 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ## [Unreleased]
 Changes since last non-beta release.
 
-- Added method for retrieving any option from `render_options` [PR 1213](https://github.com/shakacode/react_on_rails/pull/1213)
-
 *Please add entries here for your pull requests that are not yet released.*
 ### [11.3.0] - 2019-04-20
 #### Added
+- Added method for retrieving any option from `render_options` [PR 1213](https://github.com/shakacode/react_on_rails/pull/1213)
+by [ashgaliyev](https://github.com/ashgaliyev).
+
 - html_options can now has option for 'tag' to add dynamically html element. like this: `html_options: { tag: "span" }`.
 [PR 1208](https://github.com/shakacode/react_on_rails/pull/1208) by [tahsin352](https://github.com/tahsin352).
 
