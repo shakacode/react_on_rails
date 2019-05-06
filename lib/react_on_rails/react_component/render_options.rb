@@ -72,6 +72,10 @@ module ReactOnRails
         "{ react_component_name = #{react_component_name}, options = #{options}, request_digest = #{request_digest}"
       end
 
+      def internal_option(key)
+        options[key]
+      end
+
       private
 
       attr_reader :options
