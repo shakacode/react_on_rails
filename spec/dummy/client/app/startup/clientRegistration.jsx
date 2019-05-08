@@ -4,6 +4,7 @@ import 'es5-shim';
 import ReactOnRails from 'react-on-rails';
 
 import HelloWorld from '../components/HelloWorld';
+import HelloWorldReason from '../components/HelloWorldReason.re';
 import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 import HelloWorldES5 from '../components/HelloWorldES5';
 import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
@@ -39,6 +40,7 @@ ReactOnRails.setOptions({
 ReactOnRails.register({
   BrokenApp,
   HelloWorld,
+  HelloWorldReason,
   HelloWorldWithLogAndThrow,
   HelloWorldES5,
   HelloWorldRehydratable,

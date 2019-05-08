@@ -1,0 +1,24 @@
+####{BSB GENERATED: NO EDIT
+FLG -ppx '/Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/bs-platform/lib/reactjs_jsx_ppx_2.exe'
+FLG -ppx /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/bs-platform/lib/bsppx.exe
+S /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/bs-platform/lib/ocaml
+B /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/bs-platform/lib/ocaml
+FLG -nostdlib -color always
+FLG -w -30-40+6+7+27+32..39+44+45+101-45
+S /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/reason-react/lib/ocaml
+B /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/reason-react/lib/ocaml
+S /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/re-classnames/lib/ocaml
+B /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/re-classnames/lib/ocaml
+S /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/re-debouncer/lib/ocaml
+B /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/re-debouncer/lib/ocaml
+S /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/@glennsl/bs-json/lib/ocaml
+B /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/@glennsl/bs-json/lib/ocaml
+S /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/bs-log/lib/ocaml
+B /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/bs-log/lib/ocaml
+S /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/bs-fetch/lib/ocaml
+B /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/bs-fetch/lib/ocaml
+S /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/bs-date-fns/lib/ocaml
+B /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/bs-date-fns/lib/ocaml
+S app/components
+B lib/bs/app/components
+####BSB GENERATED: NO EDIT}

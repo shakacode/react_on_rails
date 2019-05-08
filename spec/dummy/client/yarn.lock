@@ -623,6 +623,10 @@
     lodash "^4.17.10"
     to-fast-properties "^2.0.0"
 
+"@glennsl/bs-json@^3.0.0":
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/@glennsl/bs-json/-/bs-json-3.0.0.tgz#b4e1cf6612270a8dd7287a8a71ebe17e8f0fb683"
+
 abab@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/abab/-/abab-2.0.0.tgz#aba0ab4c5eee2d4c79d3487d85450fb2376ebb0f"
@@ -1193,9 +1197,27 @@ browserslist@^4.1.0:
   version "4.3.0"
   resolved "https://registry.yarnpkg.com/browserslist/-/browserslist-4.3.0.tgz#779a235bd1ace0f3841a9b294df4cd47ac046c9d"
   dependencies:
-    caniuse-lite "^1.0.30000893"
-    electron-to-chromium "^1.3.80"
-    node-releases "^1.0.0-alpha.14"
+    caniuse-lite "^1.0.30000963"
+    electron-to-chromium "^1.3.127"
+    node-releases "^1.1.17"
+
+bs-date-fns@0.1.6:
+  version "0.1.6"
+  resolved "https://registry.yarnpkg.com/bs-date-fns/-/bs-date-fns-0.1.6.tgz#29983fb072611539e7585d85450759ad366d61f8"
+  dependencies:
+    date-fns "^1.29.0"
+
+bs-fetch@0.3.1:
+  version "0.3.1"
+  resolved "https://registry.yarnpkg.com/bs-fetch/-/bs-fetch-0.3.1.tgz#9c7d074b27e6bb2b9f2ec985964f32bcac49f79e"
+
+bs-log@0.1.1:
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/bs-log/-/bs-log-0.1.1.tgz#03181ea3589c130b24ab4fc294b6948f823ff6a4"
+
+bs-platform@4.0.5:
+  version "4.0.5"
+  resolved "https://registry.yarnpkg.com/bs-platform/-/bs-platform-4.0.5.tgz#d4fd9bbdd11765af5b75110a5655065ece05eed6"
 
 buffer-from@^1.0.0:
   version "1.1.1"

@@ -6,13 +6,13 @@
     "postinstall": "cd ./client && yarn install",
     "test": "yarn run build:test && yarn run lint && rspec",
     "lint": "cd client && yarn run lint",
-    "build:clean": "rm -rf public/webpack || true",
+    "build:clean": "rm -rf public/webpack || true && bsb -clean-world",
     "build:test": "(cd client && yarn run build:test)",
     "build:production:client": "(cd client && yarn run build:production:client)",
     "build:production:server": "(cd client && yarn run build:production:server)",
-    "build:client": "(cd client && yarn run build:client)",
+    "build:client": "(cd client && yarn run build:client && bsb -make-world)",
     "build:server": "(cd client && yarn run build:server)",
-    "build:dev:client": "(cd client && yarn run build:dev:client)",
+    "build:dev:client": "(cd client && yarn run build:dev:client && bsb -make-world -w)",
     "build:dev:server": "(cd client && yarn run build:dev:server)",
     "hot-assets": "(cd client && yarn run hot-assets)"
   },
@@ -31,6 +31,10 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "devDependencies": {},
-  "dependencies": {}
+  "devDependencies": {
+    "bs-platform": "^5.0.4"
+  },
+  "dependencies": {
+    "reason-react": "0.7.0"
+  }
 }
