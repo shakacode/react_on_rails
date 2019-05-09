@@ -4,7 +4,7 @@ import 'es5-shim';
 import ReactOnRails from 'react-on-rails';
 
 import HelloWorld from '../components/HelloWorld';
-import HelloWorldReason from '../components/HelloWorldReason.re';
+import HelloWorldReason from '../components/HelloWorldReason.bs';
 import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 import HelloWorldES5 from '../components/HelloWorldES5';
 import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
