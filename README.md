@@ -332,6 +332,9 @@ The following companies support this open source project, and ShakaCode uses the
 [![BrowserStack](https://cloud.githubusercontent.com/assets/1118459/23203304/1261e468-f886-11e6-819e-93b1a3f17da4.png)](https://www.browserstack.com)
 [![CodersRank](https://user-images.githubusercontent.com/1118459/55040254-ad8a7b00-4fcb-11e9-8936-c6765eb30698.png)](https://codersrank.io/?utm_source=github&utm_medium=banner&utm_campaign=shakacode)
 
+## Clubhouse
+I've just moved ShakaCode's development to [ClubHouse](https://clubhouse.io/) from Trello. We're going to be doing this with all our projects. If you want to **try ClubHouse and get 2 months free beyond the 14-day trial period**, click [here to use ShakaCode's referral code](http://r.clbh.se/mvfd30S). We're participating in their awesome triple-sided referral program, which you can read about [here](https://clubhouse.io/blog/clubhouse-referral-program-5f614bb437c3). By using our [referral code])(http://r.clbh.se/mvfd30S) you'll be supporting ShakaCode and, thus, React on Rails!
+
 *If you'd like to support React on Rails and have your company listed here, [get in touch](mailto:justin@shakacode.com).*
 
 Aloha and best wishes from Justin and the ShakaCode team!
