@@ -21,11 +21,11 @@ helper.setConfig = function() {
   buildConfig({
     bundlePath: path.resolve(__dirname, './tmp'),
   });
-}
+};
 
 helper.vmBundlePath = function() {
   return path.resolve(__dirname, `./tmp/${BUNDLE_TIMESTAMP}.js`);
-}
+};
 
 /**
  *
@@ -34,19 +34,19 @@ helper.vmBundlePath = function() {
 helper.createVmBundle = async function() {
   fsExtra.copySync(getFixtureBundle(), vmBundlePath());
   await buildVM(vmBundlePath());
-}
+};
 
 helper.lockfilePath = function() {
   return `${vmBundlePath()}.lock`;
-}
+};
 
 helper.uploadedBundlePath = function() {
   return path.resolve(__dirname, `./tmp/uploads/${BUNDLE_TIMESTAMP}.js`);
-}
+};
 
 helper.createUploadedBundle = function() {
   fsExtra.copySync(getFixtureBundle(), uploadedBundlePath());
-}
+};
 
 helper.resetForTest = function() {
   if (fs.existsSync(uploadedBundlePath())) fs.unlinkSync(uploadedBundlePath());
@@ -54,7 +54,7 @@ helper.resetForTest = function() {
   if (fs.existsSync(lockfilePath())) fs.unlinkSync(lockfilePath());
   resetVM();
   setConfig();
-}
+};
 
 helper.readRenderingRequest = function(projectName, commit, requestDumpFileName) {
   const renderingRequestRelativePath = path.join(
@@ -64,7 +64,7 @@ helper.readRenderingRequest = function(projectName, commit, requestDumpFileName)
     requestDumpFileName,
   );
   return fs.readFileSync(path.resolve(__dirname, renderingRequestRelativePath), 'utf8');
-}
+};
 
 helper.createResponse = function(validate) {
   const result = {

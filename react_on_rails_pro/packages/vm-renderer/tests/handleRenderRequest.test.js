@@ -3,7 +3,14 @@ const touch = require('touch');
 const lockfile = require('lockfile');
 const sleep = require('sleep-promise');
 
-const { createVmBundle, uploadedBundlePath, createUploadedBundle, resetForTest, BUNDLE_TIMESTAMP, lockfilePath } = require('./helper');
+const {
+  createVmBundle,
+  uploadedBundlePath,
+  createUploadedBundle,
+  resetForTest,
+  BUNDLE_TIMESTAMP,
+  lockfilePath,
+} = require('./helper');
 
 const { getVmBundleFilePath } = require('../lib/worker/vm');
 const handleRenderRequest = require('../lib/worker/handleRenderRequest');

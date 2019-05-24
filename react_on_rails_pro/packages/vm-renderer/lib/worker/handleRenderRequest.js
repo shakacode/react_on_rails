@@ -205,7 +205,11 @@ to ${bundleFilePathPerTimestamp})`,
  * @returns Promise where the result contains { status, data, headers } for to
  * send back to the browser.
  */
-module.exports = (async function handleRenderRequest({ renderingRequest, bundleTimestamp, providedNewBundle }) {
+module.exports = async function handleRenderRequest({
+  renderingRequest,
+  bundleTimestamp,
+  providedNewBundle,
+}) {
   try {
     const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
 
@@ -253,4 +257,4 @@ module.exports = (async function handleRenderRequest({ renderingRequest, bundleT
     errorReporter.notify(msg);
     return Promise.reject(error);
   }
-});
+};

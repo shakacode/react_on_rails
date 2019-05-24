@@ -9,4 +9,4 @@ exports.reactOnRailsProVmRenderer = function(config = {}) {
   } else {
     worker(config);
   }
-}
+};
