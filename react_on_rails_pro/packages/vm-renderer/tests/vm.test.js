@@ -1,6 +1,6 @@
-import path from 'path';
-import { uploadedBundlePath, createUploadedBundle, readRenderingRequest, createVmBundle } from './helper';
-import { buildVM, runInVM, getVmBundleFilePath, resetVM } from '../src/worker/vm';
+const path = require('path');
+const { uploadedBundlePath, createUploadedBundle, readRenderingRequest, createVmBundle } = require('./helper');
+const { buildVM, runInVM, getVmBundleFilePath, resetVM } = require('../lib/worker/vm');
 
 test('buildVM and runInVM', async () => {
   expect.assertions(14);

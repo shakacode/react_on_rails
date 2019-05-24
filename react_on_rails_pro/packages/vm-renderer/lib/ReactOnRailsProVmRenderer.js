@@ -1,10 +1,9 @@
-import cluster from 'cluster';
-
-import master from './master';
-import worker from './worker';
+const cluster = require('cluster');
+const master = require('./master');
+const worker = require('./worker');
 
 /* eslint-disable import/prefer-default-export */
-export function reactOnRailsProVmRenderer(config = {}) {
+exports.reactOnRailsProVmRenderer = function(config = {}) {
   if (cluster.isMaster) {
     master(config);
   } else {

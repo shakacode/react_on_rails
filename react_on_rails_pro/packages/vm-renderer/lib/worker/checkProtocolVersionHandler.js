@@ -2,9 +2,9 @@
  * Logic for checking protocol version.
  * @module worker/checkProtocVersionHandler
  */
-import semver from 'semver';
+const semver = require('semver');
 
-import packageJson from '../shared/packageJson';
+const packageJson = require('../shared/packageJson');
 
 module.exports = function checkProtocolVersion(req) {
   if (

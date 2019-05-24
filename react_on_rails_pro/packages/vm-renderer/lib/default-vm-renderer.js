@@ -1,4 +1,4 @@
 // This is a the default vm-render from running `yarn start`
-import { reactOnRailsProVmRenderer } from './ReactOnRailsProVmRenderer';
+const { reactOnRailsProVmRenderer } = require('./ReactOnRailsProVmRenderer');
 
 reactOnRailsProVmRenderer();

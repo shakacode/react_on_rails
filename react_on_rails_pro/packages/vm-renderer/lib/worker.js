@@ -3,18 +3,18 @@
  * @module worker
  */
 
-import path from 'path';
-import cluster from 'cluster';
-import express from 'express';
-import busBoy from 'express-busboy';
-import log from './shared/log';
-import packageJson from './shared/packageJson';
-import { buildConfig, getConfig } from './shared/configBuilder';
-import checkProtocolVersion from './worker/checkProtocolVersionHandler';
-import authenticate from './worker/authHandler';
-import handleRenderRequest from './worker/handleRenderRequest';
-import { errorResponseResult, formatExceptionMessage } from './shared/utils';
-import errorReporter from './shared/errorReporter';
+const path = require('path');
+const cluster = require('cluster');
+const express = require('express');
+const busBoy = require('express-busboy');
+const log = require('./shared/log');
+const packageJson = require('./shared/packageJson');
+const { buildConfig, getConfig } = require('./shared/configBuilder');
+const checkProtocolVersion = require('./worker/checkProtocolVersionHandler');
+const authenticate = require('./worker/authHandler');
+const handleRenderRequest = require('./worker/handleRenderRequest');
+const { errorResponseResult, formatExceptionMessage } = require('./shared/utils');
+const errorReporter = require('./shared/errorReporter');
 
 function setHeaders(headers, res) {
   Object.keys(headers).forEach(key => res.set(key, headers[key]));
@@ -30,7 +30,7 @@ const setResponse = (result, res) => {
   res.send(data);
 };
 
-export default function run(config) {
+module.exports = function run(config) {
   // Store config in app state. From now it can be loaded by any module using
   // getConfig():
   buildConfig(config);

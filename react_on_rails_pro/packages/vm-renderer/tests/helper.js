@@ -1,27 +1,29 @@
-import path from 'path';
-import fs from 'fs';
-import fsExtra from 'fs-extra';
+const path = require('path');
+const fs = require('fs');
+const fsExtra = require('fs-extra');
 
-import { buildVM, resetVM } from '../src/worker/vm';
+const { buildVM, resetVM } = require('../lib/worker/vm');
 
-const { buildConfig } = require('../src/shared/configBuilder');
+const { buildConfig } = require('../lib/shared/configBuilder');
 
 function getFixtureBundle() {
   return path.resolve(__dirname, './fixtures/bundle.js');
 }
 
-export const BUNDLE_TIMESTAMP = 1495063024898;
+const helper = exports;
+
+helper.BUNDLE_TIMESTAMP = 1495063024898;
 
 /**
  *
  */
-export function setConfig() {
+helper.setConfig = function() {
   buildConfig({
     bundlePath: path.resolve(__dirname, './tmp'),
   });
 }
 
-export function vmBundlePath() {
+helper.vmBundlePath = function() {
   return path.resolve(__dirname, `./tmp/${BUNDLE_TIMESTAMP}.js`);
 }
 
@@ -29,24 +31,24 @@ export function vmBundlePath() {
  *
  * @returns {Promise<void>}
  */
-export async function createVmBundle() {
+helper.createVmBundle = async function() {
   fsExtra.copySync(getFixtureBundle(), vmBundlePath());
   await buildVM(vmBundlePath());
 }
 
-export function lockfilePath() {
+helper.lockfilePath = function() {
   return `${vmBundlePath()}.lock`;
 }
 
-export function uploadedBundlePath() {
+helper.uploadedBundlePath = function() {
   return path.resolve(__dirname, `./tmp/uploads/${BUNDLE_TIMESTAMP}.js`);
 }
 
-export function createUploadedBundle() {
+helper.createUploadedBundle = function() {
   fsExtra.copySync(getFixtureBundle(), uploadedBundlePath());
 }
 
-export function resetForTest() {
+helper.resetForTest = function() {
   if (fs.existsSync(uploadedBundlePath())) fs.unlinkSync(uploadedBundlePath());
   if (fs.existsSync(vmBundlePath())) fs.unlinkSync(vmBundlePath());
   if (fs.existsSync(lockfilePath())) fs.unlinkSync(lockfilePath());
@@ -54,7 +56,7 @@ export function resetForTest() {
   setConfig();
 }
 
-export function readRenderingRequest(projectName, commit, requestDumpFileName) {
+helper.readRenderingRequest = function(projectName, commit, requestDumpFileName) {
   const renderingRequestRelativePath = path.join(
     './fixtures/projects/',
     projectName,
@@ -64,7 +66,7 @@ export function readRenderingRequest(projectName, commit, requestDumpFileName) {
   return fs.readFileSync(path.resolve(__dirname, renderingRequestRelativePath), 'utf8');
 }
 
-export const createResponse = validate => {
+helper.createResponse = function(validate) {
   const result = {
     headers: {},
     data: '',
@@ -85,4 +87,4 @@ export const createResponse = validate => {
   };
 };
 
-setConfig();
+helper.setConfig();

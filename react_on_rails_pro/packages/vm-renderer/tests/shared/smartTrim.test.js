@@ -1,4 +1,4 @@
-import { smartTrim, TRUNCATION_FILLER } from '../../src/shared/utils';
+const { smartTrim, TRUNCATION_FILLER } = require('../../lib/shared/utils');
 
 test('If gem has posted updated bundle', () => {
   const s = '1234567890';
