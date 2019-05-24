@@ -6,7 +6,7 @@ const fs = require('fs');
 const os = require('os');
 
 const log = require('./log');
-const { configureLogger } = require('./log')
+const { configureLogger } = require('./log');
 const errorReporter = require('./errorReporter');
 const packageJson = require('./packageJson');
 
@@ -27,7 +27,7 @@ configBuilder.getConfig = function() {
   }
 
   return config;
-}
+};
 
 function getTmpDir() {
   if (!fs.existsSync(DEFAULT_TMP_DIR)) {
@@ -99,10 +99,13 @@ configBuilder.logSanitizedConfig = function() {
   log.info(`VM Renderer v${packageJson.version}, protocol v${packageJson.protocolVersion}`);
   log.info('NOTE: renderer settings names do not have prefix "RENDERER_"');
   log.info('Default values for settings:\n%O', defaultConfig);
-  log.info('Customized values for settings from config object:\n%O', sanitizedSettings(configBuilder.getConfig()));
+  log.info(
+    'Customized values for settings from config object:\n%O',
+    sanitizedSettings(configBuilder.getConfig()),
+  );
   log.info('ENV values used for settings (use "RENDERER_" prefix):\n%O', envValuesUsed());
   log.info('Final renderer settings used:\n%O', sanitizedSettings(config, '<NOT PROVIDED>'));
-}
+};
 
 /**
  * Lazily create the config
@@ -136,4 +139,4 @@ configBuilder.buildConfig = function(providedUserConfig) {
 
   configureLogger(log, config.logLevel);
   return config;
-}
+};

@@ -55,4 +55,4 @@ module.exports = function masterRun(runningConfig) {
   } else {
     log.info('No schedule for workers restarts');
   }
-}
+};

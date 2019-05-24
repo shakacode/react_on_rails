@@ -29,7 +29,7 @@ let vmBundleFilePath;
  */
 exports.getVmBundleFilePath = function() {
   return vmBundleFilePath;
-}
+};
 
 function undefinedForExecLogging(functionName) {
   return `
@@ -139,7 +139,7 @@ exports.buildVM = async function(filePath) {
     errorReporter.notify(error);
     return Promise.reject(error);
   }
-}
+};
 
 /**
  *
@@ -180,7 +180,7 @@ ${smartTrim(result)}`);
     errorReporter.notify(exceptionMessage);
     return Promise.resolve({ exceptionMessage });
   }
-}
+};
 
 /**
  *
@@ -188,4 +188,4 @@ ${smartTrim(result)}`);
 exports.resetVM = function() {
   context = undefined;
   vmBundleFilePath = undefined;
-}
+};

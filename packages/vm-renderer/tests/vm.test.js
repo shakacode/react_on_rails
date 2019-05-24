@@ -1,5 +1,10 @@
 const path = require('path');
-const { uploadedBundlePath, createUploadedBundle, readRenderingRequest, createVmBundle } = require('./helper');
+const {
+  uploadedBundlePath,
+  createUploadedBundle,
+  readRenderingRequest,
+  createVmBundle,
+} = require('./helper');
 const { buildVM, runInVM, getVmBundleFilePath, resetVM } = require('../lib/worker/vm');
 
 test('buildVM and runInVM', async () => {

@@ -9,7 +9,7 @@ utils.TRUNCATION_FILLER = '\n... TRUNCATED ...\n';
 utils.workerIdLabel = function() {
   const workerId = (cluster && cluster.worker && cluster.worker.id) || 'NO WORKER ID';
   return workerId;
-}
+};
 
 // From https://stackoverflow.com/a/831583/1009332
 utils.smartTrim = function(value, maxLength = getConfig().maxDebugSnippetLength) {
@@ -30,8 +30,10 @@ utils.smartTrim = function(value, maxLength = getConfig().maxDebugSnippetLength)
   const toRemove = string.length - maxLength;
   const lstrip = Math.ceil(toRemove / 2);
   const rstrip = toRemove - lstrip;
-  return string.substring(0, midpoint - lstrip) + utils.TRUNCATION_FILLER + string.substring(midpoint + rstrip);
-}
+  return (
+    string.substring(0, midpoint - lstrip) + utils.TRUNCATION_FILLER + string.substring(midpoint + rstrip)
+  );
+};
 
 utils.errorResponseResult = function(msg) {
   return {
@@ -39,7 +41,7 @@ utils.errorResponseResult = function(msg) {
     status: 400,
     data: msg,
   };
-}
+};
 
 /**
  *
@@ -59,4 +61,4 @@ STACK:
 ${error.stack}`;
 
   return exceptionMessage;
-}
+};

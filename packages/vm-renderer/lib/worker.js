@@ -111,4 +111,4 @@ module.exports = function run(config) {
   }
 
   return app;
-}
+};
