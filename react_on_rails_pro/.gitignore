@@ -25,7 +25,6 @@
 
 node_modules
 
-/packages/vm-renderer/lib
 /packages/vm-renderer/tests/tmp
 
 yarn-debug.*
@@ -41,4 +40,3 @@ spec/dummy/client/npm-debug.log*
 
 .yalc
 yalc.lock
-
