@@ -1,14 +1,8 @@
-import request from 'supertest';
-import path from 'path';
+const request = require('supertest');
+const path = require('path');
 
-import worker from '../src/worker';
-import {
-  BUNDLE_TIMESTAMP,
-  createVmBundle,
-  resetForTest,
-  uploadedBundlePath,
-  createUploadedBundle,
-} from './helper';
+const worker = require('../lib/worker');
+const { BUNDLE_TIMESTAMP, createVmBundle, resetForTest, uploadedBundlePath, createUploadedBundle } = require('./helper');
 
 // eslint-disable-next-line import/no-dynamic-require
 const packageJson = require(path.join(__dirname, '/../../../package.json'));

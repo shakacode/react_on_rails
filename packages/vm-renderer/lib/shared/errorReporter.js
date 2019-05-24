@@ -1,4 +1,4 @@
-import Honeybadger from 'honeybadger';
+const Honeybadger = require('honeybadger');
 
 class ErrorReporter {
   constructor() {
@@ -31,4 +31,4 @@ class ErrorReporter {
 
 const errorReporter = new ErrorReporter();
 
-export default errorReporter;
+module.exports = errorReporter;

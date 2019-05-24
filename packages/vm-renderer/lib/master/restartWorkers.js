@@ -3,8 +3,8 @@
  * @module master/restartWorkers
  */
 
-import cluster from 'cluster';
-import log from '../shared/log';
+const cluster = require('cluster');
+const log = require('../shared/log');
 
 const MILLISECONDS_IN_MINUTE = 60000;
 

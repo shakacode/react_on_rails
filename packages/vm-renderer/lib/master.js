@@ -2,14 +2,14 @@
  * Entry point for master process that forks workers.
  * @module master
  */
-import cluster from 'cluster';
-import log from './shared/log';
-import { buildConfig, logSanitizedConfig } from './shared/configBuilder';
-import restartWorkers from './master/restartWorkers';
+const cluster = require('cluster');
+const log = require('./shared/log');
+const { buildConfig, logSanitizedConfig } = require('./shared/configBuilder');
+const restartWorkers = require('./master/restartWorkers');
 
 const MILLISECONDS_IN_MINUTE = 60000;
 
-export default function masterRun(runningConfig) {
+module.exports = function masterRun(runningConfig) {
   // Store config in app state. From now it can be loaded by any module using getConfig():
   const config = buildConfig(runningConfig);
   const { workersCount, allWorkersRestartInterval, delayBetweenIndividualWorkerRestarts } = config;
