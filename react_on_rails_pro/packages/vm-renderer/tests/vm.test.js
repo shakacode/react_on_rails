@@ -5,7 +5,7 @@ const {
   readRenderingRequest,
   createVmBundle,
 } = require('./helper');
-const { buildVM, runInVM, getVmBundleFilePath, resetVM } = require('../lib/worker/vm');
+const { buildVM, runInVM, getVmBundleFilePath, resetVM } = require('../src/worker/vm');
 
 test('buildVM and runInVM', async () => {
   expect.assertions(14);

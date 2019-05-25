@@ -2,9 +2,9 @@ const path = require('path');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
 
-const { buildVM, resetVM } = require('../lib/worker/vm');
+const { buildVM, resetVM } = require('../src/worker/vm');
 
-const { buildConfig } = require('../lib/shared/configBuilder');
+const { buildConfig } = require('../src/shared/configBuilder');
 
 function getFixtureBundle() {
   return path.resolve(__dirname, './fixtures/bundle.js');
