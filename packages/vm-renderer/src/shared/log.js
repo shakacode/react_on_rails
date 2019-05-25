@@ -1,5 +1,5 @@
-const { format, transports } = require('winston');
 const winston = require('winston');
+const { format, transports } = winston;
 
 const { combine, splat, colorize, label, printf } = format;
 
