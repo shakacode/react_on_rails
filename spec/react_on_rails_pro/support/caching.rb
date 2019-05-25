@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module CachingHelpers
   # INFO: helper for accessing key/value pairs included in the cache
   #

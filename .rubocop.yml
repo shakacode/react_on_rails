@@ -3,7 +3,7 @@
 
 AllCops:
   DisplayCopNames: true
-  TargetRubyVersion: 2.2
+  TargetRubyVersion: 2.3
 
   Include:
     - '**/Rakefile'
@@ -82,4 +82,4 @@ Style/GlobalVars:
     - 'spec/dummy/config/environments/development.rb'
 
 Style/FrozenStringLiteralComment:
-  EnforcedStyle: when_needed
+  EnforcedStyle: always

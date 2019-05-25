@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 source "https://rubygems.org"
 
 eval_gemfile File.expand_path("../../react_on_rails_pro.gemspec", __dir__)
