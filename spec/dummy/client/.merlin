@@ -1,0 +1,13 @@
+####{BSB GENERATED: NO EDIT
+FLG -ppx '/Users/leorajuster/.nvm/versions/node/v10.9.0/lib/node_modules/bs-platform/lib/bsppx.exe -bs-jsx 2'
+S /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/bs-platform/lib/ocaml
+B /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/bs-platform/lib/ocaml
+FLG -nostdlib -color always
+FLG -w -30-40+6+7+27+32..39+44+45+101
+S /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/reason-react/lib/ocaml
+B /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/reason-react/lib/ocaml
+S /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/bs-react-on-rails/lib/ocaml
+B /Users/leorajuster/Desktop/repos/react_on_rails/spec/dummy/client/node_modules/bs-react-on-rails/lib/ocaml
+S app/components
+B lib/bs/app/components
+####BSB GENERATED: NO EDIT}

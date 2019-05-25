@@ -2,3 +2,6 @@
 # yarn lockfile v1
 
 
+bs-react-on-rails@^0.2.0:
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/bs-react-on-rails/-/bs-react-on-rails-0.2.0.tgz#de40b3e3e70aeb780da031d031fe8d4390a2d42d"
