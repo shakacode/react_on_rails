@@ -27,6 +27,7 @@ rules:
   jest/no-identical-title: "error"
   jest/prefer-to-have-length: "warn"
   jest/valid-expect: "error"
+  import/prefer-default-export: "off"
 
   # incompatible with prettier
   no-mixed-operators: 0

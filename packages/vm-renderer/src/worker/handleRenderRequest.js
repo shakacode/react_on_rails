@@ -5,20 +5,20 @@
  * @module worker/handleRenderRequest
  */
 
-import sleep from 'sleep-promise';
-import cluster from 'cluster';
-import path from 'path';
-import fs from 'fs';
-import fsExtra from 'fs-extra';
-import lockfile from 'lockfile';
-import { promisify } from 'util';
+const sleep = require('sleep-promise');
+const cluster = require('cluster');
+const path = require('path');
+const fs = require('fs');
+const fsExtra = require('fs-extra');
+const lockfile = require('lockfile');
+const { promisify } = require('util');
 
-import debug from '../shared/debug';
-import log from '../shared/log';
-import { formatExceptionMessage, workerIdLabel } from '../shared/utils';
-import { getConfig } from '../shared/configBuilder';
-import errorReporter from '../shared/errorReporter';
-import { buildVM, getVmBundleFilePath, runInVM } from './vm';
+const debug = require('../shared/debug');
+const log = require('../shared/log');
+const { formatExceptionMessage, workerIdLabel } = require('../shared/utils');
+const { getConfig } = require('../shared/configBuilder');
+const errorReporter = require('../shared/errorReporter');
+const { buildVM, getVmBundleFilePath, runInVM } = require('./vm');
 
 const lockfileLockAsync = promisify(lockfile.lock);
 const lockfileUnlockAsync = promisify(lockfile.unlock);
@@ -205,7 +205,11 @@ to ${bundleFilePathPerTimestamp})`,
  * @returns Promise where the result contains { status, data, headers } for to
  * send back to the browser.
  */
-export default (async function handleRenderRequest({ renderingRequest, bundleTimestamp, providedNewBundle }) {
+module.exports = async function handleRenderRequest({
+  renderingRequest,
+  bundleTimestamp,
+  providedNewBundle,
+}) {
   try {
     const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
 
@@ -253,4 +257,4 @@ export default (async function handleRenderRequest({ renderingRequest, bundleTim
     errorReporter.notify(msg);
     return Promise.reject(error);
   }
-});
+};

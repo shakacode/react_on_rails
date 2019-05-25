@@ -1,19 +1,19 @@
-import path from 'path';
-import touch from 'touch';
-import lockfile from 'lockfile';
-import sleep from 'sleep-promise';
+const path = require('path');
+const touch = require('touch');
+const lockfile = require('lockfile');
+const sleep = require('sleep-promise');
 
-import {
+const {
   createVmBundle,
   uploadedBundlePath,
   createUploadedBundle,
   resetForTest,
   BUNDLE_TIMESTAMP,
   lockfilePath,
-} from './helper';
+} = require('./helper');
 
-import { getVmBundleFilePath } from '../src/worker/vm';
-import handleRenderRequest from '../src/worker/handleRenderRequest';
+const { getVmBundleFilePath } = require('../src/worker/vm');
+const handleRenderRequest = require('../src/worker/handleRenderRequest');
 
 test('If gem has posted updated bundle and no prior bundle', async () => {
   expect.assertions(2);

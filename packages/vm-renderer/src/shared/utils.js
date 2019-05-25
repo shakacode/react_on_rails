@@ -1,16 +1,18 @@
-import cluster from 'cluster';
+const cluster = require('cluster');
 
-import { getConfig } from './configBuilder';
+const { getConfig } = require('./configBuilder');
 
-export const TRUNCATION_FILLER = '\n... TRUNCATED ...\n';
+const utils = exports;
 
-export function workerIdLabel() {
+utils.TRUNCATION_FILLER = '\n... TRUNCATED ...\n';
+
+utils.workerIdLabel = function workerIdLabel() {
   const workerId = (cluster && cluster.worker && cluster.worker.id) || 'NO WORKER ID';
   return workerId;
-}
+};
 
 // From https://stackoverflow.com/a/831583/1009332
-export function smartTrim(value, maxLength = getConfig().maxDebugSnippetLength) {
+utils.smartTrim = function smartTrim(value, maxLength = getConfig().maxDebugSnippetLength) {
   let string;
   if (!value) return value;
 
@@ -22,22 +24,24 @@ export function smartTrim(value, maxLength = getConfig().maxDebugSnippetLength) 
 
   if (maxLength < 1) return string;
   if (string.length <= maxLength) return string;
-  if (maxLength === 1) return string.substring(0, 1) + TRUNCATION_FILLER;
+  if (maxLength === 1) return string.substring(0, 1) + utils.TRUNCATION_FILLER;
 
   const midpoint = Math.ceil(string.length / 2);
   const toRemove = string.length - maxLength;
   const lstrip = Math.ceil(toRemove / 2);
   const rstrip = toRemove - lstrip;
-  return string.substring(0, midpoint - lstrip) + TRUNCATION_FILLER + string.substring(midpoint + rstrip);
-}
+  return (
+    string.substring(0, midpoint - lstrip) + utils.TRUNCATION_FILLER + string.substring(midpoint + rstrip)
+  );
+};
 
-export function errorResponseResult(msg) {
+utils.errorResponseResult = function errorResponseResult(msg) {
   return {
     headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
     status: 400,
     data: msg,
   };
-}
+};
 
 /**
  *
@@ -45,10 +49,10 @@ export function errorResponseResult(msg) {
  * @param error
  * @returns {string}
  */
-export function formatExceptionMessage(renderingRequest, error, context) {
+utils.formatExceptionMessage = function formatExceptionMessage(renderingRequest, error, context) {
   const exceptionMessage = `${context ? `\nContext:\n${context}\n` : ''}
 JS code for rendering request was:
-${smartTrim(renderingRequest)}
+${utils.smartTrim(renderingRequest)}
     
 EXCEPTION MESSAGE:
 ${error.message || error}
@@ -57,4 +61,4 @@ STACK:
 ${error.stack}`;
 
   return exceptionMessage;
-}
+};
