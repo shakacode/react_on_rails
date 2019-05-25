@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "net/http"
 require "net/http/post/multipart"
 require "uri"
@@ -7,7 +9,7 @@ module ReactOnRailsPro
   module ServerRenderingPool
     # This implementation of the rendering pool uses NodeJS to execute javasript code
     class VmRenderingPool
-      RENDERED_HTML_KEY = "renderedHtml".freeze
+      RENDERED_HTML_KEY = "renderedHtml"
 
       class << self
         attr_accessor :bundle_update_utc_timestamp
@@ -80,7 +82,7 @@ module ReactOnRailsPro
           form_data = {
             "renderingRequest" => js_code,
             "gemVersion" => ReactOnRailsPro::VERSION,
-            "protocolVersion" => "1.0.0".freeze,
+            "protocolVersion" => "1.0.0",
             "password" => ReactOnRailsPro.configuration.renderer_password
           }
 

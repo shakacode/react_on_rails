@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # See documentation in docs/configuration.md
 ReactOnRailsPro.configure do |config|
   # Get timing of server render calls
