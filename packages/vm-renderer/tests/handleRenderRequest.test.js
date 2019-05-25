@@ -12,8 +12,8 @@ const {
   lockfilePath,
 } = require('./helper');
 
-const { getVmBundleFilePath } = require('../lib/worker/vm');
-const handleRenderRequest = require('../lib/worker/handleRenderRequest');
+const { getVmBundleFilePath } = require('../src/worker/vm');
+const handleRenderRequest = require('../src/worker/handleRenderRequest');
 
 test('If gem has posted updated bundle and no prior bundle', async () => {
   expect.assertions(2);

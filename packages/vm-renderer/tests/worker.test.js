@@ -1,7 +1,7 @@
 const request = require('supertest');
 const path = require('path');
 
-const worker = require('../lib/worker');
+const worker = require('../src/worker');
 const {
   BUNDLE_TIMESTAMP,
   createVmBundle,

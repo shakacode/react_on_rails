@@ -3,9 +3,9 @@
   "version": "1.2.1",
   "protocolVersion": "1.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
-  "main": "packages/vm-renderer/lib/ReactOnRailsProVmRenderer.js",
+  "main": "packages/vm-renderer/src/ReactOnRailsProVmRenderer.js",
   "bin": {
-    "vm-renderer": "./packages/vm-renderer/lib/default-vm-renderer.js"
+    "vm-renderer": "./packages/vm-renderer/src/default-vm-renderer.js"
   },
   "directories": {
     "doc": "docs"
@@ -47,12 +47,12 @@
     "touch": "^3.1.0",
     "yalc": "^1.0.0-pre.27"
   },
-  "files": ["packages/vm-renderer/lib"],
+  "files": ["packages/vm-renderer/src"],
   "scripts": {
     "test": "npx -n '--experimental-modules' jest packages/vm-renderer/tests/**/*.test.js",
     "prerelease": "yarn run check",
     "start": "nps",
-    "developing": "rm -rf /tmp/react-on-rails-pro-vm-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node  -r source-map-support/register --experimental-modules packages/vm-renderer/lib/default-vm-renderer.js",
+    "developing": "rm -rf /tmp/react-on-rails-pro-vm-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node  -r source-map-support/register --experimental-modules packages/vm-renderer/src/default-vm-renderer.js",
     "eslint": "eslint .",
     "lint": "yarn run eslint",
     "check": "yarn run lint && yarn run test",
