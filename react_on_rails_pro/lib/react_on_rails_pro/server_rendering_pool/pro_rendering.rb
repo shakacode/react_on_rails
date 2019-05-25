@@ -1,7 +1,9 @@
+# frozen_string_literal: true
+
 module ReactOnRailsPro
   module ServerRenderingPool
     class ProRendering
-      RENDERED_HTML_KEY = "renderedHtml".freeze
+      RENDERED_HTML_KEY = "renderedHtml"
 
       class << self
         def pool

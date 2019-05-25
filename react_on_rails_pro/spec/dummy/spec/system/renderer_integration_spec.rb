@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rails_helper"
 
 feature "Shared Redux store example", :server_rendering do

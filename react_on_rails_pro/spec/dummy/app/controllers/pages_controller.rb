@@ -2,7 +2,7 @@
 
 class PagesController < ApplicationController
   XSS_PAYLOAD = { "<script>window.alert('xss1');</script>" => '<script>window.alert("xss2");</script>' }.freeze
-  PROPS_NAME = "Mr. Server Side Rendering".freeze
+  PROPS_NAME = "Mr. Server Side Rendering"
   APP_PROPS_SERVER_RENDER = {
     helloWorldData: {
       name: PROPS_NAME
