@@ -49,10 +49,10 @@
   },
   "files": ["packages/vm-renderer/src"],
   "scripts": {
-    "test": "npx -n '--experimental-modules' jest packages/vm-renderer/tests/**/*.test.js",
+    "test": "jest packages/vm-renderer/tests/**/*.test.js",
     "prerelease": "yarn run check",
     "start": "nps",
-    "developing": "rm -rf /tmp/react-on-rails-pro-vm-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node  -r source-map-support/register --experimental-modules packages/vm-renderer/src/default-vm-renderer.js",
+    "developing": "rm -rf /tmp/react-on-rails-pro-vm-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node  -r source-map-support/register packages/vm-renderer/src/default-vm-renderer.js",
     "eslint": "eslint .",
     "lint": "yarn run eslint",
     "check": "yarn run lint && yarn run test",
