@@ -6,13 +6,13 @@ const utils = exports;
 
 utils.TRUNCATION_FILLER = '\n... TRUNCATED ...\n';
 
-utils.workerIdLabel = function() {
+utils.workerIdLabel = function workerIdLabel() {
   const workerId = (cluster && cluster.worker && cluster.worker.id) || 'NO WORKER ID';
   return workerId;
 };
 
 // From https://stackoverflow.com/a/831583/1009332
-utils.smartTrim = function(value, maxLength = getConfig().maxDebugSnippetLength) {
+utils.smartTrim = function smartTrim(value, maxLength = getConfig().maxDebugSnippetLength) {
   let string;
   if (!value) return value;
 
@@ -35,7 +35,7 @@ utils.smartTrim = function(value, maxLength = getConfig().maxDebugSnippetLength)
   );
 };
 
-utils.errorResponseResult = function(msg) {
+utils.errorResponseResult = function errorResponseResult(msg) {
   return {
     headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
     status: 400,
@@ -49,7 +49,7 @@ utils.errorResponseResult = function(msg) {
  * @param error
  * @returns {string}
  */
-utils.formatExceptionMessage = function(renderingRequest, error, context) {
+utils.formatExceptionMessage = function formatExceptionMessage(renderingRequest, error, context) {
   const exceptionMessage = `${context ? `\nContext:\n${context}\n` : ''}
 JS code for rendering request was:
 ${utils.smartTrim(renderingRequest)}

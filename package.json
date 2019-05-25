@@ -25,6 +25,7 @@
     "winston": "^3.0.0"
   },
   "devDependencies": {
+    "babel-eslint": "^10.0.1",
     "eslint": "^5.12.1",
     "eslint-config-shakacode": "^17.0.0",
     "eslint-plugin-import": "^2.8.0",
