@@ -17,46 +17,46 @@ helper.BUNDLE_TIMESTAMP = 1495063024898;
 /**
  *
  */
-helper.setConfig = function() {
+helper.setConfig = function setConfig() {
   buildConfig({
     bundlePath: path.resolve(__dirname, './tmp'),
   });
 };
 
-helper.vmBundlePath = function() {
-  return path.resolve(__dirname, `./tmp/${BUNDLE_TIMESTAMP}.js`);
+helper.vmBundlePath = function vmBundlePath() {
+  return path.resolve(__dirname, `./tmp/${helper.BUNDLE_TIMESTAMP}.js`);
 };
 
 /**
  *
  * @returns {Promise<void>}
  */
-helper.createVmBundle = async function() {
-  fsExtra.copySync(getFixtureBundle(), vmBundlePath());
-  await buildVM(vmBundlePath());
+helper.createVmBundle = async function createVmBundle() {
+  fsExtra.copySync(getFixtureBundle(), helper.vmBundlePath());
+  await buildVM(helper.vmBundlePath());
 };
 
-helper.lockfilePath = function() {
-  return `${vmBundlePath()}.lock`;
+helper.lockfilePath = function lockfilePath() {
+  return `${helper.vmBundlePath()}.lock`;
 };
 
-helper.uploadedBundlePath = function() {
-  return path.resolve(__dirname, `./tmp/uploads/${BUNDLE_TIMESTAMP}.js`);
+helper.uploadedBundlePath = function uploadedBundlePath() {
+  return path.resolve(__dirname, `./tmp/uploads/${helper.BUNDLE_TIMESTAMP}.js`);
 };
 
-helper.createUploadedBundle = function() {
-  fsExtra.copySync(getFixtureBundle(), uploadedBundlePath());
+helper.createUploadedBundle = function createUploadedBundle() {
+  fsExtra.copySync(getFixtureBundle(), helper.uploadedBundlePath());
 };
 
-helper.resetForTest = function() {
-  if (fs.existsSync(uploadedBundlePath())) fs.unlinkSync(uploadedBundlePath());
-  if (fs.existsSync(vmBundlePath())) fs.unlinkSync(vmBundlePath());
-  if (fs.existsSync(lockfilePath())) fs.unlinkSync(lockfilePath());
+helper.resetForTest = function resetForTest() {
+  if (fs.existsSync(helper.uploadedBundlePath())) fs.unlinkSync(helper.uploadedBundlePath());
+  if (fs.existsSync(helper.vmBundlePath())) fs.unlinkSync(helper.vmBundlePath());
+  if (fs.existsSync(helper.lockfilePath())) fs.unlinkSync(helper.lockfilePath());
   resetVM();
-  setConfig();
+  helper.setConfig();
 };
 
-helper.readRenderingRequest = function(projectName, commit, requestDumpFileName) {
+helper.readRenderingRequest = function readRenderingRequest(projectName, commit, requestDumpFileName) {
   const renderingRequestRelativePath = path.join(
     './fixtures/projects/',
     projectName,
@@ -66,7 +66,7 @@ helper.readRenderingRequest = function(projectName, commit, requestDumpFileName)
   return fs.readFileSync(path.resolve(__dirname, renderingRequestRelativePath), 'utf8');
 };
 
-helper.createResponse = function(validate) {
+helper.createResponse = function createResponse(validate) {
   const result = {
     headers: {},
     data: '',

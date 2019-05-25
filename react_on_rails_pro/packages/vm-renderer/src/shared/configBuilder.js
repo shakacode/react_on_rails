@@ -21,7 +21,7 @@ let userConfig;
 
 const configBuilder = exports;
 
-configBuilder.getConfig = function() {
+configBuilder.getConfig = function getConfig() {
   if (!config) {
     throw Error('Call buildConfig before calling getConfig');
   }
@@ -95,7 +95,7 @@ function sanitizedSettings(aConfig, defaultValue) {
   });
 }
 
-configBuilder.logSanitizedConfig = function() {
+configBuilder.logSanitizedConfig = function logSanitizedConfig() {
   log.info(`VM Renderer v${packageJson.version}, protocol v${packageJson.protocolVersion}`);
   log.info('NOTE: renderer settings names do not have prefix "RENDERER_"');
   log.info('Default values for settings:\n%O', defaultConfig);
@@ -112,7 +112,7 @@ configBuilder.logSanitizedConfig = function() {
  * @param providedUserConfig
  * @returns {*}
  */
-configBuilder.buildConfig = function(providedUserConfig) {
+configBuilder.buildConfig = function buildConfig(providedUserConfig) {
   userConfig = providedUserConfig || {};
   config = Object.assign({}, defaultConfig, userConfig);
 

@@ -27,7 +27,7 @@ let vmBundleFilePath;
  * Value is set after VM created from the bundleFilePath. This value is null if the context is
  * not ready.
  */
-exports.getVmBundleFilePath = function() {
+exports.getVmBundleFilePath = function getVmBundleFilePath() {
   return vmBundleFilePath;
 };
 
@@ -62,7 +62,7 @@ function replayVmConsole() {
  * @param filePath
  * @returns {Promise<void>}
  */
-exports.buildVM = async function(filePath) {
+exports.buildVM = async function buildVM(filePath) {
   if (filePath === vmBundleFilePath && context) {
     return Promise.resolve(true);
   }
@@ -147,7 +147,7 @@ exports.buildVM = async function(filePath) {
  * @param vmCluster
  * @returns {{exceptionMessage: string}}
  */
-exports.runInVM = async function(renderingRequest, vmCluster) {
+exports.runInVM = async function runInVM(renderingRequest, vmCluster) {
   const { bundlePath } = getConfig();
 
   try {
@@ -185,7 +185,7 @@ ${smartTrim(result)}`);
 /**
  *
  */
-exports.resetVM = function() {
+exports.resetVM = function resetVM() {
   context = undefined;
   vmBundleFilePath = undefined;
 };
