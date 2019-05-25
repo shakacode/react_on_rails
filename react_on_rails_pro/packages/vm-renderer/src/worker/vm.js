@@ -3,16 +3,16 @@
  * @module worker/vm
  */
 
-import fs from 'fs';
-import path from 'path';
-import vm from 'vm';
-import cluster from 'cluster';
-import { promisify } from 'util';
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const cluster = require('cluster');
+const { promisify } = require('util');
 
-import log from '../shared/log';
-import { getConfig } from '../shared/configBuilder';
-import { formatExceptionMessage, smartTrim } from '../shared/utils';
-import errorReporter from '../shared/errorReporter';
+const log = require('../shared/log');
+const { getConfig } = require('../shared/configBuilder');
+const { formatExceptionMessage, smartTrim } = require('../shared/utils');
+const errorReporter = require('../shared/errorReporter');
 
 const readFileAsync = promisify(fs.readFile); // (A)
 
@@ -27,9 +27,9 @@ let vmBundleFilePath;
  * Value is set after VM created from the bundleFilePath. This value is null if the context is
  * not ready.
  */
-export function getVmBundleFilePath() {
+exports.getVmBundleFilePath = function getVmBundleFilePath() {
   return vmBundleFilePath;
-}
+};
 
 function undefinedForExecLogging(functionName) {
   return `
@@ -62,7 +62,7 @@ function replayVmConsole() {
  * @param filePath
  * @returns {Promise<void>}
  */
-export async function buildVM(filePath) {
+exports.buildVM = async function buildVM(filePath) {
   if (filePath === vmBundleFilePath && context) {
     return Promise.resolve(true);
   }
@@ -139,7 +139,7 @@ export async function buildVM(filePath) {
     errorReporter.notify(error);
     return Promise.reject(error);
   }
-}
+};
 
 /**
  *
@@ -147,7 +147,7 @@ export async function buildVM(filePath) {
  * @param vmCluster
  * @returns {{exceptionMessage: string}}
  */
-export async function runInVM(renderingRequest, vmCluster) {
+exports.runInVM = async function runInVM(renderingRequest, vmCluster) {
   const { bundlePath } = getConfig();
 
   try {
@@ -180,12 +180,12 @@ ${smartTrim(result)}`);
     errorReporter.notify(exceptionMessage);
     return Promise.resolve({ exceptionMessage });
   }
-}
+};
 
 /**
  *
  */
-export function resetVM() {
+exports.resetVM = function resetVM() {
   context = undefined;
   vmBundleFilePath = undefined;
-}
+};

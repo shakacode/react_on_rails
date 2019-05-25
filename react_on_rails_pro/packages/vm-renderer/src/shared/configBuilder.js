@@ -2,12 +2,13 @@
  * Reads CLI arguments and build the config.
  * @module worker/configBuilder
  */
-import fs from 'fs';
-import os from 'os';
+const fs = require('fs');
+const os = require('os');
 
-import log, { configureLogger } from './log';
-import errorReporter from './errorReporter';
-import packageJson from './packageJson';
+const log = require('./log');
+const { configureLogger } = require('./log');
+const errorReporter = require('./errorReporter');
+const packageJson = require('./packageJson');
 
 const DEFAULT_TMP_DIR = '/tmp/react-on-rails-pro-vm-renderer-bundles';
 const DEFAULT_PORT = 3800;
@@ -18,13 +19,15 @@ const MAX_DEBUG_SNIPPET_LENGTH = 1000;
 let config;
 let userConfig;
 
-export function getConfig() {
+const configBuilder = exports;
+
+configBuilder.getConfig = function getConfig() {
   if (!config) {
     throw Error('Call buildConfig before calling getConfig');
   }
 
   return config;
-}
+};
 
 function getTmpDir() {
   if (!fs.existsSync(DEFAULT_TMP_DIR)) {
@@ -92,21 +95,24 @@ function sanitizedSettings(aConfig, defaultValue) {
   });
 }
 
-export function logSanitizedConfig() {
+configBuilder.logSanitizedConfig = function logSanitizedConfig() {
   log.info(`VM Renderer v${packageJson.version}, protocol v${packageJson.protocolVersion}`);
   log.info('NOTE: renderer settings names do not have prefix "RENDERER_"');
   log.info('Default values for settings:\n%O', defaultConfig);
-  log.info('Customized values for settings from config object:\n%O', sanitizedSettings(getConfig()));
+  log.info(
+    'Customized values for settings from config object:\n%O',
+    sanitizedSettings(configBuilder.getConfig()),
+  );
   log.info('ENV values used for settings (use "RENDERER_" prefix):\n%O', envValuesUsed());
   log.info('Final renderer settings used:\n%O', sanitizedSettings(config, '<NOT PROVIDED>'));
-}
+};
 
 /**
  * Lazily create the config
  * @param providedUserConfig
  * @returns {*}
  */
-export function buildConfig(providedUserConfig) {
+configBuilder.buildConfig = function buildConfig(providedUserConfig) {
   userConfig = providedUserConfig || {};
   config = Object.assign({}, defaultConfig, userConfig);
 
@@ -133,4 +139,4 @@ export function buildConfig(providedUserConfig) {
 
   configureLogger(log, config.logLevel);
   return config;
-}
+};
