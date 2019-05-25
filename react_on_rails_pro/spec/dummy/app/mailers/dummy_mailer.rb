@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class DummyMailer < ActionMailer::Base
   add_template_helper(ReactOnRailsHelper)
   default from: "nobody@nope.com"

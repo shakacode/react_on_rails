@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ReactOnRailsPro
   def self.configure
     yield(configuration)
@@ -21,8 +23,8 @@ module ReactOnRailsPro
   end
 
   class Configuration
-    DEFAULT_RENDERER_URL = "http://localhost:3800".freeze
-    DEFAULT_RENDERER_METHOD = "ExecJS".freeze
+    DEFAULT_RENDERER_URL = "http://localhost:3800"
+    DEFAULT_RENDERER_METHOD = "ExecJS"
     DEFAULT_RENDERER_FALLBACK_EXEC_JS = true
     DEFAULT_RENDERER_HTTP_POOL_SIZE = 10
     DEFAULT_RENDERER_HTTP_POOL_TIMEOUT = 5
