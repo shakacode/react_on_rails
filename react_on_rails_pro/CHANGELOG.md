@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [1.4.2] - 2019-05-26
+### Changed
+- Removed babel processing. Node v12 recommended.
+
 ## [1.4.1] - 2019-03-19
 ### Fixed
 - `cached_react_component_hash` incorrectly failed to include the bundle_hash unless `prerender: true` was used as an option. This fix addresses that issue. There is no need to use `prerender: true` as generating a hash only makes sense if prerendering is done.
@@ -71,7 +75,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.1...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.2...HEAD
+[1.4.2]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.1...1.4.2
 [1.4.1]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.0...1.4.1
 [1.4.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.3.1...1.4.0
 [1.3.1]: https://github.com/shakacode/react_on_rails_pro/compare/1.3.0...1.3.1
