@@ -31,13 +31,13 @@ const TEST_LOCKFILE_THREADING = false;
  * lockFile.lock. Poll for opts.wait ms. If the lock is not cleared by the time the wait expires,
  * then it returns with the original error.
  */
-const LOCKFILE_WAIT = 1000;
+const LOCKFILE_WAIT = 3000;
 
 /*
  * When using opts.wait, this is the period in ms in which it polls to check if the lock has
  * expired. Defaults to 100.
  */
-const LOCKFILE_POLL_PERIOD = 500; // defaults to 100
+const LOCKFILE_POLL_PERIOD = 300; // defaults to 100
 
 /*
  * A number of milliseconds before locks are considered to have expired.
@@ -47,12 +47,12 @@ const LOCKFILE_STALE = 20000;
 /*
  * Used by lock and lockSync. Retry n number of times before giving up.
  */
-const LOCKFILE_RETRIES = 15;
+const LOCKFILE_RETRIES = 45;
 
 /*
  * Used by lock. Wait n milliseconds before retrying.
  */
-const LOCKFILE_RETRY_WAIT = 500;
+const LOCKFILE_RETRY_WAIT = 300;
 
 const lockfileOptions = {
   wait: LOCKFILE_WAIT,
@@ -185,7 +185,7 @@ to ${bundleFilePathPerTimestamp})`,
     }
   } finally {
     if (lockAcquired) {
-      log.warn('About to unlock %s from worker %i', lockfileName, workerId);
+      log.info('About to unlock %s from worker %i', lockfileName, workerId);
       try {
         await unlock(lockfileName);
       } catch (error) {

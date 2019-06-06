@@ -9,7 +9,7 @@ gemspec
 
 # gem "react_on_rails", github: "shakacode/react_on_rails"
 # gem "react_on_rails", path: "../react_on_rails"
-gem "react_on_rails", "~> 11.2"
+gem "react_on_rails", "~> 11.3"
 
 gem "webpacker", "3.4.3"
 
