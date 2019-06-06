@@ -73,12 +73,7 @@ module ReactOnRailsPro
             .exec_server_render_js(js_code, render_options, self)
         end
 
-        def eval_js(js_code, render_options, send_bundle: false)
-          ReactOnRailsPro::ServerRenderingPool::ProRendering
-            .set_request_digest_on_render_options(js_code, render_options)
-
-          path = "/bundles/#{@bundle_update_utc_timestamp}/render/#{render_options.request_digest}"
-
+        def request_form_data(js_code, send_bundle)
           form_data = {
             "renderingRequest" => js_code,
             "gemVersion" => ReactOnRailsPro::VERSION,
@@ -92,36 +87,49 @@ module ReactOnRailsPro
               ReactOnRails::Utils.server_bundle_js_file_path
             )
           end
+          form_data
+        end
 
-          request = Net::HTTP::Post::Multipart.new(path, form_data)
+        def eval_js(js_code, render_options, send_bundle: false)
+          ReactOnRailsPro::ServerRenderingPool::ProRendering
+            .set_request_digest_on_render_options(js_code, render_options)
 
-          response = @connection.request(request)
+          path = "/bundles/#{@bundle_update_utc_timestamp}/render/#{render_options.request_digest}"
+
+          request = Net::HTTP::Post::Multipart.new(path, request_form_data(js_code, send_bundle))
+
+          begin
+            response = @connection.request(request)
+          rescue StandardError => e
+            raise ReactOnRailsPro::Error, "Can't connect to VmRenderer renderer at #{renderer_url_base}.\n"\
+                  "Original error:\n#{e}"
+          end
 
           case response.code
           when "200"
             return response.body
+          when "410"
+            # 410 is a special value meaning send the updated bundle with the next request.
+            return eval_js(js_code, render_options, send_bundle: true)
           when "400"
             raise ReactOnRailsPro::Error,
                   "Renderer unhandled error at the VM level: #{response.code}:\n#{response.body}"
-          when "410"
-            return eval_js(js_code, render_options, send_bundle: true)
           when "412"
-            raise ReactOnRailsPro::Error, "Renderer version does not match gem version"
+            # 412 is a protocol error, meaning the server and renderer are running incompatible versions
+            # of React on Rails.
+            raise ReactOnRailsPro::Error, response.body
           else
             raise ReactOnRailsPro::Error, "Unknown response code from renderer: #{response.code}:\n#{response.body}"
           end
-        rescue Errno::ECONNREFUSED
-          fallback_exec_js(js_code, render_options)
+        rescue StandardError => e
+          raise e unless ReactOnRailsPro.configuration.renderer_use_fallback_exec_js
+
+          fallback_exec_js(js_code, render_options, e)
         end
 
-        def fallback_exec_js(js_code, render_options)
-          unless ReactOnRailsPro.configuration.renderer_use_fallback_exec_js
-            raise ReactOnRailsPro::Error, "Can't connect to VmRenderer renderer at #{renderer_url_base}"
-          end
-
+        def fallback_exec_js(js_code, render_options, error)
           Rails.logger.warn do
-            "[ReactOnRailsPro] Can't connect to VmRenderer renderer at #{renderer_url_base}."\
-            " Falling back to ExecJS"
+            "[ReactOnRailsPro] Falling back to ExecJS because of #{error}"
           end
           fallback_renderer = ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript
 
@@ -132,10 +140,6 @@ module ReactOnRailsPro
           result = fallback_renderer.eval_js(js_code, render_options)
           fallback_renderer.instance_variable_set(:@js_context_pool, nil)
           result
-        end
-
-        def exception_debug_message(exception)
-          "[ReactOnRails Renderer]: #{exception.response.code}\n#{exception.response.headers}\n#{exception.response}"
         end
       end
     end

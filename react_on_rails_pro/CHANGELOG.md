@@ -4,20 +4,23 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [1.4.3] - 2019-06-06
 ### Fixed
-- Added check to skip pre-render cache for components rendered by `cache_react_component` and `cache_react_component_hash` because this saves on cache storage, thus improving overall performance.
+- Lock timeouts and update error handling. Previously, many renderer errors resulted in crashes rather than a fallback
+to ExecJS. Also, lengthened the lock timeouts for the bundle lock. [PR 100](https://github.com/shakacode/react_on_rails_pro/pull/100) by [justin808](https://github.com/justin808).
+- Added check to skip pre-render cache for components rendered by `cache_react_component` and `cache_react_component_hash` because this saves on cache storage, thus improving overall performance. [PR 91](https://github.com/shakacode/react_on_rails_pro/pull/91) by [ashgaliyev](https://github.com/ashgaliyev).
 
 ## [1.4.2] - 2019-05-26
 ### Changed
-- Removed babel processing. Node v12 recommended.
+- Removed babel processing. Node v12 recommended. [PR 93](https://github.com/shakacode/react_on_rails_pro/pull/91) by [ashgaliyev](https://github.com/ashgaliyev).
 
 ## [1.4.1] - 2019-03-19
 ### Fixed
-- `cached_react_component_hash` incorrectly failed to include the bundle_hash unless `prerender: true` was used as an option. This fix addresses that issue. There is no need to use `prerender: true` as generating a hash only makes sense if prerendering is done.
+- `cached_react_component_hash` incorrectly failed to include the bundle_hash unless `prerender: true` was used as an option. This fix addresses that issue. There is no need to use `prerender: true` as generating a hash only makes sense if prerendering is done. [PR 82](https://github.com/shakacode/react_on_rails_pro/pull/82) by [justin808](https://github.com/justin808).
 
 ## [1.4.0] - 2019-01-15
 ### Added
-- Added config option `honeybadgerApiKey` or ENV value `HONEYBADGER_API_KEY` so that errors can flow to HoneyBadger.
+- Added config option `honeybadgerApiKey` or ENV value `HONEYBADGER_API_KEY` so that errors can flow to HoneyBadger. [PR 93](https://github.com/shakacode/react_on_rails_pro/pull/75) by [ashgaliyev](https://github.com/ashgaliyev).
 
 ## [1.3.1] - 2018-12-26
 ### Added
@@ -78,7 +81,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.2...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.3...HEAD
+[1.4.3]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.2...1.4.3
 [1.4.2]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.1...1.4.2
 [1.4.1]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.0...1.4.1
 [1.4.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.3.1...1.4.0
