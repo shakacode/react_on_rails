@@ -43,4 +43,4 @@ scripts:
         script: prettier "**/*.json" "../spec/**/*.json" --list-different
   renderer:
     description: Starts the node renderer.
-    script: node renderer.js
+    script: node ./packages/vm-renderer/src/default-vm-renderer.js

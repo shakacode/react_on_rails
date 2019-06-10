@@ -89,7 +89,7 @@ module.exports = function run(config) {
         });
     } catch (theErr) {
       const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
-      log.error(` UNHANDLED TOP LEVEL error ${exceptionMessage}`);
+      log.error(`UNHANDLED TOP LEVEL error ${exceptionMessage}`);
       errorReporter.notify(exceptionMessage);
       setResponse(errorResponseResult(exceptionMessage), res);
     }
