@@ -63,8 +63,6 @@ GEM
       tzinfo (~> 1.1)
     addressable (2.6.0)
       public_suffix (>= 2.0.2, < 4.0)
-    archive-zip (0.11.0)
-      io-like (~> 0.3.0)
     arel (9.0.0)
     ast (2.4.0)
     awesome_print (1.8.0)
@@ -85,9 +83,6 @@ GEM
       launchy
     childprocess (0.9.0)
       ffi (~> 1.0, >= 1.0.11)
-    chromedriver-helper (2.1.0)
-      archive-zip (~> 0.10)
-      nokogiri (~> 1.8)
     coderay (1.1.2)
     coffee-rails (4.2.2)
       coffee-script (>= 2.2.0)
@@ -121,7 +116,6 @@ GEM
     i18n (1.6.0)
       concurrent-ruby (~> 1.0)
     interception (0.5)
-    io-like (0.3.0)
     jaro_winkler (1.5.2)
     jbuilder (2.8.0)
       activesupport (>= 4.2.0)
@@ -312,6 +306,10 @@ GEM
     uglifier (4.1.20)
       execjs (>= 0.3.0, < 3)
     unicode-display_width (1.4.1)
+    webdrivers (4.0.0)
+      nokogiri (~> 1.6)
+      rubyzip (~> 1.0)
+      selenium-webdriver (~> 3.0)
     webpacker (3.5.5)
       activesupport (>= 4.2)
       rack-proxy (>= 0.6.1)
@@ -330,7 +328,6 @@ DEPENDENCIES
   awesome_print
   capybara
   capybara-screenshot
-  chromedriver-helper
   coffee-rails
   coveralls
   equivalent-xml!
@@ -359,11 +356,11 @@ DEPENDENCIES
   sass-rails
   scss_lint
   sdoc
-  selenium-webdriver
   spring
   sqlite3
   turbolinks
   uglifier
+  webdrivers
   webpacker
 
 BUNDLED WITH

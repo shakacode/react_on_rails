@@ -50,7 +50,7 @@ utils.errorResponseResult = function errorResponseResult(msg) {
  * @returns {string}
  */
 utils.formatExceptionMessage = function formatExceptionMessage(renderingRequest, error, context) {
-  const exceptionMessage = `${context ? `\nContext:\n${context}\n` : ''}
+  return `${context ? `\nContext:\n${context}\n` : ''}
 JS code for rendering request was:
 ${utils.smartTrim(renderingRequest)}
     
@@ -59,6 +59,4 @@ ${error.message || error}
 
 STACK:
 ${error.stack}`;
-
-  return exceptionMessage;
 };

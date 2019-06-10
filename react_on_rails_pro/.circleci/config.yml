@@ -81,17 +81,22 @@ aliases:
   - &install-latest-chrome
     name: Ensure minimum required Chrome version
     command: |
-      wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-      sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
-      sudo apt-get update
-      sudo apt-get install google-chrome-stable
-      echo -e "\nInstalled $(google-chrome --version)"
+      echo -e "Installed $(google-chrome --version)\n"
+      MINIMUM_REQUIRED_CHROME_VERSION=75
+      INSTALLED_CHROME_MAJOR_VERSION="$(google-chrome --version | tr ' .' '\t' | cut -f3)"
+      if [[ $INSTALLED_CHROME_MAJOR_VERSION < $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
+        wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+        sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+        sudo apt-get update
+        sudo apt-get install google-chrome-stable
+        echo -e "\nInstalled $(google-chrome --version)"
+      fi
 
 jobs:
   # Lint all
   lint-js-and-ruby:
     docker:
-      - image: &docker_image circleci/ruby:2.4.4-stretch-node
+      - image: &docker_image circleci/ruby:2.5-node-browsers
     steps:
       - checkout
       - run: *print-system-info
@@ -137,6 +142,7 @@ jobs:
       - run: *print-system-info
       - restore_cache: *restore-dummy-app-node-modules-cache
       - run: *install-yarn-link-source
+      - run: *install-yarn-link-destination
       - run: *install-dummy-app-node-modules
       - save_cache:
           name: Save spec/dummy/client/node_modules to cache
@@ -186,6 +192,7 @@ jobs:
       - run: *print-system-info
       - run: *install-yarn-link-source
       - restore_cache: *restore-dummy-app-node-modules-cache
+      - run: *install-yarn-link-destination
       - run: *install-dummy-app-node-modules
       - run:
           name: Build test bundles for dummy app
@@ -243,10 +250,10 @@ jobs:
           key: v3-dummy-app-webpack-bundle-{{ .Revision }}
       - run: *install-dummy-app-ruby-gems
       - run: *install-package-node-modules
-      - run: *install-dummy-app-node-modules
       - run: *install-latest-chrome
       - run: *install-yarn-link-source
       - run: *install-yarn-link-destination
+      - run: *install-dummy-app-node-modules
       - run:
           name: Run Node renderer in a background
           command: cd spec/dummy && yarn run vm-renderer

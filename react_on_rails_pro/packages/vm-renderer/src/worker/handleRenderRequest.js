@@ -15,7 +15,7 @@ const { promisify } = require('util');
 
 const debug = require('../shared/debug');
 const log = require('../shared/log');
-const { formatExceptionMessage, workerIdLabel } = require('../shared/utils');
+const { formatExceptionMessage, errorResponseResult, workerIdLabel } = require('../shared/utils');
 const { getConfig } = require('../shared/configBuilder');
 const errorReporter = require('../shared/errorReporter');
 const { buildVM, getVmBundleFilePath, runInVM } = require('./vm');
@@ -68,21 +68,34 @@ const lockfileOptions = {
  * @returns {Promise<*>}
  */
 async function prepareResult(renderingRequest) {
-  const result = await runInVM(renderingRequest, cluster);
+  try {
+    const result = await runInVM(renderingRequest, cluster);
 
-  if (result.exceptionMessage) {
+    let exceptionMessage = null;
+    if (!result) {
+      const error = new Error('INVALID NIL or NULL result for rendering');
+      exceptionMessage = formatExceptionMessage(renderingRequest, error, 'INVALID result for prepareResult');
+    } else if (result.exceptionMessage) {
+      ({ exceptionMessage } = result);
+    }
+
+    if (exceptionMessage) {
+      log.error(exceptionMessage);
+      errorReporter.notify(exceptionMessage);
+      return Promise.resolve(errorResponseResult(exceptionMessage));
+    }
+
     return Promise.resolve({
-      headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
-      status: 400,
-      data: result.exceptionMessage,
+      headers: { 'Cache-Control': 'public, max-age=31536000' },
+      status: 200,
+      data: result,
     });
+  } catch (err) {
+    const exceptionMessage = formatExceptionMessage(renderingRequest, err, 'Unknown error calling runInVM');
+    log.error(exceptionMessage);
+    errorReporter.notify(exceptionMessage);
+    return Promise.resolve(errorResponseResult(exceptionMessage));
   }
-
-  return Promise.resolve({
-    headers: { 'Cache-Control': 'public, max-age=31536000' },
-    status: 200,
-    data: result,
-  });
 }
 
 function getRequestBundleFilePath(bundleTimestamp) {
