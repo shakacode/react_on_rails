@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [1.4.4] - 2019-06-10
+
+### Fixed
+- Improve error handling. [PR 103](https://github.com/shakacode/react_on_rails_pro/pull/103) by [justin808](https://github.com/justin808).
+
 ## [1.4.3] - 2019-06-06
 ### Fixed
 - Lock timeouts and update error handling. Previously, many renderer errors resulted in crashes rather than a fallback
@@ -81,7 +86,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.3...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.4...HEAD
+[1.4.4]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.3...1.4.4
 [1.4.3]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.2...1.4.3
 [1.4.2]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.1...1.4.2
 [1.4.1]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.0...1.4.1
