@@ -11,7 +11,7 @@ const { resolve } = require('path');
 // Webpacker specific
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 
-const configPath = resolve('..', 'config');
+const configPath = resolve('.', 'config');
 const { output, settings } = webpackConfigLoader(configPath);
 const isHMR = settings.dev_server && settings.dev_server.hmr;
 
