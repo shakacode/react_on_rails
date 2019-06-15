@@ -7,18 +7,17 @@ const { assetLoaderRules } = webpackCommon;
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 
-const configPath = resolve('..', 'config');
+const configPath = resolve('.', 'config');
 const { output } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
 const nodeEnv = devBuild ? 'development' : 'production';
-
 module.exports = {
 
   // the project dir
   context: __dirname,
   entry: [
-    './app/startup/serverRegistration',
+    './app/packs/serverRegistration',
   ],
   output: {
     // Important to NOT use a hash if the server webpack config runs separately from the client one.
