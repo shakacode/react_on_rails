@@ -28,6 +28,7 @@
     "webpack-merge": "^4.1.5"
   },
   "devDependencies": {
+    "babel-cli": "^6.6.5",
     "eslint": "^5.7.0",
     "eslint-config-prettier": "^3.1.0",
     "eslint-config-shakacode": "^16.0.1",
@@ -36,6 +37,7 @@
     "eslint-plugin-react": "^7.11.1",
     "fbjs": "^1.0.0",
     "jsdom": "^12.2.0",
+    "preload-webpack-plugin": "^3.0.0-alpha.1",
     "prettier": "^1.14.3",
     "prettier-eslint-cli": "^4.7.1",
     "tape": "^4.7.0",
@@ -49,6 +51,9 @@
     "lint": "cd client && yarn run lint",
     "test": "yarn run build:test && yarn run lint && rspec",
     "build:test": "yarn run build:test:client && yarn run build:test:server",
-    "build:clean": "rm -rf public/webpack || true"
+    "build:clean": "rm -rf public/webpack || true",
+    "build:dev:client": "NODE_ENV=development webpack -w --config client/webpack.client.rails.build.config.js",
+    "build:dev:server": "NODE_ENV=development webpack -w --config client/webpack.server.rails.build.config.js",
+    "hot-assets": "cd client && yarn run hot-assets"
   }
 }
