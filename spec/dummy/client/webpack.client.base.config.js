@@ -13,7 +13,7 @@ const configPath = resolve('.', 'config');
 const { output } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
-console.log('end of client base');
+
 module.exports = {
 
   // the project dir
