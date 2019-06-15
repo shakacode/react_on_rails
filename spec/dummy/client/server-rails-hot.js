@@ -20,7 +20,7 @@ const webpackConfig = require('./webpack.client.rails.hot.config');
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 
-const configPath = resolve('..', 'config');
+const configPath = resolve('.', 'config');
 const { output, settings } = webpackConfigLoader(configPath);
 
 const compiler = webpack(webpackConfig);
