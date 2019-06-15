@@ -12,7 +12,7 @@ const merge = require('webpack-merge');
 const config = require('./webpack.client.base.config');
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 
-const configPath = resolve('..', 'config');
+const configPath = resolve('.', 'config');
 const { output, settings } = webpackConfigLoader(configPath);
 
 // entry is prepended because 'react-hot-loader/patch' must be the very first entry

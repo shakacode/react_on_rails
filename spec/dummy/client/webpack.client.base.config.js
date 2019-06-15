@@ -9,7 +9,7 @@ const { assetLoaderRules } = require('./webpack.common.config');
 
 const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
 
-const configPath = resolve('..', 'config');
+const configPath = resolve('.', 'config');
 const { output } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
@@ -22,7 +22,7 @@ module.exports = {
     // This will contain the app entry points defined by
     // webpack.client.rails.hot.config and webpack.client.rails.build.config
     'app-bundle': [
-      './app/startup/clientRegistration',
+      './app/packs/clientRegistration',
     ],
   },
   resolve: {
@@ -74,3 +74,4 @@ module.exports = {
     ],
   },
 };
+
