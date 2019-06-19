@@ -59,7 +59,7 @@ ReactOnRails.configure do |config|
 
   # defaults to "" (top level)
   #
-  config.node_modules_location = "client" # Recommended!
+  config.node_modules_location = "client" # Recommended!, "" from version 8 if using webpacker.
 
   # This configures the script to run to build the production assets by webpack. Set this to nil
   # if you don't want react_on_rails building this file for you.

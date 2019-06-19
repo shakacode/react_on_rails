@@ -8,13 +8,16 @@
   "main": "js/app.js",
   "dependencies": {
     "@babel/preset-react": "^7.0.0",
-    "@rails/webpacker": "^4.0.2",
+    "@rails/webpacker": "^4.0.7",
     "babel-plugin-module-resolver": "^3.2.0",
     "babel-plugin-transform-react-remove-prop-types": "^0.4.24",
+    "core-js": "3",
     "es5-shim": "^4.5.9",
-    "extract-text-webpack-plugin": "^3.0.0",
     "history": "^4.6.3",
+    "jquery": "^3.2.1",
+    "jquery-ujs": "^1.2.2",
     "lodash": "^4.17.4",
+    "mini-css-extract-plugin": "^0.7.0",
     "nps": "^5.9.3",
     "prop-types": "^15.6.2",
     "react": "^16.5.2",
@@ -28,6 +31,8 @@
     "redux": "^4.0.1",
     "redux-thunk": "^2.2.0",
     "sass-resources-loader": "^2.0.0",
+    "webpack-cli": "^3.3.4",
+    "webpack-dev-server": "^3.7.2",
     "webpack-merge": "^4.1.5"
   },
   "devDependencies": {
@@ -44,19 +49,24 @@
     "prettier": "^1.14.3",
     "prettier-eslint-cli": "^4.7.1",
     "tape": "^4.7.0",
-    "webpack-dev-server": "^3.2.1"
+    "webpack-cli": "^3.3.4",
+    "webpack-dev-server": "^3.7.2"
   },
   "browser": {
     "fs": false
   },
   "scripts": {
     "postinstall": "yarn link react-on-rails",
-    "lint": "cd client && yarn run lint",
+    "lint": "yarn run lint",
     "test": "yarn run build:test && yarn run lint && rspec",
     "build:test": "yarn run build:test:client && yarn run build:test:server",
-    "build:clean": "rm -rf public/webpack || true",
-    "build:dev:client": "NODE_ENV=development webpack -w --config client/webpack.client.rails.build.config.js",
-    "build:dev:server": "NODE_ENV=development webpack -w --config client/webpack.server.rails.build.config.js",
-    "hot-assets": "cd client && yarn run hot-assets"
+    "build:test:client": "RAILS_ENV=test NODE_ENV=test bin/webpack ",
+    "build:test:server": "RAILS_ENV=test NODE_ENV=test bin/webpack-dev-server ",
+    "build:dev:client": "RAILS_ENV=development NODE_ENV=development webpack",
+    "build:dev:server": "RAILS_ENV=development NODE_ENV=development webpack-dev-server",
+    "build:production:client": "RAILS_ENV=development NODE_ENV=production webpack",
+    "build:production:server": "RAILS_ENV=development NODE_ENV=production webpack-dev-server",
+    "build:production": "yarn run build:production:server && yarn run build:production:client",
+    "hot-assets": "NODE_ENV=development babel-node server-rails-hot.js"
   }
 }
