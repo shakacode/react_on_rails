@@ -24,6 +24,6 @@ ReactOnRails.configure do |config|
   # See webpacker.yml public_output_path for replacement for generated_assets_dir
   # config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
   config.webpack_generated_files = %w[manifest.json]
-  config.server_bundle_js_file = "server-bundle.js"
+  config.server_bundle_js_file = "serverRegistration.js"
   config.rendering_extension = RenderingExtension
 end

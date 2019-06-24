@@ -21,7 +21,7 @@ class PagesController < ApplicationController
   end
 
   def data
-    xss_payload = { "<script>window.alert('xss1');</script>" => '<script>window.alert("xss2");</script>' }
+    xss_payload = { }
     # This is the props used by the React component.
     @app_props_server_render = {
       helloWorldData: {
