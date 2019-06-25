@@ -23,6 +23,7 @@ sassLoader.use.push({
 })
 
 environment.config.merge(aliasConfig)
-environment.splitChunks((config) => Object.assign({}, config, { optimization: { splitChunks: false }}))
+environment.splitChunks()
+environment.config.set('output.filename', '[name].js')
 
 module.exports = environment
