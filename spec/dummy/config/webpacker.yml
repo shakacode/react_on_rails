@@ -7,17 +7,17 @@ default: &default
 
   cache_path: tmp/cache/webpacker
   check_yarn_integrity: false
-  webpack_compile_output: false
+  webpack_compile_output: true
 
   # Additional paths webpack should lookup modules
   # ['app/assets', 'engine/foo/app/assets']
   resolved_paths: []
 
   # Reload manifest.json on all requests so we reload latest compiled packs
-  cache_manifest: false
+  cache_manifest: true
 
   # Extract and emit a css file
-  extract_css: false
+  extract_css: true
 
   static_assets_extensions:
     - .jpg
@@ -51,7 +51,7 @@ default: &default
 
 development:
   <<: *default
-  compile: true
+  compile: false
 
   public_output_path: webpack/development
 
