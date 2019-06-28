@@ -7,7 +7,7 @@ import HelloWorld from '../components/HelloWorld';
 // import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 // import HelloWorldES5 from '../components/HelloWorldES5';
 // import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
-import HelloWorldApp from '../startup/HelloWorldApp';
+// import HelloWorldApp from '../startup/HelloWorldApp';
 // import BrokenApp from '../startup/BrokenApp';
 
 // import ReduxApp from '../startup/ClientReduxApp';
@@ -44,7 +44,7 @@ ReactOnRails.register({
   // HelloWorldRehydratable,
   // ReduxApp,
   // ReduxSharedStoreApp,
-  HelloWorldApp,
+  // HelloWorldApp,
   // RouterApp,
   // PureComponent,
   // CssModulesImagesFontsExample,
@@ -57,6 +57,6 @@ ReactOnRails.register({
   // SetTimeoutLoggingApp,
 });
 
-// ReactOnRails.registerStore({
+ReactOnRails.registerStore({
   // SharedReduxStore,
-// });
+});

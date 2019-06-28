@@ -4,13 +4,13 @@ const merge = require("webpack-merge")
 // React Server Side Rendering webpacker config
 // Builds a Node compatible file that React on Rails can load, never served to the client.
 
+
 const serverEnvironment = merge(environment.toWebpackConfig(), {
   target: "node",
-  entry: "./client/app/packs/serverRegistration.jsx",
+  entry: "./client/app/startup/serverRegistration.jsx",
   output: {
     filename: "server-bundle.js",
     path: environment.config.output.path,
-    libraryTarget: "commonjs",
   },
 })
 

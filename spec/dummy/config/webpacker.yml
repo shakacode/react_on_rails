@@ -14,7 +14,7 @@ default: &default
   resolved_paths: []
 
   # Reload manifest.json on all requests so we reload latest compiled packs
-  cache_manifest: true
+  cache_manifest: false
 
   # Extract and emit a css file
   extract_css: true
