@@ -20,6 +20,9 @@ import HelloWorld from '../components/HelloWorld';
 // import DeferredRenderApp from '../startup/DeferredRenderAppClient';
 
 // import SharedReduxStore from '../stores/SharedReduxStore';
+console.log("C*******************************************************")
+console.log("C*******************************************************")
+console.log("C*******************************************************")
 
 // Deferred render on the client side w/ server render
 // import RenderedHtml from '../startup/ClientRenderedHtml';

@@ -7,6 +7,10 @@ import ReactOnRails from 'react-on-rails';
 // // React components
 import HelloWorld from '../components/HelloWorld';
 
+console.log("*******************************************************")
+console.log("*******************************************************")
+console.log("*******************************************************")
+
 // import HelloWorldES5 from '../components/HelloWorldES5';
 // import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
 // import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
