@@ -21,9 +21,10 @@ sassLoader.use.push({
     resources: sassResources
   },
 })
+console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
+console.log("rules", rules);
+console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
 
 environment.config.merge(aliasConfig)
-environment.splitChunks()
-environment.config.set('output.filename', '[name].js')
 
 module.exports = environment

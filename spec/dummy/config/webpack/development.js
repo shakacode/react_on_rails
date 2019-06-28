@@ -5,9 +5,9 @@ process.env.NODE_ENV = process.env.NODE_ENV || "development"
 const environment = require("./environment")
 const serverConfig = require("./server")
 
+environment.splitChunks((config) => Object.assign({}, config, { optimization: { splitChunks: false }}))
 
 module.exports = [environment.toWebpackConfig(), serverConfig]
 
 // If you just want to test the client config without building the server config
 // module.exports = environment.toWebpackConfig()
-
