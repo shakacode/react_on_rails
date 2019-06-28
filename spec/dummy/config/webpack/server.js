@@ -13,7 +13,8 @@ const serverEnvironment = merge(environment.toWebpackConfig(), {
     path: environment.config.output.path,
   },
 })
-
+debugger
+console.log('OUTPUUUUUUUTPATH', environment.config.output.path)
 // This removes the Manifest plugin from the Server.
 // Manifest overwrites the _real_ client manifest, required by Rails.
 serverEnvironment.plugins = serverEnvironment.plugins
