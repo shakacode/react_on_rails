@@ -1,6 +1,3 @@
-import '@babel/polyfill';
-import 'es5-shim';
-
 // // Shows the mapping from the exported object to the name used by the server rendering.
 import ReactOnRails from 'react-on-rails';
 //
@@ -9,6 +6,11 @@ import ReactOnRails from 'react-on-rails';
 //
 // // React components
 import HelloWorld from '../components/HelloWorld';
+
+console.log("*******************************************************")
+console.log("*******************************************************")
+console.log("*******************************************************")
+
 // import HelloWorldES5 from '../components/HelloWorldES5';
 // import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
 // import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
@@ -66,6 +68,6 @@ ReactOnRails.register({
 //   SetTimeoutLoggingApp,
 });
 //
-// ReactOnRails.registerStore({
+ReactOnRails.registerStore({
 //   SharedReduxStore,
-// });
+});

@@ -7,7 +7,7 @@ import HelloWorld from '../components/HelloWorld';
 // import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 // import HelloWorldES5 from '../components/HelloWorldES5';
 // import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
-import HelloWorldApp from '../startup/HelloWorldApp';
+// import HelloWorldApp from '../startup/HelloWorldApp';
 // import BrokenApp from '../startup/BrokenApp';
 
 // import ReduxApp from '../startup/ClientReduxApp';
@@ -20,6 +20,9 @@ import HelloWorldApp from '../startup/HelloWorldApp';
 // import DeferredRenderApp from '../startup/DeferredRenderAppClient';
 
 // import SharedReduxStore from '../stores/SharedReduxStore';
+console.log("C*******************************************************")
+console.log("C*******************************************************")
+console.log("C*******************************************************")
 
 // Deferred render on the client side w/ server render
 // import RenderedHtml from '../startup/ClientRenderedHtml';
@@ -44,7 +47,7 @@ ReactOnRails.register({
   // HelloWorldRehydratable,
   // ReduxApp,
   // ReduxSharedStoreApp,
-  HelloWorldApp,
+  // HelloWorldApp,
   // RouterApp,
   // PureComponent,
   // CssModulesImagesFontsExample,
@@ -57,6 +60,6 @@ ReactOnRails.register({
   // SetTimeoutLoggingApp,
 });
 
-// ReactOnRails.registerStore({
+ReactOnRails.registerStore({
   // SharedReduxStore,
-// });
+});

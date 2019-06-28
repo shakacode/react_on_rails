@@ -22,8 +22,8 @@ ReactOnRails.configure do |config|
   config.build_test_command = "yarn run build:test"
 
   # See webpacker.yml public_output_path for replacement for generated_assets_dir
-  # config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
+  config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
   config.webpack_generated_files = %w[manifest.json]
-  config.server_bundle_js_file = "serverRegistration.js"
+  config.server_bundle_js_file = "server-bundle.js"
   config.rendering_extension = RenderingExtension
 end
