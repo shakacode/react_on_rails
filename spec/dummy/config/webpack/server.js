@@ -6,11 +6,11 @@ const merge = require("webpack-merge")
 
 
 const serverEnvironment = merge(environment.toWebpackConfig(), {
-  target: "node",
+  target: "web",
   entry: "./client/app/startup/serverRegistration.jsx",
   output: {
     filename: "server-bundle.js",
-    path: environment.config.output.path,
+    path: environment.config.output.path
   },
 })
 debugger
