@@ -1,48 +1,40 @@
-// Shows the mapping from the exported object to the name used by the server rendering.
+import '@babel/polyfill';
+import 'es5-shim';
+
 import ReactOnRails from 'react-on-rails';
 
-// Example of server rendering with no React
-import HelloString from '../non_react/HelloString';
-
-// React components
 import HelloWorld from '../components/HelloWorld';
-
+import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 import HelloWorldES5 from '../components/HelloWorldES5';
 import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
-import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
-
-// Generator function
 import HelloWorldApp from '../startup/HelloWorldApp';
 import BrokenApp from '../startup/BrokenApp';
 
-// Example of React + Redux
-import ReduxApp from '../startup/ServerReduxApp';
-
-// Example of 2 React components sharing the same store
-import ReduxSharedStoreApp from '../startup/ServerReduxSharedStoreApp';
-
-// Example of React Router with Server Rendering
-import RouterApp from '../startup/ServerRouterApp';
-
+import ReduxApp from '../startup/ClientReduxApp';
+import ReduxSharedStoreApp from '../startup/ClientReduxSharedStoreApp';
+import RouterApp from '../startup/ClientRouterApp';
 import PureComponent from '../components/PureComponent';
+import CacheDisabled from '../components/CacheDisabled';
 import CssModulesImagesFontsExample from '../components/CssModulesImagesFontsExample';
+import ManualRenderApp from '../startup/ManualRenderAppRenderer';
+import DeferredRenderApp from '../startup/DeferredRenderAppClient';
 
 import SharedReduxStore from '../stores/SharedReduxStore';
 
 // Deferred render on the client side w/ server render
-import DeferredRenderApp from '../startup/DeferredRenderAppServer';
-
-// Deferred render on the client side w/ server render
-import RenderedHtml from '../startup/ServerRenderedHtml';
+import RenderedHtml from '../startup/ClientRenderedHtml';
 
 // Deferred render on the client side w/ server render with additional HTML strings:
-import ReactHelmetApp from '../startup/ReactHelmetServerApp';
+import ReactHelmetApp from '../startup/ReactHelmetClientApp';
 
 // Demonstrate using Images
 import ImageExample from '../components/ImageExample';
 
 import SetTimeoutLoggingApp from '../startup/SetTimeoutLoggingApp';
 
+ReactOnRails.setOptions({
+  traceTurbolinks: true,
+});
 
 ReactOnRails.register({
   BrokenApp,
@@ -54,10 +46,11 @@ ReactOnRails.register({
   ReduxSharedStoreApp,
   HelloWorldApp,
   RouterApp,
-  HelloString,
   PureComponent,
   CssModulesImagesFontsExample,
+  ManualRenderApp,
   DeferredRenderApp,
+  CacheDisabled,
   RenderedHtml,
   ReactHelmetApp,
   ImageExample,
