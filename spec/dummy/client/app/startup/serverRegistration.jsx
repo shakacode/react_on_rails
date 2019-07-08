@@ -31,6 +31,7 @@ import SharedReduxStore from '../stores/SharedReduxStore';
 
 // Deferred render on the client side w/ server render
 import DeferredRenderApp from '../startup/DeferredRenderAppServer';
+import ManualRenderApp from '../startup/ManualRenderAppRenderer';
 
 // Deferred render on the client side w/ server render
 import RenderedHtml from '../startup/ServerRenderedHtml';
@@ -53,6 +54,7 @@ ReactOnRails.register({
   ReduxApp,
   ReduxSharedStoreApp,
   HelloWorldApp,
+  ManualRenderApp,
   RouterApp,
   HelloString,
   PureComponent,
