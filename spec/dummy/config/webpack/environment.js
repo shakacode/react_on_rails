@@ -2,6 +2,7 @@ const { environment } = require('@rails/webpacker')
 const sassResources = ['./client/app/assets/styles/app-variables.scss']
 const aliasConfig = require('./alias.js')
 const rules = environment.loaders
+const cssLoader = rules.get('css')
 const sassLoader = rules.get('sass')
 const urlFileSizeCutover = 1000; // below 10k, inline, small 1K is to test file loader
 
@@ -11,6 +12,9 @@ sassLoader.use.push({
     resources: sassResources
   },
 })
+
+cssLoader.use[1].options.modules = true
+
 
 const urlLoader = {
     test: /\.(jpe?g|png|gif|ico|woff)$/,
