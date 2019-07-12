@@ -42,6 +42,8 @@ import ReactHelmetApp from '../startup/ReactHelmetServerApp';
 // Demonstrate using Images
 import ImageExample from '../components/ImageExample';
 
+import CacheDisabled from '../components/CacheDisabled';
+
 import SetTimeoutLoggingApp from '../startup/SetTimeoutLoggingApp';
 
 
@@ -55,6 +57,7 @@ ReactOnRails.register({
   ReduxSharedStoreApp,
   HelloWorldApp,
   ManualRenderApp,
+  CacheDisabled,
   RouterApp,
   HelloString,
   PureComponent,
