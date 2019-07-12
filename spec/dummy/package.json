@@ -85,15 +85,9 @@
     "postinstall": "yarn link react-on-rails",
     "lint": "cd client && yarn run lint",
     "test": "yarn run build:test && yarn run lint && rspec",
-    "build:test": "yarn run build:test:client && yarn run build:test:server",
-    "build:clean": "rm -rf public/webpack || true",
-    "build:test:client": "RAILS_ENV=test NODE_ENV=test bin/webpack ",
-    "build:test:server": "RAILS_ENV=test NODE_ENV=test bin/webpack-dev-server ",
-    "build:dev:client": "RAILS_ENV=development NODE_ENV=development bin/webpack",
-    "build:dev:server": "RAILS_ENV=development NODE_ENV=development bin/webpack-dev-server",
-    "build:production:client": "RAILS_ENV=development NODE_ENV=production bin/webpack",
-    "build:production:server": "RAILS_ENV=development NODE_ENV=production bin/webpack-dev-server",
-    "build:production": "yarn run build:production:server && yarn run build:production:client",
-    "hot-assets": "NODE_ENV=development babel-node server-rails-hot.js"
+    "build:test": "RAILS_ENV=test NODE_ENV=test bin/webpack-dev-server",
+    "build:dev": "RAILS_ENV=development NODE_ENV=development bin/webpack-dev-server",
+    "build:production": "RAILS_ENV=production NODE_ENV=production bin/webpack-dev-server",
+    "build:clean": "rm -rf public/webpack || true"
   }
 }
