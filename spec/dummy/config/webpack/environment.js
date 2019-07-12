@@ -2,13 +2,15 @@ const { environment } = require('@rails/webpacker')
 
 const sassResources = ['./client/app/assets/styles/app-variables.scss']
 const aliasConfig = require('./alias.js')
-
+const webpack = require('webpack')
 const rules = environment.loaders
 const fileLoader = rules.get('file')
 const cssLoader = rules.get('css')
 const sassLoader = rules.get('sass')
 const babelLoader = rules.get('babel')
 const urlFileSizeCutover = 1000; // below 10k, inline, small 1K is to test file loader
+
+const ManifestPlugin = environment.plugins.get('Manifest')
 
 sassLoader.use.push({
   loader: 'sass-resources-loader',
@@ -60,5 +62,14 @@ environment.loaders.insert('jquery-ujs', jqueryujsLoader, { after: 'react'} )
 environment.loaders.insert('babel', babelLoader, { before: 'css'} )
 
 environment.config.merge(aliasConfig)
+
+// plugins
+environment.plugins.insert('DefinePlugin',
+    new webpack.DefinePlugin({
+        TRACE_TURBOLINKS: true
+    })
+    , { after: 'Environment' })
+
+ManifestPlugin.options.writeToFileEmit = true
 
 module.exports = environment
