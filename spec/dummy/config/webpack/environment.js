@@ -8,16 +8,6 @@ const cssLoader = rules.get('css')
 const sassLoader = rules.get('sass')
 const urlFileSizeCutover = 1000; // below 10k, inline, small 1K is to test file loader
 
-debugger;
-
-console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
-console.log("rules", rules);
-console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
-
-
-environment.config.merge(aliasConfig)
-
-const sassLoader = rules.get('sass')
 sassLoader.use.push({
   loader: 'sass-resources-loader',
   options: {
@@ -29,7 +19,7 @@ console.log("rules", rules);
 console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
 
 cssLoader.use[1].options.modules = true
-
+sassLoader.use[1].options.modules = true
 
 const urlLoader = {
     test: /\.(jpe?g|png|gif|ico|woff)$/,
@@ -52,8 +42,6 @@ const exposeLoader = {
 }
 // Insert json loader after/before a given loader
 environment.loaders.insert('expose', exposeLoader, { after: 'file'} )
-
-debugger
 
 environment.config.merge(aliasConfig)
 
