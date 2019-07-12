@@ -6,6 +6,7 @@ const cssLoader = rules.get('css')
 const sassLoader = rules.get('sass')
 const urlFileSizeCutover = 1000; // below 10k, inline, small 1K is to test file loader
 
+
 sassLoader.use.push({
   loader: 'sass-resources-loader',
   options: {
@@ -14,7 +15,7 @@ sassLoader.use.push({
 })
 
 cssLoader.use[1].options.modules = true
-
+sassLoader.use[1].options.modules = true
 
 const urlLoader = {
     test: /\.(jpe?g|png|gif|ico|woff)$/,
@@ -37,8 +38,6 @@ const exposeLoader = {
 }
 // Insert json loader after/before a given loader
 environment.loaders.insert('expose', exposeLoader, { after: 'file'} )
-
-debugger
 
 environment.config.merge(aliasConfig)
 
