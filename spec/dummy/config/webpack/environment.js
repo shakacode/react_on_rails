@@ -8,6 +8,9 @@ const fileLoader = rules.get('file')
 const cssLoader = rules.get('css')
 const sassLoader = rules.get('sass')
 const babelLoader = rules.get('babel')
+const nodeModulesLoader = rules.get('nodeModules')
+const moduleCssLoader = rules.get('moduleCss')
+const moduleSassLoader = rules.get('moduleSass')
 const urlFileSizeCutover = 1000; // below 10k, inline, small 1K is to test file loader
 
 const ManifestPlugin = environment.plugins.get('Manifest')
@@ -71,5 +74,9 @@ environment.plugins.insert('DefinePlugin',
     , { after: 'Environment' })
 
 ManifestPlugin.options.writeToFileEmit = true
+
+rules.delete('nodeModules')
+rules.delete('moduleCss')
+rules.delete('moduleSass')
 
 module.exports = environment
