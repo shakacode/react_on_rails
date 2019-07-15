@@ -8,13 +8,10 @@ const fileLoader = rules.get('file')
 const cssLoader = rules.get('css')
 const sassLoader = rules.get('sass')
 const babelLoader = rules.get('babel')
-const nodeModulesLoader = rules.get('nodeModules')
-const moduleCssLoader = rules.get('moduleCss')
-const moduleSassLoader = rules.get('moduleSass')
+const ManifestPlugin = environment.plugins.get('Manifest')
 const urlFileSizeCutover = 1000; // below 10k, inline, small 1K is to test file loader
 
-const ManifestPlugin = environment.plugins.get('Manifest')
-
+// rules
 sassLoader.use.push({
   loader: 'sass-resources-loader',
   options: {
@@ -25,18 +22,12 @@ console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ
 console.log("rules", rules);
 console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
 
-cssLoader.use[1].options.modules = true
-sassLoader.use[1].options.modules = true
-fileLoader.test = /\.(ttf|eot|svg)$/
-fileLoader.use[0].options = { name: 'images/[name]-[hash].[ext]' }
-
 const urlLoader = {
     test: /\.(jpe?g|png|gif|ico|woff)$/,
     use: {
         loader: 'url-loader',
         options: {
             limit: urlFileSizeCutover,
-
             // NO leading slash
             name: 'images/[name]-[hash].[ext]',
         },
@@ -50,11 +41,11 @@ const exposeLoader = {
 }
 environment.loaders.insert('expose', exposeLoader, { after: 'file'} )
 
-const reactLoader = {
+const es5Loader = {
     test: require.resolve('react'),
     use: [ { loader: 'imports-loader', options: { shim: 'es5-shim/es5-shim', sham: 'es5-shim/es5-sham' } } ]
 }
-environment.loaders.insert('react', reactLoader, { after: 'sass'} )
+environment.loaders.insert('react', es5Loader, { after: 'sass'} )
 
 const jqueryujsLoader = {
     test: require.resolve('jquery-ujs'),
@@ -66,17 +57,20 @@ environment.loaders.insert('babel', babelLoader, { before: 'css'} )
 
 environment.config.merge(aliasConfig)
 
+cssLoader.use[1].options.modules = true
+sassLoader.use[1].options.modules = true
+fileLoader.test = /\.(ttf|eot|svg)$/
+fileLoader.use[0].options = { name: 'images/[name]-[hash].[ext]' }
+rules.delete('nodeModules')
+rules.delete('moduleCss')
+rules.delete('moduleSass')
+
 // plugins
 environment.plugins.insert('DefinePlugin',
     new webpack.DefinePlugin({
         TRACE_TURBOLINKS: true
     })
     , { after: 'Environment' })
-
 ManifestPlugin.options.writeToFileEmit = true
-
-rules.delete('nodeModules')
-rules.delete('moduleCss')
-rules.delete('moduleSass')
 
 module.exports = environment
