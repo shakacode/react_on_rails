@@ -6,7 +6,19 @@ const environment = require("./environment")
 const serverConfig = require("./server")
 const merge = require("webpack-merge")
 
-environment.splitChunks((config) => Object.assign({}, config, { optimization: { splitChunks: false }}))
+
+const optimization = {
+    splitChunks: {
+        cacheGroups: {
+            vendor: {
+                chunks: 'initial',
+                name: 'vendor',
+                test: 'vendor',
+                enforce: true
+            },
+        }
+    }
+}
 
 const clientEnvironment = merge(environment.toWebpackConfig(), {
     entry: {
@@ -14,7 +26,13 @@ const clientEnvironment = merge(environment.toWebpackConfig(), {
             'jquery-ujs',
         ],
     },
+    output: {
+        filename: '[name].js',
+        path: environment.config.output.path
+    }
 })
+
+environment.splitChunks((config) => Object.assign({}, config, { optimization: optimization }))
 
 module.exports = [clientEnvironment, serverConfig]
 
