@@ -34,12 +34,9 @@
     "jquery-ujs": "^1.2.2",
     "loader-utils": "^1.2.3",
     "lodash": "^4.17.4",
-<<<<<<< HEAD
-=======
     "mini-css-extract-plugin": "^0.7.0",
     "node-libs-browser": "^2.2.1",
     "node-sass": "^4.12.0",
->>>>>>> add dependencies based on the previous package.json
     "nps": "^5.9.3",
     "postcss-loader": "^3.0.0",
     "prop-types": "^15.6.2",
@@ -84,9 +81,9 @@
     "postinstall": "yarn link react-on-rails",
     "lint": "cd client && yarn run lint",
     "test": "yarn run build:test && yarn run lint && rspec",
-    "build:test": "RAILS_ENV=test NODE_ENV=development bin/webpack",
+    "build:test": "RAILS_ENV=test NODE_ENV=test bin/webpack",
     "build:dev": "RAILS_ENV=development NODE_ENV=development bin/webpack-dev-server",
-    "build:production": "RAILS_ENV=production NODE_ENV=production bin/webpack",
+    "build:production": "RAILS_ENV=production NODE_ENV=production bin/webpack -p",
     "build:clean": "rm -rf public/webpack || true"
   }
 }
