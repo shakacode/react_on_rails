@@ -18,10 +18,8 @@ sassLoader.use.push({
     resources: sassResources
   },
 })
-console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
-console.log("rules", rules);
-console.log("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
 
+//adding urlLoader
 const urlLoader = {
     test: /\.(jpe?g|png|gif|ico|woff)$/,
     use: {
@@ -35,42 +33,55 @@ const urlLoader = {
 }
 environment.loaders.insert('url', urlLoader, { before: 'file'} )
 
+//adding exposeLoader
 const exposeLoader = {
     test: require.resolve('jquery'),
     use: [ { loader: 'expose-loader', options: 'jQuery' } ]
 }
 environment.loaders.insert('expose', exposeLoader, { after: 'file'} )
 
+//adding es5Loader
 const es5Loader = {
     test: require.resolve('react'),
     use: [ { loader: 'imports-loader', options: { shim: 'es5-shim/es5-shim', sham: 'es5-shim/es5-sham' } } ]
 }
 environment.loaders.insert('react', es5Loader, { after: 'sass'} )
 
-const jqueryujsLoader = {
+//adding jqueryUjsLoader
+const jqueryUjsLoader = {
     test: require.resolve('jquery-ujs'),
     use: [ { loader: 'imports-loader', options: { jQuery: 'jquery' } } ]
 }
-environment.loaders.insert('jquery-ujs', jqueryujsLoader, { after: 'react'} )
+environment.loaders.insert('jquery-ujs', jqueryUjsLoader, { after: 'react'} )
 
+// changing order of babelLoader
 environment.loaders.insert('babel', babelLoader, { before: 'css'} )
 
+// add aliases to config
 environment.config.merge(aliasConfig)
 
+// modifying modules in css and sass to true,
 cssLoader.use[1].options.modules = true
 sassLoader.use[1].options.modules = true
+
+//changing fileLoader to use proper values
 fileLoader.test = /\.(ttf|eot|svg)$/
 fileLoader.use[0].options = { name: 'images/[name]-[hash].[ext]' }
+
+// removing extra rules added by webpacker
 rules.delete('nodeModules')
 rules.delete('moduleCss')
 rules.delete('moduleSass')
 
 // plugins
+// adding definePlugin
 environment.plugins.insert('DefinePlugin',
     new webpack.DefinePlugin({
         TRACE_TURBOLINKS: true
     })
     , { after: 'Environment' })
+
+// manipulating manifestPlugin
 ManifestPlugin.options.writeToFileEmit = true
 
 module.exports = environment
