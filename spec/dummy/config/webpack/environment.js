@@ -9,7 +9,12 @@ const cssLoader = rules.get('css')
 const sassLoader = rules.get('sass')
 const babelLoader = rules.get('babel')
 const ManifestPlugin = environment.plugins.get('Manifest')
+// const MiniCssExtractPlugin = environment.plugins.get('MiniCssExtract')
 const urlFileSizeCutover = 1000; // below 10k, inline, small 1K is to test file loader
+
+// ask about this: https://github.com/webpack-contrib/mini-css-extract-plugin#advanced-configuration-example]
+// const devMode = process.env.NODE_ENV !== 'production';
+
 
 // rules
 sassLoader.use.push({
@@ -83,5 +88,9 @@ environment.plugins.insert('DefinePlugin',
 
 // manipulating manifestPlugin
 ManifestPlugin.options.writeToFileEmit = true
+
+// ask about this,
+// MiniCssExtractPlugin.options.filename =  devMode ? 'css/[name].css' : 'css/[name].[hash].css'
+// MiniCssExtractPlugin.options.chunkFilename = devMode ? 'css/[id].css' : 'css/[id].[hash].css',
 
 module.exports = environment
