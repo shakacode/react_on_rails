@@ -20,6 +20,8 @@ const optimization = {
     }
 }
 
+environment.splitChunks((config) => Object.assign({}, config, { optimization: optimization }))
+
 const clientEnvironment = merge(environment.toWebpackConfig(), {
     entry: {
         'vendor-bundle': [
@@ -28,11 +30,11 @@ const clientEnvironment = merge(environment.toWebpackConfig(), {
     },
     output: {
         filename: '[name].js',
+        // due to https://webpack.js.org/guides/code-splitting/#dynamic-imports
+        chunkFilename: '[name].bundle.js',
         path: environment.config.output.path
     }
 })
-
-environment.splitChunks((config) => Object.assign({}, config, { optimization: optimization }))
 
 module.exports = [clientEnvironment, serverConfig]
 

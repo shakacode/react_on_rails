@@ -12,6 +12,11 @@ const clientEnvironment = merge(environment.toWebpackConfig(), {
             'jquery-ujs',
         ],
     },
+    output: {
+        filename: '[name].js',
+        chunkFilename: '[name].bundle.js',
+        path: environment.config.output.path
+}
 })
 
 module.exports = [clientEnvironment, serverConfig]
