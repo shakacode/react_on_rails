@@ -11,9 +11,10 @@ const DeferredRenderAppClient = (_props, _railsContext, domNodeId) => {
     component: DeferredRender,
     childRoutes: [{
       path: '/deferred_render_with_server_rendering/async_page',
-      getComponent(_nextState, callback) {
-        const component = import(
-          /* webpackChunkName: "my-chunk-name" */
+      async getComponent(_nextState, callback) {
+        const component = await import(
+          /* webpackChunkName: "clientRegistration.bundle.js" */
+          /* webpackPrefetch: true */
           /* webpackMode: "lazy" */
           '../components/DeferredRenderAsyncPage'
           );

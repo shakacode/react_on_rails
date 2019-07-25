@@ -9,11 +9,12 @@ const cssLoader = rules.get('css')
 const sassLoader = rules.get('sass')
 const babelLoader = rules.get('babel')
 const ManifestPlugin = environment.plugins.get('Manifest')
-// const MiniCssExtractPlugin = environment.plugins.get('MiniCssExtract')
-const urlFileSizeCutover = 1000; // below 10k, inline, small 1K is to test file loader
 
+const urlFileSizeCutover = 1000; // below 10k, inline, small 1K is to test file loader
+// const MiniCssExtractPlugin = environment.plugins.get('MiniCssExtract')
 // ask about this: https://github.com/webpack-contrib/mini-css-extract-plugin#advanced-configuration-example]
 // const devMode = process.env.NODE_ENV !== 'production';
+
 
 
 // rules
