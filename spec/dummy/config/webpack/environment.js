@@ -83,7 +83,10 @@ rules.delete('moduleSass')
 // adding definePlugin
 environment.plugins.insert('DefinePlugin',
     new webpack.DefinePlugin({
-        TRACE_TURBOLINKS: true
+        TRACE_TURBOLINKS: true,
+        'process.env': {
+            NODE_ENV: process.env.NODE_ENV,
+        },
     })
     , { after: 'Environment' })
 
