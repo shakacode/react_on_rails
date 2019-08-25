@@ -19,6 +19,7 @@ const clientEnvironment = merge(environment.toWebpackConfig(), {
             path: environment.config.output.path
         }
     },
+    devtool: 'inline-source-map'
 })
 
 module.exports = [clientEnvironment, serverConfig]

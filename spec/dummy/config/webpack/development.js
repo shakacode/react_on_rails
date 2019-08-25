@@ -7,22 +7,23 @@ const serverConfig = require("./server")
 const merge = require("webpack-merge")
 
 
-const optimization = {
-    splitChunks: {
-        cacheGroups: {
-            vendor: {
-                chunks: 'initial',
-                name: 'vendor',
-                test: 'vendor',
-                enforce: true
-            },
-        }
-    }
-}
+// const optimization = {
+//     splitChunks: {
+//         cacheGroups: {
+//             vendor: {
+//                 chunks: 'initial',
+//                 name: 'vendor',
+//                 test: 'vendor',
+//                 enforce: true
+//             },
+//         }
+//     }
+// }
 
-environment.splitChunks((config) => Object.assign({}, config, { optimization: optimization }))
+// environment.splitChunks((config) => Object.assign({}, config, { optimization: false }))
 
 const clientEnvironment = merge(environment.toWebpackConfig(), {
+    mode: 'none',
     entry: {
         'vendor-bundle': [
             'jquery-ujs',
