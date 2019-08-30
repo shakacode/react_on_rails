@@ -13,12 +13,12 @@ const DeferredRenderAppClient = (_props, _railsContext, domNodeId) => {
       path: '/deferred_render_with_server_rendering/async_page',
       async getComponent(_nextState, callback) {
         const component = await import(
-          /* webpackChunkName: "clientRegistration.bundle.js" */
+          /* webpackChunkName: "deferred" */
           /* webpackPrefetch: true */
           /* webpackMode: "lazy" */
           '../components/DeferredRenderAsyncPage'
           );
-        callback(null, component)
+        callback(null, component.default)
       },
     }],
   };
@@ -28,6 +28,7 @@ const DeferredRenderAppClient = (_props, _railsContext, domNodeId) => {
   // component, immediately rendering a Router could cause a client/server
   // checksum mismatch.
   match({ history, routes }, (error, _redirectionLocation, routerProps) => {
+    console.log('BEHRAAAAAAAAAANG', error, routerProps, domNodeId)
     if (error) {
       throw error;
     }
