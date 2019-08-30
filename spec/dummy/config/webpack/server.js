@@ -11,7 +11,8 @@ const serverEnvironment = merge(environment.toWebpackConfig(), {
   entry: "./client/app/startup/serverRegistration.jsx",
   output: {
     filename: "server-bundle.js",
-    path: environment.config.output.path
+    path: environment.config.output.path,
+    globalObject: 'this'
   },
   // resolve: {
   //   extensions: ['.js', '.jsx'],
