@@ -23,7 +23,7 @@ const optimization = {
 
 environment.splitChunks((config) => Object.assign({}, config, { optimization: optimization }))
 
-const clientEnvironment = merge(environment.toWebpackConfig(), {
+const clientConfig = merge(environment.toWebpackConfig(), {
     mode: 'development',
     entry: {
         'vendor-bundle': [
@@ -38,7 +38,7 @@ const clientEnvironment = merge(environment.toWebpackConfig(), {
     }
 })
 
-module.exports = [clientEnvironment, serverConfig]
+module.exports = [clientConfig, serverConfig]
 
 // If you just want to test the client config without building the server config
 // module.exports = environment.toWebpackConfig()

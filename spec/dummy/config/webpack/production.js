@@ -8,7 +8,7 @@ const merge = require("webpack-merge")
 
 environment.splitChunks((config) => Object.assign({}, config, { optimization: { splitChunks: false }}))
 
-const clientEnvironment = merge(environment.toWebpackConfig(), {
+const clientConfig = merge(environment.toWebpackConfig(), {
     entry: {
         'vendor-bundle': [
             'jquery-ujs',
@@ -22,4 +22,4 @@ const clientEnvironment = merge(environment.toWebpackConfig(), {
     devtool: 'inline-source-map'
 })
 
-module.exports = [clientEnvironment, serverConfig]
+module.exports = [clientConfig, serverConfig]

@@ -4,7 +4,7 @@ const environment = require('./environment')
 const serverConfig = require('./server')
 const merge = require("webpack-merge")
 
-const clientEnvironment = merge(environment.toWebpackConfig(), {
+const clientConfig = merge(environment.toWebpackConfig(), {
     mode: 'development',
     entry: {
         'vendor-bundle': [
@@ -21,4 +21,4 @@ const clientEnvironment = merge(environment.toWebpackConfig(), {
 
 debugger
 
-module.exports = [clientEnvironment, serverConfig]
+module.exports = [clientConfig, serverConfig]
