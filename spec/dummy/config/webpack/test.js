@@ -1,6 +1,7 @@
 process.env.NODE_ENV = process.env.NODE_ENV || 'test'
 
 const environment = require('./environment')
+const serverConfig = require('./server')
 const merge = require("webpack-merge")
 
 const clientEnvironment = merge(environment.toWebpackConfig(), {
@@ -17,8 +18,6 @@ const clientEnvironment = merge(environment.toWebpackConfig(), {
     },
     devtool: 'inline-source-map'
 })
-
-const serverConfig = require('./server')
 
 debugger
 
