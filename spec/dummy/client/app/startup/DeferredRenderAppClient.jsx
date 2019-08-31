@@ -13,7 +13,7 @@ const DeferredRenderAppClient = (_props, _railsContext, domNodeId) => {
       path: '/deferred_render_with_server_rendering/async_page',
       async getComponent(_nextState, callback) {
         const component = await import(
-          /* webpackChunkName: "deferred" */
+          /* webpackChunkName: "deferredAsyncPage" */
           /* webpackPrefetch: true */
           /* webpackMode: "lazy" */
           '../components/DeferredRenderAsyncPage'
@@ -23,12 +23,11 @@ const DeferredRenderAppClient = (_props, _railsContext, domNodeId) => {
     }],
   };
 
-  // This match is potentially asyncronous, because one of the routes
-  // implements an asyncronous getComponent. Since we do server rendering for this
+  // This match is potentially asynchronous, because one of the routes
+  // implements an asynchronous getComponent. Since we do server rendering for this
   // component, immediately rendering a Router could cause a client/server
   // checksum mismatch.
   match({ history, routes }, (error, _redirectionLocation, routerProps) => {
-    console.log('BEHRAAAAAAAAAANG', error, routerProps, domNodeId)
     if (error) {
       throw error;
     }
