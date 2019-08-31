@@ -9,7 +9,7 @@ const cssLoader = rules.get('css')
 const sassLoader = rules.get('sass')
 const babelLoader = rules.get('babel')
 const ManifestPlugin = environment.plugins.get('Manifest')
-
+const devBuild = process.env.NODE_ENV === 'production' ? 'production' : 'development'
 const urlFileSizeCutover = 1000; // below 10k, inline, small 1K is to test file loader
 // const MiniCssExtractPlugin = environment.plugins.get('MiniCssExtract')
 // ask about this: https://github.com/webpack-contrib/mini-css-extract-plugin#advanced-configuration-example]
@@ -85,7 +85,7 @@ environment.plugins.insert('DefinePlugin',
     new webpack.DefinePlugin({
         TRACE_TURBOLINKS: true,
         'process.env': {
-            NODE_ENV: process.env.NODE_ENV,
+            NODE_ENV: devBuild,
         },
     })
     , { after: 'Environment' })
