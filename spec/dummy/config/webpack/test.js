@@ -15,10 +15,7 @@ const clientConfig = merge(environment.toWebpackConfig(), {
         filename: '[name].js',
         chunkFilename: '[name].bundle.js',
         path: environment.config.output.path
-    },
-    devtool: 'inline-source-map'
+    }
 })
-
-debugger
 
 module.exports = [clientConfig, serverConfig]

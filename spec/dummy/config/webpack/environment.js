@@ -11,11 +11,13 @@ const babelLoader = rules.get('babel')
 const ManifestPlugin = environment.plugins.get('Manifest')
 const devBuild = process.env.NODE_ENV === 'production' ? 'production' : 'development'
 const urlFileSizeCutover = 1000; // below 10k, inline, small 1K is to test file loader
-// const MiniCssExtractPlugin = environment.plugins.get('MiniCssExtract')
-// ask about this: https://github.com/webpack-contrib/mini-css-extract-plugin#advanced-configuration-example]
-// const devMode = process.env.NODE_ENV !== 'production';
 
-
+const reactHotReload = {
+    test: /\.(js|jsx)$/,
+    use: 'react-hot-loader/webpack',
+    include: /node_modules/,
+}
+environment.loaders.insert('reactHotReload', reactHotReload, { after: 'babel'})
 
 // rules
 sassLoader.use.push({
@@ -92,9 +94,5 @@ environment.plugins.insert('DefinePlugin',
 
 // manipulating manifestPlugin
 ManifestPlugin.options.writeToFileEmit = true
-
-// ask about this,
-// MiniCssExtractPlugin.options.filename =  devMode ? 'css/[name].css' : 'css/[name].[hash].css'
-// MiniCssExtractPlugin.options.chunkFilename = devMode ? 'css/[id].css' : 'css/[id].[hash].css',
 
 module.exports = environment

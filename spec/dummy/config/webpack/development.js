@@ -6,6 +6,9 @@ const environment = require("./environment")
 const serverConfig = require("./server")
 const merge = require("webpack-merge")
 
+if (!module.hot) {
+    environment.loaders.get('sass').use.find(item => item.loader === 'sass-loader').options.sourceMapContents = false;
+}
 
 const optimization = {
     splitChunks: {
@@ -32,13 +35,9 @@ const clientConfig = merge(environment.toWebpackConfig(), {
     },
     output: {
         filename: '[name].js',
-        // due to https://webpack.js.org/guides/code-splitting/#dynamic-imports
         chunkFilename: '[name].bundle.js',
         path: environment.config.output.path
     }
 })
 
 module.exports = [clientConfig, serverConfig]
-
-// If you just want to test the client config without building the server config
-// module.exports = environment.toWebpackConfig()

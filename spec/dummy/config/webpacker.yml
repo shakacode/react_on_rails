@@ -86,22 +86,10 @@ test:
   public_output_path: webpack/test
 
   dev_server:
-    https: false
-    host: localhost
-    port: 3035
-    public: localhost:3035
     hmr: true
     # Inline should be set to true if using HMR
     inline: true
-    overlay: true
-    compress: true
-    disable_host_check: true
-    use_local_ip: false
-    quiet: false
-    headers:
-      'Access-Control-Allow-Origin': '*'
-    watch_options:
-      ignored: '**/node_modules/**'
+
 
 
 production:
