@@ -2,22 +2,13 @@ const { environment } = require('@rails/webpacker')
 
 const sassResources = ['./client/app/assets/styles/app-variables.scss']
 const aliasConfig = require('./alias.js')
-const webpack = require('webpack')
 const rules = environment.loaders
 const fileLoader = rules.get('file')
 const cssLoader = rules.get('css')
 const sassLoader = rules.get('sass')
 const babelLoader = rules.get('babel')
 const ManifestPlugin = environment.plugins.get('Manifest')
-const devBuild = process.env.NODE_ENV === 'production' ? 'production' : 'development'
 const urlFileSizeCutover = 1000; // below 10k, inline, small 1K is to test file loader
-
-const reactHotReload = {
-    test: /\.(js|jsx)$/,
-    use: 'react-hot-loader/webpack',
-    include: /node_modules/,
-}
-environment.loaders.insert('reactHotReload', reactHotReload, { after: 'babel'})
 
 // rules
 sassLoader.use.push({
@@ -41,27 +32,6 @@ const urlLoader = {
 }
 environment.loaders.insert('url', urlLoader, { before: 'file'} )
 
-//adding exposeLoader
-const exposeLoader = {
-    test: require.resolve('jquery'),
-    use: [ { loader: 'expose-loader', options: 'jQuery' } ]
-}
-environment.loaders.insert('expose', exposeLoader, { after: 'file'} )
-
-//adding es5Loader
-const es5Loader = {
-    test: require.resolve('react'),
-    use: [ { loader: 'imports-loader', options: { shim: 'es5-shim/es5-shim', sham: 'es5-shim/es5-sham' } } ]
-}
-environment.loaders.insert('react', es5Loader, { after: 'sass'} )
-
-//adding jqueryUjsLoader
-const jqueryUjsLoader = {
-    test: require.resolve('jquery-ujs'),
-    use: [ { loader: 'imports-loader', options: { jQuery: 'jquery' } } ]
-}
-environment.loaders.insert('jquery-ujs', jqueryUjsLoader, { after: 'react'} )
-
 // changing order of babelLoader
 environment.loaders.insert('babel', babelLoader, { before: 'css'} )
 
@@ -83,14 +53,7 @@ rules.delete('moduleSass')
 
 // plugins
 // adding definePlugin
-environment.plugins.insert('DefinePlugin',
-    new webpack.DefinePlugin({
-        TRACE_TURBOLINKS: true,
-        'process.env': {
-            NODE_ENV: devBuild,
-        },
-    })
-    , { after: 'Environment' })
+
 
 // manipulating manifestPlugin
 ManifestPlugin.options.writeToFileEmit = true
