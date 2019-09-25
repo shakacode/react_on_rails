@@ -328,6 +328,7 @@ Bug reports and pull requests are welcome. See [Contributing](CONTRIBUTING.md) t
 
 The following companies support this open source project, and ShakaCode uses their products! Justin writes React on Rails on [RubyMine](https://www.jetbrains.com/ruby/). We use [Scout](https://scoutapp.com/) to monitor the live performance of [HawaiiChee.com](https://www.hawaiichee.com), [BrowserStack](https://www.browserstack.com) to solve problems with oddball browsers, and [CodersRank](https://codersrank.io/) to find candidates for our team.
 
+[![2019-09-24_17-48-00](https://user-images.githubusercontent.com/1118459/65567887-96353780-def3-11e9-926d-4a55e2e186ff.png)](https://www.jetbrains.com/ruby/)
 [![Scout](https://user-images.githubusercontent.com/1118459/41828269-106b40f8-77d0-11e8-8d19-9c4b167ef9d8.png)](https://scoutapp.com/)
 [![BrowserStack](https://cloud.githubusercontent.com/assets/1118459/23203304/1261e468-f886-11e6-819e-93b1a3f17da4.png)](https://www.browserstack.com)
 [![CodersRank](https://user-images.githubusercontent.com/1118459/55040254-ad8a7b00-4fcb-11e9-8936-c6765eb30698.png)](https://codersrank.io/?utm_source=github&utm_medium=banner&utm_campaign=shakacode)
