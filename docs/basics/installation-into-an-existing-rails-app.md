@@ -11,7 +11,7 @@
    gem "webpacker", "~> 3" # Newer versions might be supported
    ```
 
-2. Run the following 2 commands to install Webpacker with React. Note, f you are using an older version of Rails than 5.1, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
+2. Run the following 2 commands to install Webpacker with React. Note, if you are using an older version of Rails than 5.1, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
 
 
    ```bash
