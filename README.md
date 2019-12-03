@@ -4,7 +4,11 @@
 
 React on Rails integrates Rails with (server rendering of) Facebook's [React](https://github.com/facebook/react) front-end framework.
 
-Interested in optimizing your webpack setup for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable with server side rendering? [Contact Justin Gordon](mailto:justin@shakacode.com).
+Interested in optimizing your webpack setup for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable with server side rendering?
+
+Check out [what ShakaCode did for PopMenu with React on Rails Pro to lower Heroku costs 20-25% and to get a 73% decrease in average response times](https://cdn2.hubspot.net/hubfs/4342163/Case%20Studies%202019/Popmenu%20Case%20Study%20-%20November%202019.pdf).
+
+[Contact Justin Gordon](mailto:justin@shakacode.com).
 
 # Intro
 
