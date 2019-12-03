@@ -4,7 +4,9 @@
 
 React on Rails integrates Rails with (server rendering of) Facebook's [React](https://github.com/facebook/react) front-end framework.
 
-Interested in optimizing your webpack setup for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable with server side rendering? [Contact Justin Gordon](mailto:justin@shakacode.com).
+Interested in optimizing your webpack setup for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable with server side rendering? We just did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://cdn2.hubspot.net/hubfs/4342163/Case%20Studies%202019/Popmenu%20Case%20Study%20-%20November%202019.pdf).
+
+[Contact Justin Gordon](mailto:justin@shakacode.com).
 
 # Intro
 
@@ -48,13 +50,17 @@ The [ShakaCode Pro Support Plan](http://www.shakacode.com/work/shakacode-pro-sup
 * Optimizing your webpack setup to Webpack v4 for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable.
 * Upgrading your app to use the current Webpack setup that skips the Sprockets asset pipeline.
 * Better performance client and server side.
-* Efficiently migrating from [Angular to React](https://www.shakacode.com/services/angular-to-react/).
 * Best practices based on over four years of React on Rails experience.
 * Using [Reason](https://reasonml.github.io/) with (or without) React on Rails.
 
-ShakaCode can also help you with your custom software development needs. We specialize in marketplace and e-commerce applications that utilize both Rails and React. Because we own [HawaiiChee.com](https://www.hawaiichee.com), we can leverage that code for your app! 
+ShakaCode can also help you with your custom software development needs. We specialize in marketplace and e-commerce applications that utilize both Rails and React. Because we own [HawaiiChee.com](https://www.hawaiichee.com), we can leverage that code for your app!
 
-The article [Why Hire ShakaCode?](https://blog.shakacode.com/can-shakacode-help-you-4a5b1e5a8a63#.jex6tg9w9) provides additional details about our projects.
+**Case Studies of Current ShakaCode Clients in 2019:**
+* [DataCenters Marketplace App Development](https://cdn2.hubspot.net/hubfs/4342163/Case%20Studies%202019/Datacenters.com%20Case%20Study%20-%20November%202019.pdf)
+* [Printivity Solidus plus React on Rails](https://cdn2.hubspot.net/hubfs/4342163/Case%20Studies%202019/Printivity%20Case%20Study%20-%20November%202019.pdf)
+* [PopMenu React on Rails Pro](https://cdn2.hubspot.net/hubfs/4342163/Case%20Studies%202019/Popmenu%20Case%20Study%20-%20November%202019.pdf)
+* [Jilt E-Commerce](https://cdn2.hubspot.net/hubfs/4342163/Case%20Studies%202019/Jilt%20Case%20Study%20-%20November%202019.pdf)
+* [BMDI DOMO Projects](https://cdn2.hubspot.net/hubfs/4342163/Case%20Studies%202019/BMDI%20Case%20Study%20-%20November%202019.pdf)
 
 Please [email me (Justin Gordon), the creator of React on Rails](mailto:justin@shakacode.com), to see if I can help you or if you want an invite to our private Slack room for ShakaCode.
 
