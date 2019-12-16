@@ -142,7 +142,26 @@ Note, the best way to understand how to use ReactOnRails is to study a few simpl
 
 7. Visit http://localhost:3000/hello_world.
 
-  
+## Typescript Installation *(Optional)*
+
+*After running the basic installation*
+
+1. Run the typescript installer
+
+   ```bash
+   $ bundle exec rails webpacker:install:typescript
+   ```
+
+2. Add react typescipt dependencies
+
+   ```bash
+   $ yarn add @types/react @types/react-dom
+   ```
+
+3. Rename the generated .js to .tsx or .ts. 
+
+4. Make the files valid typescript. Now you can use typescript with React.
+
 ### Turning on server rendering
 
 With the code from running the React on Rails generator above:
