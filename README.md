@@ -158,7 +158,7 @@ Note, the best way to understand how to use ReactOnRails is to study a few simpl
    $ yarn add @types/react @types/react-dom
    ```
 
-3. Rename the generated .js to .tsx or .ts. 
+3. Rename the generated .js files to .tsx or .ts. 
 
 4. Make the files valid typescript. Now you can use typescript with React.
 
