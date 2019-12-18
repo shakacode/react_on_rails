@@ -1,4 +1,6 @@
-require_relative "../simplecov_helper"
+# frozen_string_literal: true
+
+require_relative "../support/generator_spec_helper"
 
 describe GeneratorMessages do
   it "has an empty messages array" do

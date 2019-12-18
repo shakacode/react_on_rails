@@ -1,0 +1,25 @@
+---
+extends: eslint-config-shakacode
+
+plugins:
+  - react
+
+globals:
+  __DEBUG_SERVER_ERRORS__: true
+  __SERVER_ERRORS__: true
+
+env:
+  browser: true
+  node: true
+  mocha: true
+
+rules:
+  no-console: 0
+
+  # https://github.com/benmosher/eslint-plugin-import/issues/340
+  import/no-extraneous-dependencies: 0
+
+  # because template cannot find react-on-rails
+  import/no-unresolved: 0
+
+  semi: 0

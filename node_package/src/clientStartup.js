@@ -80,7 +80,7 @@ function delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)
     if (trace) {
       console.log(`\
 DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, railsContext:`,
-        props, railsContext);
+      props, railsContext);
     }
 
     component(props, railsContext, domNodeId);
@@ -90,18 +90,22 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
   return false;
 }
 
+function domNodeIdForEl(el) {
+  return el.getAttribute('data-dom-id');
+}
+
 /**
- * Used for client rendering by ReactOnRails. Either calls ReactDOM.render or delegates
- * to a renderer registered by the user.
+ * Used for client rendering by ReactOnRails. Either calls ReactDOM.hydrate, ReactDOM.render, or
+ * delegates to a renderer registered by the user.
  * @param el
  */
 function render(el, railsContext) {
   const context = findContext();
-  const jsonEl = JSON.parse(el.textContent);
-  const name = jsonEl.component_name;
-  const domNodeId = jsonEl.dom_id;
-  const props = jsonEl.props;
-  const trace = jsonEl.trace;
+  // This must match lib/react_on_rails/helper.rb
+  const name = el.getAttribute('data-component-name');
+  const domNodeId = domNodeIdForEl(el);
+  const props = JSON.parse(el.textContent);
+  const trace = el.getAttribute('data-trace');
 
   try {
     const domNode = document.getElementById(domNodeId);
@@ -111,18 +115,24 @@ function render(el, railsContext) {
         return;
       }
 
+      // Hydrate if available and was server rendered
+      const shouldHydrate = !!ReactDOM.hydrate && !!domNode.innerHTML;
+
       const reactElementOrRouterResult = createReactElement({
         componentObj,
         props,
         domNodeId,
         trace,
         railsContext,
+        shouldHydrate,
       });
 
       if (isRouterResult(reactElementOrRouterResult)) {
         throw new Error(`\
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);
+      } else if (shouldHydrate) {
+        ReactDOM.hydrate(reactElementOrRouterResult, domNode);
       } else {
         ReactDOM.render(reactElementOrRouterResult, domNode);
       }
@@ -152,10 +162,14 @@ export function reactOnRailsPageLoaded() {
 }
 
 function unmount(el) {
-  const elData = JSON.parse(el.textContent);
-  const domNodeId = elData.dom_id;
+  const domNodeId = domNodeIdForEl(el);
   const domNode = document.getElementById(domNodeId);
-  ReactDOM.unmountComponentAtNode(domNode);
+  try {
+    ReactDOM.unmountComponentAtNode(domNode);
+  } catch (e) {
+    console.info(`Caught error calling unmountComponentAtNode: ${e.message} for domNode`,
+      domNode, e);
+  }
 }
 
 function reactOnRailsPageUnloaded() {
@@ -163,8 +177,34 @@ function reactOnRailsPageUnloaded() {
   forEachComponent(unmount);
 }
 
+function renderInit() {
+  // Install listeners when running on the client (browser).
+  // We must do this check for turbolinks AFTER the document is loaded because we load the
+  // Webpack bundles first.
+  if (!turbolinksInstalled() || !turbolinksSupported()) {
+    debugTurbolinks('NOT USING TURBOLINKS: calling reactOnRailsPageLoaded');
+    reactOnRailsPageLoaded();
+    return;
+  }
+
+  if (turbolinksVersion5()) {
+    debugTurbolinks(
+      'USING TURBOLINKS 5: document added event listeners ' +
+      'turbolinks:before-render and turbolinks:render.');
+    document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
+    document.addEventListener('turbolinks:render', reactOnRailsPageLoaded);
+    reactOnRailsPageLoaded();
+  } else {
+    debugTurbolinks(
+      'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +
+      'page:change.');
+    document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
+    document.addEventListener('page:change', reactOnRailsPageLoaded);
+  }
+}
+
 export function clientStartup(context) {
-  const document = context.document;
+  const { document } = context;
 
   // Check if server rendering
   if (!document) {
@@ -182,31 +222,9 @@ export function clientStartup(context) {
 
   debugTurbolinks('Adding DOMContentLoaded event to install event listeners.');
 
-  document.addEventListener('DOMContentLoaded', () => {
-    // Install listeners when running on the client (browser).
-    // We must do this check for turbolinks AFTER the document is loaded because we load the
-    // Webpack bundles first.
-
-    if (turbolinksInstalled() && turbolinksSupported()) {
-      if (turbolinksVersion5()) {
-        debugTurbolinks(
-          'USING TURBOLINKS 5: document added event listeners ' +
-          'turbolinks:before-render and turbolinks:render.');
-        document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
-        document.addEventListener('turbolinks:render', reactOnRailsPageLoaded);
-        reactOnRailsPageLoaded();
-      } else {
-        debugTurbolinks(
-          'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +
-          'page:change.');
-        document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
-        document.addEventListener('page:change', reactOnRailsPageLoaded);
-      }
-    } else {
-      debugTurbolinks(
-        'NOT USING TURBOLINKS: DOMContentLoaded event, calling reactOnRailsPageLoaded',
-      );
-      reactOnRailsPageLoaded();
-    }
-  });
+  if (document.readyState === 'complete') {
+    window.setTimeout(renderInit);
+  } else {
+    document.addEventListener('DOMContentLoaded', renderInit);
+  }
 }

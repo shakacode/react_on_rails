@@ -1,11 +1,10 @@
-<%= render "header" %>
 
 <% cache @app_props_server_render do %>
   <!-- print statements to show when server rendering is happening -->
   <% puts "=" * 80 %>
   <% puts "server rendering react components" %>
   <% puts "=" * 80 %>
-  <%= react_component("ReduxApp", props: @app_props_server_render, prerender: true, trace: true, id: "ReduxApp-react-component-0") %>
+  <%= react_component("ReduxApp", props: @app_props_server_render.merge(prerender: true), prerender: true, trace: true, id: "ReduxApp-react-component-0") %>
 <% end %>
 <hr/>
 
@@ -30,7 +29,7 @@
     Create redux listening component: spec/dummy/client/app/components/HelloWorldRedux.jsx
   </li>
   <li>
-    Create redux container: spec/dummy/client/app/components/HelloWorldContainer.jsx
+    Create redux container: spec/dummy/client/app/components/HelloWorldContainer.js
   </li>
   <li>
     Create redux app client side: spec/dummy/client/app/startup/ClientReduxApp.jsx
@@ -63,7 +62,7 @@
     <br/>
     <pre>
     <%% cache @app_props_server_render do %>
-      <%%= react_component("ReduxApp", props: @app_props_server_render, prerender: true, trace: true, id: "ReduxApp-react-component-0") %>
+      <%%= react_component("ReduxApp", props: @app_props_server_render.merge(prerender: true), prerender: true, trace: true, id: "ReduxApp-react-component-0") %>
     <%% end %>
     </pre>
   </li>

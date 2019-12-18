@@ -1,11 +1,14 @@
 // Common webpack configuration for server bundle
-/* eslint-disable comma-dangle */
-
+const { resolve, join } = require('path');
 const webpack = require('webpack');
-const path = require('path');
-const { imageLoaderRules } = require('./webpack.common');
-const webpackCommon = require('./webpack.common');
+const webpackCommon = require('./webpack.common.config');
+
 const { assetLoaderRules } = webpackCommon;
+
+const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
+
+const configPath = resolve('..', 'config');
+const { output } = webpackConfigLoader(configPath);
 
 const devBuild = process.env.NODE_ENV !== 'production';
 const nodeEnv = devBuild ? 'development' : 'production';
@@ -18,15 +21,23 @@ module.exports = {
     './app/startup/serverRegistration',
   ],
   output: {
+    // Important to NOT use a hash if the server webpack config runs separately from the client one.
+    // Otherwise, both would be writing to the same manifest.json file.
+    // Additionally, there's no particular need to have a fingerprint (hash) on the server bundle,
+    // since it's not cached by the browsers.
     filename: 'server-bundle.js',
-    path: path.resolve(__dirname, '../app/assets/webpack'),
+
+    // Leading and trailing slashes ARE necessary.
+    publicPath: output.publicPath,
+    path: output.path,
   },
   resolve: {
     extensions: ['.js', '.jsx'],
     alias: {
-      images: path.join(process.cwd(), 'app', 'assets', 'images'),
+      images: join(process.cwd(), 'app', 'assets', 'images'),
     },
   },
+
   plugins: [
     new webpack.DefinePlugin({
       'process.env': {
@@ -49,9 +60,9 @@ module.exports = {
           options: {
             modules: true,
             importLoaders: 0,
-            localIdentName: '[name]__[local]__[hash:base64:5]'
-          }
-        }
+            localIdentName: '[name]__[local]__[hash:base64:5]',
+          },
+        },
       },
       {
         test: /\.scss$/,
@@ -62,17 +73,17 @@ module.exports = {
               modules: true,
               importLoaders: 2,
               localIdentName: '[name]__[local]__[hash:base64:5]',
-            }
+            },
           },
           {
-            loader: 'sass-loader'
+            loader: 'sass-loader',
           },
           {
             loader: 'sass-resources-loader',
             options: {
-              resources: './app/assets/styles/app-variables.scss'
+              resources: './app/assets/styles/app-variables.scss',
             },
-          }
+          },
         ],
       },
     ],

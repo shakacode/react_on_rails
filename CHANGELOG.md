@@ -1,9 +1,346 @@
 # Change Log
-All notable changes to this project's source code will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version.
+All notable changes to this project's source code will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version. NOTE: major versions of the npm module and the gem must be kept in sync.
 
-Contributors: please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
+Migration instructions for the major updates can be found [here](docs/basics/upgrading-react-on-rails.md#upgrading-to-version-9.md). Some smaller migration information can be found here.
+
+## Need Help Migrating?
+If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for information about our [ShakaCode Pro Support](https://www.shakacode.com/work/shakacode-pro-support.pdf).
+
+We specialize in helping companies to quickly and efficiently move from versions before 9 to current. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4 for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
+
+## Contributors
+Please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## [Unreleased]
+Changes since last non-beta release.
+
+*Please add entries here for your pull requests that are not yet released.*
+### [11.3.0] - 2019-05-24
+#### Added
+- Added method for retrieving any option from `render_options` [PR 1213](https://github.com/shakacode/react_on_rails/pull/1213)
+by [ashgaliyev](https://github.com/ashgaliyev).
+
+- html_options has an option for 'tag' to set the html tag name like this: `html_options: { tag: "span" }`.
+[PR 1208](https://github.com/shakacode/react_on_rails/pull/1208) by [tahsin352](https://github.com/tahsin352).
+
+### [11.2.2] - 2018-12-24
+#### Improved
+- rails_context can more easily be called from controller methods. The mandatory param of server_side has been made optional.
+
+### [11.2.1] - 2018-12-06
+## MIGRATION for v11.2
+- If using **React on Rails Pro**, upgrade react_on_rails_pro to a version >= 1.3.
+
+#### Improved
+- To support React v16, updated API for manually calling `ReactOnRails.render(name, props, domNodeId, hydrate)`. Added 3rd @param hydrate Pass truthy to update server rendered html. Default is falsey Any truthy values calls hydrate rather than render. [PR 1159](https://github.com/shakacode/react_on_rails/pull/1159) by [justin808](https://github.com/justin808) and [coopersamuel](https://github.com/coopersamuel).
+
+- Enabled the use of webpack-dev-server with Server-side rendering. [PR 1173](https://github.com/shakacode/react_on_rails/pull/1173) by [justin808](https://github.com/justin808) and [judahmeek](https://github.com/judahmeek).
+
+#### Changed
+- Changed the default for:
+  ```rb
+  config.raise_on_prerender_error = Rails.env.development? 
+  ```
+  
+  Thus, developers will need to fix server rendering errors before continuing.
+  [PR 1145](https://github.com/shakacode/react_on_rails/pull/1145) by [justin808](https://github.com/justin808).
+
+### 11.2.0 - 2018-12-06
+Do not use. Unpublished. Caused by an issue with the release script.
+
+### [11.1.8] - 2018-10-14
+
+#### Improved
+- Improved tutorial and support for HMR when using `rails/webpacker` for Webpack configuration. [PR 1156](https://github.com/shakacode/react_on_rails/pull/1156) by [justin808](https://github.com/justin808).
+
+### [11.1.7] - 2018-10-10
+#### Fixed
+- Fixed bug where intl parsing would fail when trying to parse integers or blank entries. by [sepehr500](https://github.com/sepehr500)
+
+### [11.1.6] - 2018-10-05
+#### Fixed
+- Fix client startup invoking render prematurely, **AGAIN**. Fix additional cases of client startup failing during interactive readyState". Closes [issue #1150](https://github.com/shakacode/react_on_rails/issues/1150). [PR 1152](https://github.com/shakacode/react_on_rails/pull/1152) by [rakelley](https://github.com/rakelley).
+
+### [11.1.5] - 2018-10-03
+#### Fixed
+- Fix client startup invoking render prematurely.  Closes [issue #1150](https://github.com/shakacode/react_on_rails/issues/1150). [PR 1151](https://github.com/shakacode/react_on_rails/pull/1151) by [rakelley](https://github.com/rakelley).
+
+### [11.1.4] - 2018-09-12
+
+#### Fixed
+- Ignore Arrays in Rails i18n yml files. [PR 1129](https://github.com/shakacode/react_on_rails/pull/1129) by [vcarel](https://github.com/vcarel).
+- Fix to apply transform-runtime. And work with Babel 6 and 7. (Include revert of [PR 1136](https://github.com/shakacode/react_on_rails/pull/1136)) [PR 1140](https://github.com/shakacode/react_on_rails/pull/1140) by [Ryunosuke Sato](https://github.com/tricknotes).
+- Upgrade Babel version to 7 [PR 1141](https://github.com/shakacode/react_on_rails/pull/1141) by [Ryunosuke Sato](https://github.com/tricknotes).
+
+### [11.1.3] - 2018-08-26
+
+#### Fixed
+- Don't apply babel-plugin-transform-runtime inside react-on-rails to work with babel 7. [PR 1136](https://github.com/shakacode/react_on_rails/pull/1136) by [Ryunosuke Sato](https://github.com/tricknotes).
+- Add support for webpacker 4 prereleases. [PR 1134](https://github.com/shakacode/react_on_rails/pull/1134) by [Judahmeek](https://github.com/Judahmeek))
+
+### [11.1.2] - 2018-08-18
+
+#### Fixed
+- Tests now properly exit if the config.build_test_command fails!
+- Source path for project using Webpacker would default to "app/javascript" even if when the node_modules
+  directory was set to "client". Fix now makes the configuration of this crystal clear.
+- renamed method RenderOptions.has_random_dom_id? to RenderOptions.random_dom_id? for rubocop rule.
+[PR 1133](https://github.com/shakacode/react_on_rails/pull/1133) by [justin808](https://github.com/justin808)
+
+### [11.1.1] - 2018-08-09
+#### Fixed
+- `TRUE` was deprecated in ruby 2.4, using `true` instead. [PR 1128](https://github.com/shakacode/react_on_rails/pull/1128) by [Aguardientico](https://github.com/Aguardientico).
+
+### [11.1.0] - 2018-08-07
+#### Added
+- Add random dom id option. This new global and react_component helper option allows configuring whether or not React on Rails will automatically add a random id to the DOM node ID. [PR 1121](https://github.com/shakacode/react_on_rails/pull/1121) by [justin808](https://github.com/justin808)
+  * Added configuration option random_dom_id
+  * Added method RenderOptions has_random_dom_id?
+#### Fixed
+- Fix invalid warn directive. [PR 1123](https://github.com/shakacode/react_on_rails/pull/1123) by [mustangostang](https://github.com/mustangostang).
+
+### [11.0.10] - 2018-07-22
+#### Fixed
+- Much better logging of rendering errors when there are lots of props. Only the a 1,000 chars are logged, and the center is indicated to be truncated. [PR 1117](https://github.com/shakacode/react_on_rails/pull/1117) and [PR 1118](https://github.com/shakacode/react_on_rails/pull/1118) by [justin808](https://github.com/justin808).
+- Properly clearing hydrated stores when server rendering. [PR 1120](https://github.com/shakacode/react_on_rails/pull/1120) by [squadette](https://github.com/squadette).
+
+### [11.0.9] - 2018-06-24
+- Handle <script async> for Webpack bundle transparently. Closes [issue #290](https://github.com/shakacode/react_on_rails/issues/290) [PR 1099](https://github.com/shakacode/react_on_rails/pull/1099) by [squadette](https://github.com/squadette). Merged in [PR 1107]( https://github.com/shakacode/react_on_rails/pull/1107).
+
+### [11.0.8] - 2018-06-15
+#### Fixed
+- HashWithIndifferent access for props threw if used for props. [PR 1100](https://github.com/shakacode/react_on_rails/pull/1100) by [justin808](https://github.com/justin808).
+- Test helper for detecting stale bundles did not properly handle the case of a server-bundle.js without a hash.[PR 1102](https://github.com/shakacode/react_on_rails/pull/1102) by [justin808](https://github.com/justin808).
+- Fix test helper determination of stale assets. [PR 1093](https://github.com/shakacode/react_on_rails/pull/1093) by [justin808](https://github.com/justin808).
+
+#### Changed
+- Document how to manually rehydrate XHR-substituted components on client side. [PR 1095](https://github.com/shakacode/react_on_rails/pull/1095) by [hchevalier](https://github.com/hchevalier).
+
+### [11.0.7] - 2018-05-16
+#### Fixed
+- Fix npm publshing. [PR 1090](https://github.com/shakacode/react_on_rails/pull/1090) by [justin808](https://github.com/justin808).
+
+### [11.0.6] - 2018-05-15
+#### Changed
+- Even more detailed errors for Honeybadger and Sentry when there's a JSON parse error on server rendering. [PR 1086](https://github.com/shakacode/react_on_rails/pull/1086) by [justin808](https://github.com/justin808).
+
+### [11.0.5] - 2018-05-11
+#### Changed
+- More detailed errors for Honeybadger and Sentry. [PR 1081](https://github.com/shakacode/react_on_rails/pull/1081) by [justin808](https://github.com/justin808).
+
+### [11.0.4] - 2018-05-3
+
+#### Changed
+- Throw if configuration.generated_assets_dir specified, and using webpacker, and if that doesn't match the public_output_path. Otherwise, warn if generated_assets_dir is specified
+- Fix the setup for tests for spec/dummy so they automatically rebuild by correctly setting the source_path in the webpacker.yml
+- Updated documentation for the testing setup.
+- Above in [PR 1072](https://github.com/shakacode/react_on_rails/pull/1072) by [justin808](https://github.com/justin808).
+- `react_component_hash` has implicit `prerender: true` because it makes no sense to have react_component_hash not use prerrender. Improved docs on `react_component_hash`. Also, fixed issue where checking gem existence. [PR 1077](https://github.com/shakacode/react_on_rails/pull/1077) by [justin808](https://github.com/justin808).
+
+### [11.0.3] - 2018-04-24
+
+#### Fixed
+- Fixed issue with component script initialization when using react_component_hash. [PR 1071](https://github.com/shakacode/react_on_rails/pull/1071) by [jblasco3](https://github.com/jblasco3).
+
+### [11.0.2] - 2018-04-24
+
+#### Fixed
+- Server rendering error for React on Rails Pro. [PR 1069](https://github.com/shakacode/react_on_rails/pull/1069) by [justin808](https://github.com/justin808).
+
+### [11.0.1] - 2018-04-23
+
+#### Added
+- `react_component` allows logging_on_server specified at the component level. [PR 1068](https://github.com/shakacode/react_on_rails/pull/1068) by [justin808](https://github.com/justin808).
+
+#### Fixed
+- Missing class when throwing some error messages. [PR 1068](https://github.com/shakacode/react_on_rails/pull/1068) by [justin808](https://github.com/justin808).
+
+### [11.0.0] - 2018-04-21
+
+## MIGRATION for v11
+- Unused `server_render_method` was removed from the configuration. If you want to use a custom renderer, contact justin@shakacode.com. We have a custom node rendering solution in production for egghead.io.
+- Removed ReactOnRails::Utils.server_bundle_file_name and ReactOnRails::Utils.bundle_file_name. These are part of the performance features of "React on Rails Pro".
+- Removed ENV["TRACE_REACT_ON_RAILS"] usage and replacing it with config.trace.
+
+#### Enhancements: Better Error Messages, Support for React on Rails Pro
+- Tracing (debugging) options are simplified with a single `config.trace` setting that defaults to true for development and false otherwise.
+- Calls to setTimeout, setInterval, clearTimeout will now always log some message if config.trace is true. Your JavaScript code should not be calling setTimout when server rendering.
+- Errors raised are of type ReactOnRailsError, so you can see they came from React on Rails for debugging.
+- Removed ReactOnRails::Utils.server_bundle_file_name and ReactOnRails::Utils.bundle_file_name.
+- No longer logging the `railsContext` when server logging.
+- Rails.env is provided in the default railsContext, as suggested in [issue #697](https://github.com/shakacode/react_on_rails/issues/697).
+[PR 1065](https://github.com/shakacode/react_on_rails/pull/1065) by [justin808](https://github.com/justin808).
+
+#### Fixes
+- More exact version checking. We keep the react_on_rails gem and the react-on-rails node package at
+the same exact versions so that we can be sure that the interaction between them is precise.
+This is so that if a bug is detected after some update, it's critical that
+both the gem and the node package get the updates. This change ensures that the package.json specification does not use a
+~ or ^ as reported in [issue #1062](https://github.com/shakacode/react_on_rails/issues/1062). [PR 1063](https://github.com/shakacode/react_on_rails/pull/1063) by [justin808](https://github.com/justin808).
+- Sprockets: Now use the most recent manifest when creating symlinks. See [issue #1023](https://github.com/shakacode/react_on_rails/issues/1023). [PR 1064](https://github.com/shakacode/react_on_rails/pull/1064) by [justin808](https://github.com/justin808).
+
+### [10.1.4] - 2018-04-11
+
+#### Fixed
+- Changed i18n parsing to convert ruby i18n argument syntax into FormatJS argument syntax. [PR 1046](https://github.com/shakacode/react_on_rails/pull/1046) by [sepehr500](https://github.com/sepehr500).
+
+- Fixed an issue where the spec compiler check would fail if the project path contained spaces. [PR 1045](https://github.com/shakacode/react_on_rails/pull/1045) by [andrewmarkle](https://github.com/andrewmarkle).
+
+- Updated the default `build_production_command` that caused production assets to be built with development settings. [PR 1053](https://github.com/shakacode/react_on_rails/pull/1053) by [Roman Kushnir](https://github.com/RKushnir).
+
+### [10.1.3] - 2018-02-28
+#### Fixed
+- Improved error reporting on version mismatches between Javascript and Ruby packages. [PR 1025](https://github.com/shakacode/react_on_rails/pull/1025) by [theJoeBiz](https://github.com/squadette).
+
+### [10.1.2] - 2018-02-27
+#### Fixed
+- Use ReactDOM.hydrate() for hydrating a SSR component if available. ReactDOM.render() has been deprecated for use on SSR components in React 16 and this addresses the warning. [PR 1028](https://github.com/shakacode/react_on_rails/pull/1028) by [theJoeBiz](https://github.com/theJoeBiz).
+
+### [10.1.1] - 2018-01-26
+#### Fixed
+- Fixed issue with server-rendering error handler: [PR 1020](https://github.com/shakacode/react_on_rails/pull/1020) by [jblasco3](https://github.com/jblasco3).
+
+### [10.1.0] - 2018-01-23
+#### Added
+- Added 2 cache helpers: ReactOnRails::Utils.bundle_file_name(bundle_name) and ReactOnRails::Utils.server_bundle_file_name
+for easy access to the hashed filenames for use in cache keys. [PR 1018](https://github.com/shakacode/react_on_rails/pull/1018) by [justin808](https://github.com/justin808).
+
+#### Fixed
+- Use redux component in generated redux Hello World example: [PR 1006](https://github.com/shakacode/react_on_rails/pull/1006) by [lewaabahmad](https://github.com/lewaabahmad).
+- Fixed `Utils.bundle_js_file_path` generating the incorrect path for `manifest.json` in webpacker projects: [Issue #1011](https://github.com/shakacode/react_on_rails/issues/1011) by [elstgav](https://github.com/elstgav)
+
+### [10.0.2] - 2017-11-10
+#### Fixed
+- Remove unnecessary dependencies from released NPM package: [PR 968](https://github.com/shakacode/react_on_rails/pull/968) by [tricknotes](https://github.com/tricknotes).
+
+### [10.0.1] - 2017-10-28
+#### Fixed
+- Fixed `react_component_hash` functionality in cases of prerendering errors: [PR 960](https://github.com/shakacode/react_on_rails/pull/960) by [Judahmeek](https://github.com/Judahmeek).
+- Fix to add missing dependency to run generator spec individually: [PR 962](https://github.com/shakacode/react_on_rails/pull/962) by [tricknotes](https://github.com/tricknotes).
+- Fixes check for i18n_dir in LocalesToJs returning false when i18n_dir was set. [PR 899](https://github.com/shakacode/react_on_rails/pull/899) by [hakongit](https://github.com/hakongit).
+- Fixed mistake in rubocop comments that led to errors when handling exceptions in ReactOnRails::ServerRendering::Exec [PR 963](https://github.com/shakacode/react_on_rails/pull/963) by [railsme](https://github.com/railsme).
+- Fixed and improved I18n directories checks: [PR 967](https://github.com/shakacode/react_on_rails/pull/967) by [railsme](https://github.com/railsme)
+
+### [10.0.0] - 2017-10-08
+#### Created
+- Created `react_component_hash` method for react_helmet support.
+#### Deprecated
+- Deprecated `react_component` functionality for react_helmet support.
+To clarify, the method itself is not deprecated, only certain functionality which has been moved to `react_component_hash`
+[PR 951](https://github.com/shakacode/react_on_rails/pull/951) by [Judahmeek](https://github.com/Judahmeek).
+
+### [9.0.3] - 2017-09-20
+#### Improved
+- Improved comments in generated Procfile.dev-server. [PR 940](https://github.com/shakacode/react_on_rails/pull/940) by [justin808](https://github.com/justin808).
+
+### [9.0.2] - 2017-09-10
+#### Fixed
+- Improved post install doc comments for generator. [PR 933](https://github.com/shakacode/react_on_rails/pull/933) by [justin808](https://github.com/justin808).
+
+### [9.0.1] - 2017-09-10
+
+#### Fixed
+- Fixes Rails 3.2 compatability issues. [PR 926](https://github.com/shakacode/react_on_rails/pull/926) by [morozovm](https://github.com/morozovm).
+
+### [9.0.0] - 2017-09-06
+Updated React on Rails to depend on [rails/webpacker](https://github.com/rails/webpacker). [PR 908](https://github.com/shakacode/react_on_rails/pull/908) by [justin808](https://github.com/justin808).
+
+
+#### 9.0 from 8.x. Upgrade Instructions
+Moved to [our documentation](docs/basics/upgrading-react-on-rails.md#upgrading-to-version-9).
+
+### [8.0.7] - 2017-08-16
+#### Fixed
+- Fixes generator bug by keeping blank line at top in case existing .gitignore does not end in a newline. [#916](https://github.com/shakacode/react_on_rails/pull/916) by [justin808](https://github.com/justin808).
+
+### [8.0.6] - 2017-07-19
+#### Fixed
+- Fixes server rendering when using a CDN. Server rendering would try to fetch a file with the "asset_host". This change updates the webpacker_lite dependency to 2.1.0 which has a new helper `pack_path`. [#901](https://github.com/shakacode/react_on_rails/pull/901) by [justin808](https://github.com/justin808). Be sure to update webpacker_lite to 2.1.0.
+- The package.json file created by the generator now creates minified javascript production builds by default. This was done by adding the -p flag to webpack on the build:production script. [#895](https://github.com/shakacode/react_on_rails/pull/895) by [serodriguez68 ](https://github.com/serodriguez68)
+- Fixes GitUtils.uncommitted_changes? throwing an error when called in an environment without Git, and allows install generator to be run successfully with `--ignore-warnings` [#878](https://github.com/shakacode/react_on_rails/pull/878) by [jasonblalock](https://github.com/jasonblalock).
+
+## [8.0.5] - 2017-07-04
+### fixed
+ - Corrects `devBuild` value for webpack production build from webpackConfigLoader. [#877](https://github.com/shakacode/react_on_rails/pull/877) by [chenqingspring](https://github.com/chenqingspring).
+ - Remove contentBase deprecation warning message. [#878](https://github.com/shakacode/react_on_rails/pull/878) by [ened ](https://github.com/ened).
+ - Removes invalid reference to _railsContext in the generated files. [#886](https://github.com/shakacode/react_on_rails/pull/886) by [justin808](https://github.com/justin808).
+ - All tests run against Rails 5.1.2
+
+*Note: 8.0.4 skipped.*
+
+## [8.0.3] - 2017-06-19
+### Fixed
+- Ruby 2.1 issue due to `<<~` as reported in [issue #870](https://github.com/shakacode/react_on_rails/issues/870). [#867](https://github.com/shakacode/react_on_rails/pull/867) by [justin808](https://github.com/justin808)
+
+## [8.0.2] - 2017-06-04
+### Fixed
+- Any failure in webpack to build test files quits tests.
+- Fixed a Ruby 2.4 potential crash which could cause a crash due to pathname change in Ruby 2.4.
+- CI Improvements:
+  - Switched to yarn link and removed relative path install of react-on-rails
+  - Removed testing of Turbolinks 2
+  - All tests run against Rails 5.1.1
+  - Fixed test failures against Ruby 2.4
+- [#862](https://github.com/shakacode/react_on_rails/pull/862) by [justin808](https://github.com/justin808)
+
+## [8.0.1] - 2017-05-30
+### Fixed
+- Generator no longer modifies `assets.rb`. [#859](https://github.com/shakacode/react_on_rails/pull/859) by [justin808](https://github.com/justin808)
+
+## [8.0.0] - 2017-05-29
+- Generators and full support for [webpacker_lite](https://github.com/shakacode/webpacker_lite)
+- No breaking changes to move to 8.0.0 other than the default for this setting changed to nil. If you depended on the default of this setting and are using the asset pipeline (and not webpacker_lite), then add this to your `config/initializers/react_on_rails.rb`:
+  ```
+  symlink_non_digested_assets_regex: /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/,
+  ```
+- For an example of migration, see: [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395)
+- For a simple example of the webpacker_lite setup, run the basic generator.
+
+## [8.0.0-beta.3] - 2017-05-27
+### Changed
+- Major updates for WebpackerLite 2.0.2. [#844](https://github.com/shakacode/react_on_rails/pull/845) by [justin808](https://github.com/justin808) with help from ](https://github.com/robwise)
+- Logging no longer occurs when trace is turned to false. [#845](https://github.com/shakacode/react_on_rails/pull/845) by [conturbo](https://github.com/Conturbo)
+
+## [8.0.0-beta.2] - 2017-05-08
+
+### Changed
+Removed unnecessary values in default paths.yml files for generators. [#834](https://github.com/shakacode/react_on_rails/pull/834) by [justin808](https://github.com/justin808).
+
+## [8.0.0-beta.1] - 2017-05-03
+
+### Added
+Support for WebpackerLite in the generators. [#822](https://github.com/shakacode/react_on_rails/pull/822) by [kaizencodes](https://github.com/kaizencodes) and [justin808](https://github.com/justin808).
+
+### Changed
+Breaking change is that the default value of symlink_non_digested_assets_regex has changed from this
+old value to nil. This is a breaking change if you didn't have this value set in your
+config/initializers/react_on_rails.rb file and you need this because you're using webpack's CSS
+features and you have not switched to webpacker lite.
+
+```
+symlink_non_digested_assets_regex: /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/,
+```
+
+## [7.0.4] - 2017-04-27
+- Return empty json when nil in json_safe_and_pretty [#824](https://github.com/shakacode/react_on_rails/pull/824) by [dzirtusss](https://github.com/dzirtusss)
+
+## [7.0.3] - 2017-04-27
+Same as 7.0.1.
+
+## 7.0.2 - 2017-04-27
+*Accidental release of beta gem here*
+
+## [7.0.1] - 2017-04-27
+### Fixed
+- Fix to handle nil values in json_safe_and_pretty [#823](https://github.com/shakacode/react_on_rails/pull/823) by [dzirtusss](https://github.com/dzirtusss)
+
+## [7.0.0] - 2017-04-25
+### Changed
+- Any version differences in gem and node package for React on Rails throw an error [#821](https://github.com/shakacode/react_on_rails/pull/821) by [justin808](https://github.com/justin808)
+
+### Fixed
+- Fixes serious performance regression when using String props for rendering. [#821](https://github.com/shakacode/react_on_rails/pull/821) by [justin808](https://github.com/justin808)
+
 ## [6.10.1] - 2017-04-23
 ### Fixed
 - Improve json conversion with tests and support for older Rails 3.x. [#787](https://github.com/shakacode/react_on_rails/pull/787) by [cheremukhin23](https://github.com/cheremukhin23) and [Ynote](https://github.com/Ynote).
@@ -216,7 +553,7 @@ No changes.
   - See [shakacode/react-webpack-rails-tutorial/pull/287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287) for an    example of upgrading from v5.
 
   - To configure the asset compliation you can either
-    1. Specify a `config/react_on_rails` setting for `npm_build_production_command` to be nil to turn this feature off.
+    1. Specify a `config/react_on_rails` setting for `build_production_command` to be nil to turn this feature off.
     2. Specify the script command you want to run to build your production assets, and remove your assets.rake file.
 
   - If you are using the ReactOnRails test helper, then you will need to add the 'config.npm_build_test_command' to your config to tell react_on_rails what command to run when you run rspec.
@@ -227,7 +564,7 @@ Here is the addition to the generated config file:
 ```ruby
   # This configures the script to run to build the production assets by webpack. Set this to nil
   # if you don't want react_on_rails building this file for you.
-  config.npm_build_production_command = "npm run build:production"
+  config.build_production_command = "npm run build:production"
 
   # If you are using the ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
   # with rspec then this controls what npm command is run
@@ -534,7 +871,56 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/6.10.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.3.0...master
+[11.3.0]: https://github.com/shakacode/react_on_rails/compare/11.2.2...11.3.0
+[11.2.2]: https://github.com/shakacode/react_on_rails/compare/11.2.1...11.2.2
+[11.2.1]: https://github.com/shakacode/react_on_rails/compare/11.1.8...11.2.1
+[11.1.8]: https://github.com/shakacode/react_on_rails/compare/11.1.7...11.1.8
+[11.1.7]: https://github.com/shakacode/react_on_rails/compare/11.1.6...11.1.7
+[11.1.6]: https://github.com/shakacode/react_on_rails/compare/11.1.5...11.1.6
+[11.1.5]: https://github.com/shakacode/react_on_rails/compare/11.1.4...11.1.5
+[11.1.4]: https://github.com/shakacode/react_on_rails/compare/11.1.3...11.1.4
+[11.1.3]: https://github.com/shakacode/react_on_rails/compare/11.1.2...11.1.3
+[11.1.2]: https://github.com/shakacode/react_on_rails/compare/11.1.1...11.1.2
+[11.1.1]: https://github.com/shakacode/react_on_rails/compare/11.1.0...11.1.1
+[11.1.0]: https://github.com/shakacode/react_on_rails/compare/11.0.10...11.1.0
+[11.0.10]: https://github.com/shakacode/react_on_rails/compare/11.0.9...11.0.10
+[11.0.9]: https://github.com/shakacode/react_on_rails/compare/11.0.8...11.0.9
+[11.0.8]: https://github.com/shakacode/react_on_rails/compare/11.0.7...11.0.8
+[11.0.7]: https://github.com/shakacode/react_on_rails/compare/11.0.6...11.0.7
+[11.0.6]: https://github.com/shakacode/react_on_rails/compare/11.0.5...11.0.6
+[11.0.5]: https://github.com/shakacode/react_on_rails/compare/11.0.4...11.0.5
+[11.0.4]: https://github.com/shakacode/react_on_rails/compare/11.0.3...11.0.4
+[11.0.3]: https://github.com/shakacode/react_on_rails/compare/11.0.2...11.0.3
+[11.0.2]: https://github.com/shakacode/react_on_rails/compare/11.0.1...11.0.2
+[11.0.1]: https://github.com/shakacode/react_on_rails/compare/11.0.0...11.0.1
+[11.0.0]: https://github.com/shakacode/react_on_rails/compare/10.1.4...11.0.0
+[10.1.4]: https://github.com/shakacode/react_on_rails/compare/10.1.3...10.1.4
+[10.1.3]: https://github.com/shakacode/react_on_rails/compare/10.1.2...10.1.3
+[10.1.2]: https://github.com/shakacode/react_on_rails/compare/10.1.1...10.1.2
+[10.1.1]: https://github.com/shakacode/react_on_rails/compare/10.1.0...10.1.1
+[10.1.0]: https://github.com/shakacode/react_on_rails/compare/10.0.2...10.1.0
+[10.0.2]: https://github.com/shakacode/react_on_rails/compare/10.0.1...10.0.2
+[10.0.1]: https://github.com/shakacode/react_on_rails/compare/10.0.0...10.0.1
+[10.0.0]: https://github.com/shakacode/react_on_rails/compare/9.0.3...10.0.0
+[9.0.3]: https://github.com/shakacode/react_on_rails/compare/9.0.2...9.0.3
+[9.0.2]: https://github.com/shakacode/react_on_rails/compare/9.0.1...9.0.2
+[9.0.1]: https://github.com/shakacode/react_on_rails/compare/9.0.0...9.0.1
+[9.0.0]: https://github.com/shakacode/react_on_rails/compare/8.0.7...9.0.0
+[8.0.7]: https://github.com/shakacode/react_on_rails/compare/8.0.6...8.0.7
+[8.0.6]: https://github.com/shakacode/react_on_rails/compare/8.0.5...8.0.6
+[8.0.5]: https://github.com/shakacode/react_on_rails/compare/8.0.3...8.0.5
+[8.0.3]: https://github.com/shakacode/react_on_rails/compare/8.0.2...8.0.3
+[8.0.2]: https://github.com/shakacode/react_on_rails/compare/8.0.1...8.0.2
+[8.0.1]: https://github.com/shakacode/react_on_rails/compare/8.0.0...8.0.1
+[8.0.0]: https://github.com/shakacode/react_on_rails/compare/7.0.4...8.0.0
+[8.0.0-beta.3]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.2...8.0.0-beta.3
+[8.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.1...8.0.0-beta.2
+[8.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/7.0.4...8.0.0-beta.1
+[7.0.4]: https://github.com/shakacode/react_on_rails/compare/7.0.3...7.0.4
+[7.0.3]: https://github.com/shakacode/react_on_rails/compare/7.0.1...7.0.3
+[7.0.1]: https://github.com/shakacode/react_on_rails/compare/7.0.0...7.0.1
+[7.0.0]: https://github.com/shakacode/react_on_rails/compare/6.10.1...7.0.0
 [6.10.1]: https://github.com/shakacode/react_on_rails/compare/6.10.0...6.10.1
 [6.10.0]: https://github.com/shakacode/react_on_rails/compare/6.9.3...6.10.0
 [6.9.3]: https://github.com/shakacode/react_on_rails/compare/6.9.1...6.9.3

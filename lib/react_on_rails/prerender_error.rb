@@ -1,31 +1,82 @@
+# frozen_string_literal: true
+
+# rubocop:disable: Layout/IndentHeredoc
 module ReactOnRails
-  class PrerenderError < RuntimeError
+  class PrerenderError < ::ReactOnRails::Error
+    MAX_ERROR_SNIPPET_TO_LOG = 1000
+    # TODO: Consider remove providing original `err` as already have access to `self.cause`
+    # http://blog.honeybadger.io/nested-errors-in-ruby-with-exception-cause/
+    attr_reader :component_name, :err, :props, :js_code, :console_messages
+
     # err might be nil if JS caught the error
     def initialize(component_name: nil, err: nil, props: nil,
                    js_code: nil, console_messages: nil)
-      message = "ERROR in SERVER PRERENDERING\n"
+      @component_name = component_name
+      @err = err
+      @props = props
+      @js_code = js_code
+      @console_messages = console_messages
+
+      backtrace, message = calc_message(component_name, console_messages, err, js_code, props)
+
+      super([message, backtrace].compact.join("\n"))
+    end
+
+    def to_honeybadger_context
+      to_error_context
+    end
+
+    def raven_context
+      to_error_context
+    end
+
+    def to_error_context
+      result = {
+        component_name: component_name,
+        err: err,
+        props: props,
+        js_code: js_code,
+        console_messages: console_messages
+      }
+
+      result.merge!(err.to_error_context) if err.respond_to?(:to_error_context)
+      result
+    end
+
+    private
+
+    def calc_message(component_name, console_messages, err, js_code, props)
+      message = "ERROR in SERVER PRERENDERING\n".dup
       if err
+        # rubocop:disable Layout/IndentHeredoc
         message << <<-MSG
 Encountered error: \"#{err}\"
         MSG
+        # rubocop:enable Layout/IndentHeredoc
         backtrace = err.backtrace.join("\n")
       else
         backtrace = nil
       end
+      # rubocop:disable Layout/IndentHeredoc
       message << <<-MSG
-when prerendering #{component_name} with props: #{props}
-js_code was:
-#{js_code}
+when prerendering #{component_name} with props: #{Utils.smart_trim(props, MAX_ERROR_SNIPPET_TO_LOG)}
+
+code:
+
+#{Utils.smart_trim(js_code, MAX_ERROR_SNIPPET_TO_LOG)}
+
       MSG
+      # rubocop:enable Layout/IndentHeredoc
 
       if console_messages
+        # rubocop:disable Layout/IndentHeredoc
         message << <<-MSG
 console messages:
 #{console_messages}
         MSG
+        # rubocop:enable Layout/IndentHeredoc
       end
-
-      super([message, backtrace].compact.join("\n"))
+      [backtrace, message]
     end
   end
 end

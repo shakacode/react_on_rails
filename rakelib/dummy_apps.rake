@@ -1,9 +1,12 @@
+# frozen_string_literal: true
+
 require_relative "task_helpers"
-include ReactOnRails::TaskHelpers
 
 namespace :dummy_apps do
+  include ReactOnRails::TaskHelpers
+
   task :yarn_install do
-    yarn_install_cmd = "yarn install --mutex network && yarn run install-react-on-rails"
+    yarn_install_cmd = "yarn install --mutex network"
     sh_in_dir(dummy_app_dir, yarn_install_cmd)
   end
 
@@ -12,12 +15,16 @@ namespace :dummy_apps do
     bundle_install_in(dummy_app_dir)
   end
 
-  task dummy_app_with_turbolinks_2: [:yarn_install] do
-    dummy_app_dir = File.join(gem_root, "spec/dummy")
-    bundle_install_with_turbolinks_2_in(dummy_app_dir)
+  task :dummy_no_webpacker do
+    npm_install_cmd = "npm install"
+    install_react_on_rails_cmd = "yarn run install-react-on-rails"
+    dummy_app_dir = File.join(gem_root, "spec/dummy_no_webpacker")
+    sh_in_dir(File.join(gem_root, "spec/dummy_no_webpacker/client"), npm_install_cmd)
+    sh_in_dir(dummy_app_dir, install_react_on_rails_cmd)
+    sh_in_dir(dummy_app_dir, "BUNDLE_GEMFILE=Gemfile.rails32 bundle install")
   end
 
-  task dummy_apps: [:dummy_app, :node_package] do
+  task dummy_apps: %i[dummy_app node_package] do
     puts "Prepared all Dummy Apps"
   end
 end

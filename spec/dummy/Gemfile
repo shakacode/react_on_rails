@@ -1,36 +1,37 @@
-source 'https://rubygems.org'
+# frozen_string_literal: true
 
-eval_gemfile File.expand_path("../../../react_on_rails.gemspec", __FILE__)
+source "https://rubygems.org"
 
-# Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
-gem 'rails'
+eval_gemfile File.expand_path("../../react_on_rails.gemspec", __dir__)
+
+gem "react_on_rails", path: "../.."
+
+gem "webpacker"
+
+gem "bootsnap", ">= 1.1.0", require: false
+gem "rails"
+
 # Use sqlite3 as the database for Active Record
-gem 'sqlite3'
+gem "sqlite3"
 # Use SCSS for stylesheets
-gem 'sass-rails'
+gem "sass-rails"
 # Use Uglifier as compressor for JavaScript assets
-gem 'uglifier'
+gem "uglifier"
 # Use CoffeeScript for .coffee assets and views
-gem 'coffee-rails'
+gem "coffee-rails"
 
 # Use jquery as the JavaScript library
-gem 'jquery-rails'
+gem "jquery-rails"
 
-gem 'puma'
+gem "puma"
 
 # Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
-if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
-  if ENV["ENABLE_TURBOLINKS_2"].nil? || ENV["ENABLE_TURBOLINKS_2"].strip.empty?
-    gem 'turbolinks', '~> 5.0'
-  else
-    gem 'turbolinks', '2.5.3'
-  end
-end
+gem "turbolinks" if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
 
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
-gem 'jbuilder', '~> 2.0'
+gem "jbuilder"
 # bundle exec rake doc:rails generates the API under doc/api.
-gem 'sdoc', '~> 0.4.0', group: :doc
+gem "sdoc", group: :doc
 
 # Use ActiveModel has_secure_password
 # gem 'bcrypt', '~> 3.1.7'
@@ -40,41 +41,37 @@ gem 'sdoc', '~> 0.4.0', group: :doc
 
 # Use Capistrano for deployment
 # gem 'capistrano-rails', group: :development
-
-gem "react_on_rails", path: "../.."
-
+gem "awesome_print"
 gem "mini_racer"
 
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console
+  gem "listen"
   gem "pry"
+  gem "pry-byebug"
   gem "pry-doc"
   gem "pry-rails"
-  gem "pry-stack_explorer"
   gem "pry-rescue"
-  gem "pry-byebug"
-  gem "awesome_print"
+  gem "pry-stack_explorer"
   gem "rubocop", require: false
   gem "ruby-lint", require: false
   gem "scss_lint", require: false
-  gem "listen"
 
   # Spring speeds up development by keeping your application running in the background. Read more: https://github.com/rails/spring
-  gem 'spring'
+  gem "spring"
 end
 
 group :test do
-  gem "coveralls", require: false
   gem "capybara"
   gem "capybara-screenshot"
-  gem "rails-controller-testing"
+  gem "coveralls", require: false
   # install trouble with updated
   # gem "capybara-webkit"
-  gem "chromedriver-helper"
+  gem "equivalent-xml", github: "mbklein/equivalent-xml"
   gem "generator_spec"
   gem "launchy"
-  gem "poltergeist"
   gem "rspec-rails"
   gem "rspec-retry"
   gem "selenium-webdriver"
+  gem "webdrivers", "~> 3.0"
 end

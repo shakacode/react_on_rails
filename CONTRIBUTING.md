@@ -46,7 +46,7 @@ When making doc changes, we want the change to work on both the gitbook and the 
 
 ```sh
 cd react_on_rails/
-bundle && yarn && rake examples:prepare_all && rake node_package && rake
+bundle && yarn && rake examples:gen_all && rake node_package && rake
 ```
 
 In order to run tests in browser
@@ -75,7 +75,7 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 # Configuring your test app to use your local fork
 You can test the `react-on-rails` gem using your own external test app or the gem's internal `spec/dummy` app. The `spec/dummy` app is an example of the various setup techniques you can use with the gem.
 ```
-├── test
+├── test_app
 |    └── client
 └── react_on_rails
     └── spec
@@ -98,21 +98,20 @@ In addition to testing the Ruby parts out, you can also test the node package pa
 cd react_on_rails/
 yarn
 yarn run build
+yarn install-react-on-rails
 ```
 
-Install the local package by using a relative path in your test/client app's `package.json`, like this:
+Install the local package by using yarn link, like this:
 ```sh
-cd test/client
-rm -rf node_modules/react-on-rails && npm i 'file:../path-to-react-on-rails-top-package.json'
+cd spec/dummy
+yarn
 ```
-_Note: You must use npm here till yarn stops preferring cached packages over local. see [issue #2649](https://github.com/yarnpkg/yarn/issues/2649)_
 
-When you use a relative path, be sure to run the above `yarn` command whenever you change the node package for react-on-rails.
+Note, yarn will run the `postinstall` script of `spec/dummy/client` which runs `yarn link` to set up a sym link to the parent package.
 
 #### Example: Testing NPM changes with the dummy app
 1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/clientStartup.js#L181) in `react_on_rails/node_package/src/clientStartup.js` to confirm we're getting an update to the node package.
-2. Run the install script `npm run install-react-on-rails` in `react_on_rails/spec/dummy` to copy over our changes to the dummy app. Alternatively, you can run `rm -rf node_modules/react-on-rails && npm i 'file:../../../'` in `react_on_rails/spec/dummy/client`. Our NPM changes are now available in the dummy app.
-3. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console.
+2. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console.
 
 _Note: running `npm i` automatically builds the npm package before installing. However, when using yarn you will need to run `yarn run build` in the root directory before the install script. This will be updated when [yarn issue #2649](https://github.com/yarnpkg/yarn/issues/2649) (above) is resolved._
 
@@ -128,14 +127,6 @@ _Note: running `npm i` automatically builds the npm package before installing. H
 ### Prereqs
 After checking out the repo, making sure you have rvm and nvm setup (setup ruby and node), cd to `spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
-Additionally, our RSpec tests use the poltergeist web driver. You will need to install the phantomjs node module:
-
-```sh
-yarn global add phantomjs
-```
-
-Note this *must* be installed globally for the dummy test project rspec runner to see it properly.
-
 ### Local Node Package
 Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the dummy app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)
 
@@ -145,7 +136,7 @@ yarn run install-react-on-rails
 ```
 _Note: this runs npm under the hood as explained in **Test NPM for react-on-rails** section above_
 
-From now on, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:prepare_all` rake task.
+From now on, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:gen_all` rake task.
 
 *Side note: It's critical to use the alias section of the webpack config to avoid a double inclusion error. This has already been done for you in the example and dummy apps, but for reference:*
 
@@ -172,7 +163,7 @@ spec/dummy.
 
 ```sh
 # Optionally change default selenium_firefox driver
-export DRIVER=poltergeist
+export DRIVER=selenium_firefox
 cd react_on_rails/
 yarn run dummy:spec
 ```
@@ -215,20 +206,13 @@ If you run `rspec` at the top level, you'll see this message: `require': cannot 
 
 After running a test, you can view the coverage results SimpleCov reports by opening `coverage/index.html`.
 
-To test `spec/dummy` against Turbolinks 2, install the gem by running `ENABLE_TURBOLINKS_2=TRUE bundle install` in the `spec/dummy` directory before running `rake`. Turbolinks 5 is the default.
+Turbolinks 5 is included in the test app, unless "DISABLE_TURBOLINKS" is set to YES in the environment.
 
 Run `rake -T` or `rake -D` to see testing options.
 
 `rake all_but_examples` is typically best for developers, except if any generators changed.
 
 See below for verifying changes to the generators.
-
-### Debugging
-Start the sample app like this for some debug printing:
-
-```sh
-TRACE_REACT_ON_RAILS=true && foreman start
-```
 
 ### Install Generator
 In your Rails app add this gem with a path to your fork.

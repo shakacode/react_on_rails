@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "spec_helper"
 require "react_on_rails/assets_precompile"
 
@@ -112,6 +114,14 @@ module ReactOnRails
       let(:digest_filename) { "alfa.12345.js" }
       let(:nondigest_filename) { "alfa.js" }
 
+      let(:create_old_json_manifest) do
+        file_path = assets_path.join("manifest-old.json")
+        File.open(file_path, "w") do |f|
+          f.write("{\"assets\":{\"#{nondigest_filename}\": \"#{digest_filename}-123\"}}")
+        end
+        FileUtils.touch file_path, mtime: Time.now - 1.day
+      end
+
       let(:create_json_manifest) do
         File.open(assets_path.join("manifest-alfa.json"), "w") do |f|
           f.write("{\"assets\":{\"#{nondigest_filename}\": \"#{digest_filename}\"}}")
@@ -127,6 +137,17 @@ module ReactOnRails
       let(:checker) do
         AssetsPrecompile.new(assets_path: assets_path,
                              symlink_non_digested_assets_regex: Regexp.new('.*\.js$'))
+      end
+
+      it "creates a symlink with the original filename that points to the digested filename" do
+        FileUtils.touch assets_path.join(digest_filename)
+        create_old_json_manifest
+        create_json_manifest
+        checker.symlink_non_digested_assets
+
+        expect(assets_path.join(nondigest_filename).lstat.symlink?).to be true
+        expect(File.identical?(assets_path.join(nondigest_filename),
+                               assets_path.join(digest_filename))).to be true
       end
 
       it "creates a symlink with the original filename that points to the digested filename" do
@@ -180,11 +201,11 @@ module ReactOnRails
       it "deletes files in ReactOnRails.configuration.generated_assets_dir" do
         allow(Rails).to receive(:root).and_return(Pathname.new(Dir.mktmpdir))
 
-        generated_assets_dir  = "generated_dir"
-        generated_assets_path = Rails.root.join(generated_assets_dir)
-        Dir.mkdir generated_assets_path
+        generated_assets_dir = "generated_dir"
+        generated_assets_full_path = Rails.root.join(generated_assets_dir)
+        Dir.mkdir generated_assets_full_path
 
-        filepath = Pathname.new(Tempfile.new("tempfile", generated_assets_path))
+        filepath = Pathname.new(Tempfile.new("tempfile", generated_assets_full_path))
 
         AssetsPrecompile.new(assets_path: assets_path,
                              generated_assets_dir: generated_assets_dir).clobber

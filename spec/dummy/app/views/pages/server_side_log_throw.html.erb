@@ -1,9 +1,5 @@
-<%= render "header" %>
 
-<%= react_component("HelloWorldWithLogAndThrow", props: @app_props_server_render, prerender: true, trace: true, id: "HelloWorldWithLogAndThrow-react-component-0") %>
-<hr/>
-
-<h1>React Rails Server Rendering</h1>
+<h1>React Rails Server Rendering with throw from "generator function"</h1>
 <p>
   This example demonstrates server side logging and error handling.<br/>
   Open up your browser console and see the messages.<br/>
@@ -17,13 +13,18 @@
   </pre>
 </p>
 
-<h2>Server render plain JS</h2>
-<p>Suppose you have some JavaScript that generates a string of HTML, but throws this error:</p>
+
+<hr/>
+
+About to call in the Rails template:
 <pre>
-  <%%= server_render_js("(function() { var x = ReactOnRails.getComponent('HelloString').world(); console.warn('ran console.warn on the server()'); throw new Error('Error thrown on server'); return x;})()") %>
+  <%%= react_component("HelloWorldWithLogAndThrow", props: @app_props_server_render, prerender: true,
+                      trace: true, id: "HelloWorldWithLogAndThrow-react-component-0") %>
 </pre>
 
+Below is the result of the call:
 
-<pre>
-<%= server_render_js("(function() { var x = ReactOnRails.getComponent('HelloString').world(); console.warn('ran console.warn on the server()'); throw new Error('Error thrown on server'); return x;})()") %>
-</pre>
+<hr/>
+
+<%= react_component("HelloWorldWithLogAndThrow", props: @app_props_server_render, prerender: true,
+                    trace: true, id: "HelloWorldWithLogAndThrow-react-component-0") %>

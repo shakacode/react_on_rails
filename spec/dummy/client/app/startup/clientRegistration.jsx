@@ -1,4 +1,4 @@
-import 'babel-polyfill';
+import '@babel/polyfill';
 import 'es5-shim';
 
 import ReactOnRails from 'react-on-rails';
@@ -6,7 +6,9 @@ import ReactOnRails from 'react-on-rails';
 import HelloWorld from '../components/HelloWorld';
 import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 import HelloWorldES5 from '../components/HelloWorldES5';
+import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
 import HelloWorldApp from './HelloWorldApp';
+import BrokenApp from './BrokenApp';
 
 import ReduxApp from './ClientReduxApp';
 import ReduxSharedStoreApp from './ClientReduxSharedStoreApp';
@@ -15,7 +17,7 @@ import PureComponent from '../components/PureComponent';
 import CacheDisabled from '../components/CacheDisabled';
 import CssModulesImagesFontsExample from '../components/CssModulesImagesFontsExample';
 import ManualRenderApp from './ManualRenderAppRenderer';
-import DeferredRenderApp from './DeferredRenderAppRenderer';
+import DeferredRenderApp from './DeferredRenderAppClient';
 
 import SharedReduxStore from '../stores/SharedReduxStore';
 
@@ -28,14 +30,18 @@ import ReactHelmetApp from './ReactHelmetClientApp';
 // Demonstrate using Images
 import ImageExample from '../components/ImageExample';
 
+import SetTimeoutLoggingApp from './SetTimeoutLoggingApp';
+
 ReactOnRails.setOptions({
   traceTurbolinks: true,
 });
 
 ReactOnRails.register({
+  BrokenApp,
   HelloWorld,
   HelloWorldWithLogAndThrow,
   HelloWorldES5,
+  HelloWorldRehydratable,
   ReduxApp,
   ReduxSharedStoreApp,
   HelloWorldApp,
@@ -48,6 +54,7 @@ ReactOnRails.register({
   RenderedHtml,
   ReactHelmetApp,
   ImageExample,
+  SetTimeoutLoggingApp,
 });
 
 ReactOnRails.registerStore({

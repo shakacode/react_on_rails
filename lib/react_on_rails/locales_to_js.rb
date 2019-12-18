@@ -1,10 +1,13 @@
+# frozen_string_literal: true
+
 require "erb"
 
 module ReactOnRails
   class LocalesToJs
     def initialize
-      return unless i18n_dir.present?
+      return if i18n_dir.nil?
       return unless obsolete?
+
       @translations, @defaults = generate_translations
       convert
     end
@@ -13,6 +16,7 @@ module ReactOnRails
 
     def obsolete?
       return true if exist_js_files.empty?
+
       js_files_are_outdated
     end
 
@@ -27,7 +31,7 @@ module ReactOnRails
     end
 
     def js_file_names
-      %w(translations default)
+      %w[translations default]
     end
 
     def js_files
@@ -43,7 +47,9 @@ module ReactOnRails
         if i18n_yml_dir.present?
           Dir["#{i18n_yml_dir}/**/*.yml"]
         else
-          (Rails.application && Rails.application.config.i18n.load_path).presence
+          ReactOnRails::Utils.truthy_presence(
+            Rails.application && Rails.application.config.i18n.load_path
+          ).presence
         end
       end
     end
@@ -103,27 +109,29 @@ module ReactOnRails
       translations.each_with_object({}) do |(k, v), h|
         if v.is_a? Hash
           flatten(v).map { |hk, hv| h["#{k}.#{hk}".to_sym] = hv }
-        else
+        elsif v.is_a?(String)
+          h[k] = v.gsub("%{", "{")
+        elsif !v.is_a?(Array)
           h[k] = v
         end
       end
     end
 
     def template_translations
-      <<-JS
-export const translations = #{@translations};
+      <<-JS.strip_heredoc
+        export const translations = #{@translations};
       JS
     end
 
     def template_default
-      <<-JS
-import { defineMessages } from 'react-intl';
+      <<-JS.strip_heredoc
+        import { defineMessages } from 'react-intl';
 
-const defaultLocale = \'#{default_locale}\';
+        const defaultLocale = \'#{default_locale}\';
 
-const defaultMessages = defineMessages(#{@defaults});
+        const defaultMessages = defineMessages(#{@defaults});
 
-export { defaultMessages, defaultLocale };
+        export { defaultMessages, defaultLocale };
       JS
     end
   end

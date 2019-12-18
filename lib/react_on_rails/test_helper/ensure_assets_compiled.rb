@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ReactOnRails
   module TestHelper
     class EnsureAssetsCompiled
@@ -41,15 +43,17 @@ module ReactOnRails
       end
 
       def puts_start_compile_check_message(stale_files)
+        # rubocop:disable Layout/IndentHeredoc
         puts <<-MSG
 
-Detected are the following stale generated files:
-#{stale_files.join("\n")}
+Detected the following stale generated files:
+  #{stale_files.join("\n  ")}
 
 React on Rails will ensure your JavaScript generated files are up to date, using your
-/client level package.json `#{ReactOnRails.configuration.npm_build_test_command}` command.
+`#{ReactOnRails::Utils.prepend_cd_node_modules_directory(ReactOnRails.configuration.build_test_command)}` command.
 
         MSG
+        # rubocop:enable Layout/IndentHeredoc
       end
     end
   end

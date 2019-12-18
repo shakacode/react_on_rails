@@ -1,9 +1,9 @@
+# frozen_string_literal: true
+
 require_relative "task_helpers"
-include ReactOnRails::TaskHelpers
 require_relative File.join(gem_root, "lib", "react_on_rails", "version_syntax_converter")
 require_relative File.join(gem_root, "lib", "react_on_rails", "git_utils")
 require_relative File.join(gem_root, "lib", "react_on_rails", "utils")
-
 desc("Releases both the gem and node package using the given version.
 
 IMPORTANT: the gem version must be in valid rubygem format (no dashes).
@@ -20,10 +20,13 @@ which are installed via `bundle install` and `yarn`
 
 Example: `rake release[2.1.0,false]`")
 
-task :release, [:gem_version, :dry_run, :tools_install] do |_t, args|
+# rubocop:disable Metrics/BlockLength
+task :release, %i[gem_version dry_run tools_install] do |_t, args|
+  include ReactOnRails::TaskHelpers
+
   class MessageHandler
     def add_error(error)
-      fail error
+      raise error
     end
   end
 
@@ -38,7 +41,7 @@ task :release, [:gem_version, :dry_run, :tools_install] do |_t, args|
   npm_version = if gem_version.strip.empty?
                   ""
                 else
-                  VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
+                  ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
                 end
 
   # Having the examples prevents publishing
@@ -57,11 +60,21 @@ task :release, [:gem_version, :dry_run, :tools_install] do |_t, args|
   sh_in_dir(gem_root, "git add .")
 
   # Will bump the yarn version, commit, tag the commit, push to repo, and release on yarn
-  release_it_command = "$(yarn bin)/release-it --non-interactive --npm.publish"
-  release_it_command << " --dry-run --verbose" if is_dry_run
+  release_it_command = "$(yarn bin)/release-it".dup
   release_it_command << " #{npm_version}" unless npm_version.strip.empty?
+  release_it_command << " --non-interactive --npm.publish"
+  release_it_command << " --dry-run --verbose" if is_dry_run
   sh_in_dir(gem_root, release_it_command)
 
   # Release the new gem version
-  sh_in_dir(gem_root, "gem release") unless is_dry_run
+  unless is_dry_run
+    sh_in_dir(gem_root, "gem release")
+
+    # Update master with new npm version
+    sleep 5 # short pause to make sure npmjs has time to update
+    sh_in_dir(File.join(gem_root, "spec", "dummy", "client"), "yarn add react-on-rails@#{npm_version} --exact")
+    sh_in_dir(gem_root, "git commit -am 'Updated spec/dummy/client/package.json latest version'")
+    sh_in_dir(gem_root, "git push")
+  end
 end
+# rubocop:enable Metrics/BlockLength

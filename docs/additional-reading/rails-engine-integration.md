@@ -20,7 +20,7 @@ Rake.application.remove_task('react_on_rails:assets:compile_environment')
 
 task 'react_on_rails:assets:compile_environment' do
   path = File.join(YourEngineName::Engine.root, 'client')
-  sh "cd #{path} && #{ReactOnRails.configuration.npm_build_production_command}"
+  sh "cd #{path} && #{ReactOnRails.configuration.build_production_command}"
 end
 ``` 
 ## In the project including your engine
@@ -32,3 +32,10 @@ This is necessary because React on Rails attaches itself to the rake assets:prec
 Requiring `react_on_rails` and including the helper will get rid of any issues where react on rails or react_component is undefined.
 
 As far as solving the assets issue, `lib/tasks/assets.rake` in `react_on_rails` would somehow have to know that `react_on_rails` was included in an engine, and decide the path accordingly. This might be impossible, especially in the case of multiple engines using `react_on_rails` in a single application. Another solution would be to detach this rake task from the rails assets:precompile task, and let people use it separately.
+
+# Github Issues
+
+* [Integration with an engine #342](https://github.com/shakacode/react_on_rails/issues/342)
+* [Feature: target destination option for the install generator #459](https://github.com/shakacode/react_on_rails/issues/459)
+* [Integration with Rails 5 Engines #562](https://github.com/shakacode/react_on_rails/issues/562)
+* [Run inside a Rails engine? #257](https://github.com/shakacode/react_on_rails/issues/257)

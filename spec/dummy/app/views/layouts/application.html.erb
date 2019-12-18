@@ -9,20 +9,13 @@
 
   <%= yield :head %>
 
-  <%= env_stylesheet_link_tag(static: 'application_static',
-                              hot: 'application_non_webpack',
-                              media: 'all',
-                              'data-turbolinks-track' => true) %>
+  <%= stylesheet_pack_tag('app-bundle',
+                          media: 'all',
+                          'data-turbolinks-track': true) %>
 
-  <!-- These do not use turbolinks, so no data-turbolinks-track -->
-  <!-- This is to load the hot assets. -->
-  <%= env_javascript_include_tag(hot: ['http://localhost:3500/vendor-bundle.js',
-                                       'http://localhost:3500/app-bundle.js']) %>
-
-  <!-- These do use turbolinks -->
-  <%= env_javascript_include_tag(static: 'application_static',
-                                 hot: 'application_non_webpack',
-                                 'data-turbolinks-track' => true) %>
+  <!--  NOTE: Must use defer and not async to keep async scripts loading in correct order  -->
+  <%= javascript_pack_tag('vendor-bundle', 'data-turbolinks-track': true, defer: true) %>
+  <%= javascript_pack_tag('app-bundle', 'data-turbolinks-track': true, defer: true) %>
 
   <%= csrf_meta_tags %>
 </head>
@@ -30,6 +23,7 @@
 <% flash.each do |key, value| %>
   <%= content_tag :div, value, class: "flash #{key}" %>
 <% end %>
+<%= render "shared/header" %>
 
 <%= yield %>
 

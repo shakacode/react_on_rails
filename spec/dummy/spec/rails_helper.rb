@@ -1,13 +1,16 @@
-# This file is copied to spec/ when you run 'rails generate rspec:install'
+# frozen_string_literal: true
+
 ENV["RAILS_ENV"] ||= "test"
+SERVER_BUNDLE_PATH = File.expand_path("../../public/webpack/" + ENV["RAILS_ENV"] + "/server-bundle.js", __FILE__)
 
 require_relative "simplecov_helper"
+require_relative "spec_helper"
+
 require_relative("../config/environment")
 
 # Prevent database truncation if the environment is production
 abort("The Rails environment is running in production mode!") if Rails.env.production?
 
-require_relative "spec_helper"
 require "rspec/rails"
 require "capybara/rspec"
 require "capybara-screenshot/rspec"
@@ -27,16 +30,22 @@ require "capybara-screenshot/rspec"
 # directory. Alternatively, in the individual `*_spec.rb` files, manually
 # require only the support files necessary.
 #
-# Dir[Rails.root.join('spec/support/**/*.rb')].each { |f| require f }
+# Dir[Rails.root.join("spec/support/**/*.rb")].each { |f| require f }
 
 # Checks for pending migrations before tests are run.
 # If you are not using ActiveRecord, you can remove this line.
 ActiveRecord::Migration.maintain_test_schema!
 
+# Requires supporting files with custom matchers and macros, etc,
+# in ./support/ and its subdirectories.
+Dir[Rails.root.join("spec", "support", "**", "*.rb")].each { |f| require f }
+
 RSpec.configure do |config|
   # Ensure that if we are running js tests, we are using latest webpack assets
-  # This will use the defaults of :js and :server_rendering meta tags
-  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :requires_webpack_assets)
+  config.define_derived_metadata(file_path: %r{spec/(system|requests|helpers)}) do |metadata|
+    metadata[:requires_webpack_assets] = true
+  end
 
   # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
   config.fixture_path = "#{::Rails.root}/spec/fixtures"
@@ -64,48 +73,66 @@ RSpec.configure do |config|
   # Capybara config
   #
   # selenium_firefox webdriver only works for Travis-CI builds.
-  default_driver = :poltergeist
+  default_driver = :selenium_chrome_headless
 
-  supported_drivers = %i( poltergeist poltergeist_errors_ok
-                          selenium_chrome selenium_firefox selenium)
+  supported_drivers = %i[ selenium_chrome_headless
+                          selenium_chrome selenium_firefox selenium]
   driver = ENV["DRIVER"].try(:to_sym) || default_driver
+  Capybara.default_driver = driver
 
-  unless supported_drivers.include?(driver)
-    raise "Unsupported driver: #{driver} (supported = #{supported_drivers})"
-  end
+  raise "Unsupported driver: #{driver} (supported = #{supported_drivers})" unless supported_drivers.include?(driver)
 
   case driver
-  when :poltergeist, :poltergeist_errors_ok
-    require "capybara/poltergeist"
-    Capybara.register_driver :poltergeist_errors_ok do |app|
-      Capybara::Poltergeist::Driver.new(app, js_errors: false)
-    end
-    config.after :each do |_example|
-      page.driver.restart if defined?(page.driver.restart)
-    end
+
   when :selenium_chrome
-    Capybara.register_driver :selenium_chrome do |app|
-      Capybara::Selenium::Driver.new(app, browser: :chrome)
-    end
-    Capybara::Screenshot.register_driver(:selenium_chrome) do |js_driver, path|
-      js_driver.browser.save_screenshot(path)
-    end
+    DriverRegistration.register_selenium_chrome
+
+  when :selenium_chrome_headless
+    DriverRegistration.register_selenium_headless
+
   when :selenium_firefox, :selenium
-    Capybara.register_driver :selenium_firefox do |app|
-      Capybara::Selenium::Driver.new(app, browser: :firefox)
-    end
-    Capybara::Screenshot.register_driver(:selenium_firefox) do |js_driver, path|
-      js_driver.browser.save_screenshot(path)
-    end
+    DriverRegistration.register_selenium_firefox
     driver = :selenium_firefox
   end
 
   Capybara.javascript_driver = driver
+  Capybara.default_driver = driver
 
+  Capybara.register_server(Capybara.javascript_driver) do |app, port|
+    require "rack/handler/puma"
+    Rack::Handler::Puma.run(app, Port: port)
+  end
+
+  config.before(:each, type: :system, js: true) do
+    driven_by driver
+  end
+
+  # Capybara.default_max_wait_time = 15
+  puts "=" * 80
   puts "Capybara using driver: #{Capybara.javascript_driver}"
+  puts "=" * 80
 
+  Capybara.save_path = Rails.root.join("tmp", "capybara")
   Capybara::Screenshot.prune_strategy = { keep: 10 }
-  # [END] Capybara config
+
+  config.append_after(:each) do
+    Capybara.reset_sessions!
+  end
+
+  # RSpec Rails can automatically mix in different behaviours to your tests
+  # based on their file location, for example enabling you to call `get` and
+  # `post` in specs under `spec/controllers`.
+  #
+  # You can disable this behaviour by removing the line below, and instead
+  # explicitly tag your specs with their type, e.g.:
+  #
+  #     RSpec.describe UsersController, :type => :controller do
+  #       # ...
+  #     end
+  #
+  # The different available types are documented in the features, such as in
+  # https://relishapp.com/rspec/rspec-rails/docs
+  config.infer_spec_type_from_file_location!
 
   # This will insert a <base> tag with the asset host into the pages created by
   # save_and_open_page, meaning that relative links will be loaded from the
@@ -113,6 +140,16 @@ RSpec.configure do |config|
   Capybara.asset_host = "http://localhost:3000"
 
   def js_errors_driver
-    Capybara.javascript_driver == :poltergeist ? :poltergeist_errors_ok : Capybara.javascript_driver
+    Capybara.javascript_driver
+  end
+
+  def js_selenium_driver
+    driver = Capybara.javascript_driver == :selenium_firefox ? :selenium_firefox : :selenium_chrome
+    if driver == :selenium_firefox
+      DriverRegistration.register_selenium_firefox
+    else
+      DriverRegistration.register_selenium_chrome
+    end
+    driver
   end
 end

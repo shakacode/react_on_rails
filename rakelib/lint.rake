@@ -1,7 +1,10 @@
-require_relative "task_helpers"
-include ReactOnRails::TaskHelpers
+# frozen_string_literal: true
 
-namespace :lint do
+require_relative "task_helpers"
+
+namespace :lint do # rubocop:disable Metrics/BlockLength
+  include ReactOnRails::TaskHelpers
+
   desc "Run Rubocop as shell"
   task :rubocop do
     sh_in_dir(gem_root, "bundle exec rubocop .")
@@ -29,7 +32,7 @@ namespace :lint do
   end
 
   desc "Run all eslint, flow, rubocop linters. Skip ruby-lint and scss"
-  task lint: [:eslint, :flow, :rubocop] do
+  task lint: %i[eslint flow rubocop] do
     puts "Completed all linting"
   end
 end

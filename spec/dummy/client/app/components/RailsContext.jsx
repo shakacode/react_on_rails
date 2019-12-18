@@ -8,14 +8,14 @@ function renderContextRows(railsContext) {
   return _.transform(railsContext, (accum, value, key) => {
     if (key !== 'serverSide') {
       const className = `js-${key}`;
-      accum.push(
-        <tr key={className}>
-          <td><strong>
+      accum.push(<tr key={className}>
+        <td>
+          <strong>
             {key}:&nbsp;
-          </strong></td>
-          <td className={className}>{`${value}`}</td>
-        </tr>,
-      );
+          </strong>
+        </td>
+        <td className={className}>{`${value}`}</td>
+                 </tr>);
     }
   }, []);
 }
@@ -24,12 +24,15 @@ const RailsContext = (props) => (
   <table>
     <thead>
       <tr>
-        <th><i>
+        <th>
+          <i>
         key
-        </i></th>
+          </i>
+        </th>
         <th><i>
         value
-        </i></th>
+        </i>
+        </th>
       </tr>
     </thead>
     <tbody>

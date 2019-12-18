@@ -61,8 +61,11 @@ console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);`;
 test('consoleReplay replays converts script tag inside of object string to be safe ', (assert) => {
   assert.plan(1);
   console.history = [
-    { arguments: ['some message </script><script>alert(\'WTF\')</script>',
-      { a: 'Wow</script><script>alert(\'WTF\')</script>', b: 2 }],
+    {
+      arguments: [
+        'some message </script><script>alert(\'WTF\')</script>',
+        { a: 'Wow</script><script>alert(\'WTF\')</script>', b: 2 },
+      ],
       level: 'log',
     },
     { arguments: ['other message', { c: 3, d: 4 }], level: 'warn' },

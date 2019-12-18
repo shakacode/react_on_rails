@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rails/generators"
 require_relative "generator_helper"
 require_relative "generator_messages"
@@ -8,7 +10,7 @@ module ReactOnRails
       include GeneratorHelper
 
       # fetch USAGE file for details generator description
-      source_root(File.expand_path("../", __FILE__))
+      source_root(File.expand_path(__dir__))
 
       # --redux
       class_option :redux,
@@ -16,13 +18,6 @@ module ReactOnRails
                    default: false,
                    desc: "Install Redux gems and Redux version of Hello World Example. Default: false",
                    aliases: "-R"
-
-      # --redux
-      class_option :node,
-                   type: :boolean,
-                   default: false,
-                   desc: "Sets up node as a server rendering option. Default: false",
-                   aliases: "-N"
 
       # --ignore-warnings
       class_option :ignore_warnings,
@@ -51,9 +46,11 @@ module ReactOnRails
 
       def invoke_generators
         invoke "react_on_rails:base"
-        invoke "react_on_rails:react_no_redux" unless options.redux?
-        invoke "react_on_rails:react_with_redux" if options.redux?
-        invoke "react_on_rails:node" if options.node?
+        if options.redux?
+          invoke "react_on_rails:react_with_redux"
+        else
+          invoke "react_on_rails:react_no_redux"
+        end
       end
 
       # NOTE: other requirements for existing files such as .gitignore or application.
@@ -65,16 +62,16 @@ module ReactOnRails
 
       def missing_yarn?
         return false unless ReactOnRails::Utils.running_on_windows? ? `where yarn`.blank? : `which yarn`.blank?
-        error = "yarn is required. Please install it before continuing. "
-        error << "https://yarnpkg.com/en/docs/install"
+
+        error = "yarn is required. Please install it before continuing. https://yarnpkg.com/en/docs/install"
         GeneratorMessages.add_error(error)
         true
       end
 
       def missing_node?
         return false unless ReactOnRails::Utils.running_on_windows? ? `where node`.blank? : `which node`.blank?
-        error = "** nodejs is required. Please install it before continuing. "
-        error << "https://nodejs.org/en/"
+
+        error = "** nodejs is required. Please install it before continuing. https://nodejs.org/en/"
         GeneratorMessages.add_error(error)
         true
       end

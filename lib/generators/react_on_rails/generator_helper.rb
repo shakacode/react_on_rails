@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rainbow"
 
 module GeneratorHelper
@@ -13,11 +15,13 @@ module GeneratorHelper
   end
 
   def setup_file_error(file, data)
+    # rubocop:disable Layout/IndentHeredoc
     <<-MSG
 #{file} was not found.
 Please add the following content to your #{file} file:
 #{data}
     MSG
+    # rubocop:enable Layout/IndentHeredoc
   end
 
   def empty_directory_with_keep_file(destination, config = {})
@@ -44,7 +48,7 @@ Please add the following content to your #{file} file:
   end
 
   def copy_file_and_missing_parent_directories(source_file, destination_file = nil)
-    destination_file = source_file unless destination_file
+    destination_file ||= source_file
     destination_path = Pathname.new(destination_file)
     parent_directories = destination_path.dirname
     empty_directory(parent_directories) unless dest_dir_exists?(parent_directories)

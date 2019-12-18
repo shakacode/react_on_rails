@@ -1,6 +1,9 @@
+# frozen_string_literal: true
+
 module ReactOnRails
   class AssetsPrecompile
-    class SymlinkTargetDoesNotExistException < StandardError; end
+    class SymlinkTargetDoesNotExistException < StandardError
+    end
 
     # Used by the rake task
     def default_asset_path
@@ -9,13 +12,16 @@ module ReactOnRails
       Pathname.new(dir)
     end
 
+    # assets_path should be a Pathname object
     def initialize(assets_path: nil,
                    symlink_non_digested_assets_regex: nil,
                    generated_assets_dir: nil)
-      @assets_path = assets_path.presence || default_asset_path
-      @symlink_non_digested_assets_regex = symlink_non_digested_assets_regex.presence ||
-                                           ReactOnRails.configuration.symlink_non_digested_assets_regex
-      @generated_assets_dir = generated_assets_dir.presence || ReactOnRails.configuration.generated_assets_dir
+      @assets_path = ReactOnRails::Utils.truthy_presence(assets_path) || default_asset_path
+      @symlink_non_digested_assets_regex =
+        ReactOnRails::Utils.truthy_presence(symlink_non_digested_assets_regex) ||
+        ReactOnRails.configuration.symlink_non_digested_assets_regex
+      @generated_assets_dir = ReactOnRails::Utils.truthy_presence(generated_assets_dir) ||
+                              ReactOnRails.configuration.generated_assets_dir
     end
 
     # target and symlink are relative to the assets directory
@@ -58,6 +64,7 @@ module ReactOnRails
       # references from webpack's CSS would be invalid. The fix is to symlink the double-digested
       # file back to the original digested name, and make a similar symlink for the gz version.
       return unless @symlink_non_digested_assets_regex
+
       manifest_glob = Dir.glob(@assets_path.join(".sprockets-manifest-*.json")) +
                       Dir.glob(@assets_path.join("manifest-*.json")) +
                       Dir.glob(@assets_path.join("manifest.yml"))
@@ -66,7 +73,7 @@ module ReactOnRails
                  "or manifest.yml at #{@assets_path}, but found none. Canceling symlinking tasks."
         return -1
       end
-      manifest_path = manifest_glob.first
+      manifest_path = take_most_recent_manifest_path(manifest_glob)
       manifest_file = File.new(manifest_path)
       manifest_data = if File.extname(manifest_file) == ".json"
                         manifest_file_data = File.read(manifest_path)
@@ -80,6 +87,7 @@ module ReactOnRails
       manifest_data.each do |original_filename, rails_digested_filename|
         # TODO: we should remove any original_filename that is NOT in the webpack deploy folder.
         next unless original_filename =~ @symlink_non_digested_assets_regex
+
         # We're symlinking from the digested filename back to the original filename which has
         # already been symlinked by Webpack
         symlink_file(rails_digested_filename, original_filename)
@@ -94,10 +102,11 @@ module ReactOnRails
     def delete_broken_symlinks
       Dir.glob(@assets_path.join("*")).each do |filename|
         next unless File.lstat(filename).symlink?
+
         begin
           target = File.readlink(filename)
-        rescue
-          puts "React on Rails: Warning: your platform doesn't support File::readlink method." /
+        rescue StandardError
+          puts "React on Rails: Warning: your platform doesn't support File::readlink method." \
                "Skipping broken link check."
           break
         end
@@ -122,6 +131,10 @@ module ReactOnRails
 
     private
 
+    def take_most_recent_manifest_path(manifest_glob)
+      manifest_glob.max_by { |name| File.mtime(name) }
+    end
+
     def symlink_and_points_to_existing_file?(symlink_path)
       # File.exist?(symlink_path) will check the file the sym is pointing to is existing
       # File.lstat(symlink_path).symlink? confirms that this is a symlink
@@ -133,7 +146,7 @@ module ReactOnRails
       # pointing to. We can't use File.exist?, as that would check the file pointed at by the symlink.
       File.lstat(path)
       true
-    rescue
+    rescue StandardError
       false
     end
   end

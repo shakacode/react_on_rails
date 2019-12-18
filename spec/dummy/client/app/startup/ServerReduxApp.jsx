@@ -20,6 +20,9 @@ import HelloWorldContainer from '../components/HelloWorldContainer';
  *  In the client, React will see that the state is the same and not do anything.
  */
 export default (props, railsContext) => {
+  // eslint-disable-next-line
+  delete props.prerender;
+
   const combinedReducer = combineReducers(reducers);
   const combinedProps = composeInitialState(props, railsContext);
 

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 Rails.application.routes.draw do
   # The priority is based upon order of creation: first created -> highest priority.
   # See how all your routes lay out with "rake routes".
@@ -15,7 +17,9 @@ Rails.application.routes.draw do
   get "server_side_hello_world" => "pages#server_side_hello_world"
   get "client_side_log_throw" => "pages#client_side_log_throw"
   get "server_side_log_throw" => "pages#server_side_log_throw"
+  get "server_side_log_throw_plain_js" => "pages#server_side_log_throw_plain_js"
   get "server_side_log_throw_raise" => "pages#server_side_log_throw_raise"
+  get "server_side_log_throw_raise_invoker" => "pages#server_side_log_throw_raise_invoker"
   get "server_side_hello_world_es5" => "pages#server_side_hello_world_es5"
   get "server_side_redux_app" => "pages#server_side_redux_app"
   get "server_side_hello_world_with_options" => "pages#server_side_hello_world_with_options"
@@ -29,6 +33,9 @@ Rails.application.routes.draw do
   get "css_modules_images_fonts_example" => "pages#css_modules_images_fonts_example"
   get "turbolinks_cache_disabled" => "pages#turbolinks_cache_disabled"
   get "rendered_html" => "pages#rendered_html"
+  get "xhr_refresh" => "pages#xhr_refresh"
   get "react_helmet" => "pages#react_helmet"
+  get "broken_app" => "pages#broken_app"
   get "image_example" => "pages#image_example"
+  get "server_render_with_timeout" => "pages#server_render_with_timeout"
 end

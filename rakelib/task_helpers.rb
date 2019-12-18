@@ -1,8 +1,10 @@
+# frozen_string_literal: true
+
 module ReactOnRails
   module TaskHelpers
     # Returns the root folder of the react_on_rails gem
     def gem_root
-      File.expand_path("../../.", __FILE__)
+      File.expand_path("..", __dir__)
     end
 
     # Returns the folder where examples are located
@@ -26,10 +28,6 @@ module ReactOnRails
 
     def bundle_install_in_no_turbolinks(dir)
       sh_in_dir(dir, "DISABLE_TURBOLINKS=TRUE bundle install")
-    end
-
-    def bundle_install_with_turbolinks_2_in(dir)
-      sh_in_dir(dir, "ENABLE_TURBOLINKS_2=TRUE BUNDLE_GEMFILE=#{dir}/Gemfile bundle install")
     end
 
     # Runs bundle exec using that directory's Gemfile

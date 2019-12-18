@@ -21,7 +21,7 @@ test('ReactOnRails render returns a virtual DOM element for component', (assert)
   ReactOnRails.register({ R1 });
 
   // eslint-disable-next-line no-underscore-dangle
-  const actual = ReactOnRails.render('R1', {}, 'root')._reactInternalInstance._currentElement.type;
+  const actual = ReactOnRails.render('R1', {}, 'root')._reactInternalFiber.type;
   assert.deepEqual(actual, R1,
     'ReactOnRails render should return a virtual DOM element for component');
 });
