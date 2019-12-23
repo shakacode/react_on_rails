@@ -4,9 +4,11 @@
 
 React on Rails integrates Rails with (server rendering of) Facebook's [React](https://github.com/facebook/react) front-end framework.
 
-Interested in optimizing your webpack setup for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable with server side rendering? We just did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://cdn2.hubspot.net/hubfs/4342163/Case%20Studies%202019/Popmenu%20Case%20Study%20-%20November%202019.pdf).
+This project is sponsored by the [ShakaCode](https://www.shakacode.com). We focus on React front-ends, often with Ruby on Rails or Gatsby. The best way to see what we do is to see the details of [our recent work](https://www.shakacode.com/recent-work).
 
-[Contact Justin Gordon](mailto:justin@shakacode.com).
+Interested in optimizing your webpack setup for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable with server side rendering? We just did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://www.shakacode.com/recent-work/popmenu/).
+
+Feel free to contact Justin Gordon, [justin@shakacode.com](mailto:justin@shakacode.com), maintainer of React on Rails, for more information.
 
 # Intro
 
@@ -30,59 +32,9 @@ Given that rails/webpacker gem already provides basic React integration, why wou
 See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
 
 ## ShakaCode Forum Premium Content
-_Requires creating a free account._ 
+_Requires creating a free account._
+ 
 * [How to use different versions of a file for client and server rendering](https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352)
-
-## React on Rails Pro and ShakaCode Pro Support
-
-React on Rails Pro provides Node server rendering and other performance enhancements for React on Rails. 
-
-[![2018-09-11_10-31-11](https://user-images.githubusercontent.com/1118459/45467845-5bcc7400-b6bd-11e8-91e1-e0cf806d4ea4.png)](https://blog.shakacode.com/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db)
-
-* [HVMN Testimonial, by Paul Benigeri, October 12, 2018](./docs/testimonials/hvmn.md)
-* [HVMN’s 90% Reduction in Server Response Time from React on Rails Pro](https://blog.shakacode.com/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db)
-* [Egghead React on Rails Pro Deployment Highlights](https://github.com/shakacode/react_on_rails/wiki/Egghead-React-on-Rails-Pro-Deployment-Highlights)
-
-For more information, see the [React on Rails Pro Docs](https://github.com/shakacode/react_on_rails/wiki).
-
-The [ShakaCode Pro Support Plan](http://www.shakacode.com/work/shakacode-pro-support.pdf) can help you with:
-
-* Optimizing your webpack setup to Webpack v4 for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable.
-* Upgrading your app to use the current Webpack setup that skips the Sprockets asset pipeline.
-* Better performance client and server side.
-* Best practices based on over four years of React on Rails experience.
-* Using [Reason](https://reasonml.github.io/) with (or without) React on Rails.
-
-ShakaCode can also help you with your custom software development needs. We specialize in marketplace and e-commerce applications that utilize both Rails and React. Because we own [HawaiiChee.com](https://www.hawaiichee.com), we can leverage that code for your app!
-
-**Case Studies of Current ShakaCode Clients in 2019:**
-* [DataCenters Marketplace App Development](https://cdn2.hubspot.net/hubfs/4342163/Case%20Studies%202019/Datacenters.com%20Case%20Study%20-%20November%202019.pdf)
-* [Printivity Solidus plus React on Rails](https://cdn2.hubspot.net/hubfs/4342163/Case%20Studies%202019/Printivity%20Case%20Study%20-%20November%202019.pdf)
-* [PopMenu React on Rails Pro](https://cdn2.hubspot.net/hubfs/4342163/Case%20Studies%202019/Popmenu%20Case%20Study%20-%20November%202019.pdf)
-* [Jilt E-Commerce](https://cdn2.hubspot.net/hubfs/4342163/Case%20Studies%202019/Jilt%20Case%20Study%20-%20November%202019.pdf)
-* [BMDI DOMO Projects](https://cdn2.hubspot.net/hubfs/4342163/Case%20Studies%202019/BMDI%20Case%20Study%20-%20November%202019.pdf)
-
-Please [email me (Justin Gordon), the creator of React on Rails](mailto:justin@shakacode.com), to see if I can help you or if you want an invite to our private Slack room for ShakaCode.
-
-## Testimonials for Hiring ShakaCode and our "Pro Support"
-
-[HVMN Testimonial, Written by Paul Benigeri, October 12, 2018](./docs/testimonials/hvmn.md)
-
-> The price we paid for the consultation + the React on Rails pro license has already been made back a couple of times from hosting fees alone. The entire process was super hands off, and our core team was able to focus on shipping new feature during that sprint.
-
-[ResortPass Testimonial, by Leora Juster, December 10, 2018](./docs/testimonials/resortpass.md)
-
-> Justin and his team were instrumental in assisting us in setting design foundations and standards for our transition to a react on rails application. Just three months of work with the team at Shaka code and we have a main page of our application server-side rendering at exponentially improved speeds.
-
-From Kyle Maune of Cooper Aerial, May 4, 2018
-
-![image](https://user-images.githubusercontent.com/1118459/40891236-9b0b406e-671d-11e8-80ee-c026dbd1d5a2.png)
-
-From Joel Hooks, Co-Founder, Chief Nerd at [egghead.io](https://egghead.io/), January 30, 2017:
-
-![2017-01-30_11-33-59](https://cloud.githubusercontent.com/assets/1118459/22443635/b3549fb4-e6e3-11e6-8ea2-6f589dc93ed3.png)
-
-For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 
 ----
 
@@ -309,10 +261,6 @@ Here are some highly recommended next articles to read:
 
 # Support
 
-## ShakaCode Support
-
-Aloha, I'm Justin Gordon the creator and maintainer of React on Rails. I'm supporting my continued dedication to this project by project by offering a React on Rails **Pro Support Plan**. Please [email me](mailto:justin@shakacode.com) to see if I can help you.
-
 ## Community Resources
 
 Please [**click to subscribe**](https://app.mailerlite.com/webforms/landing/l1d9x5) to keep in touch with Justin Gordon and [ShakaCode](http://www.shakacode.com/). I intend to send announcements of new releases of React on Rails and of our latest [blog articles](https://blog.shakacode.com) and tutorials.
@@ -329,6 +277,40 @@ Please [**click to subscribe**](https://app.mailerlite.com/webforms/landing/l1d9
 ## Contributing
 
 Bug reports and pull requests are welcome. See [Contributing](CONTRIBUTING.md) to get started, and the [list of help wanted issues](https://github.com/shakacode/react_on_rails/labels/contributions%3A%20up%20for%20grabs%21).
+
+## React on Rails Pro
+
+React on Rails Pro provides Node server rendering, fragment caching, code-splitting, and other performance enhancements for React on Rails. For a case study, see the article [HVMN’s 90% Reduction in Server Response Time from React on Rails Pro](https://blog.shakacode.com/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db). The [Wiki](https://github.com/shakacode/react_on_rails/wiki) contains more details.
+
+[![2018-09-11_10-31-11](https://user-images.githubusercontent.com/1118459/45467845-5bcc7400-b6bd-11e8-91e1-e0cf806d4ea4.png)](https://blog.shakacode.com/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db)
+
+## ShakaCode Pro Support
+
+The [ShakaCode Pro Support Plan](http://www.shakacode.com/work/shakacode-pro-support.pdf) can help you with:
+
+* Optimizing your webpack setup to Webpack v4 for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable.
+* Upgrading your app to use the current Webpack setup that skips the Sprockets asset pipeline.
+* Better performance client and server side.
+* Best practices based on over four years of React on Rails experience.
+* Using [Reason](https://reasonml.github.io/) with (or without) React on Rails.
+
+ShakaCode can also help you with your custom software development needs. We specialize in marketplace and e-commerce applications that utilize both Rails and React. Because we own [HawaiiChee.com](https://www.hawaiichee.com), we can leverage that code for your app!
+
+Please email Justin Gordon [justin@shakacode.com](mailto:justin@shakacode.com), the maintainer of React on Rails, for more information.
+
+## Testimonials for ShakaCode
+[HVMN Testimonial, by Paul Benigeri, October 12, 2018](./docs/testimonials/hvmn.md)
+> The price we paid for the consultation + the React on Rails pro license has already been made back a couple of times from hosting fees alone. The entire process was super hands off, and our core team was able to focus on shipping new feature during that sprint.
+
+[ResortPass Testimonial, by Leora Juster, December 10, 2018](./docs/testimonials/resortpass.md)
+
+> Justin and his team were instrumental in assisting us in setting design foundations and standards for our transition to a react on rails application. Just three months of work with the team at Shaka code and we have a main page of our application server-side rendering at exponentially improved speeds.
+
+From Joel Hooks, Co-Founder, Chief Nerd at [egghead.io](https://egghead.io/), January 30, 2017:
+
+![2017-01-30_11-33-59](https://cloud.githubusercontent.com/assets/1118459/22443635/b3549fb4-e6e3-11e6-8ea2-6f589dc93ed3.png)
+
+For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
 
 # Supporters
 
