@@ -14,7 +14,7 @@
     "@babel/preset-env": "^7.0.0",
     "@babel/preset-react": "^7.0.0",
     "@babel/runtime": "^7.4.5",
-    "@rails/webpacker": "^4.0.7",
+    "@rails/webpacker": "^4.2.2",
     "babel-loader": "^8.0.6",
     "babel-plugin-module-resolver": "^3.2.0",
     "babel-plugin-syntax-dynamic-import": "^6.18.0",
@@ -82,8 +82,9 @@
     "postinstall": "yarn link react-on-rails",
     "lint": "cd client && yarn run lint",
     "test": "yarn run build:test && yarn run lint && rspec",
-    "build:test": "RAILS_ENV=test NODE_ENV=test bin/webpack",
-    "build:dev": "RAILS_ENV=development NODE_ENV=development bin/webpack-dev-server",
+    "build:test": "rm -rf public/webpack/test && RAILS_ENV=test NODE_ENV=test bin/webpack",
+    "build:dev": "rm -rf public/webpack/develoment && RAILS_ENV=development NODE_ENV=development bin/webpack",
+    "build:dev:watch": "RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
     "build:production": "RAILS_ENV=production NODE_ENV=production bin/webpack -p",
     "build:clean": "rm -rf public/webpack || true"
   }

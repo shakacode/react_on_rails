@@ -17,20 +17,35 @@ module.exports = function(api) {
 
   return {
     presets: [
-      isTestEnv && [
+      // Let's comment out and document how this file and the other config files
+      // differ from https://github.com/rails/webpacker/blob/master/lib/install/config/babel.config.js
+      // and the other files in that are installed by default.
+
+      // We may need differences in testEnv for running jest tests
+      // isTestEnv && [
+      //   require('@babel/preset-env').default,
+      //   {
+      //     targets: {
+      //       node: 'current'
+      //     }
+      //   }
+      // ],
+      // (isProductionEnv || isDevelopmentEnv) &&
+      [
         require('@babel/preset-env').default,
         {
-          targets: {
-            node: 'current'
-          }
-        }
-      ],
-      (isProductionEnv || isDevelopmentEnv) && [
-        require('@babel/preset-env').default,
-        {
+          // OK to support ES5
+          // https://babeljs.io/docs/en/babel-preset-env#forcealltransforms
           forceAllTransforms: true,
+          // OK to include polyfills globally, just once
+          // https://babeljs.io/docs/en/babel-preset-env#usebuiltins-entry
           useBuiltIns: 'entry',
+          // OK to not use ES6 modules since we want to support ES5
+          // https://babeljs.io/docs/en/babel-preset-env#modules
           modules: false,
+          // No idea on this one.
+          // Suggestion for performance from create-react-app
+          // https://github.com/facebook/create-react-app/issues/5277
           exclude: ['transform-typeof-symbol']
         }
       ],
@@ -51,7 +66,11 @@ module.exports = function(api) {
       }],
       require('babel-plugin-macros'),
       require('@babel/plugin-syntax-dynamic-import').default,
-      isTestEnv && require('babel-plugin-dynamic-import-node'),
+
+      // Hard to say why this would be needed.
+      // CRA has this:
+      // https://github.com/facebook/create-react-app/pull/4984
+      // isTestEnv && require('babel-plugin-dynamic-import-node'),
       require('@babel/plugin-transform-destructuring').default,
       [
         require('@babel/plugin-proposal-class-properties').default,

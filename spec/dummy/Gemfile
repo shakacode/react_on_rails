@@ -7,7 +7,8 @@ eval_gemfile File.expand_path("../../react_on_rails.gemspec", __dir__)
 gem "react_on_rails", path: "../.."
 
 # We'll revert this before the final merge.
-gem "webpacker", git: 'https://github.com/rails/webpacker.git'
+#gem "webpacker", git: 'https://github.com/rails/webpacker.git'
+gem "webpacker"
 
 gem "bootsnap", ">= 1.1.0", require: false
 gem "rails"
