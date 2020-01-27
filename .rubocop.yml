@@ -27,8 +27,8 @@ AllCops:
     - 'spec/react_on_rails/dummy-for-generators/**/*'
     - 'spec/dummy/Procfile.*'
     - 'spec/dummy/bin/**/*'
-    - 'spec/dummy/client/node_modules/**/*'
-    - 'spec/dummy/client/node_modules/**/.*'
+    - 'spec/dummy/node_modules/**/*'
+    - 'spec/dummy/node_modules/**/.*'
     - 'spec/dummy_no_webpacker/Procfile.*'
     - 'spec/dummy_no_webpacker/bin/**/*'
     - 'spec/dummy_no_webpacker/client/node_modules/**/*'
@@ -59,7 +59,7 @@ Lint/AssignmentInCondition:
   Exclude:
     - 'spec/dummy/bin/spring'
 
-Lint/HandleExceptions:
+Lint/SuppressedException:
   Exclude:
     - 'spec/dummy/bin/rails'
     - 'spec/dummy/bin/rake'
