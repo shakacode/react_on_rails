@@ -15,7 +15,7 @@ gem "jbuilder"
 gem "jquery-rails"
 gem "mini_racer"
 gem "puma"
-
+gem 'sprockets', '~>3.0'
 gem "rails_12factor"
 gem "ruby-lint", require: false
 gem "sass-rails"
