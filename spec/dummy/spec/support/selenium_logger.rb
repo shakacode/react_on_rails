@@ -22,6 +22,7 @@ RSpec.configure do |config|
     end
 
     # We may skip componentWillReceiveProps & componentWillUpdate deprecation warning for now.
-    raise("Java Script Error(s) on the page:\n\n" + errors.join("\n")) if errors.present? && !errors.all? { |e| e.match?('Warning') }
+    raise("Java Script Error(s) on the page:\n\n" + errors.join("\n")) if errors.present? &&
+                                                                          !errors.all? { |e| e.match?("Warning") }
   end
 end

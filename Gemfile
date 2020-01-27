@@ -15,13 +15,13 @@ gem "jbuilder"
 gem "jquery-rails"
 gem "mini_racer"
 gem "puma"
-gem 'sprockets', '~>3.0'
 gem "rails_12factor"
 gem "ruby-lint", require: false
 gem "sass-rails"
 gem "scss_lint", require: false
 gem "sdoc", group: :doc
 gem "spring"
+gem "sprockets", "~>3.0"
 gem "sqlite3", "~> 1.3.6"
 gem "turbolinks"
 gem "uglifier"
