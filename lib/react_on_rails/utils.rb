@@ -8,7 +8,7 @@ require "active_support/core_ext/string"
 
 module ReactOnRails
   module Utils
-    TRUNCATION_FILLER = "\n... TRUNCATED ...\n".freeze
+    TRUNCATION_FILLER = "\n... TRUNCATED ...\n"
 
     # https://forum.shakacode.com/t/yak-of-the-week-ruby-2-4-pathname-empty-changed-to-look-at-file-size/901
     # return object if truthy, else return nil
@@ -24,13 +24,12 @@ module ReactOnRails
     # Pass in the msg and color as a symbol.
     def self.wrap_message(msg, color = :red)
       wrapper_line = ("=" * 80).to_s
-      # rubocop:disable Layout/IndentHeredoc
-      fenced_msg = <<-MSG
-#{wrapper_line}
-#{msg.strip}
-#{wrapper_line}
+      fenced_msg = <<~MSG
+        #{wrapper_line}
+        #{msg.strip}
+        #{wrapper_line}
       MSG
-      # rubocop:enable Layout/IndentHeredoc
+
       Rainbow(fenced_msg).color(color)
     end
 
@@ -48,14 +47,13 @@ module ReactOnRails
       unless status.success?
         stdout_msg = stdout.present? ? "\nstdout:\n#{stdout.strip}\n" : ""
         stderr_msg = stderr.present? ? "\nstderr:\n#{stderr.strip}\n" : ""
-        # rubocop:disable Layout/IndentHeredoc
-        msg = <<-MSG
-React on Rails FATAL ERROR!
-#{failure_message}
-cmd: #{cmd}
-exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
+        msg = <<~MSG
+          React on Rails FATAL ERROR!
+          #{failure_message}
+          cmd: #{cmd}
+          exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
         MSG
-        # rubocop:enable Layout/IndentHeredoc
+
         puts wrap_message(msg)
 
         # Rspec catches exit without! in the exit callbacks
