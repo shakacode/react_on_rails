@@ -11,7 +11,7 @@ gem "react_on_rails", path: "../.."
 gem "webpacker"
 
 gem "bootsnap", ">= 1.1.0", require: false
-gem "rails"
+gem "rails", "~> 5.2"
 
 # Use sqlite3 as the database for Active Record
 gem "sqlite3"
