@@ -24,7 +24,9 @@ RSpec.configure do |config|
     end
 
     # We may skip componentWillReceiveProps & componentWillUpdate deprecation warning for now.
+    byebug if errors.present? &&
+                 !errors.all? { |e| !!(e =~ /\bWarning\b/) }
     raise("Java Script Error(s) on the page:\n\n" + errors.join("\n")) if errors.present? &&
-                                                                          !errors.all? { |e| e.match?("Warning") }
+                                                                          !errors.all? { |e| !!(e =~ /\bWarning\b/) }
   end
 end
