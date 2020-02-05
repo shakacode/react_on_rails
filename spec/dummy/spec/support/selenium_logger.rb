@@ -23,9 +23,7 @@ RSpec.configure do |config|
       log_only_list.include?(entry.level) ? puts(entry.message) : errors << entry.message
     end
 
-    # We may skip componentWillReceiveProps & componentWillUpdate deprecation warning for now.
-    raise("Java Script Error(s) on the page:\n\n" + errors.join("\n")) if errors.present? &&
-                                                                                   !errors.all? { |e| e.match?("Warning") }
-    #
+    raise("Java Script Error(s) on the page:\n\n" + errors.join("\n")) if errors.present?
+
   end
 end
