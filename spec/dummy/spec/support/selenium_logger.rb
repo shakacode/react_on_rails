@@ -24,6 +24,5 @@ RSpec.configure do |config|
     end
 
     raise("Java Script Error(s) on the page:\n\n" + errors.join("\n")) if errors.present?
-
   end
 end
