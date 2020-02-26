@@ -2,6 +2,12 @@
 
 [![License](https://img.shields.io/badge/license-mit-green.svg)](./LICENSE.md) [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![](https://ruby-gem-downloads-badge.herokuapp.com/react_on_rails?type=total)](https://rubygems.org/gems/react_on_rails)
 
+#### News
+February 26, 2019: React on Rails Pro is getting a big update to support the awesome [Loadable Components](https://loadable-components.com) library for code-splitting with SSR. We're going to see some awesome performance boosts! Please [email me](mailto:justin@shakacode.com) if you'd like to use [Loadable Components Code Splitting](https://loadable-components.com/docs/code-splitting/) to speed up your app by reducing your bundle sizes and lazily loading the code that's needed. 
+
+---
+
+#### About
 React on Rails integrates Rails with (server rendering of) Facebook's [React](https://github.com/facebook/react) front-end framework.
 
 This project is sponsored by the software consulting firm [ShakaCode](https://www.shakacode.com). We focus on React front-ends, often with Ruby on Rails or Gatsby. The best way to see what we do is to see the details of [our recent work](https://www.shakacode.com/recent-work).
