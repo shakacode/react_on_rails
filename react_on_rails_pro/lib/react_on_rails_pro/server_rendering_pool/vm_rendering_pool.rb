@@ -107,10 +107,10 @@ module ReactOnRailsPro
 
           case response.code
           when "200"
-            return response.body
+            response.body
           when "410"
             # 410 is a special value meaning send the updated bundle with the next request.
-            return eval_js(js_code, render_options, send_bundle: true)
+            eval_js(js_code, render_options, send_bundle: true)
           when "400"
             raise ReactOnRailsPro::Error,
                   "Renderer unhandled error at the VM level: #{response.code}:\n#{response.body}"
