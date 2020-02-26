@@ -50,7 +50,7 @@ Lint/AssignmentInCondition:
   Exclude:
     - 'spec/dummy/bin/spring'
 
-Lint/HandleExceptions:
+Lint/SuppressedException:
   Exclude:
     - 'spec/dummy/bin/rails'
     - 'spec/dummy/bin/rake'

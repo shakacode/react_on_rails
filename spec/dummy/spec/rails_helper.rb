@@ -38,7 +38,7 @@ ActiveRecord::Migration.maintain_test_schema!
 
 # Requires supporting files with custom matchers and macros, etc,
 # in ./support/ and its subdirectories.
-Dir[Rails.root.join("spec", "support", "**", "*.rb")].each { |f| require f }
+Dir[Rails.root.join("spec", "support", "**", "*.rb")].sort.each { |f| require f }
 
 require_relative "../../react_on_rails_pro/support/caching.rb"
 RSpec.configure do |config|

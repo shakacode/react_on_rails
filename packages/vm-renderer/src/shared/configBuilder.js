@@ -78,7 +78,7 @@ function envValuesUsed() {
     RENDERER_LOG_LEVEL: !userConfig.logLevel && env.RENDERER_LOG_LEVEL,
     RENDERER_BUNDLE_PATH: !userConfig.bundlePath && env.RENDERER_BUNDLE_PATH,
     RENDERER_WORKERS_COUNT: !userConfig.workersCount && env.RENDERER_WORKERS_COUNT,
-    RENDERER_PASSWORD: !userConfig.password && (env.RENDERER_PASSWORD && '<MASKED'),
+    RENDERER_PASSWORD: !userConfig.password && env.RENDERER_PASSWORD && '<MASKED',
     RENDERER_ALL_WORKERS_RESTART_INTERVAL:
       !userConfig.allWorkersRestartInterval && env.RENDERER_ALL_WORKERS_RESTART_INTERVAL,
     RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS:

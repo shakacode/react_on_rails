@@ -28,7 +28,4 @@ function mapDispatchToProps(dispatch) {
 }
 
 // Don't forget to actually use connect!
-export default connect(
-  mapStateToProps,
-  mapDispatchToProps,
-)(HelloWorldContainer);
+export default connect(mapStateToProps, mapDispatchToProps)(HelloWorldContainer);
