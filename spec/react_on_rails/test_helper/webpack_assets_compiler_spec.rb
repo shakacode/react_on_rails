@@ -33,9 +33,11 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
         expect do
           begin
             ReactOnRails::TestHelper::WebpackAssetsCompiler.new.compile_assets
+            # rubocop:disable Lint/HandleExceptions
           rescue SystemExit
             # No op
           end
+          # rubocop:enable Lint/HandleExceptions
         end.to output(/#{expected_output}/).to_stdout
       end
     end

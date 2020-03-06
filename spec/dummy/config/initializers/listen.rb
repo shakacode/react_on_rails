@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 # https://github.com/guard/listen/wiki/Duplicate-directory-errors
 # Listen >=2.8 patch to silence duplicate directory errors. USE AT YOUR OWN RISK
 require "listen/record/symlink_detector"

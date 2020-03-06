@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module ReactOnRails
   class JsonParseError < ::ReactOnRails::Error
     attr_reader :json

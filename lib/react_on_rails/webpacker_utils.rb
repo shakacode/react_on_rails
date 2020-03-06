@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module ReactOnRails
   module WebpackerUtils
     def self.using_webpacker?
