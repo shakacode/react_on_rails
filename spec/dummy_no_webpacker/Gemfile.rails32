@@ -52,7 +52,7 @@ group :development, :test do
   gem "pry-rescue"
   gem "pry-byebug"
   gem "awesome_print"
-  gem "rubocop", require: false
+  gem "rubocop", "< 0.69", require: false
   gem "ruby-lint", require: false
   gem "listen"
 
