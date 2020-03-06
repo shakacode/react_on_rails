@@ -21,6 +21,9 @@ RSpec.configure do |config|
       log_only_list.include?(entry.level) ? puts(entry.message) : errors << entry.message
     end
 
-    raise("Java Script Error(s) on the page:\n\n" + errors.join("\n")) if errors.present?
+    # https://stackoverflow.com/questions/60114639/timed-out-receiving-message-from-renderer-0-100-log-messages-using-chromedriver
+    clean_errors = errors.reject { |err_msg| err_msg.include?("Timed out receiving message from renderer: 0.100") }
+
+    raise("Java Script Error(s) on the page:\n\n" + errors.join("\n")) if clean_errors.present?
   end
 end
