@@ -3,7 +3,7 @@
 
 AllCops:
   DisplayCopNames: true
-  TargetRubyVersion: 2.3
+  TargetRubyVersion: 2.2
 
   Include:
     - '**/Rakefile'
@@ -59,11 +59,10 @@ Lint/AssignmentInCondition:
   Exclude:
     - 'spec/dummy/bin/spring'
 
-Lint/SuppressedException:
+Lint/HandleExceptions:
   Exclude:
     - 'spec/dummy/bin/rails'
     - 'spec/dummy/bin/rake'
-    - 'spec/react_on_rails/test_helper/webpack_assets_compiler_spec.rb'
 
 Metrics/AbcSize:
   Max: 28
@@ -92,4 +91,4 @@ Style/GlobalVars:
     - 'spec/dummy/config/environments/development.rb'
 
 Style/FrozenStringLiteralComment:
-  EnforcedStyle: always
+  EnforcedStyle: when_needed
