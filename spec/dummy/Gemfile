@@ -6,6 +6,8 @@ eval_gemfile File.expand_path("../../react_on_rails.gemspec", __dir__)
 
 gem "react_on_rails", path: "../.."
 
+# We'll revert this before the final merge.
+# gem "webpacker", git: 'https://github.com/rails/webpacker.git'
 gem "webpacker"
 
 gem "bootsnap", ">= 1.1.0", require: false
@@ -39,6 +41,8 @@ gem "sdoc", group: :doc
 # Use Unicorn as the app server
 # gem 'unicorn'
 
+gem "sprockets", "~>3.0"
+
 # Use Capistrano for deployment
 # gem 'capistrano-rails', group: :development
 gem "awesome_print"
@@ -53,7 +57,7 @@ group :development, :test do
   gem "pry-rails"
   gem "pry-rescue"
   gem "pry-stack_explorer"
-  gem "rubocop", require: false
+  gem "rubocop", "< 0.69", require: false
   gem "ruby-lint", require: false
   gem "scss_lint", require: false
 
