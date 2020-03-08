@@ -3,7 +3,11 @@
 [![License](https://img.shields.io/badge/license-mit-green.svg)](./LICENSE.md) [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![](https://ruby-gem-downloads-badge.herokuapp.com/react_on_rails?type=total)](https://rubygems.org/gems/react_on_rails)
 
 #### News
-February 26, 2019: React on Rails Pro is getting a big update to support the awesome [Loadable Components](https://loadable-components.com) library for code-splitting with SSR. We're going to see some awesome performance boosts! Please [email me](mailto:justin@shakacode.com) if you'd like to use [Loadable Components Code Splitting](https://loadable-components.com/docs/code-splitting/) to speed up your app by reducing your bundle sizes and lazily loading the code that's needed. 
+**March 7, 2020**: `react_on_rails` fully supports `rails/webpacker`. The example test app in `spec/dummy` was just converted over to use rails/webpacker v4. It's a good example of how to leverage rails/webpacker's webpack configuration. 
+
+**March 4, 20202**: Justin Gordon is presenting [Webpacker, It-Just-Works, But How? at RailsConf, 2020](https://railsconf.com/program/sessions#session-943). Want to hear Justin give a trial run of the talk with the ability to ask questions? [Click here to sign up](https://signup.shakacode.com/webpacker_it_just_works) for notification of when this will happen.
+
+**February 26, 2020**: React on Rails Pro is getting a big update to support the awesome [Loadable Components](https://loadable-components.com) library for code-splitting with SSR. We're going to see some awesome performance boosts! Please [email me](mailto:justin@shakacode.com) if you'd like to use [Loadable Components Code Splitting](https://loadable-components.com/docs/code-splitting/) to speed up your app by reducing your bundle sizes and lazily loading the code that's needed. 
 
 ---
 
