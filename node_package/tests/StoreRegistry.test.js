@@ -61,7 +61,7 @@ test('StoreRegistry throws error for retrieving unregistered store', assert => {
 });
 
 test(
-  'StoreRegistry returns undefined for retrieving unregistered store, ' + 'passing throwIfMissing = false',
+  'StoreRegistry returns undefined for retrieving unregistered store, passing throwIfMissing = false',
   assert => {
     assert.plan(1);
     StoreRegistry.setStore('foobarX', {});
@@ -70,7 +70,7 @@ test(
     assert.equals(
       actual,
       expected,
-      'StoreRegistry.get should return undefined for missing ' + 'store if throwIfMissing is passed as false',
+      'StoreRegistry.get should return undefined for missing store if throwIfMissing is passed as false',
     );
   },
 );

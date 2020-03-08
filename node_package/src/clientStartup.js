@@ -200,7 +200,7 @@ function renderInit() {
     reactOnRailsPageLoaded();
   } else {
     debugTurbolinks(
-      'USING TURBOLINKS 2: document added event listeners page:before-unload and ' + 'page:change.',
+      'USING TURBOLINKS 2: document added event listeners page:before-unload and page:change.',
     );
     document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
     document.addEventListener('page:change', reactOnRailsPageLoaded);
