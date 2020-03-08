@@ -10,9 +10,7 @@ export default class CacheDisabled extends React.Component {
     return (
       <div className="container">
         <h2>Turbolinks cache is disabled</h2>
-        <p>
-          Must call componentWillUnmount.
-        </p>
+        <p>Must call componentWillUnmount.</p>
       </div>
     );
   }

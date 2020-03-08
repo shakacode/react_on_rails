@@ -29,7 +29,7 @@
     "flow-bin": "^0.83.0",
     "jsdom": "^11.1.0",
     "nps": "^5.9.3",
-    "prettier": "^1.14.3",
+    "prettier": "^1.19.1",
     "prettier-eslint-cli": "^4.7.1",
     "prop-types": "^15.5.10",
     "react": "^16.5.2",
@@ -43,7 +43,8 @@
     "webpack-manifest-plugin": "^1.2.1"
   },
   "dependencies": {
-    "@babel/runtime-corejs2": "^7.0.0"
+    "@babel/runtime-corejs2": "^7.0.0",
+    "concurrently": "^5.1.0"
   },
   "peerDependencies": {
     "js-yaml": ">= 3.0.0",

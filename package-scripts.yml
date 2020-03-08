@@ -30,7 +30,8 @@ scripts:
     js:
       default:
         description: Run prettier-eslint on JS.
-        script: prettier "packages/**/*.@(js|jsx)" "spec/dummy/client/app/**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --write
+        #script: prettier "packages/**/*.@(js|jsx)" "spec/dummy/client/app/**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --write
+        script: prettier "**/*.@(js|jsx) --write
       listDifferent:
         description: Check if any JS files would change by running prettier-eslint.
         script: prettier "**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --list-different

@@ -9,18 +9,20 @@ const DeferredRenderAppClient = (_props, _railsContext, domNodeId) => {
   const routes = {
     path: '/deferred_render_with_server_rendering',
     component: DeferredRender,
-    childRoutes: [{
-      path: '/deferred_render_with_server_rendering/async_page',
-      async getComponent(_nextState, callback) {
-        const component = await import(
-          /* webpackChunkName: "deferredAsyncPage" */
-          /* webpackPrefetch: true */
-          /* webpackMode: "lazy" */
-          '../components/DeferredRenderAsyncPage'
+    childRoutes: [
+      {
+        path: '/deferred_render_with_server_rendering/async_page',
+        async getComponent(_nextState, callback) {
+          const component = await import(
+            /* webpackChunkName: "deferredAsyncPage" */
+            /* webpackPrefetch: true */
+            /* webpackMode: "lazy" */
+            '../components/DeferredRenderAsyncPage'
           );
-        callback(null, component.default)
+          callback(null, component.default);
+        },
       },
-    }],
+    ],
   };
 
   // This match is potentially asynchronous, because one of the routes

@@ -222,13 +222,13 @@ GEM
     rspec-retry (0.6.2)
       rspec-core (> 3.3)
     rspec-support (3.9.2)
-    rubocop (0.79.0)
+    rubocop (0.68.1)
       jaro_winkler (~> 1.5.1)
       parallel (~> 1.10)
-      parser (>= 2.7.0.1)
+      parser (>= 2.5, != 2.5.1.1)
       rainbow (>= 2.2.2, < 4.0)
       ruby-progressbar (~> 1.7)
-      unicode-display_width (>= 1.4.0, < 1.7)
+      unicode-display_width (>= 1.4.0, < 1.6)
     ruby-lint (2.3.1)
       parser (~> 2.2)
       slop (~> 3.4, >= 3.4.7)
@@ -288,7 +288,7 @@ GEM
       thread_safe (~> 0.1)
     uglifier (4.2.0)
       execjs (>= 0.3.0, < 3)
-    unicode-display_width (1.6.1)
+    unicode-display_width (1.5.0)
     webdrivers (3.9.4)
       nokogiri (~> 1.6)
       rubyzip (~> 1.0)
@@ -328,11 +328,11 @@ DEPENDENCIES
   pry-rescue
   pry-stack_explorer
   puma
-  rails (~> 5.2)
+  rails
   react_on_rails!
   rspec-rails
   rspec-retry
-  rubocop (= 0.79.0)
+  rubocop (< 0.69)
   ruby-lint
   sass-rails
   scss_lint
