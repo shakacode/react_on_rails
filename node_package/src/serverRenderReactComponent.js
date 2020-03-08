@@ -2,8 +2,7 @@ import ReactDOMServer from 'react-dom/server';
 
 import ComponentRegistry from './ComponentRegistry';
 import createReactElement from './createReactElement';
-import isCreateReactElementResultNonReactComponent from
-  './isCreateReactElementResultNonReactComponent';
+import isCreateReactElementResultNonReactComponent from './isCreateReactElementResultNonReactComponent';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 
@@ -35,9 +34,7 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
       hasErrors = !!reactElementOrRouterResult.routeError;
 
       if (hasErrors) {
-        console.error(
-          `React Router ERROR: ${JSON.stringify(reactElementOrRouterResult.routeError)}`,
-        );
+        console.error(`React Router ERROR: ${JSON.stringify(reactElementOrRouterResult.routeError)}`);
       }
 
       if (reactElementOrRouterResult.redirectLocation) {
@@ -45,8 +42,7 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
           const { redirectLocation } = reactElementOrRouterResult;
           const redirectPath = redirectLocation.pathname + redirectLocation.search;
           console.log(`\
-ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redirectPath}`,
-          );
+ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redirectPath}`);
         }
         // For redirects on server rendering, we can't stop Rails from returning the same result.
         // Possibly, someday, we could have the rails server redirect.

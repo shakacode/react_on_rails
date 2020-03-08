@@ -14,7 +14,7 @@ export function consoleReplay() {
     const stringifiedList = msg.arguments.map(arg => {
       let val;
       try {
-        val = (typeof arg === 'string' || arg instanceof String) ? arg : JSON.stringify(arg);
+        val = typeof arg === 'string' || arg instanceof String ? arg : JSON.stringify(arg);
       } catch (e) {
         val = `${e.message}: ${arg}`;
       }

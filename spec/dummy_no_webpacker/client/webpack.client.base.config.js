@@ -9,15 +9,12 @@ const { assetLoaderRules } = require('./webpack.common.config');
 const devBuild = process.env.NODE_ENV !== 'production';
 
 module.exports = {
-
   // the project dir
   context: resolve(__dirname),
   entry: {
     // This will contain the app entry points defined by
     // webpack.client.rails.hot.config and webpack.client.rails.build.config
-    'app-bundle': [
-      './app/startup/clientRegistration',
-    ],
+    'app-bundle': ['./app/startup/clientRegistration'],
   },
   resolve: {
     extensions: ['.js', '.jsx'],
@@ -25,7 +22,6 @@ module.exports = {
       images: join(process.cwd(), 'app', 'assets', 'images'),
     },
   },
-
 
   plugins: [
     new webpack.EnvironmentPlugin({

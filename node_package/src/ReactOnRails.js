@@ -34,8 +34,10 @@ ctx.ReactOnRails = {
    */
   registerStore(stores) {
     if (!stores) {
-      throw new Error('Called ReactOnRails.registerStores with a null or undefined, rather than ' +
-        'an Object with keys being the store names and the values are the store generators.');
+      throw new Error(
+        'Called ReactOnRails.registerStores with a null or undefined, rather than ' +
+          'an Object with keys being the store names and the values are the store generators.',
+      );
     }
 
     StoreRegistry.register(stores);
@@ -68,9 +70,7 @@ ctx.ReactOnRails = {
     }
 
     if (Object.keys(newOptions).length > 0) {
-      throw new Error(
-        'Invalid options passed to ReactOnRails.options: ', JSON.stringify(newOptions),
-      );
+      throw new Error('Invalid options passed to ReactOnRails.options: ', JSON.stringify(newOptions));
     }
   },
 

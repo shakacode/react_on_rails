@@ -9,24 +9,21 @@ import React from 'react';
 import createReactClass from 'create-react-class';
 import ReactOnRails from '../src/ReactOnRails';
 
-test('ReactOnRails render returns a virtual DOM element for component', (assert) => {
+test('ReactOnRails render returns a virtual DOM element for component', assert => {
   assert.plan(1);
   const R1 = createReactClass({
     render() {
-      return (
-        <div> WORLD </div>
-      );
+      return <div> WORLD </div>;
     },
   });
   ReactOnRails.register({ R1 });
 
   // eslint-disable-next-line no-underscore-dangle
   const actual = ReactOnRails.render('R1', {}, 'root')._reactInternalFiber.type;
-  assert.deepEqual(actual, R1,
-    'ReactOnRails render should return a virtual DOM element for component');
+  assert.deepEqual(actual, R1, 'ReactOnRails render should return a virtual DOM element for component');
 });
 
-test('ReactOnRails accepts traceTurbolinks as an option true', (assert) => {
+test('ReactOnRails accepts traceTurbolinks as an option true', assert => {
   ReactOnRails.resetOptions();
   assert.plan(1);
   ReactOnRails.setOptions({ traceTurbolinks: true });
@@ -34,7 +31,7 @@ test('ReactOnRails accepts traceTurbolinks as an option true', (assert) => {
   assert.equal(actual, true);
 });
 
-test('ReactOnRails accepts traceTurbolinks as an option false', (assert) => {
+test('ReactOnRails accepts traceTurbolinks as an option false', assert => {
   ReactOnRails.resetOptions();
   assert.plan(1);
   ReactOnRails.setOptions({ traceTurbolinks: false });
@@ -42,15 +39,15 @@ test('ReactOnRails accepts traceTurbolinks as an option false', (assert) => {
   assert.equal(actual, false);
 });
 
-test('ReactOnRails not specified has traceTurbolinks as false', (assert) => {
+test('ReactOnRails not specified has traceTurbolinks as false', assert => {
   ReactOnRails.resetOptions();
   assert.plan(1);
-  ReactOnRails.setOptions({ });
+  ReactOnRails.setOptions({});
   const actual = ReactOnRails.option('traceTurbolinks');
   assert.equal(actual, false);
 });
 
-test('serverRenderReactComponent throws error for invalid options', (assert) => {
+test('serverRenderReactComponent throws error for invalid options', assert => {
   ReactOnRails.resetOptions();
   assert.plan(1);
   assert.throws(
@@ -60,7 +57,7 @@ test('serverRenderReactComponent throws error for invalid options', (assert) => 
   );
 });
 
-test('registerStore throws if passed a falsey object (null, undefined, etc)', (assert) => {
+test('registerStore throws if passed a falsey object (null, undefined, etc)', assert => {
   assert.plan(3);
 
   assert.throws(
@@ -82,7 +79,7 @@ test('registerStore throws if passed a falsey object (null, undefined, etc)', (a
   );
 });
 
-test('register store and getStoreGenerator allow registration', (assert) => {
+test('register store and getStoreGenerator allow registration', assert => {
   assert.plan(2);
   function reducer() {
     return {};
@@ -95,14 +92,17 @@ test('register store and getStoreGenerator allow registration', (assert) => {
   ReactOnRails.registerStore({ storeGenerator });
 
   const actual = ReactOnRails.getStoreGenerator('storeGenerator');
-  assert.equal(actual, storeGenerator,
+  assert.equal(
+    actual,
+    storeGenerator,
     `Could not find 'storeGenerator' amongst store generators \
-${JSON.stringify(ReactOnRails.storeGenerators())}.`);
+${JSON.stringify(ReactOnRails.storeGenerators())}.`,
+  );
 
   assert.deepEqual(ReactOnRails.storeGenerators(), new Map([['storeGenerator', storeGenerator]]));
 });
 
-test('setStore and getStore', (assert) => {
+test('setStore and getStore', assert => {
   assert.plan(2);
   function reducer() {
     return {};
@@ -117,15 +117,18 @@ test('setStore and getStore', (assert) => {
   ReactOnRails.setStore('storeGenerator', store);
 
   const actual = ReactOnRails.getStore('storeGenerator');
-  assert.equal(actual, store,
-    `Could not find 'store' amongst store generators ${JSON.stringify(ReactOnRails.stores())}.`);
+  assert.equal(
+    actual,
+    store,
+    `Could not find 'store' amongst store generators ${JSON.stringify(ReactOnRails.stores())}.`,
+  );
   const expected = new Map();
   expected.set('storeGenerator', store);
 
   assert.deepEqual(ReactOnRails.stores(), expected);
 });
 
-test('clearHydratedStores', (assert) => {
+test('clearHydratedStores', assert => {
   assert.plan(2);
   function reducer() {
     return {};
@@ -142,6 +145,5 @@ test('clearHydratedStores', (assert) => {
 
   ReactOnRails.clearHydratedStores();
   const expected = new Map();
-  assert.deepEqual(ReactOnRails.stores(), expected,
-    'clearHydratedStores should clear hydratedStores map');
+  assert.deepEqual(ReactOnRails.stores(), expected, 'clearHydratedStores should clear hydratedStores map');
 });

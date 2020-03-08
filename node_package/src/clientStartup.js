@@ -31,7 +31,7 @@ function debugTurbolinks(...msg) {
 }
 
 function turbolinksInstalled() {
-  return (typeof Turbolinks !== 'undefined');
+  return typeof Turbolinks !== 'undefined';
 }
 
 function forEach(fn, className, railsContext) {
@@ -66,7 +66,7 @@ function forEachStore(railsContext) {
 }
 
 function turbolinksVersion5() {
-  return (typeof Turbolinks.controller !== 'undefined');
+  return typeof Turbolinks.controller !== 'undefined';
 }
 
 function turbolinksSupported() {
@@ -78,9 +78,12 @@ function delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)
 
   if (isRenderer) {
     if (trace) {
-      console.log(`\
+      console.log(
+        `\
 DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, railsContext:`,
-      props, railsContext);
+        props,
+        railsContext,
+      );
     }
 
     component(props, railsContext, domNodeId);
@@ -138,7 +141,8 @@ You should return a React.Component always for the client side entry point.`);
       }
     }
   } catch (e) {
-    e.message = `ReactOnRails encountered an error while rendering component: ${name}.\n` +
+    e.message =
+      `ReactOnRails encountered an error while rendering component: ${name}.\n` +
       `Original message: ${e.message}`;
     throw e;
   }
@@ -167,8 +171,7 @@ function unmount(el) {
   try {
     ReactDOM.unmountComponentAtNode(domNode);
   } catch (e) {
-    console.info(`Caught error calling unmountComponentAtNode: ${e.message} for domNode`,
-      domNode, e);
+    console.info(`Caught error calling unmountComponentAtNode: ${e.message} for domNode`, domNode, e);
   }
 }
 
@@ -190,14 +193,15 @@ function renderInit() {
   if (turbolinksVersion5()) {
     debugTurbolinks(
       'USING TURBOLINKS 5: document added event listeners ' +
-      'turbolinks:before-render and turbolinks:render.');
+        'turbolinks:before-render and turbolinks:render.',
+    );
     document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
     document.addEventListener('turbolinks:render', reactOnRailsPageLoaded);
     reactOnRailsPageLoaded();
   } else {
     debugTurbolinks(
-      'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +
-      'page:change.');
+      'USING TURBOLINKS 2: document added event listeners page:before-unload and ' + 'page:change.',
+    );
     document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
     document.addEventListener('page:change', reactOnRailsPageLoaded);
   }

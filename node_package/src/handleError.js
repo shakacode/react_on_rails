@@ -11,8 +11,7 @@ function handleGeneratorFunctionIssue(options) {
       'A generator function takes a single arg of props (and the location for react-router) ' +
       'and returns a ReactElement.';
 
-    let shouldBeGeneratorError =
-      `ERROR: ReactOnRails is incorrectly detecting generator function to be false. The React
+    let shouldBeGeneratorError = `ERROR: ReactOnRails is incorrectly detecting generator function to be false. The React
 component '${name}' seems to be a generator function.\n${lastLine}`;
     const reMatchShouldBeGeneratorError = /Can't add property context, object is not extensible/;
     if (reMatchShouldBeGeneratorError.test(e.message)) {
@@ -20,8 +19,7 @@ component '${name}' seems to be a generator function.\n${lastLine}`;
       console.error(shouldBeGeneratorError);
     }
 
-    shouldBeGeneratorError =
-      `ERROR: ReactOnRails is incorrectly detecting generatorFunction to be true, but the React
+    shouldBeGeneratorError = `ERROR: ReactOnRails is incorrectly detecting generatorFunction to be true, but the React
 component '${name}' is not a generator function.\n${lastLine}`;
 
     const reMatchShouldNotBeGeneratorError = /Cannot call a class as a function/;
@@ -35,7 +33,7 @@ component '${name}' is not a generator function.\n${lastLine}`;
   return msg;
 }
 
-const handleError = (options) => {
+const handleError = options => {
   const { e, jsCode, serverSide } = options;
 
   console.error('Exception in rendering!');

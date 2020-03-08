@@ -18,10 +18,9 @@ const assetLoaderRules = [
     use: {
       loader: 'file-loader',
       options: {
-
         // NO leading slash
         name: 'images/[name]-[hash].[ext]',
-      }
+      },
     },
   },
 ];

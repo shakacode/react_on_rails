@@ -4,7 +4,7 @@
 
 const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const merge = require('webpack-merge');
-const { env } = require('process')
+const { env } = require('process');
 const config = require('./webpack.client.base.config');
 const { resolve } = require('path');
 const isHMR = false;
@@ -19,7 +19,6 @@ if (devBuild) {
 }
 
 module.exports = merge(config, {
-
   output: {
     filename: isHMR ? '[name]-[hash].js' : '[name]-[chunkhash].js',
     chunkFilename: '[name]-[chunkhash].chunk.js',
@@ -73,16 +72,16 @@ module.exports = merge(config, {
             {
               loader: 'postcss-loader',
               options: {
-                plugins: 'autoprefixer'
-              }
+                plugins: 'autoprefixer',
+              },
             },
             'sass-loader',
             {
               loader: 'sass-resources-loader',
               options: {
-                resources: './app/assets/styles/app-variables.scss'
+                resources: './app/assets/styles/app-variables.scss',
               },
-            }
+            },
           ],
         }),
       },
@@ -93,8 +92,8 @@ module.exports = merge(config, {
           options: {
             shim: 'es5-shim/es5-shim',
             sham: 'es5-shim/es5-sham',
-          }
-        }
+          },
+        },
       },
       {
         test: require.resolve('jquery-ujs'),
@@ -102,17 +101,16 @@ module.exports = merge(config, {
           loader: 'imports-loader',
           options: {
             jQuery: 'jquery',
-          }
-        }
-      }
+          },
+        },
+      },
     ],
   },
 
   plugins: [
     new ExtractTextPlugin({
       filename: '[name]-[contenthash].css',
-      allChunks: true
+      allChunks: true,
     }),
   ],
 });
-
