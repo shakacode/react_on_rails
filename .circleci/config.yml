@@ -11,6 +11,7 @@ aliases:
              echo "Ruby version: "; ruby -v
              echo "Node version: "; node -v
              echo "Yarn version: "; yarn --version
+             echo "Bundler version: "; bundle --version
   - &lint-js
     name: Linting of JS
     command: yarn lint
@@ -43,6 +44,7 @@ aliases:
     name: Install Ruby Gems for dummy app
     command: |
       gem install bundler
+      echo "Bundler version: "; bundle --version
       cd spec/dummy && bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
 
   # Install ruby gems unless existing set of gems is satisfying bundler.
@@ -50,6 +52,7 @@ aliases:
     name: Install Ruby Gems for package
     command: |
       gem install bundler
+      echo "Bundler version: "; bundle --version
       bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
 
   # Restore node_modules dir from cache using yarn.lock checksum as a key.
@@ -58,11 +61,11 @@ aliases:
     keys:
       - v3-package-node-modules-cache-{{ checksum "yarn.lock" }}
 
-  # Restore spec/dummy/client/node_modules dir from cache using yarn.lock checksum as a key.
+  # Restore spec/dummy/node_modules dir from cache using yarn.lock checksum as a key.
   - &restore-dummy-app-node-modules-cache
-    name: Restore cached spec/dummy/client/node_modules directory
+    name: Restore cached spec/dummy/node_modules directory
     keys:
-      - v3-dummy-app-node-modules-cache-{{ checksum "spec/dummy/client/yarn.lock" }}
+      - v3-dummy-app-node-modules-cache-{{ checksum "spec/dummy/yarn.lock" }}
 
   # Restore vendor/bundle dir from cache using Gemfile.lock checksum as a key.
   - &restore-dummy-app-gem-cache
@@ -96,7 +99,7 @@ jobs:
   # Lint all
   lint-js-and-ruby:
     docker:
-      - image: &docker_image circleci/ruby:2.5-node-browsers
+      - image: &docker_image circleci/ruby:2.6-node-browsers
     steps:
       - checkout
       - run: *print-system-info
@@ -145,11 +148,11 @@ jobs:
       - run: *install-yarn-link-destination
       - run: *install-dummy-app-node-modules
       - save_cache:
-          name: Save spec/dummy/client/node_modules to cache
-          key: v3-dummy-app-node-modules-cache-{{ checksum "spec/dummy/client/yarn.lock" }}
+          name: Save spec/dummy/node_modules to cache
+          key: v3-dummy-app-node-modules-cache-{{ checksum "spec/dummy/yarn.lock" }}
           paths:
             - spec/dummy/node_modules
-            - spec/dummy/client/node_modules
+            - spec/dummy/node_modules
 
   # Install Ruby gems for package with Bundler and save them to cache.
   install-package-ruby-gems:
@@ -194,9 +197,10 @@ jobs:
       - restore_cache: *restore-dummy-app-node-modules-cache
       - run: *install-yarn-link-destination
       - run: *install-dummy-app-node-modules
+      - run: *install-dummy-app-ruby-gems
       - run:
           name: Build test bundles for dummy app
-          command: cd spec/dummy/client && yarn run build:test
+          command: cd spec/dummy && yarn run build:test
       - save_cache:
           name: Save test webpack bundles to cache (for build number checksum used by rspec job)
           key: v3-dummy-app-webpack-bundle-{{ .Revision }}
@@ -274,7 +278,7 @@ jobs:
       - store_artifacts:
           path: log/test.log
       - store_artifacts:
-          path: spec/dummy/client/yarn-error.log
+          path: spec/dummy/yarn-error.log
 
   # Test React on Rails Pro without the VM Renderer
   rspec-dummy-app:
@@ -307,7 +311,7 @@ jobs:
       - store_artifacts:
           path: log/test.log
       - store_artifacts:
-          path: spec/dummy/client/yarn-error.log
+          path: spec/dummy/yarn-error.log
 
 workflows:
   version: 2

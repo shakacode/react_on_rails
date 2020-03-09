@@ -11,7 +11,7 @@ gemspec
 # gem "react_on_rails", path: "../react_on_rails"
 gem "react_on_rails", "~> 11.3"
 
-gem "webpacker", "3.4.3"
+gem "webpacker", "~> 4"
 
 # The following gems are dependencies of the gem's dummy/example apps, not the gem itself.
 # They must be defined here because of the way Travis CI works, in that it will only

@@ -10,13 +10,19 @@ const RouterLayout = ({ children }) => (
     </p>
     <ul>
       <li>
-        <Link to="/react_router">React Router Layout Only</Link>
+        <Link to="/react_router" href="/react_router">
+          React Router Layout Only
+        </Link>
       </li>
       <li>
-        <Link to="/react_router/first_page">Router First Page</Link>
+        <Link to="/react_router/first_page" href="/react_router/first_page">
+          Router First Page
+        </Link>
       </li>
       <li>
-        <Link to="/react_router/second_page">Router Second Page</Link>
+        <Link to="/react_router/second_page" href="/react_router/second_page">
+          Router Second Page
+        </Link>
       </li>
     </ul>
     <hr />

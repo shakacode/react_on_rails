@@ -18,8 +18,6 @@
 
 /node_modules
 
-/app/assets/webpack
+/public/webpack/*
 
 /spec/examples.txt
-
-/public/webpack

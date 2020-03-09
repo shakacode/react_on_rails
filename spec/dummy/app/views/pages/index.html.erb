@@ -21,13 +21,13 @@ This page demonstrates a few things the other pages do not show:
 </p>
 
 <pre>
-  <%%= react_component("ReduxApp", props: @app_props_server_render, trace: true, id: "ReduxApp-react-component-0") %><br/>
+  <%%= react_component("ReduxApp", props: @app_props_server_render.merge(prerender: false), trace: true, prerender: false, id: "ReduxApp-react-component-0") %>
 </pre>
 <p>
   That will generate this, which is done only once on the server side:
 </p>
 
-<%= react_component("ReduxApp", props: @app_props_server_render, trace: true, id: "ReduxApp-react-component-0") %>
+<%= react_component("ReduxApp", props: @app_props_server_render.merge(prerender: false), trace: true, prerender: false, id: "ReduxApp-react-component-0") %>
 <hr/>
 
 <h1>Server Rendered React Component Without Redux</h1>
