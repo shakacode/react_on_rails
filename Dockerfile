@@ -40,7 +40,7 @@ ENV RUBY_HOME=$USER_HOME/ruby-$RUBY_VERSION
 ENV GEM_HOME=$RUBY_HOME/gems
 ENV PATH=$PATH:$RUBY_HOME:$RUBY_HOME/bin:$RUBY_HOME/gems/bin:
 
-RUN gem install bundler -v 1.16.1
+RUN gem install bundler
 
 ENV NODE_VERSION=8.9.4
 RUN \

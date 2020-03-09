@@ -42,14 +42,14 @@ aliases:
   - &install-dummy-app-ruby-gems
     name: Install Ruby Gems for dummy app
     command: |
-      gem install bundler --version 1.16.1
+      gem install bundler
       cd spec/dummy && bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
 
   # Install ruby gems unless existing set of gems is satisfying bundler.
   - &install-package-ruby-gems
     name: Install Ruby Gems for package
     command: |
-      gem install bundler --version 1.16.1
+      gem install bundler
       bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
 
   # Restore node_modules dir from cache using yarn.lock checksum as a key.
