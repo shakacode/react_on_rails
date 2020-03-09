@@ -34,7 +34,7 @@ Gem::Specification.new do |s|
   s.add_dependency "rainbow"
   s.add_development_dependency "awesome_print"
   s.add_development_dependency "binding_of_caller"
-  s.add_development_dependency "bundler", "~> 1.10"
+  s.add_development_dependency "bundler"
   s.add_development_dependency "coveralls"
   s.add_development_dependency "gem-release"
   s.add_development_dependency "generator_spec"

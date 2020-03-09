@@ -1,5 +1,5 @@
 GIT
-  remote: git://github.com/mbklein/equivalent-xml.git
+  remote: https://github.com/mbklein/equivalent-xml.git
   revision: 47de39c006636eaeea2eb153e0a346470e0ec693
   specs:
     equivalent-xml (1.0.0)
@@ -364,4 +364,4 @@ DEPENDENCIES
   webpacker
 
 BUNDLED WITH
-   1.17.1
+   2.1.4
