@@ -1,0 +1,20 @@
+printWidth: 110
+tabWidth: 2
+useTabs: false
+semi: true
+singleQuote: true
+trailingComma: all
+bracketSpacing: true
+jsxBracketSameLine: false
+parser: flow
+
+overrides:
+- files: "*.@(css|scss)"
+  options:
+    parser: css
+    singleQuote: false
+    printWidth: 120
+- files: "*.@(json)"
+  options:
+    parser: json
+    printWidth: 100

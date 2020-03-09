@@ -1,5 +1,5 @@
 
-<%= react_component("ManualRenderApp", props: {}, prerender: false) %>
+<%= react_component("ManualRenderApp", props: { prerender: false }, prerender: false) %>
 <hr/>
 
 <h2>Using Renderer Functions to Manually Render Your App</h2>
@@ -7,7 +7,7 @@
   <li>
     <p>Use react_component the same way you would if you were registering a generator function or component:</p>
     <pre>
-  <%%= react_component("ManualRenderApp", props: {}, prerender: false) %>
+  <%%= react_component("ManualRenderApp", props: { prerender: false }, prerender: false) %>
     </pre>
     <h4>spec/dummy/app/views/pages/client_side_manual_render.html.erb</h4>
     <br>

@@ -4,7 +4,7 @@ import { match, Router, browserHistory } from 'react-router';
 
 import DeferredRender from '../components/DeferredRender';
 
-const DeferredRenderAppRenderer = (_props, _railsContext, domNodeId) => {
+const DeferredRenderAppClient = (_props, _railsContext, domNodeId) => {
   const history = browserHistory;
   const routes = {
     path: '/deferred_render_with_server_rendering',
@@ -12,20 +12,21 @@ const DeferredRenderAppRenderer = (_props, _railsContext, domNodeId) => {
     childRoutes: [
       {
         path: '/deferred_render_with_server_rendering/async_page',
-        getComponent(_nextState, callback) {
-          require.ensure([], require => {
-            const component = require('../components/DeferredRenderAsyncPage').default;
-
-            // The first argument of the getComponent callback is error
-            callback(null, component);
-          });
+        async getComponent(_nextState, callback) {
+          const component = await import(
+            /* webpackChunkName: "deferredAsyncPage" */
+            /* webpackPrefetch: true */
+            /* webpackMode: "lazy" */
+            '../components/DeferredRenderAsyncPage'
+          );
+          callback(null, component.default);
         },
       },
     ],
   };
 
-  // This match is potentially asyncronous, because one of the routes
-  // implements an asyncronous getComponent. Since we do server rendering for this
+  // This match is potentially asynchronous, because one of the routes
+  // implements an asynchronous getComponent. Since we do server rendering for this
   // component, immediately rendering a Router could cause a client/server
   // checksum mismatch.
   match({ history, routes }, (error, _redirectionLocation, routerProps) => {
@@ -38,4 +39,4 @@ const DeferredRenderAppRenderer = (_props, _railsContext, domNodeId) => {
   });
 };
 
-export default DeferredRenderAppRenderer;
+export default DeferredRenderAppClient;

@@ -17,7 +17,7 @@ end
 
 ReactOnRails.configure do |config|
   config.random_dom_id = false
-  config.node_modules_location = "client" # Pre 9.0.0 always used "client"
+  config.node_modules_location = ""
   config.build_production_command = "yarn run build:production"
   config.build_test_command = "yarn run build:test"
 

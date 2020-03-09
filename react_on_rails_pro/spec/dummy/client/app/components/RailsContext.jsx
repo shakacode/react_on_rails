@@ -13,10 +13,7 @@ function renderContextRows(railsContext) {
         accum.push(
           <tr key={className}>
             <td>
-              <strong>
-                {key}
-                :&nbsp;
-              </strong>
+              <strong>{key}:&nbsp;</strong>
             </td>
             <td className={className}>{`${value}`}</td>
           </tr>,
