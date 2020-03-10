@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "lib": ["dom", "es2015"],
+    "noEmit": true,
+    "target": "es5"
+  },
+  "include": [
+    "node_package/src/**/*"
+  ]
+}

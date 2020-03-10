@@ -1,5 +1,3 @@
-// @flow
-
 // See discussion:
 // https://discuss.reactjs.org/t/how-to-determine-if-js-object-is-react-component/2825/2
 

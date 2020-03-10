@@ -1,9 +1,7 @@
-// @flow
-
 export default {
 
   authenticityToken() {
-    const token: ?HTMLElement = document.querySelector('meta[name="csrf-token"]');
+    const token = document.querySelector('meta[name="csrf-token"]');
     if (token && (token instanceof window.HTMLMetaElement)) {
       return token.content;
     }
