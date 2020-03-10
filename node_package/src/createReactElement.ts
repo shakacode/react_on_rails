@@ -2,6 +2,15 @@
 
 import React from 'react';
 
+interface ReactElementParams {
+  componentObj: any;
+  props: any;
+  railsContext?: any;
+  domNodeId?: string;
+  trace?: boolean;
+  shouldHydrate?: boolean;
+}
+
 /**
  * Logic to either call the generatorFunction or call React.createElement to get the
  * React.Component
@@ -20,7 +29,7 @@ export default function createReactElement({
   domNodeId,
   trace,
   shouldHydrate,
-}) {
+}: ReactElementParams) {
   const { name, component, generatorFunction } = componentObj;
 
   if (trace) {

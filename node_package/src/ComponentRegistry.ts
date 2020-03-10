@@ -1,5 +1,3 @@
-// key = name used by react_on_rails
-// value = { name, component, generatorFunction: boolean, isRenderer: boolean }
 import generatorFunction from './generatorFunction';
 
 const registeredComponents = new Map();

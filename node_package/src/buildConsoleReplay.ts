@@ -1,7 +1,11 @@
-// @flow
-
 import RenderUtils from './RenderUtils';
 import scriptSanitizedVal from './scriptSanitizedVal';
+
+declare global {
+    interface Console {
+        history?: Array<any>;
+    }
+}
 
 export function consoleReplay() {
   // console.history is a global polyfill used in server rendering.

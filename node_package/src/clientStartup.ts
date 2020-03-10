@@ -1,4 +1,21 @@
-/* global ReactOnRails Turbolinks */
+declare global {
+  interface Window {
+      ReactOnRails: any;
+  }
+  namespace NodeJS {
+    interface Global {
+        ReactOnRails: any;
+    }
+  }
+  namespace Turbolinks {
+    interface TurbolinksStatic {
+      controller?: any;
+    }
+  }
+}
+
+declare var ReactOnRails: any;
+declare var Turbolinks: Turbolinks.TurbolinksStatic | undefined;
 
 import ReactDOM from 'react-dom';
 
@@ -174,7 +191,7 @@ function unmount(el) {
 
 function reactOnRailsPageUnloaded() {
   debugTurbolinks('reactOnRailsPageUnloaded');
-  forEachComponent(unmount);
+  forEachComponent(unmount, this);
 }
 
 function renderInit() {
