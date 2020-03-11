@@ -16,6 +16,14 @@ env:
   node: true
   mocha: true
 
+overrides:
+  files: ["**/*.ts", "**/*.tsx"]
+  parser: "@typescript-eslint/parser"
+  parserOptions:
+    ecmaVersion: 2018
+    sourceType: module
+    project: "./tsconfig.json"
+
 rules:
   no-console: 0
   function-paren-newline: 0
