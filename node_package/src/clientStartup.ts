@@ -1,3 +1,8 @@
+import ReactDOM from 'react-dom';
+
+import createReactElement from './createReactElement';
+import isRouterResult from './isCreateReactElementResultNonReactComponent';
+
 declare global {
   interface Window {
       ReactOnRails: any;
@@ -14,13 +19,7 @@ declare global {
   }
 }
 
-declare var ReactOnRails: any;
-declare var Turbolinks: Turbolinks.TurbolinksStatic | undefined;
-
-import ReactDOM from 'react-dom';
-
-import createReactElement from './createReactElement';
-import isRouterResult from './isCreateReactElementResultNonReactComponent';
+declare const ReactOnRails: any;
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
