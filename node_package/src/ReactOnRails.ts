@@ -9,6 +9,9 @@ import buildConsoleReplay from './buildConsoleReplay';
 import createReactElement from './createReactElement';
 import Authenticity from './Authenticity';
 import context from './context';
+import type { Component } from 'react';
+import type { Store } from 'redux';
+import type { RegisteredComponent, RenderParams, ErrorOptions } from './types/index';
 
 const ctx = context();
 
@@ -22,7 +25,7 @@ ctx.ReactOnRails = {
    * find you components for rendering.
    * @param components (key is component name, value is component)
    */
-  register(components) {
+  register(components: { [id: string]: Component; }): void {
     ComponentRegistry.register(components);
   },
 
@@ -32,7 +35,7 @@ ctx.ReactOnRails = {
    * the setStore API is different in that it's the actual store hydrated with props.
    * @param stores (keys are store names, values are the store generators)
    */
-  registerStore(stores) {
+  registerStore(stores: { [id: string]: Function; }): void {
     if (!stores) {
       throw new Error('Called ReactOnRails.registerStores with a null or undefined, rather than ' +
         'an Object with keys being the store names and the values are the store generators.');
@@ -50,7 +53,7 @@ ctx.ReactOnRails = {
    *        there is no store with the given name.
    * @returns Redux Store, possibly hydrated
    */
-  getStore(name, throwIfMissing = true) {
+  getStore(name: string, throwIfMissing: boolean = true): Store {
     return StoreRegistry.getStore(name, throwIfMissing);
   },
 
@@ -59,7 +62,7 @@ ctx.ReactOnRails = {
    * Available Options:
    * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
    */
-  setOptions(newOptions) {
+  setOptions(newOptions: {traceTurbolinks: boolean}): void {
     if ('traceTurbolinks' in newOptions) {
       this.options.traceTurbolinks = newOptions.traceTurbolinks;
 
@@ -80,7 +83,7 @@ ctx.ReactOnRails = {
    * More details can be found here:
    * https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/turbolinks.md
    */
-  reactOnRailsPageLoaded() {
+  reactOnRailsPageLoaded(): void {
     ClientStartup.reactOnRailsPageLoaded();
   },
 
@@ -89,7 +92,7 @@ ctx.ReactOnRails = {
    * @returns String or null
    */
 
-  authenticityToken() {
+  authenticityToken(): string {
     return Authenticity.authenticityToken();
   },
 
@@ -99,7 +102,7 @@ ctx.ReactOnRails = {
    * @returns {*} header
    */
 
-  authenticityHeaders(otherHeaders = {}) {
+  authenticityHeaders(otherHeaders: { [id: string]: string; } = {}): { [id: string]: string; } & { 'X-CSRF-Token': any; 'X-Requested-With': string; } {
     return Authenticity.authenticityHeaders(otherHeaders);
   },
 
@@ -112,7 +115,7 @@ ctx.ReactOnRails = {
    * @param key
    * @returns option value
    */
-  option(key) {
+  option(key: string): string | number | boolean | undefined {
     return this.options[key];
   },
 
@@ -122,7 +125,7 @@ ctx.ReactOnRails = {
    * @param name
    * @returns Redux Store generator function
    */
-  getStoreGenerator(name) {
+  getStoreGenerator(name: string): Function {
     return StoreRegistry.getStoreGenerator(name);
   },
 
@@ -131,7 +134,7 @@ ctx.ReactOnRails = {
    * @param name
    * @returns Redux Store, possibly hydrated
    */
-  setStore(name, store) {
+  setStore(name: string, store: Store): void {
     return StoreRegistry.setStore(name, store);
   },
 
@@ -139,7 +142,7 @@ ctx.ReactOnRails = {
    * Clears hydratedStores to avoid accidental usage of wrong store hydrated in previous/parallel
    * request.
    */
-  clearHydratedStores() {
+  clearHydratedStores(): void {
     StoreRegistry.clearHydratedStores();
   },
 
@@ -156,7 +159,7 @@ ctx.ReactOnRails = {
    * @param hydrate Pass truthy to update server rendered html. Default is falsy
    * @returns {virtualDomElement} Reference to your component's backing instance
    */
-  render(name, props, domNodeId, hydrate) {
+  render(name: string, props: Object, domNodeId: string, hydrate: boolean): any {
     const componentObj = ComponentRegistry.get(name);
     const reactElement = createReactElement({ componentObj, props, domNodeId });
 
@@ -170,7 +173,7 @@ ctx.ReactOnRails = {
    * @param name
    * @returns {name, component, generatorFunction, isRenderer}
    */
-  getComponent(name) {
+  getComponent(name: string): RegisteredComponent {
     return ComponentRegistry.get(name);
   },
 
@@ -178,7 +181,7 @@ ctx.ReactOnRails = {
    * Used by server rendering by Rails
    * @param options
    */
-  serverRenderReactComponent(options) {
+  serverRenderReactComponent(options: RenderParams): string {
     return serverRenderReactComponent(options);
   },
 
@@ -186,14 +189,14 @@ ctx.ReactOnRails = {
    * Used by Rails to catch errors in rendering
    * @param options
    */
-  handleError(options) {
+  handleError(options: ErrorOptions): string | undefined {
     return handleError(options);
   },
 
   /**
    * Used by Rails server rendering to replay console messages.
    */
-  buildConsoleReplay() {
+  buildConsoleReplay(): string {
     return buildConsoleReplay();
   },
 
@@ -201,7 +204,7 @@ ctx.ReactOnRails = {
    * Get an Object containing all registered components. Useful for debugging.
    * @returns {*}
    */
-  registeredComponents() {
+  registeredComponents(): Object {
     return ComponentRegistry.components();
   },
 
@@ -209,7 +212,7 @@ ctx.ReactOnRails = {
    * Get an Object containing all registered store generators. Useful for debugging.
    * @returns {*}
    */
-  storeGenerators() {
+  storeGenerators(): Object {
     return StoreRegistry.storeGenerators();
   },
 
@@ -217,11 +220,11 @@ ctx.ReactOnRails = {
    * Get an Object containing all hydrated stores. Useful for debugging.
    * @returns {*}
    */
-  stores() {
+  stores(): Object {
     return StoreRegistry.stores();
   },
 
-  resetOptions() {
+  resetOptions(): void {
     this.options = Object.assign({}, DEFAULT_OPTIONS);
   },
 };

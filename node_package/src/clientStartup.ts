@@ -1,4 +1,6 @@
 import ReactDOM from 'react-dom';
+import type { Component } from 'react';
+import type { RailsContext } from './types/index';
 
 import createReactElement from './createReactElement';
 import isRouterResult from './isCreateReactElementResultNonReactComponent';
@@ -6,6 +8,7 @@ import isRouterResult from './isCreateReactElementResultNonReactComponent';
 declare global {
   interface Window {
       ReactOnRails: any;
+      __REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__?: boolean;
   }
   namespace NodeJS {
     interface Global {
@@ -23,7 +26,7 @@ declare const ReactOnRails: any;
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
-function findContext() {
+function findContext(): Window | NodeJS.Global {
   if (typeof window.ReactOnRails !== 'undefined') {
     return window;
   } else if (typeof ReactOnRails !== 'undefined') {
@@ -35,7 +38,7 @@ ReactOnRails is undefined in both global and window namespaces.
   `);
 }
 
-function debugTurbolinks(...msg) {
+function debugTurbolinks(...msg: string[]): void {
   if (!window) {
     return;
   }
@@ -46,29 +49,29 @@ function debugTurbolinks(...msg) {
   }
 }
 
-function turbolinksInstalled() {
+function turbolinksInstalled(): boolean {
   return (typeof Turbolinks !== 'undefined');
 }
 
-function forEach(fn, className, railsContext) {
+function forEach(fn: Function, className: string, railsContext: RailsContext): void {
   const els = document.getElementsByClassName(className);
   for (let i = 0; i < els.length; i += 1) {
     fn(els[i], railsContext);
   }
 }
 
-function forEachByAttribute(fn, attributeName, railsContext) {
+function forEachByAttribute(fn: Function, attributeName: string, railsContext: RailsContext): void {
   const els = document.querySelectorAll(`[${attributeName}]`);
   for (let i = 0; i < els.length; i += 1) {
     fn(els[i], railsContext);
   }
 }
 
-function forEachComponent(fn, railsContext) {
+function forEachComponent(fn: Function, railsContext: RailsContext): void {
   forEach(fn, 'js-react-on-rails-component', railsContext);
 }
 
-function initializeStore(el, railsContext) {
+function initializeStore(el: HTMLElement, railsContext: RailsContext): void {
   const context = findContext();
   const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE);
   const props = JSON.parse(el.textContent);
@@ -77,19 +80,24 @@ function initializeStore(el, railsContext) {
   context.ReactOnRails.setStore(name, store);
 }
 
-function forEachStore(railsContext) {
+function forEachStore(railsContext: RailsContext): void {
   forEachByAttribute(initializeStore, REACT_ON_RAILS_STORE_ATTRIBUTE, railsContext);
 }
 
-function turbolinksVersion5() {
+function turbolinksVersion5(): boolean {
   return (typeof Turbolinks.controller !== 'undefined');
 }
 
-function turbolinksSupported() {
+function turbolinksSupported(): boolean {
   return Turbolinks.supported;
 }
 
-function delegateToRenderer(componentObj, props, railsContext, domNodeId, trace) {
+function delegateToRenderer(
+  componentObj: Component,
+  props: Object,
+  railsContext: RailsContext,
+  domNodeId: string,
+  trace: string) {
   const { name, component, isRenderer } = componentObj;
 
   if (isRenderer) {
@@ -106,7 +114,7 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
   return false;
 }
 
-function domNodeIdForEl(el) {
+function domNodeIdForEl(el: HTMLElement): string {
   return el.getAttribute('data-dom-id');
 }
 
@@ -115,7 +123,7 @@ function domNodeIdForEl(el) {
  * delegates to a renderer registered by the user.
  * @param el
  */
-function render(el, railsContext) {
+function render(el: HTMLElement, railsContext: RailsContext): Component {
   const context = findContext();
   // This must match lib/react_on_rails/helper.rb
   const name = el.getAttribute('data-component-name');
@@ -160,7 +168,7 @@ You should return a React.Component always for the client side entry point.`);
   }
 }
 
-function parseRailsContext() {
+function parseRailsContext(): RailsContext {
   const el = document.getElementById('js-react-on-rails-context');
   if (el) {
     return JSON.parse(el.textContent);
@@ -169,7 +177,7 @@ function parseRailsContext() {
   return null;
 }
 
-export function reactOnRailsPageLoaded() {
+export function reactOnRailsPageLoaded(): void {
   debugTurbolinks('reactOnRailsPageLoaded');
 
   const railsContext = parseRailsContext();
@@ -177,7 +185,7 @@ export function reactOnRailsPageLoaded() {
   forEachComponent(render, railsContext);
 }
 
-function unmount(el) {
+function unmount(el: HTMLElement): void {
   const domNodeId = domNodeIdForEl(el);
   const domNode = document.getElementById(domNodeId);
   try {
@@ -188,12 +196,12 @@ function unmount(el) {
   }
 }
 
-function reactOnRailsPageUnloaded() {
+function reactOnRailsPageUnloaded(): void {
   debugTurbolinks('reactOnRailsPageUnloaded');
   forEachComponent(unmount, this);
 }
 
-function renderInit() {
+function renderInit(): void {
   // Install listeners when running on the client (browser).
   // We must do this check for turbolinks AFTER the document is loaded because we load the
   // Webpack bundles first.
@@ -219,13 +227,16 @@ function renderInit() {
   }
 }
 
-export function clientStartup(context) {
-  const { document } = context;
+function isWindow (context: Window | NodeJS.Global): context is Window {
+  return (context as Window).document !== undefined;
+}
 
+export function clientStartup(context: Window | NodeJS.Global): void {
   // Check if server rendering
-  if (!document) {
+  if (!isWindow(context)) {
     return;
   }
+  const { document } = context;
 
   // Tried with a file local variable, but the install handler gets called twice.
   // eslint-disable-next-line no-underscore-dangle
