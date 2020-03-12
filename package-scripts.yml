@@ -1,6 +1,6 @@
 scripts:
   lint:
-    description: Run all linters (eslint, flow)
+    description: Run all linters (eslint, tsc)
     script: concurrently --prefix "[{name}]" --names "ESLINT" -c "blue,yellow,magenta,orange" "nps eslint"
 
   eslint:
