@@ -7,7 +7,7 @@ declare global {
     }
 }
 
-export function consoleReplay() {
+export function consoleReplay(): string {
   // console.history is a global polyfill used in server rendering.
   // $FlowFixMe
   if (!(console.history instanceof Array)) {
@@ -32,6 +32,6 @@ export function consoleReplay() {
   return lines.join('\n');
 }
 
-export default function buildConsoleReplay() {
+export default function buildConsoleReplay(): string {
   return RenderUtils.wrapInScriptTags('consoleReplayLog', consoleReplay());
 }

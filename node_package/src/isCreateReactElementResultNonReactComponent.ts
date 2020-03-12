@@ -1,4 +1,4 @@
-export default function isResultNonReactComponent(reactElementOrRouterResult) {
+export default function isResultNonReactComponent(reactElementOrRouterResult: any): boolean {
   return !!(
     reactElementOrRouterResult.renderedHtml ||
     reactElementOrRouterResult.redirectLocation ||

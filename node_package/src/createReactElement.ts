@@ -1,15 +1,7 @@
 /* eslint-disable react/prop-types */
 
 import React from 'react';
-
-interface ReactElementParams {
-  componentObj: any;
-  props: any;
-  railsContext?: any;
-  domNodeId?: string;
-  trace?: boolean;
-  shouldHydrate?: boolean;
-}
+import type { RenderParams } from './types/index';
 
 /**
  * Logic to either call the generatorFunction or call React.createElement to get the
@@ -29,7 +21,7 @@ export default function createReactElement({
   domNodeId,
   trace,
   shouldHydrate,
-}: ReactElementParams) {
+}: RenderParams) {
   const { name, component, generatorFunction } = componentObj;
 
   if (trace) {
