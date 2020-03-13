@@ -1,11 +1,10 @@
 {
   "presets": [
     ["@babel/preset-env", {"useBuiltIns": "entry"}],
-    "@babel/preset-react",
-    "@babel/preset-typescript"
+    "@babel/preset-react"
   ],
   "plugins": [
-    "@babel/plugin-transform-typescript",
+    ["@babel/plugin-transform-typescript", {"isTSX": true}],
     ["@babel/plugin-transform-runtime", {"corejs": 2}]
   ]
 }
