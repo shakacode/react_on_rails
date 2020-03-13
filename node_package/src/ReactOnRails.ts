@@ -1,4 +1,6 @@
 import ReactDOM from 'react-dom';
+import { Component, Ref } from 'react';
+import { Store } from 'redux';
 
 import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
@@ -9,9 +11,7 @@ import buildConsoleReplay from './buildConsoleReplay';
 import createReactElement from './createReactElement';
 import Authenticity from './Authenticity';
 import context from './context';
-import type { Component } from 'react';
-import type { Store } from 'redux';
-import type { RegisteredComponent, RenderParams, ErrorOptions } from './types/index';
+import { RegisteredComponent, RenderParams, ErrorOptions } from './types/index';
 
 const ctx = context();
 
@@ -25,7 +25,7 @@ ctx.ReactOnRails = {
    * find you components for rendering.
    * @param components (key is component name, value is component)
    */
-  register(components: { [id: string]: Component; }): void {
+  register(components: { [id: string]: Component }): void {
     ComponentRegistry.register(components);
   },
 
@@ -35,7 +35,7 @@ ctx.ReactOnRails = {
    * the setStore API is different in that it's the actual store hydrated with props.
    * @param stores (keys are store names, values are the store generators)
    */
-  registerStore(stores: { [id: string]: Function; }): void {
+  registerStore(stores: { [id: string]: Function }): void {
     if (!stores) {
       throw new Error('Called ReactOnRails.registerStores with a null or undefined, rather than ' +
         'an Object with keys being the store names and the values are the store generators.');
@@ -53,7 +53,7 @@ ctx.ReactOnRails = {
    *        there is no store with the given name.
    * @returns Redux Store, possibly hydrated
    */
-  getStore(name: string, throwIfMissing: boolean = true): Store {
+  getStore(name: string, throwIfMissing = true): Store {
     return StoreRegistry.getStore(name, throwIfMissing);
   },
 
@@ -102,7 +102,9 @@ ctx.ReactOnRails = {
    * @returns {*} header
    */
 
-  authenticityHeaders(otherHeaders: { [id: string]: string; } = {}): { [id: string]: string; } & { 'X-CSRF-Token': any; 'X-Requested-With': string; } {
+  authenticityHeaders(
+    otherHeaders: { [id: string]: string } = {}
+  ): { [id: string]: string } & { 'X-CSRF-Token': string; 'X-Requested-With': string } {
     return Authenticity.authenticityHeaders(otherHeaders);
   },
 
@@ -159,7 +161,7 @@ ctx.ReactOnRails = {
    * @param hydrate Pass truthy to update server rendered html. Default is falsy
    * @returns {virtualDomElement} Reference to your component's backing instance
    */
-  render(name: string, props: Object, domNodeId: string, hydrate: boolean): any {
+  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): Ref {
     const componentObj = ComponentRegistry.get(name);
     const reactElement = createReactElement({ componentObj, props, domNodeId });
 
@@ -204,7 +206,7 @@ ctx.ReactOnRails = {
    * Get an Object containing all registered components. Useful for debugging.
    * @returns {*}
    */
-  registeredComponents(): Object {
+  registeredComponents(): Map<string, Component> {
     return ComponentRegistry.components();
   },
 
@@ -212,7 +214,7 @@ ctx.ReactOnRails = {
    * Get an Object containing all registered store generators. Useful for debugging.
    * @returns {*}
    */
-  storeGenerators(): Object {
+  storeGenerators(): Map<string, Function> {
     return StoreRegistry.storeGenerators();
   },
 
@@ -220,7 +222,7 @@ ctx.ReactOnRails = {
    * Get an Object containing all hydrated stores. Useful for debugging.
    * @returns {*}
    */
-  stores(): Object {
+  stores(): Map<string, Store> {
     return StoreRegistry.stores();
   },
 

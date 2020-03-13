@@ -2,9 +2,11 @@ import RenderUtils from './RenderUtils';
 import scriptSanitizedVal from './scriptSanitizedVal';
 
 declare global {
-    interface Console {
-        history?: Array<any>;
-    }
+  interface Console {
+    history?: {
+      arguments: Array<string | Record<string, string>>; level: "error" | "log" | "debug";
+    }[];
+  }
 }
 
 export function consoleReplay(): string {

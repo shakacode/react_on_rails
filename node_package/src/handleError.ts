@@ -1,8 +1,8 @@
 import React from 'react';
 import ReactDOMServer from 'react-dom/server';
-import type { ErrorOptions } from './types/index';
+import { ErrorOptions } from './types/index';
 
-function handleGeneratorFunctionIssue(options: {e: Error, name?: string}): string {
+function handleGeneratorFunctionIssue(options: {e: Error; name?: string}): string {
   const { e, name } = options;
 
   let msg = '';

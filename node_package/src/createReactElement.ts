@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types */
 
-import React from 'react';
-import type { RenderParams } from './types/index';
+import React, { Element } from 'react';
+import { RenderParams } from './types/index';
 
 /**
  * Logic to either call the generatorFunction or call React.createElement to get the
@@ -21,7 +21,7 @@ export default function createReactElement({
   domNodeId,
   trace,
   shouldHydrate,
-}: RenderParams) {
+}: RenderParams): Element {
   const { name, component, generatorFunction } = componentObj;
 
   if (trace) {

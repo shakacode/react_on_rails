@@ -1,6 +1,6 @@
+import { Component } from 'react';
 import generatorFunction from './generatorFunction';
-import type { Component } from 'react';
-import type { RegisteredComponent } from './types/index';
+import { RegisteredComponent } from './types/index';
 
 const registeredComponents = new Map();
 
@@ -50,7 +50,7 @@ Registered component names include [ ${keys} ]. Maybe you forgot to register the
    * @returns Map where key is the component name and values are the
    * { name, component, generatorFunction, isRenderer}
    */
-  components(): Map <string, Component> {
+  components(): Map<string, Component> {
     return registeredComponents;
   },
 };

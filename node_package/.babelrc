@@ -5,6 +5,7 @@
     "@babel/preset-typescript"
   ],
   "plugins": [
+    "@babel/plugin-transform-typescript",
     ["@babel/plugin-transform-runtime", {"corejs": 2}]
   ]
 }

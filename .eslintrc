@@ -23,12 +23,14 @@ overrides:
       ecmaVersion: 2018
       sourceType: module
       project: "./tsconfig.json"
-      extends:
-        - eslint:recommended
-        - plugin:@typescript-eslint/eslint-recommended
-        - plugin:@typescript-eslint/recommended
+    extends:
+      - eslint:recommended
+      - plugin:@typescript-eslint/eslint-recommended
+      - plugin:@typescript-eslint/recommended
     plugins:
       - "@typescript-eslint"
+    rules:
+      "@typescript-eslint/no-namespace": 0
 
 rules:
   no-console: 0
@@ -46,4 +48,4 @@ settings:
     - react-redux
   import/resolver:
     node:
-      extensions: [".js", ".ts"]
+      extensions: [".js", ".ts", ".d.ts"]
