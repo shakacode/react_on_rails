@@ -6,9 +6,9 @@ import isCreateReactElementResultNonReactComponent from
   './isCreateReactElementResultNonReactComponent';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
-import type { RenderParams } from './types/index';
+import { RenderParams } from './types/index';
 
-export default function serverRenderReactComponent(options: RenderParams) {
+export default function serverRenderReactComponent(options: RenderParams): string {
   const { name, domNodeId, trace, props, railsContext } = options;
 
   let htmlResult = '';

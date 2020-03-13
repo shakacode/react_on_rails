@@ -1,28 +1,28 @@
 import ReactDOM from 'react-dom';
-import type { Component } from 'react';
-import type { RailsContext } from './types/index';
+import { Component } from 'react';
+import { ReactOnRails as ReactOnRailsType, RailsContext } from './types/index';
 
 import createReactElement from './createReactElement';
 import isRouterResult from './isCreateReactElementResultNonReactComponent';
 
 declare global {
   interface Window {
-      ReactOnRails: any;
+      ReactOnRails?: ReactOnRailsType;
       __REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__?: boolean;
   }
   namespace NodeJS {
     interface Global {
-        ReactOnRails: any;
+        ReactOnRails?: ReactOnRailsType;
     }
   }
   namespace Turbolinks {
     interface TurbolinksStatic {
-      controller?: any;
+      controller?: {};
     }
   }
 }
 
-declare const ReactOnRails: any;
+declare const ReactOnRails: ReactOnRailsType;
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
@@ -94,10 +94,11 @@ function turbolinksSupported(): boolean {
 
 function delegateToRenderer(
   componentObj: Component,
-  props: Object,
+  props: Record<string, string>,
   railsContext: RailsContext,
   domNodeId: string,
-  trace: string) {
+  trace: string
+): boolean {
   const { name, component, isRenderer } = componentObj;
 
   if (isRenderer) {

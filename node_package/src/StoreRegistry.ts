@@ -1,4 +1,4 @@
-import type { Store } from 'redux';
+import { Store } from 'redux';
 
 const registeredStoreGenerators = new Map();
 const hydratedStores = new Map();
@@ -31,7 +31,7 @@ export default {
    *        there is no store with the given name.
    * @returns Redux Store, possibly hydrated
    */
-  getStore(name: string, throwIfMissing: boolean = true): Store {
+  getStore(name: string, throwIfMissing = true): Store {
     if (hydratedStores.has(name)) {
       return hydratedStores.get(name);
     }
@@ -77,7 +77,7 @@ This can happen if you are server rendering and either:
    * @param name
    * @param store (not the storeGenerator, but the hydrated store)
    */
-  setStore(name: string, store: Store) {
+  setStore(name: string, store: Store): void {
     hydratedStores.set(name, store);
   },
 
