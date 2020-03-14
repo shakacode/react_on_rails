@@ -26,13 +26,8 @@ namespace :lint do # rubocop:disable Metrics/BlockLength
     sh_in_dir(gem_root, "yarn run eslint")
   end
 
-  desc "Run tsc from shell"
-  task :tsc do
-    sh_in_dir(gem_root, "yarn run tsc")
-  end
-
-  desc "Run all eslint, tsc, rubocop linters. Skip ruby-lint and scss"
-  task lint: %i[eslint tsc rubocop] do
+  desc "Run all eslint & rubocop linters. Skip ruby-lint and scss"
+  task lint: %i[eslint rubocop] do
     puts "Completed all linting"
   end
 end
