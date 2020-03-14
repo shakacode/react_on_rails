@@ -1,6 +1,10 @@
 {
   "compilerOptions": {
+    "allowJs": true,
+    "esModuleInterop": true,
+    "jsx": "react",
     "lib": ["dom", "es2015"],
+    "module": "CommonJS",
     "noEmit": true,
     "target": "es5"
   },

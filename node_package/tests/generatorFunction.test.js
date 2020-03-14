@@ -3,91 +3,87 @@
 /* eslint-disable react/prefer-stateless-function */
 /* eslint-disable react/jsx-filename-extension */
 
-import test from 'tape';
 import React from 'react';
 import createReactClass from 'create-react-class';
 
 import generatorFunction from '../src/generatorFunction';
 
-test('generatorFunction: ES5 Component recognized as React.Component', (assert) => {
-  assert.plan(1);
+describe('generatorFunction', () => {
+  expect.assertions(6);
+  it('returns false for a ES5 React Component', () => {
+    expect.assertions(1);
 
-  const es5Component = createReactClass({
-    render() {
-      return (<div>ES5 React Component</div>);
-    },
+    const es5Component = createReactClass({
+      render() {
+        return (<div>ES5 React Component</div>);
+      },
+    });
+
+    expect(generatorFunction(es5Component)).toBe(false);
   });
 
-  assert.equal(generatorFunction(es5Component), false,
-    'ES5 Component should not be a generatorFunction');
-});
+  it('returns false for a ES6 React class', () => {
+    expect.assertions(1);
 
-test('generatorFunction: ES6 class recognized as React.Component', (assert) => {
-  assert.plan(1);
-
-  class ES6Component extends React.Component {
-    render() {
-      return (<div>ES6 Component</div>);
+    class ES6Component extends React.Component {
+      render() {
+        return (<div>ES6 Component</div>);
+      }
     }
-  }
 
-  assert.equal(generatorFunction(ES6Component), false,
-    'es6Component should not be a generatorFunction');
-});
-
-test('generatorFunction: ES6 class subclass recognized as React.Component', (assert) => {
-  assert.plan(1);
-
-  class ES6Component extends React.Component {
-    render() {
-      return (<div>ES6 Component</div>);
-    }
-  }
-
-  class ES6ComponentChild extends ES6Component {
-    render() {
-      return (<div>ES6 Component Child</div>);
-    }
-  }
-
-  assert.equal(generatorFunction(ES6ComponentChild), false,
-    'es6ComponentChild should not be a generatorFunction');
-});
-
-test('generatorFunction: pure component recognized as React.Component', (assert) => {
-  assert.plan(1);
-
-  /* eslint-disable react/prop-types */
-  const pureComponent = (props) => <h1>{ props.title }</h1>;
-  /* eslint-enable react/prop-types */
-
-  assert.equal(generatorFunction(pureComponent), true,
-    'pure component should not be a generatorFunction');
-});
-
-test('generatorFunction: Generator function recognized as such', (assert) => {
-  assert.plan(1);
-
-  const foobarComponent = createReactClass({
-    render() {
-      return (<div>Component for Generator Function</div>);
-    },
+    expect(generatorFunction(ES6Component)).toBe(false);
   });
 
-  const foobarGeneratorFunction = () => foobarComponent;
+  it('returns false for a ES6 React subclass', () => {
+    expect.assertions(1);
 
-  assert.equal(generatorFunction(foobarGeneratorFunction), true,
-    'generatorFunction should be recognized as a generatorFunction');
-});
+    class ES6Component extends React.Component {
+      render() {
+        return (<div>ES6 Component</div>);
+      }
+    }
 
-test('generatorFunction: simple object returns false', (assert) => {
-  assert.plan(1);
+    class ES6ComponentChild extends ES6Component {
+      render() {
+        return (<div>ES6 Component Child</div>);
+      }
+    }
 
-  const foobarComponent = {
-    hello() {
-      return 'world';
-    },
-  };
-  assert.equal(generatorFunction(foobarComponent), false,
-    'Plain object is not a generator function.');
-});
+    expect(generatorFunction(ES6ComponentChild)).toBe(false);
+  });
+
+  it('returns true for a stateless functional component', () => {
+    expect.assertions(1);
+
+    /* eslint-disable react/prop-types */
+    const pureComponent = (props) => <h1>{ props.title }</h1>;
+    /* eslint-enable react/prop-types */
+
+    expect(generatorFunction(pureComponent)).toBe(true);
+  });
+
+  it('returns true for a generator function', () => {
+    expect.assertions(1);
+
+    const foobarComponent = createReactClass({
+      render() {
+        return (<div>Component for Generator Function</div>);
+      },
+    });
+
+    const foobarGeneratorFunction = () => foobarComponent;
+
+    expect(generatorFunction(foobarGeneratorFunction)).toBe(true);
+  });
+
+  it('returns false for simple object', () => {
+    expect.assertions(1);
+
+    const foobarComponent = {
+      hello() {
+        return 'world';
+      },
+    };
+    expect(generatorFunction(foobarComponent)).toBe(false);
+  })
+})
