@@ -15,6 +15,7 @@ env:
   browser: true
   node: true
   mocha: true
+  jest: true
 
 overrides:
   - files: ["**/*.ts", "**/*.tsx"]

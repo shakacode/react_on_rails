@@ -14,12 +14,12 @@
     "@babel/preset-env": "^7.0.0",
     "@babel/preset-react": "^7.0.0",
     "@babel/types": "^7.0.0",
+    "@types/jest": "^25.1.4",
     "@types/node": "^13.9.0",
     "@types/turbolinks": "^5.2.0",
     "@typescript-eslint/eslint-plugin": "^2.23.0",
     "@typescript-eslint/parser": "^2.23.0",
     "babel-loader": "^8.0.2",
-    "babel-tape-runner": "Judahmeek/babel-tape-runner",
     "babelify": "^10.0.0",
     "blue-tape": "^1.0.0",
     "create-react-class": "^15.6.0",
@@ -30,6 +30,7 @@
     "eslint-plugin-jsx-a11y": "^6.1.2",
     "eslint-plugin-prettier": "^3.0.0",
     "eslint-plugin-react": "^7.1.0",
+    "jest": "^25.1.0",
     "jsdom": "^11.1.0",
     "nps": "^5.9.3",
     "prettier": "^1.14.3",
@@ -40,8 +41,7 @@
     "react-transform-hmr": "^1.0.4",
     "redux": "^4.0.1",
     "release-it": "^8.2.0",
-    "tap-spec": "^5.0.0",
-    "tape": "^4.7.0",
+    "ts-jest": "^25.2.1",
     "typescript": "^3.8.3",
     "webpack": "^3.4.1",
     "webpack-manifest-plugin": "^1.2.1"
@@ -59,7 +59,7 @@
     "webpackConfigLoader.js"
   ],
   "scripts": {
-    "test": "babel-tape-runner -r node_package/tests/helpers/test_helper.js node_package/tests/*.js | tap-spec",
+    "test": "jest node_package/tests",
     "clean": "rm -rf node_package/lib",
     "prepare": "yarn run build",
     "prepublish": "npm run prepare",
@@ -93,10 +93,6 @@
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
-  },
-  "jest": {
-    "verbose": true,
-    "testURL": "http://localhost/"
   },
   "homepage": "https://github.com/shakacode/react_on_rails#readme"
 }
