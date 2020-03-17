@@ -1,6 +1,5 @@
-import { Component } from 'react';
+import type { RegisteredComponent, ComponentOrRenderFunction } from './types/index';
 import generatorFunction from './generatorFunction';
-import { RegisteredComponent } from './types/index';
 
 const registeredComponents = new Map();
 
@@ -8,7 +7,7 @@ export default {
   /**
    * @param components { component1: component1, component2: component2, etc. }
    */
-  register(components: { [id: string]: Component }): void {
+  register(components: { [id: string]: ComponentOrRenderFunction }): void {
     Object.keys(components).forEach(name => {
       if (registeredComponents.has(name)) {
         console.warn('Called register for component that is already registered', name);
@@ -20,7 +19,7 @@ export default {
       }
 
       const isGeneratorFunction = generatorFunction(component);
-      const isRenderer = isGeneratorFunction && component.length === 3;
+      const isRenderer = isGeneratorFunction && (component as Function).length === 3;
 
       registeredComponents.set(name, {
         name,
@@ -50,7 +49,7 @@ Registered component names include [ ${keys} ]. Maybe you forgot to register the
    * @returns Map where key is the component name and values are the
    * { name, component, generatorFunction, isRenderer}
    */
-  components(): Map<string, Component> {
+  components(): Map<string, RegisteredComponent> {
     return registeredComponents;
   },
 };

@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types */
 
-import React, { Element } from 'react';
-import { RenderParams } from './types/index';
+import React from 'react';
+import type { CreateParams, ComponentVariant, RenderFunction, CREReturnTypes } from './types/index';
 
 /**
  * Logic to either call the generatorFunction or call React.createElement to get the
@@ -12,7 +12,7 @@ import { RenderParams } from './types/index';
  * @param options.domNodeId
  * @param options.trace
  * @param options.location
- * @returns {Element}
+ * @returns {ReactElement}
  */
 export default function createReactElement({
   componentObj,
@@ -21,7 +21,7 @@ export default function createReactElement({
   domNodeId,
   trace,
   shouldHydrate,
-}: RenderParams): Element {
+}: CreateParams): CREReturnTypes {
   const { name, component, generatorFunction } = componentObj;
 
   if (trace) {
@@ -37,8 +37,8 @@ export default function createReactElement({
   }
 
   if (generatorFunction) {
-    return component(props, railsContext);
+    return (component as RenderFunction)(props, railsContext);
   }
 
-  return React.createElement(component, props);
+  return React.createElement(component as ComponentVariant, props);
 }

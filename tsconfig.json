@@ -5,7 +5,9 @@
     "jsx": "react",
     "lib": ["dom", "es2015"],
     "module": "CommonJS",
+    "noImplicitAny": true,
     "outDir": "node_package/lib",
+    "strict": true,
     "target": "es5"
   },
   "include": [

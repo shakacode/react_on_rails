@@ -1,4 +1,5 @@
-import { Store } from 'redux';
+import type { Store } from 'redux';
+import type { StoreGenerator } from './types';
 
 const registeredStoreGenerators = new Map();
 const hydratedStores = new Map();
@@ -8,7 +9,7 @@ export default {
    * Register a store generator, a function that takes props and returns a store.
    * @param storeGenerators { name1: storeGenerator1, name2: storeGenerator2 }
    */
-  register(storeGenerators: { [id: string]: Function }): void {
+  register(storeGenerators: { [id: string]: Store }): void {
     Object.keys(storeGenerators).forEach(name => {
       if (registeredStoreGenerators.has(name)) {
         console.warn('Called registerStore for store that is already registered', name);
@@ -31,7 +32,7 @@ export default {
    *        there is no store with the given name.
    * @returns Redux Store, possibly hydrated
    */
-  getStore(name: string, throwIfMissing = true): Store {
+  getStore(name: string, throwIfMissing = true): Store | undefined {
     if (hydratedStores.has(name)) {
       return hydratedStores.get(name);
     }
@@ -62,7 +63,7 @@ This can happen if you are server rendering and either:
    * @param name
    * @returns storeCreator with given name
    */
-  getStoreGenerator(name: string): Function {
+  getStoreGenerator(name: string): StoreGenerator {
     if (registeredStoreGenerators.has(name)) {
       return registeredStoreGenerators.get(name);
     }

@@ -1,4 +1,3 @@
-import { Component }  from 'react';
 // See discussion:
 // https://discuss.reactjs.org/t/how-to-determine-if-js-object-is-react-component/2825/2
 
@@ -8,7 +7,7 @@ import { Component }  from 'react';
  * @param component
  * @returns {boolean}
  */
-export default function generatorFunction(component: Component | Function): boolean {
+export default function generatorFunction(component: any): boolean {
   if (!component.prototype) {
     return false;
   }
