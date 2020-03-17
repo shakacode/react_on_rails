@@ -4,17 +4,26 @@
  */
 
 const path = require('path');
+const fs = require('fs');
+const { promisify } = require('util');
 const cluster = require('cluster');
 const express = require('express');
 const busBoy = require('express-busboy');
+
 const log = require('./shared/log');
 const packageJson = require('./shared/packageJson');
 const { buildConfig, getConfig } = require('./shared/configBuilder');
+const asyncHandler = require('./shared/expressAsyncHandler');
+const fileExistsAsync = require('./shared/fileExistsAsync');
+
 const checkProtocolVersion = require('./worker/checkProtocolVersionHandler');
 const authenticate = require('./worker/authHandler');
 const handleRenderRequest = require('./worker/handleRenderRequest');
-const { errorResponseResult, formatExceptionMessage } = require('./shared/utils');
+const { errorResponseResult, formatExceptionMessage, workerIdLabel } = require('./shared/utils');
 const errorReporter = require('./shared/errorReporter');
+const { lock, unlock } = require('./shared/locks');
+
+const fsCopyFileAsync = promisify(fs.copyFile);
 
 function setHeaders(headers, res) {
   Object.keys(headers).forEach(key => res.set(key, headers[key]));
@@ -50,50 +59,164 @@ module.exports = function run(config) {
     },
   });
 
-  //
-  app.route('/bundles/:bundleTimestamp/render/:renderRequestDigest').post((req, res) => {
+  const isProtocolVersionMatch = (req, res) => {
     // Check protocol version
     const protocolVersionCheckingResult = checkProtocolVersion(req);
 
     if (typeof protocolVersionCheckingResult === 'object') {
       setResponse(protocolVersionCheckingResult, res);
-      return;
+      return false;
     }
 
+    return true;
+  };
+
+  const isAuthenticated = (req, res) => {
     // Authenticate Ruby client
     const authResult = authenticate(req);
 
     if (typeof authResult === 'object') {
       setResponse(authResult, res);
-      return;
+      return false;
     }
 
-    const { renderingRequest } = req.body;
-    const { bundleTimestamp } = req.params;
-    const { bundle: providedNewBundle } = req.files;
+    return true;
+  };
 
-    try {
-      handleRenderRequest({ renderingRequest, bundleTimestamp, providedNewBundle })
-        .then(result => {
-          setResponse(result, res);
-        })
-        .catch(err => {
-          const exceptionMessage = formatExceptionMessage(
-            renderingRequest,
-            err,
-            'UNHANDLED error in handleRenderRequest',
+  const requestPrechecks = (req, res) => {
+    if (!isProtocolVersionMatch(req, res)) {
+      return false;
+    }
+
+    if (!isAuthenticated(req, res)) {
+      return false;
+    }
+
+    return true;
+  };
+
+  //
+  app.route('/bundles/:bundleTimestamp/render/:renderRequestDigest').post(
+    asyncHandler(async (req, res, _next) => {
+      if (!requestPrechecks(req, res)) {
+        return;
+      }
+
+      const { renderingRequest } = req.body;
+      const { bundleTimestamp } = req.params;
+      const { bundle: providedNewBundle } = req.files;
+
+      try {
+        handleRenderRequest({ renderingRequest, bundleTimestamp, providedNewBundle })
+          .then(result => {
+            setResponse(result, res);
+          })
+          .catch(err => {
+            const exceptionMessage = formatExceptionMessage(
+              renderingRequest,
+              err,
+              'UNHANDLED error in handleRenderRequest',
+            );
+            log.error(exceptionMessage);
+            errorReporter.notify(exceptionMessage);
+            setResponse(errorResponseResult(exceptionMessage), res);
+          });
+      } catch (theErr) {
+        const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
+        log.error(`UNHANDLED TOP LEVEL error ${exceptionMessage}`);
+        errorReporter.notify(exceptionMessage);
+        setResponse(errorResponseResult(exceptionMessage), res);
+      }
+    }),
+  );
+
+  // There can be additional files that might be required
+  // in the runtime. Since remote renderer doesn't contain
+  // any assets, they must be uploaded manually.
+  app.route('/upload-asset').post(
+    asyncHandler(async (req, res, _next) => {
+      if (!requestPrechecks(req, res)) {
+        return;
+      }
+      let lockAcquired;
+      let lockfileName;
+      const { asset } = req.files;
+      const description = `Uploading file ${asset.filename}`;
+      try {
+        const { lockfileName: name, wasLockAcquired, errorMessage } = await lock(asset.filename);
+        lockfileName = name;
+        lockAcquired = wasLockAcquired;
+
+        if (!lockAcquired) {
+          const msg = formatExceptionMessage(
+            description,
+            errorMessage,
+            `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
           );
-          log.error(exceptionMessage);
-          errorReporter.notify(exceptionMessage);
-          setResponse(errorResponseResult(exceptionMessage), res);
-        });
-    } catch (theErr) {
-      const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
-      log.error(`UNHANDLED TOP LEVEL error ${exceptionMessage}`);
-      errorReporter.notify(exceptionMessage);
-      setResponse(errorResponseResult(exceptionMessage), res);
-    }
-  });
+          setResponse(errorResponseResult(msg), res);
+        } else {
+          log.info(`Uploading asset ${asset.filename} to ${bundlePath}`);
+          try {
+            await fsCopyFileAsync(asset.file, path.join(bundlePath, asset.filename));
+            setResponse(
+              {
+                status: 200,
+                headers: {},
+              },
+              res,
+            );
+          } catch (err) {
+            const message = `ERROR when trying to copy asset. ${err}`;
+            log.info(message);
+            setResponse(errorResponseResult(message), res);
+          }
+        }
+      } finally {
+        if (lockAcquired) {
+          try {
+            await unlock(lockfileName);
+          } catch (error) {
+            const msg = formatExceptionMessage(
+              description,
+              error,
+              `Error unlocking ${lockfileName} from worker ${workerIdLabel()}.`,
+            );
+            log.warn(msg);
+          }
+        }
+      }
+    }),
+  );
+
+  // Checks if file exist
+  app.route('/asset-exists').post(
+    asyncHandler(async (req, res, _next) => {
+      if (!isAuthenticated(req, res)) {
+        return;
+      }
+
+      const { filename } = req.query;
+
+      if (!filename) {
+        const message = `ERROR: filename param not provided to GET /asset-exists`;
+        log.info(message);
+        setResponse(errorResponseResult(message), res);
+        return;
+      }
+
+      const assetPath = path.join(bundlePath, filename);
+
+      const fileExists = await fileExistsAsync(assetPath);
+
+      if (fileExists) {
+        log.info(`/asset-exists Uploaded asset DOES exist: ${assetPath}`);
+        setResponse({ status: 200, data: { exists: true }, headers: {} }, res);
+      } else {
+        log.info(`/asset-exists Uploaded asset DOES NOT exist: ${assetPath}`);
+        setResponse({ status: 200, data: { exists: false }, headers: {} }, res);
+      }
+    }),
+  );
 
   app.get('/info', (_req, res) => {
     res.send({

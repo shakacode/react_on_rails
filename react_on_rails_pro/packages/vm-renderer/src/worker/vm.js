@@ -6,6 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const m = require('module');
 const cluster = require('cluster');
 const { promisify } = require('util');
 
@@ -14,9 +15,10 @@ const { getConfig } = require('../shared/configBuilder');
 const { formatExceptionMessage, smartTrim } = require('../shared/utils');
 const errorReporter = require('../shared/errorReporter');
 
-const readFileAsync = promisify(fs.readFile); // (A)
+const readFileAsync = promisify(fs.readFile);
+const writeFileAsync = promisify(fs.writeFile);
 
-// Both are set when the VM is ready.
+// Both context and vmBundleFilePath are set when the VM is ready.
 let context;
 
 // vmBundleFilePath is cleared at the beginning of creating the context and set only when the
@@ -60,7 +62,8 @@ function replayVmConsole() {
 /**
  *
  * @param filePath
- * @returns {Promise<void>}
+ * @param supportModules if true, then allow exports, require, etc.
+ * @returns {Promise<boolean>}
  */
 exports.buildVM = async function buildVM(filePath) {
   if (filePath === vmBundleFilePath && context) {
@@ -68,6 +71,7 @@ exports.buildVM = async function buildVM(filePath) {
   }
 
   try {
+    const { supportModules } = getConfig();
     vmBundleFilePath = undefined;
     context = vm.createContext();
     // Create explicit reference to global context, just in case (some libs can use it):
@@ -113,7 +117,20 @@ exports.buildVM = async function buildVM(filePath) {
 
     // Run bundle code in created context:
     const bundleContents = await readFileAsync(filePath, 'utf8');
-    vm.runInContext(bundleContents, context);
+
+    // If node-specific code is provided then it must be wrapped into a module wrapper. The bundle
+    // may need the `require` function, which is not available when running in vm unless passed in.
+    if (supportModules) {
+      vm.runInContext(m.wrap(bundleContents), context)(
+        exports,
+        require,
+        module,
+        filePath,
+        path.dirname(filePath),
+      );
+    } else {
+      vm.runInContext(bundleContents, context);
+    }
 
     // !isMaster check is required for JS unit testing:
     if (!cluster.isMaster) {
@@ -157,7 +174,7 @@ exports.runInVM = async function runInVM(renderingRequest, vmCluster) {
 ${smartTrim(renderingRequest)}`);
       const debugOutputPathCode = path.join(bundlePath, 'code.js');
       log.debug(`Full code executed written to: ${debugOutputPathCode}`);
-      fs.writeFileSync(debugOutputPathCode, renderingRequest);
+      await writeFileAsync(debugOutputPathCode, renderingRequest);
     }
 
     vm.runInContext('console.history = []', context);
@@ -169,7 +186,7 @@ ${smartTrim(renderingRequest)}`);
 ${smartTrim(result)}`);
       const debugOutputPathResult = path.join(bundlePath, 'result.json');
       log.debug(`Wrote result to file: ${debugOutputPathResult}`);
-      fs.writeFileSync(debugOutputPathResult, result);
+      await writeFileAsync(debugOutputPathResult, result);
     }
 
     replayVmConsole();

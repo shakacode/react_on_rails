@@ -4,6 +4,7 @@
  * and without async calls.
  * @module worker/authHandler
  */
+// TODO: Replace with express-basic-auth per https://github.com/shakacode/react_on_rails_pro/issues/110
 
 const { getConfig } = require('../shared/configBuilder');
 
