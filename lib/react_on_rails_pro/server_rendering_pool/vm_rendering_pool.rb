@@ -1,10 +1,5 @@
 # frozen_string_literal: true
 
-require "net/http"
-require "net/http/post/multipart"
-require "uri"
-require "persistent_http"
-
 module ReactOnRailsPro
   module ServerRenderingPool
     # This implementation of the rendering pool uses NodeJS to execute javasript code
@@ -15,20 +10,7 @@ module ReactOnRailsPro
         attr_accessor :bundle_update_utc_timestamp
 
         def reset_pool
-          Rails.logger.info { "[ReactOnRailsPro] Setting up connection VM Renderer at #{renderer_url_base}" }
-
-          # NOTE: there are multiple similar gems
-          # We use https://github.com/bpardee/persistent_http/blob/master/lib/persistent_http.rb
-          # Not: https://github.com/drbrain/net-http-persistent
-          @connection = PersistentHTTP.new(
-            name: "ReactOnRailsProVmRendererClient",
-            logger: Rails.logger,
-            pool_size: ReactOnRailsPro.configuration.renderer_http_pool_size,
-            pool_timeout: ReactOnRailsPro.configuration.renderer_http_pool_timeout,
-            warn_timeout: ReactOnRailsPro.configuration.renderer_http_pool_warn_timeout,
-            force_retry: true,
-            url: ReactOnRailsPro.configuration.renderer_url
-          )
+          ReactOnRailsPro::Request.reset_connection
         end
 
         def reset_pool_if_server_bundle_was_modified
@@ -73,37 +55,13 @@ module ReactOnRailsPro
             .exec_server_render_js(js_code, render_options, self)
         end
 
-        def request_form_data(js_code, send_bundle)
-          form_data = {
-            "renderingRequest" => js_code,
-            "gemVersion" => ReactOnRailsPro::VERSION,
-            "protocolVersion" => "1.0.0",
-            "password" => ReactOnRailsPro.configuration.renderer_password
-          }
-
-          if send_bundle
-            form_data["bundle"] = UploadIO.new(
-              File.new(ReactOnRails::Utils.server_bundle_js_file_path),
-              ReactOnRails::Utils.server_bundle_js_file_path
-            )
-          end
-          form_data
-        end
-
         def eval_js(js_code, render_options, send_bundle: false)
           ReactOnRailsPro::ServerRenderingPool::ProRendering
             .set_request_digest_on_render_options(js_code, render_options)
 
           path = "/bundles/#{@bundle_update_utc_timestamp}/render/#{render_options.request_digest}"
 
-          request = Net::HTTP::Post::Multipart.new(path, request_form_data(js_code, send_bundle))
-
-          begin
-            response = @connection.request(request)
-          rescue StandardError => e
-            raise ReactOnRailsPro::Error, "Can't connect to VmRenderer renderer at #{renderer_url_base}.\n"\
-                  "Original error:\n#{e}"
-          end
+          response = ReactOnRailsPro::Request.render_code(path, js_code, send_bundle)
 
           case response.code
           when "200"
@@ -114,10 +72,6 @@ module ReactOnRailsPro
           when "400"
             raise ReactOnRailsPro::Error,
                   "Renderer unhandled error at the VM level: #{response.code}:\n#{response.body}"
-          when "412"
-            # 412 is a protocol error, meaning the server and renderer are running incompatible versions
-            # of React on Rails.
-            raise ReactOnRailsPro::Error, response.body
           else
             raise ReactOnRailsPro::Error, "Unknown response code from renderer: #{response.code}:\n#{response.body}"
           end

@@ -37,7 +37,7 @@ Naming/FileName:
     - 'spec/dummy/Gemfile'
     - 'spec/dummy_no_webpacker/Gemfile'
 
-Metrics/LineLength:
+Layout/LineLength:
   Max: 120
 
 Style/StringLiterals:
@@ -45,6 +45,15 @@ Style/StringLiterals:
 
 Style/Documentation:
   Enabled: false
+
+Style/HashEachMethods:
+  Enabled: true
+
+Style/HashTransformKeys:
+  Enabled: true
+
+Style/HashTransformValues:
+  Enabled: true
 
 Lint/AssignmentInCondition:
   Exclude:

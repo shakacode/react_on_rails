@@ -6,9 +6,9 @@ const env = process.env;
 const { reactOnRailsProVmRenderer } = require('react-on-rails-pro-vm-renderer');
 
 const config = {
-  bundlePath: path.resolve(__dirname, '../tmp/bundles'),  // Save bundle to "tmp/" dir of our dummy app
+  bundlePath: path.resolve(__dirname, '../tmp/bundles'), // Save bundle to "tmp/bundles" dir of our dummy app
   // This is the default
-  port: env.RENDERER_PORT || 3800,         // Listen at RENDERER_PORT env value or default port 3800
+  port: env.RENDERER_PORT || 3800, // Listen at RENDERER_PORT env value or default port 3800
   logLevel: env.RENDERER_LOG_LEVEL || 'info',
 
   // See value in /config/initializers/react_on_rails_pro.rb. Should use env value in real app.
@@ -27,6 +27,11 @@ const config = {
 
   // Uncomment and change value for testing the honeybadger API integration
   honeybadgerApiKey: 'a602365c',
+
+  // This option is required if loadable/components lib is used.
+  // The server-rendering of this lib is working only libraryTarget: 'commonjs2'
+  // possible values: null | 'commonjs2'
+  libraryTarget: env.RENDERER_LIBRARY_TARGET || null,
 };
 
 // Renderer detects a total number of CPUs on virtual hostings like Heroky or CircleCI instead

@@ -1,62 +1,84 @@
+// NOTE: The tmp bundle directory for each test file must be different due to the fact that
+// jest will run multiple test files synchronously.
 const path = require('path');
 const fs = require('fs');
+const { promisify } = require('util');
 const fsExtra = require('fs-extra');
+
+const fsCopyFileAsync = promisify(fs.copyFile);
 
 const { buildVM, resetVM } = require('../src/worker/vm');
 
 const { buildConfig } = require('../src/shared/configBuilder');
 
-function getFixtureBundle() {
+exports.BUNDLE_TIMESTAMP = 1495063024898;
+
+exports.ASSET_UPLOAD_FILE = 'loadable-stats.json';
+
+exports.getFixtureBundle = function getFixtureBundle() {
   return path.resolve(__dirname, './fixtures/bundle.js');
-}
-
-const helper = exports;
-
-helper.BUNDLE_TIMESTAMP = 1495063024898;
-
-/**
- *
- */
-helper.setConfig = function setConfig() {
-  buildConfig({
-    bundlePath: path.resolve(__dirname, './tmp'),
-  });
 };
 
-helper.vmBundlePath = function vmBundlePath() {
-  return path.resolve(__dirname, `./tmp/${helper.BUNDLE_TIMESTAMP}.js`);
+exports.getFixtureAsset = function getFixtureAsset() {
+  return path.resolve(__dirname, './fixtures/loadable-stats.json');
+};
+
+exports.bundlePath = function bundlePath(testName) {
+  return path.resolve(__dirname, 'tmp', testName);
+};
+
+exports.setConfig = function setConfig(testName) {
+  buildConfig({
+    bundlePath: exports.bundlePath(testName),
+  });
 };
 
 /**
  *
  * @returns {Promise<void>}
  */
-helper.createVmBundle = async function createVmBundle() {
-  fsExtra.copySync(getFixtureBundle(), helper.vmBundlePath());
-  await buildVM(helper.vmBundlePath());
+exports.createVmBundle = async function createVmBundle(testName) {
+  await fsCopyFileAsync(exports.getFixtureBundle(), exports.vmBundlePath(testName));
+  return buildVM(exports.vmBundlePath(testName));
 };
 
-helper.lockfilePath = function lockfilePath() {
-  return `${helper.vmBundlePath()}.lock`;
+exports.lockfilePath = function lockfilePath(testName) {
+  return `${exports.vmBundlePath(testName)}.lock`;
 };
 
-helper.uploadedBundlePath = function uploadedBundlePath() {
-  return path.resolve(__dirname, `./tmp/uploads/${helper.BUNDLE_TIMESTAMP}.js`);
+exports.uploadedBundleDir = function uploadedBundleDir(testName) {
+  return path.resolve(exports.bundlePath(testName), 'uploads');
 };
 
-helper.createUploadedBundle = function createUploadedBundle() {
-  fsExtra.copySync(getFixtureBundle(), helper.uploadedBundlePath());
+exports.uploadedBundlePath = function uploadedBundlePath(testName) {
+  return path.resolve(exports.uploadedBundleDir(testName), `${exports.BUNDLE_TIMESTAMP}.js`);
 };
 
-helper.resetForTest = function resetForTest() {
-  if (fs.existsSync(helper.uploadedBundlePath())) fs.unlinkSync(helper.uploadedBundlePath());
-  if (fs.existsSync(helper.vmBundlePath())) fs.unlinkSync(helper.vmBundlePath());
-  if (fs.existsSync(helper.lockfilePath())) fs.unlinkSync(helper.lockfilePath());
+exports.vmBundlePath = function vmBundlePath(testName) {
+  return path.resolve(exports.bundlePath(testName), `${exports.BUNDLE_TIMESTAMP}.js`);
+};
+
+exports.assetPath = function assetPath(testName) {
+  return path.resolve(exports.bundlePath(testName), exports.ASSET_UPLOAD_FILE);
+};
+
+exports.createUploadedBundle = async function createUploadedBundle(testName) {
+  const mkdirAsync = promisify(fs.mkdir);
+  await mkdirAsync(exports.uploadedBundleDir(testName), { recursive: true });
+  return fsCopyFileAsync(exports.getFixtureBundle(), exports.uploadedBundlePath(testName));
+};
+
+exports.createAsset = async function createAsset(testName) {
+  return fsCopyFileAsync(exports.getFixtureAsset(), exports.assetPath(testName));
+};
+
+exports.resetForTest = async function resetForTest(testName) {
+  await fsExtra.emptyDir(exports.bundlePath(testName));
   resetVM();
-  helper.setConfig();
+  exports.setConfig(testName);
 };
 
-helper.readRenderingRequest = function readRenderingRequest(projectName, commit, requestDumpFileName) {
+exports.readRenderingRequest = function readRenderingRequest(projectName, commit, requestDumpFileName) {
   const renderingRequestRelativePath = path.join(
     './fixtures/projects/',
     projectName,
@@ -66,7 +88,7 @@ helper.readRenderingRequest = function readRenderingRequest(projectName, commit,
   return fs.readFileSync(path.resolve(__dirname, renderingRequestRelativePath), 'utf8');
 };
 
-helper.createResponse = function createResponse(validate) {
+exports.createResponse = function createResponse(validate) {
   const result = {
     headers: {},
     data: '',
@@ -87,4 +109,4 @@ helper.createResponse = function createResponse(validate) {
   };
 };
 
-helper.setConfig();
+exports.setConfig('helper');

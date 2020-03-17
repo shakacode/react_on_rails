@@ -4,231 +4,283 @@ const {
   createUploadedBundle,
   readRenderingRequest,
   createVmBundle,
+  resetForTest,
 } = require('./helper');
 const { buildVM, runInVM, getVmBundleFilePath, resetVM } = require('../src/worker/vm');
+const { getConfig } = require('../src/shared/configBuilder');
 
-test('buildVM and runInVM', async () => {
-  expect.assertions(14);
+const testName = 'vm';
+const uploadedBundlePathForTest = () => uploadedBundlePath(testName);
+const createUploadedBundleForTest = () => createUploadedBundle(testName);
+const createVmBundleForTest = () => createVmBundle(testName);
 
-  createUploadedBundle();
-  await buildVM(uploadedBundlePath());
+describe('buildVM and runInVM', () => {
+  beforeEach(async () => {
+    await resetForTest(testName);
+  });
 
-  let result = await runInVM('ReactOnRails');
-  expect(result).toEqual({ dummy: { html: 'Dummy Object' } });
+  afterAll(async () => {
+    await resetForTest(testName);
+  });
 
-  expect(global.ReactOnRails === undefined).toBeTruthy();
+  test('buildVM and runInVM', async () => {
+    expect.assertions(14);
 
-  result = await runInVM('typeof global !== undefined');
-  expect(result).toBeTruthy();
+    await createUploadedBundleForTest();
+    await buildVM(uploadedBundlePathForTest());
 
-  result = await runInVM('Math === global.Math');
-  expect(result).toBeTruthy();
+    let result = await runInVM('ReactOnRails');
+    expect(result).toEqual({ dummy: { html: 'Dummy Object' } });
 
-  result = await runInVM('ReactOnRails === global.ReactOnRails');
-  expect(result).toBeTruthy();
+    expect(global.ReactOnRails === undefined).toBeTruthy();
 
-  await runInVM('global.testVar = "test"');
-  result = await runInVM('this.testVar === "test"');
-  expect(result).toBeTruthy();
+    result = await runInVM('typeof global !== undefined');
+    expect(result).toBeTruthy();
 
-  result = await runInVM('testVar === "test"');
-  expect(result).toBeTruthy();
+    result = await runInVM('Math === global.Math');
+    expect(result).toBeTruthy();
 
-  result = await runInVM('console');
-  expect(result !== console).toBeTruthy();
+    result = await runInVM('ReactOnRails === global.ReactOnRails');
+    expect(result).toBeTruthy();
 
-  expect(console.history === undefined).toBeTruthy();
+    await runInVM('global.testVar = "test"');
+    result = await runInVM('this.testVar === "test"');
+    expect(result).toBeTruthy();
 
-  result = await runInVM('console.history !== undefined');
-  expect(result).toBeTruthy();
+    result = await runInVM('testVar === "test"');
+    expect(result).toBeTruthy();
 
-  result = await runInVM('getStackTrace !== undefined');
-  expect(result).toBeTruthy();
+    result = await runInVM('console');
+    expect(result !== console).toBeTruthy();
 
-  result = await runInVM('setInterval !== undefined');
-  expect(result).toBeTruthy();
+    expect(console.history === undefined).toBeTruthy();
 
-  result = await runInVM('setTimeout !== undefined');
-  expect(result).toBeTruthy();
+    result = await runInVM('console.history !== undefined');
+    expect(result).toBeTruthy();
 
-  result = await runInVM('clearTimeout !== undefined');
-  expect(result).toBeTruthy();
-});
+    result = await runInVM('getStackTrace !== undefined');
+    expect(result).toBeTruthy();
 
-test('VM security and captured exceptions', async () => {
-  expect.assertions(1);
-  createUploadedBundle();
-  await buildVM(uploadedBundlePath());
-  // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
-  const result = await runInVM('process.exit()');
-  expect(result.exceptionMessage.match(/process is not defined/)).toBeTruthy();
-});
+    result = await runInVM('setInterval !== undefined');
+    expect(result).toBeTruthy();
 
-test('Captured exceptions for a long message', async () => {
-  expect.assertions(4);
-  createUploadedBundle();
-  await buildVM(uploadedBundlePath());
-  // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
-  const code = `process.exit()${'\n// 1234567890123456789012345678901234567890'.repeat(
-    50,
-  )}\n// Finishing Comment`;
-  const { exceptionMessage } = await runInVM(code);
-  expect(exceptionMessage.match(/process is not defined/)).toBeTruthy();
-  expect(exceptionMessage.match(/process.exit/)).toBeTruthy();
-  expect(exceptionMessage.match(/Finishing Comment/)).toBeTruthy();
-  expect(exceptionMessage.match(/\.\.\./)).toBeTruthy();
-});
+    result = await runInVM('setTimeout !== undefined');
+    expect(result).toBeTruthy();
 
-test('resetVM', async () => {
-  expect.assertions(2);
-  createUploadedBundle();
-  buildVM(uploadedBundlePath());
+    result = await runInVM('clearTimeout !== undefined');
+    expect(result).toBeTruthy();
+  });
 
-  const result = await runInVM('ReactOnRails');
-  expect(result).toEqual({ dummy: { html: 'Dummy Object' } });
+  test('VM security and captured exceptions', async () => {
+    expect.assertions(1);
+    await createUploadedBundleForTest();
+    await buildVM(uploadedBundlePathForTest());
+    // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
+    const result = await runInVM('process.exit()');
+    expect(result.exceptionMessage.match(/process is not defined/)).toBeTruthy();
+  });
 
-  resetVM();
+  test('Captured exceptions for a long message', async () => {
+    expect.assertions(4);
+    await createUploadedBundleForTest();
+    await buildVM(uploadedBundlePathForTest());
+    // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
+    const code = `process.exit()${'\n// 1234567890123456789012345678901234567890'.repeat(
+      50,
+    )}\n// Finishing Comment`;
+    const { exceptionMessage } = await runInVM(code);
+    expect(exceptionMessage.match(/process is not defined/)).toBeTruthy();
+    expect(exceptionMessage.match(/process.exit/)).toBeTruthy();
+    expect(exceptionMessage.match(/Finishing Comment/)).toBeTruthy();
+    expect(exceptionMessage.match(/\.\.\./)).toBeTruthy();
+  });
 
-  expect(getVmBundleFilePath() === undefined).toBeTruthy();
-});
+  test('resetVM', async () => {
+    expect.assertions(2);
+    await createUploadedBundleForTest();
+    await buildVM(uploadedBundlePathForTest());
 
-test('VM console history', async () => {
-  expect.assertions(1);
-  createUploadedBundle();
-  buildVM(uploadedBundlePath());
+    const result = await runInVM('ReactOnRails');
+    expect(result).toEqual({ dummy: { html: 'Dummy Object' } });
 
-  const vmResult = await runInVM('console.log("Console message inside of VM") || console.history;');
-  const consoleHistory = [{ level: 'log', arguments: ['[SERVER] Console message inside of VM'] }];
+    resetVM();
 
-  expect(vmResult).toEqual(consoleHistory);
-});
+    expect(getVmBundleFilePath() === undefined).toBeTruthy();
+  });
 
-test('getVmBundleFilePath', async () => {
-  expect.assertions(1);
-  await createVmBundle();
+  test('VM console history', async () => {
+    expect.assertions(1);
+    await createUploadedBundleForTest();
+    await buildVM(uploadedBundlePathForTest());
 
-  expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, './tmp/1495063024898.js'));
-});
+    const vmResult = await runInVM('console.log("Console message inside of VM") || console.history;');
+    const consoleHistory = [{ level: 'log', arguments: ['[SERVER] Console message inside of VM'] }];
 
-test('FriendsAndGuests bundle for commit 1a7fe417', async () => {
-  expect.assertions(5);
+    expect(vmResult).toEqual(consoleHistory);
+  });
 
-  const project = 'friendsandguests';
-  const commit = '1a7fe417';
+  test('getVmBundleFilePath', async () => {
+    expect.assertions(1);
+    await createVmBundleForTest();
 
-  await buildVM(path.resolve(__dirname, './fixtures/projects/friendsandguests/1a7fe417/server-bundle.js'));
+    expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, `./tmp/${testName}/1495063024898.js`));
+  });
 
-  // WelcomePage component:
-  const welcomePageComponentRenderingRequest = readRenderingRequest(
-    project,
-    commit,
-    'welcomePageRenderingRequest.js',
-  );
-  const welcomePageRenderingResult = await runInVM(welcomePageComponentRenderingRequest);
-  expect(welcomePageRenderingResult.includes('data-react-checksum=\\"800299790\\"')).toBeTruthy();
+  test('FriendsAndGuests bundle for commit 1a7fe417 requires supportModules false', async () => {
+    expect.assertions(5);
 
-  // LayoutNavbar component:
-  const layoutNavbarComponentRenderingRequest = readRenderingRequest(
-    project,
-    commit,
-    'layoutNavbarRenderingRequest.js',
-  );
-  const layoutNavbarRenderingResult = await runInVM(layoutNavbarComponentRenderingRequest);
-  expect(layoutNavbarRenderingResult.includes('data-react-checksum=\\"-667058792\\"')).toBeTruthy();
+    const project = 'friendsandguests';
+    const commit = '1a7fe417';
 
-  // ListingIndex component:
-  const listingIndexComponentRenderingRequest = readRenderingRequest(
-    project,
-    commit,
-    'listingIndexRenderingRequest.js',
-  );
-  const listingIndexRenderingResult = await runInVM(listingIndexComponentRenderingRequest);
-  expect(listingIndexRenderingResult.includes('data-react-checksum=\\"452252439\\"')).toBeTruthy();
+    const config = getConfig();
+    config.supportModules = false;
 
-  // ListingShow component:
-  const listingShowComponentRenderingRequest = readRenderingRequest(
-    project,
-    commit,
-    'listingsShowRenderingRequest.js',
-  );
-  const listingShowRenderingResult = await runInVM(listingShowComponentRenderingRequest);
-  expect(listingShowRenderingResult.includes('data-react-checksum=\\"-324043796\\"')).toBeTruthy();
+    await buildVM(path.resolve(__dirname, './fixtures/projects/friendsandguests/1a7fe417/server-bundle.js'));
 
-  // UserShow component:
-  const userShowComponentRenderingRequest = readRenderingRequest(
-    project,
-    commit,
-    'userShowRenderingRequest.js',
-  );
-  const userShowRenderingResult = await runInVM(userShowComponentRenderingRequest);
-  expect(userShowRenderingResult.includes('data-react-checksum=\\"-1039690194\\"')).toBeTruthy();
-});
+    // WelcomePage component:
+    const welcomePageComponentRenderingRequest = readRenderingRequest(
+      project,
+      commit,
+      'welcomePageRenderingRequest.js',
+    );
+    const welcomePageRenderingResult = await runInVM(welcomePageComponentRenderingRequest);
+    expect(welcomePageRenderingResult.includes('data-react-checksum=\\"800299790\\"')).toBeTruthy();
 
-test('ReactWebpackRailsTutorial bundle for commit ec974491', async () => {
-  expect.assertions(3);
+    // LayoutNavbar component:
+    const layoutNavbarComponentRenderingRequest = readRenderingRequest(
+      project,
+      commit,
+      'layoutNavbarRenderingRequest.js',
+    );
+    const layoutNavbarRenderingResult = await runInVM(layoutNavbarComponentRenderingRequest);
+    expect(layoutNavbarRenderingResult.includes('data-react-checksum=\\"-667058792\\"')).toBeTruthy();
 
-  const project = 'react-webpack-rails-tutorial';
-  const commit = 'ec974491';
+    // ListingIndex component:
+    const listingIndexComponentRenderingRequest = readRenderingRequest(
+      project,
+      commit,
+      'listingIndexRenderingRequest.js',
+    );
+    const listingIndexRenderingResult = await runInVM(listingIndexComponentRenderingRequest);
+    expect(listingIndexRenderingResult.includes('data-react-checksum=\\"452252439\\"')).toBeTruthy();
 
-  await buildVM(
-    path.resolve(__dirname, './fixtures/projects/react-webpack-rails-tutorial/ec974491/server-bundle.js'),
-  );
+    // ListingShow component:
+    const listingShowComponentRenderingRequest = readRenderingRequest(
+      project,
+      commit,
+      'listingsShowRenderingRequest.js',
+    );
+    const listingShowRenderingResult = await runInVM(listingShowComponentRenderingRequest);
+    expect(listingShowRenderingResult.includes('data-react-checksum=\\"-324043796\\"')).toBeTruthy();
 
-  // NavigationBar component:
-  const navigationBarComponentRenderingRequest = readRenderingRequest(
-    project,
-    commit,
-    'navigationBarAppRenderingRequest.js',
-  );
-  const navigationBarRenderingResult = await runInVM(navigationBarComponentRenderingRequest);
-  expect(navigationBarRenderingResult.includes('data-react-checksum=\\"-472831860\\"')).toBeTruthy();
+    // UserShow component:
+    const userShowComponentRenderingRequest = readRenderingRequest(
+      project,
+      commit,
+      'userShowRenderingRequest.js',
+    );
+    const userShowRenderingResult = await runInVM(userShowComponentRenderingRequest);
+    expect(userShowRenderingResult.includes('data-react-checksum=\\"-1039690194\\"')).toBeTruthy();
+  });
 
-  // RouterApp component:
-  const routerAppComponentRenderingRequest = readRenderingRequest(
-    project,
-    commit,
-    'routerAppRenderingRequest.js',
-  );
-  const routerAppRenderingResult = await runInVM(routerAppComponentRenderingRequest);
-  expect(routerAppRenderingResult.includes('data-react-checksum=\\"-1777286250\\"')).toBeTruthy();
+  test('ReactWebpackRailsTutorial bundle for commit ec974491', async () => {
+    expect.assertions(3);
 
-  // App component:
-  const appComponentRenderingRequest = readRenderingRequest(project, commit, 'appRenderingRequest.js');
-  const appRenderingResult = await runInVM(appComponentRenderingRequest);
-  expect(appRenderingResult.includes('data-react-checksum=\\"-490396040\\"')).toBeTruthy();
-});
+    const project = 'react-webpack-rails-tutorial';
+    const commit = 'ec974491';
 
-test('BionicWorkshop bundle for commit fa6ccf6b', async () => {
-  expect.assertions(4);
+    await buildVM(
+      path.resolve(__dirname, './fixtures/projects/react-webpack-rails-tutorial/ec974491/server-bundle.js'),
+    );
 
-  const project = 'bionicworkshop';
-  const commit = 'fa6ccf6b';
+    // NavigationBar component:
+    const navigationBarComponentRenderingRequest = readRenderingRequest(
+      project,
+      commit,
+      'navigationBarAppRenderingRequest.js',
+    );
+    const navigationBarRenderingResult = await runInVM(navigationBarComponentRenderingRequest);
+    expect(navigationBarRenderingResult.includes('data-react-checksum=\\"-472831860\\"')).toBeTruthy();
 
-  await buildVM(path.resolve(__dirname, './fixtures/projects/bionicworkshop/fa6ccf6b/server-bundle.js'));
+    // RouterApp component:
+    const routerAppComponentRenderingRequest = readRenderingRequest(
+      project,
+      commit,
+      'routerAppRenderingRequest.js',
+    );
+    const routerAppRenderingResult = await runInVM(routerAppComponentRenderingRequest);
+    expect(routerAppRenderingResult.includes('data-react-checksum=\\"-1777286250\\"')).toBeTruthy();
 
-  // SignIn page with flash component:
-  const signInPageWithFlashRenderingRequest = readRenderingRequest(
-    project,
-    commit,
-    'signInPageWithFlashRenderingRequest.js',
-  );
-  const signInPageWithFlashRenderingResult = await runInVM(signInPageWithFlashRenderingRequest);
+    // App component:
+    const appComponentRenderingRequest = readRenderingRequest(project, commit, 'appRenderingRequest.js');
+    const appRenderingResult = await runInVM(appComponentRenderingRequest);
+    expect(appRenderingResult.includes('data-react-checksum=\\"-490396040\\"')).toBeTruthy();
+  });
 
-  // We don't put checksum here since it changes for every request with Rails auth token:
-  expect(signInPageWithFlashRenderingResult.includes('data-react-checksum=')).toBeTruthy();
+  test('BionicWorkshop bundle for commit fa6ccf6b', async () => {
+    expect.assertions(4);
 
-  // Landing page component:
-  const landingPageRenderingRequest = readRenderingRequest(project, commit, 'landingPageRenderingRequest.js');
-  const landingPageRenderingResult = await runInVM(landingPageRenderingRequest);
-  expect(landingPageRenderingResult.includes('data-react-checksum=\\"-1899958456\\"')).toBeTruthy();
+    const project = 'bionicworkshop';
+    const commit = 'fa6ccf6b';
 
-  // Post page component:
-  const postPageRenderingRequest = readRenderingRequest(project, commit, 'postPageRenderingRequest.js');
-  const postPageRenderingResult = await runInVM(postPageRenderingRequest);
-  expect(postPageRenderingResult.includes('data-react-checksum=\\"-1296077150\\"')).toBeTruthy();
+    await buildVM(path.resolve(__dirname, './fixtures/projects/bionicworkshop/fa6ccf6b/server-bundle.js'));
 
-  // Authors page component:
-  const authorsPageRenderingRequest = readRenderingRequest(project, commit, 'authorsPageRenderingRequest.js');
-  const authorsPageRenderingResult = await runInVM(authorsPageRenderingRequest);
-  expect(authorsPageRenderingResult.includes('data-react-checksum=\\"-1066737665\\"')).toBeTruthy();
+    // SignIn page with flash component:
+    const signInPageWithFlashRenderingRequest = readRenderingRequest(
+      project,
+      commit,
+      'signInPageWithFlashRenderingRequest.js',
+    );
+    const signInPageWithFlashRenderingResult = await runInVM(signInPageWithFlashRenderingRequest);
+
+    // We don't put checksum here since it changes for every request with Rails auth token:
+    expect(signInPageWithFlashRenderingResult.includes('data-react-checksum=')).toBeTruthy();
+
+    // Landing page component:
+    const landingPageRenderingRequest = readRenderingRequest(
+      project,
+      commit,
+      'landingPageRenderingRequest.js',
+    );
+    const landingPageRenderingResult = await runInVM(landingPageRenderingRequest);
+    expect(landingPageRenderingResult.includes('data-react-checksum=\\"-1899958456\\"')).toBeTruthy();
+
+    // Post page component:
+    const postPageRenderingRequest = readRenderingRequest(project, commit, 'postPageRenderingRequest.js');
+    const postPageRenderingResult = await runInVM(postPageRenderingRequest);
+    expect(postPageRenderingResult.includes('data-react-checksum=\\"-1296077150\\"')).toBeTruthy();
+
+    // Authors page component:
+    const authorsPageRenderingRequest = readRenderingRequest(
+      project,
+      commit,
+      'authorsPageRenderingRequest.js',
+    );
+    const authorsPageRenderingResult = await runInVM(authorsPageRenderingRequest);
+    expect(authorsPageRenderingResult.includes('data-react-checksum=\\"-1066737665\\"')).toBeTruthy();
+  });
+
+  // Testing using a bundle that used a web target for the server bundle
+  test('spec/dummy web', async () => {
+    expect.assertions(1);
+
+    const project = 'spec-dummy';
+    const commit = '9fa89f7';
+
+    await buildVM(
+      path.resolve(__dirname, './fixtures/projects/spec-dummy/9fa89f7/server-bundle-web-target.js'),
+    );
+
+    // WelcomePage component:
+    const reduxAppComponentRenderingRequest = readRenderingRequest(
+      project,
+      commit,
+      'reduxAppRenderingRequest.js',
+    );
+    const reduxAppRenderingResult = await runInVM(reduxAppComponentRenderingRequest);
+
+    expect(
+      reduxAppRenderingResult.includes('<h3>Redux Hello, <!-- -->Mr. Server Side Rendering<!-- -->!</h3>'),
+    ).toBeTruthy();
+  });
 });

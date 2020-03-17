@@ -5,62 +5,17 @@
  * @module worker/handleRenderRequest
  */
 
-const sleep = require('sleep-promise');
 const cluster = require('cluster');
 const path = require('path');
-const fs = require('fs');
 const fsExtra = require('fs-extra');
-const lockfile = require('lockfile');
-const { promisify } = require('util');
 
-const debug = require('../shared/debug');
+const { lock, unlock } = require('../shared/locks');
+const fileExistsAsync = require('../shared/fileExistsAsync');
 const log = require('../shared/log');
 const { formatExceptionMessage, errorResponseResult, workerIdLabel } = require('../shared/utils');
 const { getConfig } = require('../shared/configBuilder');
 const errorReporter = require('../shared/errorReporter');
 const { buildVM, getVmBundleFilePath, runInVM } = require('./vm');
-
-const lockfileLockAsync = promisify(lockfile.lock);
-const lockfileUnlockAsync = promisify(lockfile.unlock);
-
-const TEST_LOCKFILE_THREADING = false;
-
-// See definitions here: https://github.com/npm/lockfile/blob/master/README.md#options
-/*
- * A number of milliseconds to wait for locks to expire before giving up. Only used by
- * lockFile.lock. Poll for opts.wait ms. If the lock is not cleared by the time the wait expires,
- * then it returns with the original error.
- */
-const LOCKFILE_WAIT = 3000;
-
-/*
- * When using opts.wait, this is the period in ms in which it polls to check if the lock has
- * expired. Defaults to 100.
- */
-const LOCKFILE_POLL_PERIOD = 300; // defaults to 100
-
-/*
- * A number of milliseconds before locks are considered to have expired.
- */
-const LOCKFILE_STALE = 20000;
-
-/*
- * Used by lock and lockSync. Retry n number of times before giving up.
- */
-const LOCKFILE_RETRIES = 45;
-
-/*
- * Used by lock. Wait n milliseconds before retrying.
- */
-const LOCKFILE_RETRY_WAIT = 300;
-
-const lockfileOptions = {
-  wait: LOCKFILE_WAIT,
-  retryWait: LOCKFILE_RETRY_WAIT,
-  retries: LOCKFILE_RETRIES,
-  stale: LOCKFILE_STALE,
-  pollPeriod: LOCKFILE_POLL_PERIOD,
-};
 
 /**
  *
@@ -80,8 +35,6 @@ async function prepareResult(renderingRequest) {
     }
 
     if (exceptionMessage) {
-      log.error(exceptionMessage);
-      errorReporter.notify(exceptionMessage);
       return Promise.resolve(errorResponseResult(exceptionMessage));
     }
 
@@ -92,8 +45,6 @@ async function prepareResult(renderingRequest) {
     });
   } catch (err) {
     const exceptionMessage = formatExceptionMessage(renderingRequest, err, 'Unknown error calling runInVM');
-    log.error(exceptionMessage);
-    errorReporter.notify(exceptionMessage);
     return Promise.resolve(errorResponseResult(exceptionMessage));
   }
 }
@@ -103,61 +54,30 @@ function getRequestBundleFilePath(bundleTimestamp) {
   return path.join(bundlePath, `${bundleTimestamp}.js`);
 }
 
-function errorResult(msg) {
-  errorReporter.notify(msg);
-  log.error(` error ${msg}`);
-  return {
-    headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
-    status: 400,
-    data: msg,
-  };
-}
-
-/**
- *
- * @param lockfileName
- * @returns {Promise<void>}
- */
-async function unlock(lockfileName) {
-  debug('Unlocking lockfile %s', lockfileName);
-
-  await lockfileUnlockAsync(lockfileName);
-}
-
 /**
  *
  * @param bundleFilePathPerTimestamp
  * @param providedNewBundle
  * @param renderingRequest
- * @returns {Promise<void>}
+ * @returns {Promise<{headers: {"Cache-Control": string}, data: any, status: number}>}
  */
 async function handleNewBundleProvided(bundleFilePathPerTimestamp, providedNewBundle, renderingRequest) {
   log.info('Worker received new bundle: %s', bundleFilePathPerTimestamp);
 
-  const lockfileName = `${bundleFilePathPerTimestamp}.lock`;
-  const workerId = workerIdLabel();
   let lockAcquired;
-
+  let lockfileName;
   try {
-    try {
-      debug('Worker %s: About to request lock %s', workerId, lockfileName);
-      log.info('Worker %s: About to request lock %s', workerId, lockfileName);
-      await lockfileLockAsync(lockfileName, lockfileOptions);
-      lockAcquired = true;
+    const { lockfileName: name, wasLockAcquired, errorMessage } = await lock(bundleFilePathPerTimestamp);
+    lockfileName = name;
+    lockAcquired = wasLockAcquired;
 
-      if (TEST_LOCKFILE_THREADING) {
-        debug('Worker %i: handleNewBundleProvided sleeping 5s', workerId);
-        await sleep(5000);
-        debug('Worker %i: handleNewBundleProvided done sleeping 5s', workerId);
-      }
-      debug('After acquired lock in pid', lockfileName);
-    } catch (error) {
+    if (!lockAcquired) {
       const msg = formatExceptionMessage(
         renderingRequest,
-        error,
-        `Failed to acquire lock ${lockfileName}. Worker: ${workerId}.`,
+        errorMessage,
+        `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
       );
-      return Promise.resolve(errorResult(msg));
+      return Promise.resolve(errorResponseResult(msg));
     }
 
     try {
@@ -166,7 +86,8 @@ async function handleNewBundleProvided(bundleFilePathPerTimestamp, providedNewBu
 
       log.info(`Completed moving uploaded file ${providedNewBundle.file} to ${bundleFilePathPerTimestamp}`);
     } catch (error) {
-      if (!fs.existsSync(bundleFilePathPerTimestamp)) {
+      const fileExists = await fileExistsAsync(bundleFilePathPerTimestamp);
+      if (!fileExists) {
         const msg = formatExceptionMessage(
           renderingRequest,
           error,
@@ -174,7 +95,7 @@ async function handleNewBundleProvided(bundleFilePathPerTimestamp, providedNewBu
 to ${bundleFilePathPerTimestamp})`,
         );
         log.error(msg);
-        return Promise.resolve(errorResult(msg));
+        return Promise.resolve(errorResponseResult(msg));
       }
       log.info(
         'File exists when trying to overwrite bundle %s. Assuming bundle written by other thread',
@@ -194,18 +115,18 @@ to ${bundleFilePathPerTimestamp})`,
         error,
         `Unexpected error when building the VM ${bundleFilePathPerTimestamp}`,
       );
-      return Promise.resolve(errorResult(msg));
+      return Promise.resolve(errorResponseResult(msg));
     }
   } finally {
     if (lockAcquired) {
-      log.info('About to unlock %s from worker %i', lockfileName, workerId);
+      log.info('About to unlock %s from worker %i', lockfileName, workerIdLabel());
       try {
         await unlock(lockfileName);
       } catch (error) {
         const msg = formatExceptionMessage(
           renderingRequest,
           error,
-          `Error unlocking ${lockfileName} from worker ${workerId}.`,
+          `Error unlocking ${lockfileName} from worker ${workerIdLabel()}.`,
         );
         log.warn(msg);
       }
@@ -246,7 +167,8 @@ module.exports = async function handleRenderRequest({
     }
 
     // Check if bundle was uploaded:
-    if (!fs.existsSync(bundleFilePathPerTimestamp)) {
+    const fileExists = await fileExistsAsync(bundleFilePathPerTimestamp);
+    if (!fileExists) {
       log.info(`No saved bundle ${bundleFilePathPerTimestamp}. Requesting a new bundle.`);
       return Promise.resolve({
         headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },

@@ -51,7 +51,5 @@ const devServer = new WebpackDevServer(compiler, {
 
 devServer.listen(settings.dev_server.port, settings.dev_server.host, err => {
   if (err) console.error(err);
-  console.log(
-    `=> 🔥  Webpack development server is running on ${output.publicPathWithHost}`
-  );
+  console.log(`=> 🔥  Webpack development server is running on ${output.publicPathWithHost}`);
 });

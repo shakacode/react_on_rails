@@ -14,11 +14,15 @@ aliases:
              echo "Bundler version: "; bundle --version
   - &lint-js
     name: Linting of JS
-    command: yarn lint
+    command: yarn start lint
 
   - &lint-ruby
     name: Linting of Ruby
     command: bundle exec rubocop
+
+  - &format
+    name: Check formatting
+    command: yarn start format.listDifferent
 
   # Install/update Node modules for renderer package unless existing set of modules is satisfying Yarn.
   - &install-package-node-modules
@@ -108,6 +112,7 @@ jobs:
       - run: *install-package-ruby-gems
       - run: *lint-ruby
       - run: *lint-js
+      - run: *format
 
   prettier:
     docker:

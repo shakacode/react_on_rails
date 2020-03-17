@@ -193,6 +193,22 @@ cd react_on_rails_pro
 yarn test
 ```
 
+### Debugging NPM JS tests
+
+Example of using ndb to debug a test
+```bash
+ndb $(yarn bin)/jest --runInBand  packages/vm-renderer/tests/**/*.test.js -t 'FriendsAndGuests bundle for commit 1a7fe417'
+```
+Hit F8 and then a debugger statement within the test will get hit.
+
+### Creating new VM tests
+1. copy a server bundle to `packages/vm-renderer/tests/fixtures/projects/<project-name>/<commit>`
+2. create a directory with a hash representing the commit of the project
+
+### Asynch issues with Jest
+Beware that Jest runs multiple test files synchronously, so you can't use the same tmp directory
+between tests. See the file `packages/vm-renderer/tests/helper.js` for how this was handled.
+
 ### Run spec/dummy tests
 
 TODO: Figure out how to run the tests on CI.
