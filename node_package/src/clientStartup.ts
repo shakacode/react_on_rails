@@ -1,18 +1,23 @@
 import ReactDOM from 'react-dom';
-import { Component } from 'react';
-import { ReactOnRails as ReactOnRailsType, RailsContext } from './types/index';
+import type { ReactElement } from 'react';
+import type {
+  ReactOnRails as ReactOnRailsType,
+  RailsContext,
+  RegisteredComponent,
+  RenderFunction
+} from './types/index';
 
 import createReactElement from './createReactElement';
 import isRouterResult from './isCreateReactElementResultNonReactComponent';
 
 declare global {
   interface Window {
-      ReactOnRails?: ReactOnRailsType;
+      ReactOnRails: ReactOnRailsType;
       __REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__?: boolean;
   }
   namespace NodeJS {
     interface Global {
-        ReactOnRails?: ReactOnRailsType;
+        ReactOnRails: ReactOnRailsType;
     }
   }
   namespace Turbolinks {
@@ -44,7 +49,7 @@ function debugTurbolinks(...msg: string[]): void {
   }
 
   const context = findContext();
-  if (context.ReactOnRails.option('traceTurbolinks')) {
+  if (context.ReactOnRails && context.ReactOnRails.option('traceTurbolinks')) {
     console.log('TURBO:', ...msg);
   }
 }
@@ -53,28 +58,28 @@ function turbolinksInstalled(): boolean {
   return (typeof Turbolinks !== 'undefined');
 }
 
-function forEach(fn: Function, className: string, railsContext: RailsContext): void {
+function forEach(fn: (element: Element, railsContext: RailsContext) => void, className: string, railsContext: RailsContext): void {
   const els = document.getElementsByClassName(className);
   for (let i = 0; i < els.length; i += 1) {
     fn(els[i], railsContext);
   }
 }
 
-function forEachByAttribute(fn: Function, attributeName: string, railsContext: RailsContext): void {
+function forEachByAttribute(fn: (element: Element, railsContext: RailsContext) => void, attributeName: string, railsContext: RailsContext): void {
   const els = document.querySelectorAll(`[${attributeName}]`);
   for (let i = 0; i < els.length; i += 1) {
     fn(els[i], railsContext);
   }
 }
 
-function forEachComponent(fn: Function, railsContext: RailsContext): void {
+function forEachComponent(fn: (element: Element, railsContext: RailsContext) => void, railsContext: RailsContext): void {
   forEach(fn, 'js-react-on-rails-component', railsContext);
 }
 
-function initializeStore(el: HTMLElement, railsContext: RailsContext): void {
+function initializeStore(el: Element, railsContext: RailsContext): void {
   const context = findContext();
-  const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE);
-  const props = JSON.parse(el.textContent);
+  const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || "";
+  const props = (el.textContent !== null) ? JSON.parse(el.textContent) : {};
   const storeGenerator = context.ReactOnRails.getStoreGenerator(name);
   const store = storeGenerator(props, railsContext);
   context.ReactOnRails.setStore(name, store);
@@ -93,11 +98,11 @@ function turbolinksSupported(): boolean {
 }
 
 function delegateToRenderer(
-  componentObj: Component,
+  componentObj: RegisteredComponent,
   props: Record<string, string>,
   railsContext: RailsContext,
   domNodeId: string,
-  trace: string
+  trace: boolean
 ): boolean {
   const { name, component, isRenderer } = componentObj;
 
@@ -108,15 +113,15 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
       props, railsContext);
     }
 
-    component(props, railsContext, domNodeId);
+    (component as RenderFunction)(props, railsContext, domNodeId);
     return true;
   }
 
   return false;
 }
 
-function domNodeIdForEl(el: HTMLElement): string {
-  return el.getAttribute('data-dom-id');
+function domNodeIdForEl(el: Element): string {
+  return el.getAttribute('data-dom-id') || "";
 }
 
 /**
@@ -124,13 +129,13 @@ function domNodeIdForEl(el: HTMLElement): string {
  * delegates to a renderer registered by the user.
  * @param el
  */
-function render(el: HTMLElement, railsContext: RailsContext): Component {
+function render(el: Element, railsContext: RailsContext): void {
   const context = findContext();
   // This must match lib/react_on_rails/helper.rb
-  const name = el.getAttribute('data-component-name');
+  const name = el.getAttribute('data-component-name') || "";
   const domNodeId = domNodeIdForEl(el);
-  const props = JSON.parse(el.textContent);
-  const trace = el.getAttribute('data-trace');
+  const props = (el.textContent !== null) ? JSON.parse(el.textContent) : {};
+  const trace = el.getAttribute('data-trace') === "true";
 
   try {
     const domNode = document.getElementById(domNodeId);
@@ -157,9 +162,9 @@ function render(el: HTMLElement, railsContext: RailsContext): Component {
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);
       } else if (shouldHydrate) {
-        ReactDOM.hydrate(reactElementOrRouterResult, domNode);
+        ReactDOM.hydrate(reactElementOrRouterResult as ReactElement, domNode);
       } else {
-        ReactDOM.render(reactElementOrRouterResult, domNode);
+        ReactDOM.render(reactElementOrRouterResult as ReactElement, domNode);
       }
     }
   } catch (e) {
@@ -172,10 +177,9 @@ You should return a React.Component always for the client side entry point.`);
 function parseRailsContext(): RailsContext {
   const el = document.getElementById('js-react-on-rails-context');
   if (el) {
-    return JSON.parse(el.textContent);
+    return (el.textContent !== null) ? JSON.parse(el.textContent) : {};
   }
-
-  return null;
+  return {};
 }
 
 export function reactOnRailsPageLoaded(): void {
@@ -186,9 +190,10 @@ export function reactOnRailsPageLoaded(): void {
   forEachComponent(render, railsContext);
 }
 
-function unmount(el: HTMLElement): void {
+function unmount(el: Element): void {
   const domNodeId = domNodeIdForEl(el);
   const domNode = document.getElementById(domNodeId);
+  if(domNode === null){return;}
   try {
     ReactDOM.unmountComponentAtNode(domNode);
   } catch (e) {
@@ -199,7 +204,7 @@ function unmount(el: HTMLElement): void {
 
 function reactOnRailsPageUnloaded(): void {
   debugTurbolinks('reactOnRailsPageUnloaded');
-  forEachComponent(unmount, this);
+  forEachComponent(unmount, {});
 }
 
 function renderInit(): void {

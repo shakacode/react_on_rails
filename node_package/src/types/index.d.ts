@@ -1,21 +1,33 @@
-import { Component, Ref } from 'react';
-import { Store } from 'redux';
+import type { ReactElement, Component, FunctionComponent, ComponentClass } from 'react';
+import type { Store } from 'redux';
 
-export interface RegisteredComponent {
+type GenericObject = Record<string, string | number | boolean>;
+type ComponentVariant = FunctionComponent | ComponentClass;
+
+interface Params {
+  props?: GenericObject;
+  railsContext?: RailsContext;
+  domNodeId?: string;
+  trace?: boolean;
+}
+
+export interface RenderParams extends Params {
   name: string;
-  component: Component;
-  generatorFunction: boolean;
-  isRenderer: boolean;
+}
+
+export interface CreateParams extends Params {
+  componentObj: RegisteredComponent;
+  shouldHydrate?: boolean;
 }
 
 export interface RailsContext {
-  railsEnv: "development" | "test" | "staging" | "production";
-  inMailer: boolean;
-  i18nLocale: string;
-  i18nDefaultLocale: string;
-  rorVersion: string;
-  rorPro: boolean;
-  serverSide: boolean;
+  railsEnv?: "development" | "test" | "staging" | "production";
+  inMailer?: boolean;
+  i18nLocale?: string;
+  i18nDefaultLocale?: string;
+  rorVersion?: string;
+  rorPro?: boolean;
+  serverSide?: boolean;
   originalUrl?: string;
   href?: string;
   location?: string;
@@ -25,6 +37,32 @@ export interface RailsContext {
   pathname?: string;
   search?: string;
   httpAcceptLanguage?: string;
+}
+
+type RenderFunction = (props?: GenericObject, railsContext?: RailsContext, domNodeId?: string) => ReactElement;
+
+type ComponentOrRenderFunction = ComponentVariant | RenderFunction;
+
+type AuthenticityHeaders = {[id: string]: string} & {'X-CSRF-Token': string | null; 'X-Requested-With': string};
+
+type StoreGenerator = (props: GenericObject, railsContext: RailsContext) => Store
+
+type CREReturnTypes = {renderedHtml: string} | {redirectLocation: {pathname: string; search: string}} | {routeError: Error} | {error: Error} | ReactElement;
+
+export type { // eslint-disable-line import/prefer-default-export
+  ComponentOrRenderFunction,
+  ComponentVariant,
+  AuthenticityHeaders,
+  RenderFunction,
+  StoreGenerator,
+  CREReturnTypes
+}
+
+export interface RegisteredComponent {
+  name: string;
+  component: ComponentOrRenderFunction;
+  generatorFunction: boolean;
+  isRenderer: boolean;
 }
 
 interface FileError extends Error {
@@ -39,35 +77,28 @@ export interface ErrorOptions {
   serverSide: boolean;
 }
 
-export interface RenderParams {
-  name?: string;
-  componentObj: Component;
-  props: Record<string, string>;
-  railsContext?: RailsContext;
-  domNodeId?: string;
-  trace?: string;
-  shouldHydrate?: boolean;
-}
-
 export interface ReactOnRails {
-  register(components: { [id: string]: Component }): void;
-  registerStore(stores: { [id: string]: Function }): void;
-  getStore(name: string, throwIfMissing: boolean): Store;
+  register(components: { [id: string]: ComponentOrRenderFunction }): void;
+  registerStore(stores: { [id: string]: Store }): void;
+  getStore(name: string, throwIfMissing: boolean): Store | undefined;
   setOptions(newOptions: {traceTurbolinks: boolean}): void;
   reactOnRailsPageLoaded(): void;
-  authenticityToken(): string;
-  authenticityHeaders(otherHeaders: { [id: string]: string }): {[id: string]: string} & {'X-CSRF-Token': string; 'X-Requested-With': string};
+  authenticityToken(): string | null;
+  authenticityHeaders(otherHeaders: { [id: string]: string }): AuthenticityHeaders;
   option(key: string): string | number | boolean | undefined;
   getStoreGenerator(name: string): Function;
   setStore(name: string, store: Store): void;
   clearHydratedStores(): void;
-  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): Ref;
+  render(
+    name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean
+  ): void | Element | Component;
   getComponent(name: string): RegisteredComponent;
   serverRenderReactComponent(options: RenderParams): string;
   handleError(options: ErrorOptions): string | undefined;
   buildConsoleReplay(): string;
-  registeredComponents(): Map<string, Component>;
+  registeredComponents(): Map<string, RegisteredComponent>;
   storeGenerators(): Map<string, Function>;
   stores(): Map<string, Store>;
   resetOptions(): void;
+  options: GenericObject;
 }

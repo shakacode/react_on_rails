@@ -1,6 +1,6 @@
 import ReactDOM from 'react-dom';
-import { Component, Ref } from 'react';
-import { Store } from 'redux';
+import type { ReactElement, Component } from 'react';
+import type { Store } from 'redux';
 
 import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
@@ -11,21 +11,33 @@ import buildConsoleReplay from './buildConsoleReplay';
 import createReactElement from './createReactElement';
 import Authenticity from './Authenticity';
 import context from './context';
-import { RegisteredComponent, RenderParams, ErrorOptions } from './types/index';
+import type {
+  RegisteredComponent,
+  RenderParams,
+  ErrorOptions,
+  ComponentOrRenderFunction,
+  AuthenticityHeaders,
+  StoreGenerator
+} from './types/index';
 
 const ctx = context();
+
+if (ctx === undefined) {
+  throw new Error("The context (usually Window or NodeJS's Global) is undefined.");
+}
 
 const DEFAULT_OPTIONS = {
   traceTurbolinks: false,
 };
 
 ctx.ReactOnRails = {
+  options: {},
   /**
    * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
    * find you components for rendering.
    * @param components (key is component name, value is component)
    */
-  register(components: { [id: string]: Component }): void {
+  register(components: { [id: string]: ComponentOrRenderFunction }): void {
     ComponentRegistry.register(components);
   },
 
@@ -35,7 +47,7 @@ ctx.ReactOnRails = {
    * the setStore API is different in that it's the actual store hydrated with props.
    * @param stores (keys are store names, values are the store generators)
    */
-  registerStore(stores: { [id: string]: Function }): void {
+  registerStore(stores: { [id: string]: Store }): void {
     if (!stores) {
       throw new Error('Called ReactOnRails.registerStores with a null or undefined, rather than ' +
         'an Object with keys being the store names and the values are the store generators.');
@@ -53,7 +65,7 @@ ctx.ReactOnRails = {
    *        there is no store with the given name.
    * @returns Redux Store, possibly hydrated
    */
-  getStore(name: string, throwIfMissing = true): Store {
+  getStore(name: string, throwIfMissing = true): Store | undefined {
     return StoreRegistry.getStore(name, throwIfMissing);
   },
 
@@ -92,7 +104,7 @@ ctx.ReactOnRails = {
    * @returns String or null
    */
 
-  authenticityToken(): string {
+  authenticityToken(): string | null {
     return Authenticity.authenticityToken();
   },
 
@@ -102,9 +114,7 @@ ctx.ReactOnRails = {
    * @returns {*} header
    */
 
-  authenticityHeaders(
-    otherHeaders: { [id: string]: string } = {}
-  ): { [id: string]: string } & { 'X-CSRF-Token': string; 'X-Requested-With': string } {
+  authenticityHeaders(otherHeaders: { [id: string]: string } = {}): AuthenticityHeaders {
     return Authenticity.authenticityHeaders(otherHeaders);
   },
 
@@ -127,7 +137,7 @@ ctx.ReactOnRails = {
    * @param name
    * @returns Redux Store generator function
    */
-  getStoreGenerator(name: string): Function {
+  getStoreGenerator(name: string): StoreGenerator {
     return StoreRegistry.getStoreGenerator(name);
   },
 
@@ -161,13 +171,13 @@ ctx.ReactOnRails = {
    * @param hydrate Pass truthy to update server rendered html. Default is falsy
    * @returns {virtualDomElement} Reference to your component's backing instance
    */
-  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): Ref {
+  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): void | Element | Component {
     const componentObj = ComponentRegistry.get(name);
     const reactElement = createReactElement({ componentObj, props, domNodeId });
 
     const render = hydrate ? ReactDOM.hydrate : ReactDOM.render;
     // eslint-disable-next-line react/no-render-return-value
-    return render(reactElement, document.getElementById(domNodeId));
+    return render(reactElement as ReactElement, document.getElementById(domNodeId));
   },
 
   /**
@@ -206,7 +216,7 @@ ctx.ReactOnRails = {
    * Get an Object containing all registered components. Useful for debugging.
    * @returns {*}
    */
-  registeredComponents(): Map<string, Component> {
+  registeredComponents(): Map<string, RegisteredComponent> {
     return ComponentRegistry.components();
   },
 

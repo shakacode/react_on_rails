@@ -25,7 +25,7 @@ export function consoleReplay(): string {
         val = `${e.message}: ${arg}`;
       }
 
-      return scriptSanitizedVal(val);
+      return scriptSanitizedVal(val as string);
     });
 
     return `console.${msg.level}.apply(console, ${JSON.stringify(stringifiedList)});`;

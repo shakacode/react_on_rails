@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOMServer from 'react-dom/server';
-import { ErrorOptions } from './types/index';
+import type { ErrorOptions } from './types/index';
 
 function handleGeneratorFunctionIssue(options: {e: Error; name?: string}): string {
   const { e, name } = options;
@@ -36,7 +36,7 @@ component '${name}' is not a generator function.\n${lastLine}`;
   return msg;
 }
 
-const handleError = (options: ErrorOptions): string | undefined => {
+const handleError = (options: ErrorOptions): string => {
   const { e, jsCode, serverSide } = options;
 
   console.error('Exception in rendering!');
@@ -65,7 +65,7 @@ ${e.stack}`;
     return ReactDOMServer.renderToString(reactElement);
   }
 
-  return undefined;
+  return "undefined";
 };
 
 export default handleError;
