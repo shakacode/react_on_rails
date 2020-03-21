@@ -1,11 +1,10 @@
 import type { ReactElement, Component, FunctionComponent, ComponentClass } from 'react';
 import type { Store } from 'redux';
 
-type GenericObject = Record<string, string | number | boolean>;
 type ComponentVariant = FunctionComponent | ComponentClass;
 
 interface Params {
-  props?: GenericObject;
+  props?: {};
   railsContext?: RailsContext;
   domNodeId?: string;
   trace?: boolean;
@@ -39,13 +38,13 @@ export interface RailsContext {
   httpAcceptLanguage?: string;
 }
 
-type RenderFunction = (props?: GenericObject, railsContext?: RailsContext, domNodeId?: string) => ReactElement;
+type RenderFunction = (props?: {}, railsContext?: RailsContext, domNodeId?: string) => ReactElement;
 
 type ComponentOrRenderFunction = ComponentVariant | RenderFunction;
 
 type AuthenticityHeaders = {[id: string]: string} & {'X-CSRF-Token': string | null; 'X-Requested-With': string};
 
-type StoreGenerator = (props: GenericObject, railsContext: RailsContext) => Store
+type StoreGenerator = (props: {}, railsContext: RailsContext) => Store
 
 type CREReturnTypes = {renderedHtml: string} | {redirectLocation: {pathname: string; search: string}} | {routeError: Error} | {error: Error} | ReactElement;
 
@@ -100,5 +99,5 @@ export interface ReactOnRails {
   storeGenerators(): Map<string, Function>;
   stores(): Map<string, Store>;
   resetOptions(): void;
-  options: GenericObject;
+  options: Record<string, string | number | boolean>;
 }

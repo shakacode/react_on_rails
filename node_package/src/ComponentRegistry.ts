@@ -1,4 +1,4 @@
-import type { RegisteredComponent, ComponentOrRenderFunction } from './types/index';
+import type { RegisteredComponent, ComponentOrRenderFunction, RenderFunction } from './types/index';
 import generatorFunction from './generatorFunction';
 
 const registeredComponents = new Map();
@@ -19,7 +19,7 @@ export default {
       }
 
       const isGeneratorFunction = generatorFunction(component);
-      const isRenderer = isGeneratorFunction && (component as Function).length === 3;
+      const isRenderer = isGeneratorFunction && (component as RenderFunction).length === 3;
 
       registeredComponents.set(name, {
         name,
