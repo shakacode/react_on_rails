@@ -72,7 +72,7 @@ function forEachByAttribute(fn: (element: Element, railsContext: RailsContext) =
   }
 }
 
-function forEachComponent(fn: (element: Element, railsContext: RailsContext) => void, railsContext: RailsContext): void {
+function forEachComponent(fn: (element: Element, railsContext: RailsContext) => void, railsContext: RailsContext = {}): void {
   forEach(fn, 'js-react-on-rails-component', railsContext);
 }
 
@@ -204,7 +204,7 @@ function unmount(el: Element): void {
 
 function reactOnRailsPageUnloaded(): void {
   debugTurbolinks('reactOnRailsPageUnloaded');
-  forEachComponent(unmount, {});
+  forEachComponent(unmount);
 }
 
 function renderInit(): void {

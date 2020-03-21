@@ -68,7 +68,7 @@
     "build": "yarn run clean && yarn run tsc",
     "build-watch": "babel --watch --out-dir node_package/lib node_package/src",
     "lint": "eslint --ext '.js,.ts' .",
-    "check": "yarn run lint && yarn run test",
+    "check": "yarn run lint && yarn run test && yarn run type-check",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",
     "prerelease": "yarn run check && yarn run clean && yarn run build",
     "release:patch": "node_package/scripts/release patch",
