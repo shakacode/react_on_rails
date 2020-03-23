@@ -4,11 +4,11 @@ language: ruby
 
 rvm:
   # Rails 5 requires 2.2
-  - 2.3.8
-  - 2.4.5
   - 2.5.3
-  - 2.6.0
-  - 2.2.10
+  - 2.6.5
+  - 2.7.0
+  - 2.2.10 # remove with another PR which is for removing dummy_no_webpacker from project
+
 services:
   - docker
 
@@ -37,7 +37,7 @@ before_install:
   - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen scn 1600x1200x16"
 
 install:
-  - travis_retry gem install bundler -v '<2' # Ruby 2.2 and Rails 3.2 & 4.2 depend on bundler 1.x.
+  - travis_retry gem install bundler -v '<2' # Ruby 2.2 and Rails 3.2 & 4.2 depend on bundler 1.x. This too should be updated to >2 after removing Ruby 2.2
   - travis_retry nvm install 8.16.0
   - node -v
   - travis_retry npm i -g yarn
@@ -55,13 +55,11 @@ script:
 matrix:
   exclude:
     - gemfile: spec/dummy_no_webpacker/Gemfile.rails32
-      rvm: 2.3.8
-    - gemfile: spec/dummy_no_webpacker/Gemfile.rails32
-      rvm: 2.4.5
-    - gemfile: spec/dummy_no_webpacker/Gemfile.rails32
       rvm: 2.5.3
     - gemfile: spec/dummy_no_webpacker/Gemfile.rails32
-      rvm: 2.6.0
+      rvm: 2.6.5
+    - gemfile: spec/dummy_no_webpacker/Gemfile.rails32
+      rvm: 2.7.0
     - gemfile: spec/dummy/Gemfile
       rvm: 2.2.10
 
