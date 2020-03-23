@@ -7,6 +7,7 @@ Because the renderer communicates over a port to the server, you can start a ren
 1. Open another console tab and run `RENDERER_LOG_LEVEL=debug yarn start`
 1. Reload the browser page that causes the renderer issue. You can then update the JS code, and restart the `yarn start` to run the renderer with the new code.
 1. Be sure to restart the rails server if you change any ruby code in loaded gems.
+1. Note, the default setup for spec/dummy to reference the pro renderer is to use yalc, which may or may not be using a link, which means that you have to re-run yarn to get the files updated when changing the renderer.  
 
 # Debugging Tape Tests
 ## Using Webstorm

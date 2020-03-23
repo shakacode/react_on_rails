@@ -17,6 +17,7 @@ Here are the options available for the JavaScript renderer configuration object,
 1. **allWorkersRestartInterval** (default: `env.RENDERER_ALL_WORKERS_RESTART_INTERVAL`) - Interval in minutes between scheduled restarts of all cluster of workers. By default restarts are not enabled. If restarts are enabled, `delayBetweenIndividualWorkerRestarts` should also be set.
 1. **delayBetweenIndividualWorkerRestarts** (default: `env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`) - Interval in minutes between individual worker restarts (when cluster restart is triggered). By default restarts are not enabled. If restarts are enabled, `allWorkersRestartInterval` should also be set.
 1. **honeybadgerApiKey** - (default: `env.HONEYBADGER_API_KEY`) - If you want errors on the VM Renderer to be sent to Honeybadger, set this value.
+1. **supportModules** - (default: `env.RENDERER_SUPPORT_MODULES || null`) - Should be set to `true` to allow the server-bundle code to see require, exports, etc. `false` is like the ExecJS behavior.
 
 ## Example Launch Files
 

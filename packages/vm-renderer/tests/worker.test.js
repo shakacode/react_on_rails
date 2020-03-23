@@ -11,9 +11,11 @@ const {
   vmBundlePath,
   getFixtureBundle,
   getFixtureAsset,
+  getOtherFixtureAsset,
   createAsset,
   bundlePath,
   assetPath,
+  assetPathOther,
 } = require('./helper');
 
 const testName = 'worker';
@@ -36,7 +38,7 @@ describe('express worker', () => {
   });
 
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest when bundle is provided and did not yet exist', async done => {
-    expect.assertions(4);
+    expect.assertions(6);
 
     const app = worker({
       bundlePath: bundlePathForTest(),
@@ -49,11 +51,15 @@ describe('express worker', () => {
       .field('gemVersion', gemVersion)
       .field('protocolVersion', protocolVersion)
       .attach('bundle', getFixtureBundle())
+      .attach('asset1', getFixtureAsset())
+      .attach('asset2', getOtherFixtureAsset())
       .end((_err, res) => {
         expect(res.headers['cache-control']).toBe('public, max-age=31536000');
         expect(res.status).toBe(200);
         expect(res.body).toEqual({ html: 'Dummy Object' });
         expect(fs.existsSync(vmBundlePath(testName))).toEqual(true);
+        expect(fs.existsSync(assetPath(testName))).toEqual(true);
+        expect(fs.existsSync(assetPathOther(testName))).toEqual(true);
         done();
       });
   });
@@ -227,23 +233,25 @@ describe('express worker', () => {
       });
   });
 
-  test('post /upload-asset', async done => {
-    expect.assertions(2);
+  test('post /upload-assets', async done => {
+    expect.assertions(3);
     const app = worker({
       bundlePath: bundlePathForTest(),
       password: 'my_password',
     });
 
     request(app)
-      .post(`/upload-asset`)
+      .post(`/upload-assets`)
       .type('json')
       .field('gemVersion', gemVersion)
       .field('protocolVersion', protocolVersion)
       .field('password', 'my_password')
-      .attach('asset', getFixtureAsset())
+      .attach('asset1', getFixtureAsset())
+      .attach('asset2', getOtherFixtureAsset())
       .end((_err, res) => {
         expect(res.status).toBe(200);
         expect(fs.existsSync(assetPath(testName))).toEqual(true);
+        expect(fs.existsSync(assetPathOther(testName))).toEqual(true);
         done();
       });
   });

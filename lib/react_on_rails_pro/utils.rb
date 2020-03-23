@@ -15,19 +15,7 @@ module ReactOnRailsPro
     def self.copy_assets
       return if ReactOnRailsPro.configuration.assets_to_copy.blank?
 
-      ReactOnRailsPro.configuration.assets_to_copy.each do |asset|
-        response = ReactOnRailsPro::Request.upload_asset(
-          asset[:filepath].to_s, asset[:content_type]
-        )
-
-        next if response.code == "200"
-
-        raise ReactOnRailsPro::Error, "Error occurred when uploading asset.\n"\
-        "response.code = #{response.code}"\
-        "filepath: #{asset[:filepath]}, content_type: #{asset[:content_type]}"\
-        "Error:\n#{response.body}"
-      end
-      true
+      ReactOnRailsPro::Request.upload_assets
     end
 
     # Returns a string which should be used as a component in any cache key for
@@ -103,6 +91,19 @@ module ReactOnRailsPro
       end
 
       result
+    end
+
+    def self.common_form_data
+      {
+        "gemVersion" => ReactOnRailsPro::VERSION,
+        "protocolVersion" => "1.0.0",
+        "password" => ReactOnRailsPro.configuration.renderer_password
+      }
+    end
+
+    def self.mine_type_from_file_name(filename)
+      extension = File.extname(filename)
+      Rack::Mime.mime_type(extension)
     end
   end
 end

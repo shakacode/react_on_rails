@@ -3,6 +3,9 @@ by ShakaCode
 
 *Last updated June 13, 2019*
 
+# Deprecated
+Please, see new doc about how to setup code splitting with loadable components.
+
 # Introduction
 
 Webpack has an interesting feature called dynamic code-splitting, which automatically breaks the bundle into parts where the `import ()` function is used.

@@ -17,6 +17,7 @@ See [docs/installation.md](../installation.md).
     * `RENDERER_PASSWORD`
     * `RENDERER_ALL_WORKERS_RESTART_INTERVAL`
     * `RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`
+    * `RENDERER_SUPPORT_MODULES`
 2. Configure ENV values and run the command. Note, you can set port with args `-p <PORT>`. For example, assuming vm-renderer is in your path:
    ```
    RENDERER_BUNDLE_PATH=/tmp/bundle-path vm-renderer
@@ -67,7 +68,7 @@ ReactOnRailsPro.configure do |config|
  # when this ENV value is not defined, the local server at localhost:3800 is used 
  config.renderer_url = ENV["REACT_RENDERER_URL"] 
 end
-```  
+```
 
 ## Troublshooting
 

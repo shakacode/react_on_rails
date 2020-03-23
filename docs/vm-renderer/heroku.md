@@ -52,32 +52,25 @@ Any task in client/package.json that starts the vm-renderer
 
 To avoid the initial round trip to get a bundle on the renderer, you can do something like this to copy the file during precompile.
 
-Note, this is a sample. You'll have to configure for your paths used in your renderer setup.
+See [lib/tasks/assets.rake](../lib/tasks/assets.rake) for a couple tasks that you can use.
 
-Create `lib/tasks/assets.rake`:
+If you're using the default tmp/bundles subdirectory for the vm-renderer, you don't need to set the ENV value for `RENDERER_BUNDLE_PATH`.
+
+
+Then you can use the rake task: `react_on_rails_pro:pre_stage_bundle_for_vm_renderer`. 
+
+You might do something like this:
 
 ```ruby
 Rake::Task["assets:precompile"]
     .clear_prerequisites
     .enhance([:environment, "react_on_rails:assets:compile_environment"])
     .enhance do
-  Rake::Task["react_on_rails:assets:symlink_non_digested_assets"].invoke
-  Rake::Task["react_on_rails:assets:delete_broken_symlinks"].invoke
-  Rake::Task["react_on_rails:assets:pre_stage_bundle_for_vm_renderer"].invoke
-end
-
-namespace :react_on_rails do
-  namespace :assets do
-    task :pre_stage_bundle_for_vm_renderer => :environment do
-      src_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
-      renderer_bundle_file_name = ReactOnRailsPro::ServerRenderingPool::VmRenderingPool.renderer_bundle_file_name
-      dest_path = Rails.root.join('tmp', 'vm-renderer-bundles', "#{renderer_bundle_file_name}").to_s
-      mkdir_p Rails.root.join("tmp", "vm-renderer-bundles")
-      cp src_bundle_path, dest_path
-    end
-  end
+  Rake::Task["react_on_rails:assets:react_on_rails_pro:pre_stage_bundle_for_vm_renderer"].invoke
 end
 ```
+
+Alternatively, if you have some custom path, take a look at the source of  [lib/tasks/assets.rake](../lib/tasks/assets.rake) for some inspiration.
 
 ## References
 

@@ -4,8 +4,6 @@
  */
 
 const path = require('path');
-const fs = require('fs');
-const { promisify } = require('util');
 const cluster = require('cluster');
 const express = require('express');
 const busBoy = require('express-busboy');
@@ -19,11 +17,14 @@ const fileExistsAsync = require('./shared/fileExistsAsync');
 const checkProtocolVersion = require('./worker/checkProtocolVersionHandler');
 const authenticate = require('./worker/authHandler');
 const handleRenderRequest = require('./worker/handleRenderRequest');
-const { errorResponseResult, formatExceptionMessage, workerIdLabel } = require('./shared/utils');
+const {
+  errorResponseResult,
+  formatExceptionMessage,
+  workerIdLabel,
+  moveUploadedAssets,
+} = require('./shared/utils');
 const errorReporter = require('./shared/errorReporter');
 const { lock, unlock } = require('./shared/locks');
-
-const fsCopyFileAsync = promisify(fs.copyFile);
 
 function setHeaders(headers, res) {
   Object.keys(headers).forEach(key => res.set(key, headers[key]));
@@ -104,10 +105,11 @@ module.exports = function run(config) {
 
       const { renderingRequest } = req.body;
       const { bundleTimestamp } = req.params;
-      const { bundle: providedNewBundle } = req.files;
+      const { bundle: providedNewBundle, ...assetsToCopyObj } = req.files;
 
       try {
-        handleRenderRequest({ renderingRequest, bundleTimestamp, providedNewBundle })
+        const assetsToCopy = Object.values(assetsToCopyObj);
+        handleRenderRequest({ renderingRequest, bundleTimestamp, providedNewBundle, assetsToCopy })
           .then(result => {
             setResponse(result, res);
           })
@@ -133,31 +135,32 @@ module.exports = function run(config) {
   // There can be additional files that might be required
   // in the runtime. Since remote renderer doesn't contain
   // any assets, they must be uploaded manually.
-  app.route('/upload-asset').post(
+  app.route('/upload-assets').post(
     asyncHandler(async (req, res, _next) => {
       if (!requestPrechecks(req, res)) {
         return;
       }
       let lockAcquired;
       let lockfileName;
-      const { asset } = req.files;
-      const description = `Uploading file ${asset.filename}`;
+      const assets = Object.values(req.files);
+      const assetsDescription = JSON.stringify(assets.map(asset => asset.filename));
+      const taskDescription = `Uploading files ${assetsDescription} to ${bundlePath}`;
       try {
-        const { lockfileName: name, wasLockAcquired, errorMessage } = await lock(asset.filename);
+        const { lockfileName: name, wasLockAcquired, errorMessage } = await lock('transferring-assets');
         lockfileName = name;
         lockAcquired = wasLockAcquired;
 
         if (!lockAcquired) {
           const msg = formatExceptionMessage(
-            description,
+            taskDescription,
             errorMessage,
             `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
           );
           setResponse(errorResponseResult(msg), res);
         } else {
-          log.info(`Uploading asset ${asset.filename} to ${bundlePath}`);
+          log.info(taskDescription);
           try {
-            await fsCopyFileAsync(asset.file, path.join(bundlePath, asset.filename));
+            await moveUploadedAssets(assets);
             setResponse(
               {
                 status: 200,
@@ -166,7 +169,7 @@ module.exports = function run(config) {
               res,
             );
           } catch (err) {
-            const message = `ERROR when trying to copy asset. ${err}`;
+            const message = `ERROR when trying to copy assets. ${err}. Task: ${taskDescription}`;
             log.info(message);
             setResponse(errorResponseResult(message), res);
           }
@@ -177,7 +180,7 @@ module.exports = function run(config) {
             await unlock(lockfileName);
           } catch (error) {
             const msg = formatExceptionMessage(
-              description,
+              taskDescription,
               error,
               `Error unlocking ${lockfileName} from worker ${workerIdLabel()}.`,
             );

@@ -2,10 +2,7 @@
 rails: rails s
 
 # Build client assets, watching for changes.
-rails-client-assets: sh -c 'rm -rf public/webpack/development/*' || true && sh -c 'yarn run build:dev:client'
-
-# Build server assets, watching for changes. Remove if not server rendering.
-rails-server-assets: sh -c 'yarn run build:dev:server'
+rails-client-assets: yarn run build:dev:watch
 
 # Start Node server for server rendering.
 vm-renderer: yarn run vm-renderer
