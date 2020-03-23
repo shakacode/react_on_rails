@@ -6,7 +6,8 @@ All notable changes to this project will be documented in this file. Items under
 
 ## [1.5.0] - 2020-03-17
 ### Added
-- Added support for loadable components SSR [PR 112](https://github.com/shakacode/react_on_rails_pro/pull/112) by [ashgaliyev](https://github.com/ashgaliyev) and [justin808](https://github.com/justin808).
+- Added support for loadable components SSR [PR 112](https://github.com/shakacode/react_on_rails_pro/pull/112) and [PR 118](https://github.com/shakacode/react_on_rails_pro/pull/118) by [ashgaliyev](https://github.com/ashgaliyev) and [justin808](https://github.com/justin808).
+- New option added to the vm-renderer: `supportModules`. This setting is necessary for using [loadable-components](https://github.com/gregberge/loadable-components/). See [Server-side rendering with code-splitting using Loadable/Components](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/code-splitting-loadable-components.md) for more detailss.
 
 ### Changed
 - Updated to bundler V2. [PR 114](https://github.com/shakacode/react_on_rails_pro/pull/114) by [justin808](https://github.com/justin808).
