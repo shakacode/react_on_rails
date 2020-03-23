@@ -30,6 +30,8 @@ module ReactOnRailsPro
           end
         end
 
+        # TODO: This request digest is probably no longer needed
+        # See https://github.com/shakacode/react_on_rails_pro/issues/119
         def set_request_digest_on_render_options(js_code, render_options)
           return unless render_options.request_digest.blank?
 

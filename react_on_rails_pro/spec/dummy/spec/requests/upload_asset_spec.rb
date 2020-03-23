@@ -3,37 +3,64 @@
 require "rails_helper"
 
 describe "Upload asset", if: ENV["SERVER_RENDERER"] != "ExecJS" do
-  let(:fixture_path) { File.expand_path("./spec/fixtures/loadable-stats.json") }
-  let(:non_exist_fixture_path) { File.expand_path("./spec/fixtures/sample99.json") }
   let(:asset_filename) { "loadable-stats.json" }
+  let(:asset_filename2) { "loadable-stats2.json" }
+  let(:fixture_path) { File.expand_path("./spec/fixtures/#{asset_filename}") }
+  let(:fixture_path2) { File.expand_path("./spec/fixtures/#{asset_filename2}") }
+  let(:non_exist_fixture_path) { File.expand_path("./spec/fixtures/sample99.json") }
   let(:asset_path_expanded) { File.expand_path(asset_filename, "#{__dir__}/../../tmp/bundles") }
+  let(:asset_path_expanded2) { File.expand_path(asset_filename2, "#{__dir__}/../../tmp/bundles") }
   before(:each) do
+    dbl_configuration = double("configuration",
+                               server_renderer: "VmRenderer",
+                               renderer_password: "myPassword1",
+                               renderer_url: "http://localhost:3800",
+                               assets_to_copy: [
+                                 Rails.root.join("public", "webpack", "production", "loadable-stats.json"),
+                                 Rails.root.join("public", "webpack", "production", "loadable-stats2.json")
+                               ])
+    allow(ReactOnRailsPro).to receive(:configuration).and_return(dbl_configuration)
+    FileUtils.mkdir_p(Rails.root.join("public", "webpack", "production"))
     File.delete(asset_path_expanded) if File.exist?(asset_path_expanded)
+    File.delete(asset_path_expanded2) if File.exist?(asset_path_expanded2)
   end
 
-  it "copying asset to public folder" do
-    expect(asset_exist_on_renderer?).to eq(false)
-    response = ReactOnRailsPro::Request.upload_asset(fixture_path, "application/json")
-    expect(response.code).to eq("200")
-    expect(asset_exist_on_renderer?).to eq(true)
+  context("assets exist") do
+    before(:each) do
+      FileUtils.cp(fixture_path, Rails.root.join("public", "webpack", "production", asset_filename))
+      FileUtils.cp(fixture_path2, Rails.root.join("public", "webpack", "production", asset_filename2))
+    end
+
+    it "copying asset to public folder" do
+      expect(asset_exist_on_renderer?(asset_filename)).to eq(false)
+      expect(asset_exist_on_renderer?(asset_filename2)).to eq(false)
+      response = ReactOnRailsPro::Request.upload_assets
+      expect(response.code).to eq("200")
+      expect(asset_exist_on_renderer?(asset_filename)).to eq(true)
+      expect(asset_exist_on_renderer?(asset_filename2)).to eq(true)
+    end
+
+    it "throws error if can't connect to vm-renderer" do
+      WebMock.disable_net_connect!(allow_localhost: false)
+      stub_request(:any, /upload-assets/).to_timeout
+      expect do
+        ReactOnRailsPro::Request.upload_assets
+      end.to raise_exception(ReactOnRailsPro::Error)
+      WebMock.allow_net_connect!
+    end
   end
 
-  it "throws error if asset not found" do
-    expect do
-      ReactOnRailsPro::Request.upload_asset(non_exist_fixture_path, "application/json")
-    end.to raise_error("Asset not found #{non_exist_fixture_path}")
+  context("assets not existing") do
+    it "throws error if asset not found" do
+      first_asset_path = Rails.root.join("public", "webpack", "production", asset_filename)
+      File.delete(first_asset_path) if File.exist?(first_asset_path)
+      expect do
+        ReactOnRailsPro::Request.upload_assets
+      end.to raise_error("Asset not found #{first_asset_path}")
+    end
   end
 
-  it "throws error if can't connect to vm-renderer" do
-    WebMock.disable_net_connect!(allow_localhost: false)
-    stub_request(:any, /upload-asset/).to_timeout
-    expect do
-      ReactOnRailsPro::Request.upload_asset(fixture_path, "application/json")
-    end.to raise_exception(ReactOnRailsPro::Error)
-    WebMock.allow_net_connect!
-  end
-
-  def asset_exist_on_renderer?
-    ReactOnRailsPro::Request.asset_exists_on_vm_renderer?(asset_filename)
+  def asset_exist_on_renderer?(filename)
+    ReactOnRailsPro::Request.asset_exists_on_vm_renderer?(filename)
   end
 end

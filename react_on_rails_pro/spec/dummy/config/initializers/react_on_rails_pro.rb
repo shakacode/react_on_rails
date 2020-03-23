@@ -8,8 +8,9 @@ ReactOnRailsPro.configure do |config|
   # Used to turn off the VmRenderer during on CI workflow
   config.server_renderer = ENV["SERVER_RENDERER"].presence || "VmRenderer"
 
-  # Setting the password myPasssword1 after the leading `:` and before the `@`
-  config.renderer_url = "http://:myPassword1@localhost:3800"
+  config.renderer_password = "myPassword1"
+
+  config.renderer_url = "http://localhost:3800"
 
   # Set this to false specs fail if remote renderer is not available. We want to ensure
   # that the remote renderer works for CI.
@@ -30,10 +31,11 @@ ReactOnRailsPro.configure do |config|
   # Rails server, but not the renderer server.
   # This option allows a remote vm renderer (not localhost)
   # to have assets copied to the  vm-renderer instance right after assets:precompile task.
-  # Value should be an Array of Hashes, with each Hash containing 2 keys:
-  # file_path and content_type, like "application/json"
+  # The value should be an Array of file_paths. The files should have extensions to resolve the
+  # content types, such as "application/json".
+  #
+  # Note, for spec/dummy, manifest.json is just used for testing
   config.assets_to_copy = [
-    { filepath: Rails.root.join("public", "webpack", "production", "loadable-stats.json"),
-      content_type: "application/json" }
+    Rails.root.join("public", "webpack", Rails.env, "manifest.json")
   ]
 end

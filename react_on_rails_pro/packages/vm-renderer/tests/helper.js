@@ -14,13 +14,18 @@ const { buildConfig } = require('../src/shared/configBuilder');
 exports.BUNDLE_TIMESTAMP = 1495063024898;
 
 exports.ASSET_UPLOAD_FILE = 'loadable-stats.json';
+exports.ASSET_UPLOAD_OTHER_FILE = 'loadable-stats-other.json';
 
 exports.getFixtureBundle = function getFixtureBundle() {
   return path.resolve(__dirname, './fixtures/bundle.js');
 };
 
 exports.getFixtureAsset = function getFixtureAsset() {
-  return path.resolve(__dirname, './fixtures/loadable-stats.json');
+  return path.resolve(__dirname, `./fixtures/${exports.ASSET_UPLOAD_FILE}`);
+};
+
+exports.getOtherFixtureAsset = function getOtherFixtureAsset() {
+  return path.resolve(__dirname, `./fixtures/${exports.ASSET_UPLOAD_OTHER_FILE}`);
 };
 
 exports.bundlePath = function bundlePath(testName) {
@@ -60,6 +65,10 @@ exports.vmBundlePath = function vmBundlePath(testName) {
 
 exports.assetPath = function assetPath(testName) {
   return path.resolve(exports.bundlePath(testName), exports.ASSET_UPLOAD_FILE);
+};
+
+exports.assetPathOther = function assetPathOther(testName) {
+  return path.resolve(exports.bundlePath(testName), exports.ASSET_UPLOAD_OTHER_FILE);
 };
 
 exports.createUploadedBundle = async function createUploadedBundle(testName) {

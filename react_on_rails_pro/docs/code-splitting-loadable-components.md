@@ -1,7 +1,7 @@
 # Server-side rendering with code-splitting using Loadable/Components
 by ShakaCode
 
-*Last updated February 23, 2020*
+*Last updated March 17, 2020*
 
 ## Introduction
 The [React library recommends](https://loadable-components.com/docs/getting-started/) the use of React.lazy for code splitting with dynamic imports except
@@ -17,7 +17,7 @@ team no longer recommends that library. The new way is far preferable.
 yarn add  @loadable/babel-plugin @loadable/component @loadable/server @loadable/webpack-plugin
 ```
 
-Short description:
+### Summary
 - [`@loadable/babel-plugin`](https://loadable-components.com/docs/getting-started/) - The plugin transforms your code to be ready for Server Side Rendering. 
 - `@loadable/component` - Main library for creating loadable components.
 - `@loadable/server` - Has functions for collecting chunks and provide style, script, link tags for the server.
@@ -178,6 +178,23 @@ const ServerApp = (props, railsContext) => {
 ReactOnRails.register({
   App: ServerApp,
 });
+```
+
+## Configure react_on_rails_pro
+
+In your `vm-renderer.js` file which runs node renderer, you need to specify `supportModules` options as follows:
+```js
+const path = require('path');
+const env = process.env;
+const { reactOnRailsProVmRenderer } = require('react-on-rails-pro-vm-renderer');
+
+const config = {
+  ...
+  supportModules: env.RENDERER_SUPPORT_MODULES || null,
+};
+...
+
+reactOnRailsProVmRenderer(config);
 ```
 
 ## Rails View

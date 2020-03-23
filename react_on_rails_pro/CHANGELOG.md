@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [1.5.0] - 2020-03-17
+### Added
+- Added support for loadable components SSR [PR 112](https://github.com/shakacode/react_on_rails_pro/pull/112) by [ashgaliyev](https://github.com/ashgaliyev) and [justin808](https://github.com/justin808).
+
+### Changed
+- Updated to bundler V2. [PR 114](https://github.com/shakacode/react_on_rails_pro/pull/114) by [justin808](https://github.com/justin808).
+- Updated spec dummy. [PR 115](https://github.com/shakacode/react_on_rails_pro/pull/115) by [justin808](https://github.com/justin808).
+
 ## [1.4.4] - 2019-06-10
 
 ### Fixed
@@ -86,7 +94,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.4...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.0...HEAD
+[1.5.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.4...1.5.0
 [1.4.4]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.3...1.4.4
 [1.4.3]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.2...1.4.3
 [1.4.2]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.1...1.4.2

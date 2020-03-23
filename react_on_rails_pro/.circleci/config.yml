@@ -279,9 +279,9 @@ jobs:
       - store_test_results:
           path: ~/rspec
       - store_artifacts:
-          path: tmp/capybara
+          path: spec/dummy/tmp/capybara
       - store_artifacts:
-          path: log/test.log
+          path: spec/dummy/log/test.log
       - store_artifacts:
           path: spec/dummy/yarn-error.log
 
@@ -312,9 +312,9 @@ jobs:
       - store_test_results:
           path: ~/rspec
       - store_artifacts:
-          path: tmp/capybara
+          path: spec/dummy/tmp/capybara
       - store_artifacts:
-          path: log/test.log
+          path: spec/dummy/log/test.log
       - store_artifacts:
           path: spec/dummy/yarn-error.log
 

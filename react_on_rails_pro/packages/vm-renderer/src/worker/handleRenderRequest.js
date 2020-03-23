@@ -12,7 +12,12 @@ const fsExtra = require('fs-extra');
 const { lock, unlock } = require('../shared/locks');
 const fileExistsAsync = require('../shared/fileExistsAsync');
 const log = require('../shared/log');
-const { formatExceptionMessage, errorResponseResult, workerIdLabel } = require('../shared/utils');
+const {
+  formatExceptionMessage,
+  errorResponseResult,
+  workerIdLabel,
+  moveUploadedAssets,
+} = require('../shared/utils');
 const { getConfig } = require('../shared/configBuilder');
 const errorReporter = require('../shared/errorReporter');
 const { buildVM, getVmBundleFilePath, runInVM } = require('./vm');
@@ -59,9 +64,15 @@ function getRequestBundleFilePath(bundleTimestamp) {
  * @param bundleFilePathPerTimestamp
  * @param providedNewBundle
  * @param renderingRequest
+ * @param assetsToCopy might be null
  * @returns {Promise<{headers: {"Cache-Control": string}, data: any, status: number}>}
  */
-async function handleNewBundleProvided(bundleFilePathPerTimestamp, providedNewBundle, renderingRequest) {
+async function handleNewBundleProvided(
+  bundleFilePathPerTimestamp,
+  providedNewBundle,
+  renderingRequest,
+  assetsToCopy,
+) {
   log.info('Worker received new bundle: %s', bundleFilePathPerTimestamp);
 
   let lockAcquired;
@@ -83,6 +94,9 @@ async function handleNewBundleProvided(bundleFilePathPerTimestamp, providedNewBu
     try {
       log.info(`Moving uploaded file ${providedNewBundle.file} to ${bundleFilePathPerTimestamp}`);
       await fsExtra.move(providedNewBundle.file, bundleFilePathPerTimestamp);
+      if (assetsToCopy) {
+        await moveUploadedAssets(assetsToCopy);
+      }
 
       log.info(`Completed moving uploaded file ${providedNewBundle.file} to ${bundleFilePathPerTimestamp}`);
     } catch (error) {
@@ -143,6 +157,7 @@ module.exports = async function handleRenderRequest({
   renderingRequest,
   bundleTimestamp,
   providedNewBundle,
+  assetsToCopy,
 }) {
   try {
     const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
@@ -154,7 +169,12 @@ module.exports = async function handleRenderRequest({
 
     // If gem has posted updated bundle:
     if (providedNewBundle && providedNewBundle.file) {
-      return handleNewBundleProvided(bundleFilePathPerTimestamp, providedNewBundle, renderingRequest);
+      return handleNewBundleProvided(
+        bundleFilePathPerTimestamp,
+        providedNewBundle,
+        renderingRequest,
+        assetsToCopy,
+      );
     }
 
     // If no vm yet or bundle name does not match

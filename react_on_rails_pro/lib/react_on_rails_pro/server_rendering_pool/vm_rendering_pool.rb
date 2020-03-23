@@ -33,14 +33,6 @@ module ReactOnRailsPro
           (bundle_update_time.utc.to_f * 1000).to_i
         end
 
-        def renderer_url_base
-          ReactOnRailsPro.configuration.renderer_url
-        end
-
-        def renderer_url(rendering_request_digest)
-          "#{renderer_url_base}/bundles/#{@bundle_update_utc_timestamp}/render/#{rendering_request_digest}"
-        end
-
         # js_code: JavaScript expression that returns a string.
         # Returns a Hash:
         #   html: string of HTML for direct insertion on the page by evaluating js_code
@@ -59,6 +51,7 @@ module ReactOnRailsPro
           ReactOnRailsPro::ServerRenderingPool::ProRendering
             .set_request_digest_on_render_options(js_code, render_options)
 
+          # TODO: Remove the request_digest. See https://github.com/shakacode/react_on_rails_pro/issues/119
           path = "/bundles/#{@bundle_update_utc_timestamp}/render/#{render_options.request_digest}"
 
           response = ReactOnRailsPro::Request.render_code(path, js_code, send_bundle)

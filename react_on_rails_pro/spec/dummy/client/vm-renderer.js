@@ -28,10 +28,10 @@ const config = {
   // Uncomment and change value for testing the honeybadger API integration
   honeybadgerApiKey: 'a602365c',
 
-  // This option is required if loadable/components lib is used.
-  // The server-rendering of this lib is working only libraryTarget: 'commonjs2'
-  // possible values: null | 'commonjs2'
-  libraryTarget: env.RENDERER_LIBRARY_TARGET || null,
+  // supportModules should be set to true to allow the server-bundle code to see require, exports, etc.
+  // false is like the ExecJS behavior
+  // this option is required to equal `true` if you want to use loadable components
+  supportModules: true,
 };
 
 // Renderer detects a total number of CPUs on virtual hostings like Heroky or CircleCI instead
