@@ -32,7 +32,7 @@ Gem::Specification.new do |s|
   s.add_dependency "rainbow", "~> 3.0"
 
   s.add_development_dependency "awesome_print"
-  s.add_development_dependency "bundler", "~> 1"
+  s.add_development_dependency "bundler", "~> 2"
   s.add_development_dependency "coveralls"
   s.add_development_dependency "gem-release"
   s.add_development_dependency "generator_spec"
