@@ -146,13 +146,10 @@ const ServerApp = (props, railsContext) => {
   // You must configure the path to resolve per your setup. If you are copying the file to
   // a remote server, the file should be a sibling of this file. 
   // __dirname is going to be the directory where the server-bundle.js exists
-  // const statsFile = path.resolve(__dirname, 'loadable-stats.json');
-  //
-  // Otherwise, you should set the path to be relative wherever you are setting the env 
-  // value RENDERER_BUNDLE_PATH, or the vm-renderer config value bundlePath. In other 
-  // words, you might be creating the file in your public/webpack/production directory
-  // and you need to refer to that file.
-  const statsFile = path.resolve('./path/to/loadable-stats.json')
+  // Note, React on Rails Pro automatically copies the loadable-stats.json to the same place as the
+  // server-bundle.js. Thus, the __dirname of this code is where we can find loadable-stats.json.
+  // Be sure to configure ReactOnRailsPro.config.assets_top_copy to this file.
+  const statsFile = path.resolve(__dirname, 'loadable-stats.json');
 
   // This object is used to search filenames by corresponding chunk names.
   // See https://loadable-components.com/docs/api-loadable-server/#chunkextractor
@@ -182,6 +179,24 @@ ReactOnRails.register({
 
 ## Configure react_on_rails_pro
 
+### React on Rails Pro
+You must sent `config.assets_top_copy` so that the vm-renderer will have access to the loadable-stats.json.
+
+```ruby
+  config.assets_to_copy = Rails.root.join("public", "webpack", Rails.env, "loadable-stats.json")
+```
+
+Your server rendering code, per the above, will find this file like this:
+
+```js
+  const statsFile = path.resolve(__dirname, 'loadable-stats.json');
+``` 
+
+Note, if `__dirname` is not working in your webpack build, that's because you didn't set `node: false`
+in your webpack configuration. That turns off the polyfills for things like `__dirname`.
+
+
+### VM Renderer
 In your `vm-renderer.js` file which runs node renderer, you need to specify `supportModules` options as follows:
 ```js
 const path = require('path');

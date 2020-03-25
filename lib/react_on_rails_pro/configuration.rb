@@ -62,9 +62,14 @@ module ReactOnRailsPro
       configure_default_url_if_not_provided
       validate_url
       setup_renderer_password
+      setup_assets_to_copy
     end
 
     private
+
+    def setup_assets_to_copy
+      self.assets_to_copy = (Array(assets_to_copy) if assets_to_copy.present?)
+    end
 
     def configure_default_url_if_not_provided
       self.renderer_url = renderer_url.presence || DEFAULT_RENDERER_URL

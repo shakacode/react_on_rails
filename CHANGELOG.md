@@ -3,6 +3,9 @@ All notable changes to this project will be documented in this file. Items under
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+## [1.5.1] - 2020-03-25
+### Improved
+- config.assets_to_copy can take a single value in addition to an array. [PR 122](https://github.com/shakacode/react_on_rails_pro/pull/122 ) [justin808](https://github.com/justin808).
 
 ## [1.5.0] - 2020-03-17
 ### Added
