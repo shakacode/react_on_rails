@@ -15,15 +15,6 @@ namespace :dummy_apps do
     bundle_install_in(dummy_app_dir)
   end
 
-  task :dummy_no_webpacker do
-    npm_install_cmd = "npm install"
-    install_react_on_rails_cmd = "yarn run install-react-on-rails"
-    dummy_app_dir = File.join(gem_root, "spec/dummy_no_webpacker")
-    sh_in_dir(File.join(gem_root, "spec/dummy_no_webpacker/client"), npm_install_cmd)
-    sh_in_dir(dummy_app_dir, install_react_on_rails_cmd)
-    sh_in_dir(dummy_app_dir, "BUNDLE_GEMFILE=Gemfile.rails32 bundle install")
-  end
-
   task dummy_apps: %i[dummy_app node_package] do
     puts "Prepared all Dummy Apps"
   end

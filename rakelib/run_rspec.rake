@@ -18,16 +18,6 @@ namespace :run_rspec do
     run_tests_in("", rspec_args: File.join("spec", "react_on_rails"))
   end
 
-  desc "Run RSpec with rails32 gemfile"
-  task :gem_rails32 do
-    rspec_args = "spec/react_on_rails --tag ~webpacker --exclude-pattern "\
-                 "\"**/generators/*_spec.rb,"\
-                 "**/test_helper/webpack_*_spec.rb\""
-    run_tests_in("",
-                 rspec_args: rspec_args,
-                 env_vars: "BUNDLE_GEMFILE=spec/dummy_no_webpacker/Gemfile.rails32")
-  end
-
   desc "Runs dummy rspec with turbolinks"
   task dummy: ["dummy_apps:dummy_app"] do
     clean_gen_assets(spec_dummy_dir)
@@ -42,14 +32,6 @@ namespace :run_rspec do
     run_tests_in(spec_dummy_dir,
                  env_vars: "DISABLE_TURBOLINKS=TRUE",
                  command_name: "dummy_no_turbolinks")
-  end
-
-  desc "Runs dummy_no_webpacker rspec"
-  task :dummy_no_webpacker do
-    dummy_app_dir = File.join(gem_root, "spec/dummy_no_webpacker")
-    clean_gen_assets(dummy_app_dir)
-    run_tests_in(dummy_app_dir,
-                 env_vars: "BUNDLE_GEMFILE=Gemfile.rails32")
   end
 
   # Dynamically define Rake tasks for each example app found in the examples directory
