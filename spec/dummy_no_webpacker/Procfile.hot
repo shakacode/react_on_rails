@@ -1,9 +1,0 @@
-# Procfile for development with hot reloading of JavaScript and CSS
-
-rails: REACT_ON_RAILS_ENV=HOT rails s -b 0.0.0.0
-
-# Run the hot reload server for client development
-hot-assets: HOT_RAILS_PORT=3500 yarn run hot-assets
-
-# Keep the JS fresh for server rendering. Remove if not server rendering
-rails-server-assets: yarn run build:dev:server

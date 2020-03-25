@@ -1,3 +1,0 @@
-client: sh -c 'rm app/assets/webpack/* || true && cd client && yarn run build:dev:client'
-server: sh -c 'cd client && yarn run build:dev:server'
-web: DISABLE_TURBOLINKS=TRUE bin/rails s -b 0.0.0.0
