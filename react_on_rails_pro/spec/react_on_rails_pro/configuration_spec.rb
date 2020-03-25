@@ -8,6 +8,30 @@ module ReactOnRailsPro
       ReactOnRailsPro.instance_variable_set(:@configuration, nil)
     end
 
+    describe ".assets_to_copy" do
+      it "stays an array if array provided" do
+        value = %w[a b]
+        ReactOnRailsPro.configure do |config|
+          config.assets_to_copy = value
+        end
+        expect(ReactOnRailsPro.configuration.assets_to_copy).to eq(value)
+      end
+
+      it "converts a single value to an array" do
+        ReactOnRailsPro.configure do |config|
+          config.assets_to_copy = "a"
+        end
+        expect(ReactOnRailsPro.configuration.assets_to_copy).to eq(["a"])
+      end
+
+      it "keep nil if not provided" do
+        ReactOnRailsPro.configure do |config|
+          config.assets_to_copy = ""
+        end
+        expect(ReactOnRailsPro.configuration.assets_to_copy).to eq(nil)
+      end
+    end
+
     describe ".renderer_url" do
       it "is the renderer_url if provided" do
         url = "http://something.com:1234"

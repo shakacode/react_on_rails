@@ -26,16 +26,13 @@ ReactOnRailsPro.configure do |config|
   # include any files used to generate the JSON props.
   config.serializer_globs = [File.join(Rails.root, "app", "views", "**", "*.jbuilder")]
 
-  # In case if there is a remote vm renderer, you may require some
-  # extra assets in addition to the bundle. These would be present on the main
-  # Rails server, but not the renderer server.
-  # This option allows a remote vm renderer (not localhost)
-  # to have assets copied to the  vm-renderer instance right after assets:precompile task.
-  # The value should be an Array of file_paths. The files should have extensions to resolve the
-  # content types, such as "application/json".
-  #
+  # When using the vm renderer, you may require some extra assets in addition to the bundle.
+  # The assets_to_copy option allows the vm renderer to have assets copied at the end of
+  # the assets:precompile task or directly by the
+  # react_on_rails_pro:copy_assets_to_vm_renderer tasks.
+  # These assets are also transferred any time a new bundle is sent from Rails to the renderer.
+  # The value should be a file_path or an Array of file_paths. The files should have extensions
+  # to resolve the content types, such as "application/json".
   # Note, for spec/dummy, manifest.json is just used for testing
-  config.assets_to_copy = [
-    Rails.root.join("public", "webpack", Rails.env, "manifest.json")
-  ]
+  config.assets_to_copy = Rails.root.join("public", "webpack", Rails.env, "manifest.json")
 end

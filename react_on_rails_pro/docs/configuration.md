@@ -84,8 +84,8 @@ ReactOnRailsPro.configure do |config|
   # the assets:precompile task or directly by the 
   # react_on_rails_pro:copy_assets_to_vm_renderer tasks.
   # These assets are also transferred any time a new bundle is sent from Rails to the renderer.
-  # The value should be an Array of file_paths. The files should have extensions to resolve the
-  # content types, such as "application/json". 
+  # The value should be a file_path or an Array of file_paths. The files should have extensions
+  # to resolve the content types, such as "application/json". 
   config.assets_to_copy = [
      Rails.root.join("public", "webpack", Rails.env, "loadable-stats.json"),
      Rails.root.join("public", "webpack", Rails.env, "manifest.json")
