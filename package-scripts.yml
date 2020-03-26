@@ -62,5 +62,9 @@ scripts:
         description: Check if any JSON files would change by running prettier-eslint.
         script: prettier "**/*.json" "../spec/**/*.json" --list-different
   renderer:
-    description: Starts the node renderer.
-    script: node ./packages/vm-renderer/src/default-vm-renderer.js
+    default:
+      description: Starts the node renderer.
+      script: RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE node ./packages/vm-renderer/src/default-vm-renderer.js
+    debug:
+      description: Starts the node renderer with debugging enabled. See Node.js V8 --inspector Manager (NiM)
+      script: RENDERER_WORKERS_COUNT=1 RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE ndb ./packages/vm-renderer/src/default-vm-renderer.js

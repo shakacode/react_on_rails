@@ -82,7 +82,7 @@
     "build:production:server": "NODE_ENV=production webpack -p --config webpack.server.rails.build.config.js",
     "build:production": "yarn run build:production:server && yarn run build:production:client",
     "hot-assets": "NODE_ENV=development babel-node server-rails-hot.js",
-    "vm-renderer-debug": "RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE ndb vm-renderer.js",
+    "vm-renderer-debug": "RENDERER_WORKERS_COUNT=1 RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE ndb vm-renderer.js",
     "vm-renderer": "RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE node vm-renderer.js"
   },
   "author": "",
