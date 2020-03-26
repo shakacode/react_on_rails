@@ -8,6 +8,8 @@ Consult the [Rails Guide on Caching](http://guides.rubyonrails.org/caching_with_
 * [Determination of Cache Keys](http://guides.rubyonrails.org/caching_with_rails.html#cache-keys)
 * [Caching in Development](http://guides.rubyonrails.org/caching_with_rails.html#caching-in-development): **To toggle caching in development**, run `rails dev:cache`.
 
+See the [bottom note on confirming and debugging cache keys](#confirming-and-debugging-cache-keys).
+
 ## Overview
 React on Rails Pro has caching at 2 levels:
 
@@ -174,4 +176,47 @@ using a separate webpack configuration to generate the server bundle file,
 then you **must not** include the hash in the output filename or else you will
 have a race condition overwriting your `manifest.json`. Regardless of which
 case you have, React on Rails handles it.
+
+# Confirming and Debugging Cache Keys
+
+Cache key composition can be confirmed in development mode with the following steps. THe goal is to confirm that some change that should  trigger new cached data actually triggers a new cache key. For example, when the server bundle changes, does that trigger a new cache key for any server rendering?
+
+1. Run `Rails.cache.clear` to clear the cache.
+1. Run `rails dev:cache` to toggle caching in development mode. 
+
+You will see a message like:
+> Development mode is now being cached.
+
+You might need to check your `config/development.rb`contains the following:
+```ruby
+  # Enable/disable caching. By default caching is disabled.
+  if Rails.root.join("tmp/caching-dev.txt").exist?
+    config.action_controller.perform_caching = true
+
+    config.cache_store = :memory_store
+    config.public_file_server.headers = {
+      "Cache-Control" => "public, max-age=172800"
+    }
+    
+    # For Rails >= 5.1 determines whether to log fragment cache reads and writes in verbose format as follows:
+    config.action_controller.enable_fragment_cache_logging
+  else
+    config.action_controller.perform_caching = false
+
+    config.cache_store = :null_store
+  end
+```
+
+3. Start your server in development mode. You should see cache entries in the console log. Fetch the page that uses the cache. Make a note of the cache key used for the cached component.
+
+4. Suppose you want to confirm that updated JavaScript causes a cache key change. Make any change to the JavaScript that's server rendered or change the version of any package in the bundle.
+
+5. Check the cache entry again. You should have noticed that it changed.
+
+
+To avoid seeing the cache calls to the prerender_caching, you can temporarily set:
+```
+config.prerender_caching = false
+```
+
 

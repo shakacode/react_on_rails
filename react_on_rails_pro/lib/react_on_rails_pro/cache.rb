@@ -10,6 +10,7 @@ module ReactOnRailsPro
       def fetch_react_component(component_name, options)
         if use_cache?(options)
           cache_key = react_component_cache_key(component_name, options)
+          Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
           cache_options = options[:cache_options]
           Rails.cache.fetch(cache_key, cache_options) { yield }
         else

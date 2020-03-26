@@ -16,12 +16,19 @@ Rails.application.configure do
 
   # Enable/disable caching. By default caching is disabled.
   if Rails.root.join("tmp/caching-dev.txt").exist?
+    puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+    puts "development.rb: #{__LINE__},  method: #{__method__}"
+    puts "Enabling caching"
+    puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+
     config.action_controller.perform_caching = true
+    config.perform_caching = true
 
     config.cache_store = :memory_store
     config.public_file_server.headers = {
       "Cache-Control" => "public, max-age=172800"
     }
+    config.action_controller.enable_fragment_cache_logging = true
   else
     config.action_controller.perform_caching = false
 
