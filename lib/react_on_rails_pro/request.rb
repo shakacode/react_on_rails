@@ -124,6 +124,18 @@ module ReactOnRailsPro
           force_retry: true,
           url: ReactOnRailsPro.configuration.renderer_url
         )
+      rescue StandardError => e
+        message = <<~MSG
+          [ReactOnRailsPro] Error creating PersistentHTTP connection.
+          renderer_http_pool_size = #{ReactOnRailsPro.configuration.renderer_http_pool_size}
+          renderer_http_pool_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_timeout}
+          renderer_http_pool_warn_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_warn_timeout}
+          renderer_url = #{ReactOnRailsPro.configuration.renderer_url}
+          Be sure to use a url that contains the protocol of http or https.
+          Original error is
+          #{e}
+        MSG
+        raise ReactOnRailsPro::Error, message
       end
     end
   end
