@@ -74,10 +74,10 @@ ${error.stack}`;
 utils.moveUploadedAssets = async function moveUploadedAssets(uploadedAssets) {
   const { bundlePath } = getConfig();
 
-  const moveMultipleAssets = uploadedAssets.map(asset => {
+  const moveMultipleAssets = uploadedAssets.map((asset) => {
     const destinationAssetFilePath = path.join(bundlePath, asset.filename);
     return fsExtra.move(asset.file, destinationAssetFilePath, { overwrite: true });
   });
   await Promise.all(moveMultipleAssets);
-  log.info(`Moved assets ${JSON.stringify(uploadedAssets.map(fileDescriptor => fileDescriptor.filename))}`);
+  log.info(`Moved assets ${JSON.stringify(uploadedAssets.map((fileDescriptor) => fileDescriptor.filename))}`);
 };

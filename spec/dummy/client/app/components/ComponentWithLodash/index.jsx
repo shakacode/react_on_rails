@@ -2,7 +2,7 @@ import React from 'react';
 import fp from 'lodash/fp';
 import css from './index.scss';
 
-export default function() {
+export default function () {
   const paddedWord = fp.padStart(7)('works!');
 
   return (

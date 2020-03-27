@@ -121,7 +121,7 @@ configBuilder.buildConfig = function buildConfig(providedUserConfig) {
 
   let currentArg;
 
-  process.argv.forEach(val => {
+  process.argv.forEach((val) => {
     if (val[0] === '-') {
       currentArg = val.slice(1);
       return;

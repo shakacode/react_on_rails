@@ -60,7 +60,8 @@ scripts:
         script: rm -rf packages/vm-renderer/tests/tmp && prettier "**/*.json" --write
       listDifferent:
         description: Check if any JSON files would change by running prettier-eslint.
-        script: prettier "**/*.json" "../spec/**/*.json" --list-different
+        script: prettier "**/*.json" --list-different
+
   renderer:
     default:
       description: Starts the node renderer.

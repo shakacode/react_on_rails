@@ -37,7 +37,7 @@ describe('express worker', () => {
     await resetForTest(testName);
   });
 
-  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest when bundle is provided and did not yet exist', async done => {
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest when bundle is provided and did not yet exist', async (done) => {
     expect.assertions(6);
 
     const app = worker({
@@ -67,7 +67,7 @@ describe('express worker', () => {
   test(
     'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
       'when password is required but no password was provided',
-    async done => {
+    async (done) => {
       expect.assertions(2);
       await createVmBundleForTest();
 
@@ -96,7 +96,7 @@ describe('express worker', () => {
   test(
     'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
       'when password is required but wrong password was provided',
-    async done => {
+    async (done) => {
       expect.assertions(2);
 
       await createVmBundleForTest();
@@ -127,7 +127,7 @@ describe('express worker', () => {
   test(
     'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
       'when password is required and correct password was provided',
-    async done => {
+    async (done) => {
       expect.assertions(3);
 
       await createVmBundleForTest();
@@ -160,7 +160,7 @@ describe('express worker', () => {
   test(
     'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
       'when password is not required and no password was provided',
-    async done => {
+    async (done) => {
       expect.assertions(3);
 
       await createVmBundleForTest();
@@ -187,7 +187,7 @@ describe('express worker', () => {
     },
   );
 
-  test('post /asset-exists when asset exists', async done => {
+  test('post /asset-exists when asset exists', async (done) => {
     expect.assertions(2);
     await createAsset(testName);
     const app = worker({
@@ -210,7 +210,7 @@ describe('express worker', () => {
       });
   });
 
-  test('post /asset-exists when asset not exists', async done => {
+  test('post /asset-exists when asset not exists', async (done) => {
     expect.assertions(2);
     await createAsset(testName);
     const app = worker({
@@ -233,7 +233,7 @@ describe('express worker', () => {
       });
   });
 
-  test('post /upload-assets', async done => {
+  test('post /upload-assets', async (done) => {
     expect.assertions(3);
     const app = worker({
       bundlePath: bundlePathForTest(),

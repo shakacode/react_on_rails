@@ -4,6 +4,10 @@ require_relative "./spec_helper"
 
 describe ReactOnRailsPro::Cache, :caching do
   describe ".fetch_react_component" do
+    let(:logger_mock) { double("Rails.logger").as_null_object }
+    before(:example) do
+      allow(Rails).to receive(:logger).and_return(logger_mock)
+    end
     it "fetches the value from the cache" do
       result = "<div>Something</div>"
       create_component_code = double("create_component_code")

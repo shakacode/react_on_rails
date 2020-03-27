@@ -25,7 +25,7 @@ module.exports = function masterRun(runningConfig) {
   }
 
   // Listen for dying workers:
-  cluster.on('exit', worker => {
+  cluster.on('exit', (worker) => {
     if (worker.isScheduledRestart) {
       log.info('Restarting worker #%d on schedule', worker.id);
     } else {

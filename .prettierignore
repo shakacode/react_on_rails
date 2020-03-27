@@ -1,4 +1,5 @@
 node_modules
+**/node_modules/**
 packages/vm-renderer/tests/fixtures/projects
 spec/dummy/tmp
 spec/dummy/public

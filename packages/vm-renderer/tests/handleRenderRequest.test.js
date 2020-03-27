@@ -114,7 +114,7 @@ describe(testName, () => {
       console.log('TEST building VM from sleep');
       createVmBundleForTest().then(() => {
         console.log('TEST DONE building VM from sleep');
-        lockfile.unlock(lockfilePathForTest(), err => {
+        lockfile.unlock(lockfilePathForTest(), (err) => {
           console.log('TEST unlocked lockfile', err);
         });
       });
