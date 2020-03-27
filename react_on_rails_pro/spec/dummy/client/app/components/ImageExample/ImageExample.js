@@ -7,7 +7,7 @@ import logo from 'Assets/images/256egghead.png';
 import bowerLogo from './bower.png';
 import blueprintIcon from './blueprint_icon.svg';
 import legoIcon from 'Assets/images/lego_icon.svg';
-const TestComponent = props => (
+const TestComponent = (props) => (
   <div>
     <h1 className={css.red}>This is a test of CSS module color red.</h1>
     <hr />

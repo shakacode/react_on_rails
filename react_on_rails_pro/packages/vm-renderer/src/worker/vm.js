@@ -43,8 +43,8 @@ function replayVmConsole() {
   if (log.level !== 'debug') return;
   const consoleHistoryFromVM = vm.runInContext('console.history', context);
 
-  consoleHistoryFromVM.forEach(msg => {
-    const stringifiedList = msg.arguments.map(arg => {
+  consoleHistoryFromVM.forEach((msg) => {
+    const stringifiedList = msg.arguments.map((arg) => {
       let val;
       try {
         val = typeof arg === 'string' || arg instanceof String ? arg : JSON.stringify(arg);

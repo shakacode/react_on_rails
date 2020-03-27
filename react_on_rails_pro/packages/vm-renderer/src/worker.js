@@ -27,7 +27,7 @@ const errorReporter = require('./shared/errorReporter');
 const { lock, unlock } = require('./shared/locks');
 
 function setHeaders(headers, res) {
-  Object.keys(headers).forEach(key => res.set(key, headers[key]));
+  Object.keys(headers).forEach((key) => res.set(key, headers[key]));
 }
 
 const setResponse = (result, res) => {
@@ -110,10 +110,10 @@ module.exports = function run(config) {
       try {
         const assetsToCopy = Object.values(assetsToCopyObj);
         handleRenderRequest({ renderingRequest, bundleTimestamp, providedNewBundle, assetsToCopy })
-          .then(result => {
+          .then((result) => {
             setResponse(result, res);
           })
-          .catch(err => {
+          .catch((err) => {
             const exceptionMessage = formatExceptionMessage(
               renderingRequest,
               err,
@@ -143,7 +143,7 @@ module.exports = function run(config) {
       let lockAcquired;
       let lockfileName;
       const assets = Object.values(req.files);
-      const assetsDescription = JSON.stringify(assets.map(asset => asset.filename));
+      const assetsDescription = JSON.stringify(assets.map((asset) => asset.filename));
       const taskDescription = `Uploading files ${assetsDescription} to ${bundlePath}`;
       try {
         const { lockfileName: name, wasLockAcquired, errorMessage } = await lock('transferring-assets');

@@ -3,7 +3,7 @@ const { promisify } = require('util');
 
 const fsAccessAsync = promisify(fs.access);
 
-const fileExistsAsync = async assetPath => {
+const fileExistsAsync = async (assetPath) => {
   try {
     await fsAccessAsync(assetPath, fs.constants.R_OK);
     return true;

@@ -20,7 +20,7 @@ const optimization = {
   },
 };
 
-clientEnvironment.splitChunks(config => Object.assign({}, config, { optimization: optimization }));
+clientEnvironment.splitChunks((config) => Object.assign({}, config, { optimization: optimization }));
 
 const clientConfig = merge(clientEnvironment.toWebpackConfig(), {
   mode: 'development',

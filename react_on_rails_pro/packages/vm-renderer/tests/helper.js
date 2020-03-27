@@ -108,10 +108,10 @@ exports.createResponse = function createResponse(validate) {
     set: (key, value) => {
       result.headers[key] = value;
     },
-    status: value => {
+    status: (value) => {
       result.status = value;
     },
-    send: data => {
+    send: (data) => {
       result.data = data;
       validate(result);
     },
