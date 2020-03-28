@@ -58,7 +58,7 @@ module ReactOnRails
                    rendering_extension: nil, build_test_command: nil,
                    build_production_command: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, random_dom_id: nil,
-                   server_render_method: nil )
+                   server_render_method: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.server_bundle_js_file = server_bundle_js_file
       self.generated_assets_dirs = generated_assets_dirs
