@@ -24,7 +24,7 @@ function renderContextRows(railsContext) {
   );
 }
 
-const RailsContext = props => (
+const RailsContext = (props) => (
   <table>
     <thead>
       <tr>

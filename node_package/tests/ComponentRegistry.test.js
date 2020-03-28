@@ -85,7 +85,7 @@ describe('ComponentRegistry', () => {
   it('only detects a renderer function if it has three arguments', () => {
     expect.assertions(2);
     const C7 = (a1, a2) => null;
-    const C8 = a1 => null;
+    const C8 = (a1) => null;
     ComponentRegistry.register({ C7 });
     ComponentRegistry.register({ C8 });
     const components = ComponentRegistry.components();

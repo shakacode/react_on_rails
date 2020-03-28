@@ -53,16 +53,13 @@ describe('', () => {
     );
   });
 
-  it(
-    'StoreRegistry returns undefined for retrieving unregistered store, ' + 'passing throwIfMissing = false',
-    () => {
-      expect.assertions(1);
-      StoreRegistry.setStore('foobarX', {});
-      const actual = StoreRegistry.getStore('foobar', false);
-      const expected = undefined;
-      expect(actual).toEqual(expected);
-    },
-  );
+  it('StoreRegistry returns undefined for retrieving unregistered store, passing throwIfMissing = false', () => {
+    expect.assertions(1);
+    StoreRegistry.setStore('foobarX', {});
+    const actual = StoreRegistry.getStore('foobar', false);
+    const expected = undefined;
+    expect(actual).toEqual(expected);
+  });
 
   it('StoreRegistry getStore, setStore', () => {
     expect.assertions(1);

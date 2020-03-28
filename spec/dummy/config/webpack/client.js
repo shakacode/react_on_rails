@@ -4,7 +4,7 @@ const devBuild = process.env.NODE_ENV === 'development';
 if (!module.hot && devBuild) {
   environment.loaders
     .get('sass')
-    .use.find(item => item.loader === 'sass-loader').options.sourceMapContents = false;
+    .use.find((item) => item.loader === 'sass-loader').options.sourceMapContents = false;
 }
 
 //adding reactHotReload

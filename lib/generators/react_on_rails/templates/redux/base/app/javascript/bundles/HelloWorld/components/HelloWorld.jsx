@@ -6,8 +6,10 @@ const HelloWorld = ({ name, updateName }) => (
     <h3>Hello, {name}!</h3>
     <hr />
     <form>
-      <label htmlFor="name">Say hello to:</label>
-      <input id="name" type="text" value={name} onChange={e => updateName(e.target.value)} />
+      <label htmlFor="name">
+        Say hello to:
+        <input id="name" type="text" value={name} onChange={(e) => updateName(e.target.value)} />
+      </label>
     </form>
   </div>
 );

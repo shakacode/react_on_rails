@@ -10,7 +10,7 @@ import css from './ImageExample.scss';
 import bowerLogo from './bower.png';
 import blueprintIcon from './blueprint_icon.svg';
 
-const TestComponent = _props => (
+const TestComponent = (_props) => (
   <div>
     <h1 className={css.red}>This is a test of CSS module color red.</h1>
     <hr />

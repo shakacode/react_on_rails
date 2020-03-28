@@ -45,7 +45,7 @@ function formatPublicPath(settings) {
      output: { path, publicPath, publicPathWithHost }
    }}
  */
-const configLoader = configPath => {
+const configLoader = (configPath) => {
   // Some test environments might not have the NODE_ENV set, so we'll have fallbacks.
   const configEnv = env.NODE_ENV || env.RAILS_ENV || 'development';
   const ymlConfigPath = join(configPath, 'webpacker.yml');

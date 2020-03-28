@@ -31,7 +31,7 @@ const serverConfig = merge(environment.toWebpackConfig(), {
 });
 
 serverConfig.plugins = serverConfig.plugins.filter(
-  plugin => plugin.constructor.name !== 'WebpackAssetsManifest',
+  (plugin) => plugin.constructor.name !== 'WebpackAssetsManifest',
 );
 
 module.exports = serverConfig;

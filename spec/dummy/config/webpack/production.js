@@ -6,7 +6,9 @@ const clientEnvironment = require('./client');
 const serverConf = require('./server');
 const merge = require('webpack-merge');
 
-clientEnvironment.splitChunks(config => Object.assign({}, config, { optimization: { splitChunks: false } }));
+clientEnvironment.splitChunks((config) =>
+  Object.assign({}, config, { optimization: { splitChunks: false } }),
+);
 
 const clientConfig = merge(clientEnvironment.toWebpackConfig(), {
   mode: 'production',

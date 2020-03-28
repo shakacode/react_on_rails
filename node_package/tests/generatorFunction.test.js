@@ -56,7 +56,7 @@ describe('generatorFunction', () => {
     expect.assertions(1);
 
     /* eslint-disable react/prop-types */
-    const pureComponent = props => <h1>{props.title}</h1>;
+    const pureComponent = (props) => <h1>{props.title}</h1>;
     /* eslint-enable react/prop-types */
 
     expect(generatorFunction(pureComponent)).toBe(true);
