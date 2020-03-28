@@ -1,4 +1,4 @@
-*Note: this doc needs updating to reflect how v8.x+ no longer puts Webpack generated files through the asset pipeline. PR's welcome!*
+*Note: this doc reflects using Sprockets for assets and has not been updated for rails/webpacker*
 
 # Using Webpack bundled assets with the Rails Asset Pipeline
 
@@ -77,7 +77,7 @@ Note: _You can output these files in the asset pipeline wherever you see fit. My
 
 Lastly, we will set the publicPath to our file(s). This will be the endpoint on our rails web server that you can visit to reach the asset (if you don't know how this works, read the [intro](#using-webpack-bundled-assets-with-the-rails-asset-pipeline)). If you've been following the previous steps, you know that we set our outputPath for our assets to be absolute at `app/assets/webpack/webpack-assets/`, which your rails app should end up hosting at `/assets/webpack-assets/file-name+hash.ext` when the server is run.
 
-Note: _If you're having a hard time figuring out what an asset's path will be on your rails server, simply run `rake assets:precompile` and `cd public/`. The path from there to your file will then be the path/url on your web server to that asset. On top of this, it is also a good idea to check out [this doc](../misc-pending/rails-assets.md) to understand how `react_on_rails` allows us to access these files after precompilation, when Rails applies another hash onto the asset._
+Note: _If you're having a hard time figuring out what an asset's path will be on your rails server, simply run `rake assets:precompile` and `cd public/`. The path from there to your file will then be the path/url on your web server to that asset. On top of this, it is also a good idea to check out [this doc](docs/outdated/rails-assets.md) to understand how `react_on_rails` allows us to access these files after precompilation, when Rails applies another hash onto the asset._
 
 Our publicPath setting will match the path to our outputted assets on our rails web server. Given our assets in this example will be outputted to `/app/assets/webpack/webpack-assets/` and hosted at `/assets/webpack-assets/`, our publicPath would be:
 
@@ -192,4 +192,4 @@ module.exports = {
 };
 ```
 
-If you'd like to understand how react_on_rails handles these bundled assets after asset precompilation and in production mode, check out: [Rails Assets](../misc-pending/rails-assets.md).
+If you'd like to understand how react_on_rails handles these bundled assets after asset precompilation and in production mode, check out: [Rails Assets](docs/outdated/rails-assets.md).

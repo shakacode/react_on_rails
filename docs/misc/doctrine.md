@@ -19,7 +19,7 @@ The React on Rails setup provides several key components related to front-end de
 6. Happiness for us is actively participating in open source, so we want to be where the action is, which is with the npm libraries on github.com.
 7. You can get set up on React on Rails **FAST** using our application generator.
 8. By placing all client-side development inside of the `/client` directory, pure JavaScript developers can productively do development separate from Rails. Instead of Rails APIs, stub APIs on an express server can provide a simple backend, allowing for rapid iteration of UI prototypes.
-9. Just because we're not relying on the Rails asset pipeline for ES6 conversion does not mean that we're deploying Rails apps in any different way. We still use the asset pipeline to include our Webpack compiled JavaScript. This only requires a few small modifications, as explained in our doc [Heroku Deployment](../additional-reading/heroku-deployment.md).
+9. Just because we're not relying on the Rails asset pipeline for ES6 conversion does not mean that we're deploying Rails apps in any different way. We still use the asset pipeline to include our Webpack compiled JavaScript. This only requires a few small modifications, as explained in our doc [Heroku Deployment](docs/outdated/heroku-deployment.md).
 
 ## Convention over Configuration
 * React on Rails has taken the hard work out of figuring out the JavaScript tooling that works best with Rails. Not only could you spend lots of time researching different tooling, but then you'd have to figure out how to splice it all together. This is where a lot of "JavaScript fatigue" comes from. The following keep the code clean and consistent:

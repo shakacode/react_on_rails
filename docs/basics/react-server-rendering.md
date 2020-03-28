@@ -10,7 +10,7 @@ During the Rails rendering of HTML per a browser request, the Rails server will 
 
 The default JavaScript interpretter is [ExecJS](https://github.com/rails/execjs). If you want to maximize the perfomance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
 
-See [this note](./how-react-on-rails-works.md#client-side-rendering-vs-server-side-rendering)
+See [this note](docs/outdated/how-react-on-rails-works.md#client-side-rendering-vs-server-side-rendering)
 
 
 ## How do you do Server Rendering with React on Rails?

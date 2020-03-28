@@ -20,7 +20,8 @@ Changes since last non-beta release.
 * Removed **env_javascript_include_tag** and **env_stylesheet_link_tag** as these are replaced by view helpers
   from rails/webpacker
 * Removal of support for old Rubies and Rails.
-
+* Removal of config.symlink_non_digested_assets_regex as it's no longer needed with rails/webpacker.
+  If any business needs this, we can move the code to a separate gem.
 
 
 

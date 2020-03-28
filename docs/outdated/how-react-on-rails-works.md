@@ -32,9 +32,9 @@ Each time you change your client code, you will need to re-generate the bundles 
 
 Simply run `foreman start -f Procfile.dev`. [Example](spec/dummy/Procfile.static).
 
-On production deployments that use asset precompilation, such as Heroku deployments, React on Rails, by default, will automatically run webpack to build your JavaScript bundles. You configure the command used as `config.build_production_command` in your [config/initializers/react_on_rails.rb](./configuration.md).
+On production deployments that use asset precompilation, such as Heroku deployments, React on Rails, by default, will automatically run webpack to build your JavaScript bundles. You configure the command used as `config.build_production_command` in your [config/initializers/react_on_rails.rb](docs/basics/configuration.md).
 
-You can see the source code for what gets added to your precompilation [here](https://github.com/shakacode/react_on_rails/tree/master/lib/tasks/assets.rake). For more information on this topic, see [the doc on Heroku deployment](docs/additional-reading/heroku-deployment.md#more-details-on-precompilation-using-webpack-to-create-javascript-assets).
+You can see the source code for what gets added to your precompilation [here](https://github.com/shakacode/react_on_rails/tree/master/lib/tasks/assets.rake). For more information on this topic, see [the doc on Heroku deployment](docs/outdated/heroku-deployment.md#more-details-on-precompilation-using-webpack-to-create-javascript-assets).
 
 If you have used the provided generator, these bundles will automatically be added to your `.gitignore` to prevent extraneous noise from re-generated code in your pull requests. You will want to do this manually if you do not use the provided generator.
 

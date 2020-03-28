@@ -1,6 +1,10 @@
-# Code Splitting
+# Code Splitting (Outdated)
 
-*Note: This document needs updating for Webpack v4, React-Router v4, and using webpacker.*
+_Note: This document is outdated._ Please email [justin@shakacode.com](mailto:justin@shakacode.com) 
+if you would be interested in help with code splitting using
+[loadable-components.com](https://loadable-components.com/docs) with React on Rails.
+
+-----
 
 What is code splitting? From the webpack documentation:
 
@@ -34,7 +38,7 @@ Here's an example of how you might use this in practice:
 
 #### clientRegistration.js
 ```js
-import ReactOnRails from 'react-on-rails';
+import ReactOnRails from 'node_package/lib/ReactOnRails';
 import NavigationApp from './NavigationApp';
 
 // Note that we're importing a different RouterApp than in serverRegistration.js
@@ -146,7 +150,7 @@ config = {
 
 This causes Webpack to prepend the code chunk filename with `/assets/` in the request url. The react on rails sets up the webpack config to put webpack bundles in `app/assets/javascripts/webpack`, and modifies `config/initializers/assets.rb` so that rails detects the bundles. This means that when we prepend the request url with `/assets/`, rails will know what webpack is asking for.
 
-See [rails-assets.md](rails-assets.md) to learn more about static assets.
+See [rails-assets.md](docs/outdated/rails-assets.md) to learn more about static assets.
 
 If you forget to set the public path, webpack will request the code chunk at `/{filename}`. This will cause the request to be handled by the Rails router, which will send back a 404 response, assuming that you don't have a catch-all route. In your javascript console, you'll get the following error:
 

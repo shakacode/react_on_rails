@@ -45,7 +45,7 @@
 
 ## Installation
 
-See the [Installation Overview](../misc-pending/manual-installation-overview.md) for a concise set summary of what's in a React on Rails installation.
+See the [Installation Overview](docs/outdated/manual-installation-overview.md) for a concise set summary of what's in a React on Rails installation.
 
 
 ## NPM

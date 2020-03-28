@@ -2,10 +2,8 @@
 The generator has created the necessary files and gems for deployment to Heroku. If you have installed manually, you will need to provide these files yourself:
 
 + `Procfile`: used by Heroku and Foreman to start the Puma server
-+ `12factor` gem: required by Heroku if using a version before Rails 5 (see their [README](https://github.com/heroku/rails_12factor#rails-5) for more information if upgrading from a lower version)
 + `'puma'` gem: recommended Heroku webserver
 + `config/puma.rb`: Puma webserver config file
-+ `/package.json`: Top level package.json which must contain `"scripts": { "postinstall": "cd client && npm install" }`
 
 If you want to see an updated example deployed to Heroku, please visit the [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial).
 
@@ -17,10 +15,6 @@ This is how the `assets:precompile` rake task gets modified by `react_on_rails`.
 Rake::Task["assets:precompile"]
     .clear_prerequisites
     .enhance([:environment, "react_on_rails:assets:compile_environment"])
-    .enhance do
-      Rake::Task["react_on_rails:assets:symlink_non_digested_assets"].invoke
-      Rake::Task["react_on_rails:assets:delete_broken_symlinks"].invoke
-    end
 ```    
 
 For an example of how to do this, see the [dummy app](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/lib/tasks/assets.rake).
