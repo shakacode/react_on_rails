@@ -15,12 +15,31 @@ env:
   browser: true
   node: true
   mocha: true
+  jest: true
+
+overrides:
+  - files: ["**/*.ts", "**/*.tsx"]
+    parser: "@typescript-eslint/parser"
+    parserOptions:
+      ecmaVersion: 2018
+      sourceType: module
+      project: "./tsconfig.json"
+    extends:
+      - eslint:recommended
+      - plugin:@typescript-eslint/eslint-recommended
+      - plugin:@typescript-eslint/recommended
+    plugins:
+      - "@typescript-eslint"
+    rules:
+      "@typescript-eslint/no-namespace": 0
 
 rules:
   no-console: 0
   function-paren-newline: 0
   object-curly-newline: 0
 
+  # https://stackoverflow.com/a/59268871/5241481
+  import/extensions: ['error', 'ignorePackages', {"js": 'never',"ts": "never"}]
 
   # https://github.com/benmosher/eslint-plugin-import/issues/340
   import/no-extraneous-dependencies: 0
@@ -28,3 +47,6 @@ rules:
 settings:
   import/core-modules:
     - react-redux
+  import/resolver:
+    node:
+      extensions: [".js", ".ts", ".d.ts"]

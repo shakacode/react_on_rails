@@ -1,9 +1,15 @@
-// @flow
-
 import RenderUtils from './RenderUtils';
 import scriptSanitizedVal from './scriptSanitizedVal';
 
-export function consoleReplay() {
+declare global {
+  interface Console {
+    history?: {
+      arguments: Array<string | Record<string, string>>; level: "error" | "log" | "debug";
+    }[];
+  }
+}
+
+export function consoleReplay(): string {
   // console.history is a global polyfill used in server rendering.
   // $FlowFixMe
   if (!(console.history instanceof Array)) {
@@ -19,7 +25,7 @@ export function consoleReplay() {
         val = `${e.message}: ${arg}`;
       }
 
-      return scriptSanitizedVal(val);
+      return scriptSanitizedVal(val as string);
     });
 
     return `console.${msg.level}.apply(console, ${JSON.stringify(stringifiedList)});`;
@@ -28,6 +34,6 @@ export function consoleReplay() {
   return lines.join('\n');
 }
 
-export default function buildConsoleReplay() {
+export default function buildConsoleReplay(): string {
   return RenderUtils.wrapInScriptTags('consoleReplayLog', consoleReplay());
 }

@@ -1,5 +1,6 @@
-// key = name used by react_on_rails to identify the store
-// value = redux store creator, which is a function that takes props and returns a store
+import type { Store } from 'redux';
+import type { StoreGenerator } from './types';
+
 const registeredStoreGenerators = new Map();
 const hydratedStores = new Map();
 
@@ -8,7 +9,7 @@ export default {
    * Register a store generator, a function that takes props and returns a store.
    * @param storeGenerators { name1: storeGenerator1, name2: storeGenerator2 }
    */
-  register(storeGenerators) {
+  register(storeGenerators: { [id: string]: Store }): void {
     Object.keys(storeGenerators).forEach(name => {
       if (registeredStoreGenerators.has(name)) {
         console.warn('Called registerStore for store that is already registered', name);
@@ -31,7 +32,7 @@ export default {
    *        there is no store with the given name.
    * @returns Redux Store, possibly hydrated
    */
-  getStore(name, throwIfMissing = true) {
+  getStore(name: string, throwIfMissing = true): Store | undefined {
     if (hydratedStores.has(name)) {
       return hydratedStores.get(name);
     }
@@ -62,7 +63,7 @@ This can happen if you are server rendering and either:
    * @param name
    * @returns storeCreator with given name
    */
-  getStoreGenerator(name) {
+  getStoreGenerator(name: string): StoreGenerator {
     if (registeredStoreGenerators.has(name)) {
       return registeredStoreGenerators.get(name);
     }
@@ -77,14 +78,14 @@ This can happen if you are server rendering and either:
    * @param name
    * @param store (not the storeGenerator, but the hydrated store)
    */
-  setStore(name, store) {
+  setStore(name: string, store: Store): void {
     hydratedStores.set(name, store);
   },
 
   /**
    * Internally used function to completely clear hydratedStores Map.
    */
-  clearHydratedStores() {
+  clearHydratedStores(): void {
     hydratedStores.clear();
   },
 
@@ -92,7 +93,7 @@ This can happen if you are server rendering and either:
    * Get a Map containing all registered store generators. Useful for debugging.
    * @returns Map where key is the component name and values are the store generators.
    */
-  storeGenerators() {
+  storeGenerators(): Map<string, Function> {
     return registeredStoreGenerators;
   },
 
@@ -100,7 +101,7 @@ This can happen if you are server rendering and either:
    * Get a Map containing all hydrated stores. Useful for debugging.
    * @returns Map where key is the component name and values are the hydrated stores.
    */
-  stores() {
+  stores(): Map<string, Store> {
     return hydratedStores;
   },
 };

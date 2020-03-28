@@ -1,5 +1,5 @@
 export default {
-  wrapInScriptTags(scriptId, scriptBody) {
+  wrapInScriptTags(scriptId: string, scriptBody: string): string {
     if (!scriptBody) {
       return '';
     }

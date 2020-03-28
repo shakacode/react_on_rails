@@ -35,7 +35,7 @@ before_install:
 
 install:
   - travis_retry gem install bundler -v '>2'
-  - travis_retry nvm install 10.13.0
+  - travis_retry nvm install 13.9.0
   - node -v
   - travis_retry npm i -g yarn
   - travis_retry bundle install

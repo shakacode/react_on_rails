@@ -1,5 +1,4 @@
-// key = name used by react_on_rails
-// value = { name, component, generatorFunction: boolean, isRenderer: boolean }
+import type { RegisteredComponent, ComponentOrRenderFunction, RenderFunction } from './types/index';
 import generatorFunction from './generatorFunction';
 
 const registeredComponents = new Map();
@@ -8,7 +7,7 @@ export default {
   /**
    * @param components { component1: component1, component2: component2, etc. }
    */
-  register(components) {
+  register(components: { [id: string]: ComponentOrRenderFunction }): void {
     Object.keys(components).forEach(name => {
       if (registeredComponents.has(name)) {
         console.warn('Called register for component that is already registered', name);
@@ -20,7 +19,7 @@ export default {
       }
 
       const isGeneratorFunction = generatorFunction(component);
-      const isRenderer = isGeneratorFunction && component.length === 3;
+      const isRenderer = isGeneratorFunction && (component as RenderFunction).length === 3;
 
       registeredComponents.set(name, {
         name,
@@ -33,9 +32,9 @@ export default {
 
   /**
    * @param name
-   * @returns { name, component, generatorFunction }
+   * @returns { name, component, generatorFunction, isRenderer }
    */
-  get(name) {
+  get(name: string): RegisteredComponent {
     if (registeredComponents.has(name)) {
       return registeredComponents.get(name);
     }
@@ -48,9 +47,9 @@ Registered component names include [ ${keys} ]. Maybe you forgot to register the
   /**
    * Get a Map containing all registered components. Useful for debugging.
    * @returns Map where key is the component name and values are the
-   * { name, component, generatorFunction}
+   * { name, component, generatorFunction, isRenderer}
    */
-  components() {
+  components(): Map<string, RegisteredComponent> {
     return registeredComponents;
   },
 };
