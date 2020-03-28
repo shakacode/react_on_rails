@@ -15,6 +15,15 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+
+* Requires the use of rails/webpacker helpers
+* Removed **env_javascript_include_tag** and **env_stylesheet_link_tag** as these are replaced by view helpers
+  from rails/webpacker
+* Removal of support for old Rubies and Rails.
+
+
+
+
 ### [11.3.0] - 2019-05-24
 #### Added
 - Added method for retrieving any option from `render_options` [PR 1213](https://github.com/shakacode/react_on_rails/pull/1213)

@@ -51,10 +51,8 @@
   + [Elastic Beanstalk Deployment](./docs/additional-reading/elastic-beanstalk.md)
 
 ## Older, Non-Webpack Docs
-  + [Setting up Hot Reloading during Rails Development, API docs](./docs/api/ruby-api-hot-reload-view-helpers.md)
   + [Developing with the Webpack Dev Server](./docs/additional-reading/webpack-dev-server.md)
   + [Webpack, the Asset Pipeline, and Using Assets w/ React](./docs/additional-reading/rails-assets-relative-paths.md)
-  + [Hot Reloading of Assets For Rails Development for Asset Pipeline](docs/additional-reading/hot-reloading-rails-development-asset-pipeline.md)
 
 ## **[CONTRIBUTING](CONTRIBUTING.md)**
   + [Generator Testing](./docs/contributor-info/generator-testing.md)
