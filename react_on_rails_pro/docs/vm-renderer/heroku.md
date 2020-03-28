@@ -66,7 +66,7 @@ Rake::Task["assets:precompile"]
     .clear_prerequisites
     .enhance([:environment, "react_on_rails:assets:compile_environment"])
     .enhance do
-  Rake::Task["react_on_rails:assets:react_on_rails_pro:pre_stage_bundle_for_vm_renderer"].invoke
+  Rake::Task["react_on_rails_pro:pre_stage_bundle_for_vm_renderer"].invoke
 end
 ```
 
