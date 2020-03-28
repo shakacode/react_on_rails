@@ -57,7 +57,7 @@ group :development, :test do
   gem "pry-rails"
   gem "pry-rescue"
   gem "pry-stack_explorer"
-  gem "rubocop", "< 0.69", require: false
+  gem "rubocop", require: false
   gem "ruby-lint", require: false
   gem "scss_lint", require: false
 
