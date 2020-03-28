@@ -35,8 +35,7 @@ describe('consoleReplay', () => {
       { arguments: ['c', 'd'], level: 'warn' },
     ];
     const actual = consoleReplay();
-    const expected =
-        'console.log.apply(console, ["a","b"]);\nconsole.warn.apply(console, ["c","d"]);';
+    const expected = 'console.log.apply(console, ["a","b"]);\nconsole.warn.apply(console, ["c","d"]);';
     expect(actual).toEqual(expected);
   });
 
@@ -58,8 +57,8 @@ console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);`;
     console.history = [
       {
         arguments: [
-          'some message </script><script>alert(\'WTF\')</script>',
-          { a: 'Wow</script><script>alert(\'WTF\')</script>', b: 2 },
+          "some message </script><script>alert('WTF')</script>",
+          { a: "Wow</script><script>alert('WTF')</script>", b: 2 },
         ],
         level: 'log',
       },
@@ -89,5 +88,5 @@ console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);
 </script>`;
 
     expect(actual).toEqual(expected);
-  })
-})
+  });
+});

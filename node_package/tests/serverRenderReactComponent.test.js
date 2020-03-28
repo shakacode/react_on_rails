@@ -13,8 +13,9 @@ describe('serverRenderReactComponent', () => {
     const X1 = () => <div>HELLO</div>;
     ComponentStore.register({ X1 });
 
-    const { html, hasErrors } =
-      JSON.parse(serverRenderReactComponent({ name: 'X1', domNodeId: 'myDomId', trace: false }));
+    const { html, hasErrors } = JSON.parse(
+      serverRenderReactComponent({ name: 'X1', domNodeId: 'myDomId', trace: false }),
+    );
 
     const result = html.indexOf('>HELLO</div>') > 0;
     expect(result).toBeTruthy();
@@ -23,14 +24,17 @@ describe('serverRenderReactComponent', () => {
 
   it('serverRenderReactComponent renders errors', () => {
     expect.assertions(2);
-    const X2 = () => { throw new Error('XYZ'); };
+    const X2 = () => {
+      throw new Error('XYZ');
+    };
 
     ComponentStore.register({ X2 });
 
     // Not testing the consoleReplayScript, as handleError is putting the console to the test
     // runner log.
-    const { html, hasErrors } =
-      JSON.parse(serverRenderReactComponent({ name: 'X2', domNodeId: 'myDomId', trace: false }));
+    const { html, hasErrors } = JSON.parse(
+      serverRenderReactComponent({ name: 'X2', domNodeId: 'myDomId', trace: false }),
+    );
 
     const result = html.indexOf('XYZ') > 0 && html.indexOf('Exception in rendering!') > 0;
     expect(result).toBeTruthy();
@@ -44,8 +48,9 @@ describe('serverRenderReactComponent', () => {
 
     ComponentStore.register({ X3 });
 
-    const { html, hasErrors, renderedHtml } =
-      JSON.parse(serverRenderReactComponent({ name: 'X3', domNodeId: 'myDomId', trace: false }));
+    const { html, hasErrors, renderedHtml } = JSON.parse(
+      serverRenderReactComponent({ name: 'X3', domNodeId: 'myDomId', trace: false }),
+    );
 
     expect(html).toEqual(expectedHtml);
     expect(hasErrors).toBeFalsy();
@@ -56,10 +61,11 @@ describe('serverRenderReactComponent', () => {
     const X3 = (a1, a2, a3) => null;
     ComponentStore.register({ X3 });
 
-    const { html } =
-      JSON.parse(serverRenderReactComponent({ name: 'X3', domNodeId: 'myDomId', trace: false }));
+    const { html } = JSON.parse(
+      serverRenderReactComponent({ name: 'X3', domNodeId: 'myDomId', trace: false }),
+    );
 
     const result = html.indexOf('renderer') > 0 && html.indexOf('Exception in rendering!') > 0;
     expect(result).toBeTruthy();
-  })
-})
+  });
+});

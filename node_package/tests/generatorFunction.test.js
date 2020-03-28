@@ -15,7 +15,7 @@ describe('generatorFunction', () => {
 
     const es5Component = createReactClass({
       render() {
-        return (<div>ES5 React Component</div>);
+        return <div>ES5 React Component</div>;
       },
     });
 
@@ -27,7 +27,7 @@ describe('generatorFunction', () => {
 
     class ES6Component extends React.Component {
       render() {
-        return (<div>ES6 Component</div>);
+        return <div>ES6 Component</div>;
       }
     }
 
@@ -39,13 +39,13 @@ describe('generatorFunction', () => {
 
     class ES6Component extends React.Component {
       render() {
-        return (<div>ES6 Component</div>);
+        return <div>ES6 Component</div>;
       }
     }
 
     class ES6ComponentChild extends ES6Component {
       render() {
-        return (<div>ES6 Component Child</div>);
+        return <div>ES6 Component Child</div>;
       }
     }
 
@@ -56,7 +56,7 @@ describe('generatorFunction', () => {
     expect.assertions(1);
 
     /* eslint-disable react/prop-types */
-    const pureComponent = (props) => <h1>{ props.title }</h1>;
+    const pureComponent = (props) => <h1>{props.title}</h1>;
     /* eslint-enable react/prop-types */
 
     expect(generatorFunction(pureComponent)).toBe(true);
@@ -67,7 +67,7 @@ describe('generatorFunction', () => {
 
     const foobarComponent = createReactClass({
       render() {
-        return (<div>Component for Generator Function</div>);
+        return <div>Component for Generator Function</div>;
       },
     });
 
@@ -85,5 +85,5 @@ describe('generatorFunction', () => {
       },
     };
     expect(generatorFunction(foobarComponent)).toBe(false);
-  })
-})
+  });
+});

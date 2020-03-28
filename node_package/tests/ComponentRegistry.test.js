@@ -38,9 +38,7 @@ describe('ComponentRegistry', () => {
     expect.assertions(1);
     class C3 extends React.Component {
       render() {
-        return (
-          <div>Wow!</div>
-        );
+        return <div>Wow!</div>;
       }
     }
     ComponentRegistry.register({ C3 });
@@ -70,10 +68,18 @@ describe('ComponentRegistry', () => {
     ComponentRegistry.register({ C6 });
     const components = ComponentRegistry.components();
     expect(components.size).toBe(6);
-    expect(components.get('C5')).toEqual(
-      { name: 'C5', component: C5, generatorFunction: true, isRenderer: false });
-    expect(components.get('C6')).toEqual(
-      { name: 'C6', component: C6, generatorFunction: true, isRenderer: false });
+    expect(components.get('C5')).toEqual({
+      name: 'C5',
+      component: C5,
+      generatorFunction: true,
+      isRenderer: false,
+    });
+    expect(components.get('C6')).toEqual({
+      name: 'C6',
+      component: C6,
+      generatorFunction: true,
+      isRenderer: false,
+    });
   });
 
   it('only detects a renderer function if it has three arguments', () => {
@@ -83,24 +89,30 @@ describe('ComponentRegistry', () => {
     ComponentRegistry.register({ C7 });
     ComponentRegistry.register({ C8 });
     const components = ComponentRegistry.components();
-    expect(components.get('C7')).toEqual(
-      { name: 'C7', component: C7, generatorFunction: true, isRenderer: false });
-    expect(components.get('C8')).toEqual(
-      { name: 'C8', component: C8, generatorFunction: true, isRenderer: false });
+    expect(components.get('C7')).toEqual({
+      name: 'C7',
+      component: C7,
+      generatorFunction: true,
+      isRenderer: false,
+    });
+    expect(components.get('C8')).toEqual({
+      name: 'C8',
+      component: C8,
+      generatorFunction: true,
+      isRenderer: false,
+    });
   });
 
   it('throws error for retrieving unregistered component', () => {
     expect.assertions(1);
     expect(() => ComponentRegistry.get('foobar')).toThrow(
-      /Could not find component registered with name foobar/
+      /Could not find component registered with name foobar/,
     );
   });
 
   it('throws error for setting null component', () => {
     expect.assertions(1);
     const C9 = null;
-    expect(() => ComponentRegistry.register({ C9 })).toThrow(
-      /Called register with null component named C9/
-    );
-  })
-})
+    expect(() => ComponentRegistry.register({ C9 })).toThrow(/Called register with null component named C9/);
+  });
+});

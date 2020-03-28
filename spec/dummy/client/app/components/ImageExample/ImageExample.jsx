@@ -14,13 +14,11 @@ const TestComponent = (_props) => (
   <div>
     <h1 className={css.red}>This is a test of CSS module color red.</h1>
     <hr />
-    <h1 className={css.background}>Here is a label with a background-image from the CSS modules
-      imported
-    </h1>
+    <h1 className={css.background}>Here is a label with a background-image from the CSS modules imported</h1>
     <img src={logo} alt="logo" />
     <hr />
-    <h1 className={css.backgroundSameDirectory}>This label has a background image from the same
-      directory. Below is an img tag in the same directory
+    <h1 className={css.backgroundSameDirectory}>
+      This label has a background image from the same directory. Below is an img tag in the same directory
     </h1>
     <img src={bowerLogo} alt="bower logo" />
     <hr />

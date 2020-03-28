@@ -24,20 +24,18 @@ export default class HelloWorld extends React.Component {
   render() {
     return (
       <div>
-        <h3>
-          Hello, {this.state.name}!
-        </h3>
+        <h3>Hello, {this.state.name}!</h3>
         <hr />
-        <form >
+        <form>
           <label htmlFor="name">
             Say hello to:
+            <input
+              id="name"
+              type="text"
+              value={this.state.name}
+              onChange={(e) => this.updateName(e.target.value)}
+            />
           </label>
-          <input
-            id="name"
-            type="text"
-            value={this.state.name}
-            onChange={(e) => this.updateName(e.target.value)}
-          />
         </form>
       </div>
     );

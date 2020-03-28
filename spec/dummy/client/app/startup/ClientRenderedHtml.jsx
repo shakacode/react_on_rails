@@ -12,6 +12,4 @@ import EchoProps from '../components/EchoProps';
  *  Note, this is a fictional example, as you'd only use a generator function if you wanted to run
  *  some extra code, such as setting up Redux and React-Router.
  */
-export default (props, _railsContext) => (
-  <EchoProps {...props} />
-);
+export default (props, _railsContext) => <EchoProps {...props} />;

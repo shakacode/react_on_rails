@@ -1,9 +1,9 @@
-module.exports = function(api) {
-  var validEnv = ['development', 'test', 'production']
-  var currentEnv = api.env()
-  var isDevelopmentEnv = api.env('development')
-  var isProductionEnv = api.env('production')
-  var isTestEnv = api.env('test')
+module.exports = function (api) {
+  var validEnv = ['development', 'test', 'production'];
+  var currentEnv = api.env();
+  var isDevelopmentEnv = api.env('development');
+  var isProductionEnv = api.env('production');
+  var isTestEnv = api.env('test');
 
   if (!validEnv.includes(currentEnv)) {
     throw new Error(
@@ -11,8 +11,8 @@ module.exports = function(api) {
         '`BABEL_ENV` environment variables. Valid values are "development", ' +
         '"test", and "production". Instead, received: ' +
         JSON.stringify(currentEnv) +
-        '.'
-    )
+        '.',
+    );
   }
 
   return {
@@ -46,24 +46,27 @@ module.exports = function(api) {
           // No idea on this one.
           // Suggestion for performance from create-react-app
           // https://github.com/facebook/create-react-app/issues/5277
-          exclude: ['transform-typeof-symbol']
-        }
+          exclude: ['transform-typeof-symbol'],
+        },
       ],
       [
         require('@babel/preset-react').default,
         {
           development: isDevelopmentEnv || isTestEnv,
-          useBuiltIns: true
-        }
-      ]
+          useBuiltIns: true,
+        },
+      ],
     ].filter(Boolean),
     plugins: [
-      [require("babel-plugin-module-resolver").default, {
-        "root": ["./client/app/assets/images"],
-        "alias": {
-          "images": "./images"
-        }
-      }],
+      [
+        require('babel-plugin-module-resolver').default,
+        {
+          root: ['./client/app/assets/images'],
+          alias: {
+            images: './images',
+          },
+        },
+      ],
       require('babel-plugin-macros'),
       require('@babel/plugin-syntax-dynamic-import').default,
 
@@ -75,34 +78,34 @@ module.exports = function(api) {
       [
         require('@babel/plugin-proposal-class-properties').default,
         {
-          loose: true
-        }
+          loose: true,
+        },
       ],
       [
         require('@babel/plugin-proposal-object-rest-spread').default,
         {
-          useBuiltIns: true
-        }
+          useBuiltIns: true,
+        },
       ],
       [
         require('@babel/plugin-transform-runtime').default,
         {
           helpers: false,
-          regenerator: true
-        }
+          regenerator: true,
+        },
       ],
       [
         require('@babel/plugin-transform-regenerator').default,
         {
-          async: false
-        }
+          async: false,
+        },
       ],
       isProductionEnv && [
         require('babel-plugin-transform-react-remove-prop-types').default,
         {
-          removeImport: true
-        }
-      ]
-    ].filter(Boolean)
-  }
-}
+          removeImport: true,
+        },
+      ],
+    ].filter(Boolean),
+  };
+};

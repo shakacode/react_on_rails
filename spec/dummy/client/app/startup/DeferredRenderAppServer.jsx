@@ -13,10 +13,12 @@ const DeferredRenderAppServer = (_props, railsContext) => {
   const routes = {
     path: '/deferred_render_with_server_rendering',
     component: DeferredRender,
-    childRoutes: [{
-      path: '/deferred_render_with_server_rendering/async_page',
-      component: DeferredRenderAsyncPage,
-    }],
+    childRoutes: [
+      {
+        path: '/deferred_render_with_server_rendering/async_page',
+        component: DeferredRenderAsyncPage,
+      },
+    ],
   };
 
   // Unlike the match in DeferredRenderAppClient, this match is always

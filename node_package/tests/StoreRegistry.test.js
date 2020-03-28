@@ -20,7 +20,7 @@ describe('', () => {
     expect.assertions(2);
     StoreRegistry.stores().clear();
     expect(() => StoreRegistry.register({ storeGenerator: null })).toThrow(
-      /Called ReactOnRails.registerStores with a null or undefined as a value/
+      /Called ReactOnRails.registerStores with a null or undefined as a value/,
     );
     expect(() => StoreRegistry.register({ storeGenerator: undefined })).toThrow(
       /Called ReactOnRails.registerStores with a null or undefined as a value/,
@@ -53,16 +53,13 @@ describe('', () => {
     );
   });
 
-  it('StoreRegistry returns undefined for retrieving unregistered store, ' +
-    'passing throwIfMissing = false',
-  () => {
+  it('StoreRegistry returns undefined for retrieving unregistered store, passing throwIfMissing = false', () => {
     expect.assertions(1);
     StoreRegistry.setStore('foobarX', {});
     const actual = StoreRegistry.getStore('foobar', false);
     const expected = undefined;
     expect(actual).toEqual(expected);
-  },
-  );
+  });
 
   it('StoreRegistry getStore, setStore', () => {
     expect.assertions(1);
@@ -93,5 +90,5 @@ describe('', () => {
     StoreRegistry.clearHydratedStores();
     const expected = new Map();
     expect(StoreRegistry.stores()).toEqual(expected);
-  })
-})
+  });
+});

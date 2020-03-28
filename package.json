@@ -26,7 +26,7 @@
     "blue-tape": "^1.0.0",
     "create-react-class": "^15.6.0",
     "eslint": "^6.3.0",
-    "eslint-config-prettier": "^3.1.0",
+    "eslint-config-prettier": "^6.10.1",
     "eslint-config-shakacode": "^16.0.1",
     "eslint-plugin-import": "^2.6.1",
     "eslint-plugin-jsx-a11y": "^6.1.2",
@@ -35,8 +35,8 @@
     "jest": "^25.1.0",
     "jsdom": "^11.1.0",
     "nps": "^5.9.3",
-    "prettier": "^1.14.3",
-    "prettier-eslint-cli": "^4.7.1",
+    "prettier": "^2.0.1",
+    "prettier-eslint-cli": "^5.0.0",
     "prop-types": "^15.5.10",
     "react": "^16.5.2",
     "react-dom": "^16.5.2",
@@ -49,7 +49,8 @@
     "webpack-manifest-plugin": "^1.2.1"
   },
   "dependencies": {
-    "@babel/runtime-corejs2": "^7.0.0"
+    "@babel/runtime-corejs2": "^7.0.0",
+    "concurrently": "^5.1.0"
   },
   "peerDependencies": {
     "js-yaml": ">= 3.0.0",
