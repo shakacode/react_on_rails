@@ -48,33 +48,29 @@ module ReactOnRails
     def calc_message(component_name, console_messages, err, js_code, props)
       message = "ERROR in SERVER PRERENDERING\n".dup
       if err
-        # rubocop:disable Layout/IndentHeredoc
-        message << <<-MSG
-Encountered error: \"#{err}\"
+        message << <<~MSG
+          Encountered error: \"#{err}\"
         MSG
-        # rubocop:enable Layout/IndentHeredoc
+
         backtrace = err.backtrace.join("\n")
       else
         backtrace = nil
       end
-      # rubocop:disable Layout/IndentHeredoc
-      message << <<-MSG
-when prerendering #{component_name} with props: #{Utils.smart_trim(props, MAX_ERROR_SNIPPET_TO_LOG)}
+      message << <<~MSG
+        when prerendering #{component_name} with props: #{Utils.smart_trim(props, MAX_ERROR_SNIPPET_TO_LOG)}
 
-code:
+        code:
 
-#{Utils.smart_trim(js_code, MAX_ERROR_SNIPPET_TO_LOG)}
+        #{Utils.smart_trim(js_code, MAX_ERROR_SNIPPET_TO_LOG)}
 
       MSG
-      # rubocop:enable Layout/IndentHeredoc
 
       if console_messages
-        # rubocop:disable Layout/IndentHeredoc
-        message << <<-MSG
-console messages:
-#{console_messages}
+        message << <<~MSG
+          console messages:
+          #{console_messages}
         MSG
-        # rubocop:enable Layout/IndentHeredoc
+
       end
       [backtrace, message]
     end

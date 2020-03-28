@@ -121,14 +121,12 @@ module ReactOnRails
           return if ReactOnRails.configuration.server_bundle_js_file.blank?
 
           bundle_js_code = read_bundle_js_code
-
-          # rubocop:disable Layout/IndentHeredoc
-          base_js_code = <<-JS
-#{console_polyfill}
-#{execjs_timer_polyfills}
-#{bundle_js_code};
+          base_js_code = <<~JS
+            #{console_polyfill}
+            #{execjs_timer_polyfills}
+            #{bundle_js_code};
           JS
-          # rubocop:enable Layout/IndentHeredoc
+
           file_name = "tmp/base_js_code.js"
           begin
             if ReactOnRails.configuration.trace
@@ -151,33 +149,31 @@ module ReactOnRails
         end
 
         def execjs_timer_polyfills
-          # rubocop:disable Layout/IndentHeredoc
-          <<-JS
-function getStackTrace () {
-  var stack;
-  try {
-    throw new Error('');
-  }
-  catch (error) {
-    stack = error.stack || '';
-  }
-  stack = stack.split('\\n').map(function (line) { return line.trim(); });
-  return stack.splice(stack[0] == 'Error' ? 2 : 1);
-}
+          <<~JS
+            function getStackTrace () {
+              var stack;
+              try {
+                throw new Error('');
+              }
+              catch (error) {
+                stack = error.stack || '';
+              }
+              stack = stack.split('\\n').map(function (line) { return line.trim(); });
+              return stack.splice(stack[0] == 'Error' ? 2 : 1);
+            }
 
-function setInterval() {
-  #{undefined_for_exec_js_logging('setInterval')}
-}
+            function setInterval() {
+              #{undefined_for_exec_js_logging('setInterval')}
+            }
 
-function setTimeout() {
-  #{undefined_for_exec_js_logging('setTimeout')}
-}
+            function setTimeout() {
+              #{undefined_for_exec_js_logging('setTimeout')}
+            }
 
-function clearTimeout() {
-  #{undefined_for_exec_js_logging('clearTimeout')}
-}
+            function clearTimeout() {
+              #{undefined_for_exec_js_logging('clearTimeout')}
+            }
           JS
-          # rubocop:enable Layout/IndentHeredoc
         end
 
         def undefined_for_exec_js_logging(function_name)
@@ -191,20 +187,18 @@ function clearTimeout() {
 
         # Reimplement console methods for replaying on the client
         def console_polyfill
-          # rubocop:disable Layout/IndentHeredoc
-          <<-JS
-var console = { history: [] };
-['error', 'log', 'info', 'warn'].forEach(function (level) {
-  console[level] = function () {
-    var argArray = Array.prototype.slice.call(arguments);
-    if (argArray.length > 0) {
-      argArray[0] = '[SERVER] ' + argArray[0];
-    }
-    console.history.push({level: level, arguments: argArray});
-  };
-});
+          <<~JS
+            var console = { history: [] };
+            ['error', 'log', 'info', 'warn'].forEach(function (level) {
+              console[level] = function () {
+                var argArray = Array.prototype.slice.call(arguments);
+                if (argArray.length > 0) {
+                  argArray[0] = '[SERVER] ' + argArray[0];
+                }
+                console.history.push({level: level, arguments: argArray});
+              };
+            });
           JS
-          # rubocop:enable Layout/IndentHeredoc
         end
 
         private
