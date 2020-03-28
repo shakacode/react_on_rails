@@ -7,12 +7,12 @@
       "url": "https://github.com/shakacode/react_on_rails/"
     },
     "sharing": {
-      "facebook":   true,
-      "twitter":    true,
-      "google":     true,
-      "weibo":      true,
+      "facebook": true,
+      "twitter": true,
+      "google": true,
+      "weibo": true,
       "instapaper": true,
-      "vk":         true
+      "vk": true
     }
   }
 }

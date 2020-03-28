@@ -11,7 +11,6 @@ const { env } = require('process');
 const { safeLoad } = require('js-yaml');
 const { readFileSync } = require('fs');
 
-
 function removeOuterSlashes(string) {
   return string.replace(/^\/*/, '').replace(/\/*$/, '');
 }
@@ -46,9 +45,9 @@ function formatPublicPath(settings) {
      output: { path, publicPath, publicPathWithHost }
    }}
  */
-const configLoader = (configPath) => {
+const configLoader = configPath => {
   // Some test environments might not have the NODE_ENV set, so we'll have fallbacks.
-  const configEnv = (env.NODE_ENV || env.RAILS_ENV || 'development');
+  const configEnv = env.NODE_ENV || env.RAILS_ENV || 'development';
   const ymlConfigPath = join(configPath, 'webpacker.yml');
   const settings = safeLoad(readFileSync(ymlConfigPath, 'utf8'))[configEnv];
 

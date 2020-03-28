@@ -1,1 +1,6 @@
-node_modules
+node_modules/
+package.json
+tmp/
+public/webpack/
+coverage/
+**/app/assets/webpack/
