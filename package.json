@@ -27,7 +27,7 @@
     "create-react-class": "^15.6.0",
     "eslint": "^6.3.0",
     "eslint-config-prettier": "^6.10.1",
-    "eslint-config-shakacode": "^17.0.0",
+    "eslint-config-shakacode": "^16.0.1",
     "eslint-plugin-import": "^2.6.1",
     "eslint-plugin-jsx-a11y": "^6.1.2",
     "eslint-plugin-prettier": "^3.0.0",
