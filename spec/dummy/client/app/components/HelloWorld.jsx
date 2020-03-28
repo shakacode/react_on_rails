@@ -33,27 +33,22 @@ class HelloWorld extends React.Component {
 
   render() {
     // eslint-disable-next-line no-console
-    console.log('HelloWorld demonstrating a call to console.log in ' +
-      'spec/dummy/client/app/components/HelloWorld.jsx:18');
+    console.log(
+      'HelloWorld demonstrating a call to console.log in ' +
+        'spec/dummy/client/app/components/HelloWorld.jsx:18',
+    );
 
     const { name } = this.state;
     const { railsContext } = this.props;
 
     return (
       <div>
-        <h3 className={css.brightColor}>
-          Hello, {name}!
-        </h3>
+        <h3 className={css.brightColor}>Hello, {name}!</h3>
         <p>
           Say hello to:
-          <input
-            type="text"
-            ref={this.setNameDomRef}
-            defaultValue={name}
-            onChange={this.handleChange}
-          />
+          <input type="text" ref={this.setNameDomRef} defaultValue={name} onChange={this.handleChange} />
         </p>
-        { railsContext && <RailsContext {...{ railsContext }} /> }
+        {railsContext && <RailsContext {...{ railsContext }} />}
       </div>
     );
   }

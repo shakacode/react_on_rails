@@ -14,9 +14,7 @@ describe('ReactOnRails', () => {
     expect.assertions(1);
     const R1 = createReactClass({
       render() {
-        return (
-          <div> WORLD </div>
-        );
+        return <div> WORLD </div>;
       },
     });
     ReactOnRails.register({ R1 });
@@ -46,7 +44,7 @@ describe('ReactOnRails', () => {
   it('not specified has traceTurbolinks as false', () => {
     ReactOnRails.resetOptions();
     expect.assertions(1);
-    ReactOnRails.setOptions({ });
+    ReactOnRails.setOptions({});
     const actual = ReactOnRails.option('traceTurbolinks');
     expect(actual).toBe(false);
   });
@@ -54,25 +52,17 @@ describe('ReactOnRails', () => {
   it('setOptions method throws error for invalid options', () => {
     ReactOnRails.resetOptions();
     expect.assertions(1);
-    expect(
-      () => ReactOnRails.setOptions({ foobar: true })
-    ).toThrow(/Invalid option/);
+    expect(() => ReactOnRails.setOptions({ foobar: true })).toThrow(/Invalid option/);
   });
 
   it('registerStore throws if passed a falsey object (null, undefined, etc)', () => {
     expect.assertions(3);
 
-    expect(
-      () => ReactOnRails.registerStore(null)
-    ).toThrow(/null or undefined/);
+    expect(() => ReactOnRails.registerStore(null)).toThrow(/null or undefined/);
 
-    expect(
-      () => ReactOnRails.registerStore(undefined)
-    ).toThrow(/null or undefined/);
+    expect(() => ReactOnRails.registerStore(undefined)).toThrow(/null or undefined/);
 
-    expect(
-      () => ReactOnRails.registerStore(false)
-    ).toThrow(/null or undefined/);
+    expect(() => ReactOnRails.registerStore(false)).toThrow(/null or undefined/);
   });
 
   it('register store and getStoreGenerator allow registration', () => {
@@ -88,7 +78,7 @@ describe('ReactOnRails', () => {
     ReactOnRails.registerStore({ storeGenerator });
 
     const actual = ReactOnRails.getStoreGenerator('storeGenerator');
-    expect(actual).toEqual(storeGenerator)
+    expect(actual).toEqual(storeGenerator);
 
     expect(ReactOnRails.storeGenerators()).toEqual(new Map([['storeGenerator', storeGenerator]]));
   });
@@ -125,7 +115,6 @@ describe('ReactOnRails', () => {
       return createStore(reducer, props);
     }
 
-
     const result = storeGenerator({});
     ReactOnRails.setStore('storeGenerator', result);
     const actual = new Map();
@@ -135,5 +124,5 @@ describe('ReactOnRails', () => {
     ReactOnRails.clearHydratedStores();
     const expected = new Map();
     expect(ReactOnRails.stores()).toEqual(expected);
-  })
-})
+  });
+});

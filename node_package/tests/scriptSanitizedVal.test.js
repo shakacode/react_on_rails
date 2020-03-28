@@ -40,5 +40,5 @@ describe('scriptSanitizedVal', () => {
     const actual = scriptSanitizedVal(input);
     const expected = 'Script5:"</div>"(/script> <script>alert(\'WTF5\')(/script>';
     expect(actual).toEqual(expected);
-  })
-})
+  });
+});

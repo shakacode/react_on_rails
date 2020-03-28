@@ -10,7 +10,5 @@
     "strict": true,
     "target": "es5"
   },
-  "include": [
-    "node_package/src/**/*"
-  ]
+  "include": ["node_package/src/**/*"]
 }
