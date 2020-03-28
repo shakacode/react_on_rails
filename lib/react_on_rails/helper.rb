@@ -15,7 +15,7 @@ module ReactOnRails
   module Helper
     include ReactOnRails::Utils::Required
 
-    COMPONENT_HTML_KEY = "componentHtml".freeze
+    COMPONENT_HTML_KEY = "componentHtml"
 
     # The env_javascript_include_tag and env_stylesheet_link_tag support the usage of a webpack
     # dev server for providing the JS and CSS assets during development mode. See
@@ -395,13 +395,11 @@ module ReactOnRails
 
     def compose_react_component_html_with_spec_and_console(component_specification_tag, rendered_output, console_script)
       # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
-      # rubocop:disable Layout/IndentHeredoc
-      <<-HTML.html_safe
-#{rendered_output}
-      #{component_specification_tag}
-      #{console_script}
+      <<~HTML.html_safe
+        #{rendered_output}
+              #{component_specification_tag}
+              #{console_script}
       HTML
-      # rubocop:enable Layout/IndentHeredoc
     end
 
     # prepend the rails_context if not yet applied

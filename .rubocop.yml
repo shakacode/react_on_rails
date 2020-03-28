@@ -3,7 +3,7 @@
 
 AllCops:
   DisplayCopNames: true
-  TargetRubyVersion: 2.2
+  TargetRubyVersion: 2.5
 
   Include:
     - '**/Rakefile'
@@ -54,7 +54,7 @@ Lint/AssignmentInCondition:
   Exclude:
     - 'spec/dummy/bin/spring'
 
-Lint/HandleExceptions:
+Lint/SuppressedException:
   Exclude:
     - 'spec/dummy/bin/rails'
     - 'spec/dummy/bin/rake'
@@ -89,4 +89,4 @@ Style/GlobalVars:
     - 'spec/dummy/config/environments/development.rb'
 
 Style/FrozenStringLiteralComment:
-  EnforcedStyle: when_needed
+  EnforcedStyle: always
