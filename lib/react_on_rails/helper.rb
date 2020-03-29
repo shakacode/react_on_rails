@@ -125,6 +125,9 @@ module ReactOnRails
     # Separate initialization of store from react_component allows multiple react_component calls to
     # use the same Redux store.
     #
+    # NOTE: This technique not recommended as it prevents dynamic code splitting for performance.
+    # Instead, you should use the standard react_component view helper.
+    #
     # store_name: name of the store, corresponding to your call to ReactOnRails.registerStores in your
     #             JavaScript code.
     # props: Ruby Hash or JSON string which contains the properties to pass to the redux store.
