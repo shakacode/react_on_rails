@@ -1,20 +1,12 @@
-# Asset Pipeline
+# Asset Pipeline with React on Rails
 
-The plumbing of webpack produced assets through the asset pipeline is deprecated as of v9.0.
+In general, you should not be mixing the asset pipeline with rails/webpacker and React on Rails.
 
-The information in this document is here for those that have not yet upgraded.
+If you're using React, then all of your CSS and images should be under either `/client` or
+`/app/javascript` or wherever you want your client side application.
 
+If you are incrementally migrating a large application, your main concern will be how to minimize
+duplication of styles and images between your old application and the new one.
 
-
-
-This option still works for your `/config/initializers/react_on_rails.rb` if you are still using the
-asset pipeline.
-```
-  ################################################################################
-  # MISCELLANEOUS OPTIONS
-  ################################################################################
-  # If you want to use webpack for CSS and images, and still use the asset pipeline,
-  # see https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/rails-assets.md
-  # And you will use a setting like this.
-  config.symlink_non_digested_assets_regex = /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/
-```
+Please email [justin@shakacode.com](mailto:justin@shakacode.com) if you would be interested in help
+to migrate a larger application.

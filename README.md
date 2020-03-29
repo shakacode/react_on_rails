@@ -266,7 +266,7 @@ Browse the links in the [Summary Table of Contents](./SUMMARY.md)
 
 Here are some highly recommended next articles to read:
 
-1. [How React on Rails Works](./docs/basics/how-react-on-rails-works.md)
+1. [How React on Rails Works](docs/outdated/how-react-on-rails-works.md)
 1. [Recommended Project Structure](./docs/basics/recommended-project-structure.md)
 1. [Webpack Configuration](./docs/basics/webpack-configuration.md)
 1. [View Helpers API](./docs/api/view-helpers-api.md) 
@@ -345,7 +345,7 @@ I've just moved ShakaCode's development to [ClubHouse](https://clubhouse.io/) fr
 Aloha and best wishes from Justin and the ShakaCode team!
 
 # Work with Us
-ShakaCode is **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded, remote-first, developers that wish to work on our projects, including [Hawaii Chee](https://www.hawaiichee.com). Your main coding interview will be pairing with us on our open source! We're getting into [Reason](https://reasonml.github.io/)!
+ShakaCode is **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded, remote-first, developers that wish to work on our projects, including [Hawaii Chee](https://www.hawaiichee.com). Your main coding interview will be pairing with us on our open source! We're also using [ReasonML](https://reasonml.github.io/) extensively!
 
 # License
 
