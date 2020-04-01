@@ -16,6 +16,7 @@ environment.plugins.insert(
   }),
   { after: 'Environment' },
 );
+
 const serverConfig = merge(environment.toWebpackConfig(), {
   mode: 'development',
   target: 'web',

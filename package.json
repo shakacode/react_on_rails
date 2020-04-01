@@ -25,7 +25,7 @@
     "babelify": "^10.0.0",
     "blue-tape": "^1.0.0",
     "create-react-class": "^15.6.0",
-    "eslint": "^6.3.0",
+    "eslint": "^6.8.0",
     "eslint-config-prettier": "^6.10.1",
     "eslint-config-shakacode": "^16.0.1",
     "eslint-plugin-import": "^2.6.1",
@@ -64,6 +64,7 @@
   "scripts": {
     "test": "jest node_package/tests",
     "clean": "rm -rf node_package/lib",
+    "start": "nps",
     "prepare": "yarn run build",
     "prepublish": "npm run prepare",
     "build": "yarn run clean && yarn run tsc",
