@@ -76,6 +76,7 @@ group :test do
   gem "launchy"
   gem "rspec-rails"
   gem "rspec-retry"
+  gem "rspec_junit_formatter"
   gem "selenium-webdriver"
   gem "webdrivers", "~> 3.0"
 end
