@@ -3,6 +3,7 @@ All notable changes to this project will be documented in this file. Items under
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+
 ## [1.5.1] - 2020-03-25
 ### Improved
 - config.assets_to_copy can take a single value in addition to an array. [PR 122](https://github.com/shakacode/react_on_rails_pro/pull/122 ) [justin808](https://github.com/justin808).
@@ -101,7 +102,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.0...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.1...HEAD
+[1.5.1]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.0...1.5.1
 [1.5.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.4...1.5.0
 [1.4.4]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.3...1.4.4
 [1.4.3]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.2...1.4.3
