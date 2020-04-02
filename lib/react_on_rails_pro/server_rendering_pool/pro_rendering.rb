@@ -18,6 +18,8 @@ module ReactOnRailsPro
 
         def exec_server_render_js(js_code, render_options)
           ::ReactOnRailsPro::Utils.with_trace(render_options.react_component_name) do
+            # See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
+            # the digest is on the render options.
             set_request_digest_on_render_options(js_code, render_options)
             if ReactOnRailsPro.configuration.prerender_caching &&
                render_options.internal_option(:skip_prerender_cache).nil?
@@ -30,8 +32,8 @@ module ReactOnRailsPro
           end
         end
 
-        # TODO: This request digest is probably no longer needed
-        # See https://github.com/shakacode/react_on_rails_pro/issues/119
+        # See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
+        # the digest is on the render options.
         def set_request_digest_on_render_options(js_code, render_options)
           return unless render_options.request_digest.blank?
 

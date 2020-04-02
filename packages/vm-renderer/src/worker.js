@@ -96,7 +96,9 @@ module.exports = function run(config) {
     return true;
   };
 
-  //
+  // See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
+  // the digest is part of the request URL. Yes, it's not used here, but the
+  // server logs might show it to distinguish different requests.
   app.route('/bundles/:bundleTimestamp/render/:renderRequestDigest').post(
     asyncHandler(async (req, res, _next) => {
       if (!requestPrechecks(req, res)) {
