@@ -3,13 +3,11 @@
 [![License](https://img.shields.io/badge/license-mit-green.svg)](./LICENSE.md) [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![](https://ruby-gem-downloads-badge.herokuapp.com/react_on_rails?type=total)](https://rubygems.org/gems/react_on_rails)
 
 #### News
-**March 25, 2020**: I've got HMR working with [Loadable Components](https://loadable-components.com) for a both amazing developer experience and great runtime performance. Blog article coming soon!
-
-**March 7, 2020**: `react_on_rails` fully supports `rails/webpacker`. The example test app in `spec/dummy` was just converted over to use rails/webpacker v4. It's a good example of how to leverage rails/webpacker's webpack configuration. 
-
-**March 4, 2020**: Justin Gordon is presenting [Webpacker, It-Just-Works, But How? at RailsConf, 2020](https://railsconf.com/program/sessions#session-943). Want to hear Justin give a trial run of the talk with the ability to ask questions? [Click here to sign up](https://signup.shakacode.com/webpacker_it_just_works) for notification of when this will happen.
-
-**February 26, 2020**: React on Rails Pro is getting a big update to support the awesome [Loadable Components](https://loadable-components.com) library for code-splitting with SSR. We're going to see some awesome performance boosts! Please [email me](mailto:justin@shakacode.com) if you'd like to use [Loadable Components Code Splitting](https://loadable-components.com/docs/code-splitting/) to speed up your app by reducing your bundle sizes and lazily loading the code that's needed. 
+**April 2, 2020**:
+* Are you interested in support for React on Rails? If so check out [React on Rails Pro](https://docs.google.com/document/d/1vwooIc6jKkuBOzllQ7rbVKMR2xOmeX0TpjHKxHcFyYo/edit#).
+* HMR is working with [Loadable Components](https://loadable-components.com) for a both amazing hot-reloading developer experience and great runtime performance. Please [email me](mailto:justin@shakacode.com) if you'd like to use [Loadable Components Code Splitting](https://loadable-components.com/docs/code-splitting/) to speed up your app by reducing your bundle sizes and lazily loading the code that's needed.
+* `react_on_rails` fully supports `rails/webpacker`. The example test app in `spec/dummy` was recently converted over to use rails/webpacker v4. It's a good example of how to leverage rails/webpacker's webpack configuration. 
+* Justin Gordon is presenting [Webpacker, It-Just-Works, But How? at RailsConf, 2020, Couch Edition](https://railsconf.com/program/sessions#session-943). Want to hear Justin give a trial run of the talk with the ability to ask questions? [Click here to sign up](https://signup.shakacode.com/webpacker_it_just_works) for notification of when this will happen.
 
 ---
 
@@ -300,9 +298,9 @@ React on Rails Pro provides Node server rendering, fragment caching, code-splitt
 
 [![2018-09-11_10-31-11](https://user-images.githubusercontent.com/1118459/45467845-5bcc7400-b6bd-11e8-91e1-e0cf806d4ea4.png)](https://blog.shakacode.com/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db)
 
-## ShakaCode Pro Support
+## React on Rails Pro Support
 
-The [ShakaCode Pro Support Plan](http://www.shakacode.com/work/shakacode-pro-support.pdf) can help you with:
+The [React on Rails Pro Support Plan](https://docs.google.com/document/d/1vwooIc6jKkuBOzllQ7rbVKMR2xOmeX0TpjHKxHcFyYo/edit#) can help!
 
 * Optimizing your webpack setup to Webpack v4 for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable.
 * Upgrading your app to use the current Webpack setup that skips the Sprockets asset pipeline.
