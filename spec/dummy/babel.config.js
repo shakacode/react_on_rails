@@ -67,6 +67,7 @@ module.exports = function (api) {
           },
         },
       ],
+      isDevelopmentEnv && require('react-refresh/babel'),
       require('babel-plugin-macros'),
       require('@babel/plugin-syntax-dynamic-import').default,
 

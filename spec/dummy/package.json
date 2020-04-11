@@ -60,6 +60,7 @@
     "webpack-merge": "^4.1.5"
   },
   "devDependencies": {
+    "@pmmmwh/react-refresh-webpack-plugin": "^0.2.0",
     "body-parser": "^1.19.0",
     "eslint": "^5.7.0",
     "eslint-config-prettier": "^3.1.0",
@@ -73,8 +74,10 @@
     "preload-webpack-plugin": "^3.0.0-alpha.1",
     "prettier": "^1.14.3",
     "prettier-eslint-cli": "^4.7.1",
+    "react-refresh": "^0.8.1",
     "tape": "^4.7.0",
-    "webpack-dev-server": "^3.2.1"
+    "webpack-dev-server": "^3.2.1",
+    "webpack-hot-middleware": "^2.25.0"
   },
   "browser": {
     "fs": false
