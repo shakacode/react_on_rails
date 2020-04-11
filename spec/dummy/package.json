@@ -14,7 +14,7 @@
     "@babel/preset-env": "^7.0.0",
     "@babel/preset-react": "^7.0.0",
     "@babel/runtime": "^7.4.5",
-    "@rails/webpacker": "^4.2.2",
+    "@rails/webpacker": "^5.0.1",
     "babel-loader": "^8.0.6",
     "babel-plugin-module-resolver": "^3.2.0",
     "babel-plugin-syntax-dynamic-import": "^6.18.0",
