@@ -31,19 +31,21 @@ Registered components may either do one of the following if functions:
 
 ##### Correct
 Either of these will work:
-1. Take 2 props and return a function that takes zero or one params and returns JSX.
+1. Take **2 params** and return **a function** that takes zero or one params and returns a
+   JSX or String. 
     ```js
-    export default (props, _railsContext) => () => <EchoProps {...props} />;
+    export default (props, _railsContext) => () => <Component {...props} />;
     ```
 
-2. Take only zero or one params and you return a JSX literal
+2. Take only zero or one params and you return a JSX literal or String
     ```js
-    export default (props) => <EchoProps {...props} />;
+    export default (props) => <Component {...props} />;
     ```
 ##### Broken, as this function takes two params and it returns a JSX Literal
 ```js
-export default (props, _railsContext) => <EchoProps {...props} />;
+export default (props, _railsContext) => <Component {...props} />;
 ```
+In this example, you need to wrap the `<Component {...props} />` in a function call.
 
 ### [11.3.0] - 2019-05-24
 #### Added
