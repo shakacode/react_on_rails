@@ -1,4 +1,12 @@
-# ReactOnRails
+![reactrails](https://user-images.githubusercontent.com/10421828/79423012-8df33580-7fc6-11ea-9a85-c90d1e0295cd.png)
+
+<p align="center">
+ <a href="https://shakacode.com/" target="_blank"><img src="https://user-images.githubusercontent.com/10421828/79423010-8d5a9f00-7fc6-11ea-9789-bba501a398c0.png"></a>
+ <a href="https://forum.shakacode.com/" target="_blank"><img src="https://user-images.githubusercontent.com/10421828/79423002-8b90db80-7fc6-11ea-96ea-350bde96246c.png"></a>
+ <a href="https://www.shakacode.com/react-on-rails-pro" target="_blank"><img src="https://user-images.githubusercontent.com/10421828/79423007-8cc20880-7fc6-11ea-9e3d-bbc635ee3507.png"></a>
+</p>
+
+---
 
 [![License](https://img.shields.io/badge/license-mit-green.svg)](./LICENSE.md) [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![](https://ruby-gem-downloads-badge.herokuapp.com/react_on_rails?type=total)](https://rubygems.org/gems/react_on_rails)
 
