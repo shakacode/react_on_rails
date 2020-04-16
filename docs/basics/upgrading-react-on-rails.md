@@ -5,6 +5,50 @@ If you would like help in migrating between React on Rails versions or help with
 
 We specialize in helping companies to quickly and efficiently move from versions before 9 to current. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4 for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
 
+## Upgrading to v12
+* Make sure that are are on a relatively more recent version of rails and webpacker.
+* Updated API for ReactOnRails.register.
+
+In order to solve the issues regarding React Hooks compatability, the number of parameters
+for functions is used to determine if you have a generator function that will get invoked to
+return a React component, or you are registering a React component defined by a function.
+
+Registered component functions may either do one of the following:
+
+##### Correct 
+Either of these will work:
+1. Take **2 params** and return **a function** that takes zero or one params and returns a
+   JSX or String. 
+    ```js
+    export default (props, _railsContext) => () => <Component {...props} />;
+    ```
+
+2. Take only zero or one params and you return a JSX literal or String
+    ```js
+    export default (props) => <Component {...props} />;
+    ```
+##### Broken, as this function takes two params and it returns a JSX Literal
+```js
+export default (props, _railsContext) => <Component {...props} />;
+```
+In this example, you need to wrap the `<Component {...props} />` in a function call, like this:
+
+```js
+export default (props, _railsContext) => () => <Component {...props} />;
+```
+
+If you make this mistake, you'll get this warning
+`Warning: React.createElement: type is invalid -- expected a string (for built-in components) or a class/function (for composite components) but got: <Fragment />. Did you accidentally export a JSX literal instead of a component?`
+
+And this error:
+`react-dom.development.js:23965 Uncaught Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: object.`
+
+If you have a pure component, taking one or zero parameters, and you have an unnecessary function
+wrapper, then:
+
+1. You won't see anything render.
+2. You will see this warning in development mode: `Warning: Functions are not valid as a React child. This may happen if you return a Component instead of <Component /> from render. Or maybe you meant to call this function rather than return it.` 
+
 ## Upgrading rails/webpacker from v3 to v4
 ### Custom Webpack build file
 The default value for `extract_css` is **false** in `config/webpack.yml`. Custom webpack builds should set this value to true or else no CSS link tags are generated. You have a custom webpack build if you are not using [rails/webpacker](https://github.com/rails/webpacker to setup your Webpack configuration.

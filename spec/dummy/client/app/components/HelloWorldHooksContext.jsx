@@ -4,13 +4,6 @@ import React, { useState } from 'react';
 import css from './HelloWorld.scss';
 import RailsContext from './RailsContext';
 
-/**
- * NOTE: This exampe
- * @param props
- * @param railsContext
- * @returns {function(): *}
- * @constructor
- */
 const HelloWorldHooksContext = (props, railsContext) => {
   // You could pass props here or use the closure
   return () => {

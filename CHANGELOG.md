@@ -16,36 +16,22 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [12.0.0]
+#### BREAKING CHANGE
+In order to solve the issues regarding React Hooks compatability, the number of parameters
+for functions is used to determine if you have a generator function that will get invoked to
+return a React component, or you are registering a functional React component. 
+[PR 1268](https://github.com/shakacode/react_on_rails/pull/1268) by [justin808](https://github.com/justin808) 
+
+See [docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rails#upgrading-to-v12)
+for details.         
+
 * Requires the use of rails/webpacker helpers
 * Removed **env_javascript_include_tag** and **env_stylesheet_link_tag** as these are replaced by view helpers
   from rails/webpacker
 * Removal of support for old Rubies and Rails.
 * Removal of config.symlink_non_digested_assets_regex as it's no longer needed with rails/webpacker.
   If any business needs this, we can move the code to a separate gem.
-
-### [12.0.0]
-#### BREAKING CHANGE
-In order to solve the issues regarding React Hooks compatability:
-
-Registered components may either do one of the following if functions:
-
-##### Correct
-Either of these will work:
-1. Take **2 params** and return **a function** that takes zero or one params and returns a
-   JSX or String. 
-    ```js
-    export default (props, _railsContext) => () => <Component {...props} />;
-    ```
-
-2. Take only zero or one params and you return a JSX literal or String
-    ```js
-    export default (props) => <Component {...props} />;
-    ```
-##### Broken, as this function takes two params and it returns a JSX Literal
-```js
-export default (props, _railsContext) => <Component {...props} />;
-```
-In this example, you need to wrap the `<Component {...props} />` in a function call.
 
 ### [11.3.0] - 2019-05-24
 #### Added
