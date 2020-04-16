@@ -1,9 +1,9 @@
-![reactrails](https://user-images.githubusercontent.com/10421828/79423012-8df33580-7fc6-11ea-9a85-c90d1e0295cd.png)
+![reactrails](https://user-images.githubusercontent.com/10421828/79436261-52159b80-7fd9-11ea-994e-2a98dd43e540.png)
 
 <p align="center">
- <a href="https://shakacode.com/" target="_blank"><img src="https://user-images.githubusercontent.com/10421828/79423010-8d5a9f00-7fc6-11ea-9789-bba501a398c0.png"></a>
- <a href="https://forum.shakacode.com/" target="_blank"><img src="https://user-images.githubusercontent.com/10421828/79423002-8b90db80-7fc6-11ea-96ea-350bde96246c.png"></a>
- <a href="https://www.shakacode.com/react-on-rails-pro" target="_blank"><img src="https://user-images.githubusercontent.com/10421828/79423007-8cc20880-7fc6-11ea-9e3d-bbc635ee3507.png"></a>
+ <a href="https://shakacode.com/" target="_blank"><img src="https://user-images.githubusercontent.com/10421828/79436256-517d0500-7fd9-11ea-9300-dfbc7c293f26.png"></a>
+ <a href="https://forum.shakacode.com/" target="_blank"><img src="https://user-images.githubusercontent.com/10421828/79436266-53df5f00-7fd9-11ea-94b3-b985e1b05bdc.png"></a>
+ <a href="https://forum.shakacode.com/t/react-on-rails-pro-2020-shave-the-yak/1842" target="_blank"><img src="https://user-images.githubusercontent.com/10421828/79436265-53df5f00-7fd9-11ea-8220-fc474f6a856c.png"></a>
 </p>
 
 ---
