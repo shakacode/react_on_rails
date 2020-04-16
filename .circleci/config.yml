@@ -66,24 +66,28 @@ aliases:
     name: Restore cached node_modules directory
     keys:
       - v3-package-node-modules-cache-{{ checksum "yarn.lock" }}
+      - v3-package-node-modules-cache-
 
   # Restore spec/dummy/node_modules dir from cache using yarn.lock checksum as a key.
   - &restore-dummy-app-node-modules-cache
     name: Restore cached spec/dummy/node_modules directory
     keys:
       - v3-dummy-app-node-modules-cache-{{ checksum "spec/dummy/yarn.lock" }}
+      - v3-dummy-app-node-modules-cache-
 
   # Restore vendor/bundle dir from cache using Gemfile.lock checksum as a key.
   - &restore-dummy-app-gem-cache
     name: Restore cached Ruby Gems for dummy app
     keys:
       - v3-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
+      - v3-dummy-app-gem-cache-
 
   # Restore vendor/bundle dir from cache using react_on_rails.gemspec checksum as a key.
   - &restore-package-gem-cache
     name: Restore cached Ruby Gems for package
     keys:
       - v3-package-app-gem-cache-{{ checksum "react_on_rails.gemspec" }}
+      - v3-package-app-gem-cache-
 
     # NOTE: Sometimes CI generated docker images are not updated in time to keep up with the minimum required
     # by chromedriver versions of Chrome. Just bump here Chrome version if chromedriver raises errors
@@ -244,7 +248,7 @@ jobs:
       - store_artifacts:
           path: log/test.log
 
-  rspec-dummy-app:
+  main:
     docker:
       - image: *docker_image
     steps:
@@ -262,11 +266,15 @@ jobs:
           name: Touch webpack bundles
           command:  touch spec/dummy/public/webpack/test/*
       - run:
-          name: Run rspec tests
+          name: Prep for CI
+          # TODO -- need to leverage Circle CI containers
           command: |
-            cd spec/dummy && SERVER_RENDERER=ExecJS bundle exec rspec --format RspecJunitFormatter \
-                                               --out ~/rspec/rspec.xml \
-                                               --format documentation
+            bundle exec rake prepare_for_ci
+      - run:
+          name: Main CI
+          # TODO -- need to leverage Circle CI containers
+          command: |
+            bundle exec rake
       - store_test_results:
           path: ~/rspec
       - store_artifacts:
@@ -305,7 +313,7 @@ workflows:
             - install-package-ruby-gems
             - build-dummy-app-webpack-test-bundles
             - install-dummy-app-ruby-gems
-      - rspec-dummy-app:
+      - main:
           requires:
             - install-package-ruby-gems
             - install-dummy-app-ruby-gems
