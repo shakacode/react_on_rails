@@ -128,15 +128,12 @@ _Note: running `npm i` automatically builds the npm package before installing. H
 After checking out the repo, making sure you have rvm and nvm setup (setup ruby and node), cd to `spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
 ### Local Node Package
-Because the example and dummy apps rely on the react-on-rails node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the dummy app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)
+The default setup of spec/dummy uses a yarn link to the `/node_package/lib` directory. To test changes
+to the node module of react-on-rails, run this from the top directory `yarn run build-watch`.
 
-```sh
-cd react_on_rails/spec/dummy
-yarn run install-react-on-rails
-```
-_Note: this runs npm under the hood as explained in **Test NPM for react-on-rails** section above_
+Then you just need to run `yarn` in the `spec/dummy` directory.
 
-From now on, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:gen_all` rake task.
+Note, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:gen_all` rake task.
 
 *Side note: It's critical to use the alias section of the webpack config to avoid a double inclusion error. This has already been done for you in the example and dummy apps, but for reference:*
 

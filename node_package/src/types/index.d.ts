@@ -46,7 +46,7 @@ type AuthenticityHeaders = {[id: string]: string} & {'X-CSRF-Token': string | nu
 
 type StoreGenerator = (props: {}, railsContext: RailsContext) => Store
 
-type CREReturnTypes = {renderedHtml: string} | {redirectLocation: {pathname: string; search: string}} | {routeError: Error} | {error: Error} | ReactElement;
+type CREReturnTypes = {renderedHtml: string} | {redirectLocation: {pathname: string; search: string}} | {routeError: Error} | {error: Error} | ReactElement | React.FC;
 
 export type { // eslint-disable-line import/prefer-default-export
   ComponentOrRenderFunction,

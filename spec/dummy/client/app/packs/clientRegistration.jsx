@@ -4,6 +4,8 @@ import 'es5-shim';
 import ReactOnRails from 'react-on-rails';
 
 import HelloWorld from '../components/HelloWorld';
+import HelloWorldHooks from '../components/HelloWorldHooks';
+import HelloWorldHooksContext from '../components/HelloWorldHooksContext';
 
 import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 import HelloWorldES5 from '../components/HelloWorldES5';
@@ -55,6 +57,8 @@ ReactOnRails.register({
   ReactHelmetApp,
   ImageExample,
   SetTimeoutLoggingApp,
+  HelloWorldHooks,
+  HelloWorldHooksContext,
 });
 
 ReactOnRails.registerStore({

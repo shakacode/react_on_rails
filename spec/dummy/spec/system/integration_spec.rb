@@ -63,6 +63,15 @@ feature "Pages/Index", :js, type: :system do
     context "Non-React Component" do
       scenario { is_expected.to have_content "Time to visit Maui" }
     end
+
+    context "React Hooks" do
+      context "Simple stateless component" do
+        include_examples "React Component", "div#HelloWorldApp-react-component-6"
+      end
+      context "Generator function that takes props" do
+        include_examples "React Component", "div#HelloWorldApp-react-component-7"
+      end
+    end
   end
 
   context "Server Rendering with Options" do

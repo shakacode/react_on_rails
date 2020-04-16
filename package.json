@@ -67,7 +67,7 @@
     "prepare": "yarn run build",
     "prepublish": "npm run prepare",
     "build": "yarn run clean && yarn run tsc",
-    "build-watch": "babel --watch --out-dir node_package/lib node_package/src",
+    "build-watch": "yarn run clean && yarn run tsc --watch",
     "lint": "eslint --ext '.js,.ts' .",
     "check": "yarn run lint && yarn run test && yarn run type-check",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",

@@ -23,7 +23,27 @@ Changes since last non-beta release.
 * Removal of config.symlink_non_digested_assets_regex as it's no longer needed with rails/webpacker.
   If any business needs this, we can move the code to a separate gem.
 
+### [12.0.0]
+#### BREAKING CHANGE
+In order to solve the issues regarding React Hooks compatability:
 
+Registered components may either do one of the following if functions:
+
+##### Correct
+Either of these will work:
+1. Take 2 props and return a function that takes zero or one params and returns JSX.
+    ```js
+    export default (props, _railsContext) => () => <EchoProps {...props} />;
+    ```
+
+2. Take only zero or one params and you return a JSX literal
+    ```js
+    export default (props) => <EchoProps {...props} />;
+    ```
+##### Broken, as this function takes two params and it returns a JSX Literal
+```js
+export default (props, _railsContext) => <EchoProps {...props} />;
+```
 
 ### [11.3.0] - 2019-05-24
 #### Added

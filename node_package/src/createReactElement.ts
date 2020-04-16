@@ -2,6 +2,7 @@
 
 import React from 'react';
 import type { CreateParams, ComponentVariant, RenderFunction, CREReturnTypes } from './types/index';
+import isRouterResult from "./isCreateReactElementResultNonReactComponent";
 
 /**
  * Logic to either call the generatorFunction or call React.createElement to get the
@@ -36,9 +37,19 @@ export default function createReactElement({
     }
   }
 
+  // TODO: replace any
+  let ReactComponent: any;
   if (generatorFunction) {
-    return (component as RenderFunction)(props, railsContext);
+    // Let's invoke the function to get the result
+    ReactComponent = (component as RenderFunction)(props, railsContext);
+    if (isRouterResult(ReactComponent)) {
+      // We just return at this point, because calling function knows how to handle this case and
+      // we can't call React.createElement with this type of Object.
+      return ReactComponent;
+    } // else we'll be calling React.createElement
+  } else {
+    ReactComponent = component;
   }
 
-  return React.createElement(component as ComponentVariant, props);
+  return React.createElement(ReactComponent as ComponentVariant, props);
 }

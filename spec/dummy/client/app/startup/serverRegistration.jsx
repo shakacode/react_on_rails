@@ -6,6 +6,8 @@ import HelloString from '../non_react/HelloString';
 
 // React components
 import HelloWorld from '../components/HelloWorld';
+import HelloWorldHooks from '../components/HelloWorldHooks';
+import HelloWorldHooksContext from '../components/HelloWorldHooksContext';
 
 import HelloWorldES5 from '../components/HelloWorldES5';
 import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
@@ -66,6 +68,8 @@ ReactOnRails.register({
   ReactHelmetApp,
   ImageExample,
   SetTimeoutLoggingApp,
+  HelloWorldHooks,
+  HelloWorldHooksContext,
 });
 
 ReactOnRails.registerStore({

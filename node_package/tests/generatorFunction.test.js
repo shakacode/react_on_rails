@@ -52,17 +52,25 @@ describe('generatorFunction', () => {
     expect(generatorFunction(ES6ComponentChild)).toBe(false);
   });
 
-  it('returns true for a stateless functional component', () => {
+  it('returns false for a stateless functional component with zero params', () => {
+    expect.assertions(1);
+
+    const pureComponent = () => <h1>Hello</h1>;
+
+    expect(generatorFunction(pureComponent)).toBe(false);
+  });
+
+  it('returns false for a stateless functional component with one param', () => {
     expect.assertions(1);
 
     /* eslint-disable react/prop-types */
     const pureComponent = (props) => <h1>{props.title}</h1>;
     /* eslint-enable react/prop-types */
 
-    expect(generatorFunction(pureComponent)).toBe(true);
+    expect(generatorFunction(pureComponent)).toBe(false);
   });
 
-  it('returns true for a generator function', () => {
+  it('returns true for a generator function (containing two params)', () => {
     expect.assertions(1);
 
     const foobarComponent = createReactClass({
@@ -71,7 +79,7 @@ describe('generatorFunction', () => {
       },
     });
 
-    const foobarGeneratorFunction = () => foobarComponent;
+    const foobarGeneratorFunction = (_props, _railsContext) => foobarComponent;
 
     expect(generatorFunction(foobarGeneratorFunction)).toBe(true);
   });
