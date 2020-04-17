@@ -36,6 +36,7 @@ Rails.application.routes.draw do
   get "rendered_html" => "pages#rendered_html"
   get "xhr_refresh" => "pages#xhr_refresh"
   get "react_helmet" => "pages#react_helmet"
+  get "react_helmet_broken" => "pages#react_helmet_broken"
   get "broken_app" => "pages#broken_app"
   get "image_example" => "pages#image_example"
   get "server_render_with_timeout" => "pages#server_render_with_timeout"

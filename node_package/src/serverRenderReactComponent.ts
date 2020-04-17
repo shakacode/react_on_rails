@@ -2,9 +2,9 @@ import ReactDOMServer from 'react-dom/server';
 import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
-import createReactElement from './createReactElement';
+import createReactOutput from './createReactOutput';
 import isCreateReactElementResultNonReactComponent from
-  './isCreateReactElementResultNonReactComponent';
+    './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import type { RenderParams } from './types/index';
@@ -23,7 +23,7 @@ Detected a renderer while server rendering component '${name}'. \
 See https://github.com/shakacode/react_on_rails#renderer-functions`);
     }
 
-    const reactElementOrRouterResult = createReactElement({
+    const reactElementOrRouterResult = createReactOutput({
       componentObj,
       domNodeId,
       trace,

@@ -1,4 +1,4 @@
-import type { RegisteredComponent, ComponentOrRenderFunction, RenderFunction } from './types/index';
+import type { RegisteredComponent, ComponentOrGeneratorFunction, GeneratorFunction } from './types/index';
 import generatorFunction from './generatorFunction';
 
 const registeredComponents = new Map();
@@ -7,7 +7,7 @@ export default {
   /**
    * @param components { component1: component1, component2: component2, etc. }
    */
-  register(components: { [id: string]: ComponentOrRenderFunction }): void {
+  register(components: { [id: string]: ComponentOrGeneratorFunction }): void {
     Object.keys(components).forEach(name => {
       if (registeredComponents.has(name)) {
         console.warn('Called register for component that is already registered', name);
@@ -19,7 +19,7 @@ export default {
       }
 
       const isGeneratorFunction = generatorFunction(component);
-      const isRenderer = isGeneratorFunction && (component as RenderFunction).length === 3;
+      const isRenderer = isGeneratorFunction && (component as GeneratorFunction).length === 3;
 
       registeredComponents.set(name, {
         name,

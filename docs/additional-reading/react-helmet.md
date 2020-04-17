@@ -55,6 +55,7 @@ ReactOnRails.register({
 });
 ```
 ```javascript
+// Note the import from the server file.
 import ReactHelmetApp from '../ReactHelmetServerApp';
 
 ReactOnRails.register({

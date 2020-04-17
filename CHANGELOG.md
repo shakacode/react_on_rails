@@ -20,7 +20,9 @@ Changes since last non-beta release.
 #### BREAKING CHANGE
 In order to solve the issues regarding React Hooks compatability, the number of parameters
 for functions is used to determine if you have a generator function that will get invoked to
-return a React component, or you are registering a functional React component. 
+return a React component, or you are registering a functional React component. Alternately, you can
+set JavaScript property `generatorFunction` on the function for which you want to return to be
+invoked to return the React component. In that case, you won't need to pass any unused params.
 [PR 1268](https://github.com/shakacode/react_on_rails/pull/1268) by [justin808](https://github.com/justin808) 
 
 See [docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rails#upgrading-to-v12)

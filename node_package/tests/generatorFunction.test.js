@@ -73,12 +73,7 @@ describe('generatorFunction', () => {
   it('returns true for a generator function (containing two params)', () => {
     expect.assertions(1);
 
-    const foobarComponent = createReactClass({
-      render() {
-        return <div>Component for Generator Function</div>;
-      },
-    });
-
+    const foobarComponent = () => <div>Component for Generator Function</div>;
     const foobarGeneratorFunction = (_props, _railsContext) => foobarComponent;
 
     expect(generatorFunction(foobarGeneratorFunction)).toBe(true);

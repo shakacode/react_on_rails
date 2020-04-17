@@ -35,11 +35,14 @@ import SharedReduxStore from '../stores/SharedReduxStore';
 import DeferredRenderApp from '../startup/DeferredRenderAppServer';
 import ManualRenderApp from '../startup/ManualRenderAppRenderer';
 
-// Deferred render on the client side w/ server render
 import RenderedHtml from '../startup/ServerRenderedHtml';
 
-// Deferred render on the client side w/ server render with additional HTML strings:
+// Server render with additional HTML strings:
 import ReactHelmetApp from '../startup/ReactHelmetServerApp';
+
+// Broken server render since ReactHelmetServerAppBroken is not properly defined
+// to be a generatorFunction
+import ReactHelmetAppBroken from '../startup/ReactHelmetServerAppBroken';
 
 // Demonstrate using Images
 import ImageExample from '../components/ImageExample';
@@ -66,6 +69,7 @@ ReactOnRails.register({
   DeferredRenderApp,
   RenderedHtml,
   ReactHelmetApp,
+  ReactHelmetAppBroken,
   ImageExample,
   SetTimeoutLoggingApp,
   HelloWorldHooks,

@@ -12,9 +12,19 @@ import ComponentRegistry from '../src/ComponentRegistry';
 
 describe('ComponentRegistry', () => {
   expect.assertions(9);
-  it('registers and retrieves generator function components', () => {
+  it('registers and retrieves React function components', () => {
     expect.assertions(1);
     const C1 = () => <div>HELLO</div>;
+    ComponentRegistry.register({ C1 });
+    const actual = ComponentRegistry.get('C1');
+    const expected = { name: 'C1', component: C1, generatorFunction: false, isRenderer: false };
+    expect(actual).toEqual(expected);
+  });
+
+  it('registers and retrieves generator function components where property generatorFunction is set and zero params', () => {
+    expect.assertions(1);
+    const C1 = () => <div>HELLO</div>;
+    C1.generatorFunction = true;
     ComponentRegistry.register({ C1 });
     const actual = ComponentRegistry.get('C1');
     const expected = { name: 'C1', component: C1, generatorFunction: true, isRenderer: false };
@@ -47,7 +57,7 @@ describe('ComponentRegistry', () => {
     expect(actual).toEqual(expected);
   });
 
-  it('registers and retrieves renderers', () => {
+  it('registers and retrieves renderers if 3 params', () => {
     expect.assertions(1);
     const C4 = (a1, a2, a3) => null;
     ComponentRegistry.register({ C4 });
@@ -62,21 +72,31 @@ describe('ComponentRegistry', () => {
    */
   it('registers and retrieves multiple components', () => {
     expect.assertions(3);
+    // Plain react stateless functional components
     const C5 = () => <div>WHY</div>;
     const C6 = () => <div>NOW</div>;
+    const C7 = () => <div>NOW</div>;
+    C7.generatorFunction = true;
     ComponentRegistry.register({ C5 });
     ComponentRegistry.register({ C6 });
+    ComponentRegistry.register({ C7 });
     const components = ComponentRegistry.components();
     expect(components.size).toBe(6);
     expect(components.get('C5')).toEqual({
       name: 'C5',
       component: C5,
-      generatorFunction: true,
+      generatorFunction: false,
       isRenderer: false,
     });
     expect(components.get('C6')).toEqual({
       name: 'C6',
       component: C6,
+      generatorFunction: false,
+      isRenderer: false,
+    });
+    expect(components.get('C7')).toEqual({
+      name: 'C7',
+      component: C7,
       generatorFunction: true,
       isRenderer: false,
     });
@@ -98,7 +118,7 @@ describe('ComponentRegistry', () => {
     expect(components.get('C8')).toEqual({
       name: 'C8',
       component: C8,
-      generatorFunction: true,
+      generatorFunction: false,
       isRenderer: false,
     });
   });

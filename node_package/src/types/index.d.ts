@@ -1,7 +1,8 @@
 import type { ReactElement, Component, FunctionComponent, ComponentClass } from 'react';
 import type { Store } from 'redux';
 
-type ComponentVariant = FunctionComponent | ComponentClass;
+
+type ReactComponentVariant = FunctionComponent | ComponentClass | string;
 
 interface Params {
   props?: {};
@@ -38,28 +39,42 @@ export interface RailsContext {
   httpAcceptLanguage?: string;
 }
 
-type RenderFunction = (props?: {}, railsContext?: RailsContext, domNodeId?: string) => ReactElement;
-
-type ComponentOrRenderFunction = ComponentVariant | RenderFunction;
+interface ServerRenderResult {
+ renderedHtml?: string;
+ redirectLocation?: {pathname: string; search: string};
+ routeError?: Error;
+ error?: Error;
+}
 
 type AuthenticityHeaders = {[id: string]: string} & {'X-CSRF-Token': string | null; 'X-Requested-With': string};
 
 type StoreGenerator = (props: {}, railsContext: RailsContext) => Store
 
-type CREReturnTypes = {renderedHtml: string} | {redirectLocation: {pathname: string; search: string}} | {routeError: Error} | {error: Error} | ReactElement | React.FC;
+type CreateReactOutputResult = ServerRenderResult | ReactElement;
+
+type GeneratorFunctionResult = ReactComponentVariant | ServerRenderResult;
+
+interface GeneratorFunction {
+  (props?: {}, railsContext?: RailsContext, domNodeId?: string): GeneratorFunctionResult;
+  generatorFunction?: boolean;
+}
+
+type ComponentOrGeneratorFunction = ReactComponentVariant | GeneratorFunction;
 
 export type { // eslint-disable-line import/prefer-default-export
-  ComponentOrRenderFunction,
-  ComponentVariant,
+  ComponentOrGeneratorFunction,
+  ReactComponentVariant,
   AuthenticityHeaders,
-  RenderFunction,
+  GeneratorFunction,
+  GeneratorFunctionResult,
   StoreGenerator,
-  CREReturnTypes
+  CreateReactOutputResult,
+  ServerRenderResult,
 }
 
 export interface RegisteredComponent {
   name: string;
-  component: ComponentOrRenderFunction;
+  component: ComponentOrGeneratorFunction;
   generatorFunction: boolean;
   isRenderer: boolean;
 }
@@ -77,7 +92,7 @@ export interface ErrorOptions {
 }
 
 export interface ReactOnRails {
-  register(components: { [id: string]: ComponentOrRenderFunction }): void;
+  register(components: { [id: string]: ComponentOrGeneratorFunction }): void;
   registerStore(stores: { [id: string]: Store }): void;
   getStore(name: string, throwIfMissing: boolean): Store | undefined;
   setOptions(newOptions: {traceTurbolinks: boolean}): void;

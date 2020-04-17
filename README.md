@@ -229,13 +229,30 @@ For details on techniques to use different code for client and server rendering,
 
 ## Specifying Your React Components: Direct or Generator Functions
 
-You have two ways to specify your React components. You can either register the React component directly, or you can create a function that returns a React component. Creating a function has the following benefits:
+You have two ways to specify your React components. You can either register the React component (either function or class component) directly, or you can create a function that returns a React component, which we using the name of a "generator function". Creating a function has the following benefits:
 
 1. You have access to the `railsContext`. See documentation for the railsContext in terms of why you might need it. You **need** a generator function to access the `railsContext`.
 2. You can use the passed-in props to initialize a redux store or set up react-router.
 3. You can return different components depending on what's in the props.
 
-ReactOnRails will automatically detect a registered generator function. Thus, there is no difference between registering a React Component versus a "generator function."
+Note, the return value of a **generator function** should be JSX or an HTML string. Do not return a
+function.
+
+ReactOnRails will automatically detect a registered generator function by the fact that the function takes
+more than 1 parameter. In other words, if you want the ability to provide a function that returns the
+React component, then you need to specify at least a second parameter. This is the `railsContext`.
+If you're not using this parameter, declare your function with the unused param:
+
+```js
+const MyComponentGenerator = (props, _railsContext) => {
+  
+  if (props.print) {
+    return <H1>{JSON.stringify(props)}</H1>;
+  }
+  
+```
+
+Thus, there is no difference between registering a React function or class Component versus a "generator function."
 
 ## react_component_hash for Generator Functions
 
