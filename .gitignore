@@ -33,4 +33,4 @@ npm-debug.*
 .DS_Store
 
 .yalc
-yalc.loc
+yalc.lock
