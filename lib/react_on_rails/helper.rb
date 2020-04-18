@@ -66,23 +66,23 @@ module ReactOnRails
         )
       elsif server_rendered_html.is_a?(Hash)
         msg = <<~MSG
-        Use react_component_hash (not react_component) to return a Hash to your ruby view code. See
-        https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
-        for an example of the necessary javascript configuration.
+          Use react_component_hash (not react_component) to return a Hash to your ruby view code. See
+          https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+          for an example of the necessary javascript configuration.
         MSG
         raise ReactOnRails::Error, msg
       else
         class_name = server_rendered_html.class.name
         msg = <<~MSG
-        ReactOnRails: server_rendered_html is expected to be a String or Hash for #{component_name}.
-        Type is #{class_name}        
-        Value:
-        #{server_rendered_html}
-        
-        If you're trying to use a render function to return a Hash to your ruby view code, then use
-        react_component_hash instead of react_component and see
-        https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
-        for an example of the JavaScript code.
+          ReactOnRails: server_rendered_html is expected to be a String or Hash for #{component_name}.
+          Type is #{class_name}
+          Value:
+          #{server_rendered_html}
+
+          If you're trying to use a render function to return a Hash to your ruby view code, then use
+          react_component_hash instead of react_component and see
+          https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+          for an example of the JavaScript code.
         MSG
         raise ReactOnRails::Error, msg
       end
