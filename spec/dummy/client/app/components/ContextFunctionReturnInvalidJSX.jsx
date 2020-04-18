@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import css from './HelloWorld.scss';
 import RailsContext from './RailsContext';
 
-const ContextFunctionReturnJSX = (props, railsContext) => (
+const ContextFunctionReturnInvalidJSX = (props, railsContext) => (
   <>
     <h3 className={css.brightColor}>Hello, {props.name}!</h3>
     <p>Rails Context :</p>
@@ -13,7 +13,10 @@ const ContextFunctionReturnJSX = (props, railsContext) => (
 
 /* Wrapping in a function would be correct in this case, since two params
    are passed to the registered function:
-const ContextFunctionReturnJSX = (props, railsContext) => () => (
+
+   This code should have been written like:
+
+const ContextFunctionReturnInvalidJSX = (props, railsContext) => () => (
   <>
     <h3 className={css.brightColor}>Hello, {props.name}!</h3>
     <p>Rails Context :</p>
@@ -22,4 +25,4 @@ const ContextFunctionReturnJSX = (props, railsContext) => () => (
 );
  */
 
-export default ContextFunctionReturnJSX;
+export default ContextFunctionReturnInvalidJSX;

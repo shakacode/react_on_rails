@@ -35,7 +35,7 @@ describe('', () => {
     );
   });
 
-  it('StoreRegistry registers and retrieves generator function stores', () => {
+  it('StoreRegistry registers and retrieves render function stores', () => {
     expect.assertions(2);
     StoreRegistry.register({ storeGenerator, storeGenerator2 });
     const actual = StoreRegistry.getStoreGenerator('storeGenerator');

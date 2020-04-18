@@ -68,7 +68,7 @@ feature "Pages/Index", :js, type: :system do
       context "Simple stateless component" do
         include_examples "React Component", "div#HelloWorldApp-react-component-6"
       end
-      context "Generator function that takes props" do
+      context "render function that takes props" do
         include_examples "React Component", "div#HelloWorldApp-react-component-7"
       end
     end
@@ -199,7 +199,7 @@ feature "Example of Code Splitting with Rendering of Async Routes", :js, type: :
   end
 end
 
-feature "renderedHtml from generator function", :js, type: :system do
+feature "renderedHtml from render function", :js, type: :system do
   subject { page }
   background { visit "/rendered_html" }
   scenario "renderedHtml should not have any errors" do
@@ -234,7 +234,7 @@ feature "returns hash if hash_result == true even with prerendering error", :js,
   end
 end
 
-feature "generator function returns renderedHtml as an object with additional HTML markups" do
+feature "render function returns renderedHtml as an object with additional HTML markups" do
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
     subject { page }
     background { visit react_helmet_path }

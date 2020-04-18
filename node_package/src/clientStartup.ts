@@ -4,8 +4,8 @@ import type {
   ReactOnRails as ReactOnRailsType,
   RailsContext,
   RegisteredComponent,
-  GeneratorFunction,
-  GeneratorFunctionResult,
+  RenderFunction,
+  RenderFunctionResult,
 } from './types/index';
 
 import createReactOutput from './createReactOutput';
@@ -114,7 +114,7 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
       props, railsContext);
     }
 
-    (component as GeneratorFunction)(props, railsContext, domNodeId);
+    (component as RenderFunction)(props, railsContext, domNodeId);
     return true;
   }
 

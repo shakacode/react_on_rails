@@ -13,7 +13,7 @@ import HelloWorldES5 from '../components/HelloWorldES5';
 import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
 import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 
-// Generator function
+// render function
 import HelloWorldApp from '../startup/HelloWorldApp';
 import BrokenApp from '../startup/BrokenApp';
 
@@ -41,7 +41,7 @@ import RenderedHtml from '../startup/ServerRenderedHtml';
 import ReactHelmetApp from '../startup/ReactHelmetServerApp';
 
 // Broken server render since ReactHelmetServerAppBroken is not properly defined
-// to be a generatorFunction
+// to be a renderFunction
 import ReactHelmetAppBroken from '../startup/ReactHelmetServerAppBroken';
 
 // Demonstrate using Images

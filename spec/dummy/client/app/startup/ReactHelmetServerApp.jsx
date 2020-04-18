@@ -13,7 +13,7 @@ import ReactHelmet from '../components/ReactHelmet';
  *  component markup must go under "componentHtml" key.
  *
  *  Note that the function takes 2 params to identify this as a generator fuction. Alternately,
- *  the function could get the property of `.generatorFunction = true` added to it.
+ *  the function could get the property of `.renderFunction = true` added to it.
  */
 export default (props, _railsContext) => {
   const componentHtml = renderToString(<ReactHelmet {...props} />);

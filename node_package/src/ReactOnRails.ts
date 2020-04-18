@@ -15,7 +15,7 @@ import type {
   RegisteredComponent,
   RenderParams,
   ErrorOptions,
-  ComponentOrGeneratorFunction,
+  ReactComponentOrRenderFunction,
   AuthenticityHeaders,
   StoreGenerator
 } from './types/index';
@@ -37,7 +37,7 @@ ctx.ReactOnRails = {
    * find you components for rendering.
    * @param components (key is component name, value is component)
    */
-  register(components: { [id: string]: ComponentOrGeneratorFunction }): void {
+  register(components: { [id: string]: ReactComponentOrRenderFunction }): void {
     ComponentRegistry.register(components);
   },
 
@@ -183,7 +183,7 @@ ctx.ReactOnRails = {
   /**
    * Get the component that you registered
    * @param name
-   * @returns {name, component, generatorFunction, isRenderer}
+   * @returns {name, component, renderFunction, isRenderer}
    */
   getComponent(name: string): RegisteredComponent {
     return ComponentRegistry.get(name);

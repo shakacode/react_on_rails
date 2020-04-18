@@ -2,11 +2,11 @@
 
 import React from 'react';
 import type { ServerRenderResult,
-  CreateParams, ReactComponentVariant, GeneratorFunction, CreateReactOutputResult } from './types/index';
+  CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index';
 import isServerRenderResult from "./isServerRenderResult";
 
 /**
- * Logic to either call the generatorFunction or call React.createElement to get the
+ * Logic to either call the renderFunction or call React.createElement to get the
  * React.Component
  * @param options
  * @param options.componentObj
@@ -24,7 +24,7 @@ export default function createReactOutput({
   trace,
   shouldHydrate,
 }: CreateParams): CreateReactOutputResult {
-  const { name, component, generatorFunction } = componentObj;
+  const { name, component, renderFunction } = componentObj;
 
   if (trace) {
     if (railsContext && railsContext.serverSide) {
@@ -38,19 +38,23 @@ export default function createReactOutput({
     }
   }
 
-  if (generatorFunction) {
+  if (renderFunction) {
     // Let's invoke the function to get the result
-    let result = (component as GeneratorFunction)(props, railsContext);
-    if (isServerRenderResult(result as CreateReactOutputResult)) {
+    let renderFunctionResult = (component as RenderFunction)(props, railsContext);
+    if (isServerRenderResult(renderFunctionResult as CreateReactOutputResult)) {
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
-      return (result as ServerRenderResult);
+      return (renderFunctionResult as ServerRenderResult);
     } else { // else we'll be calling React.createElement
-      let reactComponent = result as ReactComponentVariant;
+      let reactComponent = renderFunctionResult as ReactComponent;
+
+      // TODO: This might be confusing that we're passing props to the function
+      // immediately afterwards
+      // Maybe it might be better for the function to return an element.
+      // The function could call React.createElement
       return React.createElement(reactComponent, props);
     }
   } else {
-    return React.createElement(component as ReactComponentVariant, props);
+    return React.createElement(component as ReactComponent, props);
   }
-
 }

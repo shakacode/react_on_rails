@@ -6,9 +6,9 @@
 import React from 'react';
 import createReactClass from 'create-react-class';
 
-import generatorFunction from '../src/generatorFunction';
+import isRenderFunction from '../src/isRenderFunction';
 
-describe('generatorFunction', () => {
+describe('isRenderFunction', () => {
   expect.assertions(6);
   it('returns false for a ES5 React Component', () => {
     expect.assertions(1);
@@ -19,7 +19,7 @@ describe('generatorFunction', () => {
       },
     });
 
-    expect(generatorFunction(es5Component)).toBe(false);
+    expect(isRenderFunction(es5Component)).toBe(false);
   });
 
   it('returns false for a ES6 React class', () => {
@@ -31,7 +31,7 @@ describe('generatorFunction', () => {
       }
     }
 
-    expect(generatorFunction(ES6Component)).toBe(false);
+    expect(isRenderFunction(ES6Component)).toBe(false);
   });
 
   it('returns false for a ES6 React subclass', () => {
@@ -49,7 +49,7 @@ describe('generatorFunction', () => {
       }
     }
 
-    expect(generatorFunction(ES6ComponentChild)).toBe(false);
+    expect(isRenderFunction(ES6ComponentChild)).toBe(false);
   });
 
   it('returns false for a stateless functional component with zero params', () => {
@@ -57,7 +57,7 @@ describe('generatorFunction', () => {
 
     const pureComponent = () => <h1>Hello</h1>;
 
-    expect(generatorFunction(pureComponent)).toBe(false);
+    expect(isRenderFunction(pureComponent)).toBe(false);
   });
 
   it('returns false for a stateless functional component with one param', () => {
@@ -67,16 +67,16 @@ describe('generatorFunction', () => {
     const pureComponent = (props) => <h1>{props.title}</h1>;
     /* eslint-enable react/prop-types */
 
-    expect(generatorFunction(pureComponent)).toBe(false);
+    expect(isRenderFunction(pureComponent)).toBe(false);
   });
 
-  it('returns true for a generator function (containing two params)', () => {
+  it('returns true for a render function (containing two params)', () => {
     expect.assertions(1);
 
-    const foobarComponent = () => <div>Component for Generator Function</div>;
-    const foobarGeneratorFunction = (_props, _railsContext) => foobarComponent;
+    const foobarComponent = () => <div>Component for render function</div>;
+    const foobarrenderFunction = (_props, _railsContext) => foobarComponent;
 
-    expect(generatorFunction(foobarGeneratorFunction)).toBe(true);
+    expect(isRenderFunction(foobarrenderFunction)).toBe(true);
   });
 
   it('returns false for simple object', () => {
@@ -87,6 +87,6 @@ describe('generatorFunction', () => {
         return 'world';
       },
     };
-    expect(generatorFunction(foobarComponent)).toBe(false);
+    expect(isRenderFunction(foobarComponent)).toBe(false);
   });
 });

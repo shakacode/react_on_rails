@@ -5,9 +5,13 @@ import React from 'react';
 
 import serverRenderReactComponent from '../src/serverRenderReactComponent';
 import ComponentStore from '../src/ComponentRegistry';
+import ComponentRegistry from "../src/ComponentRegistry";
 
 describe('serverRenderReactComponent', () => {
-  expect.assertions(7);
+  beforeEach(() => {
+    ComponentRegistry.components().clear();
+  });
+
   it('serverRenderReactComponent renders a registered component', () => {
     expect.assertions(2);
     const X1 = () => <div>HELLO</div>;
@@ -44,7 +48,7 @@ describe('serverRenderReactComponent', () => {
   it('serverRenderReactComponent renders html', () => {
     expect.assertions(2);
     const expectedHtml = '<div>Hello</div>';
-    const X3 = () => ({ renderedHtml: expectedHtml });
+    const X3 = (props, _railsContext) => ({ renderedHtml: expectedHtml });
 
     ComponentStore.register({ X3 });
 

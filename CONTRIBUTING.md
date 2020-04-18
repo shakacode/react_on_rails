@@ -97,15 +97,25 @@ In addition to testing the Ruby parts out, you can also test the node package pa
 ```sh
 cd react_on_rails/
 yarn
-yarn run build
-yarn install-react-on-rails
+yarn run build:watch
+yalc pubish react-on-rails
 ```
 
-Install the local package by using yarn link, like this:
+Install the local package by using yalc, like this:
 ```sh
 cd spec/dummy
+yalc link react-on-rails
 yarn
 ```
+
+Make changes to the node package.
+
+Then run:
+
+```      
+cd <top dir>
+yalc push
+```      
 
 Note, yarn will run the `postinstall` script of `spec/dummy/client` which runs `yarn link` to set up a sym link to the parent package.
 

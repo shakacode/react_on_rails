@@ -6,7 +6,7 @@ import ReactOnRails from 'react-on-rails';
 import HelloWorld from '../components/HelloWorld';
 import HelloWorldHooks from '../components/HelloWorldHooks';
 import HelloWorldHooksContext from '../components/HelloWorldHooksContext';
-import ContextFunctionReturnJSX from '../components/ContextFunctionReturnJSX';
+import ContextFunctionReturnInvalidJSX from '../components/ContextFunctionReturnInvalidJSX';
 import PureComponentWrappedInFunction from '../components/PureComponentWrappedInFunction';
 
 import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
@@ -61,7 +61,7 @@ ReactOnRails.register({
   SetTimeoutLoggingApp,
   HelloWorldHooks,
   HelloWorldHooksContext,
-  ContextFunctionReturnJSX,
+  ContextFunctionReturnJSX: ContextFunctionReturnInvalidJSX,
   PureComponentWrappedInFunction,
 });
 

@@ -50,7 +50,7 @@ module ReactOnRails
         contents = File.read(package_json)
         replacement_value = <<-STRING
   "scripts": {
-    "postinstall": "yarn link react-on-rails",
+    "postinstall": "yalc link react-on-rails",
         STRING
         new_client_package_json_contents = contents.gsub(/ {2}"scripts": {/,
                                                          replacement_value)

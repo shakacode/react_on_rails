@@ -1,22 +1,22 @@
 // See discussion:
 // https://discuss.reactjs.org/t/how-to-determine-if-js-object-is-react-component/2825/2
-import { ComponentOrGeneratorFunction, GeneratorFunction } from "./types/index";
+import { ReactComponentOrRenderFunction, RenderFunction } from "./types/index";
 
 /**
  * Used to determine we'll call be calling React.createElement on the component of if this is a
- * generator function used return a function that takes props to return a React element
+ * render function used return a function that takes props to return a React element
  * @param component
  * @returns {boolean}
  */
-export default function generatorFunction(component: ComponentOrGeneratorFunction): boolean {
+export default function isRenderFunction(component: ReactComponentOrRenderFunction): boolean {
   // No for es5 or es6 React Component
   if (
-    (component as GeneratorFunction).prototype &&
-    (component as GeneratorFunction).prototype.isReactComponent) {
+    (component as RenderFunction).prototype &&
+    (component as RenderFunction).prototype.isReactComponent) {
     return false;
   }
 
-  if ((component as GeneratorFunction).generatorFunction) {
+  if ((component as RenderFunction).renderFunction) {
     return true;
   }
 

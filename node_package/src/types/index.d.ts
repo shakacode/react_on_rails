@@ -2,7 +2,7 @@ import type { ReactElement, Component, FunctionComponent, ComponentClass } from 
 import type { Store } from 'redux';
 
 
-type ReactComponentVariant = FunctionComponent | ComponentClass | string;
+type ReactComponent = FunctionComponent | ComponentClass | string;
 
 interface Params {
   props?: {};
@@ -39,34 +39,36 @@ export interface RailsContext {
   httpAcceptLanguage?: string;
 }
 
-interface ServerRenderResult {
- renderedHtml?: string;
- redirectLocation?: {pathname: string; search: string};
- routeError?: Error;
- error?: Error;
-}
-
 type AuthenticityHeaders = {[id: string]: string} & {'X-CSRF-Token': string | null; 'X-Requested-With': string};
 
 type StoreGenerator = (props: {}, railsContext: RailsContext) => Store
 
-type CreateReactOutputResult = ServerRenderResult | ReactElement;
-
-type GeneratorFunctionResult = ReactComponentVariant | ServerRenderResult;
-
-interface GeneratorFunction {
-  (props?: {}, railsContext?: RailsContext, domNodeId?: string): GeneratorFunctionResult;
-  generatorFunction?: boolean;
+interface ServerRenderResult {
+  renderedHtml?: string;
+  redirectLocation?: {pathname: string; search: string};
+  routeError?: Error;
+  error?: Error;
 }
 
-type ComponentOrGeneratorFunction = ReactComponentVariant | GeneratorFunction;
+type CreateReactOutputResult = ServerRenderResult | ReactElement;
+
+type RenderFunctionResult = ReactComponent | ServerRenderResult;
+
+interface RenderFunction {
+  (props?: {}, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
+  // We allow specifying that the function is RenderFunction and not a React Function Component
+  // by setting this property
+  renderFunction?: boolean;
+}
+
+type ReactComponentOrRenderFunction = ReactComponent | RenderFunction;
 
 export type { // eslint-disable-line import/prefer-default-export
-  ComponentOrGeneratorFunction,
-  ReactComponentVariant,
+  ReactComponentOrRenderFunction,
+  ReactComponent,
   AuthenticityHeaders,
-  GeneratorFunction,
-  GeneratorFunctionResult,
+  RenderFunction,
+  RenderFunctionResult,
   StoreGenerator,
   CreateReactOutputResult,
   ServerRenderResult,
@@ -74,8 +76,8 @@ export type { // eslint-disable-line import/prefer-default-export
 
 export interface RegisteredComponent {
   name: string;
-  component: ComponentOrGeneratorFunction;
-  generatorFunction: boolean;
+  component: ReactComponentOrRenderFunction;
+  renderFunction: boolean;
   isRenderer: boolean;
 }
 
@@ -92,7 +94,7 @@ export interface ErrorOptions {
 }
 
 export interface ReactOnRails {
-  register(components: { [id: string]: ComponentOrGeneratorFunction }): void;
+  register(components: { [id: string]: ReactComponentOrRenderFunction }): void;
   registerStore(stores: { [id: string]: Store }): void;
   getStore(name: string, throwIfMissing: boolean): Store | undefined;
   setOptions(newOptions: {traceTurbolinks: boolean}): void;

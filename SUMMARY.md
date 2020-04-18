@@ -9,7 +9,7 @@
   + [Client vs. Server Rendering](./docs/basics/client-vs-server-rendering.md)
   + [React Server Rendering](./docs/basics/react-server-rendering.md)
   + [Recommended Project Structure](./docs/basics/recommended-project-structure.md)
-  + [Generator Functions and the RailsContext](docs/basics/generator-functions-and-railscontext.md)
+  + [Render-Functions and the RailsContext](docs/basics/render-functions-and-railscontext.md)
   + [Caching and Performance: React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
   + [Deployment](docs/basics/deployment.md).
   + [React on Rails Internationalization (I18n, localization)](docs/basics/i18n.md)
