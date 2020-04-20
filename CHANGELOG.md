@@ -22,6 +22,7 @@ Changes since last non-beta release.
 * Removal of support for old Rubies and Rails.
 * Removal of config.symlink_non_digested_assets_regex as it's no longer needed with rails/webpacker.
   If any business needs this, we can move the code to a separate gem.
+* Added support to export locales in JSON format.
 
 
 

@@ -15,6 +15,11 @@ namespace :react_on_rails do
     ReactOnRails::Locales::ToJs.new
   end
 
+  desc <<-DESC.strip_heredoc
+    Generate i18n JSON files
+    This task generates JSON locale files: `translations.json` & `default.json` and places them in
+    the "ReactOnRails.configuration.i18n_dir".
+  DESC
   task locale_json: :environment do
     ReactOnRails::Locales::ToJson.new
   end
