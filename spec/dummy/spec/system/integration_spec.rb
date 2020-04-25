@@ -66,10 +66,10 @@ feature "Pages/Index", :js, type: :system do
 
     context "React Hooks" do
       context "Simple stateless component" do
-        include_examples "React Component", "div#HelloWorldApp-react-component-6"
+        include_examples "React Component", "div#HelloWorld-react-component-6"
       end
       context "render function that takes props" do
-        include_examples "React Component", "div#HelloWorldApp-react-component-7"
+        include_examples "React Component", "div#HelloWorld-react-component-7"
       end
     end
   end
