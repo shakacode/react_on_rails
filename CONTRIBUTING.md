@@ -98,7 +98,7 @@ In addition to testing the Ruby parts out, you can also test the node package pa
 cd react_on_rails/
 yarn
 yarn run build:watch
-yalc pubish react-on-rails
+yalc publish react-on-rails
 ```
 
 Install the local package by using yalc, like this:

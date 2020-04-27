@@ -34,7 +34,7 @@ Make sure there is only one version of React installed!
 
 If you used yarn link, then you'll have two versions of React installed.
 
-Instead use Yalc.
+Instead use [Yalc](https://github.com/whitecolor/yalc).
 
 ```
 cd <top level>
@@ -43,4 +43,3 @@ yalc publish
 cd spec/dummy
 yalc link react-on-rails
 ```
-

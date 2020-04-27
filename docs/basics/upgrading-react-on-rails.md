@@ -6,19 +6,19 @@ If you would like help in migrating between React on Rails versions or help with
 We specialize in helping companies to quickly and efficiently move from versions before 9 to current. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4 for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
 
 ## Upgrading to v13
-* Make sure that are are on a relatively more recent version of rails and webpacker.
+* Make sure that you are on a relatively more recent version of rails and webpacker.
 * Updated API for ReactOnRails.register.
 
-In order to solve the issues regarding React Hooks compatability, the number of parameters
+In order to solve the issues regarding React Hooks compatibility, the number of parameters
 for functions is used to determine if you have a render function that will get invoked to
 return a React component, or you are registering a React component defined by a function.
 
 Registered Objects are of the following types:
 
-##### Correct 
+##### Correct
 Either of these will work:
 1. Take **2 params** and return **a React function or class component**. A function component is a function
-   that takes zero or one params and returns a React Element, like JSX. 
+   that takes zero or one params and returns a React Element, like JSX.
     ```js
     export default (props, _railsContext) => () => <Component {...props} />;
     ```
@@ -49,7 +49,7 @@ If you have a pure component, taking one or zero parameters, and you have an unn
 wrapper such that you're returning a function rather than a React Element, then:
 
 1. You won't see anything render.
-2. You will see this warning in development mode: `Warning: Functions are not valid as a React child. This may happen if you return a Component instead of <Component /> from render. Or maybe you meant to call this function rather than return it.` 
+2. You will see this warning in development mode: `Warning: Functions are not valid as a React child. This may happen if you return a Component instead of <Component /> from render. Or maybe you meant to call this function rather than return it.`
 
 ---------
 
@@ -90,8 +90,8 @@ Reason for doing this: This enables your webpack bundles to bypass the Rails ass
 ##### ...while keeping your `client` directory
 *   `.gitignore`: add `/public/webpack/*`
 *   `Gemfile`: bump `react_on_rails` and add `webpacker`
-*   layout views: anything bundled by webpack will need to be requested by a `javascript_pack_tag` or `stylesheet_pack_tag`. 
-  * Search your codebase for javascript_include_tag. Use the 
+*   layout views: anything bundled by webpack will need to be requested by a `javascript_pack_tag` or `stylesheet_pack_tag`.
+  * Search your codebase for javascript_include_tag. Use the
 *   `config/initializers/assets.rb`: we no longer need to modify `Rails.application.config.assets.paths` or append anything to `Rails.application.config.assets.precompile`.
 *   `config/initializers/react_on_rails.rb`:
     *   Delete `config.generated_assets_dir`. Webpacker's config now supplies this information
