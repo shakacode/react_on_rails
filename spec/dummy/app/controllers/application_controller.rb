@@ -11,7 +11,7 @@ class ApplicationController < ActionController::Base
     Rails.logger.error("Caught ReactOnRails::PrerenderError in ApplicationController error handler.")
     Rails.logger.error(err.message)
     Rails.logger.error(err.backtrace.join("\n"))
-    msg = <<-MSG.strip_heredoc
+    msg = <<~MSG
       Error prerendering in react_on_rails.
       Redirected back to '/server_side_log_throw_raise_invoker'.
       See server logs for output.

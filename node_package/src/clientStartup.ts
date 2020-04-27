@@ -4,11 +4,12 @@ import type {
   ReactOnRails as ReactOnRailsType,
   RailsContext,
   RegisteredComponent,
-  RenderFunction
+  RenderFunction,
+  RenderFunctionResult,
 } from './types/index';
 
-import createReactElement from './createReactElement';
-import isRouterResult from './isCreateReactElementResultNonReactComponent';
+import createReactOutput from './createReactOutput';
+import isServerRenderResult from './isServerRenderResult';
 
 declare global {
   interface Window {
@@ -148,7 +149,7 @@ function render(el: Element, railsContext: RailsContext): void {
       // Hydrate if available and was server rendered
       const shouldHydrate = !!ReactDOM.hydrate && !!domNode.innerHTML;
 
-      const reactElementOrRouterResult = createReactElement({
+      const reactElementOrRouterResult = createReactOutput({
         componentObj,
         props,
         domNodeId,
@@ -157,7 +158,7 @@ function render(el: Element, railsContext: RailsContext): void {
         shouldHydrate,
       });
 
-      if (isRouterResult(reactElementOrRouterResult)) {
+      if (isServerRenderResult(reactElementOrRouterResult)) {
         throw new Error(`\
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);

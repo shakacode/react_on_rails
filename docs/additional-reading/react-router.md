@@ -1,4 +1,7 @@
+_This article needs updating for the latest version of React Router_
+
 # Using React Router
+
 
 React on Rails supports the use of React Router. Client-side code doesn't need any special configuration for the React on Rails gem. Implement React Router how you normally would. Note, you might want to avoid using Turbolinks as both Turbolinks and React-Router will be trying to handle the back and forward buttons. If you get this figured out, please do share with the community! Otherwise, you might have to tweak the basic settings for Turbolinks, and this may or may not be worth the effort.
 
@@ -36,7 +39,7 @@ For a fleshed out integration of react_on_rails with react-router, check out [Re
 
 # Server Rendering Using React Router V4
 
-Your generator function may not return an object with the property `renderedHtml`. Thus, you call 
+Your render function may not return an object with the property `renderedHtml`. Thus, you call 
 renderToString() and return an object with this property.
 
 This example **only applies to server rendering** and should be only used in the server side bundle.

@@ -17,13 +17,18 @@ module ReactOnRails
 
     COMPONENT_HTML_KEY = "componentHtml"
 
-    # react_component_name: can be a React component, created using a ES6 class, or
-    #   React.createClass, or a
-    #    `generator function` that returns a React component
-    #      using ES6
-    #         let MyReactComponentApp = (props, railsContext) => <MyReactComponent {...props}/>;
-    #      or using ES5
-    #         var MyReactComponentApp = function(props, railsContext) { return <YourReactComponent {...props}/>; }
+    # react_component_name: can be a React function or class component or a "render function".
+    # "render functions" differ from a React function in that they take two parameters, the
+    #   props and the railsContext, like this:
+    #
+    #   let MyReactComponentApp = (props, railsContext) => <MyReactComponent {...props}/>;
+    #
+    #   Alternately, you can define the render function with an additional property
+    #   `.renderFunction = true`:
+    #
+    #   let MyReactComponentApp = (props) => <MyReactComponent {...props}/>;
+    #   MyReactComponent.renderFunction = true;
+    #
     #   Exposing the react_component_name is necessary to both a plain ReactComponent as well as
     #     a generator:
     #   See README.md for how to "register" your react components.
@@ -45,7 +50,8 @@ module ReactOnRails
     #   raise_on_prerender_error: <true/false> Default to false. True will raise exception on server
     #      if the JS code throws
     # Any other options are passed to the content tag, including the id.
-    # random_dom_id can be set to override the global default.
+    # random_dom_id can be set to override the default from the config/initializers. That's only
+    # used if you have multiple instance of the same component on the Rails view.
     def react_component(component_name, options = {})
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
@@ -59,20 +65,24 @@ module ReactOnRails
           render_options: internal_result[:render_options]
         )
       elsif server_rendered_html.is_a?(Hash)
-        msg = <<-MSG.strip_heredoc
-        Use react_component_hash (not react_component) to return a Hash to your ruby view code. See
-        https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
-        for an example of the necessary javascript configuration."
+        msg = <<~MSG
+          Use react_component_hash (not react_component) to return a Hash to your ruby view code. See
+          https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+          for an example of the necessary javascript configuration.
         MSG
         raise ReactOnRails::Error, msg
-
       else
-        msg = <<-MSG.strip_heredoc
-        ReactOnRails: server_rendered_html is expected to be a String for #{component_name}. If you're
-        trying to use a generator function to return a Hash to your ruby view code, then use
-        react_component_hash instead of react_component and see
-        https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
-        for an example of the JavaScript code."
+        class_name = server_rendered_html.class.name
+        msg = <<~MSG
+          ReactOnRails: server_rendered_html is expected to be a String or Hash for #{component_name}.
+          Type is #{class_name}
+          Value:
+          #{server_rendered_html}
+
+          If you're trying to use a render function to return a Hash to your ruby view code, then use
+          react_component_hash instead of react_component and see
+          https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+          for an example of the JavaScript code.
         MSG
         raise ReactOnRails::Error, msg
       end
@@ -83,7 +93,7 @@ module ReactOnRails
     # It is exactly like react_component except for the following:
     # 1. prerender: true is automatically added, as this method doesn't make sense for client only
     #    rendering.
-    # 2. Your JavaScript generator function for server rendering must return an Object rather than a React component.
+    # 2. Your JavaScript render function for server rendering must return an Object rather than a React component.
     # 3. Your view code must expect an object and not a string.
     #
     # Here is an example of the view code:
@@ -113,10 +123,12 @@ module ReactOnRails
           render_options: internal_result[:render_options]
         )
       else
-        msg = <<-MSG.strip_heredoc
-          Generator function used by react_component_hash for #{component_name} is expected to return
+        msg = <<~MSG
+          render function used by react_component_hash for #{component_name} is expected to return
           an Object. See https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
-          for an example of the JavaScript code."
+          for an example of the JavaScript code.
+          Note, your render function must either take 2 params or have the property
+          `.renderFunction = true` added to it to distinguish it from a React Function Component.
         MSG
         raise ReactOnRails::Error, msg
       end
@@ -228,7 +240,7 @@ module ReactOnRails
     end
 
     # This is the definitive list of the default values used for the rails_context, which is the
-    # second parameter passed to both component and store generator functions.
+    # second parameter passed to both component and store render functions.
     # This method can be called from views and from the controller, as `helpers.rails_context`
     #
     # rubocop:disable Metrics/AbcSize

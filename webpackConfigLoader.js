@@ -1,4 +1,6 @@
 /**
+ * TODO: THIS SHOULD BE REMOVED
+ *
  * Allow defaults for the config/webpacker.yml. Thee values in this file MUST match values
  * in https://github.com/rails/webpacker/blob/master/lib/install/config/webpacker.yml
  *

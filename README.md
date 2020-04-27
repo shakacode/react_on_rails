@@ -170,13 +170,14 @@ Below is the line where you turn server rendering on by setting `prerender` to t
     <%= react_component("HelloWorld", props: { name: "Stranger" }) %>
   ```
   
-- This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://reactjs.org/docs/context.html). See [Generator Functions and the RailsContext](docs/basics/generator-functions-and-railscontext.md) for more details on this topic.
+- This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://reactjs.org/docs/context.html). See [render functions and the RailsContext](docs/basics/render-functions-and-railscontext.md) for more details on this topic.
   
   ```js
   import React from 'react';
 
   export default (props, railsContext) => {
-    return (
+    // Note wrap in a function to make this a React function component
+    return () => (
       <div>
         Your locale is {railsContext.i18nLocale}.<br/>
         Hello, {props.name}!
@@ -236,21 +237,38 @@ Another way is to use a separate webpack configuration file that can use a diffe
 
 For details on techniques to use different code for client and server rendering, see: [How to use different versions of a file for client and server rendering](https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352). (_Requires creating a free account._)
 
-## Specifying Your React Components: Direct or Generator Functions
+## Specifying Your React Components: Direct or render functions
 
-You have two ways to specify your React components. You can either register the React component directly, or you can create a function that returns a React component. Creating a function has the following benefits:
+You have two ways to specify your React components. You can either register the React component (either function or class component) directly, or you can create a function that returns a React component, which we using the name of a "render function". Creating a function has the following benefits:
 
-1. You have access to the `railsContext`. See documentation for the railsContext in terms of why you might need it. You **need** a generator function to access the `railsContext`.
+1. You have access to the `railsContext`. See documentation for the railsContext in terms of why you might need it. You **need** a render function to access the `railsContext`.
 2. You can use the passed-in props to initialize a redux store or set up react-router.
 3. You can return different components depending on what's in the props.
 
-ReactOnRails will automatically detect a registered generator function. Thus, there is no difference between registering a React Component versus a "generator function."
+Note, the return value of a **render function** should be JSX or an HTML string. Do not return a
+function.
 
-## react_component_hash for Generator Functions
+ReactOnRails will automatically detect a registered render function by the fact that the function takes
+more than 1 parameter. In other words, if you want the ability to provide a function that returns the
+React component, then you need to specify at least a second parameter. This is the `railsContext`.
+If you're not using this parameter, declare your function with the unused param:
 
-Another reason to use a generator function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }. Make sure you use this function with `react_component_hash`. 
+```js
+const MyComponentGenerator = (props, _railsContext) => {
+  if (props.print) {
+    // Wrap in a function so this is a React Component    
+    return () => <H1>{JSON.stringify(props)}</H1>;
+  }
+}
+```
 
-For server rendering, if you wish to return multiple HTML strings from a generator function, you may return an Object from your generator function with a single top-level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
+Thus, there is no difference between registering a React function or class Component versus a "render function."
+
+## react_component_hash for render functions
+
+Another reason to use a render function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }. Make sure you use this function with `react_component_hash`. 
+
+For server rendering, if you wish to return multiple HTML strings from a render function, you may return an Object from your render function with a single top-level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
 
 ```js
 { renderedHtml: { componentHtml, customKey1, customKey2} }

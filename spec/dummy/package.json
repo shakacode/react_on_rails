@@ -44,7 +44,7 @@
     "react-dom": "^16.8.6",
     "react-helmet": "^6.0.0-beta.2",
     "react-hot-loader": "^4.12.12",
-    "react-on-rails": "11.2.2",
+    "react-on-rails": "11.3.0",
     "react-proptypes": "^1.0.0",
     "react-redux": "^5.0.5",
     "react-router": "^3.2.1",
@@ -80,7 +80,7 @@
     "fs": false
   },
   "scripts": {
-    "postinstall": "yarn link react-on-rails",
+    "yalc-postinstall": "yalc link react-on-rails",
     "lint": "cd client && yarn run lint",
     "test": "yarn run build:test && yarn run lint && rspec",
     "build:test": "rm -rf public/webpack/test && RAILS_ENV=test NODE_ENV=test bin/webpack",

@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails",
-  "version": "11.3.0",
+  "version": "12.0.0",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "node_package/lib/ReactOnRails.js",
   "directories": {
@@ -54,8 +54,8 @@
   },
   "peerDependencies": {
     "js-yaml": ">= 3.0.0",
-    "react": ">= 0.14",
-    "react-dom": ">= 0.14"
+    "react": ">= 16",
+    "react-dom": ">= 16"
   },
   "files": [
     "node_package/lib",
@@ -67,7 +67,7 @@
     "prepare": "yarn run build",
     "prepublish": "npm run prepare",
     "build": "yarn run clean && yarn run tsc",
-    "build-watch": "babel --watch --out-dir node_package/lib node_package/src",
+    "build-watch": "yarn run clean && yarn run tsc --watch",
     "lint": "eslint --ext '.js,.ts' .",
     "check": "yarn run lint && yarn run test && yarn run type-check",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",
@@ -76,8 +76,7 @@
     "release:minor": "node_package/scripts/release minor",
     "release:major": "node_package/scripts/release major",
     "dummy:install": "rake dummy_apps",
-    "dummy:spec": "rake run_rspec:dummy",
-    "install-react-on-rails": "yarn link"
+    "dummy:spec": "rake run_rspec:dummy"
   },
   "repository": {
     "type": "git",

@@ -1,45 +1,80 @@
-# Generator Functions and Rails Context 
+# Render-Functions and the Rails Context 
 
-## Generator Functions
+## Render-Functions
 
-When you use a "generator function" to create react components (or renderedHtml on the server), or you used shared redux stores, you get two params passed to your function that creates a React component:
+When you use a render-function to create react components (or renderedHtml on the server), or you
+used shared redux stores, you get two params passed to your function that creates a React component:
 
 1. `props`: Props that you pass in the view helper of either `react_component` or `redux_store`
-2. `railsContext`: Rails contextual information, such as the current pathname. You can customize this in your config file. **Note**: The `railsContext` is not related to the concept of a ["context" for React components](https://facebook.github.io/react/docs/context.html#how-to-use-context).
+2. `railsContext`: Rails contextual information, such as the current pathname. You can customize
+   this in your config file. **Note**: The `railsContext` is not related to the concept of a
+   ["context" for React components](https://facebook.github.io/react/docs/context.html#how-to-use-context).
 
-This parameters (`props` and `railsContext`) will be the same regardless of either client or server side rendering, except for the key `serverSide` based on whether or not you are server rendering.
+These parameters (`props` and `railsContext`) will be the same regardless of either client or server
+side rendering, except for the key `serverSide` based on whether or not you are server rendering.
 
-While you could manually configure your Rails code to pass the "`railsContext` information" with the rest of your "props", the `railsContext` is a convenience because it's passed consistently to all invocations of generator functions.
+While you could manually configure your Rails code to pass the "`railsContext` information" with
+the rest of your "props", the `railsContext` is a convenience because it's passed consistently to
+all invocations of render functions.
 
-For example, suppose you create a "generator function" called MyAppComponent.
+For example, suppose you create a "render-function" called MyAppComponent.
 
 ```js
 import React from 'react';
 const MyAppComponent = (props, railsContext) => (
-  <div>
-    <p>props are: {JSON.stringify(props)}</p>
-    <p>railsContext is: {JSON.stringify(railsContext)}
-    </p>
-  </div>
+  // NOTE: need to wrap in a function so this is proper React function component that can use
+  // hooks
+ 
+  // the props get passed again, but we ignore since we use a closure
+  // or should we
+  (_props) =>
+      <div>
+        <p>props are: {JSON.stringify(props)}</p>
+        <p>railsContext is: {JSON.stringify(railsContext)}
+        </p>
+      </div>
 );
 export default MyAppComponent;
 ```
 
+------------------------------
+
+_This would be alternate API where you have to call React.createElement and the React on Rails code doesn't do that._
+
+```js
+import React from 'react';
+const MyAppComponent = (props, railsContext) => (
+  // NOTE: need to wrap in a function so this is proper React function component that can use
+  // hooks
+  React.createElement(
+    () =>
+      <div>
+        <p>props are: {JSON.stringify(props)}</p>
+        <p>railsContext is: {JSON.stringify(railsContext)}
+        </p>
+      </div>,
+  props)
+);
+export default MyAppComponent;
+```
+
+------------------------------------
+
 *Note: you will get a React browser console warning if you try to serverRender this since the value of `serverSide` will be different for server rendering.*
 
-So if you register your generator function `MyAppComponent`, it will get called like:
+So if you register your render-function `MyAppComponent`, it will get called like:
 
 ```js
 reactComponent = MyAppComponent(props, railsContext);
 ```
 
-and, similarly, any redux store always initialized with 2 parameters:
+and, similarly, any redux store is always initialized with 2 parameters:
 
 ```js
 reduxStore = MyReduxStore(props, railsContext);
 ```
 
-Note: you never make these calls. React on Rails makes these calls when it does either client or server rendering. You will define functions that take these 2 params and return a React component or a Redux Store. Naturally, you do not have to use second parameter of the railsContext if you do not need it.
+Note: you never make these calls. React on Rails makes these calls when it does either client or server rendering. You will define functions that take these 2 params and return a React component or a Redux Store. Naturally, you do not have to use second parameter of the railsContext if you do not need it. If you don't take a second parameter, then you're probably defining a React function component and you will simply return a React Element, often just JSX.
 
 (Note: see below [section](#multiple-react-components-on-a-page-with-one-store) on how to setup redux stores that allow multiple components to talk to the same store.)
 
@@ -76,7 +111,7 @@ Plus, you can add your customizations to this. See "rendering extension" below.
 
 ## Rails Context
 
-The `railsContext` is a second param passed to your generator functions for React components. This is in addition to the props that are passed from the `react_component` Rails helper. For example:
+The `railsContext` is a second param passed to your render-functions for React components. This is in addition to the props that are passed from the `react_component` Rails helper. For example:
 
 ERB view file: 
 
@@ -91,7 +126,8 @@ This is what your HelloWorld.js file might contain. The railsContext is always a
 import React from 'react';
 
 export default (props, railsContext) => {
-  return (
+  // Note, wrap in a function so this is React function component
+  return () => (
     <div>
       Your locale is {railsContext.i18nLocale}.<br/>
       Hello, {props.name}!
@@ -100,15 +136,18 @@ export default (props, railsContext) => {
 };
 ``` 
 
-## Why is the railsContext is only passed to generator functions?
+## Why is the railsContext only passed to render-functions?
 
-There's no reason that the railsContext would ever get passed to your React component unless the value is explicitly put into the props used for rendering. If you create a react component, rather than a generator function, for use by React on Rails, then you get whatever props are passed in from the view helper, which **does not include the Rails Context**. It's trivial to wrap your component in a "generator function" to return a new component that takes both:
+There's no reason that the railsContext would ever get passed to your React component unless the value is explicitly put into the props used for rendering. If you create a react component, rather than a render-function, for use by React on Rails, then you get whatever props are passed in from the view helper, which **does not include the Rails Context**. It's trivial to wrap your component in a "render-function" to return a new component that takes both:
+
+POSSIBLE ENHANCEMENT: Would it be better to offer the ability to send props this way if a flag is passed in
+the `react_component` helper? Probably not, since this is so easily done.
 
 ```js
 import React from 'react';
 import AppComponent from './AppComponent';
 const AppComponentWithRailsContext = (props, railsContext) => (
-  <AppComponent {...{...props, railsContext}}/>
+  () => <AppComponent {...{...props, railsContext}}/>
 )
 export default AppComponentWithRailsContext;
 ```
@@ -153,7 +192,7 @@ See [spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakac
 module RenderingExtension
 
   # Return a Hash that contains custom values from the view context that will get merged with
-  # the standard rails_context values and passed to all calls to generator functions used by the
+  # the standard rails_context values and passed to all calls to render-functions used by the
   # react_component and redux_store view helpers
   def self.custom_context(view_context)
     {

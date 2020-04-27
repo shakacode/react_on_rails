@@ -42,6 +42,20 @@ This page demonstrates a few things the other pages do not show:
 <%= react_component("HelloWorld", props: @app_props_server_render, trace: true, id: "HelloWorld-react-component-1") %>
 <hr/>
 
+<h1>React Rails Server Rendering with Hooks</h1>
+<pre>
+    <%%= react_component("HelloWorldHooks", props: @app_props_server_render, prerender: true, trace: true, id: "HelloWorld-react-component-6") %><br/>
+</pre>
+<%= react_component("HelloWorldHooks", props: @app_props_server_render, prerender: true, trace: true, id: "HelloWorld-react-component-6") %>
+<hr/>
+
+<h1>React Rails Server Rendering with Hooks with rails_context</h1>
+<pre>
+    <%%= react_component("HelloWorldHooksContext", props: @app_props_server_render, prerender: true, trace: true, id: "HelloWorld-react-component-7") %><br/>
+</pre>
+<%= react_component("HelloWorldHooksContext", props: @app_props_server_render, prerender: false, trace: true, id: "HelloWorld-react-component-7") %>
+<hr/>
+
 <h1>Simple Client Rendered Component</h1>
 <!-- Passing prerender: false to not render on server -->
 <pre>

@@ -1,5 +1,5 @@
-import type { RegisteredComponent, ComponentOrRenderFunction, RenderFunction } from './types/index';
-import generatorFunction from './generatorFunction';
+import type { RegisteredComponent, ReactComponentOrRenderFunction, RenderFunction } from './types/index';
+import isRenderFunction from './isRenderFunction';
 
 const registeredComponents = new Map();
 
@@ -7,7 +7,7 @@ export default {
   /**
    * @param components { component1: component1, component2: component2, etc. }
    */
-  register(components: { [id: string]: ComponentOrRenderFunction }): void {
+  register(components: { [id: string]: ReactComponentOrRenderFunction }): void {
     Object.keys(components).forEach(name => {
       if (registeredComponents.has(name)) {
         console.warn('Called register for component that is already registered', name);
@@ -18,13 +18,13 @@ export default {
         throw new Error(`Called register with null component named ${name}`);
       }
 
-      const isGeneratorFunction = generatorFunction(component);
-      const isRenderer = isGeneratorFunction && (component as RenderFunction).length === 3;
+      const renderFunction = isRenderFunction(component);
+      const isRenderer = renderFunction && (component as RenderFunction).length === 3;
 
       registeredComponents.set(name, {
         name,
         component,
-        generatorFunction: isGeneratorFunction,
+        renderFunction: renderFunction,
         isRenderer,
       });
     });
@@ -32,7 +32,7 @@ export default {
 
   /**
    * @param name
-   * @returns { name, component, generatorFunction, isRenderer }
+   * @returns { name, component, isRenderFunction, isRenderer }
    */
   get(name: string): RegisteredComponent {
     if (registeredComponents.has(name)) {
@@ -47,7 +47,7 @@ Registered component names include [ ${keys} ]. Maybe you forgot to register the
   /**
    * Get a Map containing all registered components. Useful for debugging.
    * @returns Map where key is the component name and values are the
-   * { name, component, generatorFunction, isRenderer}
+   * { name, component, renderFunction, isRenderer}
    */
   components(): Map<string, RegisteredComponent> {
     return registeredComponents;
