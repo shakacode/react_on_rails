@@ -14,28 +14,23 @@ AllCops:
   Exclude:
     - 'vendor/**/*'
     - 'spec/fixtures/**/*'
-    - 'node_modules/**/.*'
-    - 'node_modules/**/*'
+    - '**/node_modules/**/.*'
+    - '**/node_modules/**/*'
     - 'coverage/**/*'
     - 'db/**/*'
     - 'db/schema.rb'
     - 'db/seeds.rb'
     - 'bin/**/*'
     - !ruby/regexp /old_and_unused\.rb$/
-    - 'spec/dummy/Procfile.*'
+    - '**/Procfile.*'
     - 'spec/dummy/bin/**/*'
-    - 'spec/dummy/node_modules/**/*'
-    - 'spec/dummy/node_modules/**/.*'
-    - 'spec/dummy/client/node_modules/**/*'
-    - 'spec/dummy/client/node_modules/**/.*'
+    - 'spec/loadable/bin/**/*'
     - 'gen-examples/examples/**/.*'
     - 'gen-examples/examples/**/*'
 
 Naming/FileName:
   Exclude:
-    - 'Gemfile'
-    - 'spec/dummy/Gemfile'
-    - 'spec/dummy_no_webpacker/Gemfile'
+    - '**/Gemfile'
 
 Layout/LineLength:
   Max: 120

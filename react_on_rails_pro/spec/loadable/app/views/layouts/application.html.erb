@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <% if content_for? :title %>
+    <%= yield :title %>
+  <% else %>
+    <title>Loadable Components Proof of Concept</title>
+  <% end %>
+
+  <%= yield :head %>
+
+  <%= stylesheet_link_tag('client-bundle',
+                          media: 'all',
+                          'data-turbolinks-track': true) %>
+
+  <%= javascript_pack_tag 'foo-bundle' %>
+  <%= javascript_pack_tag 'vendor' %>
+
+  <%= yield :head %>
+
+  <%= csrf_meta_tags %>
+</head>
+<body>
+
+<%= yield %>
+
+</body>
+</html>
