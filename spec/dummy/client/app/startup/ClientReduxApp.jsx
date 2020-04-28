@@ -6,7 +6,6 @@ import React from 'react';
 import { combineReducers, applyMiddleware, createStore } from 'redux';
 import { Provider } from 'react-redux';
 import thunkMiddleware from 'redux-thunk';
-import { AppContainer } from 'react-hot-loader';
 import ReactDOM from 'react-dom';
 
 import reducers from '../reducers/reducersIndex';
@@ -33,29 +32,13 @@ export default (props, railsContext, domNodeId) => {
   // store will have helloWorldData as a top level property
   const store = createStore(combinedReducer, combinedProps, applyMiddleware(thunkMiddleware));
 
-  // renderApp is a function required for hot reloading. see
-  // https://github.com/retroalgic/react-on-rails-hot-minimal/blob/master/client/src/entry.js
-
   // Provider uses this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
-  const renderApp = (Komponent) => {
-    const element = (
-      <AppContainer>
-        <Provider store={store}>
-          <Komponent />
-        </Provider>
-      </AppContainer>
-    );
+  const element = (
+    <Provider store={store}>
+      <HelloWorldContainer />
+    </Provider>
+  );
 
-    render(element, document.getElementById(domNodeId));
-  };
-
-  renderApp(HelloWorldContainer);
-
-  if (module.hot) {
-    module.hot.accept(['../reducers/reducersIndex', '../components/HelloWorldContainer'], () => {
-      store.replaceReducer(combineReducers(reducers));
-      renderApp(HelloWorldContainer);
-    });
-  }
+  render(element, document.getElementById(domNodeId));
 };

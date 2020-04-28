@@ -7,14 +7,6 @@ if (!module.hot && devBuild) {
     .use.find((item) => item.loader === 'sass-loader').options.sourceMapContents = false;
 }
 
-//adding reactHotReload
-const reactHotReload = {
-  test: /\.(js|jsx)$/,
-  use: 'react-hot-loader/webpack',
-  include: /node_modules/,
-};
-environment.loaders.insert('reactHotReload', reactHotReload, { after: 'babel' });
-
 //adding exposeLoader
 const exposeLoader = {
   test: require.resolve('jquery'),

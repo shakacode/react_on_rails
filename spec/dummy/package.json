@@ -39,7 +39,6 @@
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
     "react-helmet": "^6.0.0-beta.2",
-    "react-hot-loader": "^4.12.12",
     "react-on-rails": "11.2.2",
     "react-on-rails-pro-vm-renderer": "file:../..",
     "react-proptypes": "^1.0.0",
@@ -63,8 +62,7 @@
     "mini-css-extract-plugin": "^0.7.0",
     "preload-webpack-plugin": "^3.0.0-alpha.1",
     "tape": "^4.7.0",
-    "webpack-dev-server": "^3.2.1",
-    "yalc": "^1.0.0-pre.27"
+    "webpack-dev-server": "^3.2.1"
   },
   "browser": {
     "fs": false
@@ -72,7 +70,8 @@
   "scripts": {
     "test": "yarn run build:test && yarn run lint && rspec",
     "lint": "cd ../.. && nps lint",
-    "install-pro-package": "cd client && yarn run install-pro-package",
+    "preinstall": "yarn run link-source && yarn link react-on-rails-pro-vm-renderer",
+    "link-source": "cd ../.. && yarn link",
     "build:test": "rm -rf public/webpack/test && RAILS_ENV=test NODE_ENV=test bin/webpack",
     "build:dev": "rm -rf public/webpack/develoment && RAILS_ENV=development NODE_ENV=development bin/webpack",
     "build:dev:watch": "RAILS_ENV=development NODE_ENV=development bin/webpack --watch",

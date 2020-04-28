@@ -4,7 +4,6 @@
 import React from 'react';
 import { Provider } from 'react-redux';
 import ReactOnRails from 'react-on-rails';
-import { AppContainer } from 'react-hot-loader';
 import ReactDOM from 'react-dom';
 
 import HelloWorldContainer from '../components/HelloWorldContainer';
@@ -22,27 +21,13 @@ export default (props, _railsContext, domNodeId) => {
   // This is where we get the existing store.
   const store = ReactOnRails.getStore('SharedReduxStore');
 
-  // renderApp is a function required for hot reloading. see
-  // https://github.com/retroalgic/react-on-rails-hot-minimal/blob/master/client/src/entry.js
-
   // Provider uses this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
-  const renderApp = (Komponent) => {
-    const element = (
-      <AppContainer>
-        <Provider store={store}>
-          <Komponent />
-        </Provider>
-      </AppContainer>
-    );
-    render(element, document.getElementById(domNodeId));
-  };
+  const element = (
+    <Provider store={store}>
+      <HelloWorldContainer />
+    </Provider>
+  );
 
-  renderApp(HelloWorldContainer);
-
-  if (module.hot) {
-    module.hot.accept(['../components/HelloWorldContainer'], () => {
-      renderApp(HelloWorldContainer);
-    });
-  }
+  render(element, document.getElementById(domNodeId));
 };

@@ -1,0 +1,7 @@
+{
+  "buildpacks": [
+    {
+      "url": "https://github.com/danp/heroku-buildpack-runit"
+    }
+  ]
+}

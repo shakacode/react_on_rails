@@ -25,17 +25,10 @@ yarn link react-on-rails
 
 ```sh
 cd react_on_rails
-yarn run dummy:install 
+yarn run dummy:install
 ```
 
 # Starting the Sample App
-
-
-## Hot Reloading of Rails Assets
-
-```sh
-foreman start -f Procfile.hot
-```
 
 ## Static Loading of Rails Assets
 ```sh
@@ -46,4 +39,3 @@ foreman start -f Procfile.static
 ```sh
 foreman start -f Procfile.spec
 ```
-

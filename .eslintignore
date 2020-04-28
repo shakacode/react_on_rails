@@ -3,7 +3,7 @@ coverage
 gen-documentation/**
 spec/react_on_rails/dummy-for-generators
 spec/dummy
-spec/dummy/public/webpack/**
+spec/loadable
 packages/vm-renderer/src/__obsolete
 packages/vm-renderer/lib/
 packages/vm-renderer/tests/node_modules
@@ -15,5 +15,6 @@ packages/vm-renderer/webpack.config.js
 **/app/assets/javascripts/application.js
 **/coverage/**
 **/cable.js
+**/public/**
 **/tmp/**
 vendor
