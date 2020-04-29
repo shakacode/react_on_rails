@@ -16,6 +16,7 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+## UPCOMING 12.0 RELEASE
 ### [12.0.0]
 #### BREAKING CHANGE
 In order to solve the issues regarding React Hooks compatibility, the number of parameters
