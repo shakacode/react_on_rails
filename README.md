@@ -11,12 +11,13 @@
 
 [![License](https://img.shields.io/badge/license-mit-green.svg)](./LICENSE.md) [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![](https://ruby-gem-downloads-badge.herokuapp.com/react_on_rails?type=total)](https://rubygems.org/gems/react_on_rails)
 
+*These are the docs for React on Rails 12, coming soon. To see the version 11 docs, [click here](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
+
 #### News
 **April 2, 2020**:
 * Are you interested in support for React on Rails? If so check out [React on Rails Pro](https://docs.google.com/document/d/1vwooIc6jKkuBOzllQ7rbVKMR2xOmeX0TpjHKxHcFyYo/edit#).
 * HMR is working with [Loadable Components](https://loadable-components.com) for a both amazing hot-reloading developer experience and great runtime performance. Please [email me](mailto:justin@shakacode.com) if you'd like to use [Loadable Components Code Splitting](https://loadable-components.com/docs/code-splitting/) to speed up your app by reducing your bundle sizes and lazily loading the code that's needed.
 * `react_on_rails` fully supports `rails/webpacker`. The example test app in `spec/dummy` was recently converted over to use rails/webpacker v4. It's a good example of how to leverage rails/webpacker's webpack configuration. 
-* Justin Gordon is presenting [Webpacker, It-Just-Works, But How? at RailsConf, 2020, Couch Edition](https://railsconf.com/program/sessions#session-943). Want to hear Justin give a trial run of the talk with the ability to ask questions? [Click here to sign up](https://signup.shakacode.com/webpacker_it_just_works) for notification of when this will happen.
 
 ---
 
