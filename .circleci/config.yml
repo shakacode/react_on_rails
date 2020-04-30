@@ -266,10 +266,7 @@ jobs:
           command:  touch spec/dummy/public/webpack/test/*
       - run:
           name: Install yalc globally
-          command:  yarn global add yalc
-      - run:
-          name: check for yalc
-          command:  which yalc
+          command:  sudo yarn global add yalc
       - run:
           name: Prep for CI
           # TODO -- need to leverage Circle CI containers
