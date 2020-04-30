@@ -31,7 +31,7 @@
     "file-loader": "^4.0.0",
     "history": "^4.6.3",
     "imports-loader": "^0.8.0",
-    "jquery": "^3.4.1",
+    "jquery": "^3.5.0",
     "jquery-ujs": "^1.2.2",
     "loader-utils": "^1.2.3",
     "lodash": "^4.17.4",
