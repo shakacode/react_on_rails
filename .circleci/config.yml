@@ -250,6 +250,9 @@ jobs:
     steps:
       - checkout
       - run: *print-system-info
+      - run:
+          name: Install yalc globally
+          command:  yarn global add yalc
       - restore_cache: *restore-package-gem-cache
       - restore_cache: *restore-dummy-app-gem-cache
       - restore_cache:
