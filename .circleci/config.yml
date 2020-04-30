@@ -250,9 +250,6 @@ jobs:
     steps:
       - checkout
       - run: *print-system-info
-      - run:
-          name: Install yalc globally
-          command:  yarn global add yalc
       - restore_cache: *restore-package-gem-cache
       - restore_cache: *restore-dummy-app-gem-cache
       - restore_cache:
@@ -267,6 +264,12 @@ jobs:
       - run:
           name: Touch webpack bundles
           command:  touch spec/dummy/public/webpack/test/*
+      - run:
+          name: Install yalc globally
+          command:  yarn global add yalc
+      - run:
+          name: check for yalc
+          command:  which yalc
       - run:
           name: Prep for CI
           # TODO -- need to leverage Circle CI containers
@@ -294,27 +297,9 @@ workflows:
       - install-package-ruby-gems
       - install-dummy-app-node-packages
       - install-dummy-app-ruby-gems
-      - lint-js-and-ruby:
-          requires:
-            - install-package-node-packages
-            - install-package-ruby-gems
-      - prettier:
-          filters:
-            branches:
-              ignore: master
-          requires:
-            - install-package-node-packages
       - build-dummy-app-webpack-test-bundles:
           requires:
             - install-dummy-app-node-packages
-      - package-js-tests:
-          requires:
-            - install-package-node-packages
-      - rspec-package-specs:
-          requires:
-            - install-package-ruby-gems
-            - build-dummy-app-webpack-test-bundles
-            - install-dummy-app-ruby-gems
       - main:
           requires:
             - install-package-ruby-gems
