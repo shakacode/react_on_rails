@@ -263,10 +263,10 @@ jobs:
       - run: *install-latest-chrome
       - run:
           name: Touch webpack bundles
-          command:  touch spec/dummy/public/webpack/test/*
+          command: touch spec/dummy/public/webpack/test/*
       - run:
           name: Install yalc globally
-          command:  sudo yarn global add yalc
+          command: sudo yarn global add yalc
       - run:
           name: Prep for CI
           # TODO -- need to leverage Circle CI containers
@@ -294,6 +294,16 @@ workflows:
       - install-package-ruby-gems
       - install-dummy-app-node-packages
       - install-dummy-app-ruby-gems
+      - lint-js-and-ruby:
+          requires:
+            - install-package-node-packages
+            - install-package-ruby-gems
+      - prettier:
+          filters:
+            branches:
+              ignore: master
+          requires:
+            - install-package-node-packages
       - build-dummy-app-webpack-test-bundles:
           requires:
             - install-dummy-app-node-packages
