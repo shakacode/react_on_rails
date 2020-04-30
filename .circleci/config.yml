@@ -276,7 +276,7 @@ jobs:
           name: Main CI
           # TODO -- need to leverage Circle CI containers
           command: |
-            bundle exec rake
+            bundle exec rake run_rspec:all_dummy
       - store_test_results:
           path: ~/rspec
       - store_artifacts:
@@ -297,6 +297,14 @@ workflows:
       - build-dummy-app-webpack-test-bundles:
           requires:
             - install-dummy-app-node-packages
+      - package-js-tests:
+          requires:
+            - install-package-node-packages
+      - rspec-package-specs:
+          requires:
+            - install-package-ruby-gems
+            - build-dummy-app-webpack-test-bundles
+            - install-dummy-app-ruby-gems
       - main:
           requires:
             - install-package-ruby-gems

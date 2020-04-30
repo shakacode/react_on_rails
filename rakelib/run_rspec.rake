@@ -59,6 +59,11 @@ namespace :run_rspec do
     puts "Completed all RSpec tests"
   end
 
+  desc "run all dummy tests"
+  task all_dummy: %i[dummy_no_turbolinks dummy] do
+    puts "Completed all RSpec tests"
+  end
+
   desc "run all tests"
   task run_rspec: %i[all_but_examples examples] do
     puts "Completed all RSpec tests"
