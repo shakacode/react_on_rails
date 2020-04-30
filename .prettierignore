@@ -3,3 +3,8 @@ package.json
 tmp/
 coverage/
 **/app/assets/webpack/
+spec/dummy/public
+gen-examples/examples/*
+node_package/lib/*
+spec/react_on_rails/dummy-for-generators/app/javascript/bundles/HelloWorld/*
+bundle/

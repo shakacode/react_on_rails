@@ -14,3 +14,4 @@ node_package/webpack.config.js
 **/cable.js
 **/public/packs*/*
 gen-examples
+bundle/
