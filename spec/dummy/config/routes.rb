@@ -15,6 +15,7 @@ Rails.application.routes.draw do
   get "server_side_hello_world_shared_store_controller" => "pages#server_side_hello_world_shared_store_controller"
   get "server_side_hello_world_shared_store_defer" => "pages#server_side_hello_world_shared_store_defer"
   get "server_side_hello_world" => "pages#server_side_hello_world"
+  get "server_side_hello_world_hooks" => "pages#server_side_hello_world_hooks"
   get "client_side_log_throw" => "pages#client_side_log_throw"
   get "server_side_log_throw" => "pages#server_side_log_throw"
   get "server_side_log_throw_plain_js" => "pages#server_side_log_throw_plain_js"
@@ -35,7 +36,10 @@ Rails.application.routes.draw do
   get "rendered_html" => "pages#rendered_html"
   get "xhr_refresh" => "pages#xhr_refresh"
   get "react_helmet" => "pages#react_helmet"
+  get "react_helmet_broken" => "pages#react_helmet_broken"
   get "broken_app" => "pages#broken_app"
   get "image_example" => "pages#image_example"
   get "server_render_with_timeout" => "pages#server_render_with_timeout"
+  get "context_function_return_jsx" => "pages#context_function_return_jsx"
+  get "pure_component_wrapped_in_function" => "pages#pure_component_wrapped_in_function"
 end

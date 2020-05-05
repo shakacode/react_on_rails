@@ -1,12 +1,13 @@
 # Using React Helmet to build `<head>` content
 
 ## Installation and general usage
-See https://github.com/nfl/react-helmet for details. Run `yarn add react-helmet` in your `client` directory to add this package to your application.
+See [nfl/react-helmet](https://github.com/nfl/react-helmet) for details on how to use this package.
+Run `yarn add react-helmet` to add this package to your application.
 
 ## Example
 Here is what you need to do in order to configure your Rails application to work with **ReactHelmet**.
 
- Create generator function for server rendering like this:
+ Create a render-function for server rendering like this:
 
 ```javascript
 export default (props, _railsContext) => {
@@ -20,17 +21,35 @@ export default (props, _railsContext) => {
   return { renderedHtml };
 };
 ```
-You can add more **helmet** properties to result, e.g. **meta**, **base** and so on. See https://github.com/nfl/react-helmet#server-usage.
+You can add more **helmet** properties to the result, e.g. **meta**, **base** and so on. See https://github.com/nfl/react-helmet#server-usage.
 
-Use regular component or generator function for client-side:
+Use a regular React functional or class component or a render-function for your client-side bundle:
 
 ```javascript
-export default (props, _railsContext) => (
+// React functional component
+export default (props) => (
   <App {...props} />
 );
 ```
 
-Put **ReactHelmet** component somewhere in your `<App>`:
+Or a render-function. Note you can't return just the JSX (React element), but you need to return
+either a React functional or class component.
+```javascript
+// React functional component
+export default (props, railsContext) => (
+  () => <App {{railsContext, ...props}} />
+);
+```
+
+Note, this doesn't work, because this function just returns a React element rather than a React component
+```javascript
+// React functional component
+export default (props, railsContext) => (
+  <App {{railsContext, ...props}} />
+);
+```
+
+Put the **ReactHelmet** component somewhere in your `<App>`:
 ```javascript
 import { Helmet } from 'react-helmet';
 
@@ -55,15 +74,18 @@ ReactOnRails.register({
 });
 ```
 ```javascript
+// Note the import from the server file.
 import ReactHelmetApp from '../ReactHelmetServerApp';
 
 ReactOnRails.register({
   ReactHelmetApp
 });
 ```
-Now when the `react_component_hash` helper is called with **"ReactHelmetApp"** as a first argument it will return a hash instead of HTML string:
+Now when the `react_component_hash` helper is called with **"ReactHelmetApp"** as a first argument it
+will return a hash instead of HTML string. Note, there is no need to specify "prerender" as it would not
+make sense to use react_component_hash without server rendering:
 ```ruby
-<% react_helmet_app = react_component_hash("ReactHelmetApp", prerender: true, props: { hello: "world" }, trace: true) %>
+<% react_helmet_app = react_component_hash("ReactHelmetApp", props: { hello: "world" }, trace: true) %>
 
 <% content_for :title do %>
   <%= react_helmet_app['title'] %>
@@ -76,5 +98,3 @@ So now we're able to insert received title tag to our application layout:
 ```ruby
  <%= yield(:title) if content_for?(:title) %>
 ```
-
-Note: Use of `react_component` for this functionality is deprecated. Please use `react_component_hash` instead.

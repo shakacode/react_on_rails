@@ -1,0 +1,323 @@
+version: 2
+
+aliases:
+  # Print critical data and executables versions.
+  - &print-system-info
+    name: Print system information
+    command: |
+      echo "Linux release: "; cat /etc/issue
+      echo "Current user: "; whoami
+      echo "Current directory: "; pwd
+      echo "Ruby version: "; ruby -v
+      echo "Node version: "; node -v
+      echo "Yarn version: "; yarn --version
+      echo "Bundler version: "; bundle --version
+  - &lint-js
+    name: Linting of JS
+    command: yarn start lint
+
+  - &lint-ruby
+    name: Linting of Ruby
+    command: bundle exec rubocop
+
+  - &format
+    name: Check formatting
+    command: yarn start format.listDifferent
+
+  # Install/update Node modules for renderer package unless existing set of modules is satisfying Yarn.
+  - &install-package-node-modules
+    name: Install Node modules with Yarn for renderer package
+    command: |
+      yarn install --no-progress --no-emoji
+      yarn run eslint -v
+
+  # Install/update Node modules for dummy app unless existing set of modules is satisfying Yarn.
+  - &install-dummy-app-node-modules
+    name: Install Node modules with Yarn for dummy app
+    command: cd spec/dummy && yarn install --no-progress --no-emoji
+
+  # Setup yarn links for react-on-rails
+  - &install-yarn-link-source
+    name: Install yarn link for react-on-rails
+    command: yarn link
+
+  - &install-yarn-link-destination
+    name: Install yarn link for react-on-rails
+    command: cd spec/dummy/client && yarn link react-on-rails
+
+  # Install ruby gems unless existing set of gems is satisfying bundler.
+  - &install-dummy-app-ruby-gems
+    name: Install Ruby Gems for dummy app
+    command: |
+      gem install bundler
+      echo "Bundler version: "; bundle --version
+      cd spec/dummy && bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+
+  # Install ruby gems unless existing set of gems is satisfying bundler.
+  - &install-package-ruby-gems
+    name: Install Ruby Gems for package
+    command: |
+      gem install bundler
+      echo "Bundler version: "; bundle --version
+      bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+
+  # Restore node_modules dir from cache using yarn.lock checksum as a key.
+  - &restore-package-node-modules-cache
+    name: Restore cached node_modules directory
+    keys:
+      - v4-package-node-modules-cache-{{ checksum "yarn.lock" }}
+
+  # Restore spec/dummy/node_modules dir from cache using yarn.lock checksum as a key.
+  - &restore-dummy-app-node-modules-cache
+    name: Restore cached spec/dummy/node_modules directory
+    keys:
+      - v4-dummy-app-node-modules-cache-{{ checksum "spec/dummy/yarn.lock" }}
+
+  # Restore vendor/bundle dir from cache using Gemfile.lock checksum as a key.
+  - &restore-dummy-app-gem-cache
+    name: Restore cached Ruby Gems for dummy app
+    keys:
+      - v4-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
+
+  # Restore vendor/bundle dir from cache using react_on_rails.gemspec checksum as a key.
+  - &restore-package-gem-cache
+    name: Restore cached Ruby Gems for package
+    keys:
+      - v4-package-app-gem-cache-{{ checksum "react_on_rails.gemspec" }}
+
+    # NOTE: Sometimes CI generated docker images are not updated in time to keep up with the minimum required
+    # by chromedriver versions of Chrome. Just bump here Chrome version if chromedriver raises errors
+  - &install-latest-chrome
+    name: Ensure minimum required Chrome version
+    command: |
+      echo -e "Installed $(google-chrome --version)\n"
+      MINIMUM_REQUIRED_CHROME_VERSION=75
+      INSTALLED_CHROME_MAJOR_VERSION="$(google-chrome --version | tr ' .' '\t' | cut -f3)"
+      if [[ $INSTALLED_CHROME_MAJOR_VERSION < $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
+        wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+        sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+        sudo apt-get update
+        sudo apt-get install google-chrome-stable
+        echo -e "\nInstalled $(google-chrome --version)"
+      fi
+
+jobs:
+  # Lint all
+  lint-js-and-ruby:
+    docker:
+      - image: &docker_image circleci/ruby:2.6-node-browsers
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-package-node-modules-cache
+      - restore_cache: *restore-package-gem-cache
+      - run: *install-package-ruby-gems
+      - run: *lint-ruby
+      - run: *lint-js
+      - run: *format
+
+  prettier:
+    docker:
+      - image: *docker_image
+    parallelism: 1
+    steps:
+      - checkout
+      - restore_cache: *restore-package-node-modules-cache
+      - run:
+          name: prettier
+          command: yarn start format.listDifferent
+
+  # Install Node modules for Renderer package with Yarn and save them to chache.
+  install-package-node-packages:
+    docker:
+      - image: *docker_image
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-package-node-modules-cache
+      - run: *install-package-node-modules
+      - save_cache:
+          name: Save root node_modules to cache
+          key: v4-package-node-modules-cache-{{ checksum "yarn.lock" }}
+          paths:
+            - node_modules
+
+
+  # Install Node modules for dummy app with Yarn and save them to cache.
+  install-dummy-app-node-packages:
+    docker:
+      - image: *docker_image
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-dummy-app-node-modules-cache
+      - run: *install-yarn-link-source
+      - run: *install-yarn-link-destination
+      - run: *install-dummy-app-node-modules
+      - save_cache:
+          name: Save spec/dummy/node_modules to cache
+          key: v4-dummy-app-node-modules-cache-{{ checksum "spec/dummy/yarn.lock" }}
+          paths:
+            - spec/dummy/node_modules
+            - spec/dummy/node_modules
+
+  # Install Ruby gems for package with Bundler and save them to cache.
+  install-package-ruby-gems:
+    docker:
+      - image: *docker_image
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-package-gem-cache
+      - run: *install-package-ruby-gems
+      - save_cache:
+          name: Save dummy app ruby gems to cache
+          key: v4-package-app-gem-cache-{{ checksum "react_on_rails.gemspec" }}
+          paths:
+            - vendor/bundle
+
+  # Install Ruby gems for dummy app with Bundler and save them to cache.
+  install-dummy-app-ruby-gems:
+    docker:
+      - image: *docker_image
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-dummy-app-gem-cache
+      - run: *install-dummy-app-ruby-gems
+      - save_cache:
+          name: Save dummy app ruby gems to cache
+          key: v4-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
+          paths:
+            - spec/dummy/vendor/bundle
+
+  # Build client and server bundles for dummy app with Webpack and save them to cache.
+  # NOTE: keeping around this cache in case we have multiple rspec suites in the future to tests
+  # different node renderers.
+  build-dummy-app-webpack-test-bundles:
+    docker:
+      - image: *docker_image
+    steps:
+      - checkout
+      - run: *print-system-info
+      - run: *install-yarn-link-source
+      - restore_cache: *restore-dummy-app-node-modules-cache
+      - run: *install-yarn-link-destination
+      - run: *install-package-node-modules
+      - run: *install-dummy-app-node-modules
+      - run: *install-dummy-app-ruby-gems
+      - run:
+          name: Build test bundles for dummy app
+          command: cd spec/dummy && yarn run build:test
+      - save_cache:
+          name: Save test webpack bundles to cache (for build number checksum used by rspec job)
+          key: v4-dummy-app-webpack-bundle-{{ .Revision }}
+          paths:
+            - spec/dummy/public/webpack
+  # Run JS unit tests for Renderer package.
+  package-js-tests:
+    docker:
+      - image: *docker_image
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-package-node-modules-cache
+      - run: *install-package-node-modules
+      - run:
+          name: Run JS unit tests for Renderer package
+          command: yarn test
+
+  rspec-package-specs:
+    docker:
+      - image: *docker_image
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-package-gem-cache
+      - run: *install-package-ruby-gems
+      - run:
+          name: Run rspec tests
+          command: |
+            bundle exec rspec spec/react_on_rails
+      - store_test_results:
+          path: ~/rspec
+      - store_artifacts:
+          path: log/test.log
+
+  main:
+    docker:
+      - image: *docker_image
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-package-gem-cache
+      - restore_cache: *restore-dummy-app-gem-cache
+      - restore_cache:
+          name: Restore cached webpack bundles for dummy app
+          key: v4-dummy-app-webpack-bundle-{{ .Revision }}
+      - restore_cache: *restore-dummy-app-node-modules-cache
+      - restore_cache: *restore-package-node-modules-cache
+      - run: *install-package-node-modules
+      - run: *install-package-ruby-gems
+      - run: *install-dummy-app-ruby-gems
+      - run: *install-latest-chrome
+      - run:
+          name: Touch webpack bundles
+          command: touch spec/dummy/public/webpack/test/*
+      - run:
+          name: Install yalc globally
+          command: sudo yarn global add yalc
+      - run:
+          name: Prep for CI
+          # TODO -- need to leverage Circle CI containers
+          command: |
+            bundle exec rake prepare_for_ci
+      - run:
+          name: Main CI
+          # TODO -- need to leverage Circle CI containers
+          command: |
+            bundle exec rake run_rspec:all_dummy
+      - store_test_results:
+          path: ~/rspec
+      - store_artifacts:
+          path: spec/dummy/tmp/capybara
+      - store_artifacts:
+          path: spec/dummy/log/test.log
+      - store_artifacts:
+          path: spec/dummy/yarn-error.log
+
+workflows:
+  version: 2
+  build-and-test:
+    jobs:
+      - install-package-node-packages
+      - install-package-ruby-gems
+      - install-dummy-app-node-packages
+      - install-dummy-app-ruby-gems
+      - lint-js-and-ruby:
+          requires:
+            - install-package-node-packages
+            - install-package-ruby-gems
+      - prettier:
+          filters:
+            branches:
+              ignore: master
+          requires:
+            - install-package-node-packages
+      - build-dummy-app-webpack-test-bundles:
+          requires:
+            - install-dummy-app-node-packages
+      - package-js-tests:
+          requires:
+            - install-package-node-packages
+      - rspec-package-specs:
+          requires:
+            - install-package-ruby-gems
+            - build-dummy-app-webpack-test-bundles
+            - install-dummy-app-ruby-gems
+      - main:
+          requires:
+            - install-package-ruby-gems
+            - install-dummy-app-ruby-gems
+            - install-package-node-packages
+            - build-dummy-app-webpack-test-bundles

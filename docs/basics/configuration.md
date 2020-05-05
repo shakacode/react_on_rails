@@ -199,7 +199,7 @@ Example of a RenderingExtension for custom values in the `rails_context`:
 module RenderingExtension
 
   # Return a Hash that contains custom values from the view context that will get merged with
-  # the standard rails_context values and passed to all calls to generator functions used by the
+  # the standard rails_context values and passed to all calls to render functions used by the
   # react_component and redux_store view helpers
   def self.custom_context(view_context)
     {

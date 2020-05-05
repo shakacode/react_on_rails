@@ -3,7 +3,7 @@ import React from 'react';
 
 import styles from './CssModulesImagesFontsExample.scss';
 
-export default (_props, _railsContext) => (
+export default (_props) => (
   <div>
     <h1 className={styles.heading}>This should be open sans light</h1>
     <div>

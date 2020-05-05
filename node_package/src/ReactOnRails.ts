@@ -8,14 +8,14 @@ import ComponentRegistry from './ComponentRegistry';
 import StoreRegistry from './StoreRegistry';
 import serverRenderReactComponent from './serverRenderReactComponent';
 import buildConsoleReplay from './buildConsoleReplay';
-import createReactElement from './createReactElement';
+import createReactOutput from './createReactOutput';
 import Authenticity from './Authenticity';
 import context from './context';
 import type {
   RegisteredComponent,
   RenderParams,
   ErrorOptions,
-  ComponentOrRenderFunction,
+  ReactComponentOrRenderFunction,
   AuthenticityHeaders,
   StoreGenerator
 } from './types/index';
@@ -37,7 +37,7 @@ ctx.ReactOnRails = {
    * find you components for rendering.
    * @param components (key is component name, value is component)
    */
-  register(components: { [id: string]: ComponentOrRenderFunction }): void {
+  register(components: { [id: string]: ReactComponentOrRenderFunction }): void {
     ComponentRegistry.register(components);
   },
 
@@ -173,7 +173,7 @@ ctx.ReactOnRails = {
    */
   render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): void | Element | Component {
     const componentObj = ComponentRegistry.get(name);
-    const reactElement = createReactElement({ componentObj, props, domNodeId });
+    const reactElement = createReactOutput({ componentObj, props, domNodeId });
 
     const render = hydrate ? ReactDOM.hydrate : ReactDOM.render;
     // eslint-disable-next-line react/no-render-return-value
@@ -183,7 +183,7 @@ ctx.ReactOnRails = {
   /**
    * Get the component that you registered
    * @param name
-   * @returns {name, component, generatorFunction, isRenderer}
+   * @returns {name, component, renderFunction, isRenderer}
    */
   getComponent(name: string): RegisteredComponent {
     return ComponentRegistry.get(name);

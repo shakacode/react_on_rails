@@ -2,19 +2,19 @@ import React from 'react';
 import ReactDOMServer from 'react-dom/server';
 import type { ErrorOptions } from './types/index';
 
-function handleGeneratorFunctionIssue(options: {e: Error; name?: string}): string {
+function handleRenderFunctionIssue(options: {e: Error; name?: string}): string {
   const { e, name } = options;
 
   let msg = '';
 
   if (name) {
     const lastLine =
-      'A generator function takes a single arg of props (and the location for react-router) ' +
+      'A render function takes a single arg of props (and the location for react-router) ' +
       'and returns a ReactElement.';
 
     let shouldBeGeneratorError =
-      `ERROR: ReactOnRails is incorrectly detecting generator function to be false. The React
-component '${name}' seems to be a generator function.\n${lastLine}`;
+      `ERROR: ReactOnRails is incorrectly detecting render function to be false. The React
+component '${name}' seems to be a render function.\n${lastLine}`;
     const reMatchShouldBeGeneratorError = /Can't add property context, object is not extensible/;
     if (reMatchShouldBeGeneratorError.test(e.message)) {
       msg += `${shouldBeGeneratorError}\n\n`;
@@ -22,8 +22,8 @@ component '${name}' seems to be a generator function.\n${lastLine}`;
     }
 
     shouldBeGeneratorError =
-      `ERROR: ReactOnRails is incorrectly detecting generatorFunction to be true, but the React
-component '${name}' is not a generator function.\n${lastLine}`;
+      `ERROR: ReactOnRails is incorrectly detecting renderFunction to be true, but the React
+component '${name}' is not a render function.\n${lastLine}`;
 
     const reMatchShouldNotBeGeneratorError = /Cannot call a class as a function/;
 
@@ -41,7 +41,7 @@ const handleError = (options: ErrorOptions): string => {
 
   console.error('Exception in rendering!');
 
-  let msg = handleGeneratorFunctionIssue(options);
+  let msg = handleRenderFunctionIssue(options);
 
   if (jsCode) {
     console.error(`JS code was: ${jsCode}`);

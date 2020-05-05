@@ -32,7 +32,7 @@ export default (props, railsContext) => {
 
   // Provider uses the this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
-  return (
+  return () => (
     <Provider store={store}>
       <HelloWorldContainer />
     </Provider>

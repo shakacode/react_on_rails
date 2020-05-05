@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails",
-  "version": "11.3.0",
+  "version": "12.0.0",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "node_package/lib/ReactOnRails.js",
   "directories": {
@@ -25,7 +25,7 @@
     "babelify": "^10.0.0",
     "blue-tape": "^1.0.0",
     "create-react-class": "^15.6.0",
-    "eslint": "^6.3.0",
+    "eslint": "^6.8.0",
     "eslint-config-prettier": "^6.10.1",
     "eslint-config-shakacode": "^16.0.1",
     "eslint-plugin-import": "^2.6.1",
@@ -54,8 +54,8 @@
   },
   "peerDependencies": {
     "js-yaml": ">= 3.0.0",
-    "react": ">= 0.14",
-    "react-dom": ">= 0.14"
+    "react": ">= 16",
+    "react-dom": ">= 16"
   },
   "files": [
     "node_package/lib",
@@ -64,11 +64,12 @@
   "scripts": {
     "test": "jest node_package/tests",
     "clean": "rm -rf node_package/lib",
+    "start": "nps",
     "prepare": "yarn run build",
     "prepublish": "npm run prepare",
     "build": "yarn run clean && yarn run tsc",
-    "build-watch": "babel --watch --out-dir node_package/lib node_package/src",
-    "lint": "eslint --ext '.js,.ts' .",
+    "build-watch": "yarn run clean && yarn run tsc --watch",
+    "lint": "nps eslint",
     "check": "yarn run lint && yarn run test && yarn run type-check",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",
     "prerelease": "yarn run check && yarn run clean && yarn run build",
@@ -76,8 +77,7 @@
     "release:minor": "node_package/scripts/release minor",
     "release:major": "node_package/scripts/release major",
     "dummy:install": "rake dummy_apps",
-    "dummy:spec": "rake run_rspec:dummy",
-    "install-react-on-rails": "yarn link"
+    "dummy:spec": "rake run_rspec:dummy"
   },
   "repository": {
     "type": "git",
