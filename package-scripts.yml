@@ -6,7 +6,7 @@ scripts:
   eslint:
     default:
       description: Run eslint.
-      script: eslint . --ext ".js,.jsx"
+      script: eslint . --ext ".js,.jsx,.ts"
     fix:
       description: Run eslint and auto-fix.
       script: nps "eslint --fix"

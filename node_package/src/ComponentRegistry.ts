@@ -24,7 +24,7 @@ export default {
       registeredComponents.set(name, {
         name,
         component,
-        renderFunction: renderFunction,
+        renderFunction,
         isRenderer,
       });
     });
