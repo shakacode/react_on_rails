@@ -40,21 +40,20 @@ export default function createReactOutput({
 
   if (renderFunction) {
     // Let's invoke the function to get the result
-    let renderFunctionResult = (component as RenderFunction)(props, railsContext);
+    const renderFunctionResult = (component as RenderFunction)(props, railsContext);
     if (isServerRenderResult(renderFunctionResult as CreateReactOutputResult)) {
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
       return (renderFunctionResult as ServerRenderResult);
-    } else { // else we'll be calling React.createElement
-      let reactComponent = renderFunctionResult as ReactComponent;
+    } // else we'll be calling React.createElement
+    // TODO: Can we detect if this is a React Element or a React Function Component?
+    // If already a ReactElement, then just return it.
+    // If a component, then wrap in an element
 
-      // TODO: This might be confusing that we're passing props to the function
-      // immediately afterwards
-      // Maybe it might be better for the function to return an element.
-      // The function could call React.createElement
-      return React.createElement(reactComponent, props);
-    }
-  } else {
-    return React.createElement(component as ReactComponent, props);
+    const reactComponent = renderFunctionResult as ReactComponent;
+
+    return React.createElement(reactComponent, props);
   }
+  // else
+  return React.createElement(component as ReactComponent, props);
 }

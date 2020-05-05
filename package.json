@@ -69,7 +69,7 @@
     "prepublish": "npm run prepare",
     "build": "yarn run clean && yarn run tsc",
     "build-watch": "yarn run clean && yarn run tsc --watch",
-    "lint": "eslint --ext '.js,.ts' .",
+    "lint": "nps eslint",
     "check": "yarn run lint && yarn run test && yarn run type-check",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",
     "prerelease": "yarn run check && yarn run clean && yarn run build",
