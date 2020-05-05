@@ -2,12 +2,12 @@
 
 require "active_support"
 
-if Rake::Task.task_defined?("assets:precompile")
-  Rake::Task["assets:precompile"].enhance do
-    Rake::Task["react_on_rails:assets:webpack"].invoke
-  end
-else
-  Rake::Task.define_task("assets:precompile" => ["react_on_rails:assets:webpack"])
+if defined?(Sprockets)
+  # These tasks run as pre-requisites of assets:precompile.
+  # Note, it's not possible to refer to ReactOnRails configuration values at this point.
+  Rake::Task["assets:precompile"]
+    .clear_prerequisites
+    .enhance([:environment, "react_on_rails:assets:compile_environment"])
 end
 
 # Sprockets independent tasks
