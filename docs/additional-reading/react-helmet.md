@@ -41,7 +41,8 @@ export default (props, railsContext) => (
 );
 ```
 
-Note, this doesn't work, because this function just returns a React element rather than a React component
+Note, this can work to return a React element rather than a React component.
+However, React hooks cannot be used here, as this function is not a React Function Component.
 ```javascript
 // React functional component
 export default (props, railsContext) => (

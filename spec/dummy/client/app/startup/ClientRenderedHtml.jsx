@@ -17,6 +17,8 @@ import EchoProps from '../components/EchoProps';
 // export default (props, _railsContext) => () => <EchoProps {...props} />;
 
 // You may do either:
-// export default (props, _railsContext) => () => <EchoProps {...props} />;
+export default (props, _railsContext) => {
+  return <EchoProps {...props} />;
+}
 // or
-export default (props) => <EchoProps {...props} />;
+// export default (props) => <EchoProps {...props} />;
