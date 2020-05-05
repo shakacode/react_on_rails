@@ -63,6 +63,15 @@ feature "Pages/Index", :js, type: :system do
     context "Non-React Component" do
       scenario { is_expected.to have_content "Time to visit Maui" }
     end
+
+    context "React Hooks" do
+      context "Simple stateless component" do
+        include_examples "React Component", "div#HelloWorld-react-component-6"
+      end
+      context "render function that takes props" do
+        include_examples "React Component", "div#HelloWorld-react-component-7"
+      end
+    end
   end
 
   context "Server Rendering with Options" do
@@ -190,7 +199,7 @@ feature "Example of Code Splitting with Rendering of Async Routes", :js, type: :
   end
 end
 
-feature "renderedHtml from generator function", :js, type: :system do
+feature "renderedHtml from render function", :js, type: :system do
   subject { page }
   background { visit "/rendered_html" }
   scenario "renderedHtml should not have any errors" do
@@ -225,7 +234,7 @@ feature "returns hash if hash_result == true even with prerendering error", :js,
   end
 end
 
-feature "generator function returns renderedHtml as an object with additional HTML markups" do
+feature "render function returns renderedHtml as an object with additional HTML markups" do
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
     subject { page }
     background { visit react_helmet_path }
@@ -234,6 +243,18 @@ feature "generator function returns renderedHtml as an object with additional HT
       expect(subject).to have_css "title", text: /\ACustom page title\z/, visible: false
       expect(subject.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
       change_text_expect_dom_selector("div#react-helmet-0")
+    end
+  end
+
+  shared_examples "renderedHtmls should have errors" do
+    subject { page }
+    background { visit react_helmet_broken_path }
+    scenario "renderedHtmls should have errors" do
+      puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+      puts "integration_spec.rb: #{__LINE__},  method: #{__method__}"
+      puts "subject.html = #{subject.html.ai}"
+      puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+      expect(subject.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
     end
   end
 

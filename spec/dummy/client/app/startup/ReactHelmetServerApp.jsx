@@ -11,6 +11,9 @@ import ReactHelmet from '../components/ReactHelmet';
  *
  *  This is imported as "ReactHelmetApp" by "serverRegistration.jsx". Note that rendered
  *  component markup must go under "componentHtml" key.
+ *
+ *  Note that the function takes 2 params to identify this as a generator fuction. Alternately,
+ *  the function could get the property of `.renderFunction = true` added to it.
  */
 export default (props, _railsContext) => {
   const componentHtml = renderToString(<ReactHelmet {...props} />);
@@ -20,5 +23,7 @@ export default (props, _railsContext) => {
     componentHtml,
     title: helmet.title.toString(),
   };
+
+  // Note that this function returns an Object for server rendering.
   return { renderedHtml };
 };

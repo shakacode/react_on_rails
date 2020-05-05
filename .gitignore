@@ -31,3 +31,6 @@ npm-debug.*
 /gen-examples
 
 .DS_Store
+
+.yalc
+yalc.lock

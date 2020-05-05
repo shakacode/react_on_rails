@@ -25,5 +25,5 @@ export default (_props, railsContext) => {
   }
 
   // Important that you don't do this if you are redirecting or have an error.
-  return <RouterContext {...routeProps} />;
+  return () => <RouterContext {...routeProps} />;
 };

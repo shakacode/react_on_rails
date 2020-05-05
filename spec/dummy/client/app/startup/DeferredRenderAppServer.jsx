@@ -34,7 +34,7 @@ const DeferredRenderAppServer = (_props, railsContext) => {
     return { error, redirectLocation };
   }
 
-  return <RouterContext {...routerProps} />;
+  return () => <RouterContext {...routerProps} />;
 };
 
 export default DeferredRenderAppServer;

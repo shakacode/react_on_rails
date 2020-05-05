@@ -1,5 +1,11 @@
 <ul>
   <li>
+    <%= link_to "One Page with Many Examples at Once", root_path %>
+  </li>
+  <li>
+    <%= link_to "Hello World Component Server Rendered Hooks", server_side_hello_world_hooks_path %>
+  </li>
+  <li>
     <%= link_to "Hello World Component Client Rendered", client_side_hello_world_path %>
   </li>
   <li>
@@ -36,10 +42,10 @@
     <%= link_to "Hello World Component Server Rendered ES5", server_side_hello_world_es5_path %>
   </li>
   <li>
-    <%= link_to "Redux App Server Rendered (Generator Function)", server_side_redux_app_path %>
+    <%= link_to "Redux App Server Rendered (render function)", server_side_redux_app_path %>
   </li>
   <li>
-    <%= link_to "Redux App Server Rendered (Generator Function) With Fragment Caching", server_side_redux_app_cached_path %>
+    <%= link_to "Redux App Server Rendered (render function) With Fragment Caching", server_side_redux_app_cached_path %>
   </li>
   <li>
     <%= link_to "Client Logging and Throw Error Handling", client_side_log_throw_path %>
@@ -60,9 +66,6 @@
     <%= link_to "XHR Refresh", xhr_refresh_path %>
   </li>
   <li>
-    <%= link_to "One Page with Many Examples at Once", root_path %>
-  </li>
-  <li>
     <%= link_to "Manually Rendered Component", client_side_manual_render_path %>
   </li>
   <li>
@@ -81,16 +84,25 @@
     <%= link_to "Turbolinks Cache Disabled Example", turbolinks_cache_disabled_path %>
   </li>
   <li>
-    <%= link_to "Generator function returns object with renderedHtml", rendered_html_path %>
+    <%= link_to "render function returns object with renderedHtml", rendered_html_path %>
   </li>
   <li>
-    <%= link_to "Generator function returns object with renderedHtml as another object (react-helmet)", react_helmet_path %>
+    <%= link_to "render function returns object with renderedHtml as another object (react-helmet)", react_helmet_path %>
+  </li>
+  <li>
+    <%= link_to "Improperly defined render function (react-helmet)", react_helmet_broken_path %>
   </li>
   <li>
     <%= link_to "Image Example", image_example_path %>
   </li>
   <li>
     <%= link_to "Server Render With Timout", server_render_with_timeout_path %>
+  </li>
+  <li>
+    <%= link_to "Incorrectly returning JSX rather than function", context_function_return_jsx_path %>
+  </li>
+  <li>
+    <%= link_to "Incorrectly wrapping a pure component in a function", pure_component_wrapped_in_function_path %>
   </li>
 </ul>
 <hr/>

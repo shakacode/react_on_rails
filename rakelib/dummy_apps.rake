@@ -8,6 +8,7 @@ namespace :dummy_apps do
   task :yarn_install do
     yarn_install_cmd = "yarn install --mutex network"
     sh_in_dir(dummy_app_dir, yarn_install_cmd)
+    sh_in_dir(dummy_app_dir, "yalc link react-on-rails")
   end
 
   task dummy_app: [:yarn_install] do

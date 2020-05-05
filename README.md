@@ -1,13 +1,23 @@
-# ReactOnRails
+![reactrails](https://user-images.githubusercontent.com/10421828/79436261-52159b80-7fd9-11ea-994e-2a98dd43e540.png)
+
+<p align="center">
+ <a href="https://shakacode.com/"><img src="https://user-images.githubusercontent.com/10421828/79436256-517d0500-7fd9-11ea-9300-dfbc7c293f26.png"></a>
+ <a href="https://forum.shakacode.com/"><img src="https://user-images.githubusercontent.com/10421828/79436266-53df5f00-7fd9-11ea-94b3-b985e1b05bdc.png"></a>
+ <a href="https://forum.shakacode.com/t/react-on-rails-pro-2020-shave-the-yak/1842"><img src="https://user-images.githubusercontent.com/10421828/79436265-53df5f00-7fd9-11ea-8220-fc474f6a856c.png"></a>
+ <a href="https://github.com/sponsors/shakacode"><img src="https://user-images.githubusercontent.com/10421828/79466109-cdd90d80-8004-11ea-88e5-25f9a9ddcf44.png"></a>
+</p>
+
+---
 
 [![License](https://img.shields.io/badge/license-mit-green.svg)](./LICENSE.md) [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![](https://ruby-gem-downloads-badge.herokuapp.com/react_on_rails?type=total)](https://rubygems.org/gems/react_on_rails)
+
+*These are the docs for React on Rails 12, coming soon. To see the version 11 docs, [click here](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
 
 #### News
 **April 2, 2020**:
 * Are you interested in support for React on Rails? If so check out [React on Rails Pro](https://docs.google.com/document/d/1vwooIc6jKkuBOzllQ7rbVKMR2xOmeX0TpjHKxHcFyYo/edit#).
 * HMR is working with [Loadable Components](https://loadable-components.com) for a both amazing hot-reloading developer experience and great runtime performance. Please [email me](mailto:justin@shakacode.com) if you'd like to use [Loadable Components Code Splitting](https://loadable-components.com/docs/code-splitting/) to speed up your app by reducing your bundle sizes and lazily loading the code that's needed.
 * `react_on_rails` fully supports `rails/webpacker`. The example test app in `spec/dummy` was recently converted over to use rails/webpacker v4. It's a good example of how to leverage rails/webpacker's webpack configuration. 
-* Justin Gordon is presenting [Webpacker, It-Just-Works, But How? at RailsConf, 2020, Couch Edition](https://railsconf.com/program/sessions#session-943). Want to hear Justin give a trial run of the talk with the ability to ask questions? [Click here to sign up](https://signup.shakacode.com/webpacker_it_just_works) for notification of when this will happen.
 
 ---
 
@@ -161,13 +171,14 @@ Below is the line where you turn server rendering on by setting `prerender` to t
     <%= react_component("HelloWorld", props: { name: "Stranger" }) %>
   ```
   
-- This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://reactjs.org/docs/context.html). See [Generator Functions and the RailsContext](docs/basics/generator-functions-and-railscontext.md) for more details on this topic.
+- This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://reactjs.org/docs/context.html). See [render functions and the RailsContext](docs/basics/render-functions-and-railscontext.md) for more details on this topic.
   
   ```js
   import React from 'react';
 
   export default (props, railsContext) => {
-    return (
+    // Note wrap in a function to make this a React function component
+    return () => (
       <div>
         Your locale is {railsContext.i18nLocale}.<br/>
         Hello, {props.name}!
@@ -227,21 +238,38 @@ Another way is to use a separate webpack configuration file that can use a diffe
 
 For details on techniques to use different code for client and server rendering, see: [How to use different versions of a file for client and server rendering](https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352). (_Requires creating a free account._)
 
-## Specifying Your React Components: Direct or Generator Functions
+## Specifying Your React Components: Direct or render functions
 
-You have two ways to specify your React components. You can either register the React component directly, or you can create a function that returns a React component. Creating a function has the following benefits:
+You have two ways to specify your React components. You can either register the React component (either function or class component) directly, or you can create a function that returns a React component, which we using the name of a "render function". Creating a function has the following benefits:
 
-1. You have access to the `railsContext`. See documentation for the railsContext in terms of why you might need it. You **need** a generator function to access the `railsContext`.
+1. You have access to the `railsContext`. See documentation for the railsContext in terms of why you might need it. You **need** a render function to access the `railsContext`.
 2. You can use the passed-in props to initialize a redux store or set up react-router.
 3. You can return different components depending on what's in the props.
 
-ReactOnRails will automatically detect a registered generator function. Thus, there is no difference between registering a React Component versus a "generator function."
+Note, the return value of a **render function** should be JSX or an HTML string. Do not return a
+function.
 
-## react_component_hash for Generator Functions
+ReactOnRails will automatically detect a registered render function by the fact that the function takes
+more than 1 parameter. In other words, if you want the ability to provide a function that returns the
+React component, then you need to specify at least a second parameter. This is the `railsContext`.
+If you're not using this parameter, declare your function with the unused param:
 
-Another reason to use a generator function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }. Make sure you use this function with `react_component_hash`. 
+```js
+const MyComponentGenerator = (props, _railsContext) => {
+  if (props.print) {
+    // Wrap in a function so this is a React Component    
+    return () => <H1>{JSON.stringify(props)}</H1>;
+  }
+}
+```
 
-For server rendering, if you wish to return multiple HTML strings from a generator function, you may return an Object from your generator function with a single top-level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
+Thus, there is no difference between registering a React function or class Component versus a "render function."
+
+## react_component_hash for render functions
+
+Another reason to use a render function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }. Make sure you use this function with `react_component_hash`. 
+
+For server rendering, if you wish to return multiple HTML strings from a render function, you may return an Object from your render function with a single top-level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
 
 ```js
 { renderedHtml: { componentHtml, customKey1, customKey2} }
