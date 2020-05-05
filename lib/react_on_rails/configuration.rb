@@ -33,7 +33,8 @@ module ReactOnRails
       server_render_method: nil,
       build_test_command: "",
       build_production_command: "",
-      random_dom_id: DEFAULT_RANDOM_DOM_ID
+      random_dom_id: DEFAULT_RANDOM_DOM_ID,
+      i18n_output_format: nil
     )
   end
 
@@ -45,7 +46,7 @@ module ReactOnRails
                   :generated_assets_dirs, :generated_assets_dir,
                   :webpack_generated_files, :rendering_extension, :build_test_command,
                   :build_production_command,
-                  :i18n_dir, :i18n_yml_dir,
+                  :i18n_dir, :i18n_yml_dir, :i18n_output_format,
                   :server_render_method, :random_dom_id
 
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
@@ -57,7 +58,7 @@ module ReactOnRails
                    generated_assets_dir: nil, webpack_generated_files: nil,
                    rendering_extension: nil, build_test_command: nil,
                    build_production_command: nil,
-                   i18n_dir: nil, i18n_yml_dir: nil, random_dom_id: nil,
+                   i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil, random_dom_id: nil,
                    server_render_method: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.server_bundle_js_file = server_bundle_js_file
@@ -67,6 +68,7 @@ module ReactOnRails
       self.build_production_command = build_production_command
       self.i18n_dir = i18n_dir
       self.i18n_yml_dir = i18n_yml_dir
+      self.i18n_output_format = i18n_output_format
 
       self.random_dom_id = random_dom_id
       self.prerender = prerender
