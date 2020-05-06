@@ -49,7 +49,7 @@
     "webpack-manifest-plugin": "^1.2.1"
   },
   "dependencies": {
-    "@babel/runtime-corejs2": "^7.0.0",
+    "@babel/runtime-corejs3": "^7.9.6",
     "concurrently": "^5.1.0"
   },
   "peerDependencies": {
