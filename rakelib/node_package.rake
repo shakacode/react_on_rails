@@ -6,7 +6,7 @@ namespace :node_package do
   include ReactOnRails::TaskHelpers
 
   task :build do
-    puts "Building Node Package and running 'yalc link'"
+    puts "Building Node Package and running 'yalc publish'"
     sh "yarn run build && yalc publish"
   end
 end

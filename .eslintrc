@@ -37,7 +37,7 @@ rules:
   no-console: 0
   function-paren-newline: 0
   object-curly-newline: 0
-
+  no-restricted-syntax: ["error", "SequenceExpression"]
   # https://stackoverflow.com/a/59268871/5241481
   import/extensions: ['error', 'ignorePackages', {"js": 'never',"ts": "never"}]
 

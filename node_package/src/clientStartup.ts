@@ -5,7 +5,6 @@ import type {
   RailsContext,
   RegisteredComponent,
   RenderFunction,
-  RenderFunctionResult,
 } from './types/index';
 
 import createReactOutput from './createReactOutput';
