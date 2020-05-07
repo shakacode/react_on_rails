@@ -1,6 +1,8 @@
-<%= react_component("ContextFunctionReturnInvalidJSX", props: @app_props_server_render, prerender: false, trace: true, id: "HelloWorld-react-component-0") %>
+<%= react_component("ContextFunctionReturnInvalidJSX", props: @app_props_hello, prerender: false, trace: true, id: "HelloWorld-react-component-0") %>
 <hr/>
 
-<h1>Example of error from failing to wrap the result in a function.</h1>
+<h1>Example of Console.error from failing to wrap the result in a function.</h1>
 
-See console log for expected warning and errors.
+See console log for expected error.
+
+Note, the component still rendered. In the next version, this should just error.

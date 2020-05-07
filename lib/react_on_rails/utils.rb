@@ -70,11 +70,8 @@ module ReactOnRails
       # Either:
       # 1. Using same bundle for both server and client, so server bundle will be hashed in manifest
       # 2. Using a different bundle (different Webpack config), so file is not hashed, and
-      #    bundle_js_path will throw.
-      # 3. Not using webpacker, and bundle_js_path always returns
-
-      # Note, server bundle should not be in the manifest
-      # If using webpacker gem per https://github.com/rails/webpacker/issues/571
+      #    bundle_js_path will throw so the default path is used without a hash.
+      # 3. Not using webpacker, and this method returns the bundle_js_file_path
       return @server_bundle_path if @server_bundle_path && !Rails.env.development?
 
       bundle_name = ReactOnRails.configuration.server_bundle_js_file

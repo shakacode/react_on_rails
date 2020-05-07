@@ -17,13 +17,13 @@ scripts:
   format:
     default:
       description: Format files using prettier.
-      script: concurrently --prefix "[{name}]" --names "js,json" -c "yellow,magenta,green" "nps format.js" "nps format.json"
+      script: concurrently --prefix "[{name}]" --names "ts,js,json" -c "yellow,magenta,green" "nps format.js" "nps format.json"
     listDifferent:
       description: Check that all files were formatted using prettier.
       script: |
         concurrently \
           --prefix "[{name}]" \
-          --names "js,json" \
+          --names "ts,js,json" \
           -c "yellow,magenta" \
           "nps format.js.listDifferent" \
           "nps format.json.listDifferent"

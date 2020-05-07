@@ -44,6 +44,7 @@
     "redux": "^4.0.1",
     "release-it": "^8.2.0",
     "ts-jest": "^25.2.1",
+    "tslint-config-prettier": "^1.18.0",
     "typescript": "^3.8.3",
     "webpack": "^3.4.1",
     "webpack-manifest-plugin": "^1.2.1"

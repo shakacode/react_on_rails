@@ -5,7 +5,7 @@ import RailsContext from './RailsContext';
 
 const ContextFunctionReturnInvalidJSX = (props, railsContext) => (
   <>
-    <h3 className={css.brightColor}>Hello, {props.name}!</h3>
+    <h3 className={css.brightColor}>Hello, {props.helloWorldData.name}!</h3>
     <p>Rails Context :</p>
     <RailsContext {...{ railsContext }} />
   </>
