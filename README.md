@@ -238,16 +238,17 @@ Another way is to use a separate webpack configuration file that can use a diffe
 
 For details on techniques to use different code for client and server rendering, see: [How to use different versions of a file for client and server rendering](https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352). (_Requires creating a free account._)
 
-## Specifying Your React Components: Direct or render functions
+## Specifying Your React Components: Register directly or use render-functions
 
-You have two ways to specify your React components. You can either register the React component (either function or class component) directly, or you can create a function that returns a React component, which we using the name of a "render function". Creating a function has the following benefits:
+You have two ways to specify your React components. You can either register the React component (either function or class component) directly, or you can create a function that returns a React component, which we using the name of a "render-function". Creating a render-function allows:
 
 1. You have access to the `railsContext`. See documentation for the railsContext in terms of why you might need it. You **need** a render function to access the `railsContext`.
 2. You can use the passed-in props to initialize a redux store or set up react-router.
 3. You can return different components depending on what's in the props.
 
-Note, the return value of a **render function** should be JSX or an HTML string. Do not return a
-function.
+Note, the return value of a **render function** should be either a React Function or Class Component, or an object representing server rendering results.
+
+Do not return a React Element (JSX).
 
 ReactOnRails will automatically detect a registered render function by the fact that the function takes
 more than 1 parameter. In other words, if you want the ability to provide a function that returns the
@@ -257,7 +258,7 @@ If you're not using this parameter, declare your function with the unused param:
 ```js
 const MyComponentGenerator = (props, _railsContext) => {
   if (props.print) {
-    // Wrap in a function so this is a React Component    
+    // This is a React FunctionComponent because it is wrapped in a function.
     return () => <H1>{JSON.stringify(props)}</H1>;
   }
 }

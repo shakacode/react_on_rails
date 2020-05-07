@@ -61,7 +61,7 @@ ReactOnRails.register({
   SetTimeoutLoggingApp,
   HelloWorldHooks,
   HelloWorldHooksContext,
-  ContextFunctionReturnJSX: ContextFunctionReturnInvalidJSX,
+  ContextFunctionReturnInvalidJSX,
   PureComponentWrappedInFunction,
 });
 

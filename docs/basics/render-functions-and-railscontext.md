@@ -27,7 +27,7 @@ const MyAppComponent = (props, railsContext) => (
  
   // the props get passed again, but we ignore since we use a closure
   // or should we
-  (_props) =>
+  () =>
       <div>
         <p>props are: {JSON.stringify(props)}</p>
         <p>railsContext is: {JSON.stringify(railsContext)}
@@ -140,13 +140,12 @@ export default (props, railsContext) => {
 
 There's no reason that the railsContext would ever get passed to your React component unless the value is explicitly put into the props used for rendering. If you create a react component, rather than a render-function, for use by React on Rails, then you get whatever props are passed in from the view helper, which **does not include the Rails Context**. It's trivial to wrap your component in a "render-function" to return a new component that takes both:
 
-POSSIBLE ENHANCEMENT: Would it be better to offer the ability to send props this way if a flag is passed in
-the `react_component` helper? Probably not, since this is so easily done.
-
 ```js
 import React from 'react';
 import AppComponent from './AppComponent';
 const AppComponentWithRailsContext = (props, railsContext) => (
+  // Create a React Function Component so you can
+  // use the React Hooks API in this React Function Component
   () => <AppComponent {...{...props, railsContext}}/>
 )
 export default AppComponentWithRailsContext;
