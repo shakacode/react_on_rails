@@ -20,11 +20,6 @@ namespace :react_on_rails do
       sh "#{ReactOnRails::Utils.prepend_cd_node_modules_directory('<ReactOnRails.configuration.build_production_command>')}"
     DESC
     task webpack: :locale do
-      if Rake::Task.task_defined?("webpacker:compile")
-        # TODO: Eventually, this will need reconsideration if we use any of the Webpacker compilation
-        Rake::Task["webpacker:compile"].clear
-      end
-
       if ReactOnRails.configuration.build_production_command.present?
         sh ReactOnRails::Utils.prepend_cd_node_modules_directory(
           ReactOnRails.configuration.build_production_command
