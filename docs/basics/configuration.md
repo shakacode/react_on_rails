@@ -182,6 +182,7 @@ ReactOnRails.configure do |config|
   config.i18n_yml_dir = Rails.root.join("config", "locales", "client")
   
   # Possible output formats are js and json
+  # The default format is json
   config.i18n_output_format = 'js'
 
   ################################################################################
