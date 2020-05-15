@@ -9,7 +9,6 @@ require "generator_spec"
 require "awesome_print"
 require "pry"
 require "pry-byebug"
-require "pry-stack_explorer"
 require "pry-doc"
 
 # Fails travis

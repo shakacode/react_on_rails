@@ -38,6 +38,19 @@ for details.
 * Removal of support for old Rubies and Rails.
 * Removal of config.symlink_non_digested_assets_regex as it's no longer needed with rails/webpacker.
   If any business needs this, we can move the code to a separate gem.
+* Added configuration option `same_bundle_for_client_and_server` with default `false` because
+
+  1. Production applications would typically have a server bundle that differs from the client bundle
+  2. This change only affects trying to use HMR with react_on_rails with rails/webpacker. 
+  
+  The previous behavior was to always go to the webpack-dev-server for the server bundle if the 
+  webpack-dev-server was running _and_ the server bundle was found in the `manifest.json`. 
+  
+  If you are using the **same bundle for client and server rendering**, then set this configuration option
+  to `true`. By [justin808](https://github.com/shakacode/react_on_rails/pull/1240).
+
+#### Improved
+- Removed unnecessary restriction to keep the server bundle in the same directory with the client bundles. Rails/webpacker 4 has an advanced cleanup that will remove any files in the directory of other webpack files. Removing this restriction allows the server bundle to be created in a sibling directory. By [justin808](https://github.com/shakacode/react_on_rails/pull/1240).
 
 ### [11.3.0] - 2019-05-24
 #### Added
