@@ -20,8 +20,6 @@
 # See http://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 require "pry"
 require "pry-byebug"
-require "pry-stack_explorer"
-require "pry-doc"
 
 RSpec.configure do |config|
   config.example_status_persistence_file_path = "spec/examples.txt"
