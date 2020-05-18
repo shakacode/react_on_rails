@@ -15,6 +15,9 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+* Added support to export locales in JSON format. New option added `i18n_output_format` which allows to specify locales format either `json` or `js`.
+**`json` format is now the default**
+[PR 1271](https://github.com/shakacode/react_on_rails/pull/1271) by [ashgaliyev](https://github.com/ashgaliyev).
 
 ## UPCOMING 12.0 RELEASE
 ### [12.0.0]
