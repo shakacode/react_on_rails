@@ -42,7 +42,7 @@ module ReactOnRails
               .with("webpack-bundle.js")
               .and_return("/webpack/dev/webpack-bundle-0123456789abcdef.js")
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                                     .and_return("server-bundle.js")
+              .and_return("server-bundle.js")
           end
 
           it { expect(subject).to eq("#{webpacker_public_output_path}/webpack-bundle-0123456789abcdef.js") }
@@ -132,7 +132,7 @@ module ReactOnRails
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
             .and_return("webpack-bundle.js")
           allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
-                                   .and_return(true)
+            .and_return(true)
           allow(Webpacker).to receive_message_chain("manifest.lookup!")
             .with("webpack-bundle.js")
             .and_return("webpack/development/webpack-bundle-123456.js")
@@ -147,18 +147,18 @@ module ReactOnRails
         " and webpack-dev-server running, and same file used for server and client", :webpacker do
         it "returns the correct path hashed server path" do
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                                   .and_return("webpack-bundle.js")
+            .and_return("webpack-bundle.js")
           allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
-                                   .and_return(true)
+            .and_return(true)
           allow(Webpacker).to receive_message_chain("dev_server.running?")
-                                .and_return(true)
+            .and_return(true)
           allow(Webpacker).to receive_message_chain("dev_server.protocol")
-                                .and_return("http")
+            .and_return("http")
           allow(Webpacker).to receive_message_chain("dev_server.host_with_port")
-                                .and_return("localhost:3035")
+            .and_return("localhost:3035")
           allow(Webpacker).to receive_message_chain("manifest.lookup!")
-                                .with("webpack-bundle.js")
-                                .and_return("/webpack/development/webpack-bundle-123456.js")
+            .with("webpack-bundle.js")
+            .and_return("/webpack/development/webpack-bundle-123456.js")
 
           path = Utils.server_bundle_js_file_path
 
@@ -170,14 +170,14 @@ module ReactOnRails
         " separate client/server files", :webpacker do
         it "returns the correct path hashed server path" do
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                                   .and_return("server-bundle.js")
+            .and_return("server-bundle.js")
           allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
-                                   .and_return(false)
+            .and_return(false)
           allow(Webpacker).to receive_message_chain("manifest.lookup!")
-                                .with("server-bundle.js")
-                                .and_return("webpack/development/server-bundle-123456.js")
+            .with("server-bundle.js")
+            .and_return("webpack/development/server-bundle-123456.js")
           allow(Webpacker).to receive_message_chain("dev_server.running?")
-                                .and_return(true)
+            .and_return(true)
 
           path = Utils.server_bundle_js_file_path
 
