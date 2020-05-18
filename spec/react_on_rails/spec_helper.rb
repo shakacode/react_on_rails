@@ -15,8 +15,8 @@ require "pry-doc"
 # require "pry-state"
 # require "pry-toys"
 # require "pry-rescue"
+# require "binding_of_caller"
 
-require "binding_of_caller"
 require "awesome_print"
 require "rspec/retry"
 
