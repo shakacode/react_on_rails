@@ -15,9 +15,6 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
-* Added support to export locales in JSON format. New option added `i18n_output_format` which allows to specify locales format either `json` or `js`.
-**`json` format is now the default**
-[PR 1271](https://github.com/shakacode/react_on_rails/pull/1271) by [ashgaliyev](https://github.com/ashgaliyev).
 
 ## UPCOMING 12.0 RELEASE
 ### [12.0.0]
@@ -48,6 +45,13 @@ for details.
   
   If you are using the **same bundle for client and server rendering**, then set this configuration option
   to `true`. By [justin808](https://github.com/shakacode/react_on_rails/pull/1240).
+  
+* Added support to export locales in JSON format. New option added `i18n_output_format` which allows to
+  specify locales format either `JSON` or `JS`. **`JSON` format is now the default.**
+ 
+  Use this config setting to get the old behavior: config.i18n_output_format = 'js'
+  
+  [PR 1271](https://github.com/shakacode/react_on_rails/pull/1271) by [ashgaliyev](https://github.com/ashgaliyev).
 
 #### Improved
 - Removed unnecessary restriction to keep the server bundle in the same directory with the client bundles. Rails/webpacker 4 has an advanced cleanup that will remove any files in the directory of other webpack files. Removing this restriction allows the server bundle to be created in a sibling directory. By [justin808](https://github.com/shakacode/react_on_rails/pull/1240).
