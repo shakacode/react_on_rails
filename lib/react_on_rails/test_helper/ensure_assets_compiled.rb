@@ -5,6 +5,7 @@ module ReactOnRails
     class EnsureAssetsCompiled
       class << self
         attr_accessor :has_been_run
+
         @has_been_run = false
       end
 

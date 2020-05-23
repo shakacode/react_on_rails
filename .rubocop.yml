@@ -41,7 +41,7 @@ Naming/FileName:
 Style/SafeNavigation:
   Enabled: false
 
-Metrics/LineLength:
+Layout/LineLength:
   Max: 120
 
 Style/StringLiterals:
@@ -49,6 +49,15 @@ Style/StringLiterals:
 
 Style/Documentation:
   Enabled: false
+
+Style/HashEachMethods:
+  Enabled: true
+
+Style/HashTransformKeys:
+  Enabled: true
+
+Style/HashTransformValues:
+  Enabled: true
 
 Lint/AssignmentInCondition:
   Exclude:
@@ -90,3 +99,22 @@ Style/GlobalVars:
 
 Style/FrozenStringLiteralComment:
   EnforcedStyle: always
+
+Layout/EmptyLinesAroundAttributeAccessor:
+  Enabled: true
+
+Layout/SpaceAroundMethodCallOperator:
+  Enabled: true
+
+Lint/RaiseException:
+  Enabled: true
+
+Lint/StructNewOverride:
+  Enabled: true
+
+Style/ExponentialNotation:
+  Enabled: true
+
+Style/SlicingWithRange:
+  Enabled: true
+

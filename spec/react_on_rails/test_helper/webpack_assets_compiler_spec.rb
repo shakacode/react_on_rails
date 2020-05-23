@@ -32,7 +32,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
 
         expect do
           ReactOnRails::TestHelper::WebpackAssetsCompiler.new.compile_assets
-        rescue SystemExit # rubocop:disable Lint/SuppressedException
+        rescue SystemExit
           # No op
         end.to output(/#{expected_output}/).to_stdout
       end
