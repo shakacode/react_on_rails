@@ -50,6 +50,7 @@ module ReactOnRails
 
       # Options we pass when running `rails new` from the command-line.
       attr_writer :rails_options
+
       def rails_options
         @rails_options ||= "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record"
       end

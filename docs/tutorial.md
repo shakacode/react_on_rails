@@ -1,3 +1,10 @@
+
+
+Start work here and work through the tutorial and maybe add a simple configuration for having a different server
+rendering file.
+
+
+
 # React on Rails Basic Tutorial
 
 This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering. It is updated to 11.2.1.
@@ -17,9 +24,9 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 
 _Note: some of the screen images below show the "npm" command. react_on_rails 6.6.0 and greater uses `yarn`._
 
-## Setting up the environment
+## Setting up your environment
 
-Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 5.x and node version 6+. I recommend `rvm` and `nvm` to install Ruby and Node, and [brew](https://brew.sh/) to install [yarn](https://yarnpkg.com/en/docs/install#mac-tab). Rails can be installed as an ordinary gem.
+Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 6.x and node version 13+. I recommend `rvm` and `nvm` to install Ruby and Node, and [brew](https://brew.sh/) to install [yarn](https://yarnpkg.com/en/docs/install#mac-tab). Rails can be installed as an ordinary gem.
 
 ```
 nvm install node                # download and install latest stable Node
@@ -28,8 +35,8 @@ nvm list                        # check
 
 brew install yarn               # you can use other installer if desired
 11\.\d+\.\d+
-rvm install 2.5.0               # download and install latest stable Ruby (update to exact version)
-rvm use 2.5.0 --default         # use it and make it default
+rvm install 2.6                 # download and install latest stable Ruby (update to exact version)
+rvm use 2.6 --default           # use it and make it default
 rvm list                        # check
 
 gem install rails               # download and install latest stable Rails
@@ -44,13 +51,13 @@ First be sure to run `rails -v` and check you are using Rails 5.1.3 or above. If
 cd <directory where you want to create your new Rails app>
 
 # any name you like for the rails app
-rails new test-react-on-rails --webpack=react 
+rails new test-react-on-rails --webpack=react --skip-sprockets 
 
 cd test-react-on-rails
 bundle
 ```
 
-Note: if you are installing React On Rails in an existing app or an app that uses **Rails pre 5.1.3** (*not for Rails > 5.2*), you will need to run these two commands as well:
+Note: if you are adding React On Rails to an existing app you will instead to run these two commands as well:
 
 ```
 bundle exec rails webpacker:install
@@ -60,7 +67,7 @@ bundle exec rails webpacker:install:react
 Add the **React On Rails** gem to your `Gemfile`:
 
 ```
-gem 'react_on_rails', '11.2.2'         # prefer exact gem version to match npm version
+gem 'react_on_rails', '12.0.0'         # prefer exact gem version to match npm version
 ```
 
 Note: Latest released React On Rails version is considered stable. Please use the latest version to ensure you get all the security patches and the best support.
@@ -81,7 +88,6 @@ Install React on Rails: `rails generate react_on_rails:install` or `rails genera
 
 ```
 rails generate react_on_rails:install
-bundle && yarn
 ```
 
 Then run server with static client side files:
@@ -96,27 +102,34 @@ foreman start -f Procfile.dev-server
 ```
 
 Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) and see your **React On Rails** app running!
-Note, foreman defaults to PORT 5000 unless you set the value of PORT in your environment or in the Procfile.
 
-## Using a pre-release of rails/webpacker
-Until `rails/webpacker` v4 ships, or if you ever want to try out the master branch, you can modify the React on Rails tutorial instructions slightly. You can see the sequence of commits here. To summarize:
+*Note, foreman may default to PORT 5000 unless you set the value of PORT in your environment or in the Procfile.*
 
-**Don't run `rails new` with the `--webpack=react` option**. Instead, add the webpacker gem to the Gemfile such that it points to master, like this if `11.2.1` is the version you want.
+# HMR vs. React Hot Reloading
 
-```ruby
-gem 'webpacker', github: "rails/webpacker"
-gem 'react_on_rails', '11.2.1' # always use exact version
-```
+First, check that the `hmr` option is `true` in your `config/webpacker.yml` file.
 
-Then run these commands:
+The basic setup will have HMR working with the default webpacker setup. However, the basic will cause a full page refresh each time you save a file.
 
-```sh
-bundle exec rails webpacker:install
-yarn add "rails/webpacker" # because the installer has a bug that puts in an invalid version in your package.json.
-bundle exec rails webpacker:install:react
-yarn add --dev webpack-dev-server
-run rails generate react_on_rails:install && bundle && yarn
-```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ### Custom IP & PORT setup (Cloud9 example)
 
@@ -264,6 +277,16 @@ You can turn on server rendering by simply changing the `prerender` option to `t
 ```erb
 <%= react_component("HelloWorld", props: @hello_world_props, prerender: true) %>
 ```
+
+If you want to test this out with HMR, then you also need to add this line to your
+`config/intializers/react_on_rails.rb`
+
+```ruby
+  config.same_bundle_for_client_and_server = true
+```
+
+More likely, you will create a different build file for server rendering. However, if you want to
+use the same file from the webpack-dev-server, you'll need to add that line.
 
 Then push to Heroku:
 

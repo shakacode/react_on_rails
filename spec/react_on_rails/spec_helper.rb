@@ -9,15 +9,14 @@ require "generator_spec"
 require "awesome_print"
 require "pry"
 require "pry-byebug"
-require "pry-stack_explorer"
 require "pry-doc"
 
 # Fails travis
 # require "pry-state"
 # require "pry-toys"
 # require "pry-rescue"
+# require "binding_of_caller"
 
-require "binding_of_caller"
 require "awesome_print"
 require "rspec/retry"
 

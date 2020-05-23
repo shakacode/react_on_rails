@@ -12,7 +12,9 @@ module ReactOnRails
       Webpacker.dev_server.running?
     end
 
-    # This returns either a URL for the webpack-dev-server or a file path
+    # This returns either a URL for the webpack-dev-server, non-server bundle or
+    # the hashed server bundle if using the same bundle for the client.
+    # Otherwise returns a file path.
     def self.bundle_js_uri_from_webpacker(bundle_name)
       # Note Webpacker 3.4.3 manifest lookup is inside of the public_output_path
       # [2] (pry) ReactOnRails::WebpackerUtils: 0> Webpacker.manifest.lookup("app-bundle.js")
@@ -20,11 +22,14 @@ module ReactOnRails
       # Next line will throw if the file or manifest does not exist
       hashed_bundle_name = Webpacker.manifest.lookup!(bundle_name)
 
-      # If someday we add support for hashing the server-bundle and having that built
+      # support for hashing the server-bundle and having that built
       # by a webpack watch process and not served by the webpack-dev-server, then we
-      # need to add an extra config value "same_bundle_for_client_and_server" where a value of false
+      # need an extra config value "same_bundle_for_client_and_server" where a value of false
       # would mean that the bundle is created by a separate webpack watch process.
-      if Webpacker.dev_server.running?
+      is_server_bundle = bundle_name == ReactOnRails.configuration.server_bundle_js_file
+
+      if Webpacker.dev_server.running? && (!is_server_bundle ||
+        ReactOnRails.configuration.same_bundle_for_client_and_server)
         "#{Webpacker.dev_server.protocol}://#{Webpacker.dev_server.host_with_port}#{hashed_bundle_name}"
       else
         File.expand_path(File.join("public", hashed_bundle_name)).to_s

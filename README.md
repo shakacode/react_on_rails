@@ -285,7 +285,8 @@ For details on using react_component_hash with react-helmet, see the docs below 
 
 ## I18n
 
-You can enable the i18n functionality with [react-intl](https://github.com/yahoo/react-intl). React on Rails provides an option for automatic conversions of Rails `*.yml` locale files into `*.js` files for `react-intl`. See the [How to add I18n](docs/basics/i18n.md) for a summary of adding I18n.
+React on Rails provides an option for automatic conversions of Rails `*.yml` locale files into `*.json` or `*.js*.
+See the [How to add I18n](docs/basics/i18n.md) for a summary of adding I18n.
 
 ## More Details
 
