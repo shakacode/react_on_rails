@@ -1,8 +1,8 @@
 import ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
 import type {
-  ReactOnRails as ReactOnRailsType,
   RailsContext,
+  ReactOnRails as ReactOnRailsType,
   RegisteredComponent,
   RenderFunction,
 } from './types/index';
@@ -58,22 +58,15 @@ function turbolinksInstalled(): boolean {
   return (typeof Turbolinks !== 'undefined');
 }
 
-function forEach(fn: (element: Element, railsContext: RailsContext) => void, className: string, railsContext: RailsContext): void {
-  const els = document.getElementsByClassName(className);
+function reactOnRailsHtmlElements() {
+  return document.getElementsByClassName('js-react-on-rails-component');
+}
+
+function forEachReactOnRailsComponentInitialize(fn: (element: Element, railsContext: RailsContext) => void, railsContext: RailsContext): void {
+  const els = reactOnRailsHtmlElements();
   for (let i = 0; i < els.length; i += 1) {
     fn(els[i], railsContext);
   }
-}
-
-function forEachByAttribute(fn: (element: Element, railsContext: RailsContext) => void, attributeName: string, railsContext: RailsContext): void {
-  const els = document.querySelectorAll(`[${attributeName}]`);
-  for (let i = 0; i < els.length; i += 1) {
-    fn(els[i], railsContext);
-  }
-}
-
-function forEachComponent(fn: (element: Element, railsContext: RailsContext) => void, railsContext: RailsContext = {}): void {
-  forEach(fn, 'js-react-on-rails-component', railsContext);
 }
 
 function initializeStore(el: Element, railsContext: RailsContext): void {
@@ -86,7 +79,10 @@ function initializeStore(el: Element, railsContext: RailsContext): void {
 }
 
 function forEachStore(railsContext: RailsContext): void {
-  forEachByAttribute(initializeStore, REACT_ON_RAILS_STORE_ATTRIBUTE, railsContext);
+  const els = document.querySelectorAll(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`);
+  for (let i = 0; i < els.length; i += 1) {
+    initializeStore(els[i], railsContext);
+  }
 }
 
 function turbolinksVersion5(): boolean {
@@ -176,10 +172,15 @@ You should return a React.Component always for the client side entry point.`);
 
 function parseRailsContext(): RailsContext {
   const el = document.getElementById('js-react-on-rails-context');
-  if (el) {
-    return (el.textContent !== null) ? JSON.parse(el.textContent) : {};
+  if (!el) {
+    throw new Error("The HTML page was missing an element with ID 'js-react-on-rails-context'");
   }
-  return {};
+
+  if (!el.textContent) {
+    throw new Error("The HTML element with ID 'js-react-on-rails-context' has no textContent");
+  }
+
+  return JSON.parse(el.textContent);
 }
 
 export function reactOnRailsPageLoaded(): void {
@@ -187,7 +188,7 @@ export function reactOnRailsPageLoaded(): void {
 
   const railsContext = parseRailsContext();
   forEachStore(railsContext);
-  forEachComponent(render, railsContext);
+  forEachReactOnRailsComponentInitialize(render, railsContext);
 }
 
 function unmount(el: Element): void {
@@ -204,7 +205,10 @@ function unmount(el: Element): void {
 
 function reactOnRailsPageUnloaded(): void {
   debugTurbolinks('reactOnRailsPageUnloaded');
-  forEachComponent(unmount);
+  const els = reactOnRailsHtmlElements();
+  for (let i = 0; i < els.length; i += 1) {
+    unmount(els[i]);
+  }
 }
 
 function renderInit(): void {

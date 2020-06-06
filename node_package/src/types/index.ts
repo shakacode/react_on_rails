@@ -21,22 +21,22 @@ export interface CreateParams extends Params {
 }
 
 export interface RailsContext {
-  railsEnv?: "development" | "test" | "staging" | "production";
-  inMailer?: boolean;
-  i18nLocale?: string;
-  i18nDefaultLocale?: string;
-  rorVersion?: string;
-  rorPro?: boolean;
-  serverSide?: boolean;
-  originalUrl?: string;
-  href?: string;
-  location?: string;
-  scheme?: string;
-  host?: string;
-  port?: string;
-  pathname?: string;
-  search?: string;
-  httpAcceptLanguage?: string;
+  railsEnv: string;
+  inMailer: boolean;
+  i18nLocale: string;
+  i18nDefaultLocale: string;
+  rorVersion: string;
+  rorPro: boolean;
+  serverSide: boolean;
+  originalUrl: string;
+  href: string;
+  location: string;
+  scheme: string;
+  host: string;
+  port: string;
+  pathname: string;
+  search: string;
+  httpAcceptLanguage: string;
 }
 
 type AuthenticityHeaders = {[id: string]: string} & {'X-CSRF-Token': string | null; 'X-Requested-With': string};
