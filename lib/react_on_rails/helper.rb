@@ -245,6 +245,7 @@ module ReactOnRails
     #
     # rubocop:disable Metrics/AbcSize
     def rails_context(server_side: true)
+      # ALERT: Keep in sync with node_package/src/types/index.ts for the properties of RailsContext
       @rails_context ||= begin
         result = {
           railsEnv: Rails.env,
