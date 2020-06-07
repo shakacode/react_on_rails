@@ -20,6 +20,7 @@ export interface CreateParams extends Params {
   shouldHydrate?: boolean;
 }
 
+// Keep these in sync with method lib/react_on_rails/helper.rb#rails_context
 export interface RailsContext {
   railsEnv: string;
   inMailer: boolean;

@@ -67,7 +67,6 @@
     "clean": "rm -rf node_package/lib",
     "start": "nps",
     "prepare": "yarn run build",
-    "prepublishOnly": "npm run prepare",
     "build": "yarn run clean && yarn run tsc --declaration",
     "build-watch": "yarn run clean && yarn run tsc --watch",
     "lint": "nps eslint",
