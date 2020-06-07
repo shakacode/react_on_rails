@@ -170,10 +170,12 @@ You should return a React.Component always for the client side entry point.`);
   }
 }
 
-function parseRailsContext(): RailsContext {
+function parseRailsContext(): RailsContext | null {
   const el = document.getElementById('js-react-on-rails-context');
   if (!el) {
-    throw new Error("The HTML page was missing an element with ID 'js-react-on-rails-context'");
+    // The HTML page will not have an element with ID 'js-react-on-rails-context' if there are no
+    // react on rails components
+    return null;
   }
 
   if (!el.textContent) {
@@ -187,6 +189,10 @@ export function reactOnRailsPageLoaded(): void {
   debugTurbolinks('reactOnRailsPageLoaded');
 
   const railsContext = parseRailsContext();
+
+  // If no react on rails components
+  if (!railsContext) return;
+
   forEachStore(railsContext);
   forEachReactOnRailsComponentInitialize(render, railsContext);
 }
