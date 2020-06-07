@@ -254,6 +254,12 @@ You can run specific linting for directories or files by using `docker-compose r
 
 `docker-compose run lint bash` sets you up to run from the container command line.
 
+### Updating Rubocop
+2 files require updating to update the Rubocop version:
+
+1. `react_on_rails.gemspec`
+2. `spec/dummy/Gemfile`
+
 ### Docker CI - Test and Linting
 Docker CI and Tests containers have a xvfd server automatically started for headless browser testing with selenium and Firefox.
 
