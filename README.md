@@ -15,7 +15,7 @@
 
 #### News
 **April 2, 2020**:
-* Are you interested in support for React on Rails? If so check out [React on Rails Pro](https://docs.google.com/document/d/1vwooIc6jKkuBOzllQ7rbVKMR2xOmeX0TpjHKxHcFyYo/edit#).
+* Are you interested in support for React on Rails? If so check out [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).
 * HMR is working with [Loadable Components](https://loadable-components.com) for a both amazing hot-reloading developer experience and great runtime performance. Please [email me](mailto:justin@shakacode.com) if you'd like to use [Loadable Components Code Splitting](https://loadable-components.com/docs/code-splitting/) to speed up your app by reducing your bundle sizes and lazily loading the code that's needed.
 * `react_on_rails` fully supports `rails/webpacker`. The example test app in `spec/dummy` was recently converted over to use rails/webpacker v4. It's a good example of how to leverage rails/webpacker's webpack configuration. 
 
@@ -191,7 +191,7 @@ See the [View Helpers API](./docs/api/view-helpers-api.md) for more details on `
 
 ## Fragment Caching
 
-Fragment caching is a [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki) feature. Fragment caching is a **HUGE** performance booster for your apps. Use the `cached_react_component` and `cached_react_component_hash`. The API is the same as `react_component` and `react_component_hash`, but for 2 differences:
+Fragment caching is a [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro) feature. Fragment caching is a **HUGE** performance booster for your apps. Use the `cached_react_component` and `cached_react_component_hash`. The API is the same as `react_component` and `react_component_hash`, but for 2 differences:
 
 1. The `cache_key` takes the same parameters as any Rails `cache` view helper.
 1. The **props** are passed via a block so that evaluation of the props is not done unless the cache is broken. Suppose you put your props calculation into some method called `some_slow_method_that_returns_props`:
@@ -213,7 +213,7 @@ Note, even without server rendering (without step 3 above), fragment caching is 
   
 ## Integration with Node.js for Server Rendering
 
-Default server rendering is done by ExecJS. If you want to use a Node.js server for better performing server rendering, [email justin@shakacode.com](mailto:justin@shakacode.com). ShakaCode has built a premium Node rendering server that is part of [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
+Default server rendering is done by ExecJS. If you want to use a Node.js server for better performing server rendering, [email justin@shakacode.com](mailto:justin@shakacode.com). ShakaCode has built a premium Node rendering server that is part of [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).
 
 ## Globally Exposing Your React Components
 
@@ -298,7 +298,7 @@ Here are some highly recommended next articles to read:
 1. [Recommended Project Structure](./docs/basics/recommended-project-structure.md)
 1. [Webpack Configuration](./docs/basics/webpack-configuration.md)
 1. [View Helpers API](./docs/api/view-helpers-api.md) 
-1. [Caching and Performance: React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
+1. [Caching and Performance: React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).
 1. [Deployment](docs/basics/deployment.md).
 
 # Support
@@ -330,7 +330,7 @@ React on Rails Pro provides Node server rendering, fragment caching, code-splitt
 
 ## React on Rails Pro Support
 
-The [React on Rails Pro Support Plan](https://docs.google.com/document/d/1vwooIc6jKkuBOzllQ7rbVKMR2xOmeX0TpjHKxHcFyYo/edit#) can help!
+The [React on Rails Pro Support Plan](https://www.shakacode.com/react-on-rails-pro) can help!
 
 * Optimizing your webpack setup to Webpack v4 for React on Rails including code splitting with react-router v4, webpack v4, and react-loadable.
 * Upgrading your app to use the current Webpack setup that skips the Sprockets asset pipeline.
