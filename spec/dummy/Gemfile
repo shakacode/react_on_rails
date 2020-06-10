@@ -68,9 +68,7 @@ group :test do
   gem "capybara"
   gem "capybara-screenshot"
   gem "coveralls", require: false
-  # install trouble with updated
-  # gem "capybara-webkit"
-  gem "equivalent-xml", github: "mbklein/equivalent-xml"
+  gem "equivalent-xml"
   gem "generator_spec"
   gem "launchy"
   gem "rspec-rails"
