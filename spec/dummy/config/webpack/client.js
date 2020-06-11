@@ -30,11 +30,8 @@ const jqueryUjsLoader = {
 };
 environment.loaders.insert('jquery-ujs', jqueryUjsLoader, { after: 'react' });
 
-if(devBuild && isHMR) {
-  environment.plugins.insert(
-      'ReactRefreshWebpackPlugin',
-      new ReactRefreshWebpackPlugin(),
-  );
+if (devBuild && isHMR) {
+  environment.plugins.insert('ReactRefreshWebpackPlugin', new ReactRefreshWebpackPlugin());
 }
 
 module.exports = environment;

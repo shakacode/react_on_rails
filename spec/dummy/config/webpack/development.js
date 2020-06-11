@@ -38,7 +38,7 @@ const clientConfig = merge(clientEnvironment.toWebpackConfig(), {
 if (process.env.WEBPACK_DEV_SERVER) {
   module.exports = clientConfig;
 } else if (process.env.SERVER_BUNDLE_ONLY) {
-   module.exports = serverConfig;
+  module.exports = serverConfig;
 } else {
   module.exports = [clientConfig, serverConfig];
 }

@@ -5,11 +5,7 @@ module.exports = function (api) {
   const isDevelopmentEnv = api.env('development');
   const isProductionEnv = api.env('production');
   const isTestEnv = api.env('test');
-  const isHMR = api.env('WEBPACK_DEV_SERVER');
-
-  const useHmr = api.caller(function (caller) {
-    return isDevelopmentEnv && caller.isDevServer && caller.isHmr;
-  });
+  const isHMR = process.env.WEBPACK_DEV_SERVER;
 
   if (!validEnv.includes(env)) {
     throw new Error(

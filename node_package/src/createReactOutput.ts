@@ -40,6 +40,9 @@ export default function createReactOutput({
 
   if (renderFunction) {
     // Let's invoke the function to get the result
+    if (trace) {
+      console.log(`${name} is a renderFunction`);
+    }
     const renderFunctionResult = (component as RenderFunction)(props, railsContext);
     if (isServerRenderResult(renderFunctionResult as CreateReactOutputResult)) {
       // We just return at this point, because calling function knows how to handle this case and
