@@ -30,7 +30,7 @@ aliases:
     command: |
       yarn install --no-progress --no-emoji
       yarn run eslint -v
-      yarn global add yalc
+      sudo yarn global add yalc
 
   # Install/update Node modules for dummy app unless existing set of modules is satisfying Yarn.
   - &install-dummy-app-node-modules
@@ -152,6 +152,7 @@ jobs:
       - checkout
       - run: *print-system-info
       - restore_cache: *restore-dummy-app-node-modules-cache
+      - run: *install-package-node-modules
       - run: *install-yalc-publish
       - run: *install-yalc-add-react-on-rails
       - run: *install-dummy-app-node-modules
@@ -201,10 +202,10 @@ jobs:
     steps:
       - checkout
       - run: *print-system-info
+      - run: *install-package-node-modules
       - run: *install-yalc-publish
       - restore_cache: *restore-dummy-app-node-modules-cache
       - run: *install-yalc-add-react-on-rails
-      - run: *install-package-node-modules
       - run: *install-dummy-app-node-modules
       - run: *install-dummy-app-ruby-gems
       - run:
@@ -259,6 +260,7 @@ jobs:
       - restore_cache: *restore-dummy-app-node-modules-cache
       - restore_cache: *restore-package-node-modules-cache
       - run: *install-package-node-modules
+      - run: *install-yalc-publish
       - run: *install-package-ruby-gems
       - run: *install-dummy-app-ruby-gems
       - run: *install-latest-chrome
