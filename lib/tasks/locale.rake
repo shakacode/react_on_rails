@@ -12,7 +12,7 @@ namespace :react_on_rails do
     the "ReactOnRails.configuration.i18n_dir".
   DESC
   task locale: :environment do
-    if ReactOnRails.configuration.i18n_output_format.downcase == 'js'
+    if ReactOnRails.configuration.i18n_output_format&.downcase == "js"
       ReactOnRails::Locales::ToJs.new
     else
       ReactOnRails::Locales::ToJson.new
