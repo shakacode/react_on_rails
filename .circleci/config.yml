@@ -1,6 +1,9 @@
 version: 2
 
 aliases:
+  - &docker-image
+    - image: circleci/ruby:2.6-node-browsers
+
   # Print critical data and executables versions.
   - &print-system-info
     name: Print system information
@@ -105,8 +108,7 @@ aliases:
 jobs:
   # Lint all
   lint-js-and-ruby:
-    docker:
-      - image: &docker_image circleci/ruby:2.6-node-browsers
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -118,8 +120,7 @@ jobs:
       - run: *format
 
   prettier:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     parallelism: 1
     steps:
       - checkout
@@ -130,8 +131,7 @@ jobs:
 
   # Install Node modules for Renderer package with Yarn and save them to chache.
   install-package-node-packages:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -146,8 +146,7 @@ jobs:
 
   # Install Node modules for dummy app with Yarn and save them to cache.
   install-dummy-app-node-packages:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -165,8 +164,7 @@ jobs:
 
   # Install Ruby gems for package with Bundler and save them to cache.
   install-package-ruby-gems:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -180,8 +178,7 @@ jobs:
 
   # Install Ruby gems for dummy app with Bundler and save them to cache.
   install-dummy-app-ruby-gems:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -197,8 +194,7 @@ jobs:
   # NOTE: keeping around this cache in case we have multiple rspec suites in the future to tests
   # different node renderers.
   build-dummy-app-webpack-test-bundles:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -218,8 +214,7 @@ jobs:
             - spec/dummy/public/webpack
   # Run JS unit tests for Renderer package.
   package-js-tests:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -230,8 +225,7 @@ jobs:
           command: yarn test
 
   rspec-package-specs:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -247,8 +241,7 @@ jobs:
           path: log/test.log
 
   main:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
