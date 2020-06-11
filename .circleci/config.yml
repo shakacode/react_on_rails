@@ -261,6 +261,7 @@ jobs:
       - restore_cache: *restore-package-node-modules-cache
       - run: *install-package-node-modules
       - run: *install-yalc-publish
+      - run: *install-yalc-add-react-on-rails
       - run: *install-package-ruby-gems
       - run: *install-dummy-app-ruby-gems
       - run: *install-latest-chrome
