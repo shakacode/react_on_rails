@@ -3,7 +3,7 @@ Using NPM for react_on_rails
 * Use 'yalc link' to hook up the spec/dummy/client/node_modules to the top level
 * Be sure to install yarn dependencies in spec/dummy/client
 
-## Setup yarn link
+## Setup yalc
 
 ```sh
 cd react_on_rails

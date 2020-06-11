@@ -69,9 +69,9 @@ You need to do this once:
 
 ```
 # Will send the updates to other folders
-yalc publish react-on-rails
+yalc publish
 cd spec/dummy
-yalc link react-on-rails
+yalc add react-on-rails
 ```
 
 The workflow is:

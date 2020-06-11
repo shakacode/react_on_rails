@@ -30,6 +30,7 @@ aliases:
     command: |
       yarn install --no-progress --no-emoji
       yarn run eslint -v
+      yarn global add yalc
 
   # Install/update Node modules for dummy app unless existing set of modules is satisfying Yarn.
   - &install-dummy-app-node-modules
@@ -37,13 +38,13 @@ aliases:
     command: cd spec/dummy && yarn install --no-progress --no-emoji
 
   # Setup yarn links for react-on-rails
-  - &install-yarn-link-source
-    name: Install yarn link for react-on-rails
-    command: yarn link
+  - &install-yalc-publish
+    name: yalc publish for react-on-rails
+    command: yalc publish
 
-  - &install-yarn-link-destination
-    name: Install yarn link for react-on-rails
-    command: cd spec/dummy/client && yarn link react-on-rails
+  - &install-yalc-add-react-on-rails
+    name: yalc add react-on-rails
+    command: cd spec/dummy && yalc add react-on-rails
 
   # Install ruby gems unless existing set of gems is satisfying bundler.
   - &install-dummy-app-ruby-gems
@@ -151,8 +152,8 @@ jobs:
       - checkout
       - run: *print-system-info
       - restore_cache: *restore-dummy-app-node-modules-cache
-      - run: *install-yarn-link-source
-      - run: *install-yarn-link-destination
+      - run: *install-yalc-publish
+      - run: *install-yalc-add-react-on-rails
       - run: *install-dummy-app-node-modules
       - save_cache:
           name: Save spec/dummy/node_modules to cache
@@ -200,9 +201,9 @@ jobs:
     steps:
       - checkout
       - run: *print-system-info
-      - run: *install-yarn-link-source
+      - run: *install-yalc-publish
       - restore_cache: *restore-dummy-app-node-modules-cache
-      - run: *install-yarn-link-destination
+      - run: *install-yalc-add-react-on-rails
       - run: *install-package-node-modules
       - run: *install-dummy-app-node-modules
       - run: *install-dummy-app-ruby-gems
