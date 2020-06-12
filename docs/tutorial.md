@@ -341,8 +341,6 @@ So you get some basics from HMR with no code changes. If you want to go further,
 * https://github.com/rails/webpacker/blob/master/docs/webpack-dev-server.md
 * https://webpack.js.org/configuration/dev-server/
 * https://webpack.js.org/concepts/hot-module-replacement/
-* https://gaearon.github.io/react-hot-loader/getstarted/
-* https://github.com/gaearon/react-hot-loader
 
 React on Rails will automatically handle disabling server rendering if there is only one bundle file created by the Webpack development server by rails/webpacker.
 

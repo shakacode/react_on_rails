@@ -43,7 +43,6 @@
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
     "react-helmet": "^6.0.0-beta.2",
-    "react-hot-loader": "^4.12.12",
     "react-on-rails": "file:.yalc/react-on-rails",
     "react-proptypes": "^1.0.0",
     "react-redux": "^5.0.5",
