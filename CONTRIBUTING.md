@@ -186,9 +186,25 @@ In your Rails app add this gem with a path to your fork.
 
 ```ruby
 gem 'react_on_rails', path: '../relative/path/to/react_on_rails'
-```
+```                                                             
+
+Then run `bundle`.
 
 The main installer can be run with ```rails generate react_on_rails:install```
+
+Then use yalc to add the npm module. 
+
+Be sure that your ran this first at the top level of React on Rails
+
+```
+yalc publish
+```
+
+Then add the node package to your test app:
+
+```
+yalc add react-on-rails
+```
 
 ### Testing the Generator
 The generators are covered by generator tests using Rails's generator testing helpers, but it never hurts to do a sanity check and explore the API. See [generator_testing_script.md](generator_testing_script.md) for a script on how to run the generator on a fresh project.
