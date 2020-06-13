@@ -6,7 +6,6 @@ import React from 'react';
 import { combineReducers, applyMiddleware, createStore } from 'redux';
 import { Provider } from 'react-redux';
 import thunkMiddleware from 'redux-thunk';
-import { AppContainer } from 'react-hot-loader';
 import ReactDOM from 'react-dom';
 
 import reducers from '../reducers/reducersIndex';
@@ -40,11 +39,9 @@ export default (props, railsContext, domNodeId) => {
   // This allows redux to add additional props to the HelloWorldContainer.
   const renderApp = (Komponent) => {
     const element = (
-      <AppContainer>
-        <Provider store={store}>
-          <Komponent />
-        </Provider>
-      </AppContainer>
+      <Provider store={store}>
+        <Komponent />
+      </Provider>
     );
 
     render(element, document.getElementById(domNodeId));

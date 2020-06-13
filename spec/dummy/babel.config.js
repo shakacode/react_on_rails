@@ -1,16 +1,18 @@
 module.exports = function (api) {
-  var validEnv = ['development', 'test', 'production'];
-  var currentEnv = api.env();
-  var isDevelopmentEnv = api.env('development');
-  var isProductionEnv = api.env('production');
-  var isTestEnv = api.env('test');
+  const validEnv = ['development', 'test', 'production'];
+  const env = api.env();
+  api.cache.using(() => env);
+  const isDevelopmentEnv = api.env('development');
+  const isProductionEnv = api.env('production');
+  const isTestEnv = api.env('test');
+  const isHMR = process.env.WEBPACK_DEV_SERVER;
 
-  if (!validEnv.includes(currentEnv)) {
+  if (!validEnv.includes(env)) {
     throw new Error(
       'Please specify a valid `NODE_ENV` or ' +
         '`BABEL_ENV` environment variables. Valid values are "development", ' +
         '"test", and "production". Instead, received: ' +
-        JSON.stringify(currentEnv) +
+        JSON.stringify(env) +
         '.',
     );
   }
@@ -67,6 +69,7 @@ module.exports = function (api) {
           },
         },
       ],
+      isDevelopmentEnv && isHMR && require('react-refresh/babel'),
       require('babel-plugin-macros'),
       require('@babel/plugin-syntax-dynamic-import').default,
 

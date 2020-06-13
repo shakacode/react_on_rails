@@ -1,6 +1,9 @@
 version: 2
 
 aliases:
+  - &docker-image
+    - image: circleci/ruby:2.6-node-browsers
+
   # Print critical data and executables versions.
   - &print-system-info
     name: Print system information
@@ -30,6 +33,7 @@ aliases:
     command: |
       yarn install --no-progress --no-emoji
       yarn run eslint -v
+      sudo yarn global add yalc
 
   # Install/update Node modules for dummy app unless existing set of modules is satisfying Yarn.
   - &install-dummy-app-node-modules
@@ -37,13 +41,13 @@ aliases:
     command: cd spec/dummy && yarn install --no-progress --no-emoji
 
   # Setup yarn links for react-on-rails
-  - &install-yarn-link-source
-    name: Install yarn link for react-on-rails
-    command: yarn link
+  - &install-yalc-publish
+    name: yalc publish for react-on-rails
+    command: yalc publish
 
-  - &install-yarn-link-destination
-    name: Install yarn link for react-on-rails
-    command: cd spec/dummy/client && yarn link react-on-rails
+  - &install-yalc-add-react-on-rails
+    name: yalc add react-on-rails
+    command: cd spec/dummy && yalc add react-on-rails
 
   # Install ruby gems unless existing set of gems is satisfying bundler.
   - &install-dummy-app-ruby-gems
@@ -104,8 +108,7 @@ aliases:
 jobs:
   # Lint all
   lint-js-and-ruby:
-    docker:
-      - image: &docker_image circleci/ruby:2.6-node-browsers
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -117,8 +120,7 @@ jobs:
       - run: *format
 
   prettier:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     parallelism: 1
     steps:
       - checkout
@@ -129,8 +131,7 @@ jobs:
 
   # Install Node modules for Renderer package with Yarn and save them to chache.
   install-package-node-packages:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -145,14 +146,14 @@ jobs:
 
   # Install Node modules for dummy app with Yarn and save them to cache.
   install-dummy-app-node-packages:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
       - restore_cache: *restore-dummy-app-node-modules-cache
-      - run: *install-yarn-link-source
-      - run: *install-yarn-link-destination
+      - run: *install-package-node-modules
+      - run: *install-yalc-publish
+      - run: *install-yalc-add-react-on-rails
       - run: *install-dummy-app-node-modules
       - save_cache:
           name: Save spec/dummy/node_modules to cache
@@ -163,8 +164,7 @@ jobs:
 
   # Install Ruby gems for package with Bundler and save them to cache.
   install-package-ruby-gems:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -178,8 +178,7 @@ jobs:
 
   # Install Ruby gems for dummy app with Bundler and save them to cache.
   install-dummy-app-ruby-gems:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -195,15 +194,14 @@ jobs:
   # NOTE: keeping around this cache in case we have multiple rspec suites in the future to tests
   # different node renderers.
   build-dummy-app-webpack-test-bundles:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
-      - run: *install-yarn-link-source
-      - restore_cache: *restore-dummy-app-node-modules-cache
-      - run: *install-yarn-link-destination
       - run: *install-package-node-modules
+      - run: *install-yalc-publish
+      - restore_cache: *restore-dummy-app-node-modules-cache
+      - run: *install-yalc-add-react-on-rails
       - run: *install-dummy-app-node-modules
       - run: *install-dummy-app-ruby-gems
       - run:
@@ -216,8 +214,7 @@ jobs:
             - spec/dummy/public/webpack
   # Run JS unit tests for Renderer package.
   package-js-tests:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -228,8 +225,7 @@ jobs:
           command: yarn test
 
   rspec-package-specs:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -245,8 +241,7 @@ jobs:
           path: log/test.log
 
   main:
-    docker:
-      - image: *docker_image
+    docker: *docker-image
     steps:
       - checkout
       - run: *print-system-info
@@ -258,6 +253,8 @@ jobs:
       - restore_cache: *restore-dummy-app-node-modules-cache
       - restore_cache: *restore-package-node-modules-cache
       - run: *install-package-node-modules
+      - run: *install-yalc-publish
+      - run: *install-yalc-add-react-on-rails
       - run: *install-package-ruby-gems
       - run: *install-dummy-app-ruby-gems
       - run: *install-latest-chrome

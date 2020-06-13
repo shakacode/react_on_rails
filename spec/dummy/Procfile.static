@@ -5,4 +5,4 @@
 rails: rails s -b 0.0.0.0
 
 # Build client assets, watching for changes.
-rails-client-assets: sh -c 'rm -rf public/webpack/development/*' || true && sh -c 'yarn run build:dev:watch'
+rails-client-assets: sh -c 'rm -rf public/webpack/development/*' || true && bin/webpack --watch

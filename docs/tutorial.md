@@ -1,13 +1,8 @@
-
-
-Start work here and work through the tutorial and maybe add a simple configuration for having a different server
-rendering file.
-
-
-
 # React on Rails Basic Tutorial
 
-This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering. It is updated to 11.2.1.
+*Updated for Ruby 2.7.1, Rails 6.0.3.1, and React on Rails v12.0.0*
+
+This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
 After finishing this tutorial you will get an application that can do the following (live on Heroku):
 
@@ -34,9 +29,8 @@ nvm alias default node          # make it default version
 nvm list                        # check
 
 brew install yarn               # you can use other installer if desired
-11\.\d+\.\d+
-rvm install 2.6                 # download and install latest stable Ruby (update to exact version)
-rvm use 2.6 --default           # use it and make it default
+rvm install 2.7                 # download and install latest stable Ruby (update to exact version)
+rvm use 2.7 --default           # use it and make it default
 rvm list                        # check
 
 gem install rails               # download and install latest stable Rails
@@ -64,6 +58,15 @@ bundle exec rails webpacker:install
 bundle exec rails webpacker:install:react
 ```
 
+Let's commit everything before installing React on Rails.
+
+```
+# Here are git commands to make a new git repo and commit everything.
+# Newer versions of Rails create the git repo by default.
+git add -A
+git commit -m "Initial commit"
+```
+
 Add the **React On Rails** gem to your `Gemfile`:
 
 ```
@@ -72,16 +75,12 @@ gem 'react_on_rails', '12.0.0'         # prefer exact gem version to match npm v
 
 Note: Latest released React On Rails version is considered stable. Please use the latest version to ensure you get all the security patches and the best support.
 
-Run `bundle` and commit the git repository (or `rails generate` will not work properly)
-
+Run `bundle` and commit the changes.
 
 ```
 bundle
 
-# Here are git commands to make a new git repo and commit everything.
-# Newer versions of Rails create the git repo by default.
-git add -A
-git commit -m "Initial commit"
+git commit -am "Added React on Rails Gem"
 ```
 
 Install React on Rails: `rails generate react_on_rails:install` or `rails generate react_on_rails:install --redux`. You need to first git commit your files before running the generator, or else it will generate an error.
@@ -341,8 +340,6 @@ So you get some basics from HMR with no code changes. If you want to go further,
 * https://github.com/rails/webpacker/blob/master/docs/webpack-dev-server.md
 * https://webpack.js.org/configuration/dev-server/
 * https://webpack.js.org/concepts/hot-module-replacement/
-* https://gaearon.github.io/react-hot-loader/getstarted/
-* https://github.com/gaearon/react-hot-loader
 
 React on Rails will automatically handle disabling server rendering if there is only one bundle file created by the Webpack development server by rails/webpacker.
 

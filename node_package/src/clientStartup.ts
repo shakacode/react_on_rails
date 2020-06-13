@@ -58,7 +58,7 @@ function turbolinksInstalled(): boolean {
   return (typeof Turbolinks !== 'undefined');
 }
 
-function reactOnRailsHtmlElements() {
+function reactOnRailsHtmlElements(): HTMLCollectionOf<Element>  {
   return document.getElementsByClassName('js-react-on-rails-component');
 }
 

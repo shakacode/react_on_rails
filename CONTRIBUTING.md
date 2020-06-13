@@ -1,45 +1,8 @@
 # Tips for Contributors
 
-* See [docs/contributor-info/Releasing](./docs/contributor-info/releasing.md) for instructions on releasing.
+* [docs/contributor-info/Releasing](./docs/contributor-info/releasing.md) for instructions on releasing.
+* [docs/contributor-info/pull-requests](./docs/contributor-info/pull-requests.md)
 * See other docs in [docs/contributor-info](./docs/contributor-info)
-
-## Summary
-
-For non-doc fixes:
-
-* Provide changelog entry in the [unreleased section of the CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#unreleased).
-* Ensure CI passes and that you added a test that passes with the fix and fails without the fix.
-* Squash all commits down to one with a nice commit message *ONLY* once final review is given. Make sure this single commit is rebased on top of master.
-* Please address all code review comments.
-* Ensure that docs are updated accordingly if a feature is added.
-
-## Commit Messages
-
-From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/)
-
-#### The seven rules of a great git commit message
-> Keep in mind: This has all been said before.
-
-1. Separate subject from body with a blank line
-1. Limit the subject line to 50 characters
-1. Capitalize the subject line
-1. Do not end the subject line with a period
-1. Use the imperative mood in the subject line
-1. Wrap the body at 72 characters
-1. Use the body to explain what and why vs. how
-
-
-## Doc Changes
-
-When making doc changes, we want the change to work on both the gitbook and the regular github site. The issue is that non-doc files will not go to the gitbook site, so doc references to non doc files must use the github URL.
-
-### Links to other docs:
-* When making references to doc files, use a relative URL path like:
-`[Installation Overview](docs/basics/installation-overview.md)`
-
-* When making references to source code files, use a full url path like:
-`[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb)`
-
 
 ## To run tests:
 * After updating code via git, to prepare all examples and run all tests:
@@ -91,46 +54,54 @@ gem "react_on_rails", path: "../path-to-react-on-rails"
 
 Note that you will need to bundle install after making this change, but also that **you will need to restart your Rails application if you make any changes to the gem**.
 
-## Testing the Node package for react-on-rails
+## Testing the Node package for react-on-rails via Yalc
 In addition to testing the Ruby parts out, you can also test the node package parts of the gem with an external application. First, be **sure** to build the NPM package:
 
 ```sh
 cd react_on_rails/
 yarn
+
+# Update the lib directory with babel compiled files
 yarn run build:watch
-yalc publish react-on-rails
+```
+   
+You need to do this once:
+
+```
+# Will send the updates to other folders
+yalc publish
+cd spec/dummy
+yalc add react-on-rails
 ```
 
-Install the local package by using yalc, like this:
-```sh
+The workflow is:
+1. Make changes to the node package.
+2. We need yalc to push and then run yarn:
+```
+cd <top dir>
+# Will send the updates to other folders
+yalc push
 cd spec/dummy
-yalc link react-on-rails
+
+# Will update from yalc
 yarn
 ```
 
-Make changes to the node package.
+When you run `yalc push`, you'll get an informative message
 
-Then run:
-
-```      
-cd <top dir>
-yalc push
-```      
-
-Note, yarn will run the `postinstall` script of `spec/dummy/client` which runs `yarn link` to set up a sym link to the parent package.
+```
+✗ yalc push
+react-on-rails@12.0.0-12070fd1 published in store.
+Pushing react-on-rails@12.0.0 in /Users/justin/shakacode/react-on-rails/react_on_rails/spec/dummy
+Package react-on-rails@12.0.0-12070fd1 added ==> /Users/justin/shakacode/react-on-rails/react_on_rails/spec/dummy/node_modules/react-on-rails.
+Don't forget you may need to run yarn after adding packages with yalc to install/update dependencies/bin scripts.
+```
 
 #### Example: Testing NPM changes with the dummy app
-1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/clientStartup.js#L181) in `react_on_rails/node_package/src/clientStartup.js` to confirm we're getting an update to the node package.
-2. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console.
-
-_Note: running `npm i` automatically builds the npm package before installing. However, when using yarn you will need to run `yarn run build` in the root directory before the install script. This will be updated when [yarn issue #2649](https://github.com/yarnpkg/yarn/issues/2649) (above) is resolved._
+1. Add `console.log('Hello!')` to [clientStartup.ts, function render](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/clientStartup.ts in `/node_package/src/clientStartup.js` to confirm we're getting an update to the node package client side. Do the same for function `serverRenderReactComponent` in `/node_package/src/serverRenderReactComponent.ts`.
+2. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console. If you did not see that message, then review the steps above for the workflow of making changes and pushing them via yalc.
 
 # Development Setup for Gem and Node Package Contributors
-
-## Checklist before Committing
-1. `rake`: runs all linters and specs (you need Docker setup, see below)
-2. Did you need any more tests for your change?
-3. Did you document your change? Update the README.md?
 
 ## Dev Initial Setup
 
@@ -138,10 +109,6 @@ _Note: running `npm i` automatically builds the npm package before installing. H
 After checking out the repo, making sure you have rvm and nvm setup (setup ruby and node), cd to `spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
 ### Local Node Package
-The default setup of spec/dummy uses a yarn link to the `/node_package/lib` directory. To test changes
-to the node module of react-on-rails, run this from the top directory `yarn run build-watch`.
-
-Then you just need to run `yarn` in the `spec/dummy` directory.
 
 Note, the example and dummy apps will use your local node_package folder as the react-on-rails node package. This will also be done automatically for you via the `rake examples:gen_all` rake task.
 
@@ -189,13 +156,6 @@ cd react_on_rails/spec/dummy
 rspec
 ```
 
-Eventually, we may have JS tests:
-
-```sh
-cd react_on_rails/spec/dummy/client
-yarn run test
-```
-
 ### Run most tests and linting
 
 ```sh
@@ -204,7 +164,7 @@ yarn run check
 ```
 
 ### Starting the Dummy App
-To run the dummy app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the webpack configs, then you need to restart foreman. If you change the JS code for react-on-rails, you need to run `yarn run build`. Since the react-on-rails package should be sym linked, you don't have to `yarn react-on-rails` after every change.
+To run the dummy app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start` with one of the Procfiles. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the webpack configs, then you need to restart foreman. If you change the JS code for react-on-rails, you need to run `yarn run build`. Since the react-on-rails package should be sym linked, you don't have to `yarn react-on-rails` after every change.
 
 ### RSpec Testing
 Run `rake` for testing the gem and `spec/dummy`. Otherwise, the `rspec` command only works for testing within the sample apps, like `spec/dummy`.
@@ -226,9 +186,25 @@ In your Rails app add this gem with a path to your fork.
 
 ```ruby
 gem 'react_on_rails', path: '../relative/path/to/react_on_rails'
-```
+```                                                             
+
+Then run `bundle`.
 
 The main installer can be run with ```rails generate react_on_rails:install```
+
+Then use yalc to add the npm module. 
+
+Be sure that your ran this first at the top level of React on Rails
+
+```
+yalc publish
+```
+
+Then add the node package to your test app:
+
+```
+yalc add react-on-rails
+```
 
 ### Testing the Generator
 The generators are covered by generator tests using Rails's generator testing helpers, but it never hurts to do a sanity check and explore the API. See [generator_testing_script.md](generator_testing_script.md) for a script on how to run the generator on a fresh project.

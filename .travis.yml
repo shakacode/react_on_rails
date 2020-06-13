@@ -40,8 +40,10 @@ install:
   - travis_retry npm i -g yarn
   - travis_retry bundle install
   - travis_retry yarn global add yalc
+  - travis_retry yalc publish
+  - travis_retry cd spec/dummy && yalc add react-on-rails
   - travis_retry yarn
-  - travis_retry yarn run build
+  - travis_retry cd ../.. && yarn run build
   - bundle exec rake prepare_for_ci
 
 before_script:

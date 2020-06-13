@@ -1,19 +1,13 @@
 const environment = require('./environment');
 const devBuild = process.env.NODE_ENV === 'development';
+const isHMR = process.env.WEBPACK_DEV_SERVER === 'TRUE';
+const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
 
-if (!module.hot && devBuild) {
+if (devBuild && !isHMR) {
   environment.loaders
     .get('sass')
     .use.find((item) => item.loader === 'sass-loader').options.sourceMapContents = false;
 }
-
-//adding reactHotReload
-const reactHotReload = {
-  test: /\.(js|jsx)$/,
-  use: 'react-hot-loader/webpack',
-  include: /node_modules/,
-};
-environment.loaders.insert('reactHotReload', reactHotReload, { after: 'babel' });
 
 //adding exposeLoader
 const exposeLoader = {
@@ -35,5 +29,9 @@ const jqueryUjsLoader = {
   use: [{ loader: 'imports-loader', options: { jQuery: 'jquery' } }],
 };
 environment.loaders.insert('jquery-ujs', jqueryUjsLoader, { after: 'react' });
+
+if (devBuild && isHMR) {
+  environment.plugins.insert('ReactRefreshWebpackPlugin', new ReactRefreshWebpackPlugin());
+}
 
 module.exports = environment;

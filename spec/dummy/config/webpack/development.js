@@ -34,4 +34,11 @@ const clientConfig = merge(clientEnvironment.toWebpackConfig(), {
   },
 });
 
-module.exports = [clientConfig, serverConfig];
+// For HMR, we want the server
+if (process.env.WEBPACK_DEV_SERVER) {
+  module.exports = clientConfig;
+} else if (process.env.SERVER_BUNDLE_ONLY) {
+  module.exports = serverConfig;
+} else {
+  module.exports = [clientConfig, serverConfig];
+}

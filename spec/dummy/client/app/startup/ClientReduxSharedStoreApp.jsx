@@ -4,7 +4,6 @@
 import React from 'react';
 import { Provider } from 'react-redux';
 import ReactOnRails from 'react-on-rails';
-import { AppContainer } from 'react-hot-loader';
 import ReactDOM from 'react-dom';
 
 import HelloWorldContainer from '../components/HelloWorldContainer';
@@ -29,11 +28,9 @@ export default (props, _railsContext, domNodeId) => {
   // This allows redux to add additional props to the HelloWorldContainer.
   const renderApp = (Komponent) => {
     const element = (
-      <AppContainer>
-        <Provider store={store}>
-          <Komponent />
-        </Provider>
-      </AppContainer>
+      <Provider store={store}>
+        <Komponent />
+      </Provider>
     );
     render(element, document.getElementById(domNodeId));
   };
