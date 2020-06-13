@@ -30,7 +30,7 @@ module ReactOnRails
         # Be sure we don't do this again.
         self.class.has_been_run = true
 
-        ReactOnRails::Locales::ToJs.new
+        ReactOnRails::Locales.compile
 
         stale_gen_files = webpack_assets_status_checker.stale_generated_webpack_files
 
