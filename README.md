@@ -14,6 +14,14 @@
 *These are the docs for React on Rails 12, coming soon. To see the version 11 docs, [click here](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
 
 #### News
+**June 12, 2020**:
+1. Gem version: 12.0.0.pre.beta.0 and npm version 12.0.0-beta.0 released! Please try this out!
+   Major enhancements:
+   1. Typescript bindings
+   2. Proper support for React Hooks
+   3. i18n support for generating a JSON file rather than a JS file.
+2. See Justin's RailsConf talk: [Webpacker, It-Just-Works, But How?](http://railsconf.com/2020/video/justin-gordon-webpacker-it-just-works-but-how).
+
 **April 2, 2020**:
 * Are you interested in support for React on Rails? If so check out [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).
 * HMR is working with [Loadable Components](https://loadable-components.com) for a both amazing hot-reloading developer experience and great runtime performance. Please [email me](mailto:justin@shakacode.com) if you'd like to use [Loadable Components Code Splitting](https://loadable-components.com/docs/code-splitting/) to speed up your app by reducing your bundle sizes and lazily loading the code that's needed.

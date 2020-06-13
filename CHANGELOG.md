@@ -17,7 +17,10 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 
 ## UPCOMING 12.0 RELEASE
-### [12.0.0]
+
+### [12.0.0.pre.beta.0]
+Gem version: 12.0.0.pre.beta.0 and npm version 12.0.0-beta.0 released! Please try this out!
+
 #### BREAKING CHANGE
 In order to solve the issues regarding React Hooks compatibility, the number of parameters
 for functions is used to determine if you have a generator function that will get invoked to
@@ -913,7 +916,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.3.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.0...master
+[12.0.0.pre.beta.0]: https://github.com/shakacode/react_on_rails/compare/11.3.0...12.0.0-beta.0
 [11.3.0]: https://github.com/shakacode/react_on_rails/compare/11.2.2...11.3.0
 [11.2.2]: https://github.com/shakacode/react_on_rails/compare/11.2.1...11.2.2
 [11.2.1]: https://github.com/shakacode/react_on_rails/compare/11.1.8...11.2.1
