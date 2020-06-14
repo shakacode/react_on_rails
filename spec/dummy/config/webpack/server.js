@@ -17,12 +17,12 @@ environment.plugins.insert(
   { after: 'Environment' },
 );
 const serverConfig = merge(environment.toWebpackConfig(), {
-  mode: 'development',
   target: 'web',
   entry: './client/app/startup/serverRegistration.jsx',
   output: {
     filename: 'server-bundle.js',
-    path: environment.config.output.path,
+
+    // https://webpack.js.org/configuration/output/#outputglobalobject
     globalObject: 'this',
   },
   optimization: {
@@ -30,6 +30,7 @@ const serverConfig = merge(environment.toWebpackConfig(), {
   },
 });
 
+// Don't hash the server bundle. No need.
 serverConfig.plugins = serverConfig.plugins.filter(
   (plugin) => plugin.constructor.name !== 'WebpackAssetsManifest',
 );

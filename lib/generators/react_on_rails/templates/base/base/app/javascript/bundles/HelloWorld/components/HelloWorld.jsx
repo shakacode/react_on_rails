@@ -1,46 +1,25 @@
 import PropTypes from 'prop-types';
-import React from 'react';
+import React, { useState } from 'react';
 
-export default class HelloWorld extends React.Component {
-  static propTypes = {
-    name: PropTypes.string.isRequired, // this is passed from the Rails view
-  };
+const HelloWorld = (props) => {
+  const [name, setName] = useState(props.name);
 
-  /**
-   * @param props - Comes from your rails view.
-   */
-  constructor(props) {
-    super(props);
+  return (
+    <div>
+      <h3>Hello, {name}!</h3>
+      <hr />
+      <form>
+        <label htmlFor="name">
+          Say hello to:
+          <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+      </form>
+    </div>
+  );
+};
 
-    // How to set initial state in ES6 class syntax
-    // https://reactjs.org/docs/state-and-lifecycle.html#adding-local-state-to-a-class
-    this.state = { name: this.props.name };
-  }
+HelloWorld.propTypes = {
+  name: PropTypes.string.isRequired, // this is passed from the Rails view
+};
 
-  updateName = (name) => {
-    this.setState({ name });
-  };
-
-  render() {
-    return (
-      <div>
-        <h3>
-          Hello,
-          {this.state.name}!
-        </h3>
-        <hr />
-        <form>
-          <label htmlFor="name">
-            Say hello to:
-            <input
-              id="name"
-              type="text"
-              value={this.state.name}
-              onChange={(e) => this.updateName(e.target.value)}
-            />
-          </label>
-        </form>
-      </div>
-    );
-  }
-}
+export default HelloWorld;

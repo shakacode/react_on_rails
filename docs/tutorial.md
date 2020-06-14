@@ -37,6 +37,7 @@ gem install rails               # download and install latest stable Rails
 gem install foreman             # download and install Foreman
 ```
 
+## Create a new Ruby on Rails App
 Then we need to create a fresh Rails application with webpacker react support as following.
 
 First be sure to run `rails -v` and check you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with react per the instructions [here](https://github.com/rails/webpacker).
@@ -67,13 +68,16 @@ git add -A
 git commit -m "Initial commit"
 ```
 
-Add the **React On Rails** gem to your `Gemfile`:
+## Add the **React On Rails** gem to your `Gemfile`:
+
+To avoid issues when of different gem and npm versions, you should specify the exact versions
+of both the gem and npm package.
 
 ```
 gem 'react_on_rails', '12.0.0'         # prefer exact gem version to match npm version
 ```
 
-Note: Latest released React On Rails version is considered stable. Please use the latest version to ensure you get all the security patches and the best support.
+Note: The latest released React On Rails version is considered stable. Please use the latest version to ensure you get all the security patches and the best support.
 
 Run `bundle` and commit the changes.
 
@@ -85,19 +89,21 @@ git commit -am "Added React on Rails Gem"
 
 Install React on Rails: `rails generate react_on_rails:install` or `rails generate react_on_rails:install --redux`. You need to first git commit your files before running the generator, or else it will generate an error.
 
+Note, using `redux` is no longer recommended as the basic installer uses React Hooks.
+
 ```
 rails generate react_on_rails:install
 ```
 
-Then run server with static client side files:
+Then run server with static client and server side files:
 
 ```
 foreman start -f Procfile.dev
 ```
 
-To run with the webpack-dev-server:
+## To run with the webpack-dev-server:
 ```
-foreman start -f Procfile.dev-server
+foreman start -f Procfile.dev-hmr
 ```
 
 Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) and see your **React On Rails** app running!
@@ -108,27 +114,8 @@ Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) and
 
 First, check that the `hmr` option is `true` in your `config/webpacker.yml` file.
 
-The basic setup will have HMR working with the default webpacker setup. However, the basic will cause a full page refresh each time you save a file.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+The basic setup will have HMR working with the default webpacker setup. The basic HMR will cause
+a full page refresh each time you save a file. You also lose any state on your page during the refresh. Don't try to use HMR
 
 ### Custom IP & PORT setup (Cloud9 example)
 
@@ -139,7 +126,6 @@ web: rails s -p 8080 -b 0.0.0.0
 ```
 
 Then visit https://your-shared-addr.c9users.io:8080/hello_world 
-
 
 ## RubyMine
 
@@ -268,7 +254,6 @@ heroku open
 
 and you will see your live app and you can share this URL with your friends. Congrats!
 
-
 ## Turning on Server Rendering
 
 You can turn on server rendering by simply changing the `prerender` option to `true`:
@@ -331,7 +316,7 @@ mv app/javascript client
 
 ## Using HMR with the rails/webpacker setup
 
-Start the app using `foreman start -f Procfile.dev-server`.
+Start the app using `foreman start -f Procfile.dev-hmr`.
 
 When you change a JSX file and save, the browser will automatically refresh!
 
