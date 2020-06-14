@@ -60,7 +60,7 @@ bundle add webpacker
 bundle add react_on_rails
 ```
 
-Note: if you are adding React On Rails to an existing app you will instead to run these two commands as well:
+## Run the webpacker generator
 
 ```
 bundle exec rails webpacker:install
@@ -78,14 +78,15 @@ git commit -m "Initial commit"
 
 ## Add the **React On Rails** gem to your `Gemfile`:
 
-To avoid issues when of different gem and npm versions, you should specify the exact versions
-of both the gem and npm package.
+To avoid issues regarding inconsistent gem and npm versions, you should specify the exact versions
+of both the gem and npm package. In other words, don't use the `^` or `~` in the version specifications.
 
 ```
 gem 'react_on_rails', '12.0.0'         # prefer exact gem version to match npm version
 ```
 
-Note: The latest released React On Rails version is considered stable. Please use the latest version to ensure you get all the security patches and the best support.
+Note: The latest released React On Rails version is considered stable. Please use the latest 
+version to ensure you get all the security patches and the best support.
 
 Run `bundle` and commit the changes.
 
@@ -104,7 +105,8 @@ If you want the redux install: `rails generate react_on_rails:install --redux`
 rails generate react_on_rails:install
 ```
 
-Then run server with static client and server side files:
+Then run server with a static client bundle. Static means that the bundle is saved in your
+public/webpack/packs directory.
 
 ```
 foreman start -f Procfile.dev
