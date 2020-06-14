@@ -45,11 +45,19 @@ First be sure to run `rails -v` and check you are using Rails 5.1.3 or above. If
 ```
 cd <directory where you want to create your new Rails app>
 
-# any name you like for the rails app
-rails new test-react-on-rails --webpack=react --skip-sprockets 
+# Any name you like for the rails app
+# Skip javascript so will add that next and get the current version 
+rails new --skip-sprockets -J --skip-turbolinks test-react-on-rails-v12-no-sprockets
 
 cd test-react-on-rails
 bundle
+```
+
+## Add the webpacker gem
+
+```
+bundle add webpacker                 
+bundle add react_on_rails
 ```
 
 Note: if you are adding React On Rails to an existing app you will instead to run these two commands as well:
@@ -87,9 +95,10 @@ bundle
 git commit -am "Added React on Rails Gem"
 ```
 
-Install React on Rails: `rails generate react_on_rails:install` or `rails generate react_on_rails:install --redux`. You need to first git commit your files before running the generator, or else it will generate an error.
+Install React on Rails: `rails generate react_on_rails:install`. You need to first git commit your files before running the generator, or else it will generate an error.
 
-Note, using `redux` is no longer recommended as the basic installer uses React Hooks.
+Note, using `redux` is no longer recommended as the basic installer uses React Hooks. 
+If you want the redux install: `rails generate react_on_rails:install --redux`
 
 ```
 rails generate react_on_rails:install
