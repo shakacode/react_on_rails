@@ -30,7 +30,7 @@ You can see all this on the source for [reactrails.com](https://www.reactrails.c
 
 Each time you change your client code, you will need to re-generate the bundles (the webpack-created JavaScript files included in application.js). The included example Foreman `Procfile.dev` files will take care of this for you by starting a webpack process with the watch flag. This will watch your JavaScript code files for changes. 
 
-Simply run `foreman start -f Procfile.dev`. [Example](spec/dummy/Procfile.static).
+Simply run `foreman start -f Procfile.dev`. [Example](spec/dummy/Procfile.dev).
 
 On production deployments that use asset precompilation, such as Heroku deployments, React on Rails, by default, will automatically run webpack to build your JavaScript bundles. You configure the command used as `config.build_production_command` in your [config/initializers/react_on_rails.rb](docs/basics/configuration.md).
 

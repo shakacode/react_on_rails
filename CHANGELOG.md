@@ -18,6 +18,11 @@ Changes since last non-beta release.
 
 ## UPCOMING 12.0 RELEASE
 
+#### Improved
+* Generator supports React Hooks
+
+
+
 ### [12.0.0.pre.beta.0]
 Gem version: 12.0.0.pre.beta.0 and npm version 12.0.0-beta.0 released! Please try this out!
 

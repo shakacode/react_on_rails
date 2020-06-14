@@ -1,6 +1,6 @@
 # Procfile for development with hot reloading of JavaScript and CSS
 
-rails: rails s -b 0.0.0.0
+rails: rails s -p 3000
 
 # Run the hot reload server for client development
 webpack-dev-server: bin/webpack-dev-server
