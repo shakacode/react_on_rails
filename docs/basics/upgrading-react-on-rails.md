@@ -5,7 +5,7 @@ If you would like help in migrating between React on Rails versions or help with
 
 We specialize in helping companies to quickly and efficiently move from versions before 9 to current. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4 for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
 
-## Upgrading to v13
+## Upgrading to v12
 * Make sure that you are on a relatively more recent version of rails and webpacker.
 * Updated API for ReactOnRails.register.
 
