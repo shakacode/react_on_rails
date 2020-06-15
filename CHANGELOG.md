@@ -21,7 +21,8 @@ Changes since last non-beta release.
 #### Improved
 * Generator supports React Hooks
 
-
+### [12.0.0.pre.beta.1]
+* Updated generators to use React hooks
 
 ### [12.0.0.pre.beta.0]
 Gem version: 12.0.0.pre.beta.0 and npm version 12.0.0-beta.0 released! Please try this out!
@@ -34,7 +35,7 @@ set JavaScript property `renderFunction` on the function for which you want to r
 invoked to return the React component. In that case, you won't need to pass any unused params.
 [PR 1268](https://github.com/shakacode/react_on_rails/pull/1268) by [justin808](https://github.com/justin808)
 
-See [docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rails#upgrading-to-v12)
+See [docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rails.md#upgrading-to-v12)
 for details.         
 
 * Requires the use of rails/webpacker helpers
@@ -921,7 +922,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.1...master
+[12.0.0.pre.beta.1]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.0...12.0.0-beta.1
 [12.0.0.pre.beta.0]: https://github.com/shakacode/react_on_rails/compare/11.3.0...12.0.0-beta.0
 [11.3.0]: https://github.com/shakacode/react_on_rails/compare/11.2.2...11.3.0
 [11.2.2]: https://github.com/shakacode/react_on_rails/compare/11.2.1...11.2.2
