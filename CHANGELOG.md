@@ -4,7 +4,7 @@ All notable changes to this project's source code will be documented in this fil
 Migration instructions for the major updates can be found [here](docs/basics/upgrading-react-on-rails.md#upgrading-to-version-9.md). Some smaller migration information can be found here.
 
 ## Need Help Migrating?
-If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for information about our [ShakaCode Pro Support](https://www.shakacode.com/work/shakacode-pro-support.pdf).
+If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for information about our [React on Rails Pro Support Options](https://www.shakacode.com/react-on-rails-pro).
 
 We specialize in helping companies to quickly and efficiently move from versions before 9 to current. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4 for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
 
