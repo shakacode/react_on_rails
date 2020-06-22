@@ -19,7 +19,8 @@ Changes since last non-beta release.
 ## UPCOMING 12.0 RELEASE
 
 #### Improved
-* Generator supports React Hooks
+### [12.0.0.pre.beta.2]
+* Changed the precompile task to use the rails/webpacker one by default
 
 ### [12.0.0.pre.beta.1]
 * Updated generators to use React hooks
@@ -39,6 +40,9 @@ See [docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rail
 for details.         
 
 * Requires the use of rails/webpacker helpers
+* If the webpacker webpack config files exist, then React on Rails will not override the default
+  assets:precompile setup by rails/webpacker. The fix is to remove the JS files inside of config/webpack,
+  like config/webpack/production.js.
 * Removed **env_javascript_include_tag** and **env_stylesheet_link_tag** as these are replaced by view helpers
   from rails/webpacker
 * Removal of support for old Rubies and Rails.

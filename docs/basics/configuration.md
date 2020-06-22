@@ -61,8 +61,11 @@ ReactOnRails.configure do |config|
   #
   config.node_modules_location = "client" # If using webpacker you should use "".
 
-  # This configures the script to run to build the production assets by webpack. Set this to nil
+  # This configures the script to run to build the production assets by webpack . Set this to nil
   # if you don't want react_on_rails building this file for you.
+  # Note, if you want to use this command then you should remove the file
+  # config/webpack/production.js
+  # If that file exists, React on Rails thinks that you'll use the rails/webpacker bin/webpack compiler.
   config.build_production_command = "RAILS_ENV=production bin/webpack"
 
   ################################################################################
@@ -89,7 +92,9 @@ ReactOnRails.configure do |config|
   # Normally, you have different bundles for client and server, thus, the default is false.
   # Furthermore, if you are not hashing the server bundle (not in the manifest.json), then React on Rails
   # will only look for the server bundle to be created in the typical file location, typically by
-  # a `webpack --watch` process. 
+  # a `webpack --watch` process.
+  # If true, ensure that in config/webpacker.yml that you have both dev_server.hmr and
+  # dev_server.inline set to false.
   config.same_bundle_for_client_and_server = false
   
   # If set to true, this forces Rails to reload the server bundle if it is modified

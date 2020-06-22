@@ -7,6 +7,12 @@ We specialize in helping companies to quickly and efficiently move from versions
 
 ## Upgrading to v12
 * Make sure that you are on a relatively more recent version of rails and webpacker.
+* If the webpacker webpack config files exist, then React on Rails will not override the default
+  assets:precompile setup by rails/webpacker. The fix is to remove the JS files inside of config/webpack,
+  like config/webpack/production.js.
+* If you're using the internalization helper, then set `config.i18n_output_format = 'js'`. You can
+  later update to the default JSON format as you will need to update your usage of that file.
+
 * Updated API for ReactOnRails.register.
 
 In order to solve the issues regarding React Hooks compatibility, the number of parameters
