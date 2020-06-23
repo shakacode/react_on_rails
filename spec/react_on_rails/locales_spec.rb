@@ -28,6 +28,14 @@ module ReactOnRails
 
         described_class.compile
       end
+
+      it "compiles to JSON" do
+        ReactOnRails.configuration.i18n_output_format = "JSON"
+
+        expect(ReactOnRails::Locales::ToJson).to receive(:new)
+
+        described_class.compile
+      end
     end
   end
 end
