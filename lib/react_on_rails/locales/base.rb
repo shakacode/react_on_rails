@@ -4,6 +4,14 @@ require "erb"
 
 module ReactOnRails
   module Locales
+    def self.compile
+      if ReactOnRails.configuration.i18n_output_format&.downcase == "js"
+        ReactOnRails::Locales::ToJs.new
+      else
+        ReactOnRails::Locales::ToJson.new
+      end
+    end
+
     class Base
       def initialize
         return if i18n_dir.nil?
