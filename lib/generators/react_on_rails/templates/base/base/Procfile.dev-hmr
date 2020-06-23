@@ -1,0 +1,18 @@
+web: rails s -p 3000
+
+# Note, hot and live reloading don't work with the default generator setup on
+# top of the rails/webpacker Webpack config with server rendering.
+# If you have server rendering enabled (prerender is true), you either need to
+# a. Skip using the webpack-dev-server. bin/webpack --watch is typically
+     fast enough.
+# b. See the React on Rails README for a link to documentation for how to setup
+#    SSR with HMR and React hot loading
+# Otherwise, you will have an error. If you want HMR and Server Rendering, see
+# the example in the https://github.com/shakacode/react-webpack-rails-tutorial
+web: rails s -p 3000
+
+# Run the hot reload server for client development
+webpack-dev-server: bin/webpack-dev-server
+
+# Keep the JS fresh for server rendering. Remove if not server rendering
+rails-server-assets: SERVER_BUNDLE_ONLY=yes bin/webpack --watch

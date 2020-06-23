@@ -30,11 +30,10 @@ const clientConfig = merge(clientEnvironment.toWebpackConfig(), {
   output: {
     filename: '[name].js',
     chunkFilename: '[name].bundle.js',
-    path: clientEnvironment.config.output.path,
   },
 });
 
-// For HMR, we want the server
+// For HMR, we need to separate the the client and server webpack configurations
 if (process.env.WEBPACK_DEV_SERVER) {
   module.exports = clientConfig;
 } else if (process.env.SERVER_BUNDLE_ONLY) {

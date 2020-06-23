@@ -1,1 +1,1 @@
-run: echo "Run Procfile.static or Procfile.hot"
+rails: rails s -b 0.0.0.0

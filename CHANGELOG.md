@@ -4,7 +4,7 @@ All notable changes to this project's source code will be documented in this fil
 Migration instructions for the major updates can be found [here](docs/basics/upgrading-react-on-rails.md#upgrading-to-version-9.md). Some smaller migration information can be found here.
 
 ## Need Help Migrating?
-If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for information about our [ShakaCode Pro Support](https://www.shakacode.com/work/shakacode-pro-support.pdf).
+If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for information about our [React on Rails Pro Support Options](https://www.shakacode.com/react-on-rails-pro).
 
 We specialize in helping companies to quickly and efficiently move from versions before 9 to current. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4 for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
 
@@ -18,6 +18,12 @@ Changes since last non-beta release.
 
 ## UPCOMING 12.0 RELEASE
 
+#### Improved
+* Generator supports React Hooks
+
+### [12.0.0.pre.beta.1]
+* Updated generators to use React hooks
+
 ### [12.0.0.pre.beta.0]
 Gem version: 12.0.0.pre.beta.0 and npm version 12.0.0-beta.0 released! Please try this out!
 
@@ -29,7 +35,7 @@ set JavaScript property `renderFunction` on the function for which you want to r
 invoked to return the React component. In that case, you won't need to pass any unused params.
 [PR 1268](https://github.com/shakacode/react_on_rails/pull/1268) by [justin808](https://github.com/justin808)
 
-See [docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rails#upgrading-to-v12)
+See [docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rails.md#upgrading-to-v12)
 for details.         
 
 * Requires the use of rails/webpacker helpers
@@ -916,7 +922,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.1...master
+[12.0.0.pre.beta.1]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.0...12.0.0-beta.1
 [12.0.0.pre.beta.0]: https://github.com/shakacode/react_on_rails/compare/11.3.0...12.0.0-beta.0
 [11.3.0]: https://github.com/shakacode/react_on_rails/compare/11.2.2...11.3.0
 [11.2.2]: https://github.com/shakacode/react_on_rails/compare/11.2.1...11.2.2
