@@ -36,13 +36,6 @@ _If you are interested in learning how to use assets in your React components, r
 _Note, this solution was removed in v14. If you're intersted in this symlink solution, please create
 a github issue._
 
-React on Rails creates symlinks of non-digested versions (original webpack digested file names) 
-to the Rails deployed digested versions when doing a Rails assets compile. The solution is 
-implemented using `assets:precompile` after-hook in 
-file [lib/tasks/assets.rake](lib/tasks/assets.rake)
-The assets for symlinking are defined by `config.symlink_non_digested_assets_regex` in 
-`config/initializers/react_on_rails.rb`.
-
 ## Example from /spec/dummy
 
 ```

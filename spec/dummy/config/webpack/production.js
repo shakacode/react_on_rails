@@ -1,31 +1,27 @@
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 
-// We need to compile both our production JS (for serving to the client) and our server JS
+// We need to compile both our development JS (for serving to the client) and our server JS
 // (for SSR of React components). This is easy enough as we can export arrays of webpack configs.
 const clientEnvironment = require('./client');
-const serverConf = require('./server');
+const serverConfig = require('./server');
 const merge = require('webpack-merge');
 
-clientEnvironment.splitChunks((config) =>
-  Object.assign({}, config, { optimization: { splitChunks: false } }),
-);
-
-const clientConfig = merge(clientEnvironment.toWebpackConfig(), {
-  mode: 'production',
-  entry: {
-    'vendor-bundle': ['jquery-ujs'],
-    output: {
-      filename: '[name].js',
-      chunkFilename: '[name].bundle.js',
-      path: clientEnvironment.config.output.path,
+const optimization = {
+  splitChunks: {
+    chunks: 'async',
+    cacheGroups: {
+      vendor: {
+        chunks: 'async',
+        name: 'vendor',
+        test: 'vendor',
+        enforce: true,
+      },
     },
   },
-  devtool: 'inline-source-map',
-});
+};
 
-// Overriding the mode for production
-const serverConfig = merge(serverConf, {
-  mode: 'production',
-});
+clientEnvironment.splitChunks((config) => Object.assign({}, config, { optimization: optimization }));
+
+const clientConfig = clientEnvironment.toWebpackConfig();
 
 module.exports = [clientConfig, serverConfig];

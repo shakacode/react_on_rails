@@ -25,6 +25,6 @@ The default path: `public/webpack` can be loaded with webpackConfigLoader as sho
 1. Configure the `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [spec/dummy/config/initializers/react_on_rails.rb](spec/dummy/config/initializers/react_on_rails.rb) for a detailed example of configuration, including comments on the different values to configure.
 1. Configure your Procfiles per the example apps. These are at the root of your Rails installation.
 1. Configure your top level JavaScript files for inclusion in your layout. You'll want a version that you use for static assets, and you want a file for any files in your setup that are not part of your webpack build. The reason for this is for use with hot-reloading. If you are not using hot reloading, then you only need to configure your `application.js` file to include your Webpack generated files. 
-1. If you are deploying to Heroku, see [heroku-deployment.md](/docs/outdated/heroku-deployment.md)
+1. If you are deploying to Heroku, see [heroku-deployment.md](/docs/basics/heroku-deployment.md)
 
 If I missed anything, please submit a PR or file an issue.

@@ -1,0 +1,13 @@
+# Heroku Deployment
+## How to Deploy
+
+React on Rails requires both a ruby environment (for Rails) and a Node environment (for Webpack), so you will need to have Heroku use multiple buildpacks.
+
+Assuming you have downloaded and installed the Heroku command-line utility and have initialized the app, you will need to tell Heroku to use both buildpacks via the command-line:
+
+```
+heroku buildpacks:set heroku/ruby
+heroku buildpacks:add --index 1 heroku/nodejs
+```
+
+For more information, see [Using Multiple Buildpacks for an App](https://devcenter.heroku.com/articles/using-multiple-buildpacks-for-an-app)

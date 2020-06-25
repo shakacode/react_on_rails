@@ -14,7 +14,7 @@
                           'data-turbolinks-track': true) %>
 
   <!--  NOTE: Must use defer and not async to keep async scripts loading in correct order  -->
-  <%= javascript_packs_with_chunks_tag('clientRegistration', 'vendor-bundle', 'data-turbolinks-track': true, defer: true) %>
+  <%= javascript_packs_with_chunks_tag('clientRegistration', 'data-turbolinks-track': true, defer: true) %>
 
   <%= csrf_meta_tags %>
 </head>

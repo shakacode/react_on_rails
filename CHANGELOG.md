@@ -19,6 +19,13 @@ Changes since last non-beta release.
 ## UPCOMING 12.0 RELEASE
 
 #### Improved
+
+* Remove the precompile task completely. A custom webpack compilation command should
+  be set in bin/webpack. See [docs/basics/upgrading-react-on-rails.md](./docs/basics/upgrading-react-on-rails.md) for
+  more details regarding this.
+* Removed the setting `config.build_production_command`. Any value within here should be moved
+  to the `bin/webpack` file.
+
 ### [12.0.0.pre.beta.2]
 * Changed the precompile task to use the rails/webpacker one by default
 
@@ -926,7 +933,9 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.3...master
+[12.0.0.pre.beta.3]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.2...12.0.0-beta.3
+[12.0.0.pre.beta.2]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.1...12.0.0-beta.2
 [12.0.0.pre.beta.1]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.0...12.0.0-beta.1
 [12.0.0.pre.beta.0]: https://github.com/shakacode/react_on_rails/compare/11.3.0...12.0.0-beta.0
 [11.3.0]: https://github.com/shakacode/react_on_rails/compare/11.2.2...11.3.0

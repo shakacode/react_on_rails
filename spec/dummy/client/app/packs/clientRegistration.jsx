@@ -1,5 +1,6 @@
 import '@babel/polyfill';
 import 'es5-shim';
+import 'jquery-ujs';
 
 import ReactOnRails from 'react-on-rails';
 

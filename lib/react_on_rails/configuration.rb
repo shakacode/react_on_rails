@@ -107,9 +107,26 @@ module ReactOnRails
       check_i18n_yml_directory_exists
       check_server_render_method_is_only_execjs
       error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
+      check_deprecated_settings
     end
 
     private
+
+    def check_deprecated_settings
+      if node_modules_location.present?
+        Rails.logger.warn("ReactOnRails configuration for `node_modules_location` is deprecated. "\
+         "Instead, prepend a `cd client` (or whichever location) before your test command.")
+      end
+
+      if build_production_command.present?
+        msg = <<~MSG
+         ReactOnRails configuration for `build_production_command` is removed. 
+         Move this command into `bin/webpack` converting the script to a shell script.
+        MSG
+        raise ReactOnRails::Error, msg
+      end
+
+    end
 
     def error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
       return unless ReactOnRails::WebpackerUtils.using_webpacker?
@@ -122,7 +139,7 @@ module ReactOnRails
         Rails.logger.warn("You specified generated_assets_dir in `config/initializers/react_on_rails.rb` "\
         "with Webpacker. Remove this line from your configuration file.")
       else
-        msg = <<-MSG.strip_heredoc
+        msg = <<~MSG
         Error configuring /config/initializers/react_on_rails.rb: You are using webpacker
         and your specified value for generated_assets_dir = #{generated_assets_dir}
         that does not match the value for public_output_path specified in
