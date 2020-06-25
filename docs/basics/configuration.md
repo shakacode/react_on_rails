@@ -139,6 +139,7 @@ ReactOnRails.configure do |config|
   # Replace the following line to the location where you keep translation.js & default.js for use
   # by the npm packages react-intl. Be sure this directory exists!
   # config.i18n_dir = Rails.root.join("client", "app", "libs", "i18n")
+  #
   # If not using the i18n feature, then leave this section commented out or set the value
   # of config.i18n_dir to nil.
   #
@@ -146,11 +147,11 @@ ReactOnRails.configure do |config|
   # that will source for automatic generation on translations.js & default.js
   # By default(without this option) all yaml files from Rails.root.join("config", "locales")
   # and installed gems are loaded
-  config.i18n_yml_dir = Rails.root.join("config", "locales", "client")
+  config.i18n_yml_dir = Rails.root.join("config", "locales")
   
   # Possible output formats are js and json
   # The default format is json
-  config.i18n_output_format = 'js'
+  config.i18n_output_format = 'json'
 
   ################################################################################
   ################################################################################
