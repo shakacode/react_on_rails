@@ -1,9 +1,32 @@
 # RSpec Configuration
 _Click [here for minitest](./minitest-configuration.md)_
 
+# If your webpack configurations correspond to rails/webpacker's default setup
+If you're able to configure your webpack configuration to be run by having your webpack configuration
+returned by the files in `/config/webpack`, then you have 2 options to ensure that your files are
+compiled by webpack before running tests and during production deployment:
+
+1. **Use rails/webpacker's compile option**: Configure your `config/webpacker.yml` so that `compile: true` is for `test` and `production`
+   environments. Ensure that your `source_path` is correct, or else `rails/webpacker` won't correctly
+   detect changes. 
+2. **Use the react_on_rails settings and helpers**. Use the settings in `config/initializers/react_on_rails.rb`. Refer to [docs/configuration](./configuration.md).
+
+```yml
+  config.build_production_command = "RAILS_ENV=production bin/webpack"
+  config.build_test_command = "RAILS_ENV=test bin/webpack"
+``` 
+
+Which should you use? If you're already using the `rails/webpacker` way to configure webpack, then
+you can keep things simple and use the `rails/webpacker` options.
+
+# Checking for stale assets using React on Rails
+
 Because you will probably want to run RSpec tests that rely on compiled webpack assets (typically, your integration/feature specs where `js: true`), you will want to ensure you don't accidentally run tests on missing or stale webpack assets. If you did use stale Webpack assets, you will get invalid test results as your tests do not use the very latest JavaScript code.
 
-ReactOnRails provides a helper method called `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`. Call this method from inside of the `RSpec.configure` block in your `spec/rails_helper.rb` file, passing the config as an argument. See file [lib/react_on_rails/test_helper.rb](../../lib/react_on_rails/test_helper.rb) for more details. You can customize this to your particular needs by replacing any of the default components used by `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`.
+As mentioned above, you can configure `compile: true` in `config/webpacker.yml` _if_ you've got configuration for
+your webpack in the standard `rails/webpacker` spot of `config/webpack/<NODE_ENV>.js`
+
+ReactOnRails also provides a helper method called `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`. Call this method from inside of the `RSpec.configure` block in your `spec/rails_helper.rb` file, passing the config as an argument. See file [lib/react_on_rails/test_helper.rb](../../lib/react_on_rails/test_helper.rb) for more details. You can customize this to your particular needs by replacing any of the default components used by `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`.
 
 ```ruby
 RSpec.configure do |config|
@@ -26,26 +49,17 @@ Please take note of the following:
 
 - This utility uses your `build_test_command` to build the static generated files. This command **must not** include the `--watch` option. If you have different server and client bundle files, this command **must** create all the bundles. If you are using webpacker, the default value will come from the `config/webpacker.yml` value for the `public_output_path` and the `source_path`
 
-- If you add an older file to your source files, that is already older than the produced output files, no new recompilation is done. The solution to this issue is to clear out your directory of webpack generated files when adding new source files that may have older dates. This is actually a common occurrence when you've built your test generated files and then you sync up your repository files.
+- If you add an older file to your source files, that is already older than the produced output files, no new recompilation is done. The solution to this issue is to clear out your directory of webpack generated files when adding new source files that may have older dates. This can happen when you've built your test generated files and then you sync up your repository files.
 
-- By default, the webpack processes look for the `config.generated_assets_dir` folder for generated files, configured via setting `webpack_generated_files`, in the `config/react_on_rails.rb`. If the `config.generated_assets_dir` folder is missing, is empty, or contains files in the `config.webpack_generated_files` list with `mtime`s older than any of the files in your `client` folder, the helper will recompile your assets. You can override the location of these files inside of `config/initializers/react_on_rails.rb` by passing a filepath (relative to the root of the app) to the `generated_assets_dir` configuration option.
+- By default, the webpack processes look in the webpack generated files folder, configured via the `config/webpacker.yml` config values of `public_root_path` and `public_output_path`. If the webpack generated files folder is missing, is empty, or contains files in the `config.webpack_generated_files` list with `mtime`s older than any of the files in your `client` folder, the helper will recompile your assets. 
 
 The following `config/react_on_rails.rb` settings **must** match your setup:
 ```ruby
-  # Directory where your generated assets go. All generated assets must go to the same directory.
-  # Configure this in your webpack config files. This relative to your Rails root directory.
-  # We recommend having different generated assets dirs per Rails env.
-  config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
-
   # Define the files we need to check for webpack compilation when running tests.
-  # Generally, the manifest.json is good enough for this check if using webpacker
   config.webpack_generated_files = %w( manifest.json )
   
   # OR if you're not hashing the server-bundle.js, then you should include your server-bundle.js in the list.
   # config.webpack_generated_files = %w( server-bundle.js manifest.json )
-  
-  # OR if you're not using webpacker, your setup might look like.
-  # config.webpack_generated_files = %w( client-bundle.js server-bundle.js )
   
   # If you are using the ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
   # with rspec then this controls what yarn command is run
@@ -53,9 +67,7 @@ The following `config/react_on_rails.rb` settings **must** match your setup:
   config.build_test_command = "yarn run build:test"
 ```
 
-If you want to speed up the re-compiling process so you don't wait to run your tests to build the files, you can run your test compilation with the "watch" flags.
-
-[spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) contains examples of how to set the proc files for this purpose.
+If you want to speed up the re-compiling process so you don't wait to run your tests to build the files, you can run your test compilation with the "watch" flags. For example, `yarn run build:test --watch`
 
 ![2016-01-27_02-36-43](https://cloud.githubusercontent.com/assets/1118459/12611951/7c56d070-c4a4-11e5-8a80-9615f99960d9.png)
 

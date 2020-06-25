@@ -123,8 +123,9 @@ Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) and
 
 First, check that the `hmr` and the `inline` options are `true` in your `config/webpacker.yml` file.
 
-The basic setup will have HMR working with the default webpacker setup. The basic HMR will cause
-a full page refresh each time you save a file. You also lose any state on your page during the refresh. 
+The basic setup will have HMR working with the default webpacker setup. The basic
+[HMR](https://webpack.js.org/concepts/hot-module-replacement/), without a special
+React setup, will cause a full page refresh each time you save a file. 
 
 ## Deploying to Heroku
 
