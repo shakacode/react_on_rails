@@ -20,5 +20,7 @@ web: rails s -p 3000
 # Run the webpack-dev-server for client and maybe server files
 webpack-dev-server: bin/webpack-dev-server
 
-# Keep the JS fresh for server rendering. Remove if not server rendering
-rails-server-assets: SERVER_BUNDLE_ONLY=yes bin/webpack --watch
+# Keep the JS fresh for server rendering. Remove if not server rendering.
+# Especially if you have not configured generation of a server bundle without a hash.
+# as that will conflict with the manifest created by the bin/webpack-dev-server
+# rails-server-assets: SERVER_BUNDLE_ONLY=yes bin/webpack --watch
