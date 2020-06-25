@@ -119,31 +119,13 @@ foreman start -f Procfile.dev-hmr
 
 Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) and see your **React On Rails** app running!
 
-*Note, foreman may default to PORT 5000 unless you set the value of PORT in your environment or in the Procfile.*
-
 # HMR vs. React Hot Reloading
 
-First, check that the `hmr` option is `true` in your `config/webpacker.yml` file.
+First, check that the `hmr` and the `inline` options are `true` in your `config/webpacker.yml` file.
 
-The basic setup will have HMR working with the default webpacker setup. The basic HMR will cause
-a full page refresh each time you save a file. You also lose any state on your page during the refresh. Don't try to use HMR
-
-### Custom IP & PORT setup (Cloud9 example)
-
-In case you are running some custom setup with different IP or PORT you should also edit Procfile.dev. For example to be able to run on free Cloud9 IDE we are putting IP 0.0.0.0 and PORT 8080. The default generated file `Procfile.dev` uses `-p 3000`.
-
-``` Procfile.dev
-web: rails s -p 8080 -b 0.0.0.0
-```
-
-Then visit https://your-shared-addr.c9users.io:8080/hello_world 
-
-## RubyMine
-
-It's super important to exclude certain directories from RubyMine or else it will slow to a crawl as it tries to parse all the npm files.
-
-* Generated files, per the settings in your `config/webpacker.yml`, which default to `public/packs` and `public/packs-test`
-* `node_modules`
+The basic setup will have HMR working with the default webpacker setup. The basic
+[HMR](https://webpack.js.org/concepts/hot-module-replacement/), without a special
+React setup, will cause a full page refresh each time you save a file. 
 
 ## Deploying to Heroku
 
@@ -166,17 +148,16 @@ Set heroku to use multiple buildpacks:
 
 ### Swap out sqlite for postgres by doing the following:
 
-1. Delete the line with `sqlite` and replace it with:
+Run these two commands:
 
-```ruby
-   gem 'pg'
 ```
-
-2. Run `bundle`
+bundle remove sqlite3
+bundle add pg
+```
 
 ![07](https://cloud.githubusercontent.com/assets/20628911/17465015/1f2f4042-5cf4-11e6-8287-2fb077550809.png)
 
-3. Replace your `database.yml` file with this (assuming your app name is "ror").
+### Replace your `database.yml` file with this (assuming your app name is "ror").
 
 ```yml
 default: &default
@@ -204,7 +185,6 @@ production:
 Then you need to setup postgres so you can run locally:
 
 ```
-bundle
 rake db:setup
 rake db:migrate
 ```
@@ -228,7 +208,7 @@ Create `/Procfile`. This is what Heroku uses to start your app.
 web: bundle exec puma -C config/puma.rb
 ```
 
-Note, newer versions of Rails create this file automatically. However, the [docs on Heroku](https://devcenter.heroku.com/articles/deploying-rails-applications-with-the-puma-web-server#config) have something a bit different, so please make it conform to those docs. As of 2018-10-13, the docs looked like this:
+Note, newer versions of Rails create this file automatically. However, the [docs on Heroku](https://devcenter.heroku.com/articles/deploying-rails-applications-with-the-puma-web-server#config) have something a bit different, so please make it conform to those docs. As of 2020-06-04, the docs looked like this:
 
 `config/puma.rb`
 ```rb
@@ -247,6 +227,15 @@ on_worker_boot do
   # See: https://devcenter.heroku.com/articles/deploying-rails-applications-with-the-puma-web-server#on-worker-boot
   ActiveRecord::Base.establish_connection
 end
+```
+
+Next, update your `package.json` to specify the version of yarn and node. Add this section:
+
+```json
+  "engines": {
+    "node": "13.9.0",
+    "yarn": "1.22.4"
+  },
 ```
 
 Then after all changes are done don't forget to commit them with git and finally you can push your app to Heroku!
@@ -338,6 +327,27 @@ So you get some basics from HMR with no code changes. If you want to go further,
 * https://webpack.js.org/concepts/hot-module-replacement/
 
 React on Rails will automatically handle disabling server rendering if there is only one bundle file created by the Webpack development server by rails/webpacker.
+
+
+### Custom IP & PORT setup (Cloud9 example)
+
+In case you are running some custom setup with different IP or PORT you should also edit Procfile.dev. For example to be able to run on free Cloud9 IDE we are putting IP 0.0.0.0 and PORT 8080. The default generated file `Procfile.dev` uses `-p 3000`.
+
+``` Procfile.dev
+web: rails s -p 8080 -b 0.0.0.0
+```
+
+Then visit https://your-shared-addr.c9users.io:8080/hello_world 
+
+## RubyMine
+
+It's super important to exclude certain directories from RubyMine or else it will slow to a crawl as it tries to parse all the npm files.
+
+* Generated files, per the settings in your `config/webpacker.yml`, which default to `public/packs` and `public/packs-test`
+* `node_modules`
+
+
+
 
 ## Conclusion
 

@@ -61,8 +61,11 @@ ReactOnRails.configure do |config|
   #
   config.node_modules_location = "client" # If using webpacker you should use "".
 
-  # This configures the script to run to build the production assets by webpack. Set this to nil
+  # This configures the script to run to build the production assets by webpack . Set this to nil
   # if you don't want react_on_rails building this file for you.
+  # Note, if you want to use this command then you should remove the file
+  # config/webpack/production.js
+  # If that file exists, React on Rails thinks that you'll use the rails/webpacker bin/webpack compiler.
   config.build_production_command = "RAILS_ENV=production bin/webpack"
 
   ################################################################################
@@ -89,7 +92,9 @@ ReactOnRails.configure do |config|
   # Normally, you have different bundles for client and server, thus, the default is false.
   # Furthermore, if you are not hashing the server bundle (not in the manifest.json), then React on Rails
   # will only look for the server bundle to be created in the typical file location, typically by
-  # a `webpack --watch` process. 
+  # a `webpack --watch` process.
+  # If true, ensure that in config/webpacker.yml that you have both dev_server.hmr and
+  # dev_server.inline set to false.
   config.same_bundle_for_client_and_server = false
   
   # If set to true, this forces Rails to reload the server bundle if it is modified
@@ -134,6 +139,7 @@ ReactOnRails.configure do |config|
   # Replace the following line to the location where you keep translation.js & default.js for use
   # by the npm packages react-intl. Be sure this directory exists!
   # config.i18n_dir = Rails.root.join("client", "app", "libs", "i18n")
+  #
   # If not using the i18n feature, then leave this section commented out or set the value
   # of config.i18n_dir to nil.
   #
@@ -141,11 +147,11 @@ ReactOnRails.configure do |config|
   # that will source for automatic generation on translations.js & default.js
   # By default(without this option) all yaml files from Rails.root.join("config", "locales")
   # and installed gems are loaded
-  config.i18n_yml_dir = Rails.root.join("config", "locales", "client")
+  config.i18n_yml_dir = Rails.root.join("config", "locales")
   
   # Possible output formats are js and json
   # The default format is json
-  config.i18n_output_format = 'js'
+  config.i18n_output_format = 'json'
 
   ################################################################################
   ################################################################################
@@ -186,7 +192,7 @@ ReactOnRails.configure do |config|
   # CONFIGURE YOUR SOURCE FILES 
   # The test helper needs to know where your JavaScript files exist. The value is configured
   # by your config/webpacker.yml source_path:
-  # source_path: client/app/javascript # if using recommended /client directory
+  # source_path: client/app # if using recommended /client directory
   #
   # Define the files we need to check for webpack compilation when running tests.
   # The default is `%w( manifest.json )` as will be sufficient for most webpacker builds.

@@ -1,18 +1,26 @@
+# Procfile for development using HMR
+
 web: rails s -p 3000
 
 # Note, hot and live reloading don't work with the default generator setup on
 # top of the rails/webpacker Webpack config with server rendering.
 # If you have server rendering enabled (prerender is true), you either need to
-# a. Skip using the webpack-dev-server. bin/webpack --watch is typically
+# a. Ensure that you have dev_server.hmr and dev_server.inline BOTH set to false,
+#    and you have this option in your config/initializers/react_on_rails.rb:
+#      config.same_bundle_for_client_and_server = true
+#    If you have either config/webpacker.yml option set to true, you'll see errors like
+#    "ReferenceError: window is not defined" (if hmr is true)
+#    "TypeError: Cannot read property 'prototype' of undefined" (if inline is true)
+# b. Skip using the webpack-dev-server. bin/webpack --watch is typically
      fast enough.
-# b. See the React on Rails README for a link to documentation for how to setup
-#    SSR with HMR and React hot loading
-# Otherwise, you will have an error. If you want HMR and Server Rendering, see
-# the example in the https://github.com/shakacode/react-webpack-rails-tutorial
-web: rails s -p 3000
+# c. See the React on Rails README for a link to documentation for how to setup
+#    SSR with HMR and React hot loading using the webpack-dev-server only for the
+#    client bundles and a static file for the server bundle.
 
-# Run the hot reload server for client development
+# Run the webpack-dev-server for client and maybe server files
 webpack-dev-server: bin/webpack-dev-server
 
-# Keep the JS fresh for server rendering. Remove if not server rendering
-rails-server-assets: SERVER_BUNDLE_ONLY=yes bin/webpack --watch
+# Keep the JS fresh for server rendering. Remove if not server rendering.
+# Especially if you have not configured generation of a server bundle without a hash.
+# as that will conflict with the manifest created by the bin/webpack-dev-server
+# rails-server-assets: SERVER_BUNDLE_ONLY=yes bin/webpack --watch

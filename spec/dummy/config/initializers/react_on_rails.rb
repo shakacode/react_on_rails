@@ -18,7 +18,7 @@ end
 ReactOnRails.configure do |config|
   config.random_dom_id = false # default is true
   config.node_modules_location = "" # Pre 9.0.0 always used "client"
-  config.build_production_command = "yarn run build:production"
+  config.build_production_command = nil # Use the rails/webpacker build
   config.build_test_command = "yarn run build:test"
 
   # See webpacker.yml public_output_path for replacement for generated_assets_dir
