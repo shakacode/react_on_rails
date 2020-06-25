@@ -32,6 +32,26 @@ describe ReactOnRails::TestHelper::EnsureAssetsCompiled do
       end
     end
 
+    context "compile_locales" do
+      let(:assets_checker) { double_assets_checker(stale_generated_webpack_files: []) }
+
+      it "does not compile locales by default" do
+        expect(ReactOnRails::Locales).not_to receive(:compile)
+
+        invoke_ensurer_with_doubles
+      end
+
+      it "does compile locales when specified" do
+        expect(ReactOnRails::Locales).to receive(:compile)
+
+        ReactOnRails::TestHelper.ensure_assets_compiled(
+          webpack_assets_status_checker: assets_checker,
+          webpack_assets_compiler: compiler,
+          compile_locales: true
+        )
+      end
+    end
+
     def invoke_ensurer_with_doubles
       ReactOnRails::TestHelper.ensure_assets_compiled(
         webpack_assets_status_checker: assets_checker,

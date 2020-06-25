@@ -16,6 +16,10 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+* `ReactOnRails::TestHelper.ensure_assets_compiled` no longer compiles locales by default.
+  You can compile locales by passing in `compile_locales: true`.
+  [PR 1299](https://github.com/shakacode/react_on_rails/pull/1299) by [peterzhu2118](https://github.com/peterzhu2118). 
+
 ## UPCOMING 12.0 RELEASE
 
 #### Improved

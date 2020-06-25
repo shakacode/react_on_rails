@@ -13,9 +13,11 @@ module ReactOnRails
                   :webpack_assets_compiler
 
       def initialize(webpack_assets_status_checker: nil,
-                     webpack_assets_compiler: nil)
+                     webpack_assets_compiler: nil,
+                     compile_locales: false)
         @webpack_assets_status_checker = webpack_assets_status_checker
         @webpack_assets_compiler = webpack_assets_compiler
+        @compile_locales = compile_locales
       end
 
       # Several Scenarios:
@@ -30,7 +32,7 @@ module ReactOnRails
         # Be sure we don't do this again.
         self.class.has_been_run = true
 
-        ReactOnRails::Locales.compile
+        ReactOnRails::Locales.compile if @compile_locales
 
         stale_gen_files = webpack_assets_status_checker.stale_generated_webpack_files
 

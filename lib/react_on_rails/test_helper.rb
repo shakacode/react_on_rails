@@ -56,7 +56,8 @@ module ReactOnRails
                                     webpack_assets_compiler: nil,
                                     source_path: nil,
                                     generated_assets_full_path: nil,
-                                    webpack_generated_files: nil)
+                                    webpack_generated_files: nil,
+                                    compile_locales: false)
       ReactOnRails::WebpackerUtils.check_manifest_not_cached
       if webpack_assets_status_checker.nil?
         source_path ||= ReactOnRails::Utils.source_path
@@ -92,7 +93,8 @@ module ReactOnRails
 
       ReactOnRails::TestHelper::EnsureAssetsCompiled.new(
         webpack_assets_status_checker: webpack_assets_status_checker,
-        webpack_assets_compiler: webpack_assets_compiler
+        webpack_assets_compiler: webpack_assets_compiler,
+        compile_locales: compile_locales
       ).call
     end
   end
