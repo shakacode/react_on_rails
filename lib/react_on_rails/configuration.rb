@@ -1,3 +1,4 @@
+# rubocop:disable Metrics/ClassLength
 # frozen_string_literal: true
 
 module ReactOnRails
@@ -118,14 +119,13 @@ module ReactOnRails
          "Instead, prepend a `cd client` (or whichever location) before your test command.")
       end
 
-      if build_production_command.present?
-        msg = <<~MSG
-         ReactOnRails configuration for `build_production_command` is removed. 
-         Move this command into `bin/webpack` converting the script to a shell script.
-        MSG
-        raise ReactOnRails::Error, msg
-      end
+      return unless build_production_command.present?
 
+      msg = <<~MSG
+        ReactOnRails configuration for `build_production_command` is removed. 
+        Move this command into `bin/webpack` converting the script to a shell script.
+      MSG
+      raise ReactOnRails::Error, msg
     end
 
     def error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
@@ -140,11 +140,11 @@ module ReactOnRails
         "with Webpacker. Remove this line from your configuration file.")
       else
         msg = <<~MSG
-        Error configuring /config/initializers/react_on_rails.rb: You are using webpacker
-        and your specified value for generated_assets_dir = #{generated_assets_dir}
-        that does not match the value for public_output_path specified in
-        webpacker.yml = #{webpacker_public_output_path}. You should remove the configuration
-        value for "generated_assets_dir" from your config/initializers/react_on_rails.rb file.
+          Error configuring /config/initializers/react_on_rails.rb: You are using webpacker
+          and your specified value for generated_assets_dir = #{generated_assets_dir}
+          that does not match the value for public_output_path specified in
+          webpacker.yml = #{webpacker_public_output_path}. You should remove the configuration
+          value for "generated_assets_dir" from your config/initializers/react_on_rails.rb file.
         MSG
         raise ReactOnRails::Error, msg
       end
@@ -231,3 +231,4 @@ module ReactOnRails
     end
   end
 end
+# rubocop:enable Metrics/ClassLength
