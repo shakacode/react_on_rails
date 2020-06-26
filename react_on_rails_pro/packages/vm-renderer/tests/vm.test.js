@@ -23,6 +23,36 @@ describe('buildVM and runInVM', () => {
     await resetForTest(testName);
   });
 
+  describe('Buffer and process in context', () => {
+    test('not available if supportModules disabled', async () => {
+      const config = getConfig();
+      config.supportModules = false;
+
+      await createUploadedBundleForTest();
+      await buildVM(uploadedBundlePathForTest());
+
+      let result = await runInVM('typeof Buffer === "undefined"');
+      expect(result).toBeTruthy();
+
+      result = await runInVM('typeof process === "undefined"');
+      expect(result).toBeTruthy();
+    });
+
+    test('available if supportModules disabled', async () => {
+      const config = getConfig();
+      config.supportModules = true;
+
+      await createUploadedBundleForTest();
+      await buildVM(uploadedBundlePathForTest());
+
+      let result = await runInVM('typeof Buffer !== "undefined"');
+      expect(result).toBeTruthy();
+
+      result = await runInVM('typeof process !== "undefined"');
+      expect(result).toBeTruthy();
+    });
+  });
+
   test('buildVM and runInVM', async () => {
     expect.assertions(14);
 

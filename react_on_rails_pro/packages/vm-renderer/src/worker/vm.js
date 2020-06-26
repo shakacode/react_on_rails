@@ -73,7 +73,11 @@ exports.buildVM = async function buildVM(filePath) {
   try {
     const { supportModules } = getConfig();
     vmBundleFilePath = undefined;
-    context = vm.createContext();
+    if (supportModules) {
+      context = vm.createContext({ Buffer, process });
+    } else {
+      context = vm.createContext();
+    }
     // Create explicit reference to global context, just in case (some libs can use it):
     vm.runInContext('global = this', context);
 
