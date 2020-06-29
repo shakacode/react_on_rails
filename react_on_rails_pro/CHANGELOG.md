@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [1.5.2] - 2020-06-25
+### Improved
+- Added `process` and `Buffer` to the context if `suppportModules === true`. [PR 131](https://github.com/shakacode/react_on_rails_pro/pull/131) by [ashgaliyev](https://github.com/ashgaliyev).
+
 ## [1.5.1] - 2020-03-25
 ### Improved
 - config.assets_to_copy can take a single value in addition to an array. [PR 122](https://github.com/shakacode/react_on_rails_pro/pull/122 ) [justin808](https://github.com/justin808).
@@ -49,16 +53,16 @@ to ExecJS. Also, lengthened the lock timeouts for the bundle lock. [PR 100](http
   a hash including values such as :compress, :expires_in, :race_condition_ttl
 - Added option `:if`, `:unless` to the cached_react_component_hash and cached_react_component
   to skip or use caching
-- option `cache_keys:` can be passed as a lambda now to delay evaluation when passing the :if or 
+- option `cache_keys:` can be passed as a lambda now to delay evaluation when passing the :if or
   :unless options
 
-Above are in [PR 82](https://github.com/shakacode/react_on_rails_pro/pull/82) by [justin808](https://github.com/justin808) 
+Above are in [PR 82](https://github.com/shakacode/react_on_rails_pro/pull/82) by [justin808](https://github.com/justin808)
 
 ## [1.3.0] - 2018-12-18
 * **Migration:** react_on_rails must be updated to version >= 11.2.1.
 
 ### Added
-- Added `config.ssr_pre_hook_js` to call some JavaScript to clear out state from libraries that 
+- Added `config.ssr_pre_hook_js` to call some JavaScript to clear out state from libraries that
   misbehave during server Rendering. For example, suppose that we had to call `SomeLibrary.clearCache()`
   between calls to server renderer. Note, SomeLibrary needs to be globally exposed in the server
   rendering webpack bundle.
@@ -102,7 +106,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.1...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.2...HEAD
+[1.5.2]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.1...1.5.2
 [1.5.1]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.0...1.5.1
 [1.5.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.4...1.5.0
 [1.4.4]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.3...1.4.4
