@@ -3,6 +3,8 @@ All notable changes to this project will be documented in this file. Items under
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+### Added
+- Added sentry support. [PR 132](https://github.com/shakacode/react_on_rails_pro/pull/132) by [ashgaliyev](https://github.com/ashgaliyev).
 
 ## [1.5.2] - 2020-06-25
 ### Improved
