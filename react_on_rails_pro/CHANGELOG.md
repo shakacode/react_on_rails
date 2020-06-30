@@ -110,7 +110,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.2...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.3...HEAD
+[1.5.3]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.2...1.5.3
 [1.5.2]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.1...1.5.2
 [1.5.1]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.0...1.5.1
 [1.5.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.4.4...1.5.0
