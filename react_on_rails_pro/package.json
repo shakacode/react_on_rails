@@ -9,6 +9,7 @@
     "doc": "docs"
   },
   "dependencies": {
+    "@sentry/node": "^5.17.0",
     "concurrently": "^4.0.1",
     "console.history": "^1.5.0",
     "express": "^4.15.2",
@@ -24,8 +25,8 @@
   "devDependencies": {
     "babel-eslint": "^10.0.1",
     "eslint": "^6.8.0",
-    "eslint-config-shakacode": "^17.0.0",
     "eslint-config-prettier": "^6.10.1",
+    "eslint-config-shakacode": "^17.0.0",
     "eslint-plugin-import": "^2.8.0",
     "eslint-plugin-jest": "^23.8.2",
     "eslint-plugin-jsx-a11y": "^6.0.2",

@@ -1,8 +1,10 @@
 const Honeybadger = require('honeybadger');
+const Sentry = require('@sentry/node');
 
 class ErrorReporter {
   constructor() {
     this.honeybadger = false;
+    this.sentry = false;
   }
 
   addHoneybadgerApiKey(apiKey) {
@@ -10,9 +12,11 @@ class ErrorReporter {
     this.honeybadger = true;
   }
 
-  addSentryDsn(_sentryDsn) {
+  addSentryDsn(sentryDsn) {
+    Sentry.init({
+      dsn: sentryDsn,
+    });
     this.sentry = true;
-    throw new Error('Sentry is not yet supported.');
   }
 
   setContext(context) {
@@ -25,6 +29,9 @@ class ErrorReporter {
     console.log('ErrorReporter postMessage', msg);
     if (this.honeybadger) {
       Honeybadger.notify(msg, context);
+    }
+    if (this.sentry) {
+      Sentry.captureMessage(msg);
     }
   }
 }
