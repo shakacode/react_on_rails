@@ -22,16 +22,7 @@ const optimization = {
 
 clientEnvironment.splitChunks((config) => Object.assign({}, config, { optimization: optimization }));
 
-const clientConfig = merge(clientEnvironment.toWebpackConfig(), {
-  mode: 'development',
-  entry: {
-    'vendor-bundle': ['jquery-ujs'],
-  },
-  output: {
-    filename: '[name].js',
-    chunkFilename: '[name].bundle.js',
-  },
-});
+const clientConfig = clientEnvironment.toWebpackConfig();
 
 // For HMR, we need to separate the the client and server webpack configurations
 if (process.env.WEBPACK_DEV_SERVER) {

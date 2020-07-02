@@ -16,14 +16,10 @@ module RenderingExtension
 end
 
 ReactOnRails.configure do |config|
-  config.random_dom_id = false # default is true
-  config.node_modules_location = "" # Pre 9.0.0 always used "client"
-  config.build_production_command = nil # Use the rails/webpacker build
-  config.build_test_command = "yarn run build:test"
-
-  # See webpacker.yml public_output_path for replacement for generated_assets_dir
-  # config.generated_assets_dir = File.join(%w[public webpack], Rails.env)
-  config.webpack_generated_files = %w[manifest.json]
   config.server_bundle_js_file = "server-bundle.js"
+  config.random_dom_id = false # default is true
+
+  # config.build_test_command = "yarn run build:test"
+  config.webpack_generated_files = %w[server-bundle.js manifest.json]
   config.rendering_extension = RenderingExtension
 end

@@ -1,7 +1,5 @@
 # Recommended Project structure
 
-While React On Rails does not *enforce* a specific project structure, we do *recommend* a standard organization. The more we follow standards as a community, the easier it will be for all of us to move between various Rails projects that include React On Rails.
-
 The React on Rails generator uses the standard `rails/webpacker` convention of this structure:
 
 ```yml
@@ -14,21 +12,9 @@ app/javascript:
   │   └── hello-world-bundle.js
 ```
 
-The problems with this structure and using rails/webpacker to configure Webpack for you:
+However, you may wish to move all your client side files to a single directory called something like `/client`.
 
-1. No support for different entry points for server rendering.
-2. Webpacker adds an extra layer of abstraction over Webpack, which you probably don't want.
-
-This default rails/webpacker configuration is used for the generator because:
-
-1. Minimizes the amount of generated code to get up and running with React on Rails.
-2. Good enough for very simple projects.
-3. Configuration of Webpack is not the goal of this library, React on Rails.
-
-
-Thus, the generator structure and using rails/webpacker for Webpack configuration **is not recommended** for any commercial projects, especially those that will use server rendering. Instead, the recommended structure is shown in this example app: [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) and described below.
-
-## Steps to convert from the generator defaults to use the recommended `/client` directory structure.
+## Steps to convert from the generator defaults to use a `/client` directory structure.
 
 1. Move the directory:
 
@@ -44,7 +30,7 @@ mv app/javascript client
 
 ## Moving node_modules from `/` to `/client` with a custom webpack setup.
 
-`rails/webpacker` probably doesn't support having your main node_modules directory under `/client`, so only follow these steps if you want to use your own webpack configuration (which is highly recommended!).
+`rails/webpacker` probably doesn't support having your main node_modules directory under `/client`, so only follow these steps if you want to use your own webpack configuration.
 
 1. Move the `/package.json` to `/client/package.json`
 2. Create a `/package.json` that delegates to `/client/package.json`. See the example in [spec/dummy/package.json](../../spec/dummy/package.json).
@@ -57,7 +43,7 @@ mv app/javascript client
 1. `/client/app/bundles`: Top level of different app domains. Use a name within this directory for you app domains. For example, if you had a domain called `widget-editing`, then you would have: `/client/app/bundles/widget-editing`
 1. `/client/app/lib`: Common code for bundles
 1. Within each bundle directory (or the lib directory), such as a domain named "comments"
-`/client/app/bundles/comments`, use following directory structure:
+`/client/app/bundles/comments`, use following directory structure, if you're using redux. However, with React hooks, this will probably be a bit different:
 
   * `/actions`: Redux actions.
   * `/components`: "dumb" components (no connections to Redux or Ajax). These get props and can render themselves and children.
@@ -79,7 +65,7 @@ This isn't really any technique, as you keep handling all your styling assets us
 1. Much simpler! There's no changes really from your current processes.
 
 ### Using Webpack to Manage Styling Assets
-This technique involves customization of the webpack config files to generate CSS, image, and font assets. See [webpack.client.rails.build.config.js](https://github.com/shakacode/react_on_rails/blob/master/spec%2Fdummy%2Fclient%2Fwebpack.client.rails.build.config.js) for an example how to set the webpack part.
+This technique involves customization of the webpack config files to generate CSS, image, and font assets. 
 
 #### Directory structure
 1. `/client/app/assets`: Assets for CSS for client app.
@@ -89,6 +75,3 @@ This technique involves customization of the webpack config files to generate CS
 1. You can use [CSS modules](https://github.com/css-modules/css-modules), which is super compelling once you seen the benefits.
 1. You can do hot reloading of your assets. Thus, you do not have to refresh your web page to see asset change, including changing styles.
 1. You can run your client code on a mocked out express server for super fast prototyping. In other words, your client application can somewhat more easily be move to a different application server.
-
-#### Updates 2017-03-04 Regarding CSS handled by Webpack
-* See article [Best practices for CSS and CSS Modules using Webpack](https://forum.shakacode.com/t/best-practices-for-css-and-css-modules-using-webpack/799).

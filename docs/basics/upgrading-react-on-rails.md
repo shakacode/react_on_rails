@@ -6,23 +6,25 @@ If you would like help in migrating between React on Rails versions or help with
 We specialize in helping companies to quickly and efficiently move from versions before 9 to current. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4 for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
 
 ## Upgrading to v12
-* Make sure that you are on a relatively more recent version of rails and webpacker.
-* If the webpacker webpack config files exist, then React on Rails will not override the default
-  assets:precompile setup by rails/webpacker. The fix is to remove the JS files inside of config/webpack,
-  like config/webpack/production.js.
-* If you're using the internalization helper, then set `config.i18n_output_format = 'js'`. You can
-  later update to the default JSON format as you will need to update your usage of that file.
+### Recent versions
+Make sure that you are on a relatively more recent version of rails and webpacker.
+v12 is tested on Rails 6. It should work on Rails v5. If you're on an older version, 
+and v12 doesn't work, please file an issue. 
 
-* Updated API for ReactOnRails.register.
+### i18n default format changed to JSON
+* If you're using the internalization helper, then set `config.i18n_output_format = 'js'`. You can
+  later update to the default JSON format as you will need to update your usage of that file. A JSON
+  format is more efficient.
+
+### Updated API for `ReactOnRails.register()`
 
 In order to solve the issues regarding React Hooks compatibility, the number of parameters
 for functions is used to determine if you have a render function that will get invoked to
 return a React component, or you are registering a React component defined by a function.
 
-Registered Objects are of the following types:
-
 ##### Correct
-Either of these will work:
+
+Registered Objects are of the following types. Either of these will work:
 1. Take **2 params** and return **a React function or class component**. A function component is a function
    that takes zero or one params and returns a React Element, like JSX.
     ```js

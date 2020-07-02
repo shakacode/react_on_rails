@@ -28,13 +28,17 @@ You can see all this on the source for [reactrails.com](https://www.reactrails.c
 
 ## Building the Bundles
 
-Each time you change your client code, you will need to re-generate the bundles (the webpack-created JavaScript files included in application.js). The included example Foreman `Procfile.dev` files will take care of this for you by starting a webpack process with the watch flag. This will watch your JavaScript code files for changes. 
+Each time you change your client code, you will need to re-generate the bundles (the webpack-created JavaScript files included in application.js). The included example Foreman `Procfile.dev` files will take care of this for you by starting a webpack process with the watch flag. This will watch your JavaScript code files for changes. Alternately, the `rails/webpacker` library also can ensure that your bundles are built. 
 
-Simply run `foreman start -f Procfile.dev`. [Example](spec/dummy/Procfile.dev).
+For example, you might create a [Procfile.dev](spec/dummy/Procfile.dev).
 
-On production deployments that use asset precompilation, such as Heroku deployments, React on Rails, by default, will automatically run webpack to build your JavaScript bundles. You configure the command used as `config.build_production_command` in your [config/initializers/react_on_rails.rb](docs/basics/configuration.md).
+On production deployments that use asset precompilation, such as Heroku deployments, `rails/webpacker`, by default, will automatically run webpack to build your JavaScript bundles, running the command `bin/webpack` in your app.
 
-You can see the source code for what gets added to your precompilation [here](https://github.com/shakacode/react_on_rails/tree/master/lib/tasks/assets.rake). For more information on this topic, see [the doc on Heroku deployment](docs/outdated/heroku-deployment.md#more-details-on-precompilation-using-webpack-to-create-javascript-assets).
+However, if you want to run a custom command to run webpack to build your bundles, then you will:
+1. Ensure you do not have a `config/webpack/production.js` file
+1. Define `config.build_production_command` in your [config/initializers/react_on_rails.rb](docs/basics/configuration.md)
+
+Then React on Rails modifies the `assets:precompile` task to run your `build_production_command`.
 
 If you have used the provided generator, these bundles will automatically be added to your `.gitignore` to prevent extraneous noise from re-generated code in your pull requests. You will want to do this manually if you do not use the provided generator.
 

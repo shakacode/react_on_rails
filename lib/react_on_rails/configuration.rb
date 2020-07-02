@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+# rubocop:disable Metrics/ClassLength
+
 module ReactOnRails
   def self.configure
     yield(configuration)
@@ -107,9 +109,45 @@ module ReactOnRails
       check_i18n_yml_directory_exists
       check_server_render_method_is_only_execjs
       error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
+      check_deprecated_settings
     end
 
     private
+
+    def check_deprecated_settings
+      if build_production_command.present? &&
+         ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
+        msg = <<~MSG
+          Setting ReactOnRails configuration for `build_production_command` is
+          not necessary if you have config/webpack/production.js. When that file
+          exists, React on Rails DOES NOT modify the standard assets:precompile.
+          If you want React on Rails to modify to the standard assets:precompile
+          to use your config/initializers/react_on_rails.rb config.build_production_command
+          then delete the config/webpack/production.js.
+        MSG
+        Rails.logger.warn(msg)
+      end
+      #
+      # msg = <<~MSG
+      #   ReactOnRails configuration for `build_production_command` is removed.
+      #   Move this command into `bin/webpack` converting the script to a shell script.
+      # MSG
+      # raise ReactOnRails::Error, msg
+      # Commenting out until v13 when
+      # https://github.com/rails/webpacker/issues/2640 gets resolved
+      # if node_modules_location.present?
+      #   Rails.logger.warn("ReactOnRails configuration for `node_modules_location` is deprecated. "\
+      #    "Instead, prepend a `cd client` (or whichever location) before your test command.")
+      # end
+      #
+      # return unless build_production_command.present?
+      #
+      # msg = <<~MSG
+      #   ReactOnRails configuration for `build_production_command` is removed.
+      #   Move this command into `bin/webpack` converting the script to a shell script.
+      # MSG
+      # raise ReactOnRails::Error, msg
+    end
 
     def error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
       return unless ReactOnRails::WebpackerUtils.using_webpacker?
@@ -122,12 +160,12 @@ module ReactOnRails
         Rails.logger.warn("You specified generated_assets_dir in `config/initializers/react_on_rails.rb` "\
         "with Webpacker. Remove this line from your configuration file.")
       else
-        msg = <<-MSG.strip_heredoc
-        Error configuring /config/initializers/react_on_rails.rb: You are using webpacker
-        and your specified value for generated_assets_dir = #{generated_assets_dir}
-        that does not match the value for public_output_path specified in
-        webpacker.yml = #{webpacker_public_output_path}. You should remove the configuration
-        value for "generated_assets_dir" from your config/initializers/react_on_rails.rb file.
+        msg = <<~MSG
+          Error configuring /config/initializers/react_on_rails.rb: You are using webpacker
+          and your specified value for generated_assets_dir = #{generated_assets_dir}
+          that does not match the value for public_output_path specified in
+          webpacker.yml = #{webpacker_public_output_path}. You should remove the configuration
+          value for "generated_assets_dir" from your config/initializers/react_on_rails.rb file.
         MSG
         raise ReactOnRails::Error, msg
       end
@@ -214,3 +252,4 @@ module ReactOnRails
     end
   end
 end
+# rubocop:enable Metrics/ClassLength

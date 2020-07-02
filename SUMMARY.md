@@ -45,7 +45,7 @@
   + [AngularJS Integration and Migration to React on Rails](./docs/additional-reading/angular-js-integration-migration.md)
 
 ## **Deployment**
-  + [Heroku Deployment](docs/outdated/heroku-deployment.md)
+  + [Heroku Deployment](docs/basics/heroku-deployment.md)
   + [Elastic Beanstalk Deployment](./docs/additional-reading/elastic-beanstalk.md)
 
 ## Outdated Non-Webpack Docs

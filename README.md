@@ -14,12 +14,17 @@
 *These are the docs for React on Rails 12, coming soon. To see the version 11 docs, [click here](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
 
 #### News
-**June 12, 2020**:
-1. Gem version: 12.0.0.pre.beta.0 and npm version 12.0.0-beta.0 released! Please try this out!
+**June 24, 2020**:
+1. Gem version: 12.0.0.pre.beta.3 and npm version 12.0.0-beta.3 released! Please try this out!
    Major enhancements:
-   1. Typescript bindings
-   2. Proper support for React Hooks
+   1. Proper support for React Hooks
+   2. Typescript bindings
    3. i18n support for generating a JSON file rather than a JS file.
+   4. Tighter rails/webpacker integration
+   
+   Be sure to see the [CHANGELOG.md](./CHANGELOG.md) and read the upgrade instructions:
+   [docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rails.md#upgrading-to-v12).
+   
 2. See Justin's RailsConf talk: [Webpacker, It-Just-Works, But How?](http://railsconf.com/2020/video/justin-gordon-webpacker-it-just-works-but-how).
 
 **April 2, 2020**:
@@ -44,20 +49,19 @@ Feel free to contact Justin Gordon, [justin@shakacode.com](mailto:justin@shakaco
 
 ## Project Objective
 
-To provide an opinionated and optimal framework for integrating Ruby on Rails with React via the [**Webpacker**](https://github.com/rails/webpacker) gem especially in regards to React Server Rendering.
+To provide a high performance framework for integrating Ruby on Rails with React via the [**Webpacker**](https://github.com/rails/webpacker) gem especially in regards to React Server Rendering.
 
 ## Features and Why React on Rails?
 
 Given that rails/webpacker gem already provides basic React integration, why would you use "React on Rails"? 
 
-1. Server rendering, often used for SEO crawler indexing and UX performance, is not offered by rails/webpacker.
 1. The easy passing of props directly from your Rails view to your React components rather than having your Rails view load and then make a separate request to your API.
+1. Tight integration with [rails/webpacker](https://github.com/rails/webpacker).
+1. Server rendering, often used for SEO crawler indexing and UX performance, is not offered by rails/webpacker.
 1. [Redux](https://github.com/reactjs/redux) and [React Router](https://github.com/reactjs/react-router) integration with server-side-rendering.
 1. [Internationalization (I18n) and (localization)](https://github.com/shakacode/react_on_rails/blob/master/docs/basics/i18n.md)
-1. [RSpec Test Helpers Configuration](docs/basics/rspec-configuration.md) to ensure your Webpack bundles are ready for tests. _(and for [Minitest](docs/basics/minitest-configuration.md))._
 1. A supportive community. This [web search shows how live public sites are using React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com/).
 1. [Reason ML Support](https://github.com/shakacode/reason-react-on-rails-example).
-
 
 See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
 
@@ -74,7 +78,7 @@ _Requires creating a free account._
 
 ## Prerequisites
 
-React on Rails supports older versions of Rails back to 3.x. Rails/webpacker requires version 4.2+.
+Ruby on Rails >=5 and rails/webpacker 4.2+.
 
 ## Getting Started
 
@@ -89,23 +93,10 @@ Note, the best way to understand how to use ReactOnRails is to study a few simpl
 
 *See also [the instructions for installing into an existing Rails app](docs/basics/installation-into-an-existing-rails-app.md).*
 
-1. Create a new Rails app:
-
-   ``````bash
-   $ rails new my-app --webpack=react
-   $ cd my-app
-   ``````
-
 2. Add the `react_on_rails` gem to Gemfile:
 
-   ```ruby
-   gem 'react_on_rails', '11.1.4' # Use the exact gem version to match npm version
-   ```
-
-3. Install the `react_on_rails` gem:
-
    ```bash
-   $ bundle install
+   bundle add react_on_rails --strict
    ```
 
 4. Commit this to git (or else you cannot run the generator unless you pass the option `--ignore-warnings`).
@@ -113,13 +104,13 @@ Note, the best way to understand how to use ReactOnRails is to study a few simpl
 5. Run the generator:
 
    ```bash
-   $ rails generate react_on_rails:install
+   rails generate react_on_rails:install
    ```
 
 6. Start the app:
 
    ```bash
-   $ rails s
+   rails s
    ```
 
 7. Visit http://localhost:3000/hello_world.
@@ -138,13 +129,18 @@ Below is the line where you turn server rendering on by setting `prerender` to t
 <%= react_component("HelloWorld", props: @hello_world_props, prerender: false) %>
 ```
 
+Note, if you got an error in your console regarding "ReferenceError: window is not defined",
+then you need to edit `config/webpacker.yml` and set `hmr: false` and `inline: false`.
+See [rails/webpacker PR 2644](https://github.com/rails/webpacker/pull/2644) for a fix for this
+issue.
+
 ## Basic Usage
 
 ### Configuration
 
 * Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](docs/basics/configuration.md) for documentation of all configuration options.
-* Configure `config/webpacker.yml`. If you used the generator and the default webpacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/webpacker.yml](./spec/dummy/config/webpacker.yml) example
-  * Set `compile: false` for all envs
+* Configure `config/webpacker.yml`. If you used the generator and the default webpacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/webpacker.yml](./spec/dummy/config/webpacker.yml) example or the official default [webpacker.yml](https://github.com/rails/webpacker/blob/master/lib/install/config/webpacker.yml).
+  * Tip: set `compile: false` for development if you know that you'll always be compiling with a watch process. Otherwise, every request will check if compilation is needed.
   * Your `public_output_path` must match your Webpack configuration for `output` of your bundles.
   * Only set `cache_manifest` to `true` in your production env.
 

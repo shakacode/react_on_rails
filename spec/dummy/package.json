@@ -88,7 +88,6 @@
     "build:dev": "rm -rf public/webpack/develoment && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
     "build:dev:server": "rm -rf public/webpack/develoment && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
     "build:dev:watch": "RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
-    "build:production": "RAILS_ENV=production NODE_ENV=production bin/webpack -p",
     "build:clean": "rm -rf public/webpack || true"
   }
 }

@@ -7,8 +7,8 @@
 1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `client/package.json` file.
 
    ```ruby
-   gem "react_on_rails", "11.1.4" # Update to the current version
-   gem "webpacker", "~> 3" # Newer versions might be supported
+   gem "react_on_rails", "12.0.0" # Update to the current version
+   gem "webpacker", "~> 5"
    ```
 
 2. Run the following 2 commands to install Webpacker with React. Note, if you are using an older version of Rails than 5.1, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
@@ -57,8 +57,3 @@ $ yarn add react-on-rails --exact
 ```
 
 That will install the latest version and update your package.json. **NOTE:** the `--exact` flag will ensure that you do not have a "~" or "^" for your react-on-rails version in your package.json.
-
-## Webpacker Configuration
-
-React on Rails users should set configuration value `compile` to false, as React on Rails handles compilation for test and production environments.
-

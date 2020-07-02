@@ -17,8 +17,8 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 
 ## UPCOMING 12.0 RELEASE
+See [docs/basics/upgrading-react-on-rails.md](./docs/basics/upgrading-react-on-rails.md).
 
-#### Improved
 ### [12.0.0.pre.beta.2]
 * Changed the precompile task to use the rails/webpacker one by default
 
@@ -926,7 +926,9 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.3...master
+[12.0.0.pre.beta.3]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.2...12.0.0-beta.3
+[12.0.0.pre.beta.2]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.1...12.0.0-beta.2
 [12.0.0.pre.beta.1]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.0...12.0.0-beta.1
 [12.0.0.pre.beta.0]: https://github.com/shakacode/react_on_rails/compare/11.3.0...12.0.0-beta.0
 [11.3.0]: https://github.com/shakacode/react_on_rails/compare/11.2.2...11.3.0

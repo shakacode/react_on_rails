@@ -12,8 +12,7 @@ compiled by webpack before running tests and during production deployment:
 2. **Use the react_on_rails settings and helpers**. Use the settings in `config/initializers/react_on_rails.rb`. Refer to [docs/configuration](./configuration.md).
 
 ```yml
-  config.build_production_command = "RAILS_ENV=production bin/webpack"
-  config.build_test_command = "RAILS_ENV=test bin/webpack"
+  config.build_test_command = "NODE_ENV=test RAILS_ENV=test bin/webpack"
 ``` 
 
 Which should you use? If you're already using the `rails/webpacker` way to configure webpack, then
@@ -45,11 +44,11 @@ If you are using Webpack to build CSS assets, you should do something like this 
 ```
 
 Please take note of the following:
-- If you are using Webpacker, be **SURE** to configure the `source_path` in your `config/webpacker.yml` unless you are using the defaults for webpacker. If you are not using webpacker, all files in the node_modules_location are used for your test sources.
+- If you are using Webpacker, be **SURE** to configure the `source_path` in your `config/webpacker.yml` unless you are using the defaults for webpacker. 
 
 - This utility uses your `build_test_command` to build the static generated files. This command **must not** include the `--watch` option. If you have different server and client bundle files, this command **must** create all the bundles. If you are using webpacker, the default value will come from the `config/webpacker.yml` value for the `public_output_path` and the `source_path`
 
-- If you add an older file to your source files, that is already older than the produced output files, no new recompilation is done. The solution to this issue is to clear out your directory of webpack generated files when adding new source files that may have older dates. This can happen when you've built your test generated files and then you sync up your repository files.
+- If you add an older file to your source files, that is already older than the produced output files, no new recompilation is done. The solution to this issue is to clear out your directory of webpack generated files when adding new source files that may have older dates. 
 
 - By default, the webpack processes look in the webpack generated files folder, configured via the `config/webpacker.yml` config values of `public_root_path` and `public_output_path`. If the webpack generated files folder is missing, is empty, or contains files in the `config.webpack_generated_files` list with `mtime`s older than any of the files in your `client` folder, the helper will recompile your assets. 
 

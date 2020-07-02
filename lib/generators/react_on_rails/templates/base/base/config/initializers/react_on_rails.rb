@@ -23,6 +23,8 @@ ReactOnRails.configure do |config|
   # with rspec then this controls what yarn command is run
   # to automatically refresh your webpack assets on every test run.
   #
+  # Alternately, you can remove the `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`
+  # and set the config/webpacker.yml option for test to true.
   config.build_test_command = "RAILS_ENV=test bin/webpack"
 
   ################################################################################

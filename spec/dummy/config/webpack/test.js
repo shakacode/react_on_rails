@@ -4,16 +4,6 @@ const clientEnvironment = require('./client');
 const serverConfig = require('./server');
 const merge = require('webpack-merge');
 
-const clientConfig = merge(clientEnvironment.toWebpackConfig(), {
-  mode: 'development',
-  entry: {
-    'vendor-bundle': ['jquery-ujs'],
-  },
-  output: {
-    filename: '[name].js',
-    chunkFilename: '[name].bundle.js',
-    path: clientEnvironment.config.output.path,
-  },
-});
+const clientConfig = clientEnvironment.toWebpackConfig();
 
 module.exports = [clientConfig, serverConfig];
