@@ -6,6 +6,15 @@ module ReactOnRails
       ReactOnRails::Utils.gem_available?("webpacker")
     end
 
+    def self.webpacker_webpack_production_config_exists?
+      webpacker_webpack_config_abs_path = File.join(Rails.root,
+                                                    "config/webpack/production.js")
+      webpack_config_path = Pathname.new(webpacker_webpack_config_abs_path).
+          relative_path_from(Rails.root).to_s
+
+      File.exists?(webpacker_webpack_config_abs_path)
+    end
+
     def self.dev_server_running?
       return false unless using_webpacker?
 
