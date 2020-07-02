@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+# rubocop:disable Metrics/ClassLength
+
 module ReactOnRails
   def self.configure
     yield(configuration)
@@ -114,14 +116,14 @@ module ReactOnRails
 
     def check_deprecated_settings
       if build_production_command.present? &&
-          ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
+         ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
         msg = <<~MSG
-           Setting ReactOnRails configuration for `build_production_command` is
-           not necessary if you have config/webpack/production.js. When that file
-           exists, React on Rails DOES NOT modify the standard assets:precompile.
-           If you want React on Rails to modify to the standard assets:precompile
-           to use your config/initializers/react_on_rails.rb config.build_production_command
-           then delete the config/webpack/production.js.
+          Setting ReactOnRails configuration for `build_production_command` is
+          not necessary if you have config/webpack/production.js. When that file
+          exists, React on Rails DOES NOT modify the standard assets:precompile.
+          If you want React on Rails to modify to the standard assets:precompile
+          to use your config/initializers/react_on_rails.rb config.build_production_command
+          then delete the config/webpack/production.js.
         MSG
         Rails.logger.warn(msg)
       end
@@ -250,3 +252,4 @@ module ReactOnRails
     end
   end
 end
+# rubocop:enable Metrics/ClassLength
