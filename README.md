@@ -140,7 +140,7 @@ issue.
 
 * Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](docs/basics/configuration.md) for documentation of all configuration options.
 * Configure `config/webpacker.yml`. If you used the generator and the default webpacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/webpacker.yml](./spec/dummy/config/webpacker.yml) example or the official default [webpacker.yml](https://github.com/rails/webpacker/blob/master/lib/install/config/webpacker.yml).
-  * Tip: set `compile: false` for developmentment if you know that you'll always be compiling with a watch process. 
+  * Tip: set `compile: false` for development if you know that you'll always be compiling with a watch process. Otherwise, every request will check if compilation is needed.
   * Your `public_output_path` must match your Webpack configuration for `output` of your bundles.
   * Only set `cache_manifest` to `true` in your production env.
 

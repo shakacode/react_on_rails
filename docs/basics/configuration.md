@@ -18,18 +18,21 @@ default: &default
 
 development:
   <<: *default
-  # generated files for development, in /public/webpack/dev
+  # Generated files for development, in /public/webpack/dev
   public_output_path: webpack/dev
 
 test:
   <<: *default
-  compile: true # ensure that webpacker invokes webpack to build files for tests
-  # generated files for tests, in /public/webpack/test
+  # Ensure that webpacker invokes webpack to build files for tests if not using the
+  #   ReactOnRails rspec helper. 
+  compile: true
+
+  # Generated files for tests, in /public/webpack/test
   public_output_path: webpack/test
 
 production:
   <<: *default
-  # generated files for production, in /public/webpack/production
+  # Generated files for production, in /public/webpack/production
   public_output_path: webpack/production
   cache_manifest: true
 ```
@@ -57,8 +60,18 @@ ReactOnRails.configure do |config|
   # it is convenient to set this to true or else you have to either manually set the ids to 
   # avoid collisions. Most newer apps will have only one instance of a component on a page,
   # so this should be false in most cases.
-  # This value can be overrident for a given call to react_component
+  # This value can be overridden for a given call to react_component
   config.random_dom_id = true # default
+
+  # defaults to "" (top level)	
+  config.node_modules_location = "client" # If using webpacker you should use "".	
+  
+  # This configures the script to run to build the production assets by webpack . Set this to nil	
+  # if you don't want react_on_rails building this file for you.	
+  # Note, if you want to use this command then you should remove the file	
+  # config/webpack/production.js	
+  # If that file exists, React on Rails thinks that you'll use the rails/webpacker bin/webpack compiler.	
+  config.build_production_command = "RAILS_ENV=production bin/webpack"
 
   ################################################################################
   ################################################################################

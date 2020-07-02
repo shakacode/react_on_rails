@@ -17,14 +17,7 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 
 ## UPCOMING 12.0 RELEASE
-
-#### Improved
-
-* Remove the precompile task completely. A custom webpack compilation command should
-  be set in bin/webpack. See [docs/basics/upgrading-react-on-rails.md](./docs/basics/upgrading-react-on-rails.md) for
-  more details regarding this.
-* Removed the setting `config.build_production_command`. Any value within here should be moved
-  to the `bin/webpack` file.
+See [docs/basics/upgrading-react-on-rails.md](./docs/basics/upgrading-react-on-rails.md).
 
 ### [12.0.0.pre.beta.2]
 * Changed the precompile task to use the rails/webpacker one by default

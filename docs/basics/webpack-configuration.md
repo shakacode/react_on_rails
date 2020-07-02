@@ -17,7 +17,7 @@ A key decision in your use React on Rails is whether you go with the rails/webpa
 
 ## Option 1: Recommended: Traditional React on Rails using the /client directory
 
-Until version 9, all React on Rails apps used the `/client` directory for configuring React on Rails in terms of the configuration of Webpack and location of your JavaScript and Webpack files, including the node_modules directory. Version 9 changed the default to `/` for the `node_modules` location using this value in `config/initializers/react_on_rails.rb`: `config.node_modules_location`. In version 12, the `node_modules_location` was removed.  
+Until version 9, all React on Rails apps used the `/client` directory for configuring React on Rails in terms of the configuration of Webpack and location of your JavaScript and Webpack files, including the node_modules directory. Version 9 changed the default to `/` for the `node_modules` location using this value in `config/initializers/react_on_rails.rb`: `config.node_modules_location`. 
 
 The [ShakaCode Team](http://www.shakacode.com) _recommends_ this approach for projects beyond the simplest cases as it provides the greatest transparency in your webpack and overall client-side setup. The *big advantage* to this is that almost everything within the `/client` directory will apply if you wish to convert your client-side code to a pure Single Page Application that runs without Rails. This allows you to Google for how to do something with Webpack configuration and what applies to a non-Rails app will apply just as well to a React on Rails app.
 

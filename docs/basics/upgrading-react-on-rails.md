@@ -11,34 +11,10 @@ Make sure that you are on a relatively more recent version of rails and webpacke
 v12 is tested on Rails 6. It should work on Rails v5. If you're on an older version, 
 and v12 doesn't work, please file an issue. 
 
-### Assets Compilation
-Prior to v12, assets compilation for deployment happened by setting 
-```ruby
-  config.build_production_command = "RAILS_ENV=production bin/webpack"
-```
-
-This was done by enhancing the `assets:precompile` rake task.
-
-**v12 removes this configuration.**
-
-1. If you're using the `rails/webpacker` webpack configuration, then you don't need
-   to do anything.
-2. If you have a custom webpack setup, then move whatever command you had for the
-   `build_production_command` into the `bin/webpack` file. Change the shebang to from
-    `!#/user/bin/env ruby` to something like `#!/bin/bash` and then place your command
-    that was in the `build_production_command`. If you fail to do this step, you'll
-    see `rails/webpacker` trying to run the default webpack build.
-
-### config.node_modules_location is removed
-This setting only affect the use of the build_production command (removed) and also the
-`config.build_test_command`. You can cd to the node_modules location in your `bin/webpack`
-script to accomdate for this change.
-
 ### i18n default format changed to JSON
-* If you're using the internationalization i18n helper, then set `config.i18n_output_format = 'js'`. You can
-
 * If you're using the internalization helper, then set `config.i18n_output_format = 'js'`. You can
-  later update to the default JSON format as you will need to update your usage of that file.
+  later update to the default JSON format as you will need to update your usage of that file. A JSON
+  format is more efficient.
 
 ### Updated API for `ReactOnRails.register()`
 

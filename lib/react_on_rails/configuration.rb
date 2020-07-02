@@ -128,6 +128,23 @@ module ReactOnRails
       raise ReactOnRails::Error, msg
     end
 
+    def check_deprecated_settings
+      # Commenting out until v13 when
+      # https://github.com/rails/webpacker/issues/2640 gets resolved
+      # if node_modules_location.present?
+      #   Rails.logger.warn("ReactOnRails configuration for `node_modules_location` is deprecated. "\
+      #    "Instead, prepend a `cd client` (or whichever location) before your test command.")
+      # end
+      #
+      # return unless build_production_command.present?
+      #
+      # msg = <<~MSG
+      #   ReactOnRails configuration for `build_production_command` is removed.
+      #   Move this command into `bin/webpack` converting the script to a shell script.
+      # MSG
+      # raise ReactOnRails::Error, msg
+    end
+
     def error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
       return unless ReactOnRails::WebpackerUtils.using_webpacker?
 
@@ -231,4 +248,5 @@ module ReactOnRails
     end
   end
 end
+# rubocop:enable Metrics/ClassLength
 # rubocop:enable Metrics/ClassLength
