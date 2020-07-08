@@ -17,13 +17,13 @@ module ReactOnRails
 
     COMPONENT_HTML_KEY = "componentHtml"
 
-    # react_component_name: can be a React function or class component or a "render function".
-    # "render functions" differ from a React function in that they take two parameters, the
+    # react_component_name: can be a React function or class component or a "Render-Function".
+    # "Render-Functions" differ from a React function in that they take two parameters, the
     #   props and the railsContext, like this:
     #
     #   let MyReactComponentApp = (props, railsContext) => <MyReactComponent {...props}/>;
     #
-    #   Alternately, you can define the render function with an additional property
+    #   Alternately, you can define the Render-Function with an additional property
     #   `.renderFunction = true`:
     #
     #   let MyReactComponentApp = (props) => <MyReactComponent {...props}/>;
@@ -79,7 +79,7 @@ module ReactOnRails
           Value:
           #{server_rendered_html}
 
-          If you're trying to use a render function to return a Hash to your ruby view code, then use
+          If you're trying to use a Render-Function to return a Hash to your ruby view code, then use
           react_component_hash instead of react_component and see
           https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
           for an example of the JavaScript code.
@@ -93,7 +93,7 @@ module ReactOnRails
     # It is exactly like react_component except for the following:
     # 1. prerender: true is automatically added, as this method doesn't make sense for client only
     #    rendering.
-    # 2. Your JavaScript render function for server rendering must return an Object rather than a React component.
+    # 2. Your JavaScript Render-Function for server rendering must return an Object rather than a React component.
     # 3. Your view code must expect an object and not a string.
     #
     # Here is an example of the view code:
@@ -124,10 +124,10 @@ module ReactOnRails
         )
       else
         msg = <<~MSG
-          render function used by react_component_hash for #{component_name} is expected to return
+          Render-Function used by react_component_hash for #{component_name} is expected to return
           an Object. See https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
           for an example of the JavaScript code.
-          Note, your render function must either take 2 params or have the property
+          Note, your Render-Function must either take 2 params or have the property
           `.renderFunction = true` added to it to distinguish it from a React Function Component.
         MSG
         raise ReactOnRails::Error, msg
@@ -240,7 +240,7 @@ module ReactOnRails
     end
 
     # This is the definitive list of the default values used for the rails_context, which is the
-    # second parameter passed to both component and store render functions.
+    # second parameter passed to both component and store Render-Functions.
     # This method can be called from views and from the controller, as `helpers.rails_context`
     #
     # rubocop:disable Metrics/AbcSize

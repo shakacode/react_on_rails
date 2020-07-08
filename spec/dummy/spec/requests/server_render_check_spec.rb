@@ -148,7 +148,7 @@ describe "Server Rendering", :server_rendering do
       end
     end
 
-    context "render function" do
+    context "Render-Function" do
       it "matches expected values" do
         do_request(server_side_redux_app_path)
         check_match("server_side_redux_app", "ReduxApp")

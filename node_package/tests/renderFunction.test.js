@@ -70,10 +70,10 @@ describe('isRenderFunction', () => {
     expect(isRenderFunction(pureComponent)).toBe(false);
   });
 
-  it('returns true for a render function (containing two params)', () => {
+  it('returns true for a Render-Function (containing two params)', () => {
     expect.assertions(1);
 
-    const foobarComponent = () => <div>Component for render function</div>;
+    const foobarComponent = () => <div>Component for Render-Function</div>;
     const foobarrenderFunction = (_props, _railsContext) => foobarComponent;
 
     expect(isRenderFunction(foobarrenderFunction)).toBe(true);

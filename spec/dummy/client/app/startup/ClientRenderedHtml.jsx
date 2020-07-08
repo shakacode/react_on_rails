@@ -9,7 +9,7 @@ import EchoProps from '../components/EchoProps';
  *  React will see that the state is the same and not do anything.
  *  Note, this is imported as "HelloWorldApp" by "clientRegistration.jsx"
  *
- *  Note, this is a fictional example, as you'd only use a render function if you wanted to run
+ *  Note, this is a fictional example, as you'd only use a Render-Function if you wanted to run
  *  some extra code, such as setting up Redux and React-Router.
  */
 

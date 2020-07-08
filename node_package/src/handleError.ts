@@ -9,27 +9,27 @@ function handleRenderFunctionIssue(options: {e: Error; name?: string}): string {
 
   if (name) {
     const lastLine =
-      'A render function takes a single arg of props (and the location for react-router) ' +
+      'A Render-Function takes a single arg of props (and the location for react-router) ' +
       'and returns a ReactElement.';
 
-    let shouldBeGeneratorError =
-      `ERROR: ReactOnRails is incorrectly detecting render function to be false. The React
-component '${name}' seems to be a render function.\n${lastLine}`;
+    let shouldBeRenderFunctionError =
+      `ERROR: ReactOnRails is incorrectly detecting Render-Function to be false. The React
+component '${name}' seems to be a Render-Function.\n${lastLine}`;
     const reMatchShouldBeGeneratorError = /Can't add property context, object is not extensible/;
     if (reMatchShouldBeGeneratorError.test(e.message)) {
-      msg += `${shouldBeGeneratorError}\n\n`;
-      console.error(shouldBeGeneratorError);
+      msg += `${shouldBeRenderFunctionError}\n\n`;
+      console.error(shouldBeRenderFunctionError);
     }
 
-    shouldBeGeneratorError =
+    shouldBeRenderFunctionError =
       `ERROR: ReactOnRails is incorrectly detecting renderFunction to be true, but the React
-component '${name}' is not a render function.\n${lastLine}`;
+component '${name}' is not a Render-Function.\n${lastLine}`;
 
     const reMatchShouldNotBeGeneratorError = /Cannot call a class as a function/;
 
     if (reMatchShouldNotBeGeneratorError.test(e.message)) {
-      msg += `${shouldBeGeneratorError}\n\n`;
-      console.error(shouldBeGeneratorError);
+      msg += `${shouldBeRenderFunctionError}\n\n`;
+      console.error(shouldBeRenderFunctionError);
     }
   }
 

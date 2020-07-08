@@ -13,7 +13,7 @@ import HelloWorldES5 from '../components/HelloWorldES5';
 import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
 import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 
-// render function
+// Render-Function
 import HelloWorldApp from '../startup/HelloWorldApp';
 import BrokenApp from '../startup/BrokenApp';
 

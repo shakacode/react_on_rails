@@ -8,8 +8,12 @@ We specialize in helping companies to quickly and efficiently move from versions
 ## Upgrading to v12
 ### Recent versions
 Make sure that you are on a relatively more recent version of rails and webpacker.
-v12 is tested on Rails 6. It should work on Rails v5. If you're on an older version, 
+v12 is tested on Rails 6. It should work on Rails v5. If you're on any older version,
 and v12 doesn't work, please file an issue. 
+
+### Removed Configuration config.symlink_non_digested_assets_regex
+Remove `config.symlink_non_digested_assets_regex` from your `config/initializers/react_on_rails.rb`.
+If you still need that feature, please file an issue.
 
 ### i18n default format changed to JSON
 * If you're using the internalization helper, then set `config.i18n_output_format = 'js'`. You can
@@ -19,22 +23,32 @@ and v12 doesn't work, please file an issue.
 ### Updated API for `ReactOnRails.register()`
 
 In order to solve the issues regarding React Hooks compatibility, the number of parameters
-for functions is used to determine if you have a render function that will get invoked to
+for functions is used to determine if you have a Render-Function that will get invoked to
 return a React component, or you are registering a React component defined by a function.
+Please see [Render-Functions and the Rails Context](./render-functions-and-railscontext.md) for
+more information on what a Render-Function is.
 
 ##### Correct
 
 Registered Objects are of the following types. Either of these will work:
-1. Take **2 params** and return **a React function or class component**. A function component is a function
-   that takes zero or one params and returns a React Element, like JSX.
+1. Takes only zero or one params and you return a React Element, often JSX.
+    ```js
+    export default (props) => <Component {...props} />;
+    ```       
+2. Takes **2 params** and returns **a React function or class component**. A function
+   component is a function that takes zero or one params and returns a React Element, like JSX.
     ```js
     export default (props, _railsContext) => () => <Component {...props} />;
     ```
+   Note, you cannot return a React Element (JSX).
+3. Takes **3 params** and uses the 3rd param, `domNodeId`, to call `ReactDOM.hydrate`
+  
+Previously, with case number 2, you could return a React Element.
 
-2. Take only zero or one params and you return a React Element, often JSX.
-    ```js
-    export default (props) => <Component {...props} />;
-    ```
+The fix is simple. Here is an example of the change you'll do:
+
+![2020-07-07_09-43-51 (1)](https://user-images.githubusercontent.com/1118459/86927351-eff79e80-c0ce-11ea-9172-d6855c45e2bb.png)
+ 
 ##### Broken, as this function takes two params and it returns a React Element from a JSX Literal
 ```js
 export default (props, _railsContext) => <Component {...props} />;
