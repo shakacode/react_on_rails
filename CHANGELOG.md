@@ -24,6 +24,7 @@ For upgrade instructions, see [docs/basics/upgrading-react-on-rails.md](./docs/b
 1. **React Hooks Support** for top level components
 2. **Typescript bindings**
 3. **rails/webpacker** "just works" with React on Rails by default.
+4. i18n support for generating a JSON file rather than a JS file.
 
 #### BREAKING CHANGE
 In order to solve the issues regarding React Hooks compatibility, the number of parameters
@@ -37,7 +38,7 @@ See [docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rail
 for details.         
 
 #### Other Updates 
-
+* `react_on_rails` fully supports `rails/webpacker`. The example test app in `spec/dummy` was recently converted over to use rails/webpacker v4+. It's a good example of how to leverage rails/webpacker's webpack configuration for server-side rendering. 
 * Changed the precompile task to use the rails/webpacker one by default
 * Updated generators to use React hooks
 * Requires the use of rails/webpacker view helpers
