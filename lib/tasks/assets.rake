@@ -12,7 +12,7 @@ unless ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
   if Rake::Task.task_defined?("assets:precompile")
     Rake::Task["assets:precompile"].enhance do
       Rake::Task["react_on_rails:assets:webpack"].invoke
-      puts "Invoking task wepacker:clean from React on Rails"
+      puts "Invoking task webpacker:clean from React on Rails"
       Rake::Task["webpacker:clean"].invoke
     end
   else
