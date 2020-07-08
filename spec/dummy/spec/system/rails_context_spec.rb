@@ -62,7 +62,7 @@ feature "rails_context" do
                        "ReduxSharedStoreApp")
     end
 
-    context "render function for component" do
+    context "Render-Function for component" do
       include_examples("railsContext",
                        "server_side_redux_app",
                        "ReduxApp")

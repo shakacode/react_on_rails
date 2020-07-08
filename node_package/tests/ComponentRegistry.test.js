@@ -24,7 +24,7 @@ describe('ComponentRegistry', () => {
     expect(actual).toEqual(expected);
   });
 
-  it('registers and retrieves render function components where property renderFunction is set and zero params', () => {
+  it('registers and retrieves Render-Function components where property renderFunction is set and zero params', () => {
     expect.assertions(1);
     const C1 = () => <div>HELLO</div>;
     C1.renderFunction = true;

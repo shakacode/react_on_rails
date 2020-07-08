@@ -15,7 +15,7 @@ side rendering, except for the key `serverSide` based on whether or not you are 
 
 While you could manually configure your Rails code to pass the "`railsContext` information" with
 the rest of your "props", the `railsContext` is a convenience because it's passed consistently to
-all invocations of render functions.
+all invocations of Render-Functions.
 
 For example, suppose you create a "render-function" called MyAppComponent.
 

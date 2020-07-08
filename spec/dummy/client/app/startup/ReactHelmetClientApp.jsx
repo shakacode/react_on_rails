@@ -7,7 +7,7 @@ import ReactHelmet from '../components/ReactHelmet';
 
 export default (props) => <ReactHelmet {...props} />;
 
-// Note, the server side has to be a render function
+// Note, the server side has to be a Render-Function
 
 // If you want a renderFunction, return a ReactComponent
 // export default (props, _railsContext) => () => <ReactHelmet {...props} />;

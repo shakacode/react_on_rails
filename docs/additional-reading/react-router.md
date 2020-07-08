@@ -39,7 +39,7 @@ For a fleshed out integration of react_on_rails with react-router, check out [Re
 
 # Server Rendering Using React Router V4
 
-Your render function may not return an object with the property `renderedHtml`. Thus, you call 
+Your Render-Function may not return an object with the property `renderedHtml`. Thus, you call 
 renderToString() and return an object with this property.
 
 This example **only applies to server rendering** and should be only used in the server side bundle.

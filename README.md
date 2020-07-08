@@ -246,15 +246,15 @@ For details on techniques to use different code for client and server rendering,
 
 You have two ways to specify your React components. You can either register the React component (either function or class component) directly, or you can create a function that returns a React component, which we using the name of a "render-function". Creating a render-function allows:
 
-1. You have access to the `railsContext`. See documentation for the railsContext in terms of why you might need it. You **need** a render function to access the `railsContext`.
+1. You have access to the `railsContext`. See documentation for the railsContext in terms of why you might need it. You **need** a Render-Function to access the `railsContext`.
 2. You can use the passed-in props to initialize a redux store or set up react-router.
 3. You can return different components depending on what's in the props.
 
-Note, the return value of a **render function** should be either a React Function or Class Component, or an object representing server rendering results.
+Note, the return value of a **Render-Function** should be either a React Function or Class Component, or an object representing server rendering results.
 
 Do not return a React Element (JSX).
 
-ReactOnRails will automatically detect a registered render function by the fact that the function takes
+ReactOnRails will automatically detect a registered Render-Function by the fact that the function takes
 more than 1 parameter. In other words, if you want the ability to provide a function that returns the
 React component, then you need to specify at least a second parameter. This is the `railsContext`.
 If you're not using this parameter, declare your function with the unused param:
@@ -268,13 +268,13 @@ const MyComponentGenerator = (props, _railsContext) => {
 }
 ```
 
-Thus, there is no difference between registering a React function or class Component versus a "render function."
+Thus, there is no difference between registering a React function or class Component versus a "Render-Function."
 
-## react_component_hash for render functions
+## react_component_hash for Render-Functions
 
-Another reason to use a render function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }. Make sure you use this function with `react_component_hash`. 
+Another reason to use a Render-Function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }. Make sure you use this function with `react_component_hash`. 
 
-For server rendering, if you wish to return multiple HTML strings from a render function, you may return an Object from your render function with a single top-level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
+For server rendering, if you wish to return multiple HTML strings from a Render-Function, you may return an Object from your Render-Function with a single top-level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
 
 ```js
 { renderedHtml: { componentHtml, customKey1, customKey2} }

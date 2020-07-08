@@ -19,7 +19,7 @@ and v12 doesn't work, please file an issue.
 ### Updated API for `ReactOnRails.register()`
 
 In order to solve the issues regarding React Hooks compatibility, the number of parameters
-for functions is used to determine if you have a render function that will get invoked to
+for functions is used to determine if you have a Render-Function that will get invoked to
 return a React component, or you are registering a React component defined by a function.
 
 ##### Correct
