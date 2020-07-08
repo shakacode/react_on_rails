@@ -17,16 +17,13 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 
 ## UPCOMING 12.0 RELEASE
-See [docs/basics/upgrading-react-on-rails.md](./docs/basics/upgrading-react-on-rails.md).
+### [12.0.0] - 2020-07-08
+For upgrade instructions, see [docs/basics/upgrading-react-on-rails.md](./docs/basics/upgrading-react-on-rails.md).
 
-### [12.0.0.pre.beta.2]
-* Changed the precompile task to use the rails/webpacker one by default
-
-### [12.0.0.pre.beta.1]
-* Updated generators to use React hooks
-
-### [12.0.0.pre.beta.0]
-Gem version: 12.0.0.pre.beta.0 and npm version 12.0.0-beta.0 released! Please try this out!
+#### Major Improvements
+1. **React Hooks Support** for top level components
+2. **Typescript bindings**
+3. **rails/webpacker** "just works" with React on Rails by default.
 
 #### BREAKING CHANGE
 In order to solve the issues regarding React Hooks compatibility, the number of parameters
@@ -39,10 +36,14 @@ invoked to return the React component. In that case, you won't need to pass any 
 See [docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rails.md#upgrading-to-v12)
 for details.         
 
-* Requires the use of rails/webpacker helpers
+#### Other Updates 
+
+* Changed the precompile task to use the rails/webpacker one by default
+* Updated generators to use React hooks
+* Requires the use of rails/webpacker view helpers
 * If the webpacker webpack config files exist, then React on Rails will not override the default
-  assets:precompile setup by rails/webpacker. The fix is to remove the JS files inside of config/webpack,
-  like config/webpack/production.js.
+  assets:precompile setup by rails/webpacker. If you are not using the rails/webpacker setup for webpack,
+  then be sure to remove the JS files inside of config/webpack, like `config/webpack/production.js.`
 * Removed **env_javascript_include_tag** and **env_stylesheet_link_tag** as these are replaced by view helpers
   from rails/webpacker
 * Removal of support for old Rubies and Rails.
@@ -62,13 +63,12 @@ for details.
 * Added support to export locales in JSON format. New option added `i18n_output_format` which allows to
   specify locales format either `JSON` or `JS`. **`JSON` format is now the default.**
  
-  Use this config setting to get the old behavior: config.i18n_output_format = 'js'
+  **Use this config setting to get the old behavior: config.i18n_output_format = 'js'**
   
   [PR 1271](https://github.com/shakacode/react_on_rails/pull/1271) by [ashgaliyev](https://github.com/ashgaliyev).
 
-#### Improved
 - Added Typescript definitions to the Node package. By [justin808](https://github.com/justin808) and [judahmeek](https://github.com/judahmeek) in [PR 1287](https://github.com/shakacode/react_on_rails/pull/1287).
-- Removed unnecessary restriction to keep the server bundle in the same directory with the client bundles. Rails/webpacker 4 has an advanced cleanup that will remove any files in the directory of other webpack files. Removing this restriction allows the server bundle to be created in a sibling directory. By [justin808](https://github.com/shakacode/react_on_rails/pull/1240).
+- Removed restriction to keep the server bundle in the same directory with the client bundles. Rails/webpacker 4 has an advanced cleanup that will remove any files in the directory of other webpack files. Removing this restriction allows the server bundle to be created in a sibling directory. By [justin808](https://github.com/shakacode/react_on_rails/pull/1240).
 
 ### [11.3.0] - 2019-05-24
 #### Added
@@ -926,11 +926,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.3...master
-[12.0.0.pre.beta.3]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.2...12.0.0-beta.3
-[12.0.0.pre.beta.2]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.1...12.0.0-beta.2
-[12.0.0.pre.beta.1]: https://github.com/shakacode/react_on_rails/compare/12.0.0-beta.0...12.0.0-beta.1
-[12.0.0.pre.beta.0]: https://github.com/shakacode/react_on_rails/compare/11.3.0...12.0.0-beta.0
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.0...master
+[12.0.0]: https://github.com/shakacode/react_on_rails/compare/11.3.0...12.0.0
 [11.3.0]: https://github.com/shakacode/react_on_rails/compare/11.2.2...11.3.0
 [11.2.2]: https://github.com/shakacode/react_on_rails/compare/11.2.1...11.2.2
 [11.2.1]: https://github.com/shakacode/react_on_rails/compare/11.1.8...11.2.1
