@@ -55,8 +55,8 @@ export default function createReactOutput({
       console.error(
 `Warning: ReactOnRails: Your registered render-function (ReactOnRails.register) for ${name}
 incorrectly returned a React Element (JSX). Instead, return a React Function Component by
-wrapping your JSX in a function. ReactOnRails v13 will error on this, as React Hooks do not
-work if you rerturn JSX.`);
+wrapping your JSX in a function. ReactOnRails v13 will throw error on this, as React Hooks do not
+work if you return JSX. Update by wrapping the result JSX of ${name} in a fat arrow function.`);
       return renderFunctionResult;
     }
 
