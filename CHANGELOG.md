@@ -11,12 +11,12 @@ We specialize in helping companies to quickly and efficiently move from versions
 ## Contributors
 Please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
-## [Unreleased]
+## Versions
+### [Unreleased]
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
-## UPCOMING 12.0 RELEASE
 ### [12.0.0] - 2020-07-08
 For upgrade instructions, see [docs/basics/upgrading-react-on-rails.md](./docs/basics/upgrading-react-on-rails.md).
 
