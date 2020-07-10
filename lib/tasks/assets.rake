@@ -13,20 +13,30 @@ unless ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
   # the build command.
   ENV["WEBPACKER_PRECOMPILE"] = "false"
 
+  precompile_tasks = lambda {
+    Rake::Task["react_on_rails:assets:webpack"].invoke
+    puts "Invoking task webpacker:clean from React on Rails"
+
+    # VERSIONS is per the rails/webpacker clean method definition.
+    # We set it very big so that it is not used, and then clean just
+    # removes files older than 1 hour.
+    VERSIONS = 100_000
+    Rake::Task["webpacker:clean"].invoke(VERSIONS)
+  }
+
   if Rake::Task.task_defined?("assets:precompile")
     Rake::Task["assets:precompile"].enhance do
-      Rake::Task["react_on_rails:assets:webpack"].invoke
-      puts "Invoking task webpacker:clean from React on Rails"
-      Rake::Task["webpacker:clean"].invoke
+      precompile_tasks.call
     end
   else
-    Rake::Task.define_task("assets:precompile" => ["react_on_rails:assets:webpack",
-                                                   "webpacker:clean"])
+    Rake::Task.define_task("assets:precompile") do
+      precompile_tasks.call
+    end
   end
 end
 
 # Sprockets independent tasks
-# rubocop:disable Metrics/ModuleLength
+# rubocop:disable Metrics/BlockLength
 namespace :react_on_rails do
   namespace :assets do
     desc <<-DESC.strip_heredoc
@@ -56,4 +66,4 @@ namespace :react_on_rails do
     end
   end
 end
-# rubocop:enable Metrics/ModuleLength
+# rubocop:enable Metrics/BlockLength
