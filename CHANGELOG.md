@@ -16,6 +16,9 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+### [12.0.1] - 2020-07-09
+#### Fixed
+- Changed invocation of webpacker:clean to use a very large number of versions so it does not acidentally delete the server-bundle.js. [PR 1306](https://github.com/shakacode/react_on_rails/pull/1306) by By [justin808](https://github.com/justin808).
 
 ### [12.0.0] - 2020-07-08
 For upgrade instructions, see [docs/basics/upgrading-react-on-rails.md](./docs/basics/upgrading-react-on-rails.md).
@@ -927,7 +930,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.1...master
+[12.0.1]: https://github.com/shakacode/react_on_rails/compare/12.0.0...12.0.1
 [12.0.0]: https://github.com/shakacode/react_on_rails/compare/11.3.0...12.0.0
 [11.3.0]: https://github.com/shakacode/react_on_rails/compare/11.2.2...11.3.0
 [11.2.2]: https://github.com/shakacode/react_on_rails/compare/11.2.1...11.2.2
