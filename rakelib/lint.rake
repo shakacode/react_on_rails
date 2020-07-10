@@ -2,7 +2,7 @@
 
 require_relative "task_helpers"
 
-namespace :lint do # rubocop:disable Metrics/BlockLength
+namespace :lint do
   include ReactOnRails::TaskHelpers
 
   desc "Run Rubocop as shell"

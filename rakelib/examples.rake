@@ -6,7 +6,7 @@
 # Also see example_type.rb
 
 require "yaml"
-require 'rails/version'
+require "rails/version"
 
 require_relative "example_type"
 require_relative "task_helpers"

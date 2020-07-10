@@ -67,8 +67,6 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   sh_in_dir(gem_root, release_it_command)
 
   # Release the new gem version
-  unless is_dry_run
-    sh_in_dir(gem_root, "gem release")
-  end
+  sh_in_dir(gem_root, "gem release") unless is_dry_run
 end
 # rubocop:enable Metrics/BlockLength

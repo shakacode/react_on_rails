@@ -26,6 +26,7 @@ unless ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
 end
 
 # Sprockets independent tasks
+# rubocop:disable Metrics/ModuleLength
 namespace :react_on_rails do
   namespace :assets do
     desc <<-DESC.strip_heredoc
@@ -55,3 +56,4 @@ namespace :react_on_rails do
     end
   end
 end
+# rubocop:enable Metrics/ModuleLength
