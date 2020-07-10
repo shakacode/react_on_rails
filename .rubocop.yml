@@ -10,6 +10,7 @@ AllCops:
     - '**/config.ru'
     - 'Gemfile'
     - '**/*.rb'
+    - '**/*.rake'
 
   Exclude:
     - 'vendor/**/*'

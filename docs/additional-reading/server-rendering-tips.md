@@ -22,6 +22,9 @@ Be sure to use mini_racer. See [issues/428](https://github.com/shakacode/react_o
 1. First be sure your code works with server rendering disabled (`prerender: false`)
 2. Be sure that `config.trace` is true. You will get the server invocation code that renders your component. If you're not using Webpacker, you will also get the whole file used to setup the JavaScript context.
 
+## CSS
+Server bundles must always have CSS Extracted
+
 ## setTimeout, setInterval, and clearTimeout
 
 These methods are polyfilled for server rendering to be no-ops. We log calls to these when in `trace` mode. In the past, some libraries, namely babel-polyfill, did call setTimout. 
