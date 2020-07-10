@@ -36,7 +36,7 @@ unless ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
 end
 
 # Sprockets independent tasks
-# rubocop:enable Metrics/BlockLength
+# rubocop:disable Metrics/BlockLength
 namespace :react_on_rails do
   namespace :assets do
     desc <<-DESC.strip_heredoc
@@ -66,4 +66,4 @@ namespace :react_on_rails do
     end
   end
 end
-# rubocop:disable Metrics/BlockLength
+# rubocop:enable Metrics/BlockLength
