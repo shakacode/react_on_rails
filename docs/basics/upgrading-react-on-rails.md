@@ -28,20 +28,22 @@ return a React component, or you are registering a React component defined by a 
 Please see [Render-Functions and the Rails Context](./render-functions-and-railscontext.md) for
 more information on what a Render-Function is.
 
-##### Correct
+##### Update required for registered functions taking exactly 2 params.
 
 Registered Objects are of the following types. Either of these will work:
-1. Takes only zero or one params and you return a React Element, often JSX.
+1. Function that takes only zero or one params and you return a React Element, often JSX.  If the function takes zero or one params, there is **no migration needed** for that function.
     ```js
     export default (props) => <Component {...props} />;
     ```       
-2. Takes **2 params** and returns **a React function or class component**. A function
-   component is a function that takes zero or one params and returns a React Element, like JSX.
+2. Function that takes **2 params** and returns **a React function or class component**. A function
+   component is a function that takes zero or one params and returns a React Element, like JSX. The correct syntax
+   looks like:
     ```js
-    export default (props, _railsContext) => () => <Component {...props} />;
+    export default (props, railsContext) => () => <Component {{...props, railsContext}} />;
     ```
-   Note, you cannot return a React Element (JSX).
-3. Takes **3 params** and uses the 3rd param, `domNodeId`, to call `ReactDOM.hydrate`
+   Note, you cannot return a React Element (JSX). See below for the fix.
+3. Function that takes **3 params** and uses the 3rd param, `domNodeId`, to call `ReactDOM.hydrate`. If the function takes 3 params, there is **no migration needed** for that function.
+4. ES6 or ES5 class. There is **no migration needed**.
   
 Previously, with case number 2, you could return a React Element.
 
@@ -51,7 +53,7 @@ The fix is simple. Here is an example of the change you'll do:
  
 ##### Broken, as this function takes two params and it returns a React Element from a JSX Literal
 ```js
-export default (props, _railsContext) => <Component {...props} />;
+export default (props, railsContext) => <Component {{...props, railsContext} />;
 ```
 
 If you make this mistake, you'll get this warning
