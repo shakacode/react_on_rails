@@ -30,18 +30,19 @@ more information on what a Render-Function is.
 
 ##### Update required for registered functions taking exactly 2 params.
 
-Registered Objects are of the following types. Either of these will work:
-1. Function that takes only zero or one params and you return a React Element, often JSX.  If the function takes zero or one params, there is **no migration needed** for that function.
+Registered Objects are of the following type:
+1. **Function that takes only zero or one params and you return a React Element**, often JSX.  If the function takes zero or one params, there is **no migration needed** for that function.
     ```js
     export default (props) => <Component {...props} />;
     ```       
-2. Function that takes **2 params** and returns **a React function or class component**. A function
-   component is a function that takes zero or one params and returns a React Element, like JSX. The correct syntax
+2. Function that takes **2 params** and returns **a React function or class component**. _Migration is needed as the older syntax returned a React Element._
+   A function component is a function that takes zero or one params and returns a React Element, like JSX. The correct syntax
    looks like:
     ```js
     export default (props, railsContext) => () => <Component {{...props, railsContext}} />;
     ```
-   Note, you cannot return a React Element (JSX). See below for the fix.
+   Note, you cannot return a React Element (JSX). See below for the migration steps. If your function that took **two params returned
+   an Object**, then no migration is required.
 3. Function that takes **3 params** and uses the 3rd param, `domNodeId`, to call `ReactDOM.hydrate`. If the function takes 3 params, there is **no migration needed** for that function.
 4. ES6 or ES5 class. There is **no migration needed**.
   
