@@ -34,7 +34,7 @@
     "jquery": "^3.4.1",
     "jquery-ujs": "^1.2.2",
     "loader-utils": "^1.2.3",
-    "lodash": "^4.17.4",
+    "lodash": "^4.17.19",
     "node-libs-browser": "^2.2.1",
     "node-sass": "^4.12.0",
     "nps": "^5.9.3",
