@@ -1,11 +1,13 @@
 {
   "name": "react-on-rails-pro-vm-renderer",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "protocolVersion": "1.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
   "main": "packages/vm-renderer/src/ReactOnRailsProVmRenderer.js",
   "bin": "./packages/vm-renderer/src/default-vm-renderer.js",
-  "publishConfig": { "registry": "https://npm.pkg.github.com/" },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
   "release-it": {
     "github": {
       "release": true
