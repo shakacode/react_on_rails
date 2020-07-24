@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file. Items under
 
 ## [1.5.4] - 2020-07-22
 ### Added
-- Support for Github packages
+- Added support for Github packages. To switch from using the Github private repo with a tag, request a new auth token from justin@shakacode.com.
 
 ## [1.5.3] - 2020-06-30
 ### Added
@@ -114,7 +114,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.3...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.4...HEAD
+[1.5.4]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.3...1.5.4
 [1.5.3]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.2...1.5.3
 [1.5.2]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.1...1.5.2
 [1.5.1]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.0...1.5.1
