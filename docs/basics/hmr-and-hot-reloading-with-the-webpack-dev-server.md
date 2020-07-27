@@ -43,7 +43,49 @@ If you don't configure these two to false, you'll see errors like:
 * "ReferenceError: window is not defined" (if hmr is true)
 * "TypeError: Cannot read property 'prototype' of undefined" (if inline is true)
 
+# HMR using react-refresh-webpack-plugin
+If you use the webpack-dev-server and want to enable HMR follow next steps:
 
+1. In `config/webpacker.yml` set **hmr** and **inline** server properties to true 
+```
+   dev_server:
+    https: false
+    host: localhost
+    port: 3035
+    public: localhost:3035
+    hmr: true
+    # Inline should be set to true if using HMR
+    inline: true
+```
+2. Add react refresh packages:
+` npm install @pmmmwh/react-refresh-webpack-plugin react-refresh --development` or ` yarn add @pmmmwh/react-refresh-webpack-plugin react-refresh -D`
 
+3. In development environment `config/webpack/development.js` add react-refresh-webpack-plugin in plugins array and react-refresh plugin for babel loader.
 
+```
+  //plugins
+  environment.plugins.append(
+     'ReactRefreshWebpackPlugin',
+      isDevelopment && new ReactRefreshWebpackPlugin()
+  );
 
+  //loaders
+  const babelLoader = environment.loaders.get('babel');
+  babelLoader.use[0].options.plugins = [].filter(Boolean);
+  isDevelopment &&  babelLoader.use[0].options.plugins.push(require.resolve('react-refresh/babel'));
+
+```
+Thats it :).
+Now Browser should reflect changes in your .js code.
+
+On sockjs error in browser console `GET http://localhost:[port]/sockjs-node/info?t=[xxxxxxxxxx] 404 (Not Found)` you have to adjust sockedPort option to match webpack dev-server port `ReactRefreshWebpackPlugin`. For example:
+ ```
+ new ReactRefreshWebpackPlugin({
+   sockPort: 3035
+ })
+```
+
+If you have troubles with rspec tests you could wrap plugins in conditional `if(process.env.RAILS_ENV === 'development')`. 
+If by some reason plugin doesnt work you could revert changes and left only devServer hmr/inline to true affecting only css files.
+
+These plugins are working and tested with babel 7, webpacker 5, bootstrap 4, jest 26, core-js 3, node 12.10.0, react-refresh-webpack-plugin 0.0.3, react-refresh 0.8.3 configuration
