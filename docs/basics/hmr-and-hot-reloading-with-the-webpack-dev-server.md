@@ -8,21 +8,17 @@ The webpack-dev-server provides:
    abruptly lose any tweaks within the Chrome development tools.
 3. Optional hot-reloading. The older react-hot-loader has been deprecated in 
    favor of [fast-refresh](https://reactnative.dev/docs/fast-refresh).
-   For use with webpack, see [react-refresh-webpack-plugin](https://github.com/pmmmwh/react-refresh-webpack-plugin).
+   For use with webpack, see **Client Side rendering and HMR using react-refresh-webpack-plugin** section bellow or visit [react-refresh-webpack-plugin](https://github.com/pmmmwh/react-refresh-webpack-plugin) for additional details.
 
 If you are ***not*** using server-side rendering (***not*** using `prerender: true`),
 then you can follow all the regular docs for using the `bin/webpack-dev-server` 
 during development.
-
 
 # Server Side Rendering with the Default rails/webpacker bin/webpack-dev-server
 
 If you are using server-side rendering, then you have a couple options. The
 recommended technique is to have a different webpack configuration for server
 rendering.  
-
-
-
 
 ## If you use the same Webpack setup for your server and client bundles 
 If you do use the webpack-dev-server for prerendering, be sure to set the
@@ -43,42 +39,44 @@ If you don't configure these two to false, you'll see errors like:
 * "ReferenceError: window is not defined" (if hmr is true)
 * "TypeError: Cannot read property 'prototype' of undefined" (if inline is true)
 
-# HMR using react-refresh-webpack-plugin
-If you use the webpack-dev-server and want to enable HMR follow next steps:
+# Client Side rendering and HMR using react-refresh-webpack-plugin
+Basic installation enabling HMR for `./bin/webpack-dev-server`
 
-1. In `config/webpacker.yml` set **hmr** and **inline** server properties to true 
-```
-   dev_server:
-    https: false
-    host: localhost
-    port: 3035
-    public: localhost:3035
-    hmr: true
-    # Inline should be set to true if using HMR
-    inline: true
-```
+1. In `config/webpacker.yml` set **hmr** and **inline** server properties to true. 
+    ```
+       dev_server:
+        https: false
+        host: localhost
+        port: 3035
+        public: localhost:3035
+        hmr: true
+        # Inline should be set to true if using HMR
+        inline: true
+    ```
+
 2. Add react refresh packages:
-` npm install @pmmmwh/react-refresh-webpack-plugin react-refresh --development` or ` yarn add @pmmmwh/react-refresh-webpack-plugin react-refresh -D`
+    ` npm install @pmmmwh/react-refresh-webpack-plugin react-refresh --development` or ` yarn add @pmmmwh/react-refresh-webpack-plugin react-refresh -D`
 
-3. In development environment `config/webpack/development.js` add react-refresh-webpack-plugin in plugins array and react-refresh plugin for babel loader.
+3. HMR is for development purpose only, so in `config/webpack/development.js` add react-refresh-webpack-plugin in plugins array and react-refresh plugin for babel loader.
 
-```
-  //plugins
-  environment.plugins.append(
-     'ReactRefreshWebpackPlugin',
-      isDevelopment && new ReactRefreshWebpackPlugin()
-  );
+    ```
+      //plugins
+      environment.plugins.append(
+         'ReactRefreshWebpackPlugin',
+          isDevelopment && new ReactRefreshWebpackPlugin()
+      );
+    
+      //loaders
+      const babelLoader = environment.loaders.get('babel');
+      babelLoader.use[0].options.plugins = [].filter(Boolean);
+      isDevelopment &&  babelLoader.use[0].options.plugins.push(require.resolve('react-refresh/babel'));
+    
+    ```
 
-  //loaders
-  const babelLoader = environment.loaders.get('babel');
-  babelLoader.use[0].options.plugins = [].filter(Boolean);
-  isDevelopment &&  babelLoader.use[0].options.plugins.push(require.resolve('react-refresh/babel'));
+That's it :).
+Now Browser should reflect .js along with .css changes without reloading.
 
-```
-Thats it :).
-Now Browser should reflect changes in your .js code.
-
-On sockjs error in browser console `GET http://localhost:[port]/sockjs-node/info?t=[xxxxxxxxxx] 404 (Not Found)` you have to adjust sockedPort option to match webpack dev-server port `ReactRefreshWebpackPlugin`. For example:
+On sockjs error in browser console `GET http://localhost:[port]/sockjs-node/info?t=[xxxxxxxxxx] 404 (Not Found)` you have to adjust sockedPort option to match webpack dev-server port in `ReactRefreshWebpackPlugin`. For example:
  ```
  new ReactRefreshWebpackPlugin({
    sockPort: 3035
@@ -86,6 +84,24 @@ On sockjs error in browser console `GET http://localhost:[port]/sockjs-node/info
 ```
 
 If you have troubles with rspec tests you could wrap plugins in conditional `if(process.env.RAILS_ENV === 'development')`. 
-If by some reason plugin doesnt work you could revert changes and left only devServer hmr/inline to true affecting only css files.
+```
+if(process.env.RAILS_ENV === 'development') {
+    //plugins
+    environment.plugins.append(
+        'ReactRefreshWebpackPlugin',
+        isDevelopment && new ReactRefreshWebpackPlugin({
+            overlay: {
+                sockPort: 3035
+            }
+        })
+    );
 
-These plugins are working and tested with babel 7, webpacker 5, bootstrap 4, jest 26, core-js 3, node 12.10.0, react-refresh-webpack-plugin 0.0.3, react-refresh 0.8.3 configuration
+    //loaders
+    const babelLoader = environment.loaders.get('babel');
+    babelLoader.use[0].options.plugins = [].filter(Boolean);
+    isDevelopment &&  babelLoader.use[0].options.plugins.push(require.resolve('react-refresh/babel'));
+}
+```
+If by some reason plugin doesn't work you could revert changes and left only devServer hmr/inline to true affecting only css files.
+
+These plugins are working and tested with babel 7, webpacker 5, bootstrap 4, jest 26, core-js 3, node 12.10.0, react-refresh-webpack-plugin 0.0.3, react-refresh 0.8.3 configuration.
