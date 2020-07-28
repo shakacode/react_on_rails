@@ -63,7 +63,9 @@ Basic installation enabling HMR for `./bin/webpack-dev-server`
       //plugins
       environment.plugins.append(
          'ReactRefreshWebpackPlugin',
-          isDevelopment && new ReactRefreshWebpackPlugin()
+          isDevelopment && new ReactRefreshWebpackPlugin({                                       
+                             sockPort: 3035
+                           })
       );
     
       //loaders
@@ -72,16 +74,10 @@ Basic installation enabling HMR for `./bin/webpack-dev-server`
       isDevelopment &&  babelLoader.use[0].options.plugins.push(require.resolve('react-refresh/babel'));
     
     ```
+    We added sockedPort option in `ReactRefreshWebpackPlugin` to match webpack dev-server port. Thats way we make sockjs works properly and suppress error in browser console `GET http://localhost:[port]/sockjs-node/info?t=[xxxxxxxxxx] 404 (Not Found)`. 
 
 That's it :).
 Now Browser should reflect .js along with .css changes without reloading.
-
-On sockjs error in browser console `GET http://localhost:[port]/sockjs-node/info?t=[xxxxxxxxxx] 404 (Not Found)` you have to adjust sockedPort option to match webpack dev-server port in `ReactRefreshWebpackPlugin`. For example:
- ```
- new ReactRefreshWebpackPlugin({
-   sockPort: 3035
- })
-```
 
 If you have troubles with rspec tests you could wrap plugins in conditional `if(process.env.RAILS_ENV === 'development')`. 
 ```
