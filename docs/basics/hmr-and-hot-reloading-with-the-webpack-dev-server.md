@@ -40,9 +40,9 @@ If you don't configure these two to false, you'll see errors like:
 * "TypeError: Cannot read property 'prototype' of undefined" (if inline is true)
 
 # Client Side rendering and HMR using react-refresh-webpack-plugin
-Basic installation enabling HMR for `./bin/webpack-dev-server`
-
-1. In `config/webpacker.yml` set **hmr** and **inline** server properties to true. 
+##Basic installation
+To enable HMR functionality you have to use `./bin/webpack-dev-server`
+1. In `config/webpacker.yml` set **hmr** and **inline** `dev_server` properties to true. 
     ```
        dev_server:
         https: false
@@ -55,49 +55,53 @@ Basic installation enabling HMR for `./bin/webpack-dev-server`
     ```
 
 2. Add react refresh packages:
-    ` npm install @pmmmwh/react-refresh-webpack-plugin react-refresh --development` or ` yarn add @pmmmwh/react-refresh-webpack-plugin react-refresh -D`
+    ` npm install @pmmmwh/react-refresh-webpack-plugin@0.4.0-beta.5 react-refresh --development` or ` yarn add @pmmmwh/react-refresh-webpack-plugin@0.4.0-beta.5 react-refresh -D`
 
-3. HMR is for development purpose only, so in `config/webpack/development.js` add react-refresh-webpack-plugin in plugins array and react-refresh plugin for babel loader.
+3. HMR is for development purpose only, so in `config/webpack/development.js` add react-refresh-webpack-plugin in plugins array
 
     ```
+   const isDevelopment = process.env.NODE_ENV !== 'production';
       //plugins
       environment.plugins.append(
          'ReactRefreshWebpackPlugin',
           isDevelopment && new ReactRefreshWebpackPlugin({                                       
                              sockPort: 3035
                            })
-      );
-    
-      //loaders
-      const babelLoader = environment.loaders.get('babel');
-      babelLoader.use[0].options.plugins = [].filter(Boolean);
-      isDevelopment &&  babelLoader.use[0].options.plugins.push(require.resolve('react-refresh/babel'));
-    
+      );  
     ```
     We added sockedPort option in `ReactRefreshWebpackPlugin` to match webpack dev-server port. Thats way we make sockjs works properly and suppress error in browser console `GET http://localhost:[port]/sockjs-node/info?t=[xxxxxxxxxx] 404 (Not Found)`. 
 
+4. Add react-refresh plugin in `babel.config.js`
+    ```
+      module.export = function(api) {
+        api.cache.using(() => process.env.NODE_ENV);
+        return {
+          plugins: [api.env('development') && 'react-refresh/babel'].filter(Boolean)
+        }
+      }
+    ```
+   
+   or in babel-loader options in `config/webpack/development.js`
+   ```   
+      //loaders
+        const babelLoader = environment.loaders.get('babel');
+        babelLoader.use[0].options.plugins = [].filter(Boolean);
+        isDevelopment &&  babelLoader.use[0].options.plugins.push(require.resolve('react-refresh/babel'));
+   ```
 That's it :).
 Now Browser should reflect .js along with .css changes without reloading.
 
-If you have troubles with rspec tests you could wrap plugins in conditional `if(process.env.RAILS_ENV === 'development')`. 
-```
-if(process.env.RAILS_ENV === 'development') {
-    //plugins
-    environment.plugins.append(
-        'ReactRefreshWebpackPlugin',
-        isDevelopment && new ReactRefreshWebpackPlugin({
-            overlay: {
-                sockPort: 3035
-            }
-        })
-    );
-
-    //loaders
-    const babelLoader = environment.loaders.get('babel');
-    babelLoader.use[0].options.plugins = [].filter(Boolean);
-    isDevelopment &&  babelLoader.use[0].options.plugins.push(require.resolve('react-refresh/babel'));
-}
-```
 If by some reason plugin doesn't work you could revert changes and left only devServer hmr/inline to true affecting only css files.
 
-These plugins are working and tested with babel 7, webpacker 5, bootstrap 4, jest 26, core-js 3, node 12.10.0, react-refresh-webpack-plugin 0.0.3, react-refresh 0.8.3 configuration.
+These plugins are working and tested with 
+   - babel 7
+   - webpacker 5
+   - bootstrap 4
+   - jest 26
+   - core-js 3
+   - node 12.10.0
+   - react-refresh-webpack-plugin@0.4.0-beta.5
+   - react-refresh 0.8.3 
+   - react_on_rails 11.1.4 
+   
+   configuration.
