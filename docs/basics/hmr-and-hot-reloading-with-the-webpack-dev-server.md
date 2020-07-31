@@ -60,11 +60,11 @@ To enable HMR functionality you have to use `./bin/webpack-dev-server`
 3. HMR is for development purpose only, so in `config/webpack/development.js` add react-refresh-webpack-plugin in plugins array
 
     ```
-   const isDevelopment = process.env.NODE_ENV !== 'production';
+      const isDevelopment = process.env.WEBPACK_DEV_SERVER;
       //plugins
       environment.plugins.append(
          'ReactRefreshWebpackPlugin',
-          isDevelopment && new ReactRefreshWebpackPlugin({                                       
+         isDevelopment && new ReactRefreshWebpackPlugin({                                       
                              sockPort: 3035
                            })
       );  
@@ -74,9 +74,8 @@ To enable HMR functionality you have to use `./bin/webpack-dev-server`
 4. Add react-refresh plugin in `babel.config.js`
     ```
       module.export = function(api) {
-        api.cache.using(() => process.env.NODE_ENV);
         return {
-          plugins: [api.env('development') && 'react-refresh/babel'].filter(Boolean)
+          plugins: [process.env.WEBPACK_DEV_SERVER && 'react-refresh/babel'].filter(Boolean)
         }
       }
     ```
