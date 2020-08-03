@@ -1,5 +1,11 @@
 # React on Rails Basic Tutorial
 
+-----
+
+**August 2, 2020**: See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) for a new way to setup the creation of your SSR bundle with `rails/webpacker`. This file will be update shortly. Most of it is still relevant.
+
+-----
+
 *Updated for Ruby 2.7.1, Rails 6.0.3.1, and React on Rails v12.0.0*
 
 This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
