@@ -38,8 +38,8 @@ gem "web-console", group: :development
 # below are copied from spec/dummy/Gemfile
 gem "capybara"
 gem "capybara-screenshot"
-gem "rspec-rails"
 gem "rspec_junit_formatter"
+gem "rspec-rails"
 # Trouble installing on Sierra
 # gem "capybara-webkit"
 gem "commonmarker"

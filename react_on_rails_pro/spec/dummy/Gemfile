@@ -68,7 +68,7 @@ group :test do
   gem "generator_spec"
   gem "launchy"
   gem "rails-controller-testing"
-  gem "rspec-rails"
   gem "rspec_junit_formatter"
+  gem "rspec-rails"
   gem "webdrivers"
 end
