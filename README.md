@@ -38,7 +38,7 @@ Be sure to see the [CHANGELOG.md](./CHANGELOG.md) and read the upgrade instructi
 #### About
 React on Rails integrates Rails with (server rendering of) Facebook's [React](https://github.com/facebook/react) front-end framework.
 
-This project is sponsored by the software consulting firm [ShakaCode](https://www.shakacode.com). We focus on React front-ends, often with Ruby on Rails or Gatsby, using TypeScript or ReasonML. The best way to see what we do is to see the details of [our recent work](https://www.shakacode.com/recent-work).
+This project is maintained by the software consulting firm [ShakaCode](https://www.shakacode.com). We focus on Ruby on Rails applications with React front-ends, often using TypeScript or ReasonML. We also build Gatsby sites. See [our recent work](https://www.shakacode.com/recent-work) for examples of what we do.
 
 Interested in optimizing your webpack setup for React on Rails including code
 splitting with [react-router](https://github.com/ReactTraining/react-router#readme), 
