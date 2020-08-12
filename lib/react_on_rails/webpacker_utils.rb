@@ -28,10 +28,10 @@ module ReactOnRails
       # Next line will throw if the file or manifest does not exist
       hashed_bundle_name = Webpacker.manifest.lookup!(bundle_name)
 
-      # support for hashing the server-bundle and having that built
-      # by a webpack watch process and not served by the webpack-dev-server, then we
-      # need an extra config value "same_bundle_for_client_and_server" where a value of false
-      # would mean that the bundle is created by a separate webpack watch process.
+      # Support for hashing the server-bundle and having that built
+      # the webpack-dev-server is provided by the config value
+      # "same_bundle_for_client_and_server" where a value of true
+      # would mean that the bundle is created by the webpack-dev-server
       is_server_bundle = bundle_name == ReactOnRails.configuration.server_bundle_js_file
 
       if Webpacker.dev_server.running? && (!is_server_bundle ||

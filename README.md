@@ -277,7 +277,6 @@ Browse the links in the [Summary Table of Contents](./SUMMARY.md)
 Here are some highly recommended next articles to read:
 
 1. [How React on Rails Works](docs/outdated/how-react-on-rails-works.md)
-1. [Recommended Project Structure](./docs/basics/recommended-project-structure.md)
 1. [Webpack Configuration](./docs/basics/webpack-configuration.md)
 1. [View Helpers API](./docs/api/view-helpers-api.md) 
 1. [Caching and Performance: React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).

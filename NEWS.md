@@ -2,6 +2,11 @@
 
 *We'll keep a history of the news. A few bullets at the top will also show on the [README.md](./README.md).*
 
+* July 8, 2020: Release **v12**.
+  1. **React Hooks Support** for top level components
+  2. **Typescript bindings**
+  3. **rails/webpacker** "just works" with React on Rails by default.
+  4. i18n support for generating a JSON file rather than a JS file.
 * 2018-02-27: **Version 10.1.2** Supports the React API for ReactDOM.hydrate.
 * 2017-09-06: **VERSION 9.0.0 shipped!** This version depends on Webpacker directly. See [Upgrading React on Rails](./docs/basics/upgrading-react-on-rails.md) for more concise instructions on upgrading.
 * Always see the [CHANGELOG.md](./CHANGELOG.md) for the latest project changes.
