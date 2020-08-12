@@ -1,8 +1,6 @@
 const { config } = require('@rails/webpacker');
 const environment = require('./environment');
 const merge = require('webpack-merge');
-
-const devBuild = process.env.NODE_ENV === 'production' ? 'production' : 'development';
 const webpack = require('webpack');
 
 const clientConfigObject = environment.toWebpackConfig();
@@ -16,9 +14,6 @@ const configureServer = () => {
   const serverWebpackConfig = merge({}, clientConfigObject);
 
   // We just want the single server bundle entry
-  // const serverEntry = {
-  //   'server-bundle': environment.entry.get('server-bundle'),
-  // }
   serverWebpackConfig.entry = './client/app/startup/serverRegistration.jsx';
 
   // Remove the mini-css-extract-plugin from the style loaders because
@@ -49,15 +44,6 @@ const configureServer = () => {
     minimize: false,
   };
   serverWebpackConfig.plugins.unshift(new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
-
-  serverWebpackConfig.plugins.push(
-    new webpack.DefinePlugin({
-      TRACE_TURBOLINKS: true,
-      'process.env': {
-        NODE_ENV: devBuild,
-      },
-    }),
-  );
 
   // Don't hash the server bundle b/c would conflict with the client manifest
   // And no need for the MiniCssExtractPlugin
