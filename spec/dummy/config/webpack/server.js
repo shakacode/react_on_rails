@@ -33,7 +33,7 @@ const configureServer = () => {
     filename: 'server-bundle.js',
     globalObject: 'this',
     // if using a node server renderer, uncomment the next line
-    libraryTarget: 'commonjs2',
+    // libraryTarget: 'commonjs2',
     path: config.outputPath,
     publicPath: config.outputPath,
     // https://webpack.js.org/configuration/output/#outputglobalobject
