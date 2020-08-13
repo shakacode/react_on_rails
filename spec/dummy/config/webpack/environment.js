@@ -19,20 +19,20 @@ sassLoader.use.push({
 });
 
 const optimization = {
-    splitChunks: {
-      chunks: 'async',
-      cacheGroups: {
-        vendor: {
-          chunks: 'async',
-          name: 'vendor',
-          test: 'vendor',
-          enforce: true,
-        },
+  splitChunks: {
+    chunks: 'async',
+    cacheGroups: {
+      vendor: {
+        chunks: 'async',
+        name: 'vendor',
+        test: 'vendor',
+        enforce: true,
       },
     },
-  };
+  },
+};
 
-environment.splitChunks((config) => Object.assign({}, config, { optimization: optimization }));
+environment.splitChunks(config => Object.assign({}, config, { optimization: optimization }));
 
 //adding urlLoader
 const urlLoader = {
