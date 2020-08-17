@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [1.5.5] - 2020-08-10
+### Added
+- Added request retrying in case of timeouts. [PR 136](https://github.com/shakacode/react_on_rails_pro/pull/136) by [ashgaliyev](https://github.com/ashgaliyev).
+
 ## [1.5.4] - 2020-07-22
 ### Added
 - Added support for Github packages. To switch from using the Github private repo with a tag, request a new auth token from justin@shakacode.com.
