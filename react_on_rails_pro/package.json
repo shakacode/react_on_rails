@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-pro-vm-renderer",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "protocolVersion": "1.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
   "main": "packages/vm-renderer/src/ReactOnRailsProVmRenderer.js",
