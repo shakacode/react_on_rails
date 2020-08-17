@@ -15,6 +15,7 @@ describe "Upload asset", if: ENV["SERVER_RENDERER"] != "ExecJS" do
                                server_renderer: "VmRenderer",
                                renderer_password: "myPassword1",
                                renderer_url: "http://localhost:3800",
+                               renderer_request_retry_limit: 5,
                                assets_to_copy: [
                                  Rails.root.join("public", "webpack", "production", "loadable-stats.json"),
                                  Rails.root.join("public", "webpack", "production", "loadable-stats2.json")
