@@ -8,7 +8,6 @@
   + [How React on Rails Works](docs/outdated/how-react-on-rails-works.md)
   + [Client vs. Server Rendering](./docs/basics/client-vs-server-rendering.md)
   + [React Server Rendering](./docs/basics/react-server-rendering.md)
-  + [Recommended Project Structure](./docs/basics/recommended-project-structure.md)
   + [Render-Functions and the RailsContext](docs/basics/render-functions-and-railscontext.md)
   + [Caching and Performance: React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
   + [Deployment](docs/basics/deployment.md).
@@ -28,6 +27,7 @@
   + [Updating Dependencies](./docs/additional-reading/updating-dependencies.md)
   + [Manual Installation Overview](docs/outdated/manual-installation-overview.md)
   + [Upgrading from rails/webpacker v3 to v4](docs/additional-reading/upgrade-webpacker-v3-to-v4.md)
+  + [Recommended Project Structure](docs/additional-reading/recommended-project-structure.md)
   
 ## **Rails**
   + [Rails Engine Integration](./docs/additional-reading/rails-engine-integration.md)
