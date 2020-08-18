@@ -1,6 +1,6 @@
 # React Server Rendering
 
-See also [Client vs. Server Rendering](./client-vs-server-rendering.md)
+See also [Client vs. Server Rendering](./client-vs-server-rendering.md).
 
 ## What is the easiest way to setup a webpack configuration for server-side-rendering?
 See the example webpack setup here: [github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh).
