@@ -16,17 +16,6 @@ const configureServer = () => {
   // We just want the single server bundle entry
   serverWebpackConfig.entry = './client/app/startup/serverRegistration.jsx';
 
-  // Remove the mini-css-extract-plugin from the style loaders because
-  // the client build will handle exporting CSS.
-  // replace file-loader with null-loader
-  serverWebpackConfig.module.rules.forEach(loader => {
-    if (loader.use && loader.use.filter) {
-      loader.use = loader.use.filter(
-        item => !(typeof item === 'string' && item.match(/mini-css-extract-plugin/)),
-      );
-    }
-  });
-
   // Custom output for the server-bundle that matches the config in
   // config/initializers/react_on_rails.rb
   serverWebpackConfig.output = {
@@ -46,11 +35,9 @@ const configureServer = () => {
   serverWebpackConfig.plugins.unshift(new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
 
   // Don't hash the server bundle b/c would conflict with the client manifest
-  // And no need for the MiniCssExtractPlugin
   serverWebpackConfig.plugins = serverWebpackConfig.plugins.filter(
     plugin =>
-      plugin.constructor.name !== 'WebpackAssetsManifest' &&
-      plugin.constructor.name !== 'MiniCssExtractPlugin',
+      plugin.constructor.name !== 'WebpackAssetsManifest'
   );
 
   // Critical due to https://github.com/rails/webpacker/pull/2644
