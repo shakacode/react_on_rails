@@ -24,7 +24,7 @@ const configureServer = () => {
     // if using a node server renderer, uncomment the next line
     // libraryTarget: 'commonjs2',
     path: config.outputPath,
-    publicPath: config.outputPath,
+    publicPath: config.publicPath,
     // https://webpack.js.org/configuration/output/#outputglobalobject
   };
 
@@ -36,8 +36,7 @@ const configureServer = () => {
 
   // Don't hash the server bundle b/c would conflict with the client manifest
   serverWebpackConfig.plugins = serverWebpackConfig.plugins.filter(
-    plugin =>
-      plugin.constructor.name !== 'WebpackAssetsManifest'
+    plugin => plugin.constructor.name !== 'WebpackAssetsManifest',
   );
 
   // Critical due to https://github.com/rails/webpacker/pull/2644
