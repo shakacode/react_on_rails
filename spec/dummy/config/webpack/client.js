@@ -1,16 +1,7 @@
 const environment = require('./environment');
-const devBuild = process.env.NODE_ENV === 'development';
-const isHMR = process.env.WEBPACK_DEV_SERVER === 'TRUE';
-const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
 const merge = require('webpack-merge');
 
 const configureClient = () => {
-  if (devBuild && !isHMR) {
-    environment.loaders
-      .get('sass')
-      .use.find(item => item.loader === 'sass-loader').options.sourceMapContents = false;
-  }
-
   // adding exposeLoader
   const exposeLoader = {
     test: require.resolve('jquery'),
@@ -31,10 +22,6 @@ const configureClient = () => {
     use: [{ loader: 'imports-loader', options: { jQuery: 'jquery' } }],
   };
   environment.loaders.insert('jquery-ujs', jqueryUjsLoader, { after: 'react' });
-
-  if (devBuild && isHMR) {
-    environment.plugins.insert('ReactRefreshWebpackPlugin', new ReactRefreshWebpackPlugin());
-  }
 
   const clientConfigObject = environment.toWebpackConfig();
   // Copy the object using merge b/c the clientConfigObject is non-stop mutable
