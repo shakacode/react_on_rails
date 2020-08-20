@@ -18,7 +18,7 @@ sassLoader.use.push({
   },
 });
 
-environment.splitChunks((config) => Object.assign({}, config, { optimization: { splitChunks: false }}))
+environment.splitChunks((config) => Object.assign({}, config, { optimization: { splitChunks: false } }));
 
 //adding urlLoader
 const urlLoader = {

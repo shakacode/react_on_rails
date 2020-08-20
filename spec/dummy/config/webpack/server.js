@@ -36,7 +36,7 @@ const configureServer = () => {
 
   // Don't hash the server bundle b/c would conflict with the client manifest
   serverWebpackConfig.plugins = serverWebpackConfig.plugins.filter(
-    plugin => plugin.constructor.name !== 'WebpackAssetsManifest',
+    (plugin) => plugin.constructor.name !== 'WebpackAssetsManifest',
   );
 
   // Critical due to https://github.com/rails/webpacker/pull/2644

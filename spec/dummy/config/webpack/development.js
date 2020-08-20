@@ -16,11 +16,11 @@ const developmentOnly = () => {
       'ReactRefreshWebpackPlugin',
       new ReactRefreshWebpackPlugin({
         overlay: {
-          sockPort: devServer.port
-        }
-      })
-    )
-  };
+          sockPort: devServer.port,
+        },
+      }),
+    );
+  }
 };
 
 module.exports = webpackConfig(developmentOnly);
