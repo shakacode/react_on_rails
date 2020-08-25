@@ -39,13 +39,15 @@ install:
   - node -v
   - travis_retry npm i -g yarn
   - travis_retry yarn global add yalc
+  - travis_retry yalc add react-on-rails
   - travis_retry yarn
   - travis_retry bundle install
   - travis_retry yarn run build
   - travis_retry yalc publish
-  - cd spec/dummy/client
+  - cd spec/dummy
   - travis_retry yalc add react-on-rails
   - travis_retry yarn
+  - cd ../..
   - bundle exec rake prepare_for_ci
 
 before_script:
