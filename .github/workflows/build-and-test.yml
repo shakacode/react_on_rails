@@ -27,8 +27,13 @@ jobs:
         echo "Node version: "; node -v
         echo "Yarn version: "; yarn --version
         echo "Bundler version: "; bundle --version
-#    - name: Cache dependencies
-#      uses: actions/cache@v2
-#      with:
-#        path: vendor/bundle
-#        key: v4-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+    - name: Save root node_modules to cache
+      uses: actions/cache@v2
+      with:
+        path: node_modules
+        key: v4-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+    - name: Install Node modules with Yarn for renderer package
+      run: |
+        yarn install --no-progress --no-emoji
+        yarn run eslint -v
+        sudo yarn global add yalc
