@@ -1,0 +1,16 @@
+name: 'Install root node modules'
+description: 'Install Node modules for Renderer package with Yarn and save them to chache'
+runs:
+  using: "composite"
+  steps:
+  - name: Save root node_modules to cache
+    uses: actions/cache@v2
+    with:
+      path: node_modules
+      key: v4-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+  - name: Install Node modules with Yarn for renderer package
+    run: |
+      yarn install --no-progress --no-emoji
+      yarn run eslint -v
+      sudo yarn global add yalc
+    shell: bash

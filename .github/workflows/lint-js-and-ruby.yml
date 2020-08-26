@@ -28,21 +28,13 @@ jobs:
         echo "Node version: "; node -v
         echo "Yarn version: "; yarn --version
         echo "Bundler version: "; bundle --version
-    - name: Save root node_modules to cache
-      uses: actions/cache@v2
-      with:
-        path: node_modules
-        key: v4-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+    - name: Use local my-action
+      uses: ./.github/actions/install-package-node-packages
     - name: Save root ruby gems to cache
       uses: actions/cache@v2
       with:
         path: vendor/bundle
         key: v4-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
-    - name: Install Node modules with Yarn for renderer package
-      run: |
-        yarn install --no-progress --no-emoji
-        yarn run eslint -v
-        sudo yarn global add yalc
     - name: Install Ruby Gems for package
       run: bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
     - name: Linting of Ruby
