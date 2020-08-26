@@ -1,0 +1,34 @@
+name: Build and test
+
+on: [push, pull_request]
+
+jobs:
+  install-package-node-packages:
+    strategy:
+      matrix:
+        ruby: [2.6]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby }}
+    - name: Setup Node
+      uses: ruby/setup-node@v1
+      with:
+        node-version: '12'
+    - name: Print system information
+      run: |
+        echo "Linux release: "; cat /etc/issue
+        echo "Current user: "; whoami
+        echo "Current directory: "; pwd
+        echo "Ruby version: "; ruby -v
+        echo "Node version: "; node -v
+        echo "Yarn version: "; yarn --version
+        echo "Bundler version: "; bundle --version
+#    - name: Cache dependencies
+#      uses: actions/cache@v2
+#      with:
+#        path: vendor/bundle
+#        key: v4-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
