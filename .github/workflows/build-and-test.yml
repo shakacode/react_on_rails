@@ -15,7 +15,7 @@ jobs:
       with:
         ruby-version: ${{ matrix.ruby }}
     - name: Setup Node
-      uses: ruby/setup-node@v1
+      uses: actions/setup-node@v1.4.3
       with:
         node-version: '12'
     - name: Print system information
