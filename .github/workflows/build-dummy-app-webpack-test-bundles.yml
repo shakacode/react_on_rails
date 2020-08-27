@@ -59,7 +59,7 @@ jobs:
     - name: Build test bundles for dummy app
       run: cd spec/dummy && yarn run build:test
     - id: get-sha
-      run: echo "::set-output name=sha::$(git rev-parse HEAD)
+      run: echo "::set-output name=sha::$(git rev-parse HEAD)"
     - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
       uses: actions/cache@v2
       with:
