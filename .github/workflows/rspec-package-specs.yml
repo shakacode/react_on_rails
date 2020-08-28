@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Setup Node
-      uses: actions/setup-node@v1.4.3
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
       with:
-        node-version: ${{ matrix.node }}
+        ruby-version: ${{ matrix.ruby }}
     - name: Print system information
       run: |
         echo "Linux release: "; cat /etc/issue
