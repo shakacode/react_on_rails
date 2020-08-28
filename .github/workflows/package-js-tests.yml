@@ -6,7 +6,6 @@ jobs:
   build:
     strategy:
       matrix:
-        ruby: [2.6]
         node: [12]
     runs-on: ubuntu-latest
     steps:
@@ -20,10 +19,8 @@ jobs:
         echo "Linux release: "; cat /etc/issue
         echo "Current user: "; whoami
         echo "Current directory: "; pwd
-        echo "Ruby version: "; ruby -v
         echo "Node version: "; node -v
         echo "Yarn version: "; yarn --version
-        echo "Bundler version: "; bundle --version
     - name: Save root node_modules to cache
       uses: actions/cache@v2
       with:
