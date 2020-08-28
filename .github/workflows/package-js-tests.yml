@@ -1,4 +1,4 @@
-name: Run JS unit tests for Renderer package
+name: JS unit tests for Renderer package
 
 on: [push, pull_request]
 
