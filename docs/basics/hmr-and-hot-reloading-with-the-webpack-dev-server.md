@@ -58,20 +58,22 @@ To enable HMR functionality you have to use `./bin/webpack-dev-server`
     ` yarn add @pmmmwh/react-refresh-webpack-plugin react-refresh -D`
 
 3. HMR is for use with the webpack-dev-server, so we only add this for the webpack-dev-server.
-    ```
-    const isWebpackDevServer = process.env.WEBPACK_DEV_SERVER;
-    
-    //plugins
-    if(isWebpackDevServer) {
-      environment.plugins.append(
-         'ReactRefreshWebpackPlugin',
-         new ReactRefreshWebpackPlugin({                 
-                           overlay: {
-                               sockPort: 3035
-                           }
-                       })
-      );  
-    }
+   ```
+   const { devServer } = require('@rails/webpacker')
+
+   const isWebpackDevServer = process.env.WEBPACK_DEV_SERVER
+
+   //plugins
+   if (isWebpackDevServer) {
+     environment.plugins.append(
+       'ReactRefreshWebpackPlugin',
+       new ReactRefreshWebpackPlugin({
+         overlay: {
+           sockPort: devServer.port
+         }
+       })
+     )
+   }
     ```
     We added overlay.sockedPort option in `ReactRefreshWebpackPlugin` to match the webpack dev-server port specified in config/webpacker.yml. Thats way we make sockjs works properly and suppress error in browser console `GET http://localhost:[port]/sockjs-node/info?t=[xxxxxxxxxx] 404 (Not Found)`. 
 
