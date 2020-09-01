@@ -18,6 +18,8 @@ sassLoader.use.push({
   },
 });
 
+environment.splitChunks();
+
 //adding urlLoader
 const urlLoader = {
   test: /\.(jpe?g|png|gif|ico|woff)$/,

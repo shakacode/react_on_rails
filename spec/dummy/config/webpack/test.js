@@ -1,9 +1,9 @@
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
-const clientEnvironment = require('./client');
-const serverConfig = require('./server');
-const merge = require('webpack-merge');
+const webpackConfig = require('./webpackConfig');
 
-const clientConfig = clientEnvironment.toWebpackConfig();
+const testOnly = () => {
+  // place any code here that is for test only
+};
 
-module.exports = [clientConfig, serverConfig];
+module.exports = webpackConfig(testOnly);
