@@ -1,6 +1,9 @@
 import type { ReactElement, Component, FunctionComponent, ComponentClass } from 'react';
-import type { Store } from 'redux';
 
+// Don't import redux just for the type definitions
+// See https://github.com/shakacode/react_on_rails/issues/1321
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Store = any;
 
 type ReactComponent = FunctionComponent | ComponentClass | string;
 

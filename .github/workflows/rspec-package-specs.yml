@@ -1,0 +1,45 @@
+name: Rspec test for gem
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        ruby: [2.6]
+        node: [12]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby }}
+    - name: Print system information
+      run: |
+        echo "Linux release: "; cat /etc/issue
+        echo "Current user: "; whoami
+        echo "Current directory: "; pwd
+        echo "Ruby version: "; ruby -v
+        echo "Node version: "; node -v
+        echo "Yarn version: "; yarn --version
+        echo "Bundler version: "; bundle --version
+    - name: Save root ruby gems to cache
+      uses: actions/cache@v2
+      with:
+        path: vendor/bundle
+        key: v4-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
+    - name: Install Ruby Gems for package
+      run: bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+    - name: Run rspec tests
+      run: bundle exec rspec spec/react_on_rails
+    - name: Store test results
+      uses: actions/upload-artifact@v2
+      with:
+        name: main-rspec
+        path: ~/rspec
+    - name: Store artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: main-test-log
+        path: log/test.log

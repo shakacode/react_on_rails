@@ -1,5 +1,7 @@
-import type { Store } from 'redux';
 import type { StoreGenerator } from './types';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Store = any;
 
 const registeredStoreGenerators = new Map();
 const hydratedStores = new Map();

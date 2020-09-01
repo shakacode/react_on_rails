@@ -1,6 +1,5 @@
 import ReactDOM from 'react-dom';
 import type { ReactElement, Component } from 'react';
-import type { Store } from 'redux';
 
 import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
@@ -19,6 +18,9 @@ import type {
   AuthenticityHeaders,
   StoreGenerator
 } from './types/index';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Store = any;
 
 const ctx = context();
 

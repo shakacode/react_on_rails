@@ -71,7 +71,11 @@ module ReactOnRails
       # 1. Using same bundle for both server and client, so server bundle will be hashed in manifest
       # 2. Using a different bundle (different Webpack config), so file is not hashed, and
       #    bundle_js_path will throw so the default path is used without a hash.
-      # 3. Not using webpacker, and this method returns the bundle_js_file_path
+      # 3. The third option of having the server bundle hashed and a different configuration than
+      #    the client bundle is not supported for 2 reasons:
+      #    a. The webpack manifest plugin would have a race condition where the same manifest.json
+      #       is edited by both the webpack-dev-server
+      #    b. There is no good reason to hash the server bundle name.
       return @server_bundle_path if @server_bundle_path && !Rails.env.development?
 
       bundle_name = ReactOnRails.configuration.server_bundle_js_file

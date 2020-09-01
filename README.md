@@ -14,6 +14,8 @@
 *These are the docs for React on Rails 12. To see the version 11 docs, [click here](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
 
 #### News
+**August 2, 2020**: See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) for a new way to setup the creation of your SSR bundle with `rails/webpacker`.
+
 **July 8, 2020**: Release v12 of React on Rails.
 
 **Major Improvements**
@@ -36,7 +38,7 @@ Be sure to see the [CHANGELOG.md](./CHANGELOG.md) and read the upgrade instructi
 #### About
 React on Rails integrates Rails with (server rendering of) Facebook's [React](https://github.com/facebook/react) front-end framework.
 
-This project is sponsored by the software consulting firm [ShakaCode](https://www.shakacode.com). We focus on React front-ends, often with Ruby on Rails or Gatsby, using TypeScript or ReasonML. The best way to see what we do is to see the details of [our recent work](https://www.shakacode.com/recent-work).
+This project is maintained by the software consulting firm [ShakaCode](https://www.shakacode.com). We focus on Ruby on Rails applications with React front-ends, often using TypeScript or ReasonML. We also build Gatsby sites. See [our recent work](https://www.shakacode.com/recent-work) for examples of what we do.
 
 Interested in optimizing your webpack setup for React on Rails including code
 splitting with [react-router](https://github.com/ReactTraining/react-router#readme), 
@@ -275,7 +277,6 @@ Browse the links in the [Summary Table of Contents](./SUMMARY.md)
 Here are some highly recommended next articles to read:
 
 1. [How React on Rails Works](docs/outdated/how-react-on-rails-works.md)
-1. [Recommended Project Structure](./docs/basics/recommended-project-structure.md)
 1. [Webpack Configuration](./docs/basics/webpack-configuration.md)
 1. [View Helpers API](./docs/api/view-helpers-api.md) 
 1. [Caching and Performance: React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).
