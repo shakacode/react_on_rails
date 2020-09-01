@@ -1,0 +1,175 @@
+name: Main test
+
+on: [push, pull_request]
+
+jobs:
+  build-dummy-app-webpack-test-bundles:
+    strategy:
+      matrix:
+        ruby: [2.6]
+        node: [12]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby }}
+    - name: Setup Node
+      uses: actions/setup-node@v1.4.3
+      with:
+        node-version: ${{ matrix.node }}
+    - name: Print system information
+      run: |
+        echo "Linux release: "; cat /etc/issue
+        echo "Current user: "; whoami
+        echo "Current directory: "; pwd
+        echo "Ruby version: "; ruby -v
+        echo "Node version: "; node -v
+        echo "Yarn version: "; yarn --version
+        echo "Bundler version: "; bundle --version
+    - name: Save root node_modules to cache
+      uses: actions/cache@v2
+      with:
+        path: node_modules
+        key: v4-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+    - name: Install Node modules with Yarn for renderer package
+      run: |
+        yarn install --no-progress --no-emoji
+        yarn run eslint -v
+        sudo yarn global add yalc
+    - name: yalc publish for react-on-rails
+      run: yalc publish
+    - name: Save spec/dummy/node_modules to cache
+      uses: actions/cache@v2
+      with:
+        path: spec/dummy/node_modules
+        key: v4-dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/yarn.lock') }}
+    - name: yalc add react-on-rails
+      run: cd spec/dummy && yalc add react-on-rails
+    - name: Install Node modules with Yarn for dummy app
+      run: cd spec/dummy && yarn install --no-progress --no-emoji
+    - name: Save dummy app ruby gems to cache
+      uses: actions/cache@v2
+      with:
+        path: spec/dummy/vendor/bundle
+        key: v4-dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
+    - name: Install Ruby Gems for dummy app
+      run: cd spec/dummy && bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+    - name: Build test bundles for dummy app
+      run: cd spec/dummy && yarn run build:test
+    - id: get-sha
+      run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+    - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
+      uses: actions/cache@v2
+      with:
+        path: spec/dummy/public/webpack
+        key: v4-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
+
+  main:
+    needs: build-dummy-app-webpack-test-bundles
+    strategy:
+      matrix:
+        ruby: [2.6]
+        node: [12]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby }}
+    - name: Setup Node
+      uses: actions/setup-node@v1.4.3
+      with:
+        node-version: ${{ matrix.node }}
+    - name: Print system information
+      run: |
+        echo "Linux release: "; cat /etc/issue
+        echo "Current user: "; whoami
+        echo "Current directory: "; pwd
+        echo "Ruby version: "; ruby -v
+        echo "Node version: "; node -v
+        echo "Yarn version: "; yarn --version
+        echo "Bundler version: "; bundle --version
+    - name: Save root node_modules to cache
+      uses: actions/cache@v2
+      with:
+        path: node_modules
+        key: v4-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+    - name: Save root ruby gems to cache
+      uses: actions/cache@v2
+      with:
+        path: vendor/bundle
+        key: v4-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
+    - name: Save dummy app ruby gems to cache
+      uses: actions/cache@v2
+      with:
+        path: spec/dummy/vendor/bundle
+        key: v4-dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
+    - name: Save spec/dummy/node_modules to cache
+      uses: actions/cache@v2
+      with:
+        path: spec/dummy/node_modules
+        key: v4-dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/yarn.lock') }}
+    - id: get-sha
+      run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+    - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
+      uses: actions/cache@v2
+      with:
+        path: spec/dummy/public/webpack
+        key: v4-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
+
+    - name: Install Node modules with Yarn for renderer package
+      run: |
+        yarn install --no-progress --no-emoji
+        yarn run eslint -v
+        sudo yarn global add yalc
+    - name: yalc publish for react-on-rails
+      run: yalc publish
+    - name: yalc add react-on-rails
+      run: cd spec/dummy && yalc add react-on-rails
+    - name: Install Ruby Gems for package
+      run: bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+    - name: Install Ruby Gems for dummy app
+      run: cd spec/dummy && bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+    - name: Ensure minimum required Chrome version
+      run: |
+        echo -e "Already installed $(google-chrome --version)\n"
+        MINIMUM_REQUIRED_CHROME_VERSION=75
+        INSTALLED_CHROME_MAJOR_VERSION="$(google-chrome --version | tr ' .' '\t' | cut -f3)"
+        if [[ $INSTALLED_CHROME_MAJOR_VERSION < $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+          sudo apt-get update
+          sudo apt-get install google-chrome-stable
+          echo -e "\nInstalled $(google-chrome --version)"
+        fi
+    - name: Touch webpack bundles
+      run: touch spec/dummy/public/webpack/test/*
+    - name: Install yalc globally
+      run: sudo yarn global add yalc
+    - name: Prep for CI
+      run: bundle exec rake prepare_for_ci
+    - name: Main CI
+      run: bundle exec rake run_rspec:all_dummy
+    - name: Store test results
+      uses: actions/upload-artifact@v2
+      with:
+        name: main-rspec
+        path: ~/rspec
+    - name: Store artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: dummy-app-capybara
+        path: spec/dummy/tmp/capybara
+    - name: Store artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: dummy-app-test-log
+        path: spec/dummy/log/test.log
+    - name: Store artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: dummy-app-yarn-log
+        path: spec/dummy/yarn-error.log

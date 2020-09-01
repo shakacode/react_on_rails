@@ -1,0 +1,35 @@
+name: JS unit tests for Renderer package
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        node: [12]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Node
+      uses: actions/setup-node@v1.4.3
+      with:
+        node-version: ${{ matrix.node }}
+    - name: Print system information
+      run: |
+        echo "Linux release: "; cat /etc/issue
+        echo "Current user: "; whoami
+        echo "Current directory: "; pwd
+        echo "Node version: "; node -v
+        echo "Yarn version: "; yarn --version
+    - name: Save root node_modules to cache
+      uses: actions/cache@v2
+      with:
+        path: node_modules
+        key: v4-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+    - name: Install Node modules with Yarn for renderer package
+      run: |
+        yarn install --no-progress --no-emoji
+        yarn run eslint -v
+        sudo yarn global add yalc
+    - name: Run JS unit tests for Renderer package
+      run: yarn test
