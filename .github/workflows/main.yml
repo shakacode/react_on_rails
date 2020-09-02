@@ -150,6 +150,8 @@ jobs:
       run: touch spec/dummy/public/webpack/test/*
     - name: Install yalc globally
       run: sudo yarn global add yalc
+    - name: Increase the amount of inotify watchers
+      run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
     - name: Prep for CI
       run: bundle exec rake prepare_for_ci
     - name: Main CI
