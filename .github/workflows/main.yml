@@ -72,6 +72,7 @@ jobs:
       matrix:
         ruby: [2.6]
         node: [12]
+        rake_task: ['run_rspec:all_dummy', 'run_rspec:all_but_examples', 'run_rspec:examples']
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -149,10 +150,12 @@ jobs:
       run: touch spec/dummy/public/webpack/test/*
     - name: Install yalc globally
       run: sudo yarn global add yalc
+    - name: Increase the amount of inotify watchers
+      run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
     - name: Prep for CI
       run: bundle exec rake prepare_for_ci
     - name: Main CI
-      run: bundle exec rake run_rspec:all_dummy
+      run: bundle exec rake ${{ matrix.rake_task }}
     - name: Store test results
       uses: actions/upload-artifact@v2
       with:
