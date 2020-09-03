@@ -265,7 +265,12 @@ export function clientStartup(context: Window | NodeJS.Global): void {
 
   debugTurbolinks('Adding DOMContentLoaded event to install event listeners.');
 
-  if (document.readyState === 'complete') {
+  // So  long as the document is not loading, we can assume:
+  // The document has finished loading and the document has been parsed
+  // but sub-resources such as images, stylesheets and frames are still loading.
+  // If lazy asynch loading is used, such as with loadable-components, then the init
+  // function will install some handler that will properly know when to do hyrdation.
+  if (document.readyState !== 'loading') {
     window.setTimeout(renderInit);
   } else {
     document.addEventListener('DOMContentLoaded', renderInit);

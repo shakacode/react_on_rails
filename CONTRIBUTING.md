@@ -62,7 +62,7 @@ cd react_on_rails/
 yarn
 
 # Update the lib directory with babel compiled files
-yarn run build:watch
+yarn run build-watch
 ```
    
 You need to do this once:

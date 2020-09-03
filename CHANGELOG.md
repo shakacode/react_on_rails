@@ -16,9 +16,18 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+
+### [12.0.3] - 2020-09-02
+#### Fixed
+- Async script loading optimizes page load speed. With this fix, a bundle
+  can be loaded "async" and a handler function can determine when to hydrate.
+  For an example of this, see the [docs for loadable-components SSR](https://loadable-components.com/docs/server-side-rendering/#4-add-loadableready-client-side).
+  [PR 1327](https://github.com/shakacode/react_on_rails/pull/1327) by [justin808](https://github.com/justin808).
+  Loadable-Components is supported by [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).
+
 ### [12.0.2] - 2020-07-09
 #### Fixed
-- Remove dependency upon Redux for Typescript types [PR 1323](https://github.com/shakacode/react_on_rails/pull/1306) by [justin808](https://github.com/justin808). 
+- Remove dependency upon Redux for Typescript types. [PR 1323](https://github.com/shakacode/react_on_rails/pull/1306) by [justin808](https://github.com/justin808). 
 
 ### [12.0.1] - 2020-07-09
 #### Fixed
@@ -934,7 +943,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.3...master
+[12.0.3]: https://github.com/shakacode/react_on_rails/compare/12.0.2...12.0.3
 [12.0.2]: https://github.com/shakacode/react_on_rails/compare/12.0.1...12.0.2
 [12.0.1]: https://github.com/shakacode/react_on_rails/compare/12.0.0...12.0.1
 [12.0.0]: https://github.com/shakacode/react_on_rails/compare/11.3.0...12.0.0
