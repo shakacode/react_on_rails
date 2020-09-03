@@ -34,8 +34,28 @@ Registered Objects are of the following type:
 1. **Function that takes only zero or one params and you return a React Element**, often JSX.  If the function takes zero or one params, there is **no migration needed** for that function.
     ```js
     export default (props) => <Component {...props} />;
-    ```       
-2. Function that takes **2 params** and returns **a React function or class component**. _Migration is needed as the older syntax returned a React Element._
+    ```
+    
+2. **Function that takes only zero or one params and you return an Object (_not a React Element_)**.  If the function takes zero or one params, **you need to add one or two unused params so you have exactly 2 params** and then that function will be treated as a render function and it can return an Object rather than a React element. If you don't do this, you'll see this obscure error message:
+
+```
+  [SERVER] message: Objects are not valid as a React child (found: object with keys {renderedHtml}). If you meant to render a collection of children, use an array instead.
+  in YourComponentRenderFunction
+```
+  
+  So look in YourComponentRenderFunction and do this change
+
+```js
+   export default (props) => { renderedHTML: getRenderedHTML };
+```
+
+   To have exactly 2 arguments:
+   
+```js
+    export default (props, _railsContext) => { renderedHTML: getRenderedHTML };
+```    
+
+3. Function that takes **2 params** and returns **a React function or class component**. _Migration is needed as the older syntax returned a React Element._
    A function component is a function that takes zero or one params and returns a React Element, like JSX. The correct syntax
    looks like:
     ```js
@@ -43,8 +63,8 @@ Registered Objects are of the following type:
     ```
    Note, you cannot return a React Element (JSX). See below for the migration steps. If your function that took **two params returned
    an Object**, then no migration is required.
-3. Function that takes **3 params** and uses the 3rd param, `domNodeId`, to call `ReactDOM.hydrate`. If the function takes 3 params, there is **no migration needed** for that function.
-4. ES6 or ES5 class. There is **no migration needed**.
+4. Function that takes **3 params** and uses the 3rd param, `domNodeId`, to call `ReactDOM.hydrate`. If the function takes 3 params, there is **no migration needed** for that function.
+5. ES6 or ES5 class. There is **no migration needed**.
   
 Previously, with case number 2, you could return a React Element.
 
