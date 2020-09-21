@@ -17,7 +17,7 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
-### [12.0.3] - 2020-09-02
+### [12.0.3] - 2020-09-20
 #### Fixed
 - Async script loading optimizes page load speed. With this fix, a bundle
   can be loaded "async" and a handler function can determine when to hydrate.
