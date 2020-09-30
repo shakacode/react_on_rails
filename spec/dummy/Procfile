@@ -1,2 +1,1 @@
-rails: PORT=3000 rails s
-webpack: bin/webpack --watch
+rails: rails s -b 0.0.0.0
