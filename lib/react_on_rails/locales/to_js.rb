@@ -5,10 +5,6 @@ require "erb"
 module ReactOnRails
   module Locales
     class ToJs < Base
-      def initialize
-        super
-      end
-
       private
 
       def file_format

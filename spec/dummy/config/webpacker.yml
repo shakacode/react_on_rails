@@ -98,8 +98,6 @@ test:
     # Inline should be set to true if using HMR
     inline: true
 
-
-
 production:
   <<: *default
 

@@ -11,13 +11,6 @@ require "pry"
 require "pry-byebug"
 require "pry-doc"
 
-# Fails travis
-# require "pry-state"
-# require "pry-toys"
-# require "pry-rescue"
-# require "binding_of_caller"
-
-require "awesome_print"
 require "rspec/retry"
 
 require "action_controller"
@@ -52,7 +45,7 @@ require "webpacker"
 #
 # See http://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 RSpec.configure do |config|
-  Rails.logger = Logger.new(STDOUT)
+  Rails.logger = Logger.new($stdout)
 
   config.example_status_persistence_file_path = "spec/examples.txt"
   config.run_all_when_everything_filtered = true

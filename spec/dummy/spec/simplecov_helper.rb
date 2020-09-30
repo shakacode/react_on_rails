@@ -12,13 +12,13 @@ if ENV["COVERAGE"] == "true"
   SimpleCov.start("rails") do
     # Consider the entire gem project as the root
     # (typically this will be the folder named "react_on_rails")
-    gem_root_path = (File.expand_path __FILE__).slice(%r{(^.*)\/spec.*\/spec}, 1)
+    gem_root_path = (File.expand_path __FILE__).slice(%r{(^.*)/spec.*/spec}, 1)
     root gem_root_path
 
     # Don't report anything that has "spec" in the path
     # NOTE: this excludes the dummy apps!
     add_filter do |src|
-      src.filename =~ %r{\/spec\/}
+      src.filename =~ %r{/spec/}
     end
   end
 end

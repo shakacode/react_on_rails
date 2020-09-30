@@ -57,14 +57,15 @@ module ReactOnRails
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
 
-      if server_rendered_html.is_a?(String)
+      case server_rendered_html
+      when String
         build_react_component_result_for_server_rendered_string(
           server_rendered_html: server_rendered_html,
           component_specification_tag: internal_result[:tag],
           console_script: console_script,
           render_options: internal_result[:render_options]
         )
-      elsif server_rendered_html.is_a?(Hash)
+      when Hash
         msg = <<~MSG
           Use react_component_hash (not react_component) to return a Hash to your ruby view code. See
           https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
@@ -243,7 +244,7 @@ module ReactOnRails
     # second parameter passed to both component and store Render-Functions.
     # This method can be called from views and from the controller, as `helpers.rails_context`
     #
-    # rubocop:disable Metrics/AbcSize
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
     def rails_context(server_side: true)
       # ALERT: Keep in sync with node_package/src/types/index.ts for the properties of RailsContext
       @rails_context ||= begin
@@ -291,7 +292,7 @@ module ReactOnRails
 
       @rails_context.merge(serverSide: server_side)
     end
-    # rubocop:enable Metrics/AbcSize
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
     private
 

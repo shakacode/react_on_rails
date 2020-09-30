@@ -52,6 +52,7 @@ module ReactOnRails
     #                        don't provide one.
     # webpack_generated_files List of files to check for up-to-date-status, defaulting to
     #                        webpack_generated_files in your configuration
+    # rubocop:disable Metrics/CyclomaticComplexity
     def self.ensure_assets_compiled(webpack_assets_status_checker: nil,
                                     webpack_assets_compiler: nil,
                                     source_path: nil,
@@ -96,4 +97,5 @@ module ReactOnRails
       ).call
     end
   end
+  # rubocop:enable Metrics/CyclomaticComplexity
 end

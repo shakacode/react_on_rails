@@ -20,8 +20,8 @@ unless ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
     # VERSIONS is per the rails/webpacker clean method definition.
     # We set it very big so that it is not used, and then clean just
     # removes files older than 1 hour.
-    VERSIONS = 100_000
-    Rake::Task["webpacker:clean"].invoke(VERSIONS)
+    versions = 100_000
+    Rake::Task["webpacker:clean"].invoke(versions)
   }
 
   if Rake::Task.task_defined?("assets:precompile")

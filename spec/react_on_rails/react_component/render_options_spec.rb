@@ -3,7 +3,7 @@
 require_relative "../spec_helper"
 
 describe ReactOnRails::ReactComponent::RenderOptions do
-  CONFIGURABLE_OPTIONS = %i[
+  configurable_options = %i[
     prerender
     trace
     replay_console
@@ -126,7 +126,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     end
   end
 
-  CONFIGURABLE_OPTIONS.each do |option|
+  configurable_options.each do |option|
     describe "##{option}" do
       context "with #{option} option" do
         it "returns #{option}" do

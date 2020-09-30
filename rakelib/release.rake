@@ -4,6 +4,13 @@ require_relative "task_helpers"
 require_relative File.join(gem_root, "lib", "react_on_rails", "version_syntax_converter")
 require_relative File.join(gem_root, "lib", "react_on_rails", "git_utils")
 require_relative File.join(gem_root, "lib", "react_on_rails", "utils")
+
+class RaisingMessageHandler
+  def add_error(error)
+    raise error
+  end
+end
+
 desc("Releases both the gem and node package using the given version.
 
 IMPORTANT: the gem version must be in valid rubygem format (no dashes).
@@ -19,19 +26,11 @@ which are installed via `bundle install` and `yarn`
 2nd argument: Perform a dry run by passing 'true' as a second argument.
 
 Example: `rake release[2.1.0,false]`")
-
-# rubocop:disable Metrics/BlockLength
 task :release, %i[gem_version dry_run tools_install] do |_t, args|
   include ReactOnRails::TaskHelpers
 
-  class MessageHandler
-    def add_error(error)
-      raise error
-    end
-  end
-
   # Check if there are uncommited changes
-  ReactOnRails::GitUtils.uncommitted_changes?(MessageHandler.new)
+  ReactOnRails::GitUtils.uncommitted_changes?(RaisingMessageHandler.new)
   args_hash = args.to_hash
 
   is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
@@ -69,4 +68,3 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   # Release the new gem version
   sh_in_dir(gem_root, "gem release") unless is_dry_run
 end
-# rubocop:enable Metrics/BlockLength

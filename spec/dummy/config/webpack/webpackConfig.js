@@ -24,7 +24,7 @@ const webpackConfig = (envSpecific) => {
   }
 
   // To debug, uncomment next line and inspect "result"
-  debugger
+  debugger;
   return result;
 };
 

@@ -24,9 +24,9 @@ const urlLoader = {
   },
 };
 
-debugger
+debugger;
 rules.insert('url', urlLoader, { before: 'file' });
-rules.delete('file')
+rules.delete('file');
 
 // rules
 const sassLoaderConfig = {
@@ -49,14 +49,14 @@ const resolveUrlLoader = {
   loader: 'resolve-url-loader',
   options: {
     root,
-  }
-}
+  },
+};
 
 const addResolveUrlLoader = (ruleName) => {
   const ruleLoaders = rules.get(ruleName).use;
   const insertPos = ruleLoaders.findIndex((item) => item.loader === 'sass-loader');
   ruleLoaders.splice(insertPos, 0, resolveUrlLoader);
-}
+};
 
 addResolveUrlLoader('sass');
 addResolveUrlLoader('moduleSass');

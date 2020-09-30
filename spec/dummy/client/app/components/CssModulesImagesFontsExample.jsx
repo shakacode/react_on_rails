@@ -17,11 +17,7 @@ export default (_props) => (
     </div>
     <div>
       <h2>Rails on Maui Logo (absolute path)</h2>
-
-
-
-        Why doesn't the next line have any style
-        check the div has no style uuuuuuu
+      Why doesn't the next line have any style check the div has no style uuuuuuu
       <div className={styles.railsOnMaui} />
     </div>
   </div>
