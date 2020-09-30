@@ -64,4 +64,25 @@ environment.splitChunks();
 // add aliases to config
 environment.config.merge(aliasConfig);
 
+environment.loaders.append('expose', {
+  test: require.resolve('jquery'),
+  use: [
+    {
+      loader: 'expose-loader',
+      options: '$',
+    },
+    {
+      loader: 'expose-loader',
+      options: 'jQuery',
+    },
+  ],
+});
+
+// adding jqueryUjsLoader
+const jqueryUjsLoader = {
+  test: require.resolve('jquery-ujs'),
+  use: [{ loader: 'imports-loader', options: { jQuery: 'jquery' } }],
+};
+environment.loaders.append('jquery-ujs', jqueryUjsLoader);
+
 module.exports = environment;
