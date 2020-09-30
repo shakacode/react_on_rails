@@ -8,8 +8,10 @@ $fonts-url-path: '../assets/fonts';
   font-family: 'OpenSans-Light';
   src: url('#{$fonts-url-path}/OpenSans-Light.ttf') format('truetype');
 }
+
 .heading {
   font-family: $font-family-sans-serif;
+  color: green;
 }
 
 // Small image is url encode
@@ -23,17 +25,17 @@ $check-size: 132px;
   height: $check-size;
 }
 
-// Relative path of larger image
-$last-call-svg: url("../assets/images/last-call.png");
-$last-call-width: 1440px;
-$last-call-height: 373px;
+// Relative path of larger image should NOT be encoded
+$hookipa-beach-svg: url("../assets/images/hookipa-beach.png");
+$hookipa-beach-width: 1440px;
+$hookipa-beach-height: 373px;
 
-.lastCall {
+.beachImage {
   display: inline-block;
-  background: $last-call-svg;
-  background-size: $last-call-width/2 $last-call-height/2;
-  width: $last-call-width/2;
-  height: $last-call-height/2;
+  background: $hookipa-beach-svg;
+  background-size: $hookipa-beach-width/2 $hookipa-beach-height/2;
+  width: $hookipa-beach-width/2;
+  height: $hookipa-beach-height/2;
 }
 
 // This is an absolute path to the image, defined in app-variables.scss

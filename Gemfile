@@ -34,7 +34,7 @@ gem "launchy"
 gem "rspec-rails"
 gem "rspec-retry"
 gem "selenium-webdriver"
-gem "webpacker", ">= 4.0.0"
+gem "webpacker", ">= 5.2.1"
 
 gem "equivalent-xml", github: "mbklein/equivalent-xml"
 gem "rainbow"

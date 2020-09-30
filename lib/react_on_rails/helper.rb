@@ -32,8 +32,8 @@ module ReactOnRails
     #   Exposing the react_component_name is necessary to both a plain ReactComponent as well as
     #     a generator:
     #   See README.md for how to "register" your react components.
-    #   See spec/dummy/client/app/startup/serverRegistration.jsx and
-    #     spec/dummy/client/app/startup/ClientRegistration.jsx for examples of this
+    #   See spec/dummy/client/app/packs/server-bundle.js and
+    #     spec/dummy/client/app/startup/client-bundle.js for examples of this
     #
     # options:
     #   props: Ruby Hash or JSON string which contains the properties to pass to the react object. Do

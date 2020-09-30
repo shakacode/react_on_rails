@@ -1,5 +1,5 @@
-import '@babel/polyfill';
-import 'es5-shim';
+import "core-js/stable";
+import "regenerator-runtime/runtime";
 import 'jquery-ujs';
 
 import ReactOnRails from 'react-on-rails';

@@ -1,6 +1,6 @@
 // Example of incorrectly taking two params and returning JSX
 import React, { useState } from 'react';
-import css from './HelloWorld.scss';
+import css from './HelloWorld.module.scss';
 import RailsContext from './RailsContext';
 
 const ContextFunctionReturnInvalidJSX = (props, railsContext) => (

@@ -1,5 +1,5 @@
 const environment = require('./environment');
-const merge = require('webpack-merge');
+const { merge } = require('webpack-merge');
 
 const configureClient = () => {
   // adding exposeLoader
@@ -8,13 +8,6 @@ const configureClient = () => {
     use: [{ loader: 'expose-loader', options: 'jQuery' }],
   };
   environment.loaders.insert('expose', exposeLoader, { after: 'file' });
-
-  // adding es5Loader
-  const es5Loader = {
-    test: require.resolve('react'),
-    use: [{ loader: 'imports-loader', options: { shim: 'es5-shim/es5-shim', sham: 'es5-shim/es5-sham' } }],
-  };
-  environment.loaders.insert('react', es5Loader, { after: 'sass' });
 
   // adding jqueryUjsLoader
   const jqueryUjsLoader = {

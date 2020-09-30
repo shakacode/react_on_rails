@@ -1,1 +1,9 @@
-Procfile
+# Procfile for development with hot reloading of JavaScript and CSS
+
+rails: rails s -p 3000
+
+# Run the hot reload server for client development
+webpack-dev-server: bin/webpack-dev-server
+
+# Keep the JS fresh for server rendering. Remove if not server rendering
+rails-server-assets: SERVER_BUNDLE_ONLY=yes bin/webpack --watch
