@@ -22,7 +22,7 @@ gem "scss_lint", require: false
 gem "sdoc", group: :doc
 gem "spring"
 gem "sprockets", "~>3.0"
-gem "sqlite3", "~> 1.3.6"
+gem "sqlite3"
 gem "turbolinks"
 gem "uglifier"
 gem "web-console", group: :development

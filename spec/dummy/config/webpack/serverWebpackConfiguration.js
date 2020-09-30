@@ -51,10 +51,10 @@ const configureServer = () => {
   // the client build will handle exporting CSS.
   // replace file-loader with null-loader
   const rules = serverWebpackConfig.module.rules;
-  rules.forEach((loader) => {
-    if (Array.isArray(loader.use)) {
+  rules.forEach((rule) => {
+    if (Array.isArray(rule.use)) {
       // remove the mini-css-extract-plugin and style-loader
-      loader.use = loader.use.filter((item) => {
+      rule.use = rule.use.filter((item) => {
         let testValue;
         if (typeof item === 'string') {
           testValue = item;
@@ -63,7 +63,7 @@ const configureServer = () => {
         }
         return !(testValue.match(/mini-css-extract-plugin/) || testValue === 'style-loader');
       });
-      const cssLoader = loader.use.find((item) => {
+      const cssLoader = rule.use.find((item) => {
         let testValue;
         if (typeof item === 'string') {
           testValue = item;
@@ -77,6 +77,10 @@ const configureServer = () => {
         // when the cssLoader goes to 4.x:
         // cssLoader.options.modules.exportOnlyLocals = true;
       }
+
+      // Skip writing image files during SSR by setting emitFile to false
+    } else if (rule.use.loader === 'url-loader' || rule.use.loader === 'file-loader') {
+      rule.use.options.emitFile = false;
     }
   });
 

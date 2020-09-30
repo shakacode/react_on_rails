@@ -22,6 +22,7 @@
     "lodash": "^4.17.4",
     "node-libs-browser": "^2.2.1",
     "nps": "^5.10.0",
+    "null-loader": "^4.0.0",
     "prop-types": "^15.7.2",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
