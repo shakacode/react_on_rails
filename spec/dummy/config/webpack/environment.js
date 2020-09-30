@@ -5,7 +5,6 @@ const sassResources = ['./client/app/assets/styles/app-variables.scss'];
 const aliasConfig = require('./alias.js');
 const rules = environment.loaders;
 const fileLoader = rules.get('file');
-const cssLoader = rules.get('css');
 const ManifestPlugin = environment.plugins.get('Manifest');
 
 // For details on the pros and cons of inlining images:
@@ -24,7 +23,6 @@ const urlLoader = {
   },
 };
 
-debugger;
 rules.insert('url', urlLoader, { before: 'file' });
 rules.delete('file');
 

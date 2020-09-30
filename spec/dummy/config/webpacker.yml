@@ -41,12 +41,12 @@ default: &default
     - .mjs
     - .js
     - .jsx
-    - .sass
-    - .scss
-    - .css
     - .module.sass
     - .module.scss
     - .module.css
+    - .sass
+    - .scss
+    - .css
     - .png
     - .svg
     - .gif
