@@ -15,6 +15,22 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+### [11.3.1] - 2020-10-01
+#### Fixed
+Update the init per backport of 12.0.3. [PR 1331](https://github.com/shakacode/react_on_rails/pull/1331)
+by [justin808](https://github.com/justin808).
+
+* Should fix issue 1330.
+* Component not loading in Chrome, DOMContentLoaded not called.
+* https://github.com/shakacode/react_on_rails/issues/1330
+
+So  long as the document is not loading, we can assume:
+The document has finished loading and the document has been parsed
+but sub-resources such as images, stylesheets and frames are still loading.
+If lazy asynch loading is used, such as with loadable-components, then the init
+function will install some handler that will properly know when to do hyrdation.
+
+
 ### [11.3.0] - 2019-04-20
 #### Added
 - Added method for retrieving any option from `render_options` [PR 1213](https://github.com/shakacode/react_on_rails/pull/1213)
@@ -871,7 +887,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.3.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/11.3.1...master
+[11.3.1]: https://github.com/shakacode/react_on_rails/compare/11.3.0...11.3.1
 [11.3.0]: https://github.com/shakacode/react_on_rails/compare/11.2.2...11.3.0
 [11.2.2]: https://github.com/shakacode/react_on_rails/compare/11.2.1...11.2.2
 [11.2.1]: https://github.com/shakacode/react_on_rails/compare/11.1.8...11.2.1
