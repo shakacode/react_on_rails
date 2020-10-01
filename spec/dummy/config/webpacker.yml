@@ -29,20 +29,24 @@ default: &default
     - .svg
     - .eot
     - .otf
+    - .svg
     - .ttf
     - .woff
     - .woff2
+    - .ttf
+    - .eot
+    - .svg
 
   extensions:
     - .mjs
     - .js
     - .jsx
-    - .sass
-    - .scss
-    - .css
     - .module.sass
     - .module.scss
     - .module.css
+    - .sass
+    - .scss
+    - .css
     - .png
     - .svg
     - .gif
@@ -55,6 +59,8 @@ development:
   # bundles need building. Also, remove the customization to spec/rails_helper.rb.
   compile: false
 
+  extract_css: false
+
   public_output_path: webpack/development
 
   # Verifies that correct packages and versions are installed by inspecting package.json, yarn.lock, and node_modules
@@ -62,7 +68,6 @@ development:
 
   # Reference: https://webpack.js.org/configuration/dev-server/
   dev_server:
-    extract_css: false
     https: false
     host: localhost
     port: 3035
@@ -92,8 +97,6 @@ test:
     hmr: true
     # Inline should be set to true if using HMR
     inline: true
-
-
 
 production:
   <<: *default

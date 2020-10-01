@@ -47,6 +47,7 @@ module ReactOnRails
         # Note, js_code does not have to be based on React.
         # js_code MUST RETURN json stringify Object
         # Calling code will probably call 'html_safe' on return value before rendering to the view.
+        # rubocop:disable Metrics/CyclomaticComplexity
         def exec_server_render_js(js_code, render_options, js_evaluator = nil)
           js_evaluator ||= self
           if render_options.trace
@@ -67,7 +68,7 @@ module ReactOnRails
             console_script = result["consoleReplayScript"]
             console_script_lines = console_script.split("\n")
             console_script_lines = console_script_lines[2..-2]
-            re = /console\.(log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
+            re = /console\.(?:log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
             if console_script_lines
               console_script_lines.each do |line|
                 match = re.match(line)
@@ -77,6 +78,7 @@ module ReactOnRails
           end
           result
         end
+        # rubocop:enable Metrics/CyclomaticComplexity
 
         def trace_js_code_used(msg, js_code, file_name = "tmp/server-generated.js", force: false)
           return unless ReactOnRails.configuration.trace || force

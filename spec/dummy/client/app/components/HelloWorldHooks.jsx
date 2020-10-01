@@ -1,6 +1,6 @@
 // Super simple example of the simplest possible React component
 import React, { useState } from 'react';
-import css from './HelloWorld.scss';
+import css from './HelloWorld.module.scss';
 
 // TODO: make more like the HelloWorld.jsx
 function HelloWorldHooks(props) {

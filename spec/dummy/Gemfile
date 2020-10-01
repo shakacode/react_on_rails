@@ -49,14 +49,13 @@ gem "awesome_print"
 gem "mini_racer"
 
 group :development, :test do
-  # Call 'byebug' anywhere in the code to stop execution and get a debugger console
   gem "listen"
   gem "pry"
   gem "pry-byebug"
   gem "pry-doc"
   gem "pry-rails"
   gem "pry-rescue"
-  gem "rubocop", "0.85.0", require: false
+  gem "rubocop", require: false
   gem "ruby-lint", require: false
   gem "scss_lint", require: false
 
@@ -71,9 +70,9 @@ group :test do
   gem "equivalent-xml"
   gem "generator_spec"
   gem "launchy"
+  gem "rspec_junit_formatter"
   gem "rspec-rails"
   gem "rspec-retry"
-  gem "rspec_junit_formatter"
   gem "selenium-webdriver"
   gem "webdrivers", "~> 3.0"
 end

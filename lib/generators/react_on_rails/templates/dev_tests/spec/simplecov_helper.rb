@@ -17,7 +17,7 @@ if ENV["COVERAGE"] == "true"
 
     # Don't report anything that has "spec" in the path
     add_filter do |src|
-      src.filename =~ %r{\/spec\/}
+      src.filename =~ %r{/spec/}
     end
   end
 end

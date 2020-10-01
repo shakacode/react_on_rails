@@ -6,7 +6,7 @@ import logo from 'Assets/images/256egghead.png';
 // eslint-disable-next-line import/no-unresolved
 import legoIcon from 'Assets/images/lego_icon.svg';
 
-import css from './ImageExample.scss';
+import css from './ImageExample.module.scss';
 import bowerLogo from './bower.png';
 import blueprintIcon from './blueprint_icon.svg';
 

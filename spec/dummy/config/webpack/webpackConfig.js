@@ -1,5 +1,5 @@
-const clientConfig = require('./client');
-const serverConfig = require('./server');
+const clientConfig = require('./clientWebpackConfiguration');
+const serverConfig = require('./serverWebpackConfiguration');
 
 const webpackConfig = (envSpecific) => {
   if (envSpecific) {
@@ -24,7 +24,7 @@ const webpackConfig = (envSpecific) => {
   }
 
   // To debug, uncomment next line and inspect "result"
-  // debugger
+  // debugger;
   return result;
 };
 

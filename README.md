@@ -14,6 +14,9 @@
 *These are the docs for React on Rails 12. To see the version 11 docs, [click here](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
 
 #### News
+**October 1, 2020**: See the [spec/dummy](./spec/dummy) example repo for a simple configuration of webpack via the rails/webpacker gem
+that supports SSR.
+
 **August 2, 2020**: See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) for a new way to setup the creation of your SSR bundle with `rails/webpacker`.
 
 **July 8, 2020**: Release v12 of React on Rails.
@@ -29,10 +32,8 @@ Be sure to see the [CHANGELOG.md](./CHANGELOG.md) and read the upgrade instructi
 [docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rails.md#upgrading-to-v12).
    
 * See Justin's RailsConf talk: [Webpacker, It-Just-Works, But How?](http://railsconf.com/2020/video/justin-gordon-webpacker-it-just-works-but-how).
-* Are you interested in support for React on Rails? If so check out [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).
+* Are you interested in support for React on Rails? Do you want to use Node.js to do your server-side rendering so libraries like Emotion and Loadable Components just work, as compared to rendering via Ruby embedded JS? If so check out [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).
 * HMR is working with [Loadable Components](https://loadable-components.com) for a both amazing hot-reloading developer experience and great runtime performance. Please [email me](mailto:justin@shakacode.com) if you'd like to use [Loadable Components Code Splitting](https://loadable-components.com/docs/code-splitting/) to speed up your app by reducing your bundle sizes and lazily loading the code that's needed.
-* `react_on_rails` fully supports `rails/webpacker`. The example test app in `spec/dummy` was recently converted over to use rails/webpacker v4+. It's a good example of how to leverage rails/webpacker's webpack configuration. 
-
 ---
 
 #### About

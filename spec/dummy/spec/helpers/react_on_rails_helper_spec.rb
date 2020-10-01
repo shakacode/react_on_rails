@@ -3,6 +3,10 @@
 require "rails_helper"
 require "support/script_tag_utils"
 
+class PlainReactOnRailsHelper
+  include ReactOnRailsHelper
+end
+
 # rubocop:disable Metrics/BlockLength
 describe ReactOnRailsHelper, type: :helper do
   before do
@@ -303,11 +307,7 @@ describe ReactOnRailsHelper, type: :helper do
     after { ReactOnRails.configuration.rendering_extension = @rendering_extension }
 
     it "should not throw an error if not in a view" do
-      class PlainClass
-        include ReactOnRailsHelper
-      end
-
-      ob = PlainClass.new
+      ob = PlainReactOnRailsHelper.new
       expect { ob.send(:rails_context, server_side: true) }.to_not raise_error
       expect { ob.send(:rails_context, server_side: false) }.to_not raise_error
     end

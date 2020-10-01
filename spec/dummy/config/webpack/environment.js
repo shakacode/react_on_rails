@@ -1,62 +1,88 @@
 const { environment } = require('@rails/webpacker');
+const { resolve } = require('path');
 
 const sassResources = ['./client/app/assets/styles/app-variables.scss'];
 const aliasConfig = require('./alias.js');
 const rules = environment.loaders;
 const fileLoader = rules.get('file');
-const cssLoader = rules.get('css');
-const sassLoader = rules.get('sass');
-const babelLoader = rules.get('babel');
 const ManifestPlugin = environment.plugins.get('Manifest');
-const urlFileSizeCutover = 1000; // below 10k, inline, small 1K is to test file loader
+
+// For details on the pros and cons of inlining images:
+// https://developers.google.com/web/fundamentals/design-and-ux/responsive/images
+// https://survivejs.com/webpack/loading/images/
+// Normally below 1k, inline. We're making the example bigger to show a both inlined and non-inlined images
+const urlFileSizeCutover = 10000;
+
+const urlLoaderOptions = Object.assign({ limit: urlFileSizeCutover }, fileLoader.use[0].options);
+//adding urlLoader
+const urlLoader = {
+  test: fileLoader.test,
+  use: {
+    loader: 'url-loader',
+    options: urlLoaderOptions,
+  },
+};
+
+rules.insert('url', urlLoader, { before: 'file' });
+rules.delete('file');
 
 // rules
-sassLoader.use.push({
+const sassLoaderConfig = {
   loader: 'sass-resources-loader',
   options: {
     resources: sassResources,
   },
-});
+};
 
-environment.splitChunks();
+function addSassResourcesLoader(ruleName) {
+  const sassLoaders = rules.get(ruleName).use;
+  sassLoaders.push(sassLoaderConfig);
+}
 
-//adding urlLoader
-const urlLoader = {
-  test: /\.(jpe?g|png|gif|ico|woff)$/,
-  use: {
-    loader: 'url-loader',
-    options: {
-      limit: urlFileSizeCutover,
-      // NO leading slash
-      name: 'images/[name]-[hash].[ext]',
-    },
+addSassResourcesLoader('sass');
+addSassResourcesLoader('moduleSass');
+
+const root = resolve(__dirname, '../../client/app');
+const resolveUrlLoader = {
+  loader: 'resolve-url-loader',
+  options: {
+    root,
   },
 };
-environment.loaders.insert('url', urlLoader, { before: 'file' });
 
-// changing order of babelLoader
-environment.loaders.insert('babel', babelLoader, { before: 'css' });
+const addResolveUrlLoader = (ruleName) => {
+  const ruleLoaders = rules.get(ruleName).use;
+  const insertPos = ruleLoaders.findIndex((item) => item.loader === 'sass-loader');
+  ruleLoaders.splice(insertPos, 0, resolveUrlLoader);
+};
+
+addResolveUrlLoader('sass');
+addResolveUrlLoader('moduleSass');
+
+environment.splitChunks();
 
 // add aliases to config
 environment.config.merge(aliasConfig);
 
-// modifying modules in css and sass to true,
-cssLoader.use[1].options.modules = true;
-sassLoader.use[1].options.modules = true;
+environment.loaders.append('expose', {
+  test: require.resolve('jquery'),
+  use: [
+    {
+      loader: 'expose-loader',
+      options: '$',
+    },
+    {
+      loader: 'expose-loader',
+      options: 'jQuery',
+    },
+  ],
+});
 
-//changing fileLoader to use proper values
-fileLoader.test = /\.(ttf|eot|svg)$/;
-fileLoader.use[0].options = { name: 'images/[name]-[hash].[ext]' };
-
-// removing extra rules added by webpacker
-rules.delete('nodeModules');
-rules.delete('moduleCss');
-rules.delete('moduleSass');
-
-// plugins
-// adding definePlugin
-
-// manipulating manifestPlugin
-ManifestPlugin.options.writeToFileEmit = true;
+// adding jqueryUjsLoader
+const jqueryUjsLoader = {
+  test: require.resolve('jquery-ujs'),
+  use: [{ loader: 'imports-loader', options: { jQuery: 'jquery' } }],
+};
+environment.loaders.append('jquery-ujs', jqueryUjsLoader);
 
 module.exports = environment;

@@ -53,6 +53,7 @@ module ReactOnRails
                   :server_render_method, :random_dom_id,
                   :same_bundle_for_client_and_server
 
+    # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
                    replay_console: nil,
                    trace: nil, development_mode: nil,
@@ -98,6 +99,7 @@ module ReactOnRails
 
       self.server_render_method = server_render_method
     end
+    # rubocop:enable Metrics/AbcSize
 
     # on ReactOnRails
     def setup_config_values

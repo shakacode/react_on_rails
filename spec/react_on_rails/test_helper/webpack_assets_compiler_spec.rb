@@ -30,13 +30,11 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
           cmd: cd \"#{Rails.root}\" && #{invalid_command}
         MSG
 
-        # rubocop:disable Lint/SuppressedException
         expect do
           ReactOnRails::TestHelper::WebpackAssetsCompiler.new.compile_assets
         rescue SystemExit
           # No op
         end.to output(/#{expected_output}/).to_stdout
-        # rubocop:enable Lint/SuppressedException
       end
     end
   end

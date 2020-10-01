@@ -1,6 +1,9 @@
-import '@babel/polyfill';
-import 'es5-shim';
+import 'core-js/stable';
+import 'regenerator-runtime/runtime';
 import 'jquery-ujs';
+
+// Next line makes jQuery available globally
+require('expose-loader?$!jquery');
 
 import ReactOnRails from 'react-on-rails';
 

@@ -86,16 +86,15 @@ task run_rspec: ["run_rspec:run_rspec"]
 private
 
 def calc_path(dir)
-  path = if dir.is_a?(String)
-           if dir.start_with?(File::SEPARATOR)
-             Pathname.new(dir)
-           else
-             Pathname.new(File.join(gem_root, dir))
-           end
-         else
-           dir
-         end
-  path
+  if dir.is_a?(String)
+    if dir.start_with?(File::SEPARATOR)
+      Pathname.new(dir)
+    else
+      Pathname.new(File.join(gem_root, dir))
+    end
+  else
+    dir
+  end
 end
 
 # Runs rspec in the given directory.
