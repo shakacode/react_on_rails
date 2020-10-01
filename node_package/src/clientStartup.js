@@ -222,7 +222,13 @@ export function clientStartup(context) {
 
   debugTurbolinks('Adding DOMContentLoaded event to install event listeners.');
 
-  if (document.readyState === 'complete') {
+  // So  long as the document is not loading, we can assume:
+  // The document has finished loading and the document has been parsed
+  // but sub-resources such as images, stylesheets and frames are still loading.
+  // If lazy asynch loading is used, such as with loadable-components, then the init
+  // function will install some handler that will properly know when to do hyrdation.
+  // backport of https://github.com/shakacode/react_on_rails/commit/7b301f9e87b4f27b9197207f8e210c38095c551b#diff-dff9a544208442c275bbe37f37438219L268
+  if (document.readyState !== 'loading') {
     window.setTimeout(renderInit);
   } else {
     document.addEventListener('DOMContentLoaded', renderInit);
