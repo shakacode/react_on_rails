@@ -1,13 +1,13 @@
 # Upgrading React on Rails
 
 ## Need Help Migrating?
-If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for information about our [ShakaCode Pro Support](https://www.shakacode.com/work/shakacode-pro-support.pdf).
+If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for more information about our [React on Rails Pro Support](https://www.shakacode.com/react-on-rails-pro).
 
-We specialize in helping companies to quickly and efficiently move from versions before 9 to current. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4 for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
+We specialize in helping companies to quickly and efficiently upgrade. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4+ for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
 
 ## Upgrading to v12
 ### Recent versions
-Make sure that you are on a relatively more recent version of rails and webpacker.
+Make sure that you are on a relatively more recent version of rails and webpacker. Yes, the [rails/webpacker](https://github.com/rails/webpacker) gem is required!
 v12 is tested on Rails 6. It should work on Rails v5. If you're on any older version,
 and v12 doesn't work, please file an issue. 
 
@@ -100,7 +100,7 @@ wrapper such that you're returning a function rather than a React Element, then:
 
 ## Upgrading rails/webpacker from v3 to v4
 ### Custom Webpack build file
-The default value for `extract_css` is **false** in `config/webpack.yml`. Custom webpack builds should set this value to true or else no CSS link tags are generated. You have a custom webpack build if you are not using [rails/webpacker](https://github.com/rails/webpacker to setup your Webpack configuration.
+The default value for `extract_css` is **false** in `config/webpack.yml`. Custom webpack builds should set this value to true or else no CSS link tags are generated. You have a custom webpack build if you are not using [rails/webpacker](https://github.com/rails/webpacker) to setup your Webpack configuration.
 
   ```yml
   default: &default
