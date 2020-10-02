@@ -14,8 +14,15 @@ require "rspec/rails"
 require "capybara/rspec"
 require "capybara/rails"
 Capybara.javascript_driver = :selenium_chrome
+
+# From https://stackoverflow.com/a/56522500/1009332
+capabilities = Selenium::WebDriver::Remote::Capabilities.chrome(
+  chromeOptions: { args: %w[headless window-size=1280,800], w3c: false }
+)
 Capybara.register_driver :selenium_chrome do |app|
-  Capybara::Selenium::Driver.new(app, browser: :chrome)
+  Capybara::Selenium::Driver.new(app,
+                                 browser: :chrome,
+                                 desired_capabilities: capabilities)
 end
 
 # Requires supporting ruby files with custom matchers and macros, etc, in
