@@ -4,8 +4,15 @@ module DriverRegistration
   def self.register_selenium_chrome
     return if @selenium_chrome_registered
 
+    Capybara.javascript_driver = :selenium_chrome
+    # From https://stackoverflow.com/a/56522500/1009332
+    capabilities = Selenium::WebDriver::Remote::Capabilities.chrome(
+      chromeOptions: { args: %w[headless window-size=1280,800], w3c: false }
+    )
     Capybara.register_driver :selenium_chrome do |app|
-      Capybara::Selenium::Driver.new(app, browser: :chrome)
+      Capybara::Selenium::Driver.new(app,
+                                     browser: :chrome,
+                                     desired_capabilities: capabilities)
     end
     Capybara::Screenshot.register_driver(:selenium_chrome) do |js_driver, path|
       js_driver.browser.save_screenshot(path)
