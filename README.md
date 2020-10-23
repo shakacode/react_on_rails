@@ -14,6 +14,9 @@
 *These are the docs for React on Rails 12. To see the version 11 docs, [click here](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
 
 #### News
+**October 14, 2020**: [RUBY ROGUES
+RR 474: React on Rails V12 – Don’t Shave That Yak! with Justin Gordon](https://devchat.tv/ruby-rogues/rr-474-react-on-rails-v12-dont-shave-that-yak-with-justin-gordon/).
+
 **October 1, 2020**: See the [spec/dummy](./spec/dummy) example repo for a simple configuration of webpack via the rails/webpacker gem
 that supports SSR.
 
@@ -65,7 +68,7 @@ Given that `rails/webpacker` gem already provides basic React integration, why w
 1. Server-Side Rendering (SSR), often used for SEO crawler indexing and UX performance, is not offered by `rails/webpacker`.
 1. [Redux](https://github.com/reactjs/redux) and [React Router](https://github.com/ReactTraining/react-router#readme) integration with server-side-rendering.
 1. [Internationalization (I18n) and (localization)](https://github.com/shakacode/react_on_rails/blob/master/docs/basics/i18n.md)
-1. A supportive community. This [web search shows how live public sites are using React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com/).
+1. A supportive community. This [web search shows how live public sites are using React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/).
 1. [Reason ML Support](https://github.com/shakacode/reason-react-on-rails-example).
 
 See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
