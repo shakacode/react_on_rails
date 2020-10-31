@@ -1,4 +1,4 @@
-# React on Rails Basic Tutorial
+# React on Rails Basic Installation Tutorial
 
 -----
 
