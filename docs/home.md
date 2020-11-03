@@ -67,10 +67,6 @@ _Requires creating a free account._
 
 ----
 
-# Docs
-
-**Consider browsing this on our [documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/).**
-
 ## Prerequisites
 
 Ruby on Rails >=5 and rails/webpacker 4.2+.
