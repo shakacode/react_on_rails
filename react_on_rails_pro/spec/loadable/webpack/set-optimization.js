@@ -16,10 +16,8 @@ function setOptimization(builderConfig, webpackConfig) {
     */
     minimizer: [
       new TerserPlugin({
-        cache: true,
-        parallel: true,
-        sourceMap: true,
         terserOptions: {
+          parallel: true,
           compress: {
             comparisons: false,
             warnings: false,

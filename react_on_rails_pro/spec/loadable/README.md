@@ -5,12 +5,16 @@
 2. [React on Rails Pro Docs](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/code-splitting-loadable-components.md)
 
 ## Why Change from React-Loadable & React-Hot-Loader?
-1. It's the official way as of March 2020 to use dyanamic code splitting with React.
+1. It's the official way as of March 2020 to use dynamic code splitting with React.
 2. react-loadable:
    1. Is not supported for recent versions of React and Webpack
    2. Required ugly code of `#if` from the webpack-conditional-loader
 
 ## Setup
+
+Before setup you need to run `yarn` in the root of the directory lib to install react_on_rails_pro-vm-renderer.
+Then go back to `spec/loadable` and continue:
+
 1. Run these commands. Ignore the warning on the db:setup. 
 ```
 yarn
@@ -38,7 +42,7 @@ foreman start -f Procfile.dev-hot
 1. Install ruby gems & node packages
 1. Run the following command:
 ```
-foreman start -f Procfile.dev-hot
+foreman start -f Procfile.dev
 ```
 1. Wait for the server & client bundles to compile
 1. Navigate to http://localhost:3000/
