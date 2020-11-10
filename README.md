@@ -14,6 +14,8 @@
 *These are the docs for React on Rails 12. To see the version 11 docs, [click here](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
 
 #### News
+**November 10, 2020**: There might be an issue with React 17. That should get resolved very soon. Check out issue [React Hooks Error for React v17 #1336](https://github.com/shakacode/react_on_rails/issues/1336).
+
 **October 14, 2020**: [RUBY ROGUES
 RR 474: React on Rails V12 – Don’t Shave That Yak! with Justin Gordon](https://devchat.tv/ruby-rogues/rr-474-react-on-rails-v12-dont-shave-that-yak-with-justin-gordon/).
 
