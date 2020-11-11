@@ -2,9 +2,7 @@
 
 -----
 
-**November 10, 2020**: There might be an issue with React 17. That should get resolved very soon. Check out issue [React Hooks Error for React v17 #1336](https://github.com/shakacode/react_on_rails/issues/1336).
-
-**August 2, 2020**: See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) for a new way to setup the creation of your SSR bundle with `rails/webpacker`. This file will be update shortly. Most of it is still relevant.
+**November 11, 2020**: See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) for a new way to setup the creation of your SSR bundle with `rails/webpacker`. This file will be update shortly. Most of it is still relevant.
 
 -----
 
