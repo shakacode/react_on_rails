@@ -7,13 +7,7 @@ namespace :lint do
 
   desc "Run Rubocop as shell"
   task :rubocop do
-    sh_in_dir(gem_root, "bundle exec rubocop .")
-  end
-
-  desc "Run ruby-lint as shell"
-  task :ruby do
-    puts "See /ruby-lint.yml for what directories are included."
-    sh_in_dir(gem_root, "bundle exec ruby-lint .")
+    sh_in_dir(gem_root, "bundle exec rubocop --version", "bundle exec rubocop .")
   end
 
   desc "Run scss-lint as shell"
@@ -23,10 +17,10 @@ namespace :lint do
 
   desc "Run eslint as shell"
   task :eslint do
-    sh_in_dir(gem_root, "yarn run eslint")
+    sh_in_dir(gem_root, "yarn run eslint --version", "yarn run eslint .")
   end
 
-  desc "Run all eslint & rubocop linters. Skip ruby-lint and scss"
+  desc "Run all eslint & rubocop linters. Skip scss"
   task lint: %i[eslint rubocop] do
     puts "Completed all linting"
   end

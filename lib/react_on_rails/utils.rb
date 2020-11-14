@@ -34,7 +34,7 @@ module ReactOnRails
     end
 
     def self.object_to_boolean(value)
-      [true, "true", "yes", 1, "1", "t"].include?(value.class == String ? value.downcase : value)
+      [true, "true", "yes", 1, "1", "t"].include?(value.instance_of?(String) ? value.downcase : value)
     end
 
     def self.server_rendering_is_enabled?
@@ -118,9 +118,11 @@ module ReactOnRails
       end
     end
 
+    # rubocop:disable Naming/VariableNumber
     def self.rails_version_less_than_4_1_1
       rails_version_less_than("4.1.1")
     end
+    # rubocop:enable Naming/VariableNumber
 
     module Required
       def required(arg_name)

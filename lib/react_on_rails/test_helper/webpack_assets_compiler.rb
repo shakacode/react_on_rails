@@ -8,7 +8,7 @@ module ReactOnRails
       def compile_assets
         if ReactOnRails.configuration.build_test_command.blank?
           msg = <<~MSG
-            You are using the React on Rails test helper. 
+            You are using the React on Rails test helper.
             Either you used:
               ReactOnRails::TestHelper.configure_rspec_to_compile_assets or
               ReactOnRails::TestHelper.ensure_assets_compiled
