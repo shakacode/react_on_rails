@@ -17,9 +17,8 @@ module ReactOnRails
     end
 
     # Executes a string or an array of strings in a shell in the given directory
-    def sh_in_dir(dir, shell_commands)
-      shell_commands = [shell_commands] if shell_commands.is_a?(String)
-      shell_commands.each { |shell_command| sh %(cd #{dir} && #{shell_command.strip}) }
+    def sh_in_dir(dir, *shell_commands)
+      shell_commands.flatten.each { |shell_command| sh %(cd #{dir} && #{shell_command.strip}) }
     end
 
     def bundle_install_in(dir)

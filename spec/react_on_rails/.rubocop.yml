@@ -1,5 +1,5 @@
 inherit_from:
-  - ../.rubocop.yml
+  - ../../.rubocop.yml
 
 Metrics/BlockLength:
-  Max: 180
+  Max: 145
