@@ -12,5 +12,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
+# rubocop:disable Lint/EmptyBlock
 ActiveRecord::Schema.define(version: 0) do
 end
+# rubocop:enable Lint/EmptyBlock

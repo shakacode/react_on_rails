@@ -40,10 +40,10 @@ end
 namespace :react_on_rails do
   namespace :assets do
     desc <<-DESC.strip_heredoc
-      Compile assets with webpack	
-      Uses command defined with ReactOnRails.configuration.build_production_command	
-      sh "#{ReactOnRails::Utils.prepend_cd_node_modules_directory('<ReactOnRails.configuration.build_production_command>')}"	
-      Note: This command is not automatically added to assets:precompile if the rails/webpacker	
+      Compile assets with webpack
+      Uses command defined with ReactOnRails.configuration.build_production_command
+      sh "#{ReactOnRails::Utils.prepend_cd_node_modules_directory('<ReactOnRails.configuration.build_production_command>')}"
+      Note: This command is not automatically added to assets:precompile if the rails/webpacker
       configuration file config/webpack/production.js exists.
     DESC
     task webpack: :locale do

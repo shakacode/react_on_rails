@@ -150,8 +150,10 @@ module ReactOnRails
     end
 
     it "has a default configuration of the gem" do
+      # rubocop:disable Lint/EmptyBlock
       ReactOnRails.configure do |_config|
       end
+      # rubocop:enable Lint/EmptyBlock
 
       expect(ReactOnRails.configuration.random_dom_id).to eq(true)
     end

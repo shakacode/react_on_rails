@@ -32,27 +32,13 @@ Gem::Specification.new do |s|
   s.add_dependency "rainbow", "~> 3.0"
   s.add_dependency "webpacker", ">= 4.0"
 
-  s.add_development_dependency "awesome_print"
   s.add_development_dependency "bundler", "~> 2"
-  s.add_development_dependency "coveralls"
   s.add_development_dependency "gem-release"
-  s.add_development_dependency "generator_spec"
-  s.add_development_dependency "listen"
-  s.add_development_dependency "pry"
-  s.add_development_dependency "pry-byebug"
-  s.add_development_dependency "pry-doc"
-  s.add_development_dependency "pry-rescue"
-  s.add_development_dependency "pry-state"
-  s.add_development_dependency "rails"
-
-  s.add_development_dependency "rake"
-  s.add_development_dependency "rspec"
-  s.add_development_dependency "rubocop"
-
   s.post_install_message = '
 --------------------------------------------------------------------------------
-Email contact@shakacode.com for access to our slack room and information about our "pro support plan"
-which supports better performance, via caching helpers and our node rendering server.
+Checkout https://www.shakacode.com/react-on-rails-pro for information about
+"React on Rails Pro" which includes one hour a month of support and a gem for
+better performance, via caching helpers, and our node rendering server.
 --------------------------------------------------------------------------------
 '
 end

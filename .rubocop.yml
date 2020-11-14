@@ -2,6 +2,7 @@
 # Check out: https://github.com/bbatsov/rubocop
 
 AllCops:
+  NewCops: enable
   DisplayCopNames: true
   TargetRubyVersion: 2.5
 
@@ -13,34 +14,32 @@ AllCops:
     - '**/*.rake'
 
   Exclude:
-    - 'vendor/**/*'
-    - 'spec/fixtures/**/*'
-    - 'node_modules/**/.*'
-    - 'node_modules/**/*'
+  <% `git status --ignored --porcelain`.lines.grep(/^!! /).each do |path| %>
+    - <%= path.sub(/^!! /, '') %>
+  <% end %>
+    - '**/*.js'
+    - '**/log/**/*'
+    - '**/node_modules/**/*'
+    - '**/public/**/*'
+    - '**/tmp/**/*'
+    - '.git/**/*'
+    - 'bin/**/*'
     - 'coverage/**/*'
     - 'db/**/*'
     - 'db/schema.rb'
     - 'db/seeds.rb'
-    - 'client/node_modules/**/*.*'
-    - 'client/node_modules/**/.*'
-    - 'bin/**/*'
-    - !ruby/regexp /old_and_unused\.rb$/
-    - 'spec/react_on_rails/dummy-for-generators/**/*'
-    - 'spec/dummy/Procfile.*'
-    - 'spec/dummy/bin/**/*'
-    - 'spec/dummy/node_modules/**/*'
-    - 'spec/dummy/node_modules/**/.*'
-    - 'gen-examples/examples/**/.*'
     - 'gen-examples/examples/**/*'
+    - 'node_modules/**/*'
+    - 'spec/dummy/bin/*'
+    - 'spec/fixtures/**/*'
+    - 'spec/react_on_rails/dummy-for-generators/**/*'
+    - 'tmp/**/*'
+    - 'vendor/**/*'
 
 Naming/FileName:
   Exclude:
     - 'Gemfile'
     - 'spec/dummy/Gemfile'
-
-# Turn off until we require 2.3 ruby
-Style/SafeNavigation:
-  Enabled: false
 
 Layout/LineLength:
   Max: 120
@@ -97,103 +96,3 @@ Naming/RescuedExceptionsVariableName:
 Style/GlobalVars:
   Exclude:
     - 'spec/dummy/config/environments/development.rb'
-
-Style/FrozenStringLiteralComment:
-  EnforcedStyle: always
-
-Layout/EmptyLinesAroundAttributeAccessor:
-  Enabled: true
-
-Layout/SpaceAroundMethodCallOperator:
-  Enabled: true
-
-Lint/RaiseException:
-  Enabled: true
-
-Lint/StructNewOverride:
-  Enabled: true
-
-Style/ExponentialNotation:
-  Enabled: true
-
-Style/SlicingWithRange:
-  Enabled: true
-
-Layout/BeginEndAlignment: # (new in 0.91)
-  Enabled: true
-Lint/BinaryOperatorWithIdenticalOperands: # (new in 0.89)
-  Enabled: true
-Lint/ConstantDefinitionInBlock: # (new in 0.91)
-  Enabled: true
-Lint/DeprecatedOpenSSLConstant: # (new in 0.84)
-  Enabled: true
-Lint/DuplicateElsifCondition: # (new in 0.88)
-  Enabled: true
-Lint/DuplicateRequire: # (new in 0.90)
-  Enabled: true
-Lint/DuplicateRescueException: # (new in 0.89)
-  Enabled: true
-Lint/EmptyConditionalBody: # (new in 0.89)
-  Enabled: true
-Lint/EmptyFile: # (new in 0.90)
-  Enabled: true
-Lint/FloatComparison: # (new in 0.89)
-  Enabled: true
-Lint/IdentityComparison: # (new in 0.91)
-  Enabled: true
-Lint/MissingSuper: # (new in 0.89)
-  Enabled: true
-Lint/MixedRegexpCaptureTypes: # (new in 0.85)
-  Enabled: true
-Lint/OutOfRangeRegexpRef: # (new in 0.89)
-  Enabled: true
-Lint/SelfAssignment: # (new in 0.89)
-  Enabled: true
-Lint/TopLevelReturnWithArgument: # (new in 0.89)
-  Enabled: true
-Lint/TrailingCommaInAttributeDeclaration: # (new in 0.90)
-  Enabled: true
-Lint/UnreachableLoop: # (new in 0.89)
-  Enabled: true
-Lint/UselessMethodDefinition: # (new in 0.90)
-  Enabled: true
-Lint/UselessTimes: # (new in 0.91)
-  Enabled: true
-Style/AccessorGrouping: # (new in 0.87)
-  Enabled: true
-Style/BisectedAttrAccessor: # (new in 0.87)
-  Enabled: true
-Style/CaseLikeIf: # (new in 0.88)
-  Enabled: true
-Style/CombinableLoops: # (new in 0.90)
-  Enabled: true
-Style/ExplicitBlockArgument: # (new in 0.89)
-  Enabled: true
-Style/GlobalStdStream: # (new in 0.89)
-  Enabled: true
-Style/HashAsLastArrayItem: # (new in 0.88)
-  Enabled: true
-Style/HashLikeCase: # (new in 0.88)
-  Enabled: true
-Style/KeywordParametersOrder: # (new in 0.90)
-  Enabled: true
-Style/OptionalBooleanParameter: # (new in 0.89)
-  Enabled: true
-Style/RedundantAssignment: # (new in 0.87)
-  Enabled: true
-Style/RedundantFetchBlock: # (new in 0.86)
-  Enabled: true
-Style/RedundantFileExtensionInRequire: # (new in 0.88)
-  Enabled: true
-Style/RedundantRegexpCharacterClass: # (new in 0.85)
-  Enabled: true
-Style/RedundantRegexpEscape: # (new in 0.85)
-  Enabled: true
-Style/RedundantSelfAssignment: # (new in 0.90)
-  Enabled: true
-Style/SingleArgumentDig: # (new in 0.89)
-  Enabled: true
-Style/SoleNestedConditional: # (new in 0.89)
-  Enabled: true
-Style/StringConcatenation: # (new in 0.89)
-  Enabled: true
