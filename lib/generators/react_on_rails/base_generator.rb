@@ -43,7 +43,14 @@ module ReactOnRails
       end
 
       def add_yarn_dependencies
-        run "yarn add react-on-rails --exact"
+        major_minor_patch_only = /\A\d+\.\d+\.\d+\z/.freeze
+        if ReactOnRails::VERSION.match?(major_minor_patch_only)
+          run "yarn add react-on-rails@#{ReactOnRails::VERSION} --exact"
+        else
+          # otherwise add latest
+          puts "Adding the lastest react-on-rails NPM module. Double check this is correct in package.json"
+          run "yarn add react-on-rails --exact"
+        end
       end
 
       def append_to_spec_rails_helper
