@@ -6,22 +6,10 @@ require "react_on_rails/webpacker_utils"
 require "react_on_rails_pro"
 # let's us use Rails's generator testing helpers but with RSpec syntax
 require "generator_spec"
-require "awesome_print"
-require "pry"
+require "amazing_print"
 require "pry-byebug"
-require "pry-stack_explorer"
-require "pry-doc"
-
-# Fails travis
-# require "pry-state"
-# require "pry-toys"
-# require "pry-rescue"
-
-require "binding_of_caller"
-require "awesome_print"
 
 require "action_controller"
-
 require "rails"
 require "rails/test_help"
 Rails.backtrace_cleaner.remove_silencers!

@@ -16,6 +16,8 @@ module ReactOnRailsPro
         end
         describe ".bundle_file_name" do
           before do
+            allow(ReactOnRails.configuration)
+              .to receive(:server_bundle_js_file).and_return(nil)
             allow(Webpacker).to receive_message_chain("manifest.lookup!")
               .with("client-bundle.js")
               .and_return("/webpack/production/client-bundle-0123456789abcdef.js")
