@@ -90,10 +90,8 @@ module ReactOnRailsPro
     def setup_renderer_password
       return if renderer_password.present?
 
-      begin
-        uri = URI(renderer_url)
-        self.renderer_password = uri.password
-      end
+      uri = URI(renderer_url)
+      self.renderer_password = uri.password
     end
   end
 end

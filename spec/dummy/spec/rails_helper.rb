@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 ENV["RAILS_ENV"] ||= "test"
-SERVER_BUNDLE_PATH = File.expand_path("../../public/webpack/" + ENV["RAILS_ENV"] + "/server-bundle.js", __FILE__)
+SERVER_BUNDLE_PATH = File.expand_path("../../public/webpack/#{ENV['RAILS_ENV']}/server-bundle.js", __FILE__)
 
 require_relative "simplecov_helper"
 require_relative "spec_helper"
@@ -40,7 +40,7 @@ ActiveRecord::Migration.maintain_test_schema!
 # in ./support/ and its subdirectories.
 Dir[Rails.root.join("spec", "support", "**", "*.rb")].sort.each { |f| require f }
 
-require_relative "../../react_on_rails_pro/support/caching.rb"
+require_relative "../../react_on_rails_pro/support/caching"
 RSpec.configure do |config|
   # Ensure that if we are running js tests, we are using latest webpack assets
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :requires_webpack_assets)
