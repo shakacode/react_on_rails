@@ -29,6 +29,7 @@ AllCops:
     - 'spec/fixtures/**/*'
     - 'spec/react_on_rails/dummy-for-generators/**/*'
     - 'tmp/**/*'
+    - 'vendor/**/*'
 
 Naming/FileName:
   Exclude:
