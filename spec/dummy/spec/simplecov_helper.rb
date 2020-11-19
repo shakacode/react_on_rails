@@ -18,7 +18,7 @@ if ENV["COVERAGE"] == "true"
     # Don't report anything that has "spec" in the path
     # NOTE: this excludes the dummy apps!
     add_filter do |src|
-      src.filename =~ %r{/spec/}
+      src.filename.include?("/spec/")
     end
   end
 end

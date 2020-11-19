@@ -38,7 +38,7 @@ shared_examples "railsContext" do |pathname, id_base|
 
       keys_to_vals.each do |key, val|
         # skip checking http_accept_language if selenium
-        next if key == :httpAcceptLanguage && Capybara.javascript_driver.to_s =~ /selenium/
+        next if key == :httpAcceptLanguage && Capybara.javascript_driver.to_s.include?("selenium")
 
         expect(page).to have_css("#{top_id} .js-#{key}", text: val)
       end
