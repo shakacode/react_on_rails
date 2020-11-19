@@ -18,28 +18,20 @@ AllCops:
     - <%= path.sub(/^!! /, '') %>
   <% end %>
     - '**/*.js'
-    - '**/log/**/*'
     - '**/node_modules/**/*'
     - '**/public/**/*'
     - '**/tmp/**/*'
-    - '.git/**/*'
-    - 'bin/**/*'
     - 'coverage/**/*'
-    - 'db/**/*'
-    - 'db/schema.rb'
-    - 'db/seeds.rb'
     - 'gen-examples/examples/**/*'
     - 'node_modules/**/*'
     - 'spec/dummy/bin/*'
     - 'spec/fixtures/**/*'
     - 'spec/react_on_rails/dummy-for-generators/**/*'
     - 'tmp/**/*'
-    - 'vendor/**/*'
 
 Naming/FileName:
   Exclude:
     - 'Gemfile'
-    - 'spec/dummy/Gemfile'
 
 Layout/LineLength:
   Max: 120

@@ -59,11 +59,21 @@ cd test-react-on-rails
 bundle
 ```
 
-## Add the webpacker gem
+## Add the webpacker and react_on_rails gems
+To avoid issues regarding inconsistent gem and npm versions, you should specify the exact versions
+of both the gem and npm package. In other words, don't use the `^` or `~` in the version specifications.
+_Use the latest version for react_on_rails._
 
 ```
+gem 'react_on_rails', '12.0.4'         # prefer exact gem version to match npm version
+```
+
+Note: The latest released React On Rails version is considered stable. Please use the latest
+version to ensure you get all the security patches and the best support.
+
+```bash
 bundle add webpacker                 
-bundle add react_on_rails
+bundle add react_on_rails --version=12.0.4 --strict
 ```
 
 ## Run the webpacker generator
@@ -82,25 +92,7 @@ git add -A
 git commit -m "Initial commit"
 ```
 
-## Add the **React On Rails** gem to your `Gemfile`:
-
-To avoid issues regarding inconsistent gem and npm versions, you should specify the exact versions
-of both the gem and npm package. In other words, don't use the `^` or `~` in the version specifications.
-
-```
-gem 'react_on_rails', '12.0.0'         # prefer exact gem version to match npm version
-```
-
-Note: The latest released React On Rails version is considered stable. Please use the latest 
-version to ensure you get all the security patches and the best support.
-
-Run `bundle` and commit the changes.
-
-```
-bundle
-
-git commit -am "Added React on Rails Gem"
-```
+## Run the React on Rails Generator
 
 Install React on Rails: `rails generate react_on_rails:install`. You need to first git commit your files before running the generator, or else it will generate an error.
 

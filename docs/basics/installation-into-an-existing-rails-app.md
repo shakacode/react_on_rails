@@ -4,19 +4,26 @@
 
 **If you have rails-5 API only project**, first [convert the rails-5 API only app to rails app](#convert-rails-5-api-only-app-to-rails-app) before [getting started](#getting-started-with-an-existing-rails-app).
 
-1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `client/package.json` file.
+1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `package.json` file.
 
    ```ruby
    gem "react_on_rails", "12.0.0" # Update to the current version
    gem "webpacker", "~> 5"
    ```
 
+1. Add the webpacker and react_on_rails gems
+_Use the latest version for react_on_rails._
+
+```
+bundle add webpacker                 
+bundle add react_on_rails --version=12.0.4 --strict
+```
+
 2. Run the following 2 commands to install Webpacker with React. Note, if you are using an older version of Rails than 5.1, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
 
-
    ```bash
-   $ bundle exec rails webpacker:install
-   $ bundle exec rails webpacker:install:react
+   bundle exec rails webpacker:install
+   bundle exec rails webpacker:install:react
    ```
 
 3. Commit this to git (or else you cannot run the generator unless you pass the option `--ignore-warnings`).

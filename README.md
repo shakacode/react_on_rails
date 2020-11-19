@@ -94,35 +94,35 @@ Ruby on Rails >=5 and rails/webpacker 4.2+.
 Note, the best way to understand how to use ReactOnRails is to study a few simple examples. You can do a quick demo setup, either on your existing app or on a new Rails app. 
 
 1. Do the quick [tutorial](docs/tutorial.md).
-2. Add React on Rails to an existing Rails app per [the instructions](docs/basics/installation-into-an-existing-rails-app.md).
-3. Look at [spec/dummy](spec/dummy), a simple, no DB example.
-3. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full-featured example live at [www.reactrails.com](http://www.reactrails.com).
+1. Add React on Rails to an existing Rails app per [the instructions](docs/basics/installation-into-an-existing-rails-app.md).
+1. Look at [spec/dummy](spec/dummy), a simple, no DB example. This has an example of using `rails/webpacker` to configure server-side rendering.
+1. See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) for a new way to setup the creation of your SSR bundle with `rails/webpacker`.
+1. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full-featured example live at [www.reactrails.com](http://www.reactrails.com).
 
 ## Basic Installation
 
 *See also [the instructions for installing into an existing Rails app](docs/basics/installation-into-an-existing-rails-app.md).*
 
-2. Add the `react_on_rails` gem to Gemfile:
+1. Add the `rails/webpacker` gem if you don't yet have it.
+   
+1. Add the `react_on_rails` gem to Gemfile. _Use the latest version for react_on_rails._
+  ```bash
+    bundle add react_on_rails --version=12.0.4 --strict
+  ```
 
-   ```bash
-   bundle add react_on_rails --strict
-   ```
+1. Commit this to git (or else you cannot run the generator unless you pass the option `--ignore-warnings`).
 
-4. Commit this to git (or else you cannot run the generator unless you pass the option `--ignore-warnings`).
-
-5. Run the generator:
-
+1. Run the generator:
    ```bash
    rails generate react_on_rails:install
    ```
 
-6. Start the app:
-
+1. Start the app:
    ```bash
    rails s
    ```
 
-7. Visit http://localhost:3000/hello_world.
+1. Visit http://localhost:3000/hello_world.
 
   
 ### Turning on server rendering
