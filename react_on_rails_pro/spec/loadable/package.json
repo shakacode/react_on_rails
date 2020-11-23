@@ -2,9 +2,7 @@
   "name": "loadable",
   "private": true,
   "scripts": {
-    "start": "nps",
-    "preinstall": "yarn run link-source && yalc add --link react-on-rails-pro-vm-renderer",
-    "link-source": "cd ../.. && yalc publish"
+    "start": "nps"
   },
   "cacheDirectories": [
     "node_modules"
@@ -46,7 +44,6 @@
     "react-dom": "17.0.1",
     "react-helmet": "^6.1.0",
     "react-on-rails": "12.0.4",
-    "react-on-rails-pro-vm-renderer": "link:.yalc/react-on-rails-pro-vm-renderer",
     "react-refresh": "^0.8.1",
     "react-router-dom": "^5.2.0",
     "terser-webpack-plugin": "^5.0.3",

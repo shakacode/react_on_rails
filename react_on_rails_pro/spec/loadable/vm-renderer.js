@@ -1,7 +1,7 @@
 const path = require('path');
 
 // Use this for package installation test:
-const { reactOnRailsProVmRenderer } = require('react-on-rails-pro-vm-renderer');
+const { reactOnRailsProVmRenderer } = require('@shakacode-tools/react-on-rails-pro-vm-renderer');
 
 const config = {
   // tmp/bundles path must be kept in sync with /lib/tasks/asset.raie

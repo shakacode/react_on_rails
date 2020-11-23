@@ -30,7 +30,7 @@ Here are the options available for the JavaScript renderer configuration object,
 Create a file './vm-renderer.js'
 ```js
 import path from 'path';
-import { reactOnRailsProVmRenderer } from 'react-on-rails-pro-vm-renderer';
+import { reactOnRailsProVmRenderer } from '@shakacode-tools/react-on-rails-pro-vm-renderer';
 
 const config = {
   // Save bundles to relative "./tmp/bundles" dir of our app 

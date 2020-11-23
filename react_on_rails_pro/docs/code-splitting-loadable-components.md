@@ -201,7 +201,7 @@ In your `vm-renderer.js` file which runs node renderer, you need to specify `sup
 ```js
 const path = require('path');
 const env = process.env;
-const { reactOnRailsProVmRenderer } = require('react-on-rails-pro-vm-renderer');
+const { reactOnRailsProVmRenderer } = require('@shakacode-tools/react-on-rails-pro-vm-renderer');
 
 const config = {
   ...

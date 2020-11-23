@@ -1,32 +1,39 @@
 # This is the configuration used to check the rubocop source code.
 # Check out: https://github.com/bbatsov/rubocop
+require:
+  - "rubocop-performance"
+
+# Todo: turn on rubocop-rspec
+#  - "rubocop-rspec"
 
 AllCops:
+  NewCops: enable
   DisplayCopNames: true
-  TargetRubyVersion: 2.4
+  TargetRubyVersion: 2.5
 
   Include:
     - '**/Rakefile'
     - '**/config.ru'
     - 'Gemfile'
     - '**/*.rb'
+    - '**/*.rake'
 
   Exclude:
-    - 'vendor/**/*'
-    - 'spec/fixtures/**/*'
-    - '**/node_modules/**/.*'
+  <% `git status --ignored --porcelain`.lines.grep(/^!! /).each do |path| %>
+    - <%= path.sub(/^!! /, '') %>
+  <% end %>
     - '**/node_modules/**/*'
-    - 'coverage/**/*'
-    - 'db/**/*'
     - 'db/schema.rb'
     - 'db/seeds.rb'
-    - 'bin/**/*'
-    - !ruby/regexp /old_and_unused\.rb$/
-    - '**/Procfile.*'
+    - 'spec/fixtures/**/*'
+    - 'spec/dummy/db/schema.rb'
     - 'spec/dummy/bin/**/*'
     - 'spec/loadable/bin/**/*'
-    - 'gen-examples/examples/**/.*'
-    - 'gen-examples/examples/**/*'
+    - 'spec/loadable/db/schema.rb'
+    - 'node_modules/**/*'
+    - 'coverage/**/*'
+    - 'bin/**/*'
+    - 'vendor/**/*'
 
 Naming/FileName:
   Exclude:
@@ -49,15 +56,6 @@ Style/HashTransformKeys:
 
 Style/HashTransformValues:
   Enabled: true
-
-Lint/AssignmentInCondition:
-  Exclude:
-    - 'spec/dummy/bin/spring'
-
-Lint/SuppressedException:
-  Exclude:
-    - 'spec/dummy/bin/rails'
-    - 'spec/dummy/bin/rake'
 
 Metrics/AbcSize:
   Max: 28

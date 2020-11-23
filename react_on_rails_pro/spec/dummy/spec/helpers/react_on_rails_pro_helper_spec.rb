@@ -35,6 +35,7 @@ describe ReactOnRailsProHelper, type: :helper do
 
   describe "#cached_react_component", :caching, :requires_webpack_assets do
     before { allow(SecureRandom).to receive(:uuid).and_return(0, 1, 2, 3) }
+
     let(:base_component_cache_key) do
       "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}"
     end
@@ -137,6 +138,7 @@ describe ReactOnRailsProHelper, type: :helper do
 
         context "with prerender_caching off" do
           before { ReactOnRailsPro.configuration.prerender_caching = false }
+
           after { ReactOnRailsPro.configuration.prerender_caching = true }
 
           it "caches the content" do

@@ -3,7 +3,7 @@
 
 gem "react_on_rails", "12.0.4" # keep in sync with package.json files
 gem "webpacker"
-gem "bootsnap", ">= 1.1.0", require: false
+gem "bootsnap", require: false
 gem "rails"
 gem "sqlite3"
 gem "sass-rails"
@@ -31,7 +31,9 @@ group :development, :test do
   gem "pry-doc"
   gem "pry-rails"
   gem "pry-rescue"
-  gem "rubocop", "1.2.0", require: false
+  gem "rubocop", require: false
+  gem 'rubocop-performance', require: false
+  gem 'rubocop-rspec', require: false
   gem "scss_lint", require: false
   gem "spring"
 end

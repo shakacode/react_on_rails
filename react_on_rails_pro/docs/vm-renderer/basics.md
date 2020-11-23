@@ -33,7 +33,7 @@ For the most control over the setup, create a JavaScript file to start the VmRen
    cd renderer-app
    ```
 2. Make sure you have **Node.js** version **8** or higher and **Yarn** installed.
-3. Init node application and yarn add to install `react-on-rails-pro-vm-renderer` package.
+3. Init node application and yarn add to install `@shakacode-tools/react-on-rails-pro-vm-renderer` package.
    ```sh
    yarn init
    yarn add https://[your-github-token]:x-oauth-basic@github.com/shakacode/react_on_rails_pro.git\#master
@@ -42,7 +42,7 @@ For the most control over the setup, create a JavaScript file to start the VmRen
 
    ```javascript
    import path from 'path';
-   import reactOnRailsProVmRenderer from 'react-on-rails-pro-vm-renderer';
+   import reactOnRailsProVmRenderer from '@shakacode-tools/react-on-rails-pro-vm-renderer';
 
    const config = {
      bundlePath: path.resolve(__dirname, '../tmp/bundles'),

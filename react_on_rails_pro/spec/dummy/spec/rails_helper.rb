@@ -12,7 +12,7 @@ require_relative("../config/environment")
 abort("The Rails environment is running in production mode!") if Rails.env.production?
 
 require "rspec/rails"
-require "capybara/rspec"
+require "capybara/rails"
 require "capybara-screenshot/rspec"
 
 # Add additional requires below this line. Rails is not loaded until this point!
@@ -34,7 +34,8 @@ require "capybara-screenshot/rspec"
 
 # Checks for pending migrations before tests are run.
 # If you are not using ActiveRecord, you can remove this line.
-ActiveRecord::Migration.maintain_test_schema!
+# No DB for these tests
+# ActiveRecord::Migration.maintain_test_schema!
 
 # Requires supporting files with custom matchers and macros, etc,
 # in ./support/ and its subdirectories.
@@ -72,27 +73,16 @@ RSpec.configure do |config|
   config.infer_spec_type_from_file_location!
 
   # Capybara config
+  config.include Capybara::DSL
   #
   # selenium_firefox webdriver only works for Travis-CI builds.
   default_driver = :selenium_chrome_headless
 
-  supported_drivers = %i[webkit selenium_chrome_headless selenium_chrome selenium_firefox selenium]
-  driver = ENV["DRIVER"].try(:to_sym) || default_driver
+  supported_drivers = %i[selenium_chrome_headless selenium_chrome selenium selenium_headless]
+  driver = ENV["DRIVER"].try(:to_sym).presence || default_driver
   Capybara.default_driver = driver
 
   raise "Unsupported driver: #{driver} (supported = #{supported_drivers})" unless supported_drivers.include?(driver)
-
-  case driver
-  when :selenium_chrome
-    DriverRegistration.register_selenium_chrome
-
-  when :selenium_chrome_headless
-    DriverRegistration.register_selenium_chrome_headless
-
-  when :selenium_firefox, :selenium
-    DriverRegistration.register_selenium_firefox
-    driver = :selenium_firefox
-  end
 
   Capybara.javascript_driver = driver
   Capybara.default_driver = driver
@@ -114,8 +104,9 @@ RSpec.configure do |config|
   Capybara.save_path = Rails.root.join("tmp", "capybara")
   Capybara::Screenshot.prune_strategy = { keep: 10 }
 
-  config.append_after(:each) do
-    Capybara.reset_sessions!
+  # https://github.com/mattheworiordan/capybara-screenshot/issues/243#issuecomment-620423225
+  config.retry_callback = proc do |ex|
+    Capybara.reset! if ex.metadata[:js]
   end
 
   # RSpec Rails can automatically mix in different behaviours to your tests
@@ -140,15 +131,5 @@ RSpec.configure do |config|
 
   def js_errors_driver
     Capybara.javascript_driver
-  end
-
-  def js_selenium_driver
-    driver = Capybara.javascript_driver == :selenium_firefox ? :selenium_firefox : :selenium_chrome
-    if driver == :selenium_firefox
-      DriverRegistration.register_selenium_firefox
-    else
-      DriverRegistration.register_selenium_chrome
-    end
-    driver
   end
 end

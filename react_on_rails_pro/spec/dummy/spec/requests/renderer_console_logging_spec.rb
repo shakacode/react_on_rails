@@ -4,6 +4,7 @@ require "rails_helper"
 
 describe "Console logging from server" do
   let!(:default_replay_console_setting) { ReactOnRails.configuration.replay_console }
+
   after { ReactOnRails.configuration.replay_console = default_replay_console_setting }
 
   context 'replay_console option set to "true"' do
