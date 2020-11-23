@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-# NOTE:
-# For any heredoc JS:
+# NOTE: For any heredoc JS:
 # 1. The white spacing in this file matters!
 # 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 

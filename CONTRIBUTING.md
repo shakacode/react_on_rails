@@ -120,7 +120,7 @@ When you use a relative path, be sure to run the above `yarn` command whenever y
 
 #### Example: Testing NPM changes with the dummy app
 1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails_pro/blob/more_test_and_docs/packages/vm-renderer/src/ReactOnRailsProVmRenderer.js#L6) in `react_on_rails/packages/vm-renderer/src/ReactOnRailsProVmRenderer.js` to confirm we're getting an update to the node package.
-2. The "postinstall" script of "spec/dummy/client" calls "yarn link react-on-rails" to setup a sym link to the parent package.
+2. The "postinstall" script of "spec/dummy" sets up yalc to use react-on-rails-pro for renderer.
 3. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console.
 
 _Note: you don't have to build the NPM package since it is used only with node runtime and its source code is exactly what is executed when you run it._

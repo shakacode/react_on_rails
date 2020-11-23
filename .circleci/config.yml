@@ -27,7 +27,9 @@ aliases:
   # Install/update Node modules for renderer package unless existing set of modules is satisfying Yarn.
   - &install-package-node-modules
     name: Install Node modules with Yarn for renderer package
-    command: yarn install --no-progress --no-emoji
+    command: |
+      sudo yarn global add yalc
+      yarn install --no-progress --no-emoji
 
   # Install/update Node modules for dummy app unless existing set of modules is satisfying Yarn.
   - &install-dummy-app-node-modules
@@ -140,6 +142,7 @@ jobs:
       - checkout
       - run: *print-system-info
       - restore_cache: *restore-dummy-app-node-modules-cache
+      - run: *install-package-node-modules
       - run: *install-dummy-app-node-modules
       - save_cache:
           name: Save spec/dummy/node_modules to cache
@@ -188,6 +191,7 @@ jobs:
       - checkout
       - run: *print-system-info
       - restore_cache: *restore-dummy-app-node-modules-cache
+      - run: *install-package-node-modules
       - run: *install-dummy-app-node-modules
       - run: *install-dummy-app-ruby-gems
       - run:

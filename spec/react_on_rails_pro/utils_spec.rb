@@ -14,7 +14,12 @@ module ReactOnRailsPro
             .and_return("public/webpack/production")
           allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
         end
+
         describe ".bundle_file_name" do
+          subject do
+            described_class.bundle_file_name("client-bundle.js")
+          end
+
           before do
             allow(ReactOnRails.configuration)
               .to receive(:server_bundle_js_file).and_return(nil)
@@ -22,9 +27,7 @@ module ReactOnRailsPro
               .with("client-bundle.js")
               .and_return("/webpack/production/client-bundle-0123456789abcdef.js")
           end
-          subject do
-            Utils.bundle_file_name("client-bundle.js")
-          end
+
           it { expect(subject).to eq("client-bundle-0123456789abcdef.js") }
         end
 
@@ -41,7 +44,7 @@ module ReactOnRailsPro
                 .to receive(:server_bundle_js_file).and_return("webpack-bundle.js")
               allow(File).to receive(:mtime).with(server_bundle_js_file_path).and_return(123)
 
-              result = Utils.bundle_hash
+              result = described_class.bundle_hash
 
               expect(result).to eq("webpack-bundle-0123456789abcdef.js")
             end
@@ -62,7 +65,7 @@ module ReactOnRailsPro
                 .and_return("foobarfoobar")
               allow(File).to receive(:mtime).with(server_bundle_js_file_path).and_return(345)
 
-              result = Utils.bundle_hash
+              result = described_class.bundle_hash
 
               expect(result).to eq("foobarfoobar")
             end
@@ -73,6 +76,7 @@ module ReactOnRailsPro
 
     describe ".with_trace" do
       let(:logger_mock) { double("Rails.logger").as_null_object }
+
       context "tracing on" do
         before do
           allow(ReactOnRailsPro.configuration).to receive(:tracing).and_return(true)
@@ -83,7 +87,7 @@ module ReactOnRailsPro
           msg = "Something"
           expect(logger_mock).to receive(:info)
 
-          result = ReactOnRailsPro::Utils.with_trace(msg) do
+          result = described_class.with_trace(msg) do
             1 + 2
           end
 
@@ -102,7 +106,7 @@ module ReactOnRailsPro
           msg = "Something"
           expect(logger_mock).not_to receive(:info)
 
-          result = ReactOnRailsPro::Utils.with_trace(msg) do
+          result = described_class.with_trace(msg) do
             1 + 2
           end
 
@@ -115,28 +119,35 @@ module ReactOnRailsPro
       context "extension is known" do
         describe "json" do
           subject do
-            ReactOnRailsPro::Utils.mine_type_from_file_name("loadable-stats.json")
+            described_class.mine_type_from_file_name("loadable-stats.json")
           end
+
           it { expect(subject).to eq("application/json") }
         end
+
         describe "JSON" do
           subject do
-            ReactOnRailsPro::Utils.mine_type_from_file_name("LOADABLE-STATS.JSON")
+            described_class.mine_type_from_file_name("LOADABLE-STATS.JSON")
           end
+
           it { expect(subject).to eq("application/json") }
         end
+
         describe "js" do
           subject do
-            ReactOnRailsPro::Utils.mine_type_from_file_name("loadable-stats.js")
+            described_class.mine_type_from_file_name("loadable-stats.js")
           end
+
           it { expect(subject).to eq("application/javascript") }
         end
       end
+
       context "extension is unknown" do
         describe "foo" do
           subject do
-            ReactOnRailsPro::Utils.mine_type_from_file_name("loadable-stats.foo")
+            described_class.mine_type_from_file_name("loadable-stats.foo")
           end
+
           it { expect(subject).to eq("application/octet-stream") }
         end
       end

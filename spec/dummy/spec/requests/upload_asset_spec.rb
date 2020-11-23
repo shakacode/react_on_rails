@@ -10,7 +10,8 @@ describe "Upload asset", if: ENV["SERVER_RENDERER"] != "ExecJS" do
   let(:non_exist_fixture_path) { File.expand_path("./spec/fixtures/sample99.json") }
   let(:asset_path_expanded) { File.expand_path(asset_filename, "#{__dir__}/../../tmp/bundles") }
   let(:asset_path_expanded2) { File.expand_path(asset_filename2, "#{__dir__}/../../tmp/bundles") }
-  before(:each) do
+
+  before do
     dbl_configuration = double("configuration",
                                server_renderer: "VmRenderer",
                                renderer_password: "myPassword1",
@@ -27,7 +28,7 @@ describe "Upload asset", if: ENV["SERVER_RENDERER"] != "ExecJS" do
   end
 
   context("assets exist") do
-    before(:each) do
+    before do
       FileUtils.cp(fixture_path, Rails.root.join("public", "webpack", "production", asset_filename))
       FileUtils.cp(fixture_path2, Rails.root.join("public", "webpack", "production", asset_filename2))
     end

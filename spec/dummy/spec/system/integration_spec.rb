@@ -8,7 +8,7 @@ def change_text_expect_dom_selector(dom_selector)
   within(dom_selector) do
     find("input").set new_text
     within("h3") do
-      is_expected.to have_content new_text
+      expect(subject).to have_content new_text
     end
   end
 end
@@ -21,11 +21,11 @@ shared_examples "React Component" do |dom_selector|
   end
 end
 
-feature "Pages/Index", :js, type: :system do
+describe "Pages/Index", :js do
   subject { page }
 
   context "All in one page" do
-    background do
+    before do
       visit root_path
     end
 
@@ -51,12 +51,12 @@ feature "Pages/Index", :js, type: :system do
     end
 
     context "Non-React Component" do
-      scenario { is_expected.to have_content "Time to visit Maui" }
+      it { is_expected.to have_content "Time to visit Maui" }
     end
   end
 
   context "Server Rendering with Options" do
-    background do
+    before do
       visit server_side_hello_world_with_options_path
     end
 
@@ -67,7 +67,7 @@ feature "Pages/Index", :js, type: :system do
     let(:serializers_cache_key) { ReactOnRailsPro::Cache.serializers_cache_key }
     let(:base_component_cache_key) { "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}" }
 
-    background do
+    before do
       visit server_side_redux_app_cached_path
     end
 
@@ -81,10 +81,10 @@ feature "Pages/Index", :js, type: :system do
   end
 end
 
-feature "Turbolinks across pages", :js, type: :system do
+describe "Turbolinks across pages", :js do
   subject { page }
 
-  scenario "changes name in message according to input" do
+  it "changes name in message according to input" do
     visit "/client_side_hello_world"
     change_text_expect_dom_selector("#HelloWorld-react-component-0")
     click_link "Hello World Component Server Rendered, with extra options"
@@ -92,47 +92,52 @@ feature "Turbolinks across pages", :js, type: :system do
   end
 end
 
-feature "Pages/client_side_log_throw", :js, type: :system do
+describe "Pages/client_side_log_throw", :js do
   subject { page }
-  background { visit "/client_side_log_throw" }
 
-  scenario "client side logging and error handling", driver: js_errors_driver do
-    is_expected.to have_text "This example demonstrates client side logging and error handling."
+  before { visit "/client_side_log_throw" }
+
+  it "client side logging and error handling", driver: js_errors_driver do
+    expect(subject).to have_text "This example demonstrates client side logging and error handling."
   end
 end
 
-feature "Pages/Pure Component", :js, type: :system do
+describe "Pages/Pure Component", :js do
   subject { page }
-  background { visit "/pure_component" }
 
-  scenario { is_expected.to have_text "This is a Pure Component!" }
+  before { visit "/pure_component" }
+
+  it { is_expected.to have_text "This is a Pure Component!" }
 end
 
-feature "Pages/server_side_log_throw", :js, type: :system do
+describe "Pages/server_side_log_throw", :js do
   subject { page }
-  background { visit "/server_side_log_throw" }
 
-  scenario "page has server side throw messages", driver: js_errors_driver do
+  before { visit "/server_side_log_throw" }
+
+  it "page has server side throw messages", :js do
     expect(subject).to have_text "This example demonstrates server side logging and error handling."
     expect(subject).to have_text "Exception in rendering!\n\nMessage: throw in HelloWorldWithLogAndThrow"
   end
 end
 
-feature "Pages/server_side_log_throw_raise" do
+describe "Pages/server_side_log_throw_raise", :js do
   subject { page }
-  background { visit "/server_side_log_throw_raise" }
 
-  scenario "redirects to /client_side_hello_world and flashes an error" do
-    expect(current_path).to eq("/server_side_log_throw_raise_invoker")
+  before { visit "/server_side_log_throw_raise" }
+
+  it "redirects to /client_side_hello_world and flashes an error" do
     flash_message = page.find(:css, ".flash").text
     expect(flash_message).to eq("Error prerendering in react_on_rails. Redirected back to"\
       " '/server_side_log_throw_raise_invoker'. See server logs for output.")
+    expect(page).to have_current_path("/server_side_log_throw_raise_invoker")
   end
 end
 
-feature "Pages/index after using browser's back button", :js, type: :system do
+describe "Pages/index after using browser's back button", :js do
   subject { page }
-  background do
+
+  before do
     visit root_path
     visit "/client_side_hello_world"
     go_back
@@ -141,91 +146,104 @@ feature "Pages/index after using browser's back button", :js, type: :system do
   include_examples "React Component", "div#ReduxApp-react-component-0"
 end
 
-feature "React Router", js: true, driver: js_errors_driver do
+describe "React Router", js: true, driver: js_errors_driver do
   subject { page }
-  background do
+
+  before do
     visit "/"
     click_link "React Router"
   end
+
   context "/react_router" do
     it { is_expected.to have_text("Woohoo, we can use react-router here!") }
-    scenario "clicking links correctly renders other pages" do
+
+    it "clicking links correctly renders other pages" do
       click_link "Router First Page"
-      expect(current_path).to eq("/react_router/first_page")
+      expect(page).to have_current_path("/react_router/first_page")
       first_page_header_text = page.find(:css, "h2").text
       expect(first_page_header_text).to eq("React Router First Page")
 
       click_link "Router Second Page"
-      expect(current_path).to eq("/react_router/second_page")
+      expect(page).to have_current_path("/react_router/second_page")
       second_page_header_text = page.find(:css, "h2").text
       expect(second_page_header_text).to eq("React Router Second Page")
     end
   end
 end
 
-feature "Manual Rendering", :js, type: :system do
+describe "Manual Rendering", :js do
   subject { page }
-  background { visit "/client_side_manual_render" }
-  scenario "renderer function is called successfully" do
+
+  before { visit "/client_side_manual_render" }
+
+  it "renderer function is called successfully" do
     header_text = page.find(:css, "h1").text
     expect(header_text).to eq("Manual Render Example")
     expect(subject).to have_text "If you can see this, you can register renderer functions."
   end
 end
 
-feature "Code Splitting", :js, type: :system do
+describe "Code Splitting", :js do
   subject { page }
-  background { visit "/deferred_render_with_server_rendering" }
-  scenario "clicking on async route causes async component to be fetched" do
+
+  before { visit "/deferred_render_with_server_rendering" }
+
+  it "clicking on async route causes async component to be fetched" do
     header_text = page.find(:css, "h1").text
 
     expect(header_text).to eq("Deferred Rendering")
-    expect(subject).to_not have_text "Noice!"
+    expect(subject).not_to have_text "Noice!"
 
     click_link "Test Async Route"
-    expect(current_path).to eq("/deferred_render_with_server_rendering/async_page")
+    expect(page).to have_current_path("/deferred_render_with_server_rendering/async_page")
     expect(subject).to have_text "Noice!"
   end
 end
 
-feature "Code Splitting w/ Server Rendering", :js, type: :system do
+describe "Code Splitting w/ Server Rendering", :js do
   subject { page }
-  background { visit "/deferred_render_with_server_rendering/async_page" }
-  scenario "loading an asyncronous route should not cause a client/server checksum mismatch" do
-    expect(current_path).to eq("/deferred_render_with_server_rendering/async_page")
+
+  before { visit "/deferred_render_with_server_rendering/async_page" }
+
+  it "loading an asyncronous route should not cause a client/server checksum mismatch" do
+    expect(page).to have_current_path("/deferred_render_with_server_rendering/async_page")
     expect(subject).to have_text "Noice!"
   end
 end
 
-feature "renderedHtml from generator function", :js, type: :system do
+describe "renderedHtml from generator function", :js do
   subject { page }
-  background { visit "/rendered_html" }
-  scenario "renderedHtml should not have any errors" do
+
+  before { visit "/rendered_html" }
+
+  it "renderedHtml should not have any errors" do
     expect(subject).to have_text 'Props: {"hello":"world"}'
     expect(subject.html).to include("[SERVER] RENDERED RenderedHtml to dom node with id")
   end
 end
 
-feature "returns hash if hash_result == true even with prerendering error", :js, type: :system do
+describe "returns hash if hash_result == true even with prerendering error", :js do
   subject { page }
-  background do
-    begin
-      visit "/broken_app"
-    # rubocop:disable Lint/SuppressedException
-    rescue Selenium::WebDriver::Error::JavascriptError
-    end
-    # rubocop:enable Lint/SuppressedException
+
+  before do
+    visit "/broken_app"
+  # rubocop:disable Lint/SuppressedException
+  rescue Selenium::WebDriver::Error::JavascriptError
   end
-  scenario "react_component should return hash" do
+  # rubocop:enable Lint/SuppressedException
+
+  it "react_component should return hash" do
     expect(subject.html).to include("Exception in rendering!")
   end
 end
 
-feature "generator function returns renderedHtml as an object with additional HTML markups" do
+describe "generator function returns renderedHtml as an object with additional HTML markups" do
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
     subject { page }
-    background { visit react_helmet_path }
-    scenario "renderedHtmls should not have any errors" do
+
+    before { visit react_helmet_path }
+
+    it "renderedHtmls should not have any errors" do
       expect(subject).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
       expect(subject).to have_css "title", text: /\ACustom page title\z/, visible: false
       expect(subject.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
@@ -237,15 +255,17 @@ feature "generator function returns renderedHtml as an object with additional HT
     include_examples "renderedHtmls should not have any errors and set correct page title"
   end
 
-  describe "with enabled JS", :js, type: :system do
+  describe "with enabled JS", :js do
     include_examples "renderedHtmls should not have any errors and set correct page title"
   end
 end
 
-feature "display images", :js, type: :system do
+describe "display images", :js do
   subject { page }
-  background { visit "/image_example" }
-  scenario "image_example should not have any errors" do
+
+  before { visit "/image_example" }
+
+  it "image_example should not have any errors" do
     expect(subject).to have_text "Here is a label with a background-image from the CSS modules imported"
     expect(subject.html).to include("[SERVER] RENDERED ImageExample to dom node with id")
   end
@@ -253,53 +273,54 @@ end
 
 shared_examples "React Component Shared Store" do |url|
   subject { page }
-  background { visit url }
+
+  before { visit url }
   context url do
     scenario "Type in one component changes the other component" do
-      expect(current_path).to eq(url)
+      expect(page).to have_current_path(url, ignore_query: true)
       new_text = "John Doe"
       new_text2 = "Jane Smith"
       within("#ReduxSharedStoreApp-react-component-0") do
         find("input").set new_text
         within("h3") do
-          is_expected.to have_content new_text
+          expect(subject).to have_content new_text
         end
       end
       within("#ReduxSharedStoreApp-react-component-1") do
         within("h3") do
-          is_expected.to have_content new_text
+          expect(subject).to have_content new_text
         end
         find("input").set new_text2
       end
       within("#ReduxSharedStoreApp-react-component-0") do
         within("h3") do
-          is_expected.to have_content new_text2
+          expect(subject).to have_content new_text2
         end
       end
     end
   end
 end
 
-feature "2 react components, 1 store, client only", :js, type: :system do
+describe "2 react components, 1 store, client only", :js do
   include_examples "React Component Shared Store", "/client_side_hello_world_shared_store"
 end
 
-feature "2 react components, 1 store, server side", :js, type: :system do
+describe "2 react components, 1 store, server side", :js do
   include_examples "React Component Shared Store", "/server_side_hello_world_shared_store"
 end
 
-feature "2 react components, 1 store, client only, controller setup", :js, type: :system do
+describe "2 react components, 1 store, client only, controller setup", :js do
   include_examples "React Component Shared Store", "/client_side_hello_world_shared_store_controller"
 end
 
-feature "2 react components, 1 store, server side, controller setup", :js, type: :system do
+describe "2 react components, 1 store, server side, controller setup", :js do
   include_examples "React Component Shared Store", "/server_side_hello_world_shared_store_controller"
 end
 
-feature "2 react components, 1 store, client only, defer", :js, type: :system do
+describe "2 react components, 1 store, client only, defer", :js do
   include_examples "React Component Shared Store", "/client_side_hello_world_shared_store_defer"
 end
 
-feature "2 react components, 1 store, server side, defer", :js, type: :system do
+describe "2 react components, 1 store, server side, defer", :js do
   include_examples "React Component Shared Store", "/server_side_hello_world_shared_store_defer"
 end

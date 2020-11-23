@@ -7,20 +7,6 @@ To toggle caching in development, as explained in [this article](http://guides.r
 `rails dev:cache`
 
 
-Using NPM for react_on_rails
-
-* Use 'yarn link' to hook up the spec/dummy/client/node_modules to the top level
-* Be sure to install yarn dependencies in spec/dummy/client
-
-## Setup yarn link
-
-```sh
-cd react_on_rails
-yarn link
-cd spec/dummy/client
-yarn link react-on-rails
-```
-
 ## Run yarn if not done yet
 
 ```sh

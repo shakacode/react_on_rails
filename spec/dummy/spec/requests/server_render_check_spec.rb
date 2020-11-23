@@ -58,6 +58,25 @@ describe "Server Rendering", :server_rendering do
       new_html_nodes = Nokogiri::HTML(response.body)
       expect(new_html_nodes.css("div#my-hello-world-id p").text).to eq(replacement_text)
     end
+
+    it "does NOT reload the server bundle on a new request if was changed but development mode false" do
+      ReactOnRails.configure { |config| config.development_mode = true }
+      get server_side_hello_world_with_options_path
+      html_nodes = Nokogiri::HTML(response.body)
+      sentinel = "Say hello to:"
+      expect(html_nodes.css("div#my-hello-world-id p").text).to eq(sentinel)
+
+      ReactOnRails.configure { |config| config.development_mode = false }
+      original_mtime = File.mtime(server_bundle)
+      replacement_text = "ZZZZZZZZZZZZZZZZZZZ"
+      new_bundle_text = original_bundle_text.gsub(sentinel, replacement_text)
+      File.open(server_bundle, "w") { |f| f.puts new_bundle_text }
+      new_mtime = File.mtime(server_bundle)
+      expect(new_mtime).not_to eq(original_mtime)
+      get server_side_hello_world_with_options_path
+      new_html_nodes = Nokogiri::HTML(response.body)
+      expect(new_html_nodes.css("div#my-hello-world-id p").text).to eq(sentinel)
+    end
   end
 
   describe "server render mailer" do

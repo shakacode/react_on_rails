@@ -50,16 +50,15 @@ task run_rspec: ["run_rspec:run_rspec"]
 private
 
 def calc_path(dir)
-  path = if dir.is_a?(String)
-           if dir.start_with?(File::SEPARATOR)
-             Pathname.new(dir)
-           else
-             Pathname.new(File.join(gem_root, dir))
-           end
-         else
-           dir
-         end
-  path
+  if dir.is_a?(String)
+    if dir.start_with?(File::SEPARATOR)
+      Pathname.new(dir)
+    else
+      Pathname.new(File.join(gem_root, dir))
+    end
+  else
+    dir
+  end
 end
 
 # Runs rspec in the given directory.
@@ -71,7 +70,7 @@ def run_tests_in(dir, options = {})
 
   command_name = options.fetch(:command_name, path.basename)
   rspec_args = options.fetch(:rspec_args, "")
-  env_vars = "#{options.fetch(:env_vars, '')} TEST_ENV_COMMAND_NAME=\"#{command_name}\"".dup
+  env_vars = +"#{options.fetch(:env_vars, '')} TEST_ENV_COMMAND_NAME=\"#{command_name}\""
   env_vars << "COVERAGE=true" if ENV["USE_COVERALLS"]
   sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
 end

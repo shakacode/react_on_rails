@@ -1,19 +1,23 @@
 {
-  "name": "react-on-rails-pro-vm-renderer",
-  "version": "1.5.5",
+  "name": "@shakacode-tools/react-on-rails-pro-vm-renderer",
+  "version": "1.5.6-beta.12",
   "protocolVersion": "1.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
   "main": "packages/vm-renderer/src/ReactOnRailsProVmRenderer.js",
   "bin": "./packages/vm-renderer/src/default-vm-renderer.js",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com/@shakacode-tools"
+    "registry": "https://npm.pkg.github.com"
   },
   "release-it": {
+    "git": {
+      "requireCleanWorkingDir": false
+    },
     "github": {
-      "release": true
+      "release": false
     },
     "npm": {
-      "publish": false
+      "publish": true,
+      "skipChecks": true
     }
   },
   "directories": {
@@ -50,7 +54,7 @@
     "nps": "^5.9.12",
     "prettier": "^2.0.2",
     "prettier-eslint-cli": "^5.0.0",
-    "release-it": "^10.0.1",
+    "release-it": "^14.2.1",
     "supertest": "^4.0.2",
     "tap-diff": "^0.1.1",
     "tap-spec": "^5.0.0",
@@ -65,11 +69,10 @@
     "test": "nps test",
     "prerelease": "nps check",
     "start": "nps",
-    "developing": "rm -rf /tmp/react-on-rails-pro-vm-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node  -r source-map-support/register packages/vm-renderer/src/default-vm-renderer.js",
+    "developing": "rm -rf /tmp/react-on-rails-pro-vm-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node -r source-map-support/register packages/vm-renderer/src/default-vm-renderer.js",
     "eslint": "eslint .",
     "check": "nps lint && nps format && nps test",
-    "local": "echo 'Be sure to run yarn run dummy:install' && yarn run build && cd spec/dummy && foreman start",
-    "link": "yarn link"
+    "local": "echo 'Be sure to run yarn run dummy:install' && yarn run build && cd spec/dummy && foreman start"
   },
   "repository": {
     "type": "git",

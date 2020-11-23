@@ -12,7 +12,7 @@ Gem::Specification.new do |s|
   s.summary       = "Rails with react server rendering with webpack. Performance helpers"
   s.description   = "See README.md"
   s.homepage      = "https://github.com/shakacode/react_on_rails_pro"
-  s.license       = "MIT"
+  s.license       = "UNLICENSED"
 
   s.files         = `git ls-files -z`.split("\x0")
                                      .reject { |f|
@@ -24,14 +24,16 @@ Gem::Specification.new do |s|
 
   s.required_ruby_version = ">= 2.1.0"
 
-  s.add_dependency "react_on_rails", ">= 11.3"
-  s.add_dependency "addressable"
-  s.add_dependency "connection_pool"
-  s.add_dependency "execjs", "~> 2.5"
-  s.add_dependency "multipart-post", "~> 2"
-  s.add_dependency "persistent_http", "~> 2"
-  s.add_dependency "rainbow"
+  s.add_runtime_dependency "react_on_rails", ">= 11.3"
+  s.add_runtime_dependency "addressable"
+  s.add_runtime_dependency "connection_pool"
+  s.add_runtime_dependency "execjs", "~> 2.5"
+  s.add_runtime_dependency "multipart-post", "~> 2"
+  s.add_runtime_dependency "persistent_http", "~> 2"
+  s.add_runtime_dependency "rainbow"
   s.add_development_dependency "bundler"
   s.add_development_dependency "gem-release"
+  s.add_development_dependency "commonmarker"
+  s.add_development_dependency "yard"
 end
 # rubocop:enable Metrics/BlockLength
