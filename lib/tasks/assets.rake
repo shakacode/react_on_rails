@@ -6,7 +6,6 @@
 require "active_support"
 
 ENV["RAILS_ENV"] ||= ENV["RACK_ENV"] || "development"
-ENV["NODE_ENV"]  ||= "development"
 
 unless ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
   # Ensure that rails/webpacker does not call bin/webpack if we're providing
