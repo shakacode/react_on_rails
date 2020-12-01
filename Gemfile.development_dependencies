@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 gem "webpacker"
-gem "bootsnap", ">= 1.1.0", require: false
+gem "bootsnap", require: false
 gem "rails"
 gem "sqlite3"
 gem "sass-rails"
@@ -46,5 +46,5 @@ group :test do
   gem "rspec-rails"
   gem "rspec-retry"
   gem "selenium-webdriver"
-  gem "webdrivers", "~> 3.0"
+  gem "webdrivers"
 end

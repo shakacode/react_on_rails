@@ -18,7 +18,6 @@
 # users commonly want.
 #
 # See http://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
-require "pry"
 require "pry-byebug"
 
 RSpec.configure do |config|

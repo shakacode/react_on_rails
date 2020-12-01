@@ -1,6 +1,8 @@
 # This is the configuration used to check the rubocop source code.
 # Check out: https://github.com/bbatsov/rubocop
-require: rubocop-performance
+require:
+  - rubocop-performance
+# todo rubocop-spec
 
 AllCops:
   NewCops: enable
