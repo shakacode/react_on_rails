@@ -3,6 +3,12 @@ All notable changes to this project will be documented in this file. Items under
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+## [1.5.6] - 2020-12-02
+Switched to releases being published packages.
+
+### Fixed
+- Minor fix to error messages
+- Updated gem and package dependencies
 
 ## [1.5.5] - 2020-08-17
 ### Added
@@ -118,7 +124,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.5...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.6...HEAD
+[1.5.6]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.5...1.5.6
 [1.5.5]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.4...1.5.5
 [1.5.4]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.3...1.5.4
 [1.5.3]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.2...1.5.3

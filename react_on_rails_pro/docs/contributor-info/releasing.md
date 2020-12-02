@@ -1,12 +1,13 @@
 # Install and Release
-Github packages and gems are used for distribution from the https://github.com/shakacode-tools/react_on_rails_pro repo.
+Github packages and gems are used for distribution from the https://github.com/shakacode-tools/react_on_rails_pro-packages repo.
 1. Check that the CHANGELOG.md is updated
 2. See below for Prerequisites and then run the release command like this
+
 ```
 rake release[1.5.7]
 ```
 
-or for a beta release
+or for a beta release. Note the period, not dash, before the 'beta'.
 
 ```
 rake release[1.5.6.beta.2]
