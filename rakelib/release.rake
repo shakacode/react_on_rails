@@ -86,8 +86,8 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
 
   msg = <<~MSG
     Once you have successfully published, check the publication of the new versions:
-    * https://github.com/shakacode-tools/react_on_rails_pro/packages/326137#{'                                   '}
-    * https://github.com/shakacode-tools/react_on_rails_pro/packages/326023
+    * https://github.com/shakacode-tools/react_on_rails_pro-packages/packages/326137
+    * https://github.com/shakacode-tools/react_on_rails_pro-packages/packages/326023
   MSG
   puts msg
 end
