@@ -2,14 +2,14 @@
   "private": true,
   "comments": {
     "comment": "Next line is what would go in dependencies for a real install, change version number",
-    "@shakacode-tools/react-on-rails-pro-vm-renderer": "1.5.4"
+    "@shakacode-tools/react-on-rails-pro-node-renderer": "1.5.4"
   },
   "dependencies": {
-    "@shakacode-tools/react-on-rails-pro-vm-renderer": "link:.yalc/@shakacode-tools/react-on-rails-pro-vm-renderer"
+    "@shakacode-tools/react-on-rails-pro-node-renderer": "link:.yalc/@shakacode-tools/react-on-rails-pro-node-renderer"
   },
   "scripts": {
-    "node-renderer": "echo 'Starting React on Rails Pro VM Renderer.' && node ./react-on-rails-pro-node-renderer.js",
-    "preinstall": "yarn run link-source && yalc add --link @shakacode-tools/react-on-rails-pro-vm-renderer",
+    "node-renderer": "echo 'Starting React on Rails Pro Node Renderer.' && node ./react-on-rails-pro-node-renderer.js",
+    "preinstall": "yarn run link-source && yalc add --link @shakacode-tools/react-on-rails-pro-node-renderer",
     "link-source": "cd ../../../.. && yalc publish"
   }
 }

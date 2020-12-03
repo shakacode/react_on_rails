@@ -6,7 +6,7 @@ directory, `yalc publish` will send the node package files to the global yalc st
 `/spec/dummy/client` directory will copy the files from the global yalc store over to the local `node_modules`
 directory.
 
-# Debugging the VM Renderer
+# Debugging the Node Renderer
 1. cd to the top level of the project.
 1. `yarn` to install any libraries.
 1. To compile renderer files on changes, open console and run `yarn build:dev`.
@@ -14,7 +14,7 @@ directory.
 1. Reload the browser page that causes the renderer issue. You can then update the JS code, and restart the `yarn start` to run the renderer with the new code.
 1. Be sure to restart the rails server if you change any ruby code in loaded gems.
 1. Note, the default setup for spec/dummy to reference the pro renderer is to use yalc, which may or may not be using a link, which means that you have to re-run yarn to get the files updated when changing the renderer.
-1. Check out the top level nps task `nps renderer.debug` and `spec/dummy/package.json` which has script `"vm-renderer-debug"`.
+1. Check out the top level nps task `nps renderer.debug` and `spec/dummy/package.json` which has script `"node-renderer-debug"`.
 
 ## Debugging using the Node debugger
 1. See [this article](https://github.com/shakacode/react_on_rails/issues/1196) on setting up the debugger.

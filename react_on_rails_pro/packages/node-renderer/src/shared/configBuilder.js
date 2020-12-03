@@ -11,7 +11,7 @@ const errorReporter = require('./errorReporter');
 const packageJson = require('./packageJson');
 const truthy = require('./truthy');
 
-const DEFAULT_TMP_DIR = '/tmp/react-on-rails-pro-vm-renderer-bundles';
+const DEFAULT_TMP_DIR = '/tmp/react-on-rails-pro-node-renderer-bundles';
 // usually remote renderers are on staging or production,
 // so, use production folder always
 const DEFAULT_PORT = 3800;
@@ -97,7 +97,7 @@ function sanitizedSettings(aConfig, defaultValue) {
 }
 
 configBuilder.logSanitizedConfig = function logSanitizedConfig() {
-  log.info(`VM Renderer v${packageJson.version}, protocol v${packageJson.protocolVersion}`);
+  log.info(`Node Renderer v${packageJson.version}, protocol v${packageJson.protocolVersion}`);
   log.info('NOTE: renderer settings names do not have prefix "RENDERER_"');
   log.info('Default values for settings:\n%O', defaultConfig);
   log.info(

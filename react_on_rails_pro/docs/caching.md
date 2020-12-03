@@ -54,7 +54,7 @@ The largest percentage gains will come from saving the time of server rendering.
 
 ### How?
 
-To enable caching server rendering requests to the JavaScript calculation engine (ExecJS or VM Renderer), set this config
+To enable caching server rendering requests to the JavaScript calculation engine (ExecJS or Node Renderer), set this config
 value in `config/initializers/react_on_rails_pro.rb` to true (default is false):
 
 ```ruby

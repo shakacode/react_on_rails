@@ -22,9 +22,9 @@ Server rendering JavaScript evaluation is cached if `prerender_caching` is turne
 * Fragment caching for `react_component` and `react_component_hash`, including lazy evaluation of props.
 * See [Caching](./docs/caching.md) for details.
 
-## React On Rails Pro VM Render
-The "React on Rails Pro VM Renderer" provides more efficient server rendering on a standalone Node JS server.
-See the [VM Renderer Docs](docs/vm-renderer/basics.md).
+## React On Rails Pro Node Renderer
+The "React on Rails Pro Node Renderer" provides more efficient server rendering on a standalone Node JS server.
+See the [Node Renderer Docs](docs/node-renderer/basics.md).
 
 ## Other Utility Methods
 See the [Ruby API](docs/ruby-api.md).
@@ -34,7 +34,7 @@ See the [Ruby API](docs/ruby-api.md).
 * [Installation](./docs/installation.md)
 * [Caching](./docs/caching.md)
 * [Rails Configuration](./docs/configuration.md)
-* [VM Renderer Docs](./docs/vm-renderer/basics.md)
+* [Node Renderer Docs](./docs/node-renderer/basics.md)
 * [HTTP Caching](./docs/http-caching.md)
 
 # Contributing

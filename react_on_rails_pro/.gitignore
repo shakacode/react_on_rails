@@ -25,7 +25,7 @@
 
 node_modules
 
-/packages/vm-renderer/tests/tmp
+/packages/node-renderer/tests/tmp
 
 yarn-debug.*
 spec/dummy/client/yarn-debug.log*

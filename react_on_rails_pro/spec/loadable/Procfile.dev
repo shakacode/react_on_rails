@@ -1,3 +1,3 @@
-renderer: PORT=3800 node vm-renderer.js
+renderer: bin/node-renderer
 web: RENDERER_URL=http://localhost:3800 rails s -p 3000
-webpack: bundle exec rake react_on_rails:locale && nps build.dev.watch
+webpack: nps build.dev.watch

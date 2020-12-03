@@ -1778,7 +1778,7 @@
     "@sentry/types" "5.27.4"
     tslib "^1.9.3"
 
-"@shakacode-tools/react-on-rails-pro-vm-renderer@link:.yalc/@shakacode-tools/react-on-rails-pro-vm-renderer":
+"@shakacode-tools/react-on-rails-pro-node-renderer@link:.yalc/@shakacode-tools/react-on-rails-pro-node-renderer":
   version "0.0.0"
   uid ""
 

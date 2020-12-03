@@ -8,11 +8,11 @@ yarn has issues with private github packages.
 2. Replace the `<TOKEN>` in the `.npmrc` file with your given token.
 3. In the `package.json`, use a line like this to include the namespace.
    ```json
-   "@shakacode-tools/react-on-rails-pro-vm-renderer": "1.5.4"
+   "@shakacode-tools/react-on-rails-pro-node-renderer": "1.5.4"
    ```
 4. In the `react-on-rails-pro-node-renderer.js` file, use a line like:
    ```js
    const {
-     reactOnRailsProVmRenderer,
-   } = require('@shakacode-tools/react-on-rails-pro-vm-renderer')
+     reactOnRailsProNodeRenderer,
+   } = require('@shakacode-tools/react-on-rails-pro-node-renderer')
    ```

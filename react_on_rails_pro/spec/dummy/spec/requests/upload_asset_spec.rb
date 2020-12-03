@@ -13,7 +13,7 @@ describe "Upload asset", if: ENV["SERVER_RENDERER"] != "ExecJS" do
 
   before do
     dbl_configuration = double("configuration",
-                               server_renderer: "VmRenderer",
+                               server_renderer: "NodeRenderer",
                                renderer_password: "myPassword1",
                                renderer_url: "http://localhost:3800",
                                renderer_request_retry_limit: 5,
@@ -42,7 +42,7 @@ describe "Upload asset", if: ENV["SERVER_RENDERER"] != "ExecJS" do
       expect(asset_exist_on_renderer?(asset_filename2)).to eq(true)
     end
 
-    it "throws error if can't connect to vm-renderer" do
+    it "throws error if can't connect to node-renderer" do
       WebMock.disable_net_connect!(allow_localhost: false)
       stub_request(:any, /upload-assets/).to_timeout
       expect do

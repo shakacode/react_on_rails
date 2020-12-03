@@ -10,9 +10,12 @@
    1. Is not supported for recent versions of React and Webpack
    2. Required ugly code of `#if` from the webpack-conditional-loader
 
+## React on Rails Pro Node Renderer in Separate Directory
+Note the placement of the Renderer in under /spec/loadable/react-on-rails-pro`.
+
 ## Setup
 
-Before setup you need to run `yarn` in the root of the directory lib to install react_on_rails_pro-vm-renderer.
+Before setup you need to run `yarn` in the root of the directory lib to install react_on_rails_pro-node-renderer.
 Then go back to `spec/loadable` and continue:
 
 1. Run these commands. Ignore the warning on the db:setup. 
@@ -29,9 +32,10 @@ HMR is enabled by using the [NormalModuleReplacementPlugin](https://webpack.js.o
 to swap out the files with suffix `.imports-loadable` with `imports-hmr`.
 
 ## Testing Hot Module Replacement
+_Note: overmind is a good substitute for foreman_
 1. Run the following command:
 ```
-foreman start -f Procfile.dev-hot
+overmind start -f Procfile.dev-hot
 ```
 1. Wait for the server & client bundles to compile
 1. Navigate to http://localhost:3000/

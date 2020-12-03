@@ -5,27 +5,39 @@ gem "react_on_rails", "12.0.4" # keep in sync with package.json files
 gem "webpacker"
 gem "bootsnap", require: false
 gem "rails"
-gem "sqlite3"
-gem "sass-rails"
-gem "uglifier"
-gem "jquery-rails"
 gem "puma"
-
-# Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
-gem "turbolinks" if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
 
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
 gem "jbuilder"
-# bundle exec rake doc:rails generates the API under doc/api.
-gem "sdoc", group: :doc
 
-gem "sprockets"
+unless ENV['SPEC_DUMMY'] == 'yes'
+  gem "pg"
+end
+
+# Skip these for spec/loadable
+unless ENV['SPEC_LOADABLE'] == 'yes'
+  # Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
+  gem "turbolinks" if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
+  gem "sqlite3"
+  gem "uglifier"
+  gem "jquery-rails"
+  gem "sprockets"
+  gem "sass-rails"
+end
 
 gem "amazing_print"
 gem "mini_racer"
 
+group :development do
+  # Access an interactive console on exception pages or by calling 'console' anywhere in the code.
+  gem 'web-console'
+  gem 'listen'
+  # Spring speeds up development by keeping your application running in the background. Read more: https://github.com/rails/spring
+  gem 'spring'
+  gem 'spring-watcher-listen'
+end
+
 group :development, :test do
-  gem "listen"
   gem "pry"
   gem "pry-byebug"
   gem "pry-doc"
@@ -35,7 +47,6 @@ group :development, :test do
   gem 'rubocop-performance', require: false
   gem 'rubocop-rspec', require: false
   gem "scss_lint", require: false
-  gem "spring"
 end
 
 group :test do

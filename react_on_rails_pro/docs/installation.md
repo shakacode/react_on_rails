@@ -55,7 +55,7 @@ You don't need to create a initializer if you are satisfied with the default as 
 [Configuration](./configuration.md)
 
 # Node Package
-Note, you only need to install the Node Package if you are using the standalone node renderer, `VmRenderer`.
+Note, you only need to install the Node Package if you are using the standalone node renderer, `NodeRenderer`.
 
 ## Installation
 
@@ -73,10 +73,10 @@ always-auth=true
 {
   "private": true,
   "dependencies": {
-    "@shakacode-tools/react-on-rails-pro-vm-renderer": "1.5.4"
+    "@shakacode-tools/react-on-rails-pro-node-renderer": "1.5.4"
   },
   "scripts": {
-    "node-renderer": "echo 'Starting React on Rails Pro VM Renderer.' && node ./react-on-rails-pro-node-renderer.js"
+    "node-renderer": "echo 'Starting React on Rails Pro Node Renderer.' && node ./react-on-rails-pro-node-renderer.js"
   }
 }
 ```
@@ -85,15 +85,15 @@ always-auth=true
 
 If you really want to use yarn, see [Yarn can't find private Github npm registry](https://stackoverflow.com/questions/58316109/yarn-cant-find-private-github-npm-registry)
 
-5. You can start the renderer with either the executable `vm-renderer` or, preferably, with 
+5. You can start the renderer with either the executable `node-renderer` or, preferably, with 
    a startup JS file, say called `react-on-rails-pro/react-on-rails-pro-node-renderer.js` with
-   these contents. _Note the use of the namespaced **`@shakacode-tools/react-on-rails-pro-vm-renderer`** for the package.
+   these contents. _Note the use of the namespaced **`@shakacode-tools/react-on-rails-pro-node-renderer`** for the package.
 
 ```js
 const path = require('path')
 const {
-  reactOnRailsProVmRenderer,
-} = require('@shakacode-tools/react-on-rails-pro-vm-renderer')
+  reactOnRailsProNodeRenderer,
+} = require('@shakacode-tools/react-on-rails-pro-node-renderer')
 
 const env = process.env
 
@@ -137,33 +137,33 @@ if (env.CI) {
   config.workersCount = 2
 }
 
-reactOnRailsProVmRenderer(config)
+reactOnRailsProNodeRenderer(config)
 ```
 
 ## Instructions for using a branch
 
-Install the vm-renderer executable, possibly globally. Substitute the branch name or tag for `master`
+Install the node-renderer executable, possibly globally. Substitute the branch name or tag for `master`
 ```
 yarn global add https://<your-github-token>:x-oauth-basic@github.com/shakacode/react_on_rails_pro.git\#master
 ```
 
-This installs a binary `vm-renderer`.
+This installs a binary `node-renderer`.
 
 ### Using Github packages
 
 Login into npm
 
 ```bash
-npm install @shakacode-tools/react-on-rails-pro-vm-renderer@1.5.4
+npm install @shakacode-tools/react-on-rails-pro-node-renderer@1.5.4
 ```                      
 
 or edit package.json directly
 ```json
-"@shakacode-tools/react-on-rails-pro-vm-renderer": "1.5.4"
+"@shakacode-tools/react-on-rails-pro-node-renderer": "1.5.4"
 ```                     
 
 ### Configuration
-See [VmRenderer JavaScript Configuration](./vm-renderer/js-configuration.md).
+See [NodeRenderer JavaScript Configuration](./node-renderer/js-configuration.md).
 
 ## Authentication when using Github packages
 [Auth for the npm package](https://docs.github.com/en/packages/using-github-packages-with-your-projects-ecosystem/configuring-npm-for-use-with-github-packages#authenticating-to-github-packages)

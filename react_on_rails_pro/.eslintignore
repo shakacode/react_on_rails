@@ -4,11 +4,11 @@ gen-documentation/**
 spec/react_on_rails/dummy-for-generators
 spec/dummy
 spec/loadable
-packages/vm-renderer/src/__obsolete
-packages/vm-renderer/lib/
-packages/vm-renderer/tests/node_modules
-packages/vm-renderer/tests/fixtures
-packages/vm-renderer/webpack.config.js
+packages/node-renderer/src/__obsolete
+packages/node-renderer/lib/
+packages/node-renderer/tests/node_modules
+packages/node-renderer/tests/fixtures
+packages/node-renderer/webpack.config.js
 **/node_modules/**
 **/assets/webpack/**
 **/generated/**

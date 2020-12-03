@@ -4,7 +4,7 @@ by ShakaCode
 *Last updated June 13, 2019*
 
 # Deprecated
-Please, see new doc about how to setup code splitting with loadable components.
+**Please, see new doc about how to setup code splitting with loadable components.**
 
 # Introduction
 
@@ -15,7 +15,7 @@ It provides a special function by which you can turn any react component into a 
 
 To use react-loadable in the react on rails project, you do not need to take any additional action until the server-side rendering is used.
 
-If the project includes server rendering, then you need to exclude the use of dynamic imports on the server-rendering side. I.e. it needs to generate a server bundle in which contains statically imported components only. This is due to how the ExecJS renderer and the vm-renderer cannot use promises.
+If the project includes server rendering, then you need to exclude the use of dynamic imports on the server-rendering side. I.e. it needs to generate a server bundle in which contains statically imported components only. This is due to how the ExecJS renderer and the node-renderer cannot use promises.
 
 # Dependencies
 

@@ -5,8 +5,8 @@ ReactOnRailsPro.configure do |config|
   # Get timing of server render calls
   config.tracing = true
 
-  # Used to turn off the VmRenderer during on CI workflow
-  config.server_renderer = ENV["SERVER_RENDERER"].presence || "VmRenderer"
+  # Used to turn off the NodeRenderer during on CI workflow
+  config.server_renderer = ENV["SERVER_RENDERER"].presence || "NodeRenderer"
 
   config.renderer_password = "myPassword1"
 
@@ -21,7 +21,7 @@ ReactOnRailsPro.configure do |config|
   # Default for `prerender_caching` is false.
   config.prerender_caching = true
 
-  # Retry request in case of time out on the vm-renderer side
+  # Retry request in case of time out on the node-renderer side
   # 0 - no retry
   config.renderer_request_retry_limit = 5
 
@@ -30,8 +30,8 @@ ReactOnRailsPro.configure do |config|
   # include any files used to generate the JSON props.
   config.serializer_globs = [File.join(Rails.root, "app", "views", "**", "*.jbuilder")]
 
-  # When using the vm renderer, you may require some extra assets in addition to the bundle.
-  # The assets_to_copy option allows the vm renderer to have assets copied at the end of
+  # When using the Node Renderer, you may require some extra assets in addition to the bundle.
+  # The assets_to_copy option allows the Node Renderer to have assets copied at the end of
   # the assets:precompile task or directly by the
   # react_on_rails_pro:copy_assets_to_vm_renderer tasks.
   # These assets are also transferred any time a new bundle is sent from Rails to the renderer.
