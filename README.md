@@ -86,7 +86,7 @@ _Requires creating a free account._
 
 # Docs
 
-**Consider browsing this on our [documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/).**
+**Consider browsing this on our [website](https://www.shakacode.com/react-on-rails/docs/).**
 
 ## Prerequisites
 
