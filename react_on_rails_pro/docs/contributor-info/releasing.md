@@ -1,5 +1,5 @@
 # Install and Release
-Github packages and gems are used for distribution from the https://github.com/shakacode-tools/react_on_rails_pro-packages repo.
+Github packages and gems are used for distribution from the https://github.com/shakacode-tools/react_on_rails_pro repo.
 1. Check that the CHANGELOG.md is updated
 2. See below for Prerequisites and then run the release command like this
 
