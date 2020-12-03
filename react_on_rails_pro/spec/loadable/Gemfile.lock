@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails_pro (1.5.6)
+    react_on_rails_pro (2.0.0.beta.0)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -118,6 +118,8 @@ GEM
     i18n (1.8.5)
       concurrent-ruby (~> 1.0)
     interception (0.5)
+    jbuilder (2.10.1)
+      activesupport (>= 5.0.0)
     json (2.3.1)
     launchy (2.5.0)
       addressable (~> 2.7)
@@ -326,6 +328,7 @@ DEPENDENCIES
   coveralls
   equivalent-xml
   generator_spec
+  jbuilder
   launchy
   listen
   mini_racer
