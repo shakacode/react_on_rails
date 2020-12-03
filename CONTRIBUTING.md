@@ -60,7 +60,7 @@ yarn run test
 * To run **RSpec** tests on dummy app, first launch renderer server:
 ```sh
   cd react_on_rails_pro/spec/dummy
-  yarn run vm-renderer
+  yarn run node-renderer
 ```
 and then run **RSpec** in another console  window/tab:
 ```sh
@@ -104,7 +104,7 @@ gem "react_on_rails"
 ```
 ================================================================================
 
-Set `config.server_renderer = "VmRenderer"` in your  `ReactOnRailsPro.configure` block.
+Set `config.server_renderer = "NodeRenderer"` in your  `ReactOnRailsPro.configure` block.
 
 Note that you will need to bundle install after making this change, but also that **you will need to restart your Rails application if you make any changes to the gem**.
 
@@ -119,7 +119,7 @@ _Note: You must use npm here till yarn stops preferring cached packages over loc
 When you use a relative path, be sure to run the above `yarn` command whenever you change the node package for react-on-rails.
 
 #### Example: Testing NPM changes with the dummy app
-1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails_pro/blob/more_test_and_docs/packages/vm-renderer/src/ReactOnRailsProVmRenderer.js#L6) in `react_on_rails/packages/vm-renderer/src/ReactOnRailsProVmRenderer.js` to confirm we're getting an update to the node package.
+1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails_pro/blob/more_test_and_docs/packages/node-renderer/src/ReactOnRailsProNodeRenderer.js#L6) in `react_on_rails/packages/node-renderer/src/ReactOnRailsProNodeRenderer.js` to confirm we're getting an update to the node package.
 2. The "postinstall" script of "spec/dummy" sets up yalc to use react-on-rails-pro for renderer.
 3. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console.
 
@@ -150,7 +150,7 @@ yarn run build:dev
 This is a possible update to package.json to debug the lockfile. Notice the `NODE_DEBUG=LOCKFILE`
 
 ```json
-    "developing": "rm -rf /tmp/react-on-rails-pro-vm-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=LOCKFILE,ROR node  -r source-map-support/register --experimental-modules packages/vm-renderer/lib/default-vm-renderer.js",
+    "developing": "rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=LOCKFILE,ROR node  -r source-map-support/register --experimental-modules packages/node-renderer/lib/default-node-renderer.js",
 ```
 
 Notice the 2 "debug" settings of LOCKFILE and ROR.
@@ -166,7 +166,7 @@ yarn run install-pro-package
 ```
 _Note: this runs npm under the hood as explained in **Test NPM for react_on_rails_pro** section above_
 
-From now on, the example and dummy apps will use your local packages/vm-renderer folder as the `react_on_rails_pro` node package.
+From now on, the example and dummy apps will use your local packages/node-renderer folder as the `react_on_rails_pro` node package.
 
 ### Install NPM dependencies and build the NPM package for react_on_rails_pro
 
@@ -197,17 +197,17 @@ yarn test
 
 Example of using ndb to debug a test
 ```bash
-ndb $(yarn bin)/jest --runInBand  packages/vm-renderer/tests/**/*.test.js -t 'FriendsAndGuests bundle for commit 1a7fe417'
+ndb $(yarn bin)/jest --runInBand  packages/node-renderer/tests/**/*.test.js -t 'FriendsAndGuests bundle for commit 1a7fe417'
 ```
 Hit F8 and then a debugger statement within the test will get hit.
 
 ### Creating new VM tests
-1. copy a server bundle to `packages/vm-renderer/tests/fixtures/projects/<project-name>/<commit>`
+1. copy a server bundle to `packages/node-renderer/tests/fixtures/projects/<project-name>/<commit>`
 2. create a directory with a hash representing the commit of the project
 
 ### Asynch issues with Jest
 Beware that Jest runs multiple test files synchronously, so you can't use the same tmp directory
-between tests. See the file `packages/vm-renderer/tests/helper.js` for how this was handled.
+between tests. See the file `packages/node-renderer/tests/helper.js` for how this was handled.
 
 ### Run spec/dummy tests
 
@@ -215,7 +215,7 @@ TODO: Figure out how to run the tests on CI.
 
 ```sh
 cd react_on_rails_pro/spec/dummy
-yarn run vm-renderer
+yarn run node-renderer
 ```
 and in another console window/tab:
 

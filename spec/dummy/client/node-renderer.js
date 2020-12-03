@@ -3,7 +3,7 @@ const path = require('path');
 const env = process.env;
 
 // Use this for package installation test:
-const { reactOnRailsProVmRenderer } = require('@shakacode-tools/react-on-rails-pro-vm-renderer');
+const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
 
 const config = {
   bundlePath: path.resolve(__dirname, '../tmp/bundles'), // Save bundle to "tmp/bundles" dir of our dummy app
@@ -41,4 +41,4 @@ if (env.CI) {
   config.workersCount = 2;
 }
 
-reactOnRailsProVmRenderer(config);
+reactOnRailsProNodeRenderer(config);

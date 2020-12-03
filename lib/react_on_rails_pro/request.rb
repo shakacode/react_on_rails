@@ -23,7 +23,7 @@ module ReactOnRailsPro
       end
 
       def asset_exists_on_vm_renderer?(filename)
-        Rails.logger.info { "[ReactOnRailsPro] Sending request to check if file exist on vm-renderer: #{filename}" }
+        Rails.logger.info { "[ReactOnRailsPro] Sending request to check if file exist on node-renderer: #{filename}" }
         response = perform_request("/asset-exists?filename=#{filename}", common_form_data)
         JSON.parse(response.body)["exists"] == true
       end
@@ -50,17 +50,17 @@ module ReactOnRailsPro
             end
             available_retries -= 1
             Rails.logger.info do
-              "[ReactOnRailsPro] Timed out trying to connect to the VM renderer.\
+              "[ReactOnRailsPro] Timed out trying to connect to the Node Renderer.\
                Retrying #{available_retries} more times..."
             end
             next
           rescue StandardError => e
-            raise ReactOnRailsPro::Error, "Can't connect to VmRenderer renderer: #{path}.\n"\
+            raise ReactOnRailsPro::Error, "Can't connect to NodeRenderer renderer: #{path}.\n"\
                 "Original error:\n#{e}\n#{e.backtrace}"
           end
         end
 
-        Rails.logger.info { "[ReactOnRailsPro] VM renderer responded" }
+        Rails.logger.info { "[ReactOnRailsPro] Node Renderer responded" }
 
         case response.code
         when "412"
@@ -127,14 +127,14 @@ module ReactOnRailsPro
 
       def create_connection
         Rails.logger.info do
-          "[ReactOnRailsPro] Setting up VM Renderer connection to #{ReactOnRailsPro.configuration.renderer_url}"
+          "[ReactOnRailsPro] Setting up Node Renderer connection to #{ReactOnRailsPro.configuration.renderer_url}"
         end
 
         # NOTE: there are multiple similar gems
         # We use https://github.com/bpardee/persistent_http/blob/master/lib/persistent_http.rb
         # Not: https://github.com/drbrain/net-http-persistent
         PersistentHTTP.new(
-          name: "ReactOnRailsProVmRendererClient",
+          name: "ReactOnRailsProNodeRendererClient",
           logger: Rails.logger,
           pool_size: ReactOnRailsPro.configuration.renderer_http_pool_size,
           pool_timeout: ReactOnRailsPro.configuration.renderer_http_pool_timeout,

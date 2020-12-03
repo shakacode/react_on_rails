@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file. Items under
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+
+## [2.0.0.beta.1] - 2020-12-03
+* Renamed VM Renderer to Node Renderer
+
 ## [1.5.6] - 2020-12-02
 Switched to releases being published packages.
 
@@ -34,7 +38,7 @@ Switched to releases being published packages.
 ## [1.5.0] - 2020-03-17
 ### Added
 - Added support for loadable components SSR [PR 112](https://github.com/shakacode/react_on_rails_pro/pull/112) and [PR 118](https://github.com/shakacode/react_on_rails_pro/pull/118) by [ashgaliyev](https://github.com/ashgaliyev) and [justin808](https://github.com/justin808).
-- New option added to the vm-renderer: `supportModules`. This setting is necessary for using [loadable-components](https://github.com/gregberge/loadable-components/). See [Server-side rendering with code-splitting using Loadable/Components](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/code-splitting-loadable-components.md) for more detailss.
+- New option added to the node-renderer: `supportModules`. This setting is necessary for using [loadable-components](https://github.com/gregberge/loadable-components/). See [Server-side rendering with code-splitting using Loadable/Components](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/code-splitting-loadable-components.md) for more detailss.
 
 ### Changed
 - Updated to bundler V2. [PR 114](https://github.com/shakacode/react_on_rails_pro/pull/114) by [justin808](https://github.com/justin808).
@@ -87,7 +91,7 @@ Above are in [PR 82](https://github.com/shakacode/react_on_rails_pro/pull/82) by
 
 ## [1.2.1] - 2018-08-26
 ### Fixed
-* Major overhaul of the vm-renderer. Improved logging and error handling, ready for async
+* Major overhaul of the node-renderer. Improved logging and error handling, ready for async
 * Fixed race conditions with init of renderer
 * Improved logging
 * Ensuring all places that an error will result in a 400 sent to the rails server.
@@ -113,7 +117,7 @@ Above are in [PR 65](https://github.com/shakacode/react_on_rails_pro/pull/65) by
 - Added `tracing` configuration flag to time server rendering calls
 
 ### Changed
-- Default usage of PORT and LOG_LEVEL for the vm-renderer bin file changed to use values RENDERER_PORT and RENDERER_LOG_LEVEL
+- Default usage of PORT and LOG_LEVEL for the node-renderer bin file changed to use values RENDERER_PORT and RENDERER_LOG_LEVEL
 - Default Rails config.server_render is "ExecJS". Previously was "VmRenderer"
 
 Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52) by [justin808](https://github.com/justin808).
@@ -124,7 +128,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.6...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0.beta.0...HEAD
+[2.0.0.beta.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.6...2.0.0.beta.0
 [1.5.6]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.5...1.5.6
 [1.5.5]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.4...1.5.5
 [1.5.4]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.3...1.5.4

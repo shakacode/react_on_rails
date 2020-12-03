@@ -13,7 +13,7 @@
     "@babel/preset-react": "^7.10.1",
     "@babel/runtime": "^7.10.3",
     "@rails/webpacker": "^4.2.2",
-    "@shakacode-tools/react-on-rails-pro-vm-renderer": "link:.yalc/@shakacode-tools/react-on-rails-pro-vm-renderer",
+    "@shakacode-tools/react-on-rails-pro-node-renderer": "link:.yalc/@shakacode-tools/react-on-rails-pro-node-renderer",
     "babel-loader": "^8.1.0",
     "babel-plugin-module-resolver": "^3.2.0",
     "babel-plugin-syntax-dynamic-import": "^6.18.0",
@@ -71,15 +71,15 @@
   "scripts": {
     "test": "yarn run build:test && yarn run lint && rspec",
     "lint": "cd ../.. && nps lint",
-    "preinstall": "yarn run link-source && yalc add --link @shakacode-tools/react-on-rails-pro-vm-renderer",
+    "preinstall": "yarn run link-source && yalc add --link @shakacode-tools/react-on-rails-pro-node-renderer",
     "link-source": "cd ../.. && yalc publish",
     "build:test": "rm -rf public/webpack/test && RAILS_ENV=test NODE_ENV=test bin/webpack",
     "build:dev": "rm -rf public/webpack/develoment && RAILS_ENV=development NODE_ENV=development bin/webpack",
     "build:dev:watch": "RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
     "build:production": "RAILS_ENV=production NODE_ENV=production bin/webpack -p",
     "build:clean": "rm -rf public/webpack || true",
-    "vm-renderer-debug": "RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE ndb client/vm-renderer.js",
-    "vm-renderer": "RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE node client/vm-renderer.js"
+    "node-renderer-debug": "RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE ndb client/node-renderer.js",
+    "node-renderer": "RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE node client/node-renderer.js"
   },
   "license": "UNLICENSED",
   "repository": {

@@ -81,7 +81,7 @@ module ReactOnRailsPro
           fallback_renderer = ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript
 
           # Pool is actually discarded btw requests:
-          # 1) not to keep ExecJS in memory once VmRenderer is available back
+          # 1) not to keep ExecJS in memory once NodeRenderer is available back
           # 2) to avoid issues with server bundle changes
           fallback_renderer.reset_pool
           result = fallback_renderer.eval_js(js_code, render_options)

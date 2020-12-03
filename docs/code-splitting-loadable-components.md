@@ -61,7 +61,7 @@ Explanation:
 If that is not done, webpack will add and invoke browser-specific functions to fetch the chunks into the bundle, which throws an error on server-rendering.
 
 - `new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 })`
-The react_on_rails_pro vm-renderer expects only one single server-bundle. In other words, we cannot and do not want to split the server bundle.
+The react_on_rails_pro node-renderer expects only one single server-bundle. In other words, we cannot and do not want to split the server bundle.
 
 #### Client config
 
@@ -180,7 +180,7 @@ ReactOnRails.register({
 ## Configure react_on_rails_pro
 
 ### React on Rails Pro
-You must sent `config.assets_top_copy` so that the vm-renderer will have access to the loadable-stats.json.
+You must sent `config.assets_top_copy` so that the node-renderer will have access to the loadable-stats.json.
 
 ```ruby
   config.assets_to_copy = Rails.root.join("public", "webpack", Rails.env, "loadable-stats.json")
@@ -196,12 +196,12 @@ Note, if `__dirname` is not working in your webpack build, that's because you di
 in your webpack configuration. That turns off the polyfills for things like `__dirname`.
 
 
-### VM Renderer
-In your `vm-renderer.js` file which runs node renderer, you need to specify `supportModules` options as follows:
+### Node Renderer
+In your `node-renderer.js` file which runs node renderer, you need to specify `supportModules` options as follows:
 ```js
 const path = require('path');
 const env = process.env;
-const { reactOnRailsProVmRenderer } = require('@shakacode-tools/react-on-rails-pro-vm-renderer');
+const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
 
 const config = {
   ...
@@ -209,7 +209,7 @@ const config = {
 };
 ...
 
-reactOnRailsProVmRenderer(config);
+reactOnRailsProNodeRenderer(config);
 ```
 
 ## Rails View

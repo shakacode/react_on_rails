@@ -1,14 +1,14 @@
 `config/initializers/react_on_rails_pro.rb`
 
 1. You don't need to create a initializer if you are satisfied with the defaults as described below. 
-1. Values beginning with `renderer` pertain only to using an external rendering server. You will need to ensure these values are consistent with your configuration for the external rendering server, as given in [docs/vm-renderer/js-configuration.md](./vm-renderer/js-configuration.md)
+1. Values beginning with `renderer` pertain only to using an external rendering server. You will need to ensure these values are consistent with your configuration for the external rendering server, as given in [docs/node-renderer/js-configuration.md](./node-renderer/js-configuration.md)
 1. `config.prerender_caching` works for standard mini_racer server rendering and using an external rendering server.
 
 # Example of Configuration
 
 Also see [spec/dummy/config/initializers/react_on_rails_pro.rb](../../spec/dummy/config/initializers/react_on_rails_pro.rb) for how the testing app is setup.
 
-The below example is a typical production setup, using the separate `VmRenderer`, where development takes the defaults when the ENV values are not specified.
+The below example is a typical production setup, using the separate `NodeRenderer`, where development takes the defaults when the ENV values are not specified.
 
 ```ruby
 ReactOnRailsPro.configure do |config|
@@ -30,16 +30,16 @@ ReactOnRailsPro.configure do |config|
   # Default for `prerender_caching` is false.  
   config.prerender_caching = true
 
-  # Retry request in case of time out on the vm-renderer side
+  # Retry request in case of time out on the node-renderer side
   # 5 - default, if not specified
   # 0 - no retry
   config.renderer_request_retry_limit = 5
   
-  # VmRenderer is for a renderer that is stateless. It does not need restarting when the JS bundles 
+  # NodeRenderer is for a renderer that is stateless. It does not need restarting when the JS bundles 
   # are updated. It is the only custom renderer currently supported. Leave blank to use the standard
-  # mini_racer rendering. Other option is VmRenderer
+  # mini_racer rendering. Other option is NodeRenderer
   # Default for `server_renderer` is "ExecJS"
-  config.server_renderer = "VmRenderer"
+  config.server_renderer = "NodeRenderer"
   
   # You may provide a password and/or a port that will be sent to renderer for simple authentication. 
   # `https://:<password>@url:<port>`. For example: https://:myPassword1@renderer:3800. Don't forget
@@ -84,8 +84,8 @@ ReactOnRailsPro.configure do |config|
   # to do server rendering. Default is nil.
   config.ssr_pre_hook_js = "SomeLibrary.clearCache();" 
 
-  # When using the vm renderer, you may require some extra assets in addition to the bundle. 
-  # The assets_to_copy option allows the vm renderer to have assets copied at the end of 
+  # When using the Node Renderer, you may require some extra assets in addition to the bundle. 
+  # The assets_to_copy option allows the Node Renderer to have assets copied at the end of 
   # the assets:precompile task or directly by the 
   # react_on_rails_pro:copy_assets_to_vm_renderer tasks.
   # These assets are also transferred any time a new bundle is sent from Rails to the renderer.

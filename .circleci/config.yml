@@ -235,9 +235,9 @@ jobs:
   # Start Renderer and run RSpec test suite for dummy app.
   # NOTES:
   # Seems that we cannot use symlinks (yarn link) with caches for the main renderer package
-  # react-on-rails-pro-vm-renderer. Consequently, we just reinstall the top level, renderer, node packages
+  # react-on-rails-pro-node-renderer. Consequently, we just reinstall the top level, renderer, node packages
   # as well as the
-  rspec-dummy-app-vm-renderer:
+  rspec-dummy-app-node-renderer:
     docker:
       - image: *docker_image
     steps:
@@ -254,7 +254,7 @@ jobs:
       - run: *install-dummy-app-node-modules
       - run:
           name: Run Node renderer in a background
-          command: cd spec/dummy && yarn run vm-renderer
+          command: cd spec/dummy && yarn run node-renderer
           background: true
       - run:
           name: Touch webpack bundles
@@ -274,7 +274,7 @@ jobs:
       - store_artifacts:
           path: spec/dummy/yarn-error.log
 
-  # Test React on Rails Pro without the VM Renderer
+  # Test React on Rails Pro without the Node Renderer
   rspec-dummy-app:
     docker:
       - image: *docker_image
@@ -341,7 +341,7 @@ workflows:
             - install-package-ruby-gems
             - install-dummy-app-ruby-gems
             - build-dummy-app-webpack-test-bundles
-      - rspec-dummy-app-vm-renderer:
+      - rspec-dummy-app-node-renderer:
           requires:
             - install-package-ruby-gems
             - build-dummy-app-webpack-test-bundles

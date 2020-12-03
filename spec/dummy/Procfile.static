@@ -1,8 +1,8 @@
 # Run Rails without hot reloading (static assets).
-rails: rails s
+rails: bin/rails s
 
 # Build client assets, watching for changes.
 rails-client-assets: yarn run build:dev:watch
 
 # Start Node server for server rendering.
-vm-renderer: yarn run vm-renderer
+node-renderer: yarn run node-renderer

@@ -24,21 +24,21 @@ web: bin/runsvdir-dyno
 
 ```
 puma: bundle exec puma -C config/puma.rb
-vm-renderer: bin/vm-renderer
+node-renderer: bin/node-renderer
 ```
 
-### bin/vm-renderer
+### bin/node-renderer
 
 ```
 #!/bin/bash
 cd client
-yarn run vm-renderer
+yarn run node-renderer
 ```
-Be sure your script to run the vm-renderer sets some port, like 3800 which is also set as the
+Be sure your script to run the node-renderer sets some port, like 3800 which is also set as the
 config.renderer_url for your Rails server.
 
-### vm-renderer
-Any task in client/package.json that starts the vm-renderer
+### node-renderer
+Any task in client/package.json that starts the node-renderer
 
 ### Modifying Precompile Task
 
@@ -46,7 +46,7 @@ To avoid the initial round trip to get a bundle on the renderer, you can do some
 
 See [lib/tasks/assets.rake](../lib/tasks/assets.rake) for a couple tasks that you can use.
 
-If you're using the default tmp/bundles subdirectory for the vm-renderer, you don't need to set the
+If you're using the default tmp/bundles subdirectory for the node-renderer, you don't need to set the
 ENV value for `RENDERER_BUNDLE_PATH`. Otherwise, please set this ENV value so the files get copied
 to the right place.
 
@@ -66,7 +66,7 @@ end
 
 ## Troubleshooting
 
-If you get this sort of error, then you're forgetting to configure the PORT on the vm-renderer and
+If you get this sort of error, then you're forgetting to configure the PORT on the node-renderer and
 setting the config.renderer_url on the Rails App.
 
 ```

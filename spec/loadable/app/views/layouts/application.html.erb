@@ -9,10 +9,10 @@
 
   <%= yield :head %>
 
-  <%= stylesheet_link_tag('client-bundle',
-                          media: 'all',
-                          'data-turbolinks-track': true) %>
+  <!--  No CSS yet-->
+  <%#= stylesheet_link_tag('foo-bundle') %>
 
+  <!--  TODO: Change to javascript_packs_with_chunks_tag -->
   <%= javascript_pack_tag 'foo-bundle' %>
   <%= javascript_pack_tag 'vendor' %>
 

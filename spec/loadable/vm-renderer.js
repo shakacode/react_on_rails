@@ -1,7 +1,7 @@
 const path = require('path');
 
 // Use this for package installation test:
-const { reactOnRailsProVmRenderer } = require('@shakacode-tools/react-on-rails-pro-vm-renderer');
+const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
 
 const config = {
   // tmp/bundles path must be kept in sync with /lib/tasks/asset.raie
@@ -27,4 +27,4 @@ if (process.env.CI) {
   config.workersCount = 2;
 }
 
-reactOnRailsProVmRenderer(config);
+reactOnRailsProNodeRenderer(config);

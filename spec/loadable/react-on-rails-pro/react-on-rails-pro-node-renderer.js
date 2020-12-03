@@ -2,10 +2,10 @@ const path = require('path');
 
 // if using the proper install, use this:
 // const {
-//   reactOnRailsProVmRenderer,
-// } = require('@shakacode-tools/react-on-rails-pro-vm-renderer')
+//   reactOnRailsProNodeRenderer,
+// } = require('@shakacode-tools/react-on-rails-pro-node-renderer')
 
-const { reactOnRailsProVmRenderer } = require('@shakacode-tools/react-on-rails-pro-vm-renderer');
+const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
 
 const env = process.env;
 
@@ -49,4 +49,4 @@ if (env.CI) {
   config.workersCount = 2;
 }
 
-reactOnRailsProVmRenderer(config);
+reactOnRailsProNodeRenderer(config);

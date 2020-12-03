@@ -1,10 +1,10 @@
 {
-  "name": "@shakacode-tools/react-on-rails-pro-vm-renderer",
+  "name": "@shakacode-tools/react-on-rails-pro-node-renderer",
   "version": "1.5.6",
   "protocolVersion": "1.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
-  "main": "packages/vm-renderer/src/ReactOnRailsProVmRenderer.js",
-  "bin": "./packages/vm-renderer/src/default-vm-renderer.js",
+  "main": "packages/node-renderer/src/ReactOnRailsProNodeRenderer.js",
+  "bin": "./packages/node-renderer/src/default-node-renderer.js",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
@@ -63,13 +63,13 @@
     "yalc": "^1.0.0-pre.27"
   },
   "files": [
-    "packages/vm-renderer/src"
+    "packages/node-renderer/src"
   ],
   "scripts": {
     "test": "nps test",
     "prerelease": "nps check",
     "start": "nps",
-    "developing": "rm -rf /tmp/react-on-rails-pro-vm-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node -r source-map-support/register packages/vm-renderer/src/default-vm-renderer.js",
+    "developing": "rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node -r source-map-support/register packages/node-renderer/src/default-node-renderer.js",
     "eslint": "eslint .",
     "check": "nps lint && nps format && nps test",
     "local": "echo 'Be sure to run yarn run dummy:install' && yarn run build && cd spec/dummy && foreman start"
@@ -95,7 +95,7 @@
   "jest": {
     "clearMocks": true,
     "collectCoverageFrom": [
-      "packages/vm-renderer/tests/**/*.{js,jsx}"
+      "packages/node-renderer/tests/**/*.{js,jsx}"
     ],
     "coverageReporters": [
       "lcov"
@@ -103,7 +103,7 @@
     "resetModules": true,
     "resetMocks": true,
     "setupFiles": [
-      "./packages/vm-renderer/tests/helper.js"
+      "./packages/node-renderer/tests/helper.js"
     ],
     "testEnvironment": "node",
     "transform": {
