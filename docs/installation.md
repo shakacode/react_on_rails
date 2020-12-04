@@ -1,9 +1,7 @@
 # Installation
-Since the repository is private, you will need a **GitHub OAuth** token. This is available from **Settings/Developer settings/Personal access tokens**. ShakaCode will generate a Github OAuth token, referred to below as **`your-github-token`**. This is done for a "machine user" github account. The reason for this is that this machine user has access to ONLY this one private repo. Justin can get this for you. If you use your personal token, it's good for any repos that you have access to.
+Since the repository is private, you will get a **GitHub Personal Access Token** and an account that can access the packages. Substitute that value in the commands below. If you dont' have this, ask [justin@shakacode.com](mailto:justin@shakacode.com) to give you one.
 
-Substitute that value in the commands below.
-
-Ask [justin@shakacode.com](mailto:justin@shakacode.com) to give you one.
+Check the [CHANGELOG](https://github.com/shakacode/react_on_rails_pro/blob/master/CHANGELOG.md) to see what version you want.
 
 # Ruby
 ## Gem Installation
@@ -19,7 +17,7 @@ Replace the following in the snippet for the Gemfile
 3. `<version>` desired
 
 ```ruby
-source "https://rorp-<account>:<api-key>@"\
+source "https://<rorp-account>:<token>@"\
   "rubygems.pkg.github.com/shakacode-tools" do
   gem "react_on_rails_pro", "<version>"
 end
@@ -64,7 +62,7 @@ Note, you only need to install the Node Package if you are using the standalone 
 2. Create a file `react-on-rails-pro/.npmrc` with the following
 ```
 always-auth=true
-//npm.pkg.github.com/:_authToken=<TOKEN>
+//npm.pkg.github.com/:_authToken=<token>
 @shakacode-tools:registry=https://npm.pkg.github.com
 ```
 
