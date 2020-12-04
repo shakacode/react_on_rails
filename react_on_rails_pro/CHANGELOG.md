@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
-## [2.0.0.beta.1] - 2020-12-03
+## [2.0.0.beta.0] - 2020-12-03
 * Renamed VM Renderer to Node Renderer
 
 ## [1.5.6] - 2020-12-02
