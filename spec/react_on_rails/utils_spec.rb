@@ -212,6 +212,7 @@ module ReactOnRails
     describe ".truthy_presence" do
       context "With non-empty string" do
         subject { "foobar" }
+
         it "returns subject (same value as presence) for a non-empty string" do
           expect(Utils.truthy_presence(subject)).to eq(subject.presence)
 
@@ -222,6 +223,7 @@ module ReactOnRails
 
       context "With empty string" do
         subject { "" }
+
         it "returns \"\" for an empty string" do
           expect(Utils.truthy_presence(subject)).to eq(subject)
         end
@@ -229,6 +231,7 @@ module ReactOnRails
 
       context "With nil object" do
         subject { nil }
+
         it "returns nil (same value as presence)" do
           expect(Utils.truthy_presence(subject)).to eq(subject.presence)
 
@@ -239,6 +242,7 @@ module ReactOnRails
 
       context "With pathname pointing to empty dir (obj.empty? is true)" do
         subject(:empty_dir) { Pathname.new(Dir.mktmpdir) }
+
         it "returns Pathname object" do
           # Blank strings are nil for presence
           expect(Utils.truthy_presence(empty_dir)).to eq(empty_dir)
@@ -251,6 +255,7 @@ module ReactOnRails
           File.basename(Tempfile.new("tempfile",
                                      empty_dir))
         end
+
         it "returns Pathname object" do
           expect(Utils.truthy_presence(empty_file)).to eq(empty_file)
         end

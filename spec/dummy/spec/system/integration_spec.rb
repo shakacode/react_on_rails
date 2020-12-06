@@ -96,6 +96,7 @@ end
 
 describe "Pages/client_side_log_throw", :js, type: :system do
   subject { page }
+
   before { visit "/client_side_log_throw" }
 
   it "client side logging and error handling", :ignore_js_errors do
@@ -105,6 +106,7 @@ end
 
 describe "Pages/Pure Component", :js, type: :system do
   subject { page }
+
   before { visit "/pure_component" }
 
   it { is_expected.to have_text "This is a Pure Component!" }
@@ -112,6 +114,7 @@ end
 
 describe "Pages/server_side_log_throw", :js, type: :system do
   subject { page }
+
   before { visit "/server_side_log_throw" }
 
   it "page has server side throw messages", :ignore_js_errors do
@@ -122,6 +125,7 @@ end
 
 describe "Pages/server_side_log_throw_raise" do
   subject { page }
+
   before { visit "/server_side_log_throw_raise" }
 
   it "redirects to /client_side_hello_world and flashes an error" do
@@ -134,6 +138,7 @@ end
 
 describe "Pages/index after using browser's back button", :js, type: :system do
   subject { page }
+
   before do
     visit root_path
     visit "/client_side_hello_world"
@@ -145,6 +150,7 @@ end
 
 describe "React Router", :js, :ignore_js_errors do
   subject { page }
+
   before do
     visit "/"
     click_link "React Router"
@@ -167,6 +173,7 @@ end
 
 describe "Manual Rendering", :js, type: :system do
   subject { page }
+
   before { visit "/client_side_manual_render" }
   it "renderer function is called successfully" do
     header_text = page.find(:css, "h1").text
@@ -177,6 +184,7 @@ end
 
 describe "Code Splitting", :js, type: :system do
   subject { page }
+
   before { visit "/deferred_render_with_server_rendering" }
   it "clicking on async route causes async component to be fetched" do
     header_text = page.find(:css, "h1").text
@@ -192,6 +200,7 @@ end
 
 describe "Example of Code Splitting with Rendering of Async Routes", :js, type: :system do
   subject { page }
+
   before { visit "/deferred_render_with_server_rendering/async_page" }
   it "deferring the initial render should prevent a client/server checksum mismatch error" do
     # Wait for client rendering to finish
@@ -201,6 +210,7 @@ end
 
 describe "renderedHtml from Render-Function", :js, type: :system do
   subject { page }
+
   before { visit "/rendered_html" }
   it "renderedHtml should not have any errors" do
     expect(subject).to have_text 'Props: {"hello":"world"}'
@@ -210,6 +220,7 @@ end
 
 describe "Manual client hydration", :js, type: :system do
   subject { page }
+
   before { visit "/xhr_refresh" }
   it "HelloWorldRehydratable onChange should trigger" do
     within("form") do
@@ -228,6 +239,7 @@ end
 describe "returns hash if hash_result == true even with prerendering error", :js, :ignore_js_errors,
         type: :system do
   subject { page }
+
   before { visit "/broken_app" }
   it "react_component should return hash" do
     expect(subject.html).to include("Exception in rendering!")
@@ -237,6 +249,7 @@ end
 describe "Render-Function returns renderedHtml as an object with additional HTML markups" do
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
     subject { page }
+
     before { visit react_helmet_path }
     it "renderedHtmls should not have any errors" do
       expect(subject).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
@@ -248,6 +261,7 @@ describe "Render-Function returns renderedHtml as an object with additional HTML
 
   shared_examples "renderedHtmls should have errors" do
     subject { page }
+
     before { visit react_helmet_broken_path }
     it "renderedHtmls should have errors" do
       puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
@@ -269,6 +283,7 @@ end
 
 describe "display images", :js, type: :system do
   subject { page }
+
   before { visit "/image_example" }
   it "image_example should not have any errors" do
     expect(subject).to have_text "Here is a label with a background-image from the CSS modules imported"
@@ -278,6 +293,7 @@ end
 
 shared_examples "React Component Shared Store" do |url|
   subject { page }
+
   background { visit url }
   context url do
     scenario "Type in one component changes the other component" do

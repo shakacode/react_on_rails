@@ -146,11 +146,13 @@ describe ReactOnRailsHelper, type: :helper do
       end
 
       subject { react_component("App", props: json_props) }
+
       it { is_expected.to include json_props_sanitized }
     end
 
     describe "API with component name only (no props or other options)" do
       subject { react_component("App") }
+
       it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
       it { is_expected.to include react_component_div }
       it {

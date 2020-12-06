@@ -7,6 +7,7 @@ module ReactOnRails
     describe ".uncommitted_changes?" do
       context "With uncommited git changes" do
         subject { "M file/path" }
+
         let(:message_handler) { instance_double("MessageHandler") }
 
         before do
@@ -23,6 +24,7 @@ module ReactOnRails
 
       context "With clean git status" do
         subject { "" }
+
         let(:message_handler) { instance_double("MessageHandler") }
 
         before do
@@ -38,6 +40,7 @@ module ReactOnRails
 
       context "With git not installed" do
         subject { nil }
+
         let(:message_handler) { instance_double("MessageHandler") }
 
         before do
