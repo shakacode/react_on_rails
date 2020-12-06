@@ -2,7 +2,7 @@
 # Check out: https://github.com/bbatsov/rubocop
 require:
   - rubocop-performance
-# todo rubocop-spec
+  - rubocop-rspec
 
 AllCops:
   NewCops: enable
