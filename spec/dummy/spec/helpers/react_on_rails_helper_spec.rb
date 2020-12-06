@@ -37,7 +37,7 @@ describe ReactOnRailsHelper, type: :helper do
 
   describe "#json_safe_and_pretty(hash_or_string)" do
     it "should raise an error if not hash nor string nor nil passed" do
-      expect { helper.json_safe_and_pretty(false) }.to raise_error
+      expect { helper.json_safe_and_pretty(false) }.to raise_error(ReactOnRails::Error)
     end
 
     it "should return empty json when an empty Hash" do
