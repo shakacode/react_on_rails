@@ -68,6 +68,7 @@ describe "Pages/Index", :js, type: :system do
       context "with Simple stateless component" do
         include_examples "React Component", "div#HelloWorld-react-component-6"
       end
+
       context "with Render-Function that takes props" do
         include_examples "React Component", "div#HelloWorld-react-component-7"
       end
