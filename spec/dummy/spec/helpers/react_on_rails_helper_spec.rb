@@ -200,7 +200,7 @@ describe ReactOnRailsHelper, type: :helper do
 
     context "with 'random_dom_id' global" do
       subject { react_component("App", props: props) }
-      around(:example) do |example|
+      around do |example|
         ReactOnRails.configure { |config| config.random_dom_id = false }
         example.run
         ReactOnRails.configure { |config| config.random_dom_id = true }

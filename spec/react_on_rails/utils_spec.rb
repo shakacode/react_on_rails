@@ -268,7 +268,7 @@ module ReactOnRails
       subject { Utils.rails_version_less_than("4") }
 
       describe ".rails_version_less_than" do
-        before(:each) { Utils.instance_variable_set :@rails_version_less_than, nil }
+        before { Utils.instance_variable_set :@rails_version_less_than, nil }
 
         context "with Rails 3" do
           before { allow(Rails).to receive(:version).and_return("3") }
@@ -316,7 +316,7 @@ module ReactOnRails
       describe ".rails_version_less_than_4_1_1" do
         subject { Utils.rails_version_less_than_4_1_1 }
 
-        before(:each) { Utils.instance_variable_set :@rails_version_less_than, nil }
+        before { Utils.instance_variable_set :@rails_version_less_than, nil }
 
         context "with Rails 4.1.0" do
           before { allow(Rails).to receive(:version).and_return("4.1.0") }
