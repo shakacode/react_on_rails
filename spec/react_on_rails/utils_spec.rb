@@ -19,7 +19,7 @@ module ReactOnRails
         Utils.bundle_js_file_path("webpack-bundle.js")
       end
 
-      context "With Webpacker enabled", :webpacker do
+      context "with Webpacker enabled", :webpacker do
         let(:webpacker_public_output_path) do
           File.expand_path(File.join(Rails.root, "public/webpack/dev"))
         end
@@ -34,7 +34,7 @@ module ReactOnRails
           allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
         end
 
-        context "and file in manifest", :webpacker do
+        context "when file in manifest", :webpacker do
           before do
             # Note Webpacker manifest lookup is inside of the public_output_path
             # [2] (pry) ReactOnRails::WebpackerUtils: 0> Webpacker.manifest.lookup("app-bundle.js")
@@ -49,7 +49,7 @@ module ReactOnRails
           it { expect(subject).to eq("#{webpacker_public_output_path}/webpack-bundle-0123456789abcdef.js") }
         end
 
-        context "manifest.json" do
+        context "with manifest.json" do
           subject do
             Utils.bundle_js_file_path("manifest.json")
           end
@@ -58,7 +58,7 @@ module ReactOnRails
         end
       end
 
-      context "Without Webpacker enabled" do
+      context "without Webpacker enabled" do
         before do
           allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
             .and_return("public/webpack/dev")
@@ -113,7 +113,7 @@ module ReactOnRails
           .and_return(Pathname.new("public/webpack/development"))
       end
 
-      context "With Webpacker enabled and server file not in manifest", :webpacker do
+      context "with Webpacker enabled and server file not in manifest", :webpacker do
         it "returns the unhashed server path" do
           server_bundle_name = "server-bundle.js"
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
@@ -128,7 +128,7 @@ module ReactOnRails
         end
       end
 
-      context "With Webpacker enabled and server file in the manifest, used for client", :webpacker do
+      context "with Webpacker enabled and server file in the manifest, used for client", :webpacker do
         it "returns the correct path hashed server path" do
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
             .and_return("webpack-bundle.js")
@@ -144,7 +144,7 @@ module ReactOnRails
         end
       end
 
-      context "With Webpacker enabled and server file in the manifest, used for client, "\
+      context "with Webpacker enabled and server file in the manifest, used for client, "\
         " and webpack-dev-server running, and same file used for server and client", :webpacker do
         it "returns the correct path hashed server path" do
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
@@ -167,7 +167,7 @@ module ReactOnRails
         end
       end
 
-      context "With Webpacker enabled, dev-server running, and server file in the manifest, and "\
+      context "with Webpacker enabled, dev-server running, and server file in the manifest, and "\
         " separate client/server files", :webpacker do
         it "returns the correct path hashed server path" do
           allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
@@ -211,7 +211,7 @@ module ReactOnRails
     end
 
     describe ".truthy_presence" do
-      context "With non-empty string" do
+      context "with non-empty string" do
         subject { "foobar" }
 
         it "returns subject (same value as presence) for a non-empty string" do
@@ -222,7 +222,7 @@ module ReactOnRails
         end
       end
 
-      context "With empty string" do
+      context "with empty string" do
         subject { "" }
 
         it "returns \"\" for an empty string" do
@@ -230,7 +230,7 @@ module ReactOnRails
         end
       end
 
-      context "With nil object" do
+      context "with nil object" do
         subject { nil }
 
         it "returns nil (same value as presence)" do
@@ -241,7 +241,7 @@ module ReactOnRails
         end
       end
 
-      context "With pathname pointing to empty dir (obj.empty? is true)" do
+      context "with pathname pointing to empty dir (obj.empty? is true)" do
         subject(:empty_dir) { Pathname.new(Dir.mktmpdir) }
 
         it "returns Pathname object" do
@@ -250,7 +250,7 @@ module ReactOnRails
         end
       end
 
-      context "With pathname pointing to empty file" do
+      context "with pathname pointing to empty file" do
         let(:empty_dir) { Pathname.new(Dir.mktmpdir) }
 
         subject(:empty_file) do
@@ -300,7 +300,7 @@ module ReactOnRails
           it { expect(subject).to eq(false) }
         end
 
-        context "called twice" do
+        context "when called twice" do
           before do
             allow(Rails).to receive(:version).and_return("4.2")
           end

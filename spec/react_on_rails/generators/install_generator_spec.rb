@@ -7,21 +7,21 @@ describe InstallGenerator, type: :generator do
 
   destination File.expand_path("../dummy-for-generators", __dir__)
 
-  context "no args" do
+  context "without args" do
     before(:all) { run_generator_test_with_args(%w[], package_json: true) }
 
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
   end
 
-  context "--redux" do
+  context "with --redux" do
     before(:all) { run_generator_test_with_args(%w[--redux], package_json: true) }
 
     include_examples "base_generator", application_js: true
     include_examples "react_with_redux_generator"
   end
 
-  context "-R" do
+  context "with -R" do
     before(:all) { run_generator_test_with_args(%w[-R], package_json: true) }
 
     include_examples "base_generator", application_js: true
@@ -67,7 +67,7 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "detect existing bin-files on *nix" do
+  context "when detecting existing bin-files on *nix" do
     before(:all) { @install_generator = InstallGenerator.new }
 
     specify "when node is exist" do
@@ -83,7 +83,7 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "detect missing bin-files on *nix" do
+  context "when detecting missing bin-files on *nix" do
     before(:all) { @install_generator = InstallGenerator.new }
 
     specify "when node is missing" do
@@ -99,7 +99,7 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "detect existing bin-files on windows" do
+  context "when detecting existing bin-files on windows" do
     before(:all) { @install_generator = InstallGenerator.new }
 
     specify "when node is exist" do
@@ -115,7 +115,7 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "detect missing bin-files on windows" do
+  context "when detecting missing bin-files on windows" do
     before(:all) { @install_generator = InstallGenerator.new }
 
     specify "when node is missing" do

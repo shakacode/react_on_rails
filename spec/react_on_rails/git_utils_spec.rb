@@ -5,7 +5,7 @@ require_relative "spec_helper"
 module ReactOnRails
   RSpec.describe GitUtils do
     describe ".uncommitted_changes?" do
-      context "With uncommited git changes" do
+      context "with uncommited git changes" do
         subject { "M file/path" }
 
         let(:message_handler) { instance_double("MessageHandler") }
@@ -22,7 +22,7 @@ module ReactOnRails
         end
       end
 
-      context "With clean git status" do
+      context "with clean git status" do
         subject { "" }
 
         let(:message_handler) { instance_double("MessageHandler") }
@@ -38,7 +38,7 @@ module ReactOnRails
         end
       end
 
-      context "With git not installed" do
+      context "with git not installed" do
         subject { nil }
 
         let(:message_handler) { instance_double("MessageHandler") }

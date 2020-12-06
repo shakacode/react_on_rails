@@ -27,7 +27,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
   end
 
   describe "#props" do
-    context "no props" do
+    context "without props" do
       it "returns empty hash" do
         attrs = the_attrs
 
@@ -37,7 +37,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
       end
     end
 
-    context "as Hash" do
+    context "with props Hash" do
       it "returns props" do
         props = { a_prop: 2 }
         attrs = the_attrs(options: { props: props })

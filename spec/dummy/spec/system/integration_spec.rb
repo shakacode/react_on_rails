@@ -34,47 +34,47 @@ end
 describe "Pages/Index", :js, type: :system do
   subject { page }
 
-  context "All in one page" do
+  context "when rendering All in one page" do
     before do
       visit root_path
     end
 
-    context "Server Rendered/Cached React/Redux Component" do
+    context "when rendering Server Rendered/Cached React/Redux Component" do
       include_examples "React Component", "div#ReduxApp-react-component-0"
     end
 
-    context "Server Rendered/Cached React Component Without Redux" do
+    context "when rendering Server Rendered/Cached React Component Without Redux" do
       include_examples "React Component", "div#HelloWorld-react-component-1"
     end
 
-    context "Simple Client Rendered Component" do
+    context "when rendering Simple Client Rendered Component" do
       include_examples "React Component", "div#HelloWorldApp-react-component-2"
 
-      context "same component with different props" do
+      context "when rendering same component with different props" do
         include_examples "React Component", "div#HelloWorldApp-react-component-3"
       end
     end
 
-    context "Simple Component Without Redux" do
+    context "when rendering Simple Component Without Redux" do
       include_examples "React Component", "div#HelloWorld-react-component-5"
       include_examples "React Component", "div#HelloWorldES5-react-component-5"
     end
 
-    context "Non-React Component" do
+    context "when rendering Non-React Component" do
       it { is_expected.to have_content "Time to visit Maui" }
     end
 
-    context "React Hooks" do
-      context "Simple stateless component" do
+    context "when rendering React Hooks" do
+      context "with Simple stateless component" do
         include_examples "React Component", "div#HelloWorld-react-component-6"
       end
-      context "Render-Function that takes props" do
+      context "with Render-Function that takes props" do
         include_examples "React Component", "div#HelloWorld-react-component-7"
       end
     end
   end
 
-  context "Server Rendering with Options" do
+  context "when Server Rendering with Options" do
     before do
       visit server_side_hello_world_with_options_path
     end
@@ -156,7 +156,7 @@ describe "React Router", :js, :ignore_js_errors do
     click_link "React Router"
   end
 
-  context "/react_router" do
+  context "when rendering /react_router" do
     it { is_expected.to have_text("Woohoo, we can use react-router here!") }
     it "clicking links correctly renders other pages" do
       click_link "Router First Page"
