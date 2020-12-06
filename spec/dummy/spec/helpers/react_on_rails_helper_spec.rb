@@ -36,21 +36,21 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#json_safe_and_pretty(hash_or_string)" do
-    it "should raise an error if not hash nor string nor nil passed" do
+    it "raises an error if not hash nor string nor nil passed" do
       expect { helper.json_safe_and_pretty(false) }.to raise_error(ReactOnRails::Error)
     end
 
-    it "should return empty json when an empty Hash" do
+    it "returns empty json when an empty Hash" do
       escaped_json = helper.json_safe_and_pretty({})
       expect(escaped_json).to eq("{}")
     end
 
-    it "should return empty json when an empty HashWithIndifferentAccess" do
+    it "returns empty json when an empty HashWithIndifferentAccess" do
       escaped_json = helper.json_safe_and_pretty(HashWithIndifferentAccess.new)
       expect(escaped_json).to eq("{}")
     end
 
-    it "should return empty json when nil" do
+    it "returns empty json when nil" do
       escaped_json = helper.json_safe_and_pretty(nil)
       expect(escaped_json).to eq("{}")
     end
@@ -312,7 +312,7 @@ describe ReactOnRailsHelper, type: :helper do
 
     after { ReactOnRails.configuration.rendering_extension = @rendering_extension }
 
-    it "should not throw an error if not in a view" do
+    it "does not throw an error if not in a view" do
       ob = PlainReactOnRailsHelper.new
       expect { ob.send(:rails_context, server_side: true) }.not_to raise_error
       expect { ob.send(:rails_context, server_side: false) }.not_to raise_error
