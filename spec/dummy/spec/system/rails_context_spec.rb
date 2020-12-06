@@ -46,7 +46,7 @@ shared_examples "railsContext" do |pathname, id_base|
   end
 end
 
-describe "rails_context" do
+describe "rails_context", type: :system do
   context "when client rendering" do
     context "with shared store" do
       include_examples("railsContext",

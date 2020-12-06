@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-describe "Server Rendering", :server_rendering do
+describe "Server Rendering", type: :request, :server_rendering do
   it "generates server rendered HTML if server rendering enabled" do
     get server_side_hello_world_with_options_path
     html_nodes = Nokogiri::HTML(response.body)
