@@ -194,7 +194,7 @@ describe "Code Splitting", :js, type: :system do
     header_text = page.find(:css, "h1").text
 
     expect(header_text).to eq("Deferred Rendering")
-    expect(subject).to_not have_text "Noice!"
+    expect(subject).not_to have_text "Noice!"
 
     click_link "Test Async Route"
     expect(current_path).to eq("/deferred_render_with_server_rendering/async_page")

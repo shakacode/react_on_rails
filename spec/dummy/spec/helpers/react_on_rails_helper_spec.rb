@@ -310,8 +310,8 @@ describe ReactOnRailsHelper, type: :helper do
 
     it "should not throw an error if not in a view" do
       ob = PlainReactOnRailsHelper.new
-      expect { ob.send(:rails_context, server_side: true) }.to_not raise_error
-      expect { ob.send(:rails_context, server_side: false) }.to_not raise_error
+      expect { ob.send(:rails_context, server_side: true) }.not_to raise_error
+      expect { ob.send(:rails_context, server_side: false) }.not_to raise_error
     end
   end
 end
