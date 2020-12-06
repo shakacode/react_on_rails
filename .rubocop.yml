@@ -89,6 +89,11 @@ Metrics/ModuleLength:
 Naming/RescuedExceptionsVariableName:
   Enabled: false
 
+RSpec/AnyInstance:
+  Exclude:
+    - 'spec/react_on_rails/git_utils_spec.rb'
+    - 'spec/react_on_rails/locales_to_js_spec.rb'
+
 RSpec/MultipleDescribes:
   Exclude:
     - 'spec/dummy/spec/system/integration_spec.rb'
