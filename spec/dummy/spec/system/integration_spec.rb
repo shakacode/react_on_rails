@@ -155,6 +155,7 @@ describe "React Router", :js, :ignore_js_errors do
     visit "/"
     click_link "React Router"
   end
+
   context "/react_router" do
     it { is_expected.to have_text("Woohoo, we can use react-router here!") }
     it "clicking links correctly renders other pages" do
@@ -175,6 +176,7 @@ describe "Manual Rendering", :js, type: :system do
   subject { page }
 
   before { visit "/client_side_manual_render" }
+
   it "renderer function is called successfully" do
     header_text = page.find(:css, "h1").text
     expect(header_text).to eq("Manual Render Example")
@@ -186,6 +188,7 @@ describe "Code Splitting", :js, type: :system do
   subject { page }
 
   before { visit "/deferred_render_with_server_rendering" }
+
   it "clicking on async route causes async component to be fetched" do
     header_text = page.find(:css, "h1").text
 
@@ -202,6 +205,7 @@ describe "Example of Code Splitting with Rendering of Async Routes", :js, type: 
   subject { page }
 
   before { visit "/deferred_render_with_server_rendering/async_page" }
+
   it "deferring the initial render should prevent a client/server checksum mismatch error" do
     # Wait for client rendering to finish
     expect(subject).to have_text("Mounted: true")
@@ -212,6 +216,7 @@ describe "renderedHtml from Render-Function", :js, type: :system do
   subject { page }
 
   before { visit "/rendered_html" }
+
   it "renderedHtml should not have any errors" do
     expect(subject).to have_text 'Props: {"hello":"world"}'
     expect(subject.html).to include("[SERVER] RENDERED RenderedHtml to dom node with id")
@@ -222,6 +227,7 @@ describe "Manual client hydration", :js, type: :system do
   subject { page }
 
   before { visit "/xhr_refresh" }
+
   it "HelloWorldRehydratable onChange should trigger" do
     within("form") do
       click_button "refresh"
@@ -241,6 +247,7 @@ describe "returns hash if hash_result == true even with prerendering error", :js
   subject { page }
 
   before { visit "/broken_app" }
+
   it "react_component should return hash" do
     expect(subject.html).to include("Exception in rendering!")
   end
@@ -251,6 +258,7 @@ describe "Render-Function returns renderedHtml as an object with additional HTML
     subject { page }
 
     before { visit react_helmet_path }
+
     it "renderedHtmls should not have any errors" do
       expect(subject).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
       expect(subject).to have_css "title", text: /\ACustom page title\z/, visible: false
@@ -263,6 +271,7 @@ describe "Render-Function returns renderedHtml as an object with additional HTML
     subject { page }
 
     before { visit react_helmet_broken_path }
+
     it "renderedHtmls should have errors" do
       puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
       puts "integration_spec.rb: #{__LINE__},  method: #{__method__}"
@@ -285,6 +294,7 @@ describe "display images", :js, type: :system do
   subject { page }
 
   before { visit "/image_example" }
+
   it "image_example should not have any errors" do
     expect(subject).to have_text "Here is a label with a background-image from the CSS modules imported"
     expect(subject.html).to include("[SERVER] RENDERED ImageExample to dom node with id")
