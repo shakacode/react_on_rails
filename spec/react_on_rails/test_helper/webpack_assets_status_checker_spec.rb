@@ -12,16 +12,16 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     let(:webpack_generated_files) { %w[manifest.json] }
     let(:server_bundle_js_file) { File.join(generated_assets_full_path, "server-bundle.js") }
     let(:client_bundle_js_file) { File.join(generated_assets_full_path, "client-bundle.js") }
-    before do
-      allow(ReactOnRails::WebpackerUtils).to receive(:check_manifest_not_cached).and_return(nil)
-      allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(generated_assets_full_path)
-    end
-
     let(:checker) do
       ReactOnRails::TestHelper::WebpackAssetsStatusChecker
         .new(generated_assets_full_path: generated_assets_full_path,
              source_path: source_path,
              webpack_generated_files: webpack_generated_files)
+    end
+
+    before do
+      allow(ReactOnRails::WebpackerUtils).to receive(:check_manifest_not_cached).and_return(nil)
+      allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(generated_assets_full_path)
     end
 
     context "with Webpacker" do
