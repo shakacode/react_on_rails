@@ -159,6 +159,7 @@ describe "React Router", :js, :ignore_js_errors do
 
   context "when rendering /react_router" do
     it { is_expected.to have_text("Woohoo, we can use react-router here!") }
+
     it "clicking links correctly renders other pages" do
       click_link "Router First Page"
       expect(current_path).to eq("/react_router/first_page")

@@ -155,6 +155,7 @@ describe ReactOnRailsHelper, type: :helper do
 
       it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
       it { is_expected.to include react_component_div }
+
       it {
         expect(is_expected.target).to script_tag_be_included(react_definition_script_no_params)
       }
@@ -166,6 +167,7 @@ describe ReactOnRailsHelper, type: :helper do
     it { is_expected.to start_with "<script" }
     it { is_expected.to match %r{</script>\s*$} }
     it { is_expected.to include react_component_div }
+
     it {
       expect(is_expected.target).to script_tag_be_included(react_definition_script)
     }
@@ -228,6 +230,7 @@ describe ReactOnRailsHelper, type: :helper do
 
       it { is_expected.to include id }
       it { is_expected.not_to include react_component_random_id_div }
+
       it {
         expect(is_expected.target).to script_tag_be_included(react_definition_script)
       }
@@ -282,6 +285,7 @@ describe ReactOnRailsHelper, type: :helper do
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
     it { is_expected.to start_with "<script" }
     it { is_expected.to end_with "</script>" }
+
     it {
       expect(is_expected.target).to script_tag_be_included(react_store_script)
     }
