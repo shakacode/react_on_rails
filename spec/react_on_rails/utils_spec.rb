@@ -23,6 +23,7 @@ module ReactOnRails
         let(:webpacker_public_output_path) do
           File.expand_path(File.join(Rails.root, "public/webpack/dev"))
         end
+
         before do
           allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
             .and_return("")
@@ -251,6 +252,7 @@ module ReactOnRails
 
       context "With pathname pointing to empty file" do
         let(:empty_dir) { Pathname.new(Dir.mktmpdir) }
+
         subject(:empty_file) do
           File.basename(Tempfile.new("tempfile",
                                      empty_dir))

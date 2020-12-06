@@ -5,6 +5,7 @@ require_relative "../spec_helper"
 describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
   describe "#ensureAssetsCompiled" do
     let(:invalid_command) { "sh -c 'exit 1'" }
+
     context "when assets compiler command is invalid" do
       before do
         allow(ReactOnRails.configuration)

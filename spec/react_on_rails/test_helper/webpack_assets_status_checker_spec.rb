@@ -31,6 +31,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
 
       context "when compiled assets with manifest exist and are up-to-date" do
         let(:fixture_dirname) { "assets_with_manifest_exist" }
+
         before do
           require "webpacker"
           allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(true)
@@ -48,6 +49,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
 
       context "when using webpacker and manifest is missing" do
         let(:fixture_dirname) { "assets_with_missing_manifest" }
+
         before do
           require "webpacker"
           allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(false)
@@ -101,6 +103,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
 
       context "when compiled assets don't exist" do
         let(:fixture_dirname) { "assets_no_exist" }
+
         specify do
           expect(checker.stale_generated_webpack_files)
             .to eq([client_bundle_js_file, server_bundle_js_file])
@@ -109,6 +112,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
 
       context "when only server-bundle.js exists" do
         let(:fixture_dirname) { "assets_exist_only_server_bundle" }
+
         before do
           touch_files_in_dir(generated_assets_full_path)
         end
@@ -121,6 +125,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
 
       context "when assets exist but are outdated" do
         let(:fixture_dirname) { "assets_outdated" }
+
         before { touch_files_in_dir(source_path) }
 
         specify do

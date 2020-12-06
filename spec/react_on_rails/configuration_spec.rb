@@ -22,6 +22,7 @@ module ReactOnRails
       let(:webpacker_public_output_path) do
         File.expand_path(File.join(Rails.root, "public/webpack/dev"))
       end
+
       before do
         allow(Rails).to receive(:root).and_return(File.expand_path("."))
         allow(Webpacker).to receive_message_chain("config.public_output_path")
