@@ -244,7 +244,7 @@ describe "Manual client hydration", :js, type: :system do
 end
 
 describe "returns hash if hash_result == true even with prerendering error", :js, :ignore_js_errors, type: :system do
-    subject { page }
+  subject { page }
 
     before { visit "/broken_app" }
 
