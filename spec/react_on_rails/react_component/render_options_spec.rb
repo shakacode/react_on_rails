@@ -67,7 +67,8 @@ describe ReactOnRails::ReactComponent::RenderOptions do
           attrs = the_attrs(react_component_name: "SomeApp", options: { random_dom_id: true })
           opts = described_class.new(attrs)
 
-          expect(SecureRandom).to receive(:uuid).and_return("123456789")
+          allow(SecureRandom).to receive(:uuid).and_return("123456789")
+          expect(SecureRandom).to receive(:uuid)
           expect(opts.dom_id).to eq "SomeApp-react-component-123456789"
           expect(opts.random_dom_id?).to eq(true)
         end
