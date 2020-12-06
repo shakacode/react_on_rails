@@ -130,7 +130,7 @@ describe "Pages/server_side_log_throw_raise" do
   before { visit "/server_side_log_throw_raise" }
 
   it "redirects to /client_side_hello_world and flashes an error" do
-    expect(current_path).to eq("/server_side_log_throw_raise_invoker")
+    expect(page).to have_current_path("/server_side_log_throw_raise_invoker")
     flash_message = page.find(:css, ".flash").text
     expect(flash_message).to eq("Error prerendering in react_on_rails. Redirected back to"\
       " '/server_side_log_throw_raise_invoker'. See server logs for output.")
@@ -162,12 +162,12 @@ describe "React Router", :js, :ignore_js_errors do
 
     it "clicking links correctly renders other pages" do
       click_link "Router First Page"
-      expect(current_path).to eq("/react_router/first_page")
+      expect(page).to have_current_path("/react_router/first_page")
       first_page_header_text = page.find(:css, "h2").text
       expect(first_page_header_text).to eq("React Router First Page")
 
       click_link "Router Second Page"
-      expect(current_path).to eq("/react_router/second_page")
+      expect(page).to have_current_path("/react_router/second_page")
       second_page_header_text = page.find(:css, "h2").text
       expect(second_page_header_text).to eq("React Router Second Page")
     end
@@ -198,7 +198,7 @@ describe "Code Splitting", :js, type: :system do
     expect(subject).not_to have_text "Noice!"
 
     click_link "Test Async Route"
-    expect(current_path).to eq("/deferred_render_with_server_rendering/async_page")
+    expect(page).to have_current_path("/deferred_render_with_server_rendering/async_page")
     expect(subject).to have_text "Noice!"
   end
 end
@@ -308,7 +308,7 @@ shared_examples "React Component Shared Store" do |url|
   background { visit url }
   context url do
     scenario "Type in one component changes the other component" do
-      expect(current_path).to eq(url)
+      expect(page).to have_current_path(url, ignore_query: true)
       new_text = "John Doe"
       new_text2 = "Jane Smith"
       within("#ReduxSharedStoreApp-react-component-0") do
