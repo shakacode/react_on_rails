@@ -251,12 +251,12 @@ module ReactOnRails
       end
 
       context "with pathname pointing to empty file" do
-        let(:empty_dir) { Pathname.new(Dir.mktmpdir) }
-
         subject(:empty_file) do
           File.basename(Tempfile.new("tempfile",
                                      empty_dir))
         end
+        let(:empty_dir) { Pathname.new(Dir.mktmpdir) }
+
 
         it "returns Pathname object" do
           expect(Utils.truthy_presence(empty_file)).to eq(empty_file)

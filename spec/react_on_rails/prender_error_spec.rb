@@ -4,6 +4,15 @@ require_relative "spec_helper"
 
 module ReactOnRails
   describe PrerenderError do
+    subject do
+      PrerenderError.new(
+        component_name: expected_error_info[:component_name],
+        err: expected_error_info[:err],
+        props: expected_error_info[:props],
+        js_code: expected_error_info[:js_code],
+        console_messages: expected_error_info[:console_messages]
+      )
+    end
     let(:err) do
       result = nil
       begin
@@ -24,15 +33,6 @@ module ReactOnRails
       }
     end
 
-    subject do
-      PrerenderError.new(
-        component_name: expected_error_info[:component_name],
-        err: expected_error_info[:err],
-        props: expected_error_info[:props],
-        js_code: expected_error_info[:js_code],
-        console_messages: expected_error_info[:console_messages]
-      )
-    end
 
     describe ".to_honey_badger_context" do
       it "returns the correct context" do

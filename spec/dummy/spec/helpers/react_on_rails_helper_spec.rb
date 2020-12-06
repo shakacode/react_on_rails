@@ -96,9 +96,9 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#react_component" do
+    subject { react_component("App", props: props) }
     before { allow(SecureRandom).to receive(:uuid).and_return(0, 1, 2, 3) }
 
-    subject { react_component("App", props: props) }
 
     let(:props) do
       { name: "My Test Name" }
@@ -136,6 +136,7 @@ describe ReactOnRailsHelper, type: :helper do
     end
 
     context "with json string props" do
+      subject { react_component("App", props: json_props) }
       let(:json_props) do
         "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"</script><script>alert('foo')</script>\"}"
       end
@@ -145,7 +146,6 @@ describe ReactOnRailsHelper, type: :helper do
           "t\\u003ealert('foo')\\u003c/script\\u003e\"}"
       end
 
-      subject { react_component("App", props: json_props) }
 
       it { is_expected.to include json_props_sanitized }
     end
@@ -199,13 +199,13 @@ describe ReactOnRailsHelper, type: :helper do
     end
 
     context "with 'random_dom_id' global" do
+      subject { react_component("App", props: props) }
       around(:example) do |example|
         ReactOnRails.configure { |config| config.random_dom_id = false }
         example.run
         ReactOnRails.configure { |config| config.random_dom_id = true }
       end
 
-      subject { react_component("App", props: props) }
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
