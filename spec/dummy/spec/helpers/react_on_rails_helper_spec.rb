@@ -170,7 +170,7 @@ describe ReactOnRailsHelper, type: :helper do
       expect(is_expected.target).to script_tag_be_included(react_definition_script)
     }
 
-    context "with 'random_dom_id' false option" do
+    context "with 'random_dom_id' option set to false" do
       subject { react_component("App", props: props, random_dom_id: false) }
 
       let(:react_definition_script) do
@@ -183,7 +183,7 @@ describe ReactOnRailsHelper, type: :helper do
       it { expect(is_expected.target).to script_tag_be_included(react_definition_script) }
     end
 
-    context "with 'random_dom_id' false option" do
+    context "with 'random_dom_id' option set to true" do
       subject { react_component("App", props: props, random_dom_id: true) }
 
       let(:react_definition_script) do
