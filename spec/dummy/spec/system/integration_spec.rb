@@ -262,7 +262,7 @@ describe "Render-Function returns renderedHtml as an object with additional HTML
 
     it "renderedHtmls should not have any errors" do
       expect(subject).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
-      expect(subject).to have_css "title", text: /\ACustom page title\z/, visible: false
+      expect(subject).to have_css "title", text: /\ACustom page title\z/, visible: hidden
       expect(subject.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
       change_text_expect_dom_selector("div#react-helmet-0")
     end
