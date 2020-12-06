@@ -2,8 +2,8 @@
 
 require_relative "../rails_helper"
 
-feature "Hello World", js: true do
-  scenario "the hello world example works" do
+describe "Hello World", js: true do
+  it "the hello world example works" do
     visit "/hello_world"
     expect(heading).to have_text("Hello World")
     expect(message).to have_text("Stranger")

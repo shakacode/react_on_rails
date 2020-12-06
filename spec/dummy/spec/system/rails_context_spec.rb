@@ -46,7 +46,7 @@ shared_examples "railsContext" do |pathname, id_base|
   end
 end
 
-feature "rails_context" do
+describe "rails_context" do
   context "client rendering" do
     context "shared store" do
       include_examples("railsContext",
