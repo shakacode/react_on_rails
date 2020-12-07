@@ -34,7 +34,6 @@ module ReactOnRails
       }
     end
 
-
     describe ".to_honey_badger_context" do
       it "returns the correct context" do
         expect(subject.to_honeybadger_context).to eq(expected_error_info)

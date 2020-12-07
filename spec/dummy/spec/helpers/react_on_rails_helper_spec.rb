@@ -100,7 +100,6 @@ describe ReactOnRailsHelper, type: :helper do
 
     before { allow(SecureRandom).to receive(:uuid).and_return(0, 1, 2, 3) }
 
-
     let(:props) do
       { name: "My Test Name" }
     end
@@ -147,7 +146,6 @@ describe ReactOnRailsHelper, type: :helper do
         '{"hello":"world","free":"of charge","x":"\\u003c/script\\u003e\\u003cscrip'\
           "t\\u003ealert('foo')\\u003c/script\\u003e\"}"
       end
-
 
       it { is_expected.to include json_props_sanitized }
     end
@@ -208,7 +206,6 @@ describe ReactOnRailsHelper, type: :helper do
         example.run
         ReactOnRails.configure { |config| config.random_dom_id = true }
       end
-
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc

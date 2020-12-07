@@ -258,7 +258,6 @@ module ReactOnRails
 
         let(:empty_dir) { Pathname.new(Dir.mktmpdir) }
 
-
         it "returns Pathname object" do
           expect(Utils.truthy_presence(empty_file)).to eq(empty_file)
         end
