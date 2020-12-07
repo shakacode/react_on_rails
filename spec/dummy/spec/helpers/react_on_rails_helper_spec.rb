@@ -305,12 +305,14 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#rails_context" do
-    before do
-      @rendering_extension = ReactOnRails.configuration.rendering_extension
+    around do |example|
+      rendering_extension = ReactOnRails.configuration.rendering_extension
       ReactOnRails.configuration.rendering_extension = nil
-    end
 
-    after { ReactOnRails.configuration.rendering_extension = @rendering_extension }
+      example.run
+
+      ReactOnRails.configuration.rendering_extension = rendering_extension
+    end
 
     it "does not throw an error if not in a view" do
       ob = PlainReactOnRailsHelper.new

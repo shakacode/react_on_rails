@@ -68,66 +68,66 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when detecting existing bin-files on *nix" do
-    before(:all) { @install_generator = InstallGenerator.new }
+    let(:install_generator) { InstallGenerator.new }
 
     specify "when node is exist" do
       stub_const("RUBY_PLATFORM", "linux")
-      allow(@install_generator).to receive(:`).with("which node").and_return("/path/to/bin")
-      expect(@install_generator.send(:missing_node?)).to eq false
+      allow(install_generator).to receive(:`).with("which node").and_return("/path/to/bin")
+      expect(install_generator.send(:missing_node?)).to eq false
     end
 
     specify "when npm is exist" do
       stub_const("RUBY_PLATFORM", "linux")
-      allow(@install_generator).to receive(:`).with("which yarn").and_return("/path/to/bin")
-      expect(@install_generator.send(:missing_yarn?)).to eq false
+      allow(install_generator).to receive(:`).with("which yarn").and_return("/path/to/bin")
+      expect(install_generator.send(:missing_yarn?)).to eq false
     end
   end
 
   context "when detecting missing bin-files on *nix" do
-    before(:all) { @install_generator = InstallGenerator.new }
+    let(:install_generator) { InstallGenerator.new }
 
     specify "when node is missing" do
       stub_const("RUBY_PLATFORM", "linux")
-      allow(@install_generator).to receive(:`).with("which node").and_return("")
-      expect(@install_generator.send(:missing_node?)).to eq true
+      allow(install_generator).to receive(:`).with("which node").and_return("")
+      expect(install_generator.send(:missing_node?)).to eq true
     end
 
     specify "when npm is missing" do
       stub_const("RUBY_PLATFORM", "linux")
-      allow(@install_generator).to receive(:`).with("which yarn").and_return("")
-      expect(@install_generator.send(:missing_yarn?)).to eq true
+      allow(install_generator).to receive(:`).with("which yarn").and_return("")
+      expect(install_generator.send(:missing_yarn?)).to eq true
     end
   end
 
   context "when detecting existing bin-files on windows" do
-    before(:all) { @install_generator = InstallGenerator.new }
+    let(:install_generator) { InstallGenerator.new }
 
     specify "when node is exist" do
       stub_const("RUBY_PLATFORM", "mswin")
-      allow(@install_generator).to receive(:`).with("where node").and_return("/path/to/bin")
-      expect(@install_generator.send(:missing_node?)).to eq false
+      allow(install_generator).to receive(:`).with("where node").and_return("/path/to/bin")
+      expect(install_generator.send(:missing_node?)).to eq false
     end
 
     specify "when npm is exist" do
       stub_const("RUBY_PLATFORM", "mswin")
-      allow(@install_generator).to receive(:`).with("where yarn").and_return("/path/to/bin")
-      expect(@install_generator.send(:missing_yarn?)).to eq false
+      allow(install_generator).to receive(:`).with("where yarn").and_return("/path/to/bin")
+      expect(install_generator.send(:missing_yarn?)).to eq false
     end
   end
 
   context "when detecting missing bin-files on windows" do
-    before(:all) { @install_generator = InstallGenerator.new }
+    let(:install_generator) { InstallGenerator.new }
 
     specify "when node is missing" do
       stub_const("RUBY_PLATFORM", "mswin")
-      allow(@install_generator).to receive(:`).with("where node").and_return("")
-      expect(@install_generator.send(:missing_node?)).to eq true
+      allow(install_generator).to receive(:`).with("where node").and_return("")
+      expect(install_generator.send(:missing_node?)).to eq true
     end
 
     specify "when yarn is missing" do
       stub_const("RUBY_PLATFORM", "mswin")
-      allow(@install_generator).to receive(:`).with("where yarn").and_return("")
-      expect(@install_generator.send(:missing_yarn?)).to eq true
+      allow(install_generator).to receive(:`).with("where yarn").and_return("")
+      expect(install_generator.send(:missing_yarn?)).to eq true
     end
   end
 end
