@@ -247,11 +247,11 @@ end
 describe "returns hash if hash_result == true even with prerendering error", :js, :ignore_js_errors, type: :system do
   subject { page }
 
-    before { visit "/broken_app" }
+  before { visit "/broken_app" }
 
-    it "react_component should return hash" do
-      expect(subject.html).to include("Exception in rendering!")
-    end
+  it "react_component should return hash" do
+    expect(subject.html).to include("Exception in rendering!")
+  end
 end
 
 describe "Render-Function returns renderedHtml as an object with additional HTML markups", type: :system do
