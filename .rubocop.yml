@@ -100,6 +100,11 @@ RSpec/MessageSpies:
 RSpec/NestedGroups:
   Max: 4
 
+RSpec/BeforeAfterAll:
+  Exclude:
+    - 'spec/react_on_rails/generators/dev_tests_generator_spec.rb'
+    - 'spec/react_on_rails/generators/install_generator_spec.rb'
+
 RSpec/MultipleDescribes:
   Exclude:
     - 'spec/dummy/spec/system/integration_spec.rb'
