@@ -157,7 +157,7 @@ describe ReactOnRailsHelper, type: :helper do
       it { is_expected.to include react_component_div }
 
       it {
-        expect(is_expected.target).to script_tag_be_included(react_definition_script_no_params)
+        expect(expect(subject).target).to script_tag_be_included(react_definition_script_no_params)
       }
     end
 
@@ -169,7 +169,7 @@ describe ReactOnRailsHelper, type: :helper do
     it { is_expected.to include react_component_div }
 
     it {
-      expect(is_expected.target).to script_tag_be_included(react_definition_script)
+      expect(expect(subject).target).to script_tag_be_included(react_definition_script)
     }
 
     context "with 'random_dom_id' option set to false" do
@@ -232,7 +232,7 @@ describe ReactOnRailsHelper, type: :helper do
       it { is_expected.not_to include react_component_random_id_div }
 
       it {
-        expect(is_expected.target).to script_tag_be_included(react_definition_script)
+        expect(expect(subject).target).to script_tag_be_included(react_definition_script)
       }
     end
 
@@ -287,7 +287,7 @@ describe ReactOnRailsHelper, type: :helper do
     it { is_expected.to end_with "</script>" }
 
     it {
-      expect(is_expected.target).to script_tag_be_included(react_store_script)
+      expect(expect(subject).target).to script_tag_be_included(react_store_script)
     }
   end
 

@@ -8,7 +8,7 @@ def change_text_expect_dom_selector(dom_selector)
   within(dom_selector) do
     find("input").set new_text
     within("h3") do
-      is_expected.to have_content new_text
+      expect(subject).to have_content new_text
     end
   end
 end
@@ -101,7 +101,7 @@ describe "Pages/client_side_log_throw", :js, type: :system do
   before { visit "/client_side_log_throw" }
 
   it "client side logging and error handling", :ignore_js_errors do
-    is_expected.to have_text "This example demonstrates client side logging and error handling."
+    expect(subject).to have_text "This example demonstrates client side logging and error handling."
   end
 end
 
@@ -238,7 +238,7 @@ describe "Manual client hydration", :js, type: :system do
     within("#HelloWorldRehydratable-react-component-1") do
       find("input").set "Should update"
       within("h3") do
-        is_expected.to have_content "Should update"
+        expect(subject).to have_content "Should update"
       end
     end
   end
@@ -314,18 +314,18 @@ shared_examples "React Component Shared Store" do |url|
       within("#ReduxSharedStoreApp-react-component-0") do
         find("input").set new_text
         within("h3") do
-          is_expected.to have_content new_text
+          expect(subject).to have_content new_text
         end
       end
       within("#ReduxSharedStoreApp-react-component-1") do
         within("h3") do
-          is_expected.to have_content new_text
+          expect(subject).to have_content new_text
         end
         find("input").set new_text2
       end
       within("#ReduxSharedStoreApp-react-component-0") do
         within("h3") do
-          is_expected.to have_content new_text2
+          expect(subject).to have_content new_text2
         end
       end
     end
