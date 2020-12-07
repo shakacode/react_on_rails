@@ -97,6 +97,9 @@ RSpec/AnyInstance:
 RSpec/MessageSpies:
   Enabled: false
 
+RSpec/NestedGroups:
+  Max: 4
+
 RSpec/MultipleDescribes:
   Exclude:
     - 'spec/dummy/spec/system/integration_spec.rb'
