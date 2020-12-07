@@ -111,6 +111,9 @@ RSpec/BeforeAfterAll:
 RSpec/MessageChain:
   Enabled: false
 
+RSpec/MultipleExpectations:
+  Enabled: false
+
 RSpec/MultipleDescribes:
   Exclude:
     - 'spec/dummy/spec/system/integration_spec.rb'
