@@ -8,7 +8,7 @@ def change_text_expect_dom_selector(dom_selector)
   within(dom_selector) do
     find("input").set new_text
     within("h3") do
-      expect(subject).to have_content new_text
+      expect(page).to have_content new_text
     end
   end
 end
@@ -24,7 +24,7 @@ def finished_all_ajax_requests?
 end
 
 shared_examples "React Component" do |dom_selector|
-  scenario { is_expected.to have_css dom_selector }
+  scenario { expect(page).to have_css dom_selector }
 
   scenario "changes name in message according to input" do
     change_text_expect_dom_selector(dom_selector)
@@ -32,8 +32,6 @@ shared_examples "React Component" do |dom_selector|
 end
 
 describe "Pages/Index", :js, type: :system do
-  subject { page }
-
   context "when rendering All in one page" do
     before do
       visit root_path
@@ -61,7 +59,7 @@ describe "Pages/Index", :js, type: :system do
     end
 
     context "when rendering Non-React Component" do
-      it { is_expected.to have_content "Time to visit Maui" }
+      it { expect(page).to have_content "Time to visit Maui" }
     end
 
     context "when rendering React Hooks" do
@@ -85,8 +83,6 @@ describe "Pages/Index", :js, type: :system do
 end
 
 describe "Turbolinks across pages", :js, type: :system do
-  subject { page }
-
   it "changes name in message according to input" do
     visit "/client_side_hello_world"
     change_text_expect_dom_selector("#HelloWorld-react-component-0")
@@ -96,12 +92,10 @@ describe "Turbolinks across pages", :js, type: :system do
 end
 
 describe "Pages/client_side_log_throw", :js, type: :system do
-  subject { page }
-
   before { visit "/client_side_log_throw" }
 
   it "client side logging and error handling", :ignore_js_errors do
-    expect(subject).to have_text "This example demonstrates client side logging and error handling."
+    expect(page).to have_text "This example demonstrates client side logging and error handling."
   end
 end
 
@@ -118,9 +112,9 @@ describe "Pages/server_side_log_throw", :js, type: :system do
 
   before { visit "/server_side_log_throw" }
 
-  it "page has server side throw messages", :ignore_js_errors do
-    expect(subject).to have_text "This example demonstrates server side logging and error handling."
-    expect(subject).to have_text "Exception in rendering!\n\nMessage: throw in HelloWorldWithLogAndThrow"
+  context "when the page has server side throw messages", :ignore_js_errors do
+    it { is_expected.to have_text "This example demonstrates server side logging and error handling." }
+    it { is_expected.to have_text "Exception in rendering!\n\nMessage: throw in HelloWorldWithLogAndThrow" }
   end
 end
 
@@ -175,31 +169,27 @@ describe "React Router", :js, :ignore_js_errors, type: :system do
 end
 
 describe "Manual Rendering", :js, type: :system do
-  subject { page }
-
   before { visit "/client_side_manual_render" }
 
   it "renderer function is called successfully" do
     header_text = page.find(:css, "h1").text
     expect(header_text).to eq("Manual Render Example")
-    expect(subject).to have_text "If you can see this, you can register renderer functions."
+    expect(page).to have_text "If you can see this, you can register renderer functions."
   end
 end
 
 describe "Code Splitting", :js, type: :system do
-  subject { page }
-
   before { visit "/deferred_render_with_server_rendering" }
 
   it "clicking on async route causes async component to be fetched" do
     header_text = page.find(:css, "h1").text
 
     expect(header_text).to eq("Deferred Rendering")
-    expect(subject).not_to have_text "Noice!"
+    expect(page).not_to have_text "Noice!"
 
     click_link "Test Async Route"
     expect(page).to have_current_path("/deferred_render_with_server_rendering/async_page")
-    expect(subject).to have_text "Noice!"
+    expect(page).to have_text "Noice!"
   end
 end
 
@@ -208,26 +198,22 @@ describe "Example of Code Splitting with Rendering of Async Routes", :js, type: 
 
   before { visit "/deferred_render_with_server_rendering/async_page" }
 
-  it "deferring the initial render should prevent a client/server checksum mismatch error" do
+  context "when deferring the initial render should prevent a client/server checksum mismatch error" do
     # Wait for client rendering to finish
-    expect(subject).to have_text("Mounted: true")
+    it { is_expected.to have_text("Mounted: true") }
   end
 end
 
 describe "renderedHtml from Render-Function", :js, type: :system do
-  subject { page }
-
   before { visit "/rendered_html" }
 
   it "renderedHtml should not have any errors" do
-    expect(subject).to have_text 'Props: {"hello":"world"}'
-    expect(subject.html).to include("[SERVER] RENDERED RenderedHtml to dom node with id")
+    expect(page).to have_text 'Props: {"hello":"world"}'
+    expect(page.html).to include("[SERVER] RENDERED RenderedHtml to dom node with id")
   end
 end
 
 describe "Manual client hydration", :js, type: :system do
-  subject { page }
-
   before { visit "/xhr_refresh" }
 
   it "HelloWorldRehydratable onChange should trigger" do
@@ -238,32 +224,28 @@ describe "Manual client hydration", :js, type: :system do
     within("#HelloWorldRehydratable-react-component-1") do
       find("input").set "Should update"
       within("h3") do
-        expect(subject).to have_content "Should update"
+        expect(page).to have_content "Should update"
       end
     end
   end
 end
 
 describe "returns hash if hash_result == true even with prerendering error", :js, :ignore_js_errors, type: :system do
-  subject { page }
-
   before { visit "/broken_app" }
 
   it "react_component should return hash" do
-    expect(subject.html).to include("Exception in rendering!")
+    expect(page.html).to include("Exception in rendering!")
   end
 end
 
 describe "Render-Function returns renderedHtml as an object with additional HTML markups", type: :system do
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
-    subject { page }
-
     before { visit react_helmet_path }
 
     it "renderedHtmls should not have any errors" do
-      expect(subject).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
-      expect(subject).to have_css "title", text: /\ACustom page title\z/, visible: hidden
-      expect(subject.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
+      expect(page).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
+      expect(page).to have_css "title", text: /\ACustom page title\z/, visible: hidden
+      expect(page.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
       change_text_expect_dom_selector("div#react-helmet-0")
     end
   end
@@ -292,19 +274,15 @@ describe "Render-Function returns renderedHtml as an object with additional HTML
 end
 
 describe "display images", :js, type: :system do
-  subject { page }
-
   before { visit "/image_example" }
 
   it "image_example should not have any errors" do
-    expect(subject).to have_text "Here is a label with a background-image from the CSS modules imported"
-    expect(subject.html).to include("[SERVER] RENDERED ImageExample to dom node with id")
+    expect(page).to have_text "Here is a label with a background-image from the CSS modules imported"
+    expect(page.html).to include("[SERVER] RENDERED ImageExample to dom node with id")
   end
 end
 
 shared_examples "React Component Shared Store" do |url|
-  subject { page }
-
   background { visit url }
   context url do
     scenario "Type in one component changes the other component" do
@@ -314,18 +292,18 @@ shared_examples "React Component Shared Store" do |url|
       within("#ReduxSharedStoreApp-react-component-0") do
         find("input").set new_text
         within("h3") do
-          expect(subject).to have_content new_text
+          expect(page).to have_content new_text
         end
       end
       within("#ReduxSharedStoreApp-react-component-1") do
         within("h3") do
-          expect(subject).to have_content new_text
+          expect(page).to have_content new_text
         end
         find("input").set new_text2
       end
       within("#ReduxSharedStoreApp-react-component-0") do
         within("h3") do
-          expect(subject).to have_content new_text2
+          expect(page).to have_content new_text2
         end
       end
     end

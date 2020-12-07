@@ -151,13 +151,13 @@ describe ReactOnRailsHelper, type: :helper do
     end
 
     describe "API with component name only (no props or other options)" do
-      subject { react_component("App") }
+      subject(:react_app) { react_component("App") }
 
       it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
       it { is_expected.to include react_component_div }
 
       it {
-        expect(expect(subject).target).to script_tag_be_included(react_definition_script_no_params)
+        expect(expect(react_app).target).to script_tag_be_included(react_definition_script_no_params)
       }
     end
 
@@ -169,11 +169,11 @@ describe ReactOnRailsHelper, type: :helper do
     it { is_expected.to include react_component_div }
 
     it {
-      expect(expect(subject).target).to script_tag_be_included(react_definition_script)
+      expect(expect(react_app).target).to script_tag_be_included(react_definition_script)
     }
 
     context "with 'random_dom_id' option set to false" do
-      subject { react_component("App", props: props, random_dom_id: false) }
+      subject(:react_app) { react_component("App", props: props, random_dom_id: false) }
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
@@ -182,11 +182,11 @@ describe ReactOnRailsHelper, type: :helper do
       end
 
       it { is_expected.to include '<div id="App-react-component"></div>' }
-      it { expect(is_expected.target).to script_tag_be_included(react_definition_script) }
+      it { expect(expect(react_app).target).to script_tag_be_included(react_definition_script) }
     end
 
     context "with 'random_dom_id' option set to true" do
-      subject { react_component("App", props: props, random_dom_id: true) }
+      subject(:react_app) { react_component("App", props: props, random_dom_id: true) }
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
@@ -195,11 +195,11 @@ describe ReactOnRailsHelper, type: :helper do
       end
 
       it { is_expected.to include '<div id="App-react-component-0"></div>' }
-      it { expect(is_expected.target).to script_tag_be_included(react_definition_script) }
+      it { expect(expect(react_app).target).to script_tag_be_included(react_definition_script) }
     end
 
     context "with 'random_dom_id' global" do
-      subject { react_component("App", props: props) }
+      subject(:react_app) { react_component("App", props: props) }
 
       around do |example|
         ReactOnRails.configure { |config| config.random_dom_id = false }
@@ -214,11 +214,11 @@ describe ReactOnRailsHelper, type: :helper do
       end
 
       it { is_expected.to include '<div id="App-react-component"></div>' }
-      it { expect(is_expected.target).to script_tag_be_included(react_definition_script) }
+      it { expect(expect(react_app).target).to script_tag_be_included(react_definition_script) }
     end
 
     context "with 'id' option" do
-      subject { react_component("App", props: props, id: id) }
+      subject(:react_app) { react_component("App", props: props, id: id) }
 
       let(:id) { "shaka_div" }
 
@@ -232,7 +232,7 @@ describe ReactOnRailsHelper, type: :helper do
       it { is_expected.not_to include react_component_random_id_div }
 
       it {
-        expect(expect(subject).target).to script_tag_be_included(react_definition_script)
+        expect(expect(react_app).target).to script_tag_be_included(react_definition_script)
       }
     end
 
@@ -268,7 +268,7 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#redux_store" do
-    subject { redux_store("reduxStore", props: props) }
+    subject(:redux_store) { redux_store("reduxStore", props: props) }
 
     let(:props) do
       { name: "My Test Name" }
@@ -287,7 +287,7 @@ describe ReactOnRailsHelper, type: :helper do
     it { is_expected.to end_with "</script>" }
 
     it {
-      expect(expect(subject).target).to script_tag_be_included(react_store_script)
+      expect(expect(redux_store).target).to script_tag_be_included(react_store_script)
     }
   end
 

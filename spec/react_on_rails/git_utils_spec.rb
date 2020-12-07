@@ -6,12 +6,10 @@ module ReactOnRails
   RSpec.describe GitUtils do
     describe ".uncommitted_changes?" do
       context "with uncommited git changes" do
-        subject { "M file/path" }
-
         let(:message_handler) { instance_double("MessageHandler") }
 
         it "returns true" do
-          allow(described_class).to receive(:`).with("git status --porcelain").and_return(subject)
+          allow(described_class).to receive(:`).with("git status --porcelain").and_return("M file/path")
           allow_any_instance_of(Process::Status).to receive(:success?).and_return(true)
           expect(message_handler).to receive(:add_error)
             .with("You have uncommitted code. Please commit or stash your changes before continuing")
@@ -21,12 +19,10 @@ module ReactOnRails
       end
 
       context "with clean git status" do
-        subject { "" }
-
         let(:message_handler) { instance_double("MessageHandler") }
 
         it "returns false" do
-          allow(described_class).to receive(:`).with("git status --porcelain").and_return(subject)
+          allow(described_class).to receive(:`).with("git status --porcelain").and_return("")
           allow_any_instance_of(Process::Status).to receive(:success?).and_return(true)
           expect(message_handler).not_to receive(:add_error)
 
@@ -35,12 +31,10 @@ module ReactOnRails
       end
 
       context "with git not installed" do
-        subject { nil }
-
         let(:message_handler) { instance_double("MessageHandler") }
 
         it "returns true" do
-          allow(described_class).to receive(:`).with("git status --porcelain").and_return(subject)
+          allow(described_class).to receive(:`).with("git status --porcelain").and_return(nil)
           allow_any_instance_of(Process::Status).to receive(:success?).and_return(false)
           expect(message_handler).to receive(:add_error)
             .with("You do not have Git installed. Please install Git, and commit your changes before continuing")

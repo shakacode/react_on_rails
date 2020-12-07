@@ -46,7 +46,7 @@ module ReactOnRails
               .and_return("server-bundle.js")
           end
 
-          it { expect(subject).to eq("#{webpacker_public_output_path}/webpack-bundle-0123456789abcdef.js") }
+          it { is_expected.to eq("#{webpacker_public_output_path}/webpack-bundle-0123456789abcdef.js") }
         end
 
         context "with manifest.json" do
@@ -54,7 +54,7 @@ module ReactOnRails
             Utils.bundle_js_file_path("manifest.json")
           end
 
-          it { expect(subject).to eq("#{webpacker_public_output_path}/manifest.json") }
+          it { is_expected.to eq("#{webpacker_public_output_path}/manifest.json") }
         end
       end
 
@@ -65,12 +65,7 @@ module ReactOnRails
           allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(false)
         end
 
-        it {
-          expect(subject).to eq(File.expand_path(
-                                  File.join(Rails.root,
-                                            "public/webpack/dev/webpack-bundle.js")
-                                ))
-        }
+        it { is_expected.to eq(File.expand_path(File.join(Rails.root, "public/webpack/dev/webpack-bundle.js"))) }
       end
     end
 
@@ -188,7 +183,7 @@ module ReactOnRails
     end
 
     describe ".wrap_message" do
-      subject do
+      subject(:stripped_heredoc) do
         <<-MSG.strip_heredoc
           Something to wrap
           with 2 lines
@@ -206,38 +201,34 @@ module ReactOnRails
       end
 
       it "outputs the correct text" do
-        expect(Utils.wrap_message(subject)).to eq(expected)
+        expect(Utils.wrap_message(stripped_heredoc)).to eq(expected)
       end
     end
 
     describe ".truthy_presence" do
       context "with non-empty string" do
-        subject { "foobar" }
+        subject(:simple_string) { "foobar" }
 
         it "returns subject (same value as presence) for a non-empty string" do
-          expect(Utils.truthy_presence(subject)).to eq(subject.presence)
+          expect(Utils.truthy_presence(simple_string)).to eq(simple_string.presence)
 
           # Blank strings are nil for presence
-          expect(Utils.truthy_presence(subject)).to eq(subject)
+          expect(Utils.truthy_presence(simple_string)).to eq(simple_string)
         end
       end
 
       context "with empty string" do
-        subject { "" }
-
         it "returns \"\" for an empty string" do
-          expect(Utils.truthy_presence(subject)).to eq(subject)
+          expect(Utils.truthy_presence("")).to eq("")
         end
       end
 
       context "with nil object" do
-        subject { nil }
-
         it "returns nil (same value as presence)" do
-          expect(Utils.truthy_presence(subject)).to eq(subject.presence)
+          expect(Utils.truthy_presence(nil)).to eq(nil.presence)
 
           # Blank strings are nil for presence
-          expect(Utils.truthy_presence(subject)).to eq(nil)
+          expect(Utils.truthy_presence(nil)).to eq(nil)
         end
       end
 
@@ -273,31 +264,31 @@ module ReactOnRails
         context "with Rails 3" do
           before { allow(Rails).to receive(:version).and_return("3") }
 
-          it { expect(subject).to eq(true) }
+          it { is_expected.to eq(true) }
         end
 
         context "with Rails 3.2" do
           before { allow(Rails).to receive(:version).and_return("3.2") }
 
-          it { expect(subject).to eq(true) }
+          it { is_expected.to eq(true) }
         end
 
         context "with Rails 4" do
           before { allow(Rails).to receive(:version).and_return("4") }
 
-          it { expect(subject).to eq(false) }
+          it { is_expected.to eq(false) }
         end
 
         context "with Rails 4.2" do
           before { allow(Rails).to receive(:version).and_return("4.2") }
 
-          it { expect(subject).to eq(false) }
+          it { is_expected.to eq(false) }
         end
 
         context "with Rails 10.0" do
           before { allow(Rails).to receive(:version).and_return("10.0") }
 
-          it { expect(subject).to eq(false) }
+          it { is_expected.to eq(false) }
         end
 
         context "when called twice" do
@@ -321,13 +312,13 @@ module ReactOnRails
         context "with Rails 4.1.0" do
           before { allow(Rails).to receive(:version).and_return("4.1.0") }
 
-          it { expect(subject).to eq(true) }
+          it { is_expected.to eq(true) }
         end
 
         context "with Rails 4.1.1" do
           before { allow(Rails).to receive(:version).and_return("4.1.1") }
 
-          it { expect(subject).to eq(false) }
+          it { is_expected.to eq(false) }
         end
       end
     end

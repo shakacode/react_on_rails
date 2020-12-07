@@ -4,7 +4,7 @@ require_relative "spec_helper"
 
 module ReactOnRails
   describe PrerenderError do
-    subject do
+    subject(:expected_error) do
       PrerenderError.new(
         component_name: expected_error_info[:component_name],
         err: expected_error_info[:err],
@@ -36,13 +36,13 @@ module ReactOnRails
 
     describe ".to_honey_badger_context" do
       it "returns the correct context" do
-        expect(subject.to_honeybadger_context).to eq(expected_error_info)
+        expect(expected_error.to_honeybadger_context).to eq(expected_error_info)
       end
     end
 
     describe ".raven_context" do
       it "returns the correct context" do
-        expect(subject.raven_context).to eq(expected_error_info)
+        expect(expected_error.raven_context).to eq(expected_error_info)
       end
     end
   end
