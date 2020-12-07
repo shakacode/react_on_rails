@@ -19,7 +19,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
       it "exits immediately" do
         puts "\n\nBEGIN IGNORE PRINTS IN THIS TEST"
         expect do
-          ReactOnRails::TestHelper::WebpackAssetsCompiler.new.compile_assets
+          described_class.new.compile_assets
         end.to raise_error(SystemExit)
         puts "END IGNORE PRINTS IN THIS TEST\n\n"
       end
@@ -32,7 +32,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
         MSG
 
         expect do
-          ReactOnRails::TestHelper::WebpackAssetsCompiler.new.compile_assets
+          described_class.new.compile_assets
         rescue SystemExit
           # No op
         end.to output(/#{expected_output}/).to_stdout

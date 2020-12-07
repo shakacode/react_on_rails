@@ -6,7 +6,7 @@ require_relative "./support/version_test_helpers"
 require_relative "../../lib/react_on_rails/version_syntax_converter"
 
 RSpec.describe ReactOnRails::VersionSyntaxConverter do
-  subject(:converter) { ReactOnRails::VersionSyntaxConverter.new }
+  subject(:converter) { described_class.new }
 
   describe "#rubygem_to_npm" do
     context "when gem version is 1.0.0" do

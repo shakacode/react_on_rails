@@ -108,7 +108,7 @@ module ReactOnRails
     end
 
     describe VersionChecker::NodePackageVersion do
-      subject(:node_package_version) { VersionChecker::NodePackageVersion.new(package_json) }
+      subject(:node_package_version) { described_class.new(package_json) }
 
       describe "#semver_wildcard?" do
         context "when package json lists an exact version of '0.0.2'" do

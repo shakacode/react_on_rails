@@ -68,7 +68,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when detecting existing bin-files on *nix" do
-    let(:install_generator) { InstallGenerator.new }
+    let(:install_generator) { described_class.new }
 
     specify "when node is exist" do
       stub_const("RUBY_PLATFORM", "linux")
@@ -84,7 +84,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when detecting missing bin-files on *nix" do
-    let(:install_generator) { InstallGenerator.new }
+    let(:install_generator) { described_class.new }
 
     specify "when node is missing" do
       stub_const("RUBY_PLATFORM", "linux")
@@ -100,7 +100,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when detecting existing bin-files on windows" do
-    let(:install_generator) { InstallGenerator.new }
+    let(:install_generator) { described_class.new }
 
     specify "when node is exist" do
       stub_const("RUBY_PLATFORM", "mswin")
@@ -116,7 +116,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when detecting missing bin-files on windows" do
-    let(:install_generator) { InstallGenerator.new }
+    let(:install_generator) { described_class.new }
 
     specify "when node is missing" do
       stub_const("RUBY_PLATFORM", "mswin")

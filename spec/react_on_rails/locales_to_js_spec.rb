@@ -21,7 +21,7 @@ module ReactOnRails
         end
 
         it "updates files" do
-          ReactOnRails::Locales::ToJs.new
+          described_class.new
 
           translations = File.read(translations_path)
           default = File.read(default_path)
@@ -42,7 +42,7 @@ module ReactOnRails
 
       context "with up-to-date js files" do
         before do
-          ReactOnRails::Locales::ToJs.new
+          described_class.new
         end
 
         it "doesn't update files" do
@@ -50,7 +50,7 @@ module ReactOnRails
           FileUtils.touch(translations_path, mtime: ref_time)
 
           update_time = Time.current
-          ReactOnRails::Locales::ToJs.new
+          described_class.new
           expect(update_time).to be > File.mtime(translations_path)
         end
       end
@@ -61,7 +61,7 @@ module ReactOnRails
       let(:en_path) { "#{locale_dir}/en.yml" }
 
       before do
-        allow_any_instance_of(ReactOnRails::Locales::ToJs).to receive(:locale_files).and_return(Dir["#{locale_dir}/*"])
+        allow_any_instance_of(described_class).to receive(:locale_files).and_return(Dir["#{locale_dir}/*"])
         ReactOnRails.configure do |config|
           config.i18n_dir = i18n_dir
         end
