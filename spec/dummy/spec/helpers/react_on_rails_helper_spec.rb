@@ -97,6 +97,7 @@ describe ReactOnRailsHelper, type: :helper do
 
   describe "#react_component" do
     subject { react_component("App", props: props) }
+
     before { allow(SecureRandom).to receive(:uuid).and_return(0, 1, 2, 3) }
 
 
@@ -137,6 +138,7 @@ describe ReactOnRailsHelper, type: :helper do
 
     context "with json string props" do
       subject { react_component("App", props: json_props) }
+
       let(:json_props) do
         "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"</script><script>alert('foo')</script>\"}"
       end
@@ -200,6 +202,7 @@ describe ReactOnRailsHelper, type: :helper do
 
     context "with 'random_dom_id' global" do
       subject { react_component("App", props: props) }
+
       around do |example|
         ReactOnRails.configure { |config| config.random_dom_id = false }
         example.run

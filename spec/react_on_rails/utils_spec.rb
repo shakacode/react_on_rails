@@ -255,6 +255,7 @@ module ReactOnRails
           File.basename(Tempfile.new("tempfile",
                                      empty_dir))
         end
+
         let(:empty_dir) { Pathname.new(Dir.mktmpdir) }
 
 

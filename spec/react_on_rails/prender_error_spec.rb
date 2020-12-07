@@ -13,6 +13,7 @@ module ReactOnRails
         console_messages: expected_error_info[:console_messages]
       )
     end
+
     let(:err) do
       result = nil
       begin
