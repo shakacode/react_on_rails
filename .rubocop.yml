@@ -108,6 +108,9 @@ RSpec/BeforeAfterAll:
     - 'spec/react_on_rails/generators/dev_tests_generator_spec.rb'
     - 'spec/react_on_rails/generators/install_generator_spec.rb'
 
+RSpec/MessageChain:
+  Enabled: false
+
 RSpec/MultipleDescribes:
   Exclude:
     - 'spec/dummy/spec/system/integration_spec.rb'
