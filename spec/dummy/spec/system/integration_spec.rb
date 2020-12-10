@@ -118,9 +118,7 @@ describe "Pages/server_side_log_throw", :js, type: :system do
   end
 end
 
-describe "Pages/server_side_log_throw_raise", type: :system do
-  subject { page }
-
+describe "Pages/server_side_log_throw_raise", type: :feature do
   before { visit "/server_side_log_throw_raise" }
 
   it "redirects to /client_side_hello_world and flashes an error" do
@@ -244,7 +242,7 @@ describe "Render-Function returns renderedHtml as an object with additional HTML
 
     it "renderedHtmls should not have any errors" do
       expect(page).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
-      expect(page).to have_css "title", text: /\ACustom page title\z/, visible: hidden
+      expect(page).to have_css "title", text: /\ACustom page title\z/, visible: :hidden
       expect(page.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
       change_text_expect_dom_selector("div#react-helmet-0")
     end

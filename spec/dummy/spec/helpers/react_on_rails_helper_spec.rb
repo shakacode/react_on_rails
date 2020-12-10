@@ -96,7 +96,7 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#react_component" do
-    subject { react_component("App", props: props) }
+    subject(:react_app) { react_component("App", props: props) }
 
     before { allow(SecureRandom).to receive(:uuid).and_return(0, 1, 2, 3) }
 
@@ -268,7 +268,7 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#redux_store" do
-    subject(:redux_store) { redux_store("reduxStore", props: props) }
+    subject(:store) { redux_store("reduxStore", props: props) }
 
     let(:props) do
       { name: "My Test Name" }
@@ -287,7 +287,7 @@ describe ReactOnRailsHelper, type: :helper do
     it { is_expected.to end_with "</script>" }
 
     it {
-      expect(expect(redux_store).target).to script_tag_be_included(react_store_script)
+      expect(expect(store).target).to script_tag_be_included(react_store_script)
     }
   end
 
