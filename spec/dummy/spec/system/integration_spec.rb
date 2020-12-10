@@ -236,7 +236,7 @@ describe "returns hash if hash_result == true even with prerendering error", :js
   end
 end
 
-describe "Render-Function returns renderedHtml as an object with additional HTML markups", type: :system do
+describe "Render-Function returns renderedHtml as an object with additional HTML markups", type: :feature do
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
     before { visit react_helmet_path }
 
