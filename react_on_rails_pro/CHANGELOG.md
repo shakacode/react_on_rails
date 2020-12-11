@@ -7,6 +7,21 @@ All notable changes to this project will be documented in this file. Items under
 ## [2.0.0.beta.0] - 2020-12-03
 * Renamed VM Renderer to Node Renderer
 
+### Upgrade Steps
+In your code:
+1. Rename any references from `vm-renderer` to `node-renderer`
+2. Rename `vmRenderer` to `NodeRenderer`
+3. Be sure to namespace the package like `require('@shakacode-tools/react-on-rails-pro-node-renderer');`
+
+For example, the old code might be:
+```js
+const { reactOnRailsProVmRenderer } = require('react-on-rails-pro-vm-renderer');
+```
+New
+```js
+const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
+```
+
 ## [1.5.6] - 2020-12-02
 Switched to releases being published packages.
 
