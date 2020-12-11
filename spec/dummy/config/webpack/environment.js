@@ -13,7 +13,10 @@ const ManifestPlugin = environment.plugins.get('Manifest');
 // Normally below 1k, inline. We're making the example bigger to show a both inlined and non-inlined images
 const urlFileSizeCutover = 10000;
 
-const urlLoaderOptions = Object.assign({ limit: urlFileSizeCutover }, fileLoader.use[0].options);
+const urlLoaderOptions = Object.assign(
+  { limit: urlFileSizeCutover, esModule: false },
+  fileLoader.use[0].options,
+);
 //adding urlLoader
 const urlLoader = {
   test: fileLoader.test,
@@ -64,24 +67,10 @@ environment.splitChunks();
 // add aliases to config
 environment.config.merge(aliasConfig);
 
-environment.loaders.append('expose', {
-  test: require.resolve('jquery'),
-  use: [
-    {
-      loader: 'expose-loader',
-      options: '$',
-    },
-    {
-      loader: 'expose-loader',
-      options: 'jQuery',
-    },
-  ],
-});
-
 // adding jqueryUjsLoader
 const jqueryUjsLoader = {
   test: require.resolve('jquery-ujs'),
-  use: [{ loader: 'imports-loader', options: { jQuery: 'jquery' } }],
+  use: [{ loader: 'imports-loader', options: { type: 'commonjs', imports: 'single jquery jQuery' } }],
 };
 environment.loaders.append('jquery-ujs', jqueryUjsLoader);
 
