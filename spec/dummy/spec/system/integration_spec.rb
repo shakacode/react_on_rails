@@ -118,7 +118,7 @@ describe "Pages/server_side_log_throw", :js, type: :system do
   end
 end
 
-describe "Pages/server_side_log_throw_raise", type: :feature do
+describe "Pages/server_side_log_throw_raise" do
   before { visit "/server_side_log_throw_raise" }
 
   it "redirects to /client_side_hello_world and flashes an error" do
@@ -141,7 +141,7 @@ describe "Pages/index after using browser's back button", :js, type: :system do
   include_examples "React Component", "div#ReduxApp-react-component-0"
 end
 
-describe "React Router", :js, :ignore_js_errors, type: :system do
+describe "React Router", :js, :ignore_js_errors do
   subject { page }
 
   before do
@@ -236,7 +236,7 @@ describe "returns hash if hash_result == true even with prerendering error", :js
   end
 end
 
-describe "Render-Function returns renderedHtml as an object with additional HTML markups", type: :feature do
+describe "Render-Function returns renderedHtml as an object with additional HTML markups" do
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
     before { visit react_helmet_path }
 

@@ -94,6 +94,9 @@ RSpec/AnyInstance:
     - 'spec/react_on_rails/git_utils_spec.rb'
     - 'spec/react_on_rails/locales_to_js_spec.rb'
 
+RSpec/DescribeClass:
+  Enabled: false
+
 RSpec/ExampleLength:
   Enabled: false
 

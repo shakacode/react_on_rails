@@ -2,7 +2,7 @@
 
 require_relative "../rails_helper"
 
-describe "Hello World", type: :feature, js: true do
+describe "Hello World", js: true do
   it "the hello world example works" do
     visit "/hello_world"
     expect(heading).to have_text("Hello World")

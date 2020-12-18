@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-describe "Server Error Logging", type: :request do
+describe "Server Error Logging" do
   it "has server log messages in the script generated" do
     get server_side_log_throw_path
     html_nodes = Nokogiri::HTML(response.body)
