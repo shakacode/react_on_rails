@@ -41,16 +41,6 @@
   },
   "devDependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "0.4.2",
-    "body-parser": "^1.19.0",
-    "eslint": "^7.15.0",
-    "eslint-config-prettier": "^7.0.0",
-    "eslint-config-shakacode": "^17.0.0",
-    "eslint-plugin-import": "^2.22.0",
-    "eslint-plugin-jsx-a11y": "^6.4.1",
-    "eslint-plugin-react": "^7.21.5",
-    "jsdom": "^16.4.0",
-    "prettier": "^2.2.1",
-    "prettier-eslint-cli": "^5.0.0",
     "react-refresh": "^0.8.1",
     "webpack-dev-server": "^3.2.1"
   },
