@@ -118,7 +118,7 @@ describe "Pages/server_side_log_throw", :js, type: :system do
   end
 end
 
-describe "Pages/server_side_log_throw_raise" do
+describe "Pages/server_side_log_throw_raise", type: :feature do
   before { visit "/server_side_log_throw_raise" }
 
   it "redirects to /client_side_hello_world and flashes an error" do
