@@ -54,11 +54,8 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   sh_in_dir(gem_root, "git pull --rebase")
   sh_in_dir(gem_root, "gem bump --no-commit #{gem_version.strip.empty? ? '' : %(--version #{gem_version})}")
 
-  # Next LINE IS NOT WORKING -- make no sense why this works from the command line but not here
   # Update dummy app's Gemfile.lock
-  # bundle_install_in(dummy_app_dir)
-  # Stage changes so far
-  # sh_in_dir(gem_root, "git add .")
+  bundle_install_in(dummy_app_dir)
 
   # Will bump the yarn version, commit, tag the commit, push to repo, and release on yarn
   release_it_command = +"$(yarn bin)/release-it"
@@ -82,7 +79,6 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
 end
 # rubocop:enable Metrics/BlockLength
 
-# This task fails for no good reason
 task :test do
   sh_in_dir(gem_root, "cd #{dummy_app_dir}; bundle update react_on_rails")
   sh_in_dir(gem_root, "git commit -a -m 'Update Gemfile.lock for spec app'")

@@ -5,7 +5,7 @@
 * See other docs in [docs/contributor-info](./docs/contributor-info)
 
 ## To run tests:
-* [Yalc](https://github.com/whitecolor/yalc) must be installed globally for most local testing.
+* [Yalc](https://github.com/whitecolor/yalc) must be installed globally for most local development.
 * After updating code via git, to prepare all examples and run all tests:
 
 ```sh
