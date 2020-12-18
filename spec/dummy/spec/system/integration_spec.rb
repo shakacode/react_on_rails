@@ -118,10 +118,9 @@ describe "Pages/server_side_log_throw", :js, type: :system do
   end
 end
 
-describe "Pages/server_side_log_throw_raise", type: :feature do
-  before { visit "/server_side_log_throw_raise" }
-
+describe "Pages/server_side_log_throw_raise" do
   it "redirects to /client_side_hello_world and flashes an error" do
+    visit "/server_side_log_throw_raise"
     expect(page).to have_current_path("/server_side_log_throw_raise_invoker")
     flash_message = page.find(:css, ".flash").text
     expect(flash_message).to eq("Error prerendering in react_on_rails. Redirected back to"\
@@ -238,9 +237,8 @@ end
 
 describe "Render-Function returns renderedHtml as an object with additional HTML markups" do
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
-    before { visit react_helmet_path }
-
     it "renderedHtmls should not have any errors" do
+      visit react_helmet_path
       expect(page).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
       expect(page).to have_css "title", text: /\ACustom page title\z/, visible: :hidden
       expect(page.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
