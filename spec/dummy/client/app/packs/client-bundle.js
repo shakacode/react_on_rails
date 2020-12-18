@@ -1,9 +1,8 @@
 import 'core-js/stable';
 import 'regenerator-runtime/runtime';
+import 'jquery';
 import 'jquery-ujs';
 
-// Next line makes jQuery available globally
-import $ from 'expose-loader?exposes[]=$&exposes[]=jQuery!jquery';
 
 import ReactOnRails from 'react-on-rails';
 
