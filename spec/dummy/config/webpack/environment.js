@@ -67,11 +67,17 @@ environment.splitChunks();
 // add aliases to config
 environment.config.merge(aliasConfig);
 
+environment.plugins.append(
+  'Provide',
+  new webpack.ProvidePlugin({
+    $: 'jquery',
+    jQuery: 'jquery',
+  }),
+);
+
 environment.loaders.append('expose', {
   test: require.resolve('jquery'),
-  options: {
-             exposes: ["$", "jQuery"],
-           },
+  use: [{ loader: 'expose-loader', options: { exposes: ['$', 'jQuery'] } }],
 });
 
 // adding jqueryUjsLoader

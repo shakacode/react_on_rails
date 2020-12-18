@@ -48,7 +48,8 @@
   },
   "scripts": {
     "yalc-postinstall": "yalc link react-on-rails",
-    "lint": "cd client && yarn run lint",
+    "lint": "cd ../.. && yarn run lint",
+    "format": "cd ../.. && yarn start format",
     "test": "yarn run build:test && yarn run lint && rspec",
     "build:test": "rm -rf public/webpack/test && RAILS_ENV=test NODE_ENV=test bin/webpack",
     "build:dev": "rm -rf public/webpack/develoment && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
