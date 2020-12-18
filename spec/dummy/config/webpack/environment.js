@@ -1,5 +1,6 @@
 const { environment } = require('@rails/webpacker');
 const { resolve } = require('path');
+const webpack = require('webpack');
 
 const sassResources = ['./client/app/assets/styles/app-variables.scss'];
 const aliasConfig = require('./alias.js');

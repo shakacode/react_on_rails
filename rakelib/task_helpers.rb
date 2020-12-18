@@ -17,7 +17,7 @@ module ReactOnRails
     end
 
     # Executes a string or an array of strings in a shell in the given directory in an unbundled environment
-    def unbundled_sh_in_dir(dir, *shell_commands)
+    def sh_in_dir(dir, *shell_commands)
       shell_commands.flatten.each { |shell_command| sh %(cd #{dir} && #{shell_command.strip}) }
     end
 
