@@ -118,7 +118,8 @@ describe "Pages/server_side_log_throw", :js, type: :system do
   end
 end
 
-describe "Pages/server_side_log_throw_raise", :js do
+describe "Pages/server_side_log_throw_raise", :js, type: :system do
+puts example.metadata[:type]
   it "redirects to /client_side_hello_world and flashes an error" do
     visit "/server_side_log_throw_raise"
     puts Capybara.current_driver
@@ -236,7 +237,7 @@ describe "returns hash if hash_result == true even with prerendering error", :js
   end
 end
 
-describe "Render-Function returns renderedHtml as an object with additional HTML markups" do
+describe "Render-Function returns renderedHtml as an object with additional HTML markups", :js, type: :system do
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
     it "renderedHtmls should not have any errors" do
       visit react_helmet_path
