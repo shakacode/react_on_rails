@@ -118,9 +118,10 @@ describe "Pages/server_side_log_throw", :js, type: :system do
   end
 end
 
-describe "Pages/server_side_log_throw_raise" do
+describe "Pages/server_side_log_throw_raise", :js do
   it "redirects to /client_side_hello_world and flashes an error" do
     visit "/server_side_log_throw_raise"
+    puts Capybara.current_driver
     expect(page).to have_current_path("/server_side_log_throw_raise_invoker")
     flash_message = page.find(:css, ".flash").text
     expect(flash_message).to eq("Error prerendering in react_on_rails. Redirected back to"\
