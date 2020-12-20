@@ -119,7 +119,7 @@ describe "Pages/server_side_log_throw", :js, type: :system do
 end
 
 describe "Pages/server_side_log_throw_raise", :js, type: :system do
-puts example.metadata[:type]
+  puts example.metadata[:type]
   it "redirects to /client_side_hello_world and flashes an error" do
     visit "/server_side_log_throw_raise"
     puts Capybara.current_driver
