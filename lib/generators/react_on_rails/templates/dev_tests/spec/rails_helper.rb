@@ -13,7 +13,6 @@ require_relative "spec_helper"
 require "rspec/rails"
 require "capybara/rspec"
 require "capybara/rails"
-Capybara.javascript_driver = :selenium_chrome
 Capybara.register_driver :selenium_chrome do |app|
   options = Selenium::WebDriver::Chrome::Options.new
   options.add_argument("--headless")
@@ -41,6 +40,10 @@ end
 # ActiveRecord::Migration.maintain_test_schema!
 
 RSpec.configure do |config|
+  config.before(:each, type: :system, js: true) do
+    driven_by :selenium_chrome
+  end
+
   # Ensure that if we are running js tests, we are using latest webpack assets
   # This will use the defaults of :js and :server_rendering meta tags
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)

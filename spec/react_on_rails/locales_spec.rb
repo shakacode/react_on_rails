@@ -5,11 +5,11 @@ require_relative "spec_helper"
 module ReactOnRails
   RSpec.describe Locales do
     describe ".compile" do
-      before :each do
+      before do
         @orginal_output_format = ReactOnRails.configuration.i18n_output_format
       end
 
-      after :each do
+      after do
         ReactOnRails.configuration.i18n_output_format = @orginal_output_format
       end
 

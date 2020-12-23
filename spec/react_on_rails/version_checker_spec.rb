@@ -20,6 +20,7 @@ module ReactOnRails
         let(:node_package_version) do
           double_package_version(raw: "2.2.5-beta.2", major_minor_patch: %w[2 2 5])
         end
+
         before { stub_gem_version("2.2.5.beta.2") }
 
         it "does not raise" do
@@ -31,6 +32,7 @@ module ReactOnRails
         let(:node_package_version) do
           double_package_version(raw: "^2.2.5", semver_wildcard: true, major_minor_patch: %w[2 2 5])
         end
+
         before { stub_gem_version("2.2.5") }
 
         it "does raise" do
@@ -43,6 +45,7 @@ module ReactOnRails
         let(:node_package_version) do
           double_package_version(raw: "13.0.0.beta-2", major_minor_patch: %w[13 0 0])
         end
+
         before { stub_gem_version("12.0.0.beta.1") }
 
         it "raises" do
@@ -55,6 +58,7 @@ module ReactOnRails
         let(:node_package_version) do
           double_package_version(raw: "13.0.0.beta-2", major_minor_patch: %w[13 0 0])
         end
+
         before { stub_gem_version("13.1.0") }
 
         it "raises" do
@@ -67,6 +71,7 @@ module ReactOnRails
         let(:node_package_version) do
           double_package_version(raw: "13.0.1", major_minor_patch: %w[13 0 1])
         end
+
         before { stub_gem_version("13.0.0") }
 
         it "raises" do
@@ -79,6 +84,7 @@ module ReactOnRails
         let(:node_package_version) do
           double_package_version(raw: "../../..", major_minor_patch: "", relative_path: true)
         end
+
         before { stub_gem_version("2.0.0.beta.1") }
 
         it "does not raise" do
@@ -102,7 +108,7 @@ module ReactOnRails
     end
 
     describe VersionChecker::NodePackageVersion do
-      subject(:node_package_version) { VersionChecker::NodePackageVersion.new(package_json) }
+      subject(:node_package_version) { described_class.new(package_json) }
 
       describe "#semver_wildcard?" do
         context "when package json lists an exact version of '0.0.2'" do

@@ -6,7 +6,7 @@ $LOAD_PATH.unshift File.expand_path("../../lib", __dir__)
 require "react_on_rails"
 # let's us use Rails's generator testing helpers but with RSpec syntax
 require "generator_spec"
-require "awesome_print"
+require "amazing_print"
 require "pry"
 require "pry-byebug"
 require "pry-doc"

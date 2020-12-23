@@ -5,6 +5,7 @@
 * See other docs in [docs/contributor-info](./docs/contributor-info)
 
 ## To run tests:
+* [Yalc](https://github.com/whitecolor/yalc) must be installed globally for most local development.
 * After updating code via git, to prepare all examples and run all tests:
 
 ```sh
@@ -64,7 +65,7 @@ yarn
 # Update the lib directory with babel compiled files
 yarn run build-watch
 ```
-   
+
 You need to do this once:
 
 ```
@@ -192,7 +193,7 @@ Then run `bundle`.
 
 The main installer can be run with ```rails generate react_on_rails:install```
 
-Then use yalc to add the npm module. 
+Then use yalc to add the npm module.
 
 Be sure that your ran this first at the top level of React on Rails
 

@@ -170,7 +170,7 @@ module ReactOnRails
     def redux_store_hydration_data
       return if @registered_stores_defer_render.blank?
 
-      @registered_stores_defer_render.reduce("".dup) do |accum, redux_store_data|
+      @registered_stores_defer_render.reduce(+"") do |accum, redux_store_data|
         accum << render_redux_store_data(redux_store_data)
       end.html_safe
     end
@@ -487,13 +487,13 @@ module ReactOnRails
     end
 
     def initialize_redux_stores
-      result = <<-JS.dup
+      result = +<<-JS
       ReactOnRails.clearHydratedStores();
       JS
 
       return result unless @registered_stores.present? || @registered_stores_defer_render.present?
 
-      declarations = "var reduxProps, store, storeGenerator;\n".dup
+      declarations = +"var reduxProps, store, storeGenerator;\n"
       all_stores = (@registered_stores || []) + (@registered_stores_defer_render || [])
 
       result << all_stores.each_with_object(declarations) do |redux_store_data, memo|

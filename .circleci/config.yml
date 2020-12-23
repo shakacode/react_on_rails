@@ -2,7 +2,7 @@ version: 2
 
 aliases:
   - &docker-image
-    - image: circleci/ruby:2.6-node-browsers
+    - image: circleci/ruby:2.7-node-browsers
 
   # Print critical data and executables versions.
   - &print-system-info
@@ -31,9 +31,9 @@ aliases:
   - &install-package-node-modules
     name: Install Node modules with Yarn for renderer package
     command: |
+      sudo yarn global add yalc
       yarn install --no-progress --no-emoji
       yarn run eslint -v
-      sudo yarn global add yalc
 
   # Install/update Node modules for dummy app unless existing set of modules is satisfying Yarn.
   - &install-dummy-app-node-modules

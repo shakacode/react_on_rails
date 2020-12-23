@@ -10,7 +10,7 @@ Dir[generators_glob.to_s].sort.each { |file| require file }
 include ReactOnRails::Generators # rubocop:disable Style/MixinUsage
 
 RSpec.configure do |config|
-  config.after(:each) do
+  config.after do
     GeneratorMessages.clear
   end
 end

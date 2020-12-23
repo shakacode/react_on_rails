@@ -6,8 +6,8 @@ jobs:
   build-dummy-app-webpack-test-bundles:
     strategy:
       matrix:
-        ruby: [2.6]
-        node: [12]
+        ruby: [2.7]
+        node: [14]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -16,7 +16,7 @@ jobs:
       with:
         ruby-version: ${{ matrix.ruby }}
     - name: Setup Node
-      uses: actions/setup-node@v1.4.3
+      uses: actions/setup-node@v2-beta
       with:
         node-version: ${{ matrix.node }}
     - name: Print system information
@@ -70,8 +70,8 @@ jobs:
     needs: build-dummy-app-webpack-test-bundles
     strategy:
       matrix:
-        ruby: [2.6]
-        node: [12]
+        ruby: [2.7]
+        node: [14]
         rake_task: ['run_rspec:all_dummy', 'run_rspec:all_but_examples', 'run_rspec:examples']
     runs-on: ubuntu-latest
     steps:
@@ -81,7 +81,7 @@ jobs:
       with:
         ruby-version: ${{ matrix.ruby }}
     - name: Setup Node
-      uses: actions/setup-node@v1.4.3
+      uses: actions/setup-node@v2-beta
       with:
         node-version: ${{ matrix.node }}
     - name: Print system information

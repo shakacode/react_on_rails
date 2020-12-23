@@ -5,7 +5,8 @@ require_relative "../spec_helper"
 describe ReactOnRails::TestHelper::EnsureAssetsCompiled do
   describe "#ensureAssetsCompiled" do
     let(:compiler) { double_assets_compiler }
-    after { ReactOnRails::TestHelper::EnsureAssetsCompiled.has_been_run = false }
+
+    after { described_class.has_been_run = false }
 
     before do
       allow(ReactOnRails::WebpackerUtils).to receive(:check_manifest_not_cached).and_return(nil)

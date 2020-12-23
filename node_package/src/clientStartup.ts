@@ -22,7 +22,7 @@ declare global {
   }
   namespace Turbolinks {
     interface TurbolinksStatic {
-      controller?: {};
+      controller?: unknown;
     }
   }
 }
