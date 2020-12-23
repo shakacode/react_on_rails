@@ -20,7 +20,7 @@ describe DevTestsGenerator, type: :generator do
     end
 
     it "copies tests" do
-      %w[spec/features/hello_world_spec.rb].each { |file| assert_file(file) }
+      %w[spec/system/hello_world_spec.rb].each { |file| assert_file(file) }
     end
 
     it "changes package.json to use local react-on-rails version of module" do

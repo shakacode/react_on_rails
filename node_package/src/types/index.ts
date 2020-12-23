@@ -7,22 +7,6 @@ type Store = any;
 
 type ReactComponent = FunctionComponent | ComponentClass | string;
 
-interface Params {
-  props?: {};
-  railsContext?: RailsContext;
-  domNodeId?: string;
-  trace?: boolean;
-}
-
-export interface RenderParams extends Params {
-  name: string;
-}
-
-export interface CreateParams extends Params {
-  componentObj: RegisteredComponent;
-  shouldHydrate?: boolean;
-}
-
 // Keep these in sync with method lib/react_on_rails/helper.rb#rails_context
 export interface RailsContext {
   railsEnv: string;
@@ -45,7 +29,7 @@ export interface RailsContext {
 
 type AuthenticityHeaders = {[id: string]: string} & {'X-CSRF-Token': string | null; 'X-Requested-With': string};
 
-type StoreGenerator = (props: {}, railsContext: RailsContext) => Store
+type StoreGenerator = (props: Record<string, unknown>, railsContext: RailsContext) => Store
 
 interface ServerRenderResult {
   renderedHtml?: string;
@@ -59,7 +43,7 @@ type CreateReactOutputResult = ServerRenderResult | ReactElement;
 type RenderFunctionResult = ReactComponent | ServerRenderResult;
 
 interface RenderFunction {
-  (props?: {}, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
+  (props?: Record<string, unknown>, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
   // We allow specifying that the function is RenderFunction and not a React Function Component
   // by setting this property
   renderFunction?: boolean;
@@ -85,6 +69,22 @@ export interface RegisteredComponent {
   isRenderer: boolean;
 }
 
+interface Params {
+  props?: Record<string, unknown>;
+  railsContext?: RailsContext;
+  domNodeId?: string;
+  trace?: boolean;
+}
+
+export interface RenderParams extends Params {
+  name: string;
+}
+
+export interface CreateParams extends Params {
+  componentObj: RegisteredComponent;
+  shouldHydrate?: boolean;
+}
+
 interface FileError extends Error {
   fileName: string;
   lineNumber: string;
@@ -106,7 +106,7 @@ export interface ReactOnRails {
   authenticityToken(): string | null;
   authenticityHeaders(otherHeaders: { [id: string]: string }): AuthenticityHeaders;
   option(key: string): string | number | boolean | undefined;
-  getStoreGenerator(name: string): Function;
+  getStoreGenerator(name: string): StoreGenerator;
   setStore(name: string, store: Store): void;
   clearHydratedStores(): void;
   render(
@@ -117,7 +117,7 @@ export interface ReactOnRails {
   handleError(options: ErrorOptions): string | undefined;
   buildConsoleReplay(): string;
   registeredComponents(): Map<string, RegisteredComponent>;
-  storeGenerators(): Map<string, Function>;
+  storeGenerators(): Map<string, StoreGenerator>;
   stores(): Map<string, Store>;
   resetOptions(): void;
   options: Record<string, string | number | boolean>;

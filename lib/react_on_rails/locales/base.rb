@@ -32,12 +32,12 @@ module ReactOnRails
       end
 
       def exist_files
-        @exist_files ||= files.select(&File.method(:exist?))
+        @exist_files ||= files.select { |file| File.exist?(file) }
       end
 
       def files_are_outdated
-        latest_yml = locale_files.map(&File.method(:mtime)).max
-        earliest = exist_files.map(&File.method(:mtime)).min
+        latest_yml = locale_files.map { |file| File.mtime(file) }.max
+        earliest = exist_files.map { |file| File.mtime(file) }.min
         latest_yml > earliest
       end
 

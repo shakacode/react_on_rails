@@ -36,21 +36,21 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#json_safe_and_pretty(hash_or_string)" do
-    it "should raise an error if not hash nor string nor nil passed" do
-      expect { helper.json_safe_and_pretty(false) }.to raise_error
+    it "raises an error if not hash nor string nor nil passed" do
+      expect { helper.json_safe_and_pretty(false) }.to raise_error(ReactOnRails::Error)
     end
 
-    it "should return empty json when an empty Hash" do
+    it "returns empty json when an empty Hash" do
       escaped_json = helper.json_safe_and_pretty({})
       expect(escaped_json).to eq("{}")
     end
 
-    it "should return empty json when an empty HashWithIndifferentAccess" do
+    it "returns empty json when an empty HashWithIndifferentAccess" do
       escaped_json = helper.json_safe_and_pretty(HashWithIndifferentAccess.new)
       expect(escaped_json).to eq("{}")
     end
 
-    it "should return empty json when nil" do
+    it "returns empty json when nil" do
       escaped_json = helper.json_safe_and_pretty(nil)
       expect(escaped_json).to eq("{}")
     end
@@ -96,9 +96,9 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#react_component" do
-    before { allow(SecureRandom).to receive(:uuid).and_return(0, 1, 2, 3) }
+    subject(:react_app) { react_component("App", props: props) }
 
-    subject { react_component("App", props: props) }
+    before { allow(SecureRandom).to receive(:uuid).and_return(0, 1, 2, 3) }
 
     let(:props) do
       { name: "My Test Name" }
@@ -136,6 +136,8 @@ describe ReactOnRailsHelper, type: :helper do
     end
 
     context "with json string props" do
+      subject { react_component("App", props: json_props) }
+
       let(:json_props) do
         "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"</script><script>alert('foo')</script>\"}"
       end
@@ -145,16 +147,17 @@ describe ReactOnRailsHelper, type: :helper do
           "t\\u003ealert('foo')\\u003c/script\\u003e\"}"
       end
 
-      subject { react_component("App", props: json_props) }
       it { is_expected.to include json_props_sanitized }
     end
 
     describe "API with component name only (no props or other options)" do
-      subject { react_component("App") }
+      subject(:react_app) { react_component("App") }
+
       it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
       it { is_expected.to include react_component_div }
+
       it {
-        expect(is_expected.target).to script_tag_be_included(react_definition_script_no_params)
+        expect(expect(react_app).target).to script_tag_be_included(react_definition_script_no_params)
       }
     end
 
@@ -164,12 +167,13 @@ describe ReactOnRailsHelper, type: :helper do
     it { is_expected.to start_with "<script" }
     it { is_expected.to match %r{</script>\s*$} }
     it { is_expected.to include react_component_div }
+
     it {
-      expect(is_expected.target).to script_tag_be_included(react_definition_script)
+      expect(expect(react_app).target).to script_tag_be_included(react_definition_script)
     }
 
-    context "with 'random_dom_id' false option" do
-      subject { react_component("App", props: props, random_dom_id: false) }
+    context "with 'random_dom_id' option set to false" do
+      subject(:react_app) { react_component("App", props: props, random_dom_id: false) }
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
@@ -178,11 +182,11 @@ describe ReactOnRailsHelper, type: :helper do
       end
 
       it { is_expected.to include '<div id="App-react-component"></div>' }
-      it { expect(is_expected.target).to script_tag_be_included(react_definition_script) }
+      it { expect(expect(react_app).target).to script_tag_be_included(react_definition_script) }
     end
 
-    context "with 'random_dom_id' false option" do
-      subject { react_component("App", props: props, random_dom_id: true) }
+    context "with 'random_dom_id' option set to true" do
+      subject(:react_app) { react_component("App", props: props, random_dom_id: true) }
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
@@ -191,17 +195,17 @@ describe ReactOnRailsHelper, type: :helper do
       end
 
       it { is_expected.to include '<div id="App-react-component-0"></div>' }
-      it { expect(is_expected.target).to script_tag_be_included(react_definition_script) }
+      it { expect(expect(react_app).target).to script_tag_be_included(react_definition_script) }
     end
 
     context "with 'random_dom_id' global" do
-      around(:example) do |example|
+      subject(:react_app) { react_component("App", props: props) }
+
+      around do |example|
         ReactOnRails.configure { |config| config.random_dom_id = false }
         example.run
         ReactOnRails.configure { |config| config.random_dom_id = true }
       end
-
-      subject { react_component("App", props: props) }
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
@@ -210,11 +214,11 @@ describe ReactOnRailsHelper, type: :helper do
       end
 
       it { is_expected.to include '<div id="App-react-component"></div>' }
-      it { expect(is_expected.target).to script_tag_be_included(react_definition_script) }
+      it { expect(expect(react_app).target).to script_tag_be_included(react_definition_script) }
     end
 
     context "with 'id' option" do
-      subject { react_component("App", props: props, id: id) }
+      subject(:react_app) { react_component("App", props: props, id: id) }
 
       let(:id) { "shaka_div" }
 
@@ -226,8 +230,9 @@ describe ReactOnRailsHelper, type: :helper do
 
       it { is_expected.to include id }
       it { is_expected.not_to include react_component_random_id_div }
+
       it {
-        expect(is_expected.target).to script_tag_be_included(react_definition_script)
+        expect(expect(react_app).target).to script_tag_be_included(react_definition_script)
       }
     end
 
@@ -263,7 +268,7 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#redux_store" do
-    subject { redux_store("reduxStore", props: props) }
+    subject(:store) { redux_store("reduxStore", props: props) }
 
     let(:props) do
       { name: "My Test Name" }
@@ -280,8 +285,9 @@ describe ReactOnRailsHelper, type: :helper do
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
     it { is_expected.to start_with "<script" }
     it { is_expected.to end_with "</script>" }
+
     it {
-      expect(is_expected.target).to script_tag_be_included(react_store_script)
+      expect(expect(store).target).to script_tag_be_included(react_store_script)
     }
   end
 
@@ -299,17 +305,19 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#rails_context" do
-    before do
-      @rendering_extension = ReactOnRails.configuration.rendering_extension
+    around do |example|
+      rendering_extension = ReactOnRails.configuration.rendering_extension
       ReactOnRails.configuration.rendering_extension = nil
+
+      example.run
+
+      ReactOnRails.configuration.rendering_extension = rendering_extension
     end
 
-    after { ReactOnRails.configuration.rendering_extension = @rendering_extension }
-
-    it "should not throw an error if not in a view" do
+    it "does not throw an error if not in a view" do
       ob = PlainReactOnRailsHelper.new
-      expect { ob.send(:rails_context, server_side: true) }.to_not raise_error
-      expect { ob.send(:rails_context, server_side: false) }.to_not raise_error
+      expect { ob.send(:rails_context, server_side: true) }.not_to raise_error
+      expect { ob.send(:rails_context, server_side: false) }.not_to raise_error
     end
   end
 end

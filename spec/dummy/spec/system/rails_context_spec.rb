@@ -3,17 +3,17 @@
 require "rails_helper"
 
 shared_examples "railsContext" do |pathname, id_base|
-  let(:http_accept_language) { "en-US,en;q=0.8" }
-
   subject { page }
 
-  background do
+  let(:http_accept_language) { "en-US,en;q=0.8" }
+
+  before do
     visit "/#{pathname}?ab=cd"
   end
 
-  context "visting /#{pathname}", :js, type: :system do
+  context "when visting /#{pathname}", :js, type: :system do
     scenario "check rails context" do
-      expect(current_path).to eq("/#{pathname}")
+      expect(page).to have_current_path("/#{pathname}", ignore_query: true)
       host = Capybara.current_session.server.host
       port = Capybara.current_session.server.port
       host_port = "#{host}:#{port}"
@@ -38,7 +38,7 @@ shared_examples "railsContext" do |pathname, id_base|
 
       keys_to_vals.each do |key, val|
         # skip checking http_accept_language if selenium
-        next if key == :httpAcceptLanguage && Capybara.javascript_driver.to_s =~ /selenium/
+        next if key == :httpAcceptLanguage && Capybara.javascript_driver.to_s.include?("selenium")
 
         expect(page).to have_css("#{top_id} .js-#{key}", text: val)
       end
@@ -46,23 +46,23 @@ shared_examples "railsContext" do |pathname, id_base|
   end
 end
 
-feature "rails_context" do
-  context "client rendering" do
-    context "shared store" do
+describe "rails_context" do
+  context "when client rendering" do
+    context "with shared store" do
       include_examples("railsContext",
                        "client_side_hello_world_shared_store",
                        "ReduxSharedStoreApp")
     end
   end
 
-  context "server rendering" do
-    context "shared store" do
+  context "when server rendering" do
+    context "with shared store" do
       include_examples("railsContext",
                        "server_side_hello_world_shared_store",
                        "ReduxSharedStoreApp")
     end
 
-    context "Render-Function for component" do
+    context "with Render-Function for component" do
       include_examples("railsContext",
                        "server_side_redux_app",
                        "ReduxApp")

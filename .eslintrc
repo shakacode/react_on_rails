@@ -31,8 +31,10 @@ overrides:
       - "@typescript-eslint"
     rules:
       "@typescript-eslint/no-namespace": 0
+      "@typescript-eslint/no-shadow": ["error"]
 
 rules:
+  no-shadow: 0
   no-console: 0
   function-paren-newline: 0
   object-curly-newline: 0

@@ -76,8 +76,8 @@ ctx.ReactOnRails = {
    * Available Options:
    * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
    */
-  setOptions(newOptions: {traceTurbolinks: boolean}): void {
-    if ('traceTurbolinks' in newOptions) {
+  setOptions(newOptions: {traceTurbolinks?: boolean}): void {
+    if (typeof newOptions.traceTurbolinks !== 'undefined') {
       this.options.traceTurbolinks = newOptions.traceTurbolinks;
 
       // eslint-disable-next-line no-param-reassign
@@ -226,7 +226,7 @@ ctx.ReactOnRails = {
    * Get an Object containing all registered store generators. Useful for debugging.
    * @returns {*}
    */
-  storeGenerators(): Map<string, Function> {
+  storeGenerators(): Map<string, StoreGenerator> {
     return StoreRegistry.storeGenerators();
   },
 
