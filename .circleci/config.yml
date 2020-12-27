@@ -274,6 +274,16 @@ jobs:
           # TODO -- need to leverage Circle CI containers
           command: |
             bundle exec rake run_rspec:all_dummy
+      # The following step will run only if the main job is finished successfully.
+      # Build hook is triggered by curl command described here https://docs.netlify.com/configure-builds/build-hooks/
+      # NETLIFY_HOOK is an environment variable on CircleCI to keep sensitive data outside the repo
+      - run:
+          name: Deploy SC website
+          command: |
+            if [ $CIRCLE_BRANCH = "master" ]; then
+              curl -X POST -d '{}' ${NETLIFY_HOOK}
+            fi
+          when: on_success
       - store_test_results:
           path: ~/rspec
       - store_artifacts:
