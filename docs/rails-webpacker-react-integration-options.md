@@ -53,3 +53,130 @@ document.addEventListener('DOMContentLoaded', () => {
   ReactDOM.render(<Hello {...data} />, node)
 })
 ```
+
+----
+
+## HMR and React Hot Reloading
+
+Before turning HMR on, consider upgrading to the latest stable gems and packages:
+https://github.com/rails/webpacker#upgrading
+
+Configure `config/webpacker.yml` file:
+
+```yaml
+development:
+  extract_css: false
+  dev_server:
+    hmr: true
+    inline: true
+```
+
+This basic configuration alone will have HMR working with the default webpacker setup. However, an code saves will trigger a full page refresh each time you save a file.
+
+Webpack's HMR allows the replacement of modules for React in-place without reloading the browser. To do this, you have two options:
+
+1. Steps below for the [github.com/pmmmwh/react-refresh-webpack-plugin](https://github.com/pmmmwh/react-refresh-webpack-plugin).
+1. Deprecated steps below for using the [github.com/gaearon/react-hot-loader](https://github.com/gaearon/react-hot-loader).
+
+### React Refresh Webpack Plugin
+[github.com/pmmmwh/react-refresh-webpack-plugin](https://github.com/pmmmwh/react-refresh-webpack-plugin)
+
+You can see an example commit of adding this [here](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh/commit/7e53803fce7034f5ecff335db1f400a5743a87e7).
+
+1. Add react refresh packages:
+   `yarn add @pmmmwh/react-refresh-webpack-plugin react-refresh -D`
+2. Update `babel.config.js` adding
+   ```js
+   plugins: [
+     process.env.WEBPACK_DEV_SERVER && 'react-refresh/babel',
+     // other plugins
+   ```
+3. Update `config/webpack/development.js`, only including the plugin if running the WEBPACK_DEV_SERVER
+   ```js
+   const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
+   const environment = require('./environment')
+   
+   const isWebpackDevServer = process.env.WEBPACK_DEV_SERVER;
+   
+   //plugins
+   if (isWebpackDevServer) {
+       environment.plugins.append(
+           'ReactRefreshWebpackPlugin',
+           new ReactRefreshWebpackPlugin({
+               overlay: {
+                   sockPort: 3035
+               }
+           })
+       );
+   }
+   ```
+
+### React Hot Loader (Deprecated)
+
+1. Add the `react-hot-loader` and ` @hot-loader/react-dom` npm packages.
+  ```sh
+  yarn add --dev react-hot-loader @hot-loader/react-dom
+  ```
+
+2. Update your babel config, `babel.config.js`. Add the plugin `react-hot-loader/babel`
+with option `"safetyNet": false`:
+
+```
+{
+    "plugins": [
+        [
+            "react-hot-loader/babel",
+            {
+            "safetyNet": false
+            }
+        ]
+    ]
+}
+```
+
+3. Add changes like this to your entry points:
+
+```diff
+// app/javascript/app.jsx
+
+import React from 'react';
++ import { hot } from 'react-hot-loader/root';
+
+const App = () => <SomeComponent(s) />
+
+- export default App;
++ export default hot(App);
+```
+
+4. Adjust your webpack configuration for development so that `sourceMapContents` option for the sass
+loader is `false`:
+
+```diff
+// config/webpack/development.js
+
+process.env.NODE_ENV = process.env.NODE_ENV || 'development'
+
+const environment = require('./environment')
+
+// allows for editing sass/scss files directly in browser
++ if (!module.hot) {
++   environment.loaders.get('sass').use.find(item => item.loader === 'sass-loader').options.sourceMapContents = false
++ }
++ 
+module.exports = environment.toWebpackConfig()
+```
+
+5. Adjust your `config/webpack/environment.js` for a 
+
+```diff
+// config/webpack/environment.js
+
+// ...
+
+// Fixes: React-Hot-Loader: react-🔥-dom patch is not detected. React 16.6+ features may not work.
+// https://github.com/gaearon/react-hot-loader/issues/1227#issuecomment-482139583
++ environment.config.merge({ resolve: { alias: { 'react-dom': '@hot-loader/react-dom' } } });
+
+module.exports = environment;
+```
+
