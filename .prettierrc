@@ -8,9 +8,6 @@ bracketSpacing: true
 jsxBracketSameLine: false
 parser: flow
 
-extends:
-- tslint-config-prettier
-
 overrides:
 - files: "*.@(css|scss)"
   options:

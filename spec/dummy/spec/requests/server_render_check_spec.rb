@@ -3,7 +3,7 @@
 require "rails_helper"
 
 describe "Server Rendering", :server_rendering do
-  it "generates server rendered HTML if server renderering enabled" do
+  it "generates server rendered HTML if server rendering enabled" do
     get server_side_hello_world_with_options_path
     html_nodes = Nokogiri::HTML(response.body)
     expect(html_nodes.css("div#my-hello-world-id").children.size).to eq(1)
@@ -23,7 +23,7 @@ describe "Server Rendering", :server_rendering do
     end)
   end
 
-  it "generates server rendered HTML if server renderering enabled for shared redux" do
+  it "generates server rendered HTML if server rendering enabled for shared redux" do
     get server_side_hello_world_shared_store_path
     html_nodes = Nokogiri::HTML(response.body)
     top_id = "#ReduxSharedStoreApp-react-component-0"
@@ -34,7 +34,7 @@ describe "Server Rendering", :server_rendering do
       .to eq("Mr. Server Side Rendering")
   end
 
-  it "generates no server rendered HTML if server renderering not enabled" do
+  it "generates no server rendered HTML if server rendering not enabled" do
     get client_side_hello_world_path
     html_nodes = Nokogiri::HTML(response.body)
     expect(html_nodes.css("div#HelloWorld-react-component-0").children.size).to eq(0)
@@ -50,7 +50,7 @@ describe "Server Rendering", :server_rendering do
 
     after do
       File.open(server_bundle, "w") { |f| f.puts original_bundle_text }
-      ReactOnRails.configure { |config| config.development_mode = true }
+      ReactOnRails.configure { |config| config.development_mode = false }
     end
 
     it "reloads the server bundle on a new request if was changed and development mode true" do
@@ -59,7 +59,7 @@ describe "Server Rendering", :server_rendering do
       sentinel = "Say hello to:"
       expect(html_nodes.css("div#my-hello-world-id p").text).to eq(sentinel)
       original_mtime = File.mtime(server_bundle)
-      replacement_text = "ZZZZZZZZZZZZZZZZZZZ"
+      replacement_text = "Z" * 20
       new_bundle_text = original_bundle_text.gsub(sentinel, replacement_text)
       File.open(server_bundle, "w") { |f| f.puts new_bundle_text }
       new_mtime = File.mtime(server_bundle)
@@ -141,14 +141,14 @@ describe "Server Rendering", :server_rendering do
       end
     end
 
-    context "shared redux store" do
+    context "with shared redux store" do
       it "matches expected values" do
         do_request(server_side_hello_world_shared_store_path)
         check_match("server_side_hello_world_shared_store", "ReduxSharedStoreApp")
       end
     end
 
-    context "Render-Function" do
+    context "when using Render-Function" do
       it "matches expected values" do
         do_request(server_side_redux_app_path)
         check_match("server_side_redux_app", "ReduxApp")

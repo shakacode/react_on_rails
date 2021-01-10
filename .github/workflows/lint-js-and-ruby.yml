@@ -6,8 +6,8 @@ jobs:
   build:
     strategy:
       matrix:
-        ruby: [2.6]
-        node: [12]
+        ruby: [2.7]
+        node: [14]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -16,7 +16,7 @@ jobs:
       with:
         ruby-version: ${{ matrix.ruby }}
     - name: Setup Node
-      uses: actions/setup-node@v1.4.3
+      uses: actions/setup-node@v2-beta
       with:
         node-version: ${{ matrix.node }}
     - name: Print system information

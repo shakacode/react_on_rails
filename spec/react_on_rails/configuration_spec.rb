@@ -22,6 +22,7 @@ module ReactOnRails
       let(:webpacker_public_output_path) do
         File.expand_path(File.join(Rails.root, "public/webpack/dev"))
       end
+
       before do
         allow(Rails).to receive(:root).and_return(File.expand_path("."))
         allow(Webpacker).to receive_message_chain("config.public_output_path")
@@ -127,7 +128,7 @@ module ReactOnRails
       end
     end
 
-    it "be able to config default configuration of the gem" do
+    it "changes the configuration of the gem, such as setting the prerender option to false" do
       ReactOnRails.configure do |config|
         config.server_bundle_js_file = "server.js"
         config.prerender = false
@@ -137,7 +138,7 @@ module ReactOnRails
       expect(ReactOnRails.configuration.prerender).to eq(false)
     end
 
-    it "be able to config default configuration of the gem" do
+    it "changes the configuration of the gem, such as setting the prerender option to true" do
       ReactOnRails.configure do |config|
         config.server_bundle_js_file = "something.js"
         config.prerender = true

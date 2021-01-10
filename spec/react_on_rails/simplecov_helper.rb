@@ -10,7 +10,7 @@ if ENV["COVERAGE"] == "true"
   SimpleCov.start do
     # Don't include coverage reports on files in "spec" folder
     add_filter do |src|
-      src.filename =~ %r{/spec/}
+      src.filename.include?("/spec/")
     end
   end
 end

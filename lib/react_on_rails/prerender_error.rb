@@ -46,7 +46,7 @@ module ReactOnRails
     private
 
     def calc_message(component_name, console_messages, err, js_code, props)
-      message = "ERROR in SERVER PRERENDERING\n".dup
+      message = +"ERROR in SERVER PRERENDERING\n"
       if err
         message << <<~MSG
           Encountered error: \"#{err}\"

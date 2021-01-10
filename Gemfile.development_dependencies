@@ -1,10 +1,7 @@
 # frozen_string_literal: true
 
-
-# We'll revert this before the final merge.
-# gem "webpacker", git: 'https://github.com/rails/webpacker.git'
 gem "webpacker"
-gem "bootsnap", ">= 1.1.0", require: false
+gem "bootsnap", require: false
 gem "rails"
 gem "sqlite3"
 gem "sass-rails"
@@ -22,9 +19,7 @@ gem "sdoc", group: :doc
 
 gem "sprockets"
 
-# Use Capistrano for deployment
-# gem 'capistrano-rails', group: :development
-gem "awesome_print"
+gem "amazing_print"
 gem "mini_racer"
 
 group :development, :test do
@@ -34,7 +29,9 @@ group :development, :test do
   gem "pry-doc"
   gem "pry-rails"
   gem "pry-rescue"
-  gem "rubocop", "1.2.0", require: false
+  gem "rubocop", require: false
+  gem "rubocop-performance", require: false
+  gem "rubocop-rspec", require: false
   gem "scss_lint", require: false
   gem "spring"
 end
@@ -50,5 +47,5 @@ group :test do
   gem "rspec-rails"
   gem "rspec-retry"
   gem "selenium-webdriver"
-  gem "webdrivers", "~> 3.0"
+  gem "webdrivers"
 end

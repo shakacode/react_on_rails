@@ -11,6 +11,8 @@ class RaisingMessageHandler
   end
 end
 
+# rubocop:disable Metrics/BlockLength
+
 desc("Releases both the gem and node package using the given version.
 
 IMPORTANT: the gem version must be in valid rubygem format (no dashes).
@@ -55,11 +57,8 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   # Update dummy app's Gemfile.lock
   bundle_install_in(dummy_app_dir)
 
-  # Stage changes so far
-  sh_in_dir(gem_root, "git add .")
-
   # Will bump the yarn version, commit, tag the commit, push to repo, and release on yarn
-  release_it_command = "$(yarn bin)/release-it".dup
+  release_it_command = +"$(yarn bin)/release-it"
   release_it_command << " #{npm_version}" unless npm_version.strip.empty?
   release_it_command << " --non-interactive --npm.publish"
   release_it_command << " --dry-run --verbose" if is_dry_run
@@ -67,4 +66,21 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
 
   # Release the new gem version
   sh_in_dir(gem_root, "gem release") unless is_dry_run
+
+  msg = <<~MSG
+    Once you have successfully published, run these commands to update the spec apps:
+
+    cd #{dummy_app_dir}; bundle update react_on_rails
+    cd #{gem_root}#{' '}
+    git commit -a -m 'Update Gemfile.lock for spec app'
+    git push
+  MSG
+  puts msg
+end
+# rubocop:enable Metrics/BlockLength
+
+task :test do
+  unbundled_sh_in_dir(gem_root, "cd #{dummy_app_dir}; bundle update react_on_rails")
+  sh_in_dir(gem_root, "git commit -a -m 'Update Gemfile.lock for spec app'")
+  sh_in_dir(gem_root, "git push")
 end

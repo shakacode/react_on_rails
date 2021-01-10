@@ -95,7 +95,7 @@ This can happen if you are server rendering and either:
    * Get a Map containing all registered store generators. Useful for debugging.
    * @returns Map where key is the component name and values are the store generators.
    */
-  storeGenerators(): Map<string, Function> {
+  storeGenerators(): Map<string, StoreGenerator> {
     return registeredStoreGenerators;
   },
 

@@ -25,7 +25,7 @@ module ReactOnRails
       end
 
       def copy_tests
-        %w[spec/features/hello_world_spec.rb].each { |file| copy_file(file) }
+        %w[spec/system/hello_world_spec.rb].each { |file| copy_file(file) }
       end
 
       def add_test_related_gems_to_gemfile
