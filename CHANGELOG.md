@@ -18,7 +18,7 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 ### [12.0.4] - 2020-11-14
 #### Fixed
-- Install generator now specifies the version. Fixes [React on Rails Generator installs the older npm package #1336](https://github.com/shakacode/react_on_rails/issues/1336). [PR 1338Fix Generator to use Exact NPM Version](https://github.com/shakacode/react_on_rails/pull/1338) by by [justin808](https://github.com/justin808).
+- Install generator now specifies the version. Fixes [React on Rails Generator installs the older npm package #1336](https://github.com/shakacode/react_on_rails/issues/1336). [PR 1338Fix Generator to use Exact NPM Version](https://github.com/shakacode/react_on_rails/pull/1338) by [justin808](https://github.com/justin808).
 
 ### [12.0.3] - 2020-09-20
 #### Fixed
