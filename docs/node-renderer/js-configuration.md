@@ -16,8 +16,11 @@ Here are the options available for the JavaScript renderer configuration object,
 1. **password** (default: `env.RENDERER_PASSWORD`) - Password expected to receive form **Rails client** to authenticate rendering requests. If no password set, no authentication will be required.
 1. **allWorkersRestartInterval** (default: `env.RENDERER_ALL_WORKERS_RESTART_INTERVAL`) - Interval in minutes between scheduled restarts of all cluster of workers. By default restarts are not enabled. If restarts are enabled, `delayBetweenIndividualWorkerRestarts` should also be set.
 1. **delayBetweenIndividualWorkerRestarts** (default: `env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`) - Interval in minutes between individual worker restarts (when cluster restart is triggered). By default restarts are not enabled. If restarts are enabled, `allWorkersRestartInterval` should also be set.
-1. **honeybadgerApiKey** - (default: `env.HONEYBADGER_API_KEY`) - If you want errors on the Node Renderer to be sent to Honeybadger, set this value.
 1. **supportModules** - (default: `env.RENDERER_SUPPORT_MODULES || null`) - Should be set to `true` to allow the server-bundle code to see require, exports, etc. `false` is like the ExecJS behavior.
+1. **honeybadgerApiKey** - (default: `env.HONEYBADGER_API_KEY`) - If you want errors on the Node Renderer to be sent to Honeybadger, set this value.
+1. **sentryDsn**: - (default: `env.SENTRY_DSN || null`) - Enables server rendering errors catching with Sentry if the options is set.
+1. **sentryTracing** - (default: `env.SENTRY_TRACING || null`) - Should be set to `true` to enable adding trace context to the error. Requires **sentryDsn** to be set.
+1. **sentryTracesSampleRate** - (default: `env.SENTRY_TRACES_SAMPLE_RATE || 0.5`) - With this option set, every transaction created will have that percentage chance of being sent to Sentry. (So, for example, if you set sentryTracesSampleRate to 0.2, approximately 20% of your transactions will get recorded and sent.) 
 
 ## Example Launch Files
 

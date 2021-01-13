@@ -24,6 +24,7 @@ const {
   moveUploadedAssets,
 } = require('./shared/utils');
 const errorReporter = require('./shared/errorReporter');
+const tracing = require('./shared/tracing');
 const { lock, unlock } = require('./shared/locks');
 
 function setHeaders(headers, res) {
@@ -111,20 +112,34 @@ module.exports = function run(config) {
 
       try {
         const assetsToCopy = Object.values(assetsToCopyObj);
-        handleRenderRequest({ renderingRequest, bundleTimestamp, providedNewBundle, assetsToCopy })
-          .then((result) => {
-            setResponse(result, res);
-          })
-          .catch((err) => {
-            const exceptionMessage = formatExceptionMessage(
-              renderingRequest,
-              err,
-              'UNHANDLED error in handleRenderRequest',
-            );
-            log.error(exceptionMessage);
-            errorReporter.notify(exceptionMessage);
-            setResponse(errorResponseResult(exceptionMessage), res);
-          });
+        tracing.withinTransaction(
+          async (transaction) => {
+            try {
+              const result = await handleRenderRequest({
+                renderingRequest,
+                bundleTimestamp,
+                providedNewBundle,
+                assetsToCopy,
+              });
+              setResponse(result, res);
+            } catch (err) {
+              const exceptionMessage = formatExceptionMessage(
+                renderingRequest,
+                err,
+                'UNHANDLED error in handleRenderRequest',
+              );
+              log.error(exceptionMessage);
+              errorReporter.notify(exceptionMessage, {}, (scope) => {
+                if (transaction) {
+                  scope.setSpan(transaction);
+                }
+              });
+              setResponse(errorResponseResult(exceptionMessage), res);
+            }
+          },
+          'handleRenderRequest',
+          'SSR Request',
+        );
       } catch (theErr) {
         const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
         log.error(`UNHANDLED TOP LEVEL error ${exceptionMessage}`);
