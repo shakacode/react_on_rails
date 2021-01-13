@@ -4,12 +4,15 @@
  * @module worker/configBuilder
  */
 const os = require('os');
-
 const log = require('./log');
+const requireOptional = require('./requireOptional');
 const { configureLogger } = require('./log');
 const errorReporter = require('./errorReporter');
+const tracing = require('./tracing');
 const packageJson = require('./packageJson');
 const truthy = require('./truthy');
+
+const Sentry = requireOptional('@sentry/node');
 
 const DEFAULT_TMP_DIR = '/tmp/react-on-rails-pro-node-renderer-bundles';
 // usually remote renderers are on staging or production,
@@ -18,6 +21,7 @@ const DEFAULT_PORT = 3800;
 const DEFAULT_LOG_LEVEL = 'info';
 const { env } = process;
 const MAX_DEBUG_SNIPPET_LENGTH = 1000;
+const DEFAULT_SAMPLE_RATE = 0.5;
 
 let config;
 let userConfig;
@@ -70,6 +74,10 @@ const defaultConfig = {
   honeybadgerApiKey: env.HONEYBADGER_API_KEY || null,
 
   sentryDsn: env.SENTRY_DSN || null,
+
+  sentryTracing: env.SENTRY_TRACING || null,
+
+  sentryTracesSampleRate: env.SENTRY_TRACES_SAMPLE_RATE || DEFAULT_SAMPLE_RATE,
 };
 
 function envValuesUsed() {
@@ -118,6 +126,7 @@ configBuilder.buildConfig = function buildConfig(providedUserConfig) {
   config = Object.assign({}, defaultConfig, userConfig);
 
   config.supportModules = truthy(config.supportModules);
+  config.sentryTracing = truthy(config.sentryTracing);
 
   let currentArg;
 
@@ -137,7 +146,27 @@ configBuilder.buildConfig = function buildConfig(providedUserConfig) {
   }
 
   if (config.sentryDsn) {
-    errorReporter.addSentryDsn(config.sentryDsn);
+    if (config.sentryTracing) {
+      let sampleRate = parseFloat(config.sentryTracesSampleRate);
+
+      if (Number.isNaN(sampleRate)) {
+        log.warn(
+          `SENTRY_TRACES_SAMPLE_RATE "${config.sentryTracesSampleRate}" is not a number. Using default of ${DEFAULT_SAMPLE_RATE}`,
+        );
+        sampleRate = DEFAULT_SAMPLE_RATE;
+      }
+
+      errorReporter.addSentryDsn(config.sentryDsn, {
+        tracing: config.sentryTracing,
+        tracesSampleRate: sampleRate,
+      });
+    } else {
+      errorReporter.addSentryDsn(config.sentryDsn);
+    }
+  }
+
+  if (config.sentryTracing) {
+    tracing.setSentry(Sentry);
   }
 
   configureLogger(log, config.logLevel);
