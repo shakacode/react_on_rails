@@ -274,39 +274,6 @@ jobs:
       - store_artifacts:
           path: spec/dummy/yarn-error.log
 
-  # Test React on Rails Pro without the Node Renderer
-  rspec-dummy-app:
-    docker:
-      - image: *docker_image
-    steps:
-      - checkout
-      - run: *print-system-info
-      - restore_cache: *restore-package-gem-cache
-      - restore_cache: *restore-dummy-app-gem-cache
-      - restore_cache:
-          name: Restore cached webpack bundles for dummy app
-          key: v3-dummy-app-webpack-bundle-{{ .Revision }}
-      - restore_cache: *restore-dummy-app-node-modules-cache
-      - run: *install-dummy-app-ruby-gems
-      - run: *install-latest-chrome
-      - run:
-          name: Touch webpack bundles
-          command:  touch spec/dummy/public/webpack/test/*
-      - run:
-          name: Run rspec tests
-          command: |
-            cd spec/dummy && SERVER_RENDERER=ExecJS bundle exec rspec --format RspecJunitFormatter \
-                                               --out ~/rspec/rspec.xml \
-                                               --format documentation
-      - store_test_results:
-          path: ~/rspec
-      - store_artifacts:
-          path: spec/dummy/tmp/capybara
-      - store_artifacts:
-          path: spec/dummy/log/test.log
-      - store_artifacts:
-          path: spec/dummy/yarn-error.log
-
 workflows:
   version: 2
   build-and-test:
@@ -336,11 +303,6 @@ workflows:
             - install-package-ruby-gems
             - build-dummy-app-webpack-test-bundles
             - install-dummy-app-ruby-gems
-      - rspec-dummy-app:
-          requires:
-            - install-package-ruby-gems
-            - install-dummy-app-ruby-gems
-            - build-dummy-app-webpack-test-bundles
       - rspec-dummy-app-node-renderer:
           requires:
             - install-package-ruby-gems

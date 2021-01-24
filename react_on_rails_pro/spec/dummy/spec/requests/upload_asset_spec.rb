@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-describe "Upload asset", if: ENV["SERVER_RENDERER"] != "ExecJS" do
+describe "Upload asset" do
   let(:asset_filename) { "loadable-stats.json" }
   let(:asset_filename2) { "loadable-stats2.json" }
   let(:fixture_path) { File.expand_path("./spec/fixtures/#{asset_filename}") }

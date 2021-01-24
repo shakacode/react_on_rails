@@ -5,8 +5,7 @@ ReactOnRailsPro.configure do |config|
   # Get timing of server render calls
   config.tracing = true
 
-  # Used to turn off the NodeRenderer during on CI workflow
-  config.server_renderer = ENV["SERVER_RENDERER"].presence || "NodeRenderer"
+  config.server_renderer = "NodeRenderer"
 
   config.renderer_password = "myPassword1"
 
