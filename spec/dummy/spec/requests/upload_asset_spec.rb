@@ -12,22 +12,22 @@ describe "Upload asset" do
   let(:asset_path_expanded2) { File.expand_path(asset_filename2, "#{__dir__}/../../tmp/bundles") }
 
   before do
-    dbl_configuration = double("configuration",
-                               server_renderer: "NodeRenderer",
-                               renderer_password: "myPassword1",
-                               renderer_url: "http://localhost:3800",
-                               renderer_request_retry_limit: 5,
-                               assets_to_copy: [
-                                 Rails.root.join("public", "webpack", "production", "loadable-stats.json"),
-                                 Rails.root.join("public", "webpack", "production", "loadable-stats2.json")
-                               ])
+    dbl_configuration = instance_double("Configuration",
+                                        server_renderer: "NodeRenderer",
+                                        renderer_password: "myPassword1",
+                                        renderer_url: "http://localhost:3800",
+                                        renderer_request_retry_limit: 5,
+                                        assets_to_copy: [
+                                          Rails.root.join("public", "webpack", "production", "loadable-stats.json"),
+                                          Rails.root.join("public", "webpack", "production", "loadable-stats2.json")
+                                        ])
     allow(ReactOnRailsPro).to receive(:configuration).and_return(dbl_configuration)
     FileUtils.mkdir_p(Rails.root.join("public", "webpack", "production"))
     File.delete(asset_path_expanded) if File.exist?(asset_path_expanded)
     File.delete(asset_path_expanded2) if File.exist?(asset_path_expanded2)
   end
 
-  context("assets exist") do
+  context("when assets exist") do
     before do
       FileUtils.cp(fixture_path, Rails.root.join("public", "webpack", "production", asset_filename))
       FileUtils.cp(fixture_path2, Rails.root.join("public", "webpack", "production", asset_filename2))
@@ -52,7 +52,7 @@ describe "Upload asset" do
     end
   end
 
-  context("assets not existing") do
+  context("when assets don't exist") do
     it "throws error if asset not found" do
       first_asset_path = Rails.root.join("public", "webpack", "production", asset_filename)
       File.delete(first_asset_path) if File.exist?(first_asset_path)

@@ -1,19 +1,9 @@
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
-const clientEnvironment = require('./client');
-const serverConfig = require('./server');
-const merge = require('webpack-merge');
+const webpackConfig = require('./webpackConfig');
 
-const clientConfig = merge(clientEnvironment.toWebpackConfig(), {
-  mode: 'development',
-  entry: {
-    'vendor-bundle': ['jquery-ujs'],
-  },
-  output: {
-    filename: '[name].js',
-    chunkFilename: '[name].bundle.js',
-    path: clientEnvironment.config.output.path,
-  },
-});
+const testOnly = () => {
+  // place any code here that is for test only
+};
 
-module.exports = [clientConfig, serverConfig];
+module.exports = webpackConfig(testOnly);

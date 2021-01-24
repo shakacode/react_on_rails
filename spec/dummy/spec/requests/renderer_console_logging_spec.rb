@@ -7,7 +7,7 @@ describe "Console logging from server" do
 
   after { ReactOnRails.configuration.replay_console = default_replay_console_setting }
 
-  context 'replay_console option set to "true"' do
+  context 'when replay_console option set to "true"' do
     before { ReactOnRails.configuration.replay_console = true }
 
     it "has server log messages in the script generated" do
@@ -49,7 +49,7 @@ describe "Console logging from server" do
     end
   end
 
-  context 'replay_console option set to "false"' do
+  context 'when replay_console option set to "false"' do
     before { ReactOnRails.configuration.replay_console = false }
 
     it "has no script with server log messages" do

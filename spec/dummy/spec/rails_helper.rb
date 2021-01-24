@@ -44,10 +44,11 @@ Dir[Rails.root.join("spec", "support", "**", "*.rb")].sort.each { |f| require f 
 require_relative "../../react_on_rails_pro/support/caching"
 RSpec.configure do |config|
   # Ensure that if we are running js tests, we are using latest webpack assets
-  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :requires_webpack_assets)
-  config.define_derived_metadata(file_path: %r{spec/(system|requests)}) do |metadata|
-    metadata[:requires_webpack_assets] = true
-  end
+  # This is commented out since we're using rails/webpacker webpacker.yml test.compile == true
+  # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :requires_webpack_assets)
+  # config.define_derived_metadata(file_path: %r{spec/(system|requests)}) do |metadata|
+  #   metadata[:requires_webpack_assets] = true
+  # end
 
   # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
   # config.fixture_path = "#{::Rails.root}/spec/fixtures"

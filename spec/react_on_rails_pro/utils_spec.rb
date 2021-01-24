@@ -5,7 +5,7 @@ require_relative "spec_helper"
 module ReactOnRailsPro
   RSpec.describe Utils do
     describe "cache helpers .bundle_hash and .bundle_file_name" do
-      context "and file in manifest", :webpacker do
+      context "with file in manifest", :webpacker do
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
           allow(ReactOnRails).to receive_message_chain("configuration.generated_assets_dir")
@@ -28,11 +28,11 @@ module ReactOnRailsPro
               .and_return("/webpack/production/client-bundle-0123456789abcdef.js")
           end
 
-          it { expect(subject).to eq("client-bundle-0123456789abcdef.js") }
+          it { is_expected.to eq("client-bundle-0123456789abcdef.js") }
         end
 
         describe ".bundle_hash" do
-          context "server bundle with hash in webpack output filename" do
+          context "with server bundle with hash in webpack output filename" do
             it "returns path for server bundle file name " do
               server_bundle_js_file = "/webpack/production/webpack-bundle-0123456789abcdef.js"
               server_bundle_js_file_path = File.expand_path("./public/#{server_bundle_js_file}")
@@ -50,7 +50,7 @@ module ReactOnRailsPro
             end
           end
 
-          context "server bundle without hash in webpack output filename" do
+          context "with server bundle without hash in webpack output filename" do
             it "returns MD5 for server bundle file name" do
               server_bundle_js_file = "webpack/production/webpack-bundle.js"
               server_bundle_js_file_path = File.expand_path("./public/#{server_bundle_js_file}")
@@ -75,9 +75,9 @@ module ReactOnRailsPro
     end
 
     describe ".with_trace" do
-      let(:logger_mock) { double("Rails.logger").as_null_object }
+      let(:logger_mock) { instance_double("Rails.logger").as_null_object }
 
-      context "tracing on" do
+      context "with tracing on" do
         before do
           allow(ReactOnRailsPro.configuration).to receive(:tracing).and_return(true)
           allow(Rails).to receive(:logger).and_return(logger_mock)
@@ -95,7 +95,7 @@ module ReactOnRailsPro
         end
       end
 
-      context "tracing off" do
+      context "with tracing off" do
         before do
           allow(ReactOnRailsPro.configuration)
             .to receive(:tracing).and_return(false)
@@ -116,13 +116,13 @@ module ReactOnRailsPro
     end
 
     describe ".mine_type_from_file_name" do
-      context "extension is known" do
+      context "when extension is known" do
         describe "json" do
           subject do
             described_class.mine_type_from_file_name("loadable-stats.json")
           end
 
-          it { expect(subject).to eq("application/json") }
+          it { is_expected.to eq("application/json") }
         end
 
         describe "JSON" do
@@ -130,7 +130,7 @@ module ReactOnRailsPro
             described_class.mine_type_from_file_name("LOADABLE-STATS.JSON")
           end
 
-          it { expect(subject).to eq("application/json") }
+          it { is_expected.to eq("application/json") }
         end
 
         describe "js" do
@@ -138,17 +138,17 @@ module ReactOnRailsPro
             described_class.mine_type_from_file_name("loadable-stats.js")
           end
 
-          it { expect(subject).to eq("application/javascript") }
+          it { is_expected.to eq("application/javascript") }
         end
       end
 
-      context "extension is unknown" do
+      context "when extension is unknown" do
         describe "foo" do
           subject do
             described_class.mine_type_from_file_name("loadable-stats.foo")
           end
 
-          it { expect(subject).to eq("application/octet-stream") }
+          it { is_expected.to eq("application/octet-stream") }
         end
       end
     end
@@ -157,7 +157,7 @@ module ReactOnRailsPro
       # http.rb uses a string for status
       raise "Use a string for status #{status}" unless status.is_a?(String)
 
-      resp = double("response")
+      resp = instance_double("response")
       allow(resp).to receive(:code).and_return(status)
       allow(resp).to receive(:body).and_return(status == "200" ? "Ok" : "Server error")
       resp

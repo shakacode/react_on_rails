@@ -24,38 +24,38 @@ end
 describe "Pages/Index", :js do
   subject { page }
 
-  context "All in one page" do
+  context "when rendering All in one page" do
     before do
       visit root_path
     end
 
-    context "Server Rendered/Cached React/Redux Component" do
+    context "with Server Rendered/Cached React/Redux Component" do
       include_examples "React Component", "div#ReduxApp-react-component-0"
     end
 
-    context "Server Rendered/Cached React Component Without Redux" do
+    context "with Server Rendered/Cached React Component Without Redux" do
       include_examples "React Component", "div#HelloWorld-react-component-1"
     end
 
-    context "Simple Client Rendered Component" do
+    context "with Simple Client Rendered Component" do
       include_examples "React Component", "div#HelloWorldApp-react-component-2"
 
-      context "same component with different props" do
+      context "with same component with different props" do
         include_examples "React Component", "div#HelloWorldApp-react-component-3"
       end
     end
 
-    context "Simple Component Without Redux" do
+    context "with Simple Component Without Redux" do
       include_examples "React Component", "div#HelloWorld-react-component-5"
       include_examples "React Component", "div#HelloWorldES5-react-component-5"
     end
 
-    context "Non-React Component" do
+    context "with Non-React Component" do
       it { is_expected.to have_content "Time to visit Maui" }
     end
   end
 
-  context "Server Rendering with Options" do
+  context "when Server Rendering with Options" do
     before do
       visit server_side_hello_world_with_options_path
     end
@@ -63,7 +63,7 @@ describe "Pages/Index", :js do
     include_examples "React Component", "div#my-hello-world-id"
   end
 
-  context "Server Rendering Cached", :caching do
+  context "when Server Rendering Cached", :caching do
     let(:serializers_cache_key) { ReactOnRailsPro::Cache.serializers_cache_key }
     let(:base_component_cache_key) { "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}" }
 
@@ -98,7 +98,7 @@ describe "Pages/client_side_log_throw", :js do
   before { visit "/client_side_log_throw" }
 
   it "client side logging and error handling", driver: js_errors_driver do
-    expect(subject).to have_text "This example demonstrates client side logging and error handling."
+    expect(page).to have_text "This example demonstrates client side logging and error handling."
   end
 end
 
@@ -116,8 +116,8 @@ describe "Pages/server_side_log_throw", :js do
   before { visit "/server_side_log_throw" }
 
   it "page has server side throw messages", :js do
-    expect(subject).to have_text "This example demonstrates server side logging and error handling."
-    expect(subject).to have_text "Exception in rendering!\n\nMessage: throw in HelloWorldWithLogAndThrow"
+    expect(page).to have_text "This example demonstrates server side logging and error handling."
+    expect(page).to have_text "Exception in rendering!\n\nMessage: throw in HelloWorldWithLogAndThrow"
   end
 end
 
@@ -154,7 +154,7 @@ describe "React Router", js: true, driver: js_errors_driver do
     click_link "React Router"
   end
 
-  context "/react_router" do
+  context "when rendering /react_router" do
     it { is_expected.to have_text("Woohoo, we can use react-router here!") }
 
     it "clicking links correctly renders other pages" do
@@ -179,7 +179,7 @@ describe "Manual Rendering", :js do
   it "renderer function is called successfully" do
     header_text = page.find(:css, "h1").text
     expect(header_text).to eq("Manual Render Example")
-    expect(subject).to have_text "If you can see this, you can register renderer functions."
+    expect(page).to have_text "If you can see this, you can register renderer functions."
   end
 end
 
@@ -192,11 +192,11 @@ describe "Code Splitting", :js do
     header_text = page.find(:css, "h1").text
 
     expect(header_text).to eq("Deferred Rendering")
-    expect(subject).not_to have_text "Noice!"
+    expect(page).not_to have_text "Noice!"
 
     click_link "Test Async Route"
     expect(page).to have_current_path("/deferred_render_with_server_rendering/async_page")
-    expect(subject).to have_text "Noice!"
+    expect(page).to have_text "Noice!"
   end
 end
 
@@ -207,7 +207,7 @@ describe "Code Splitting w/ Server Rendering", :js do
 
   it "loading an asyncronous route should not cause a client/server checksum mismatch" do
     expect(page).to have_current_path("/deferred_render_with_server_rendering/async_page")
-    expect(subject).to have_text "Noice!"
+    expect(page).to have_text "Noice!"
   end
 end
 
@@ -217,8 +217,8 @@ describe "renderedHtml from generator function", :js do
   before { visit "/rendered_html" }
 
   it "renderedHtml should not have any errors" do
-    expect(subject).to have_text 'Props: {"hello":"world"}'
-    expect(subject.html).to include("[SERVER] RENDERED RenderedHtml to dom node with id")
+    expect(page).to have_text 'Props: {"hello":"world"}'
+    expect(page.html).to include("[SERVER] RENDERED RenderedHtml to dom node with id")
   end
 end
 
@@ -233,7 +233,7 @@ describe "returns hash if hash_result == true even with prerendering error", :js
   # rubocop:enable Lint/SuppressedException
 
   it "react_component should return hash" do
-    expect(subject.html).to include("Exception in rendering!")
+    expect(page.html).to include("Exception in rendering!")
   end
 end
 
@@ -244,9 +244,9 @@ describe "generator function returns renderedHtml as an object with additional H
     before { visit react_helmet_path }
 
     it "renderedHtmls should not have any errors" do
-      expect(subject).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
-      expect(subject).to have_css "title", text: /\ACustom page title\z/, visible: false
-      expect(subject.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
+      expect(page).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
+      expect(page).to have_css "title", text: /\ACustom page title\z/, visible: :hidden
+      expect(page.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
       change_text_expect_dom_selector("div#react-helmet-0")
     end
   end
@@ -266,8 +266,8 @@ describe "display images", :js do
   before { visit "/image_example" }
 
   it "image_example should not have any errors" do
-    expect(subject).to have_text "Here is a label with a background-image from the CSS modules imported"
-    expect(subject.html).to include("[SERVER] RENDERED ImageExample to dom node with id")
+    expect(page).to have_text "Here is a label with a background-image from the CSS modules imported"
+    expect(page.html).to include("[SERVER] RENDERED ImageExample to dom node with id")
   end
 end
 
@@ -275,6 +275,7 @@ shared_examples "React Component Shared Store" do |url|
   subject { page }
 
   before { visit url }
+
   context url do
     scenario "Type in one component changes the other component" do
       expect(page).to have_current_path(url, ignore_query: true)
@@ -283,18 +284,18 @@ shared_examples "React Component Shared Store" do |url|
       within("#ReduxSharedStoreApp-react-component-0") do
         find("input").set new_text
         within("h3") do
-          expect(subject).to have_content new_text
+          expect(page).to have_content new_text
         end
       end
       within("#ReduxSharedStoreApp-react-component-1") do
         within("h3") do
-          expect(subject).to have_content new_text
+          expect(page).to have_content new_text
         end
         find("input").set new_text2
       end
       within("#ReduxSharedStoreApp-react-component-0") do
         within("h3") do
-          expect(subject).to have_content new_text2
+          expect(page).to have_content new_text2
         end
       end
     end

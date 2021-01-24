@@ -47,22 +47,22 @@ shared_examples "railsContext" do |pathname, id_base|
 end
 
 describe "rails_context" do
-  context "client rendering" do
-    context "shared store" do
+  context "when client rendering" do
+    context "with shared store" do
       include_examples("railsContext",
                        "client_side_hello_world_shared_store",
                        "ReduxSharedStoreApp")
     end
   end
 
-  context "server rendering" do
-    context "shared store" do
+  context "when server rendering" do
+    context "with shared store" do
       include_examples("railsContext",
                        "server_side_hello_world_shared_store",
                        "ReduxSharedStoreApp")
     end
 
-    context "Render-Function for component" do
+    context "with Render-Function for component" do
       include_examples("railsContext",
                        "server_side_redux_app",
                        "ReduxApp")

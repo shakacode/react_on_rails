@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import css from './ImageExample.scss';
+import css from './ImageExample.module.scss';
 
 // Note the global alias for images
 import logo from 'Assets/images/256egghead.png';

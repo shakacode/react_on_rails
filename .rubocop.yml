@@ -1,10 +1,8 @@
 # This is the configuration used to check the rubocop source code.
 # Check out: https://github.com/bbatsov/rubocop
 require:
-  - "rubocop-performance"
-
-# Todo: turn on rubocop-rspec
-#  - "rubocop-rspec"
+  - rubocop-performance
+  - rubocop-rspec
 
 AllCops:
   NewCops: enable
@@ -78,6 +76,36 @@ Metrics/MethodLength:
 
 Metrics/ModuleLength:
   Max: 180
+
+RSpec/DescribeClass:
+  Enabled: false
+
+RSpec/ExampleLength:
+  Enabled: false
+
+RSpec/MessageSpies:
+  Enabled: false
+
+RSpec/NestedGroups:
+  Max: 5
+
+RSpec/BeforeAfterAll:
+  Exclude:
+    - 'spec/react_on_rails/generators/dev_tests_generator_spec.rb'
+    - 'spec/react_on_rails/generators/install_generator_spec.rb'
+
+RSpec/MessageChain:
+  Enabled: false
+
+RSpec/MultipleExpectations:
+  Enabled: false
+
+RSpec/MultipleDescribes:
+  Exclude:
+    - 'spec/dummy/spec/system/integration_spec.rb'
+
+RSpec/MultipleMemoizedHelpers:
+  Max: 12
 
 Style/GlobalVars:
   Exclude:
