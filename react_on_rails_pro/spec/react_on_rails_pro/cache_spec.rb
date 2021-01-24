@@ -4,7 +4,7 @@ require_relative "./spec_helper"
 
 describe ReactOnRailsPro::Cache, :caching do
   describe ".fetch_react_component" do
-    let(:logger_mock) { double("Rails.logger").as_null_object }
+    let(:logger_mock) { instance_double("Rails.logger").as_null_object }
 
     before do
       allow(Rails).to receive(:logger).and_return(logger_mock)
@@ -12,7 +12,7 @@ describe ReactOnRailsPro::Cache, :caching do
 
     it "fetches the value from the cache" do
       result = "<div>Something</div>"
-      create_component_code = double("create_component_code")
+      create_component_code = instance_double("create_component_code")
       allow(create_component_code).to receive(:call) { result }
 
       react_component_string1 = described_class.fetch_react_component("MyComponent",
@@ -36,7 +36,7 @@ describe ReactOnRailsPro::Cache, :caching do
 
     it "fetches the value from the cache if cache_key is a lambda" do
       result = "<div>Something</div>"
-      create_component_code = double("create_component_code")
+      create_component_code = instance_double("create_component_code")
       allow(create_component_code).to receive(:call) { result }
 
       react_component_string1 = described_class.fetch_react_component("MyComponent",
@@ -60,7 +60,7 @@ describe ReactOnRailsPro::Cache, :caching do
 
     it "skips the cache if option :if is false" do
       result = "<div>Something</div>"
-      create_component_code = double("create_component_code")
+      create_component_code = instance_double("create_component_code")
       allow(create_component_code).to receive(:call) { result }
 
       react_component_string1 = described_class.fetch_react_component("MyComponent",
@@ -82,7 +82,7 @@ describe ReactOnRailsPro::Cache, :caching do
 
     it "skips the cache if option :unless is true" do
       result = "<div>Something</div>"
-      create_component_code = double("create_component_code")
+      create_component_code = instance_double("create_component_code")
       allow(create_component_code).to receive(:call) { result }
 
       react_component_string1 = described_class.fetch_react_component("MyComponent",
@@ -121,7 +121,7 @@ describe ReactOnRailsPro::Cache, :caching do
 
   describe ".react_component_cache_key" do
     it "properly expands cache keys without the serializers" do
-      cacheable = double("cacheable")
+      cacheable = instance_double("cacheable")
       allow(cacheable).to receive(:cache_key).and_return("the_cache_key")
       allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
 
@@ -133,7 +133,7 @@ describe ReactOnRailsPro::Cache, :caching do
     end
 
     it "properly expands cache keys with the serializers" do
-      cacheable = double("cacheable")
+      cacheable = instance_double("cacheable")
       allow(cacheable).to receive(:cache_key).and_return("the_cache_key")
       allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
       allow(described_class).to receive(:serializers_cache_key).and_return("abc")
@@ -147,11 +147,15 @@ describe ReactOnRailsPro::Cache, :caching do
   end
 
   describe ".serializers_cache_key" do
-    context "serializer_files is defined" do
+    let(:md5_instance) { instance_double(Digest::MD5) }
+
+    context "when serializer_files is defined" do
       it "returns an MD5 based on the files" do
         serializer_glob = File.join(FixturesHelper.fixtures_dir, "app", "views", "**", "*.jbuilder")
         allow(ReactOnRailsPro.configuration).to receive(:serializer_globs).and_return(serializer_glob)
-        allow_any_instance_of(Digest::MD5).to receive(:hexdigest).and_return("eb3dc8ec96886ec81203c9e13f0277a7")
+        allow(Digest::MD5).to receive(:new).and_return(md5_instance)
+        allow(md5_instance).to receive(:file)
+        allow(md5_instance).to receive(:hexdigest).and_return("eb3dc8ec96886ec81203c9e13f0277a7")
 
         result = described_class.serializers_cache_key
 
@@ -159,7 +163,7 @@ describe ReactOnRailsPro::Cache, :caching do
       end
     end
 
-    context "serializer_files is not defined" do
+    context "when serializer_files is not defined" do
       it "returns nil" do
         allow(ReactOnRailsPro.configuration).to receive(:serializer_globs).and_return(nil)
 

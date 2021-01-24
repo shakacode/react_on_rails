@@ -131,14 +131,14 @@ describe "Server Rendering", :server_rendering do
       end
     end
 
-    context "shared redux store" do
+    context "with shared redux store" do
       it "matches expected values" do
         do_request(server_side_hello_world_shared_store_path)
         check_match("server_side_hello_world_shared_store", "ReduxSharedStoreApp")
       end
     end
 
-    context "generator function" do
+    context "with generator function" do
       it "matches expected values" do
         do_request(server_side_redux_app_path)
         check_match("server_side_redux_app", "ReduxApp")

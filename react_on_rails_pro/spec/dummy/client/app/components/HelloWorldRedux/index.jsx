@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import React from 'react';
 import RailsContext from '../RailsContext';
-import css from './index.scss';
+import css from './index.module.scss';
 
 // Super simple example of the simplest possible React component
 export default class HelloWorldRedux extends React.Component {

@@ -1,9 +1,11 @@
-module.exports = function (api) {
-  var validEnv = ['development', 'test', 'production'];
-  var currentEnv = api.env();
-  var isDevelopmentEnv = api.env('development');
-  var isProductionEnv = api.env('production');
-  var isTestEnv = api.env('test');
+module.exports = function config(api) {
+  const validEnv = ['development', 'test', 'production'];
+  const currentEnv = api.env();
+  api.cache.using(() => currentEnv);
+  const isDevelopmentEnv = api.env('development');
+  const isProductionEnv = api.env('production');
+  const isTestEnv = api.env('test');
+  const isHMR = process.env.WEBPACK_DEV_SERVER;
 
   if (!validEnv.includes(currentEnv)) {
     throw new Error(
@@ -17,40 +19,28 @@ module.exports = function (api) {
 
   return {
     presets: [
-      // Let's comment out and document how this file and the other config files
-      // differ from https://github.com/rails/webpacker/blob/master/lib/install/config/babel.config.js
-      // and the other files in that are installed by default.
-
-      // We may need differences in testEnv for running jest tests
-      // isTestEnv && [
-      //   require('@babel/preset-env').default,
-      //   {
-      //     targets: {
-      //       node: 'current'
-      //     }
-      //   }
-      // ],
-      // (isProductionEnv || isDevelopmentEnv) &&
-      [
-        require('@babel/preset-env').default,
+      isTestEnv && [
+        '@babel/preset-env',
         {
-          // OK to support ES5
-          // https://babeljs.io/docs/en/babel-preset-env#forcealltransforms
-          forceAllTransforms: true,
-          // OK to include polyfills globally, just once
-          // https://babeljs.io/docs/en/babel-preset-env#usebuiltins-entry
+          targets: {
+            node: 'current',
+          },
+          modules: 'commonjs',
+        },
+      ],
+      (isProductionEnv || isDevelopmentEnv) && [
+        '@babel/preset-env',
+        {
           useBuiltIns: 'entry',
-          // OK to not use ES6 modules since we want to support ES5
-          // https://babeljs.io/docs/en/babel-preset-env#modules
+          corejs: 3,
           modules: false,
-          // No idea on this one.
-          // Suggestion for performance from create-react-app
-          // https://github.com/facebook/create-react-app/issues/5277
+          bugfixes: true,
+          loose: true,
           exclude: ['transform-typeof-symbol'],
         },
       ],
       [
-        require('@babel/preset-react').default,
+        '@babel/preset-react',
         {
           development: isDevelopmentEnv || isTestEnv,
           useBuiltIns: true,
@@ -58,50 +48,23 @@ module.exports = function (api) {
       ],
     ].filter(Boolean),
     plugins: [
+      'babel-plugin-macros',
       [
-        require('babel-plugin-module-resolver').default,
-        {
-          root: ['./client/app/assets/images'],
-          alias: {
-            images: './images',
-          },
-        },
-      ],
-      require('babel-plugin-macros'),
-      require('@babel/plugin-syntax-dynamic-import').default,
-
-      // Hard to say why this would be needed.
-      // CRA has this:
-      // https://github.com/facebook/create-react-app/pull/4984
-      // isTestEnv && require('babel-plugin-dynamic-import-node'),
-      require('@babel/plugin-transform-destructuring').default,
-      [
-        require('@babel/plugin-proposal-class-properties').default,
+        '@babel/plugin-proposal-class-properties',
         {
           loose: true,
         },
       ],
       [
-        require('@babel/plugin-proposal-object-rest-spread').default,
-        {
-          useBuiltIns: true,
-        },
-      ],
-      [
-        require('@babel/plugin-transform-runtime').default,
+        '@babel/plugin-transform-runtime',
         {
           helpers: false,
           regenerator: true,
-        },
-      ],
-      [
-        require('@babel/plugin-transform-regenerator').default,
-        {
-          async: false,
+          corejs: false,
         },
       ],
       isProductionEnv && [
-        require('babel-plugin-transform-react-remove-prop-types').default,
+        'babel-plugin-transform-react-remove-prop-types',
         {
           removeImport: true,
         },
