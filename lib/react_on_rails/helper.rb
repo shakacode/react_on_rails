@@ -257,6 +257,9 @@ module ReactOnRails
           rorVersion: ReactOnRails::VERSION,
           rorPro: ReactOnRails::Utils.react_on_rails_pro?
         }
+        if ReactOnRails::Utils.react_on_rails_pro?
+          result.rorProVersion = Gem.loaded_specs["react_on_rails_pro"].version.to_s
+        end
         if defined?(request) && request.present?
           # Check for encoding of the request's original_url and try to force-encoding the
           # URLs as UTF-8. This situation can occur in browsers that do not encode the
