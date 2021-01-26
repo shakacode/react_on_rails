@@ -257,9 +257,25 @@ module ReactOnRails
           rorVersion: ReactOnRails::VERSION,
           rorPro: ReactOnRails::Utils.react_on_rails_pro?
         }
-        if ReactOnRails::Utils.react_on_rails_pro?
-          result.rorProVersion = Gem.loaded_specs["react_on_rails_pro"].version.to_s
-        end
+        result[:rorProVersion] = ReactOnRails::Utils.react_on_rails_pro_version if ReactOnRails::Utils.react_on_rails_pro?
+
+        puts "react_on_rails_pro?"
+        p ReactOnRails::Utils.react_on_rails_pro? # false beccause of memoization
+        puts "gem_available?"
+        p ReactOnRails::Utils.gem_available?("react_on_rails_pro") # true
+        puts "gemspec-blah"
+        p Gem::Specification.find_all_by_name("react_on_rails_pro").present? # true
+
+        puts "react_on_rails_pro_version"
+        p ReactOnRails::Utils.react_on_rails_pro_version # "1.1.1"
+        puts "result[]"
+        p result[:rorProVersion] # nil because of memoization
+        puts "gemspec-blah"
+        p Gem::Specification.find_all_by_name("react_on_rails_pro")[0].version # "1.1.1"
+
+        puts "context result"
+        p result
+
         if defined?(request) && request.present?
           # Check for encoding of the request's original_url and try to force-encoding the
           # URLs as UTF-8. This situation can occur in browsers that do not encode the
