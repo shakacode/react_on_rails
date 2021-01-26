@@ -2,18 +2,12 @@
 
 require "rails_helper"
 
-shared_examples "railsContext" do |pathname, id_base, options|
+shared_examples "railsContext" do |pathname, id_base|
   subject { page }
 
   let(:http_accept_language) { "en-US,en;q=0.8" }
 
   before do
-    if options[:rorPro]
-      doubled_spec = instance_double(Gem::Specification)
-      allow(Gem::Specification).to receive(:find_all_by_name).with("react_on_rails_pro").and_return([doubled_spec])
-      allow(Gem::Specification).to receive(:find_all_by_name).with("webpacker")
-      allow(doubled_spec).to receive(:version).and_return("1.1.1")
-    end
     visit "/#{pathname}?ab=cd"
   end
 
@@ -26,6 +20,7 @@ shared_examples "railsContext" do |pathname, id_base, options|
       keys_to_vals = {
         railsEnv: Rails.env,
         rorVersion: ReactOnRails::VERSION,
+        rorPro: ReactOnRails::Utils.react_on_rails_pro?,
         href: "http://#{host_port}/#{pathname}?ab=cd",
         location: "/#{pathname}?ab=cd",
         port: port,
@@ -39,18 +34,7 @@ shared_examples "railsContext" do |pathname, id_base, options|
         somethingUseful: "REALLY USEFUL"
       }
 
-      keys_to_vals[:rorProVersion] = "1.1.1" if options[:rorPro]
-      keys_to_vals[:rorPro] = options[:rorPro].to_s
-
-
-      p "key_to_vals"
-      p keys_to_vals
-
       top_id = "##{id_base}-react-component-0"
-
-      p "specific elements"
-      p find(:css, "#{top_id} .js-rorPro").text
-      p find(:css, "#{top_id} .js-rorProVersion").text
 
       keys_to_vals.each do |key, val|
         # skip checking http_accept_language if selenium
@@ -65,19 +49,9 @@ end
 describe "rails_context" do
   context "when client rendering" do
     context "with shared store" do
-      context "with mocked react_on_rails_pro gem", :focus do
-        include_examples("railsContext",
-                         "client_side_hello_world_shared_store",
-                         "ReduxSharedStoreApp",
-                         { rorPro: true })
-      end
-
-      context "without mocked react_on_rails_pro gem" do
-        include_examples("railsContext",
-                         "client_side_hello_world_shared_store",
-                         "ReduxSharedStoreApp",
-                         { rorPro: false })
-      end
+      include_examples("railsContext",
+                       "client_side_hello_world_shared_store",
+                       "ReduxSharedStoreApp")
     end
   end
 
@@ -85,15 +59,13 @@ describe "rails_context" do
     context "with shared store" do
       include_examples("railsContext",
                        "server_side_hello_world_shared_store",
-                       "ReduxSharedStoreApp",
-                       { rorPro: false })
+                       "ReduxSharedStoreApp")
     end
 
     context "with Render-Function for component" do
       include_examples("railsContext",
                        "server_side_redux_app",
-                       "ReduxApp",
-                       { rorPro: false })
+                       "ReduxApp")
     end
   end
 end
