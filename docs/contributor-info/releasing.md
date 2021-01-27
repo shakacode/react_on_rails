@@ -3,7 +3,7 @@
 We're now releasing this as a combined ruby gem plus npm package. We will keep the version numbers in sync.
 
 ## Testing the Gem before Release from a Rails App
-See [Contributing](../../CONTRIBUTING.md)
+See [Contributing](https://github.com/shakacode/react_on_rails/tree/master/CONTRIBUTING.md)
 
 ## Releasing a new gem version
 Run `rake -D release` to see instructions on how to release via the rake task.

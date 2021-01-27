@@ -1,6 +1,6 @@
 # Code Splitting (Outdated)
 
-_Note: This document is outdated._ Please email [justin@shakacode.com](mailto:justin@shakacode.com) 
+_Note: This document is outdated._ Please email [justin@shakacode.com](mailto:justin@shakacode.com)
 if you would be interested in help with code splitting using
 [loadable-components.com](https://loadable-components.com/docs) with React on Rails.
 
@@ -150,7 +150,7 @@ config = {
 
 This causes Webpack to prepend the code chunk filename with `/assets/` in the request url. The react on rails sets up the webpack config to put webpack bundles in `app/assets/javascripts/webpack`, and modifies `config/initializers/assets.rb` so that rails detects the bundles. This means that when we prepend the request url with `/assets/`, rails will know what webpack is asking for.
 
-See [rails-assets.md](docs/outdated/rails-assets.md) to learn more about static assets.
+See [rails-assets.md](../outdated/rails-assets.md) to learn more about static assets.
 
 If you forget to set the public path, webpack will request the code chunk at `/{filename}`. This will cause the request to be handled by the Rails router, which will send back a 404 response, assuming that you don't have a catch-all route. In your javascript console, you'll get the following error:
 

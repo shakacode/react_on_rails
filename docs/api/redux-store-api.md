@@ -13,7 +13,7 @@ Consider using the `redux_store` helper for the two following use cases:
 
 ## Multiple React Components on a Page with One Store
 
-You may wish to have 2 React components share the same the Redux store. For example, if your navbar is a React component, you may want it to use the same store as your component in the main area of the page. You may even want multiple React components in the main area, which allows for greater modularity. Also, you may want this to work with Turbolinks to minimize reloading the JavaScript. 
+You may wish to have 2 React components share the same the Redux store. For example, if your navbar is a React component, you may want it to use the same store as your component in the main area of the page. You may even want multiple React components in the main area, which allows for greater modularity. Also, you may want this to work with Turbolinks to minimize reloading the JavaScript.
 
 A good example of this would be something like a notifications counter in a header. As each notification is read in the body of the page, you would like to update the header. If both the header and body share the same Redux store, then this is trivial. Otherwise, we have to rely on other solutions, such as the header polling the server to see how many unread notifications exist.
 
@@ -98,5 +98,5 @@ Place this view helper (no parameters) at the end of your shared layout so React
 
 # More Details
 
-* [lib/react_on_rails/controller.rb](../../lib/react_on_rails/controller.rb) source
-* [lib/react_on_rails/helper.rb](../../lib/react_on_rails/helper.rb) source
+* [lib/react_on_rails/controller.rb](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/controller.rb) source
+* [lib/react_on_rails/helper.rb](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/helper.rb) source
