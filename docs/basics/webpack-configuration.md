@@ -1,8 +1,8 @@
 # Webpack Configuration: custom setup for Webpack or rails/webpacker?
 
-## Webpack vs. rails/webpacker 
+## Webpack vs. rails/webpacker
 
-[Webpack](https://webpack.js.org) is the JavaScript npm package that prepares all your client-side assets. The Rails asset pipeline used to be the preferable way to prepare client-side assets. 
+[Webpack](https://webpack.js.org) is the JavaScript npm package that prepares all your client-side assets. The Rails asset pipeline used to be the preferable way to prepare client-side assets.
 
 [rails/webpacker](https://github.com/rails/webpacker) is the Ruby gem that mainly gives us 2 things:
 
@@ -22,13 +22,13 @@ A key decision in your use React on Rails is whether you go with the rails/webpa
 
 ## Option 1: Default Generator Setup: rails/webpacker app/javascript
 
-Typical rails/webpacker apps have a standard directory structure as documented [here](https://github.com/rails/webpacker/blob/master/docs/folder-structure.md). If you follow the steps in the the [basic tutorial](../../docs/tutorial.md), you will see this pattern in action. In order to customize the Webpack configuration, you need to consult with the [rails/webpacker Webpack configuration](https://github.com/rails/webpacker/blob/master/docs/webpack.md). 
+Typical rails/webpacker apps have a standard directory structure as documented [here](https://github.com/rails/webpacker/blob/5-x-stable/docs/recommended-project-structure.md). If you follow the steps in the the [basic tutorial](https://www.shakacode.com/react-on-rails/docs/basics/tutorial), you will see this pattern in action. In order to customize the Webpack configuration, you need to consult with the [rails/webpacker Webpack configuration](https://www.shakacode.com/react-on-rails/docs/javascript/webpack).
 
 The *advantage* of using rails/webpacker to configure Webpack is that there is very little code needed to get started and you don't need to understand really anything about Webpack customization.
 
 ## Option 2: Traditional React on Rails using the /client directory
 
-Until version 9, all React on Rails apps used the `/client` directory for configuring React on Rails in terms of the configuration of Webpack and location of your JavaScript and Webpack files, including the node_modules directory. Version 9 changed the default to `/` for the `node_modules` location using this value in `config/initializers/react_on_rails.rb`: `config.node_modules_location`. 
+Until version 9, all React on Rails apps used the `/client` directory for configuring React on Rails in terms of the configuration of Webpack and location of your JavaScript and Webpack files, including the node_modules directory. Version 9 changed the default to `/` for the `node_modules` location using this value in `config/initializers/react_on_rails.rb`: `config.node_modules_location`.
 
 You can access values in the `config/webpacker.yml`
 
@@ -40,5 +40,3 @@ You will want consider using some of the same values set in these files:
 
 * https://github.com/rails/webpacker/blob/master/package/environments/base.js
 * https://github.com/rails/webpacker/blob/master/package/environments/development.js
-
-

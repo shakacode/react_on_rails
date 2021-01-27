@@ -52,7 +52,7 @@ First be sure to run `rails -v` and check you are using Rails 5.1.3 or above. If
 cd <directory where you want to create your new Rails app>
 
 # Any name you like for the rails app
-# Skip javascript so will add that next and get the current version 
+# Skip javascript so will add that next and get the current version
 rails new --skip-sprockets -J --skip-turbolinks test-react-on-rails-v12-no-sprockets
 
 cd test-react-on-rails
@@ -96,7 +96,7 @@ git commit -m "Initial commit"
 
 Install React on Rails: `rails generate react_on_rails:install`. You need to first git commit your files before running the generator, or else it will generate an error.
 
-Note, using `redux` is no longer recommended as the basic installer uses React Hooks. 
+Note, using `redux` is no longer recommended as the basic installer uses React Hooks.
 If you want the redux install: `rails generate react_on_rails:install --redux`
 
 ```
@@ -123,7 +123,7 @@ First, check that the `hmr` and the `inline` options are `true` in your `config/
 
 The basic setup will have HMR working with the default webpacker setup. The basic
 [HMR](https://webpack.js.org/concepts/hot-module-replacement/), without a special
-React setup, will cause a full page refresh each time you save a file. 
+React setup, will cause a full page refresh each time you save a file.
 
 ## Deploying to Heroku
 
@@ -292,8 +292,8 @@ versus with server rendering:
 
 For more details on server rendering, see:
 
-  + [Client vs. Server Rendering](./basics/client-vs-server-rendering.md)
-  + [React Server Rendering](./basics/react-server-rendering.md)
+  + [Client vs. Server Rendering](https://www.shakacode.com/react-on-rails/docs/basics/client-vs-server-rendering)
+  + [React Server Rendering](https://www.shakacode.com/react-on-rails/docs/basics/react-server-rendering)
 
 ## Moving from the Rails default `/app/javascript` to the recommended `/client` structure
 
@@ -320,7 +320,7 @@ When you change a JSX file and save, the browser will automatically refresh!
 
 So you get some basics from HMR with no code changes. If you want to go further, take a look at these links:
 
-* https://github.com/rails/webpacker/blob/master/docs/webpack-dev-server.md
+* https://github.com/rails/webpacker/blob/5-x-stable/docs/webpack-dev-server.md
 * https://webpack.js.org/configuration/dev-server/
 * https://webpack.js.org/concepts/hot-module-replacement/
 
@@ -335,7 +335,7 @@ In case you are running some custom setup with different IP or PORT you should a
 web: rails s -p 8080 -b 0.0.0.0
 ```
 
-Then visit https://your-shared-addr.c9users.io:8080/hello_world 
+Then visit https://your-shared-addr.c9users.io:8080/hello_world
 
 ## RubyMine
 
@@ -349,8 +349,8 @@ It's super important to exclude certain directories from RubyMine or else it wil
 
 ## Conclusion
 
-* Browse the docs either on the [gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) or in the [docs directory on github](https://github.com/shakacode/react_on_rails/tree/master/docs)
+* Browse the docs on [our documentation website](https://www.shakacode.com/react-on-rails/docs/)
 
-Feedback is greatly appreciated! As are stars on github! 
+Feedback is greatly appreciated! As are stars on github!
 
 If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com). We offer [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki) and consulting so you can focus on your app and not on how to make Webpack plus Rails work optimally.

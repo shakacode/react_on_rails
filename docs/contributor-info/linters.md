@@ -1,5 +1,5 @@
 # Linters
-These linters support the [ShakaCode Style Guidelines](./style.md)
+These linters support the [ShakaCode Style Guidelines](https://www.shakacode.com/react-on-rails/docs/misc/style)
 
 ## Autofix!
 
@@ -15,9 +15,9 @@ If you haven't tried the autofix options for `eslint` and `rubocop`, you're seri
   ```
   eslint --fix .
   ```
-  
-  or 
-  
+
+  or
+
   ```
   npm run lint -- --fix
   ```
@@ -32,7 +32,7 @@ Rules are configured with a 0, 1 or 2. Setting a rule to 0 is turning it off, se
 
 Rules can also take a few additional options. In this case, the rule can be set to an array, the first item of which is the 0/1/2 flag and the rest are options.
 
-See file [.eslintrc](../../client/.eslintrc) for examples of configuration
+See file [.eslintrc](https://github.com/shakacode/react_on_rails/tree/master/.eslintrc) for examples of configuration
 
 ### Specify/Override rules in code
 
@@ -66,4 +66,3 @@ You can disable all rules for a line or block, or only specific rules, as shown 
 * [ESLint quick start](http://untilfalse.com/eslint-quick-start/)
 * [RuboCop](https://github.com/bbatsov/rubocop)
 * [ESLint](http://eslint.org/)
-

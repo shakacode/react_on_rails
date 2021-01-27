@@ -35,13 +35,9 @@ can pass the redux option if you'd like to have redux setup for you automaticall
 Then you may run
 
     `rails s`
-
-More Details:
-
-    `https://github.com/shakacode/react_on_rails/blob/master/docs/basics/generator-details.md`
 ```
 
-Another good option is to create a simple test app per the [Tutorial](../tutorial.md).
+Another good option is to create a simple test app per the [Tutorial](https://www.shakacode.com/react-on-rails/docs/basics/tutorial).
 
 # Understanding the Organization of the Generated Client Code
 The generated client code follows our organization scheme. Each unique set of functionality, is given its own folder inside of `app/javascript/app/bundles`. Note, the recommended for bigger projects is `client/app/bundles`. This encourages for modularity of *domains*.
@@ -58,4 +54,3 @@ You may also notice the `app/lib` folder. This is for any code that is common be
 If you have used the `--redux` generator option, you will notice the familiar additional redux folders in addition to the aforementioned folders. The Hello World example has also been modified to use Redux.
 
 Note the organizational paradigm of "bundles". These are like application domains and are used for grouping your code into webpack bundles, in case you decide to create different bundles for deployment. This is also useful for separating out logical parts of your application. The concept is that each bundle will have it's own Redux store. If you have code that you want to reuse across bundles, including components and reducers, place them under `/client/app/lib`.
-

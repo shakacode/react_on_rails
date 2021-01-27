@@ -2,11 +2,13 @@
 
 *These are the docs for React on Rails 12. To see the version 11 docs, [click here](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
 
+**If you're viewing this page on Github, please go to [our documentation website](https://www.shakacode.com/react-on-rails/docs/) instead!**
+
 #### News
 **October 14, 2020**: [RUBY ROGUES
 RR 474: React on Rails V12 – Don’t Shave That Yak! with Justin Gordon](https://devchat.tv/ruby-rogues/rr-474-react-on-rails-v12-dont-shave-that-yak-with-justin-gordon/).
 
-**October 1, 2020**: See the [spec/dummy](./spec/dummy) example repo for a simple configuration of webpack via the rails/webpacker gem
+**October 1, 2020**: See the [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) example repo for a simple configuration of webpack via the rails/webpacker gem
 that supports SSR.
 
 **August 2, 2020**: See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) for a new way to setup the creation of your SSR bundle with `rails/webpacker`.
@@ -19,10 +21,10 @@ that supports SSR.
 2. **Typescript bindings**
 3. **rails/webpacker** "just works" with React on Rails by default.
 4. i18n support for generating a JSON file rather than a JS file.
-   
-Be sure to see the [CHANGELOG.md](./CHANGELOG.md) and read the upgrade instructions:
-[docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rails.md#upgrading-to-v12).
-   
+
+Be sure to see the [CHANGELOG.md](https://github.com/shakacode/react_on_rails/tree/master/CHANGELOG.md) and read the upgrade instructions:
+[docs/basics/upgrading-react-on-rails](https://www.shakacode.com/react-on-rails/docs/basics/upgrading-react-on-rails#upgrading-to-v12).
+
 * See Justin's RailsConf talk: [Webpacker, It-Just-Works, But How?](http://railsconf.com/2020/video/justin-gordon-webpacker-it-just-works-but-how).
 * Are you interested in support for React on Rails? Do you want to use Node.js to do your server-side rendering so libraries like Emotion and Loadable Components just work, as compared to rendering via Ruby embedded JS? If so check out [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).
 * HMR is working with [Loadable Components](https://loadable-components.com) for a both amazing hot-reloading developer experience and great runtime performance. Please [email me](mailto:justin@shakacode.com) if you'd like to use [Loadable Components Code Splitting](https://loadable-components.com/docs/code-splitting/) to speed up your app by reducing your bundle sizes and lazily loading the code that's needed.
@@ -34,7 +36,7 @@ React on Rails integrates Rails with (server rendering of) Facebook's [React](ht
 This project is maintained by the software consulting firm [ShakaCode](https://www.shakacode.com). We focus on Ruby on Rails applications with React front-ends, often using TypeScript or ReasonML. We also build Gatsby sites. See [our recent work](https://www.shakacode.com/recent-work) for examples of what we do.
 
 Interested in optimizing your webpack setup for React on Rails including code
-splitting with [react-router](https://github.com/ReactTraining/react-router#readme), 
+splitting with [react-router](https://github.com/ReactTraining/react-router#readme),
 and [loadable-components](https://loadable-components.com/) with server-side rendering?
 We just did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://www.shakacode.com/recent-work/popmenu/).
 
@@ -50,13 +52,13 @@ To provide a high performance framework for integrating Ruby on Rails with React
 
 ## Features and Why React on Rails?
 
-Given that `rails/webpacker` gem already provides basic React integration, why would you use "React on Rails"? 
+Given that `rails/webpacker` gem already provides basic React integration, why would you use "React on Rails"?
 
 1. Easy passing of props directly from your Rails view to your React components rather than having your Rails view load and then make a separate request to your API.
 1. Tight integration with [rails/webpacker](https://github.com/rails/webpacker).
 1. Server-Side Rendering (SSR), often used for SEO crawler indexing and UX performance, is not offered by `rails/webpacker`.
 1. [Redux](https://github.com/reactjs/redux) and [React Router](https://github.com/ReactTraining/react-router#readme) integration with server-side-rendering.
-1. [Internationalization (I18n) and (localization)](https://github.com/shakacode/react_on_rails/blob/master/docs/basics/i18n.md)
+1. [Internationalization (I18n) and (localization)](https://www.shakacode.com/react-on-rails/docs/basics/i18n)
 1. A supportive community. This [web search shows how live public sites are using React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/).
 1. [Reason ML Support](https://github.com/shakacode/reason-react-on-rails-example).
 
@@ -64,10 +66,14 @@ See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpac
 
 ## ShakaCode Forum Premium Content
 _Requires creating a free account._
- 
+
 * [How to use different versions of a file for client and server rendering](https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352)
 
 ----
+
+# Docs
+
+**Consider browsing this on our [website](https://www.shakacode.com/react-on-rails/docs/).**
 
 ## Prerequisites
 
@@ -75,16 +81,16 @@ Ruby on Rails >=5 and rails/webpacker 4.2+.
 
 ## Getting Started
 
-Note, the best way to understand how to use ReactOnRails is to study a few simple examples. You can do a quick demo setup, either on your existing app or on a new Rails app. 
+Note, the best way to understand how to use ReactOnRails is to study a few simple examples. You can do a quick demo setup, either on your existing app or on a new Rails app.
 
-1. Do the quick [tutorial](docs/tutorial.md).
-2. Add React on Rails to an existing Rails app per [the instructions](docs/basics/installation-into-an-existing-rails-app.md).
-3. Look at [spec/dummy](spec/dummy), a simple, no DB example.
+1. Do the quick [tutorial](https://www.shakacode.com/react-on-rails/docs/basics/tutorial).
+2. Add React on Rails to an existing Rails app per [the instructions](https://www.shakacode.com/react-on-rails/docs/basics/installation-into-an-existing-rails-app).
+3. Look at [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy), a simple, no DB example.
 3. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full-featured example live at [www.reactrails.com](http://www.reactrails.com).
 
 ## Basic Installation
 
-*See also [the instructions for installing into an existing Rails app](docs/basics/installation-into-an-existing-rails-app.md).*
+*See also [the instructions for installing into an existing Rails app](https://www.shakacode.com/react-on-rails/docs/basics/installation-into-an-existing-rails-app).*
 
 2. Add the `react_on_rails` gem to Gemfile:
 
@@ -108,7 +114,7 @@ Note, the best way to understand how to use ReactOnRails is to study a few simpl
 
 7. Visit http://localhost:3000/hello_world.
 
-  
+
 ### Turning on server rendering
 
 With the code from running the React on Rails generator above:
@@ -131,8 +137,8 @@ issue.
 
 ### Configuration
 
-* Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](docs/basics/configuration.md) for documentation of all configuration options.
-* Configure `config/webpacker.yml`. If you used the generator and the default webpacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/webpacker.yml](./spec/dummy/config/webpacker.yml) example or the official default [webpacker.yml](https://github.com/rails/webpacker/blob/master/lib/install/config/webpacker.yml).
+* Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](https://www.shakacode.com/react-on-rails/docs/basics/configuration) for documentation of all configuration options.
+* Configure `config/webpacker.yml`. If you used the generator and the default webpacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/webpacker.yml](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/webpacker.yml) example or the official default [webpacker.yml](https://github.com/rails/webpacker/blob/master/lib/install/config/webpacker.yml).
   * Tip: set `compile: false` for development if you know that you'll always be compiling with a watch process. Otherwise, every request will check if compilation is needed.
   * Your `public_output_path` must match your custom Webpack configuration for `output` of your bundles.
   * Only set `cache_manifest` to `true` in your production env.
@@ -167,9 +173,9 @@ issue.
     # Rails View
     <%= react_component("HelloWorld", props: { name: "Stranger" }) %>
   ```
-  
-- This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://reactjs.org/docs/context.html). See [Render-Functions and the RailsContext](docs/basics/render-functions-and-railscontext.md) for more details on this topic.
-  
+
+- This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://reactjs.org/docs/context.html). See [Render-Functions and the RailsContext](https://www.shakacode.com/react-on-rails/docs/basics/render-functions-and-railscontext) for more details on this topic.
+
   ```js
   import React from 'react';
 
@@ -182,9 +188,9 @@ issue.
       </div>
     );
   };
-  ``` 
-  
-See the [View Helpers API](./docs/api/view-helpers-api.md) for more details on `react_component` and its sibling function `react_component_hash`.
+  ```
+
+See the [View Helpers API](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api) for more details on `react_component` and its sibling function `react_component_hash`.
 
 ## Globally Exposing Your React Components
 
@@ -203,7 +209,7 @@ This is how to expose a component to the `react_component` view helper.
 
 #### Different Server-Side Rendering Code (and a Server-Specific Bundle)
 
-You may want different code for your server-rendered components running server side versus client side. For example, if you have an animation that runs when a component is displayed, you might need to turn that off when server rendering. One way to handle this is conditional code like `if (window) { doClientOnlyCode() }`. 
+You may want different code for your server-rendered components running server side versus client side. For example, if you have an animation that runs when a component is displayed, you might need to turn that off when server rendering. One way to handle this is conditional code like `if (window) { doClientOnlyCode() }`.
 
 Another way is to use a separate webpack configuration file that can use a different server side entry file, like  'serverRegistration.js' as opposed to 'clientRegistration.js.' That would set up different code for server rendering.
 
@@ -213,7 +219,7 @@ For details on techniques to use different code for client and server rendering,
 
 You have two ways to specify your React components. You can either register the React component (either function or class component) directly, or you can create a function that returns a React component, which we using the name of a "render-function". Creating a render-function allows:
 
-1. You to have access to the `railsContext`. See [documentation for the railsContext](./docs/basics/render-functions-and-railscontext.md) in terms of why you might need it. You **need** a Render-Function to access the `railsContext`.
+1. You to have access to the `railsContext`. See [documentation for the railsContext](https://www.shakacode.com/react-on-rails/docs/basics/render-functions-and-railscontext) in terms of why you might need it. You **need** a Render-Function to access the `railsContext`.
 2. You can use the passed-in props to initialize a redux store or set up react-router.
 3. You can return different components depending on what's in the props.
 
@@ -239,7 +245,7 @@ Thus, there is no difference between registering a React Function Component or c
 
 ## react_component_hash for Render-Functions
 
-Another reason to use a Render-Function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }. Make sure you use this function with `react_component_hash`. 
+Another reason to use a Render-Function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }. Make sure you use this function with `react_component_hash`.
 
 For server rendering, if you wish to return multiple HTML strings from a Render-Function, you may return an Object from your Render-Function with a single top-level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
 
@@ -247,7 +253,7 @@ For server rendering, if you wish to return multiple HTML strings from a Render-
 { renderedHtml: { componentHtml, customKey1, customKey2} }
 ```
 
-For details on using react_component_hash with react-helmet, see the docs below for the helper API and [docs/additional-reading/react-helmet.md](docs/additional-reading/react-helmet.md).
+For details on using react_component_hash with react-helmet, see [our react-helmet documentation](https://www.shakacode.com/react-on-rails/docs/additional-reading/react-helmet).
 
 ## Error Handling
 
@@ -257,19 +263,19 @@ For details on using react_component_hash with react-helmet, see the docs below 
 ## I18n
 
 React on Rails provides an option for automatic conversions of Rails `*.yml` locale files into `*.json` or `*.js*.
-See the [How to add I18n](docs/basics/i18n.md) for a summary of adding I18n.
+See the [How to add I18n](https://www.shakacode.com/react-on-rails/docs/basics/i18n) for a summary of adding I18n.
 
 ## More Details
 
-Browse the links in the [Summary Table of Contents](./SUMMARY.md)
+Browse the links in the [Summary Table of Contents](https://github.com/shakacode/react_on_rails/tree/master/SUMMARY.md)
 
 Here are some highly recommended next articles to read:
 
-1. [How React on Rails Works](docs/outdated/how-react-on-rails-works.md)
-1. [Webpack Configuration](./docs/basics/webpack-configuration.md)
-1. [View Helpers API](./docs/api/view-helpers-api.md) 
+1. [How React on Rails Works](https://www.shakacode.com/react-on-rails/docs/basics/how-react-on-rails-works)
+1. [Webpack Configuration](https://www.shakacode.com/react-on-rails/docs/basics/webpack-configuration)
+1. [View Helpers API](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api)
 1. [Caching and Performance: React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).
-1. [Deployment](docs/basics/deployment.md).
+1. [Deployment](https://www.shakacode.com/react-on-rails/docs/basics/deployment).
 
 # Support
 
@@ -285,12 +291,12 @@ Please [**click to subscribe**](https://app.mailerlite.com/webforms/landing/l1d9
 - **[forum.shakacode.com](https://forum.shakacode.com)**: Post your questions
 - **[@railsonmaui on Twitter](https://twitter.com/railsonmaui)**
 - For a live, [open source](https://github.com/shakacode/react-webpack-rails-tutorial), example of this gem, see [www.reactrails.com](http://www.reactrails.com).
-- See [Projects](PROJECTS.md) using and [KUDOS](./KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
-- *See [NEWS.md](NEWS.md) for more notes over time.*
+- See [Projects](https://github.com/shakacode/react_on_rails/tree/master/PROJECTS.md) using and [KUDOS](https://github.com/shakacode/react_on_rails/tree/master/KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
+- *See [NEWS.md](https://github.com/shakacode/react_on_rails/tree/master/NEWS.md) for more notes over time.*
 
 ## Contributing
 
-Bug reports and pull requests are welcome. See [Contributing](CONTRIBUTING.md) to get started, and the [list of help wanted issues](https://github.com/shakacode/react_on_rails/labels/contributions%3A%20up%20for%20grabs%21).
+Bug reports and pull requests are welcome. See [Contributing](https://github.com/shakacode/react_on_rails/tree/master/CONTRIBUTING.md) to get started, and the [list of help wanted issues](https://github.com/shakacode/react_on_rails/labels/contributions%3A%20up%20for%20grabs%21).
 
 ## React on Rails Pro
 
@@ -333,16 +339,16 @@ Such fragment caching saves CPU work for your web server and greatly reduces the
 4. Creating the HTML string containing the props and the server-rendered JavaScript code.
 
 Note, even without server rendering (without step 3 above), fragment caching is still effective.
-  
+
 ## Integration with Node.js for Server Rendering
 
 Default server rendering is done by ExecJS. If you want to use a Node.js server for better performing server rendering, [email justin@shakacode.com](mailto:justin@shakacode.com). ShakaCode has built a premium Node rendering server that is part of [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).
 
 ## Testimonials for ShakaCode
-[HVMN Testimonial, by Paul Benigeri, October 12, 2018](./docs/testimonials/hvmn.md)
+[HVMN Testimonial, by Paul Benigeri, October 12, 2018](https://www.shakacode.com/react-on-rails/docs/testimonials/hvmn)
 > The price we paid for the consultation + the React on Rails pro license has already been made back a couple of times from hosting fees alone. The entire process was super hands off, and our core team was able to focus on shipping new feature during that sprint.
 
-[ResortPass Testimonial, by Leora Juster, December 10, 2018](./docs/testimonials/resortpass.md)
+[ResortPass Testimonial, by Leora Juster, December 10, 2018](https://www.shakacode.com/react-on-rails/docs/testimonials/resortpass)
 
 > Justin and his team were instrumental in assisting us in setting design foundations and standards for our transition to a react on rails application. Just three months of work with the team at Shaka code and we have a main page of our application server-side rendering at exponentially improved speeds.
 
@@ -350,7 +356,7 @@ From Joel Hooks, Co-Founder, Chief Nerd at [egghead.io](https://egghead.io/), Ja
 
 ![2017-01-30_11-33-59](https://cloud.githubusercontent.com/assets/1118459/22443635/b3549fb4-e6e3-11e6-8ea2-6f589dc93ed3.png)
 
-For more testimonials, see [Live Projects](PROJECTS.md) and [Kudos](./KUDOS.md).
+For more testimonials, see [Live Projects](https://github.com/shakacode/react_on_rails/tree/master/PROJECTS.md) and [Kudos](https://github.com/shakacode/react_on_rails/tree/master/KUDOS.md).
 
 # Supporters
 
@@ -373,4 +379,4 @@ ShakaCode is **[currently looking to hire](http://www.shakacode.com/about/#work-
 
 # License
 
-The gem is available as open source under the terms of the [MIT License](LICENSE.md).
+The gem is available as open source under the terms of the [MIT License](https://github.com/shakacode/react_on_rails/tree/master/LICENSE.md).

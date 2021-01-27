@@ -1,21 +1,21 @@
 # How React on Rails Works (with rails/webpacker)
 
-*Note, older versions of React on Rails pushed the Webpack bundles through the Asset Pipeline. This older method has *many* disadvantages, such as broken sourcemaps, performance issues, etc. If you need help migrating to the current way of bypassing the Asset Pipeline, [email Justin](mailto:justin@shakacode.com).* 
+*Note, older versions of React on Rails pushed the Webpack bundles through the Asset Pipeline. This older method has *many* disadvantages, such as broken sourcemaps, performance issues, etc. If you need help migrating to the current way of bypassing the Asset Pipeline, [email Justin](mailto:justin@shakacode.com).*
 
-Webpack is used to generate JavaScript and CSS "bundles" directly to your `/public` directory. [rails/webpacker](https://github.com/rails/webpacker) provides view helpers to access the Webpack generated (and fingerprinted) JS and CSS. These files totally skip the Rails asset pipeline. You are responsible for properly configuring your Webpack output. You will either use the standard Webpack configuration (*recommended*) or the `rails/webpacker` setup for Webpack. 
+Webpack is used to generate JavaScript and CSS "bundles" directly to your `/public` directory. [rails/webpacker](https://github.com/rails/webpacker) provides view helpers to access the Webpack generated (and fingerprinted) JS and CSS. These files totally skip the Rails asset pipeline. You are responsible for properly configuring your Webpack output. You will either use the standard Webpack configuration (*recommended*) or the `rails/webpacker` setup for Webpack.
 
 Ensure these generated bundle files are in your `.gitignore`, as you never want to add the large compiled bundles to git.
 
-Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the react component helper. 
+Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the react component helper.
 
-Optionally, you can also initialize a Redux store with the view or controller helper `redux_store` so that the redux store can be shared amongst multiple React components. 
+Optionally, you can also initialize a Redux store with the view or controller helper `redux_store` so that the redux store can be shared amongst multiple React components.
 
 ## Client-Side Rendering vs. Server-Side Rendering
 
 In most cases, you should use the `prerender: false` (default behavior) with the provided `react_component` helper method to render the React component from your Rails views. In some cases, such as when SEO is vital, or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
 
 Now the server will interpret your JavaScript. The default is to use [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. If you want to maximize the perfomance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
- 
+
 ## HTML Source Code
 
 If you open the HTML source of any web page using React on Rails, you'll see the 3 parts of React on Rails rendering:
@@ -28,17 +28,16 @@ You can see all this on the source for [reactrails.com](https://www.reactrails.c
 
 ## Building the Bundles
 
-Each time you change your client code, you will need to re-generate the bundles (the webpack-created JavaScript files included in application.js). The included example Foreman `Procfile.dev` files will take care of this for you by starting a webpack process with the watch flag. This will watch your JavaScript code files for changes. Alternately, the `rails/webpacker` library also can ensure that your bundles are built. 
+Each time you change your client code, you will need to re-generate the bundles (the webpack-created JavaScript files included in application.js). The included example Foreman `Procfile.dev` files will take care of this for you by starting a webpack process with the watch flag. This will watch your JavaScript code files for changes. Alternately, the `rails/webpacker` library also can ensure that your bundles are built.
 
-For example, you might create a [Procfile.dev](spec/dummy/Procfile.dev).
+For example, you might create a [Procfile.dev](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/Procfile.dev).
 
 On production deployments that use asset precompilation, such as Heroku deployments, `rails/webpacker`, by default, will automatically run webpack to build your JavaScript bundles, running the command `bin/webpack` in your app.
 
 However, if you want to run a custom command to run webpack to build your bundles, then you will:
 1. Ensure you do not have a `config/webpack/production.js` file
-1. Define `config.build_production_command` in your [config/initializers/react_on_rails.rb](docs/basics/configuration.md)
+1. Define `config.build_production_command` in your [config/initializers/react_on_rails.rb](https://www.shakacode.com/react-on-rails/docs/basics/configuration)
 
 Then React on Rails modifies the `assets:precompile` task to run your `build_production_command`.
 
 If you have used the provided generator, these bundles will automatically be added to your `.gitignore` to prevent extraneous noise from re-generated code in your pull requests. You will want to do this manually if you do not use the provided generator.
-
