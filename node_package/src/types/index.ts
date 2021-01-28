@@ -15,6 +15,7 @@ export interface RailsContext {
   i18nDefaultLocale: string;
   rorVersion: string;
   rorPro: boolean;
+  rorProVersion?: string;
   serverSide: boolean;
   originalUrl: string;
   href: string;

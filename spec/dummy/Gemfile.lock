@@ -245,7 +245,7 @@ GEM
       rubocop (~> 1.0)
       rubocop-ast (>= 1.1.0)
     ruby-progressbar (1.10.1)
-    rubyzip (2.3.0)
+    rubyzip (1.3.0)
     sass (3.7.4)
       sass-listen (~> 4.0.0)
     sass-listen (4.0.0)
@@ -298,10 +298,10 @@ GEM
     uglifier (4.2.0)
       execjs (>= 0.3.0, < 3)
     unicode-display_width (1.7.0)
-    webdrivers (4.4.1)
+    webdrivers (3.9.4)
       nokogiri (~> 1.6)
-      rubyzip (>= 1.3.0)
-      selenium-webdriver (>= 3.0, < 4.0)
+      rubyzip (~> 1.0)
+      selenium-webdriver (~> 3.0)
     webpacker (5.2.1)
       activesupport (>= 5.2)
       rack-proxy (>= 0.6.1)
@@ -354,7 +354,7 @@ DEPENDENCIES
   sqlite3
   turbolinks
   uglifier
-  webdrivers
+  webdrivers (= 3.9.4)
   webpacker
 
 BUNDLED WITH

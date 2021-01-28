@@ -166,7 +166,15 @@ module ReactOnRails
     end
 
     def self.react_on_rails_pro?
-      @react_on_rails_pro ||= gem_available?("react_on_rails_pro")
+      return @react_on_rails_pro if defined?(@react_on_rails_pro)
+
+      @_eact_on_rails_pro = gem_available?("react_on_rails_pro")
+    end
+
+    def self.react_on_rails_pro_version
+      return @react_on_rails_pro_version if defined?(@react_on_rails_pro_version)
+
+      @react_on_rails_pro_version = Gem::Specification.find_all_by_name("react_on_rails_pro")[0].version.to_s
     end
 
     def self.smart_trim(str, max_length = 1000)
