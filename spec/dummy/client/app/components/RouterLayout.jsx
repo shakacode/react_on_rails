@@ -1,6 +1,8 @@
 import PropTypes from 'prop-types';
 import React from 'react';
-import { Link } from 'react-router';
+import { Link, Route, Switch } from 'react-router-dom';
+import RouterFirstPage from './RouterFirstPage';
+import RouterSecondPage from './RouterSecondPage';
 
 const RouterLayout = ({ children }) => (
   <div className="container">
@@ -10,23 +12,20 @@ const RouterLayout = ({ children }) => (
     </p>
     <ul>
       <li>
-        <Link to="/react_router" href="/react_router">
-          React Router Layout Only
-        </Link>
+        <Link to="/react_router">React Router Layout Only</Link>
       </li>
       <li>
-        <Link to="/react_router/first_page" href="/react_router/first_page">
-          Router First Page
-        </Link>
+        <Link to="/react_router/first_page">Router First Page</Link>
       </li>
       <li>
-        <Link to="/react_router/second_page" href="/react_router/second_page">
-          Router Second Page
-        </Link>
+        <Link to="/react_router/second_page">Router Second Page</Link>
       </li>
     </ul>
     <hr />
-    {children}
+    <Switch>
+      <Route path="/react_router/first_page" component={RouterFirstPage} />
+      <Route path="/react_router/second_page" component={RouterSecondPage} />
+    </Switch>
   </div>
 );
 

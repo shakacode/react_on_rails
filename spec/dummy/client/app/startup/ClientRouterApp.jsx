@@ -1,9 +1,5 @@
 import React from 'react';
-import { Router, browserHistory } from 'react-router';
+import { BrowserRouter } from 'react-router-dom';
 import routes from '../routes/routes';
 
-export default (props) => (
-  <Router history={browserHistory} {...props}>
-    {routes}
-  </Router>
-);
+export default (props) => <BrowserRouter {...props}>{routes}</BrowserRouter>;

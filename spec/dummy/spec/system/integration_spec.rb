@@ -177,32 +177,6 @@ describe "Manual Rendering", :js, type: :system do
   end
 end
 
-describe "Code Splitting", :js, type: :system do
-  before { visit "/deferred_render_with_server_rendering" }
-
-  it "clicking on async route causes async component to be fetched" do
-    header_text = page.find(:css, "h1").text
-
-    expect(header_text).to eq("Deferred Rendering")
-    expect(page).not_to have_text "Noice!"
-
-    click_link "Test Async Route"
-    expect(page).to have_current_path("/deferred_render_with_server_rendering/async_page")
-    expect(page).to have_text "Noice!"
-  end
-end
-
-describe "Example of Code Splitting with Rendering of Async Routes", :js, type: :system do
-  subject { page }
-
-  before { visit "/deferred_render_with_server_rendering/async_page" }
-
-  context "when deferring the initial render should prevent a client/server checksum mismatch error" do
-    # Wait for client rendering to finish
-    it { is_expected.to have_text("Mounted: true") }
-  end
-end
-
 describe "renderedHtml from Render-Function", :js, type: :system do
   before { visit "/rendered_html" }
 
