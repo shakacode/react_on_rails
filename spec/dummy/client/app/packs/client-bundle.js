@@ -18,7 +18,6 @@ import PureComponent from '../components/PureComponent';
 import CacheDisabled from '../components/CacheDisabled';
 import CssModulesImagesFontsExample from '../components/CssModulesImagesFontsExample';
 import ManualRenderApp from '../startup/ManualRenderAppRenderer';
-import DeferredRenderApp from '../startup/DeferredRenderAppClient';
 
 import SharedReduxStore from '../stores/SharedReduxStore';
 
@@ -52,7 +51,6 @@ ReactOnRails.register({
   PureComponent,
   CssModulesImagesFontsExample,
   ManualRenderApp,
-  DeferredRenderApp,
   CacheDisabled,
   RenderedHtml,
   ReactHelmetApp,

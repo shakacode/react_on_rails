@@ -30,7 +30,6 @@ import CssModulesImagesFontsExample from '../components/CssModulesImagesFontsExa
 import SharedReduxStore from '../stores/SharedReduxStore';
 
 // Deferred render on the client side w/ server render
-import DeferredRenderApp from '../startup/DeferredRenderAppServer';
 import ManualRenderApp from '../startup/ManualRenderAppRenderer';
 
 // Deferred render on the client side w/ server render
@@ -61,7 +60,6 @@ ReactOnRails.register({
   HelloString,
   PureComponent,
   CssModulesImagesFontsExample,
-  DeferredRenderApp,
   RenderedHtml,
   ReactHelmetApp,
   ImageExample,
