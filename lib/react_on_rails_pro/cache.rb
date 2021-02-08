@@ -51,7 +51,8 @@ module ReactOnRailsPro
         return @serializer_checksum if @serializer_checksum.present? && !Rails.env.development?
         return nil unless ReactOnRailsPro.configuration.serializer_globs.present?
 
-        serializer_files = Dir.glob(ReactOnRailsPro.configuration.serializer_globs)
+        # NOTE: Dir.glob is not stable between machines, even with same OS. So we must sort.
+        serializer_files = Dir.glob(ReactOnRailsPro.configuration.serializer_globs).sort
         digest = Digest::MD5.new
         serializer_files.each { |f| digest.file(f) }
         @serializer_checksum = digest.hexdigest
