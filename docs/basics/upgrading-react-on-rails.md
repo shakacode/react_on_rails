@@ -9,7 +9,7 @@ We specialize in helping companies to quickly and efficiently upgrade. The older
 ### Recent versions
 Make sure that you are on a relatively more recent version of rails and webpacker. Yes, the [rails/webpacker](https://github.com/rails/webpacker) gem is required!
 v12 is tested on Rails 6. It should work on Rails v5. If you're on any older version,
-and v12 doesn't work, please file an issue. 
+and v12 doesn't work, please file an issue.
 
 ### Removed Configuration config.symlink_non_digested_assets_regex
 Remove `config.symlink_non_digested_assets_regex` from your `config/initializers/react_on_rails.rb`.
@@ -25,7 +25,7 @@ If you still need that feature, please file an issue.
 In order to solve the issues regarding React Hooks compatibility, the number of parameters
 for functions is used to determine if you have a Render-Function that will get invoked to
 return a React component, or you are registering a React component defined by a function.
-Please see [Render-Functions and the Rails Context](./render-functions-and-railscontext.md) for
+Please see [Render-Functions and the Rails Context](https://www.shakacode.com/react-on-rails/docs/basics/render-functions-and-railscontext) for
 more information on what a Render-Function is.
 
 ##### Update required for registered functions taking exactly 2 params.
@@ -35,14 +35,14 @@ Registered Objects are of the following type:
     ```js
     export default (props) => <Component {...props} />;
     ```
-    
+
 2. **Function that takes only zero or one params and you return an Object (_not a React Element_)**.  If the function takes zero or one params, **you need to add one or two unused params so you have exactly 2 params** and then that function will be treated as a render function and it can return an Object rather than a React element. If you don't do this, you'll see this obscure error message:
 
 ```
   [SERVER] message: Objects are not valid as a React child (found: object with keys {renderedHtml}). If you meant to render a collection of children, use an array instead.
   in YourComponentRenderFunction
 ```
-  
+
   So look in YourComponentRenderFunction and do this change
 
 ```js
@@ -50,7 +50,7 @@ Registered Objects are of the following type:
 ```
 
    To have exactly 2 arguments:
-   
+
 ```js
     export default (props, _railsContext) => { renderedHTML: getRenderedHTML };
 ```    
@@ -65,13 +65,13 @@ Registered Objects are of the following type:
    an Object**, then no migration is required.
 4. Function that takes **3 params** and uses the 3rd param, `domNodeId`, to call `ReactDOM.hydrate`. If the function takes 3 params, there is **no migration needed** for that function.
 5. ES6 or ES5 class. There is **no migration needed**.
-  
+
 Previously, with case number 2, you could return a React Element.
 
 The fix is simple. Here is an example of the change you'll do:
 
 ![2020-07-07_09-43-51 (1)](https://user-images.githubusercontent.com/1118459/86927351-eff79e80-c0ce-11ea-9172-d6855c45e2bb.png)
- 
+
 ##### Broken, as this function takes two params and it returns a React Element from a JSX Literal
 ```js
 export default (props, railsContext) => <Component {{...props, railsContext} />;

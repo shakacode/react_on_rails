@@ -16,4 +16,4 @@ Rails will start creating the app and will skip the files you have already creat
 3. If it is removeing some of your code then press "n" and add all additions manually
 ```
 
-3. Run `bundle install` and follow [the instructions for installing into an existing Rails app](../basics/installation-into-an-existing-rails-app.md).*
+3. Run `bundle install` and follow [the instructions for installing into an existing Rails app](https://www.shakacode.com/react-on-rails/docs/basics/installation-into-an-existing-rails-app)

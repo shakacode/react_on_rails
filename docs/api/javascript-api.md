@@ -34,7 +34,7 @@ The best source of docs is the main [ReactOnRails.js](https://github.com/shakaco
    * Your Ruby code with get this Object as a Hash containing keys componentHtml and any other
    * custom keys that you added:
    * { renderedHtml: { componentHtml, customKey1, customKey2 } }
-   * See the example in /docs/additional-reading/react-helmet.md
+   * See the example in https://www.shakacode.com/react-on-rails/docs/javascript/react-helmet
    * @param components (key is component name, value is component)
    */
   register(components)
@@ -69,7 +69,7 @@ The best source of docs is the main [ReactOnRails.js](https://github.com/shakaco
    * Allow directly calling the page loaded script in case the default events that trigger react
    * rendering are not sufficient, such as when loading JavaScript asynchronously with TurboLinks:
    * More details can be found here:
-   * https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/turbolinks.md
+   * https://www.shakacode.com/react-on-rails/docs/rails/turbolinks
    */
   reactOnRailsPageLoaded()
 

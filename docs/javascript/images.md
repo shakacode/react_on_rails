@@ -1,8 +1,8 @@
 # Images
 
-1. leading slash necessary on the 
+1. leading slash necessary on the
    a. Option name for the file-loader and url-loader (todo reference)
-   b. Option publicPath for the output (todo reference) 
+   b. Option publicPath for the output (todo reference)
 
 
 
@@ -39,13 +39,13 @@ const assetLoaderRules = [
 
 
 
-A full example can be found at [spec/dummy/client/app/components/ImageExample/ImageExample.jsx](../../spec/dummy/client/app/components/ImageExample/ImageExample.jsx)
+A full example can be found at [spec/dummy/client/app/components/ImageExample/ImageExample.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/components/ImageExample/ImageExample.jsx)
 
-You are free to use images either in image tags or as background images in SCSS files. You can 
+You are free to use images either in image tags or as background images in SCSS files. You can
 use a "global" location of /client/app/assets/images or a relative path to your JS or SCSS file, as
 is done with CSS modules.
 
-**images** is a defined alias, so "images/foobar.jpg" would point to the file at 
+**images** is a defined alias, so "images/foobar.jpg" would point to the file at
 `/client/app/assets/images/foobar.jpg.`
 
 ```
@@ -55,4 +55,3 @@ is done with CSS modules.
     },
   },
 ```
-

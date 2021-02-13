@@ -1,17 +1,8 @@
-![reactrails](https://user-images.githubusercontent.com/10421828/79436261-52159b80-7fd9-11ea-994e-2a98dd43e540.png)
-
-<p align="center">
- <a href="https://shakacode.com/"><img src="https://user-images.githubusercontent.com/10421828/79436256-517d0500-7fd9-11ea-9300-dfbc7c293f26.png"></a>
- <a href="https://forum.shakacode.com/"><img src="https://user-images.githubusercontent.com/10421828/79436266-53df5f00-7fd9-11ea-94b3-b985e1b05bdc.png"></a>
- <a href="https://www.shakacode.com/react-on-rails-pro"><img src="https://user-images.githubusercontent.com/10421828/79436265-53df5f00-7fd9-11ea-8220-fc474f6a856c.png"></a>
- <a href="https://github.com/sponsors/shakacode"><img src="https://user-images.githubusercontent.com/10421828/79466109-cdd90d80-8004-11ea-88e5-25f9a9ddcf44.png"></a>
-</p>
-
----
-
-[![License](https://img.shields.io/badge/license-mit-green.svg)](LICENSE.md) [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![](https://ruby-gem-downloads-badge.herokuapp.com/react_on_rails?type=total)](https://rubygems.org/gems/react_on_rails)
+# React on Rails
 
 *These are the docs for React on Rails 12. To see the version 11 docs, [click here](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
+
+**If you're viewing this page on Github, please go to [our documentation website](https://www.shakacode.com/react-on-rails/docs/) instead!**
 
 #### News
 **October 14, 2020**: [RUBY ROGUES
@@ -71,15 +62,12 @@ Given that `rails/webpacker` gem already provides basic React integration, why w
 1. A supportive community. This [web search shows how live public sites are using React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/).
 1. [Reason ML Support](https://github.com/shakacode/reason-react-on-rails-example).
 
-See [Rails/Webpacker React Integration Options](./docs/rails-webpacker-react-integration-options.md) for comparisons to other gems.
-
 See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
 
 ## ShakaCode Forum Premium Content
 _Requires creating a free account._
 
 * [How to use different versions of a file for client and server rendering](https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352)
-* [How to conditionally render server side based on the device type](https://forum.shakacode.com/t/how-to-conditionally-render-server-side-based-on-the-device-type/1473)
 
 ----
 
@@ -312,11 +300,11 @@ Bug reports and pull requests are welcome. See [Contributing](https://github.com
 
 ## React on Rails Pro
 
-Support React on Rails Pro development [by becoming a Github sponsor](https://github.com/sponsors/shakacode) and get these benefits.
-
-React on Rails Pro includes Node server rendering, fragment caching, code-splitting, and other performance enhancements for React on Rails. For a case study, see the article [HVMN’s 90% Reduction in Server Response Time from React on Rails Pro](https://www.shakacode.com/blog/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro/). The [Wiki](https://github.com/shakacode/react_on_rails/wiki) contains more details.
+React on Rails Pro provides Node server rendering, fragment caching, code-splitting, and other performance enhancements for React on Rails. For a case study, see the article [HVMN’s 90% Reduction in Server Response Time from React on Rails Pro](https://blog.shakacode.com/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db). The [Wiki](https://github.com/shakacode/react_on_rails/wiki) contains more details.
 
 [![2018-09-11_10-31-11](https://user-images.githubusercontent.com/1118459/45467845-5bcc7400-b6bd-11e8-91e1-e0cf806d4ea4.png)](https://blog.shakacode.com/hvmns-90-reduction-in-server-response-time-from-react-on-rails-pro-eb08226687db)
+
+## React on Rails Pro Support
 
 The [React on Rails Pro Support Plan](https://www.shakacode.com/react-on-rails-pro) can help!
 
@@ -330,7 +318,7 @@ ShakaCode can also help you with your custom software development needs. We spec
 
 Please email Justin Gordon [justin@shakacode.com](mailto:justin@shakacode.com), the maintainer of React on Rails, for more information.
 
-### Pro: Fragment Caching
+### Fragment Caching
 
 Fragment caching is a [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro) feature. Fragment caching is a **HUGE** performance booster for your apps. Use the `cached_react_component` and `cached_react_component_hash`. The API is the same as `react_component` and `react_component_hash`, but for 2 differences:
 
@@ -352,7 +340,7 @@ Such fragment caching saves CPU work for your web server and greatly reduces the
 
 Note, even without server rendering (without step 3 above), fragment caching is still effective.
 
-### Pro: Integration with Node.js for Server Rendering
+## Integration with Node.js for Server Rendering
 
 Default server rendering is done by ExecJS. If you want to use a Node.js server for better performing server rendering, [email justin@shakacode.com](mailto:justin@shakacode.com). ShakaCode has built a premium Node rendering server that is part of [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).
 
@@ -372,11 +360,10 @@ For more testimonials, see [Live Projects](https://github.com/shakacode/react_on
 
 # Supporters
 
-The following companies support this open source project, and ShakaCode uses their products! Justin writes React on Rails on [RubyMine](https://www.jetbrains.com/ruby/). We use [Scout](https://scoutapp.com/) to monitor the live performance of [HiChee.com](https://HiChee.com), [Rails AutoScale](https://railsautoscale.com) to scale the dynos of HiChee, [BrowserStack](https://www.browserstack.com) to solve problems with oddball browsers, and [CodersRank](https://codersrank.io/) to find candidates for our team.
+The following companies support this open source project, and ShakaCode uses their products! Justin writes React on Rails on [RubyMine](https://www.jetbrains.com/ruby/). We use [Scout](https://scoutapp.com/) to monitor the live performance of [HawaiiChee.com](https://www.hawaiichee.com), [BrowserStack](https://www.browserstack.com) to solve problems with oddball browsers, and [CodersRank](https://codersrank.io/) to find candidates for our team.
 
 [![2019-09-24_17-48-00](https://user-images.githubusercontent.com/1118459/65567887-96353780-def3-11e9-926d-4a55e2e186ff.png)](https://www.jetbrains.com/ruby/)
 [![Scout](https://user-images.githubusercontent.com/1118459/41828269-106b40f8-77d0-11e8-8d19-9c4b167ef9d8.png)](https://scoutapp.com/)
-[![2020-12-27_21-26-19](https://user-images.githubusercontent.com/1118459/103197530-48dc0e80-488a-11eb-8b1b-a16664b30274.png)](https://railsautoscale.com/)
 [![BrowserStack](https://cloud.githubusercontent.com/assets/1118459/23203304/1261e468-f886-11e6-819e-93b1a3f17da4.png)](https://www.browserstack.com)
 [![CodersRank](https://user-images.githubusercontent.com/1118459/55040254-ad8a7b00-4fcb-11e9-8936-c6765eb30698.png)](https://codersrank.io/?utm_source=github&utm_medium=banner&utm_campaign=shakacode)
 
@@ -388,7 +375,7 @@ I've just moved ShakaCode's development to [ClubHouse](https://clubhouse.io/) fr
 Aloha and best wishes from Justin and the ShakaCode team!
 
 # Work with Us
-ShakaCode is **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded, remote-first, developers that wish to work on our projects, including [HiChee](https://hichee.com). Your main coding interview will be pairing with us on our open source! We're also using [ReasonML](https://reasonml.github.io/) extensively!
+ShakaCode is **[currently looking to hire](http://www.shakacode.com/about/#work-with-us)** like-minded, remote-first, developers that wish to work on our projects, including [Hawaii Chee](https://www.hawaiichee.com). Your main coding interview will be pairing with us on our open source! We're also using [ReasonML](https://reasonml.github.io/) extensively!
 
 # License
 
