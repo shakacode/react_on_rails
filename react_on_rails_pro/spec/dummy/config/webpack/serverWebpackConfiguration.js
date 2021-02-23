@@ -24,7 +24,6 @@ const configureServer = () => {
     minimize: false,
   };
   serverWebpackConfig.plugins.unshift(new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
-
   // Custom output for the server-bundle that matches the config in
   // config/initializers/react_on_rails.rb
   serverWebpackConfig.output = {
@@ -96,6 +95,8 @@ const configureServer = () => {
   // break with SSR. The fix is to use a node renderer and change the target.
   // If using the React on Rails Pro node server renderer, uncomment the next line
   serverWebpackConfig.target = 'node';
+
+  serverWebpackConfig.node = false;
 
   return serverWebpackConfig;
 };

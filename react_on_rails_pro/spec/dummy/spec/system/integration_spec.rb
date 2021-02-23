@@ -243,6 +243,15 @@ describe "display images", :js do
   end
 end
 
+describe "loadable components", :js do
+  before { visit "loadable/page-a" }
+
+  it "displays the proper text" do
+    expect(page).to have_text "This is Page A."
+    expect(page.html).to include("[SERVER] RENDERED Loadable")
+  end
+end
+
 shared_examples "React Component Shared Store" do |url|
   subject { page }
 

@@ -5,7 +5,6 @@ module.exports = function config(api) {
   const isDevelopmentEnv = api.env('development');
   const isProductionEnv = api.env('production');
   const isTestEnv = api.env('test');
-  const isHMR = process.env.WEBPACK_DEV_SERVER;
 
   if (!validEnv.includes(currentEnv)) {
     throw new Error(
@@ -48,6 +47,7 @@ module.exports = function config(api) {
       ],
     ].filter(Boolean),
     plugins: [
+      '@loadable/babel-plugin',
       'babel-plugin-macros',
       [
         '@babel/plugin-proposal-class-properties',

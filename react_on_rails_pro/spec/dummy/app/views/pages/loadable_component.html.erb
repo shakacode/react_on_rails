@@ -1,0 +1,15 @@
+
+<% loadable_app = react_component_hash("Loadable", props: { title: "This is a Loadable Component!" }, prerender: true, trace: true, id: "LoadableComponent-react-component-0") %>
+
+<%= loadable_app["componentHtml"] %>
+
+<hr/>
+
+<h1>React Rails Server Rendering of Loadable Component</h1>
+<pre>
+<%%= react_component("LoadableComponent",
+  { title: "This is a Loadable Component!" },
+  prerender: true,
+  trace: true,
+  id: "LoadableComponent-react-component-0") %>
+</pre>

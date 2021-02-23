@@ -16,12 +16,6 @@ yarn run dummy:install
 
 # Starting the Sample App
 
-## Static Loading of Rails Assets
 ```sh
 foreman start -f Procfile.static
-```
-
-## Creating Assets for Tests
-```sh
-foreman start -f Procfile.spec
 ```
