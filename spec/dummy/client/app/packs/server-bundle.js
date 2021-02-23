@@ -45,6 +45,8 @@ import CacheDisabled from '../components/CacheDisabled';
 
 import SetTimeoutLoggingApp from '../startup/SetTimeoutLoggingApp';
 
+import Loadable from '../startup/loadable-server.imports-loadable';
+
 ReactOnRails.register({
   BrokenApp,
   HelloWorld,
@@ -64,6 +66,7 @@ ReactOnRails.register({
   ReactHelmetApp,
   ImageExample,
   SetTimeoutLoggingApp,
+  Loadable,
 });
 
 ReactOnRails.registerStore({

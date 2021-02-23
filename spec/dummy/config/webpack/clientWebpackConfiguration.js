@@ -1,5 +1,8 @@
 const environment = require('./environment');
 const { merge } = require('webpack-merge');
+const LoadablePlugin = require('@loadable/webpack-plugin');
+
+const isHMR = process.env.HMR;
 
 const configureClient = () => {
   const clientConfigObject = environment.toWebpackConfig();
@@ -14,6 +17,10 @@ const configureClient = () => {
   // error shows referring to window["webpackJsonp"]. That is because the
   // client config is going to try to load chunks.
   delete clientConfig.entry['server-bundle'];
+
+  if (!isHMR) {
+    clientConfig.plugins.unshift(new LoadablePlugin({ filename: 'loadable-stats.json', writeToDisk: true }));
+  }
 
   return clientConfig;
 };

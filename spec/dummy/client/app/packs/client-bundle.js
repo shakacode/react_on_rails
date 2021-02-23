@@ -34,6 +34,8 @@ import SetTimeoutLoggingApp from '../startup/SetTimeoutLoggingApp';
 
 import ComponentWithLodashApp from '../startup/ComponentWithLodashApp';
 
+import Loadable from '../startup/loadable-client.imports-loadable';
+
 ReactOnRails.setOptions({
   traceTurbolinks: true,
 });
@@ -57,6 +59,7 @@ ReactOnRails.register({
   ImageExample,
   SetTimeoutLoggingApp,
   ComponentWithLodashApp,
+  Loadable,
 });
 
 ReactOnRails.registerStore({

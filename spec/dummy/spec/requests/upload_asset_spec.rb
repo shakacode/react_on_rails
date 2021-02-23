@@ -3,8 +3,8 @@
 require "rails_helper"
 
 describe "Upload asset" do
-  let(:asset_filename) { "loadable-stats.json" }
-  let(:asset_filename2) { "loadable-stats2.json" }
+  let(:asset_filename) { "loadable-stats2.json" }
+  let(:asset_filename2) { "loadable-stats3.json" }
   let(:fixture_path) { File.expand_path("./spec/fixtures/#{asset_filename}") }
   let(:fixture_path2) { File.expand_path("./spec/fixtures/#{asset_filename2}") }
   let(:non_exist_fixture_path) { File.expand_path("./spec/fixtures/sample99.json") }
@@ -18,8 +18,8 @@ describe "Upload asset" do
                                         renderer_url: "http://localhost:3800",
                                         renderer_request_retry_limit: 5,
                                         assets_to_copy: [
-                                          Rails.root.join("public", "webpack", "production", "loadable-stats.json"),
-                                          Rails.root.join("public", "webpack", "production", "loadable-stats2.json")
+                                          Rails.root.join("public", "webpack", "production", "loadable-stats2.json"),
+                                          Rails.root.join("public", "webpack", "production", "loadable-stats3.json")
                                         ])
     allow(ReactOnRailsPro).to receive(:configuration).and_return(dbl_configuration)
     FileUtils.mkdir_p(Rails.root.join("public", "webpack", "production"))
