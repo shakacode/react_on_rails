@@ -64,7 +64,7 @@ describe "Pages/Index", :js do
   end
 
   context "when Server Rendering Cached", :caching do
-    let(:serializers_cache_key) { ReactOnRailsPro::Cache.serializers_cache_key }
+    let(:dependencies_cache_key) { ReactOnRailsPro::Cache.dependencies_cache_key }
     let(:base_component_cache_key) { "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}" }
 
     before do
@@ -75,7 +75,7 @@ describe "Pages/Index", :js do
 
     it "adds a value to the cache" do
       base_cache_key_with_prerender = "#{base_component_cache_key}/"\
-        "#{ReactOnRailsPro::Utils.bundle_hash}/#{serializers_cache_key}"
+        "#{ReactOnRailsPro::Utils.bundle_hash}/#{dependencies_cache_key}"
       expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReduxApp})
     end
   end

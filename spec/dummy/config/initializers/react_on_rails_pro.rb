@@ -27,7 +27,7 @@ ReactOnRailsPro.configure do |config|
   # Array of globs to find any files for which changes should bust the fragment cache for
   # cached_react_component and cached_react_component_hash. This should
   # include any files used to generate the JSON props.
-  config.serializer_globs = [File.join(Rails.root, "app", "views", "**", "*.jbuilder")]
+  config.dependency_globs = [File.join(Rails.root, "app", "views", "**", "*.jbuilder")]
 
   # When using the Node Renderer, you may require some extra assets in addition to the bundle.
   # The assets_to_copy option allows the Node Renderer to have assets copied at the end of

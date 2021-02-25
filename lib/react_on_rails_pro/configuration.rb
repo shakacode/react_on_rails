@@ -17,7 +17,7 @@ module ReactOnRailsPro
       renderer_http_pool_warn_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_TIMEOUT,
       renderer_password: nil,
       tracing: Configuration::DEFAULT_TRACING,
-      serializer_globs: Configuration::DEFAULT_SERIALIZER_GLOBS,
+      dependency_globs: Configuration::DEFAULT_DEPENDENCY_GLOBS,
       ssr_pre_hook_js: nil,
       assets_to_copy: nil,
       renderer_request_retry_limit: Configuration::DEFAULT_RENDERER_REQUEST_RETRY_LIMIT
@@ -33,20 +33,20 @@ module ReactOnRailsPro
     DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT = 0.25
     DEFAULT_PRERENDER_CACHING = false
     DEFAULT_TRACING = false
-    DEFAULT_SERIALIZER_GLOBS = nil
+    DEFAULT_DEPENDENCY_GLOBS = nil
     DEFAULT_RENDERER_REQUEST_RETRY_LIMIT = 5
 
     attr_accessor :renderer_url, :renderer_password, :tracing,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
                   :renderer_http_pool_size, :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout,
-                  :serializer_globs, :ssr_pre_hook_js, :assets_to_copy,
+                  :dependency_globs, :ssr_pre_hook_js, :assets_to_copy,
                   :renderer_request_retry_limit
 
     def initialize(renderer_url: nil, renderer_password: nil, server_renderer: nil,
                    renderer_use_fallback_exec_js: nil, prerender_caching: nil,
                    renderer_http_pool_size: nil, renderer_http_pool_timeout: nil,
                    renderer_http_pool_warn_timeout: nil, tracing: nil,
-                   serializer_globs: nil, ssr_pre_hook_js: nil, assets_to_copy: nil,
+                   dependency_globs: nil, ssr_pre_hook_js: nil, assets_to_copy: nil,
                    renderer_request_retry_limit: nil)
       self.renderer_url = renderer_url
       self.renderer_password = renderer_password
@@ -57,7 +57,7 @@ module ReactOnRailsPro
       self.renderer_http_pool_timeout = renderer_http_pool_timeout
       self.renderer_http_pool_warn_timeout = renderer_http_pool_warn_timeout
       self.tracing = tracing
-      self.serializer_globs = serializer_globs
+      self.dependency_globs = dependency_globs
       self.ssr_pre_hook_js = ssr_pre_hook_js
       self.assets_to_copy = assets_to_copy
       self.renderer_request_retry_limit = renderer_request_retry_limit

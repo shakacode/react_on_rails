@@ -41,10 +41,10 @@ describe ReactOnRailsProHelper, type: :helper do
     end
     let(:base_cache_key_with_prerender) do
       "#{base_component_cache_key}/#{ReactOnRailsPro::Utils.bundle_hash}/"\
-      "#{ReactOnRailsPro::Cache.serializers_cache_key}"
+      "#{ReactOnRailsPro::Cache.dependencies_cache_key}"
     end
     let(:base_cache_key_without_prerender) do
-      "#{base_component_cache_key}/#{ReactOnRailsPro::Cache.serializers_cache_key}"
+      "#{base_component_cache_key}/#{ReactOnRailsPro::Cache.dependencies_cache_key}"
     end
     let(:base_js_eval_cache_key) do
       "ror_pro_rendered_html/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}"
