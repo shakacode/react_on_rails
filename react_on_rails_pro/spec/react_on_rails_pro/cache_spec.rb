@@ -120,7 +120,7 @@ describe ReactOnRailsPro::Cache, :caching do
   end
 
   describe ".react_component_cache_key" do
-    it "properly expands cache keys without the serializers" do
+    it "properly expands cache keys without the dependencies" do
       cacheable = instance_double("cacheable")
       allow(cacheable).to receive(:cache_key).and_return("the_cache_key")
       allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
@@ -132,11 +132,11 @@ describe ReactOnRailsPro::Cache, :caching do
                             cacheable])
     end
 
-    it "properly expands cache keys with the serializers" do
+    it "properly expands cache keys with the dependencies" do
       cacheable = instance_double("cacheable")
       allow(cacheable).to receive(:cache_key).and_return("the_cache_key")
       allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
-      allow(described_class).to receive(:serializers_cache_key).and_return("abc")
+      allow(described_class).to receive(:dependencies_cache_key).and_return("abc")
 
       result = described_class.react_component_cache_key("Foobar", cache_key: cacheable,
                                                                    prerender: true)
@@ -146,28 +146,28 @@ describe ReactOnRailsPro::Cache, :caching do
     end
   end
 
-  describe ".serializers_cache_key" do
+  describe ".dependencies_cache_key" do
     let(:md5_instance) { instance_double(Digest::MD5) }
 
-    context "when serializer_files is defined" do
+    context "when dependency_globs is defined" do
       it "returns an MD5 based on the files" do
-        serializer_glob = File.join(FixturesHelper.fixtures_dir, "app", "views", "**", "*.jbuilder")
-        allow(ReactOnRailsPro.configuration).to receive(:serializer_globs).and_return(serializer_glob)
+        dependency_glob = File.join(FixturesHelper.fixtures_dir, "app", "views", "**", "*.jbuilder")
+        allow(ReactOnRailsPro.configuration).to receive(:dependency_globs).and_return(dependency_glob)
         allow(Digest::MD5).to receive(:new).and_return(md5_instance)
         allow(md5_instance).to receive(:file)
         allow(md5_instance).to receive(:hexdigest).and_return("eb3dc8ec96886ec81203c9e13f0277a7")
 
-        result = described_class.serializers_cache_key
+        result = described_class.dependencies_cache_key
 
         expect(result).to eq("eb3dc8ec96886ec81203c9e13f0277a7")
       end
     end
 
-    context "when serializer_files is not defined" do
+    context "when dependency_globs is not defined" do
       it "returns nil" do
-        allow(ReactOnRailsPro.configuration).to receive(:serializer_globs).and_return(nil)
+        allow(ReactOnRailsPro.configuration).to receive(:dependency_globs).and_return(nil)
 
-        result = described_class.serializers_cache_key
+        result = described_class.dependencies_cache_key
 
         expect(result).to be_nil
       end

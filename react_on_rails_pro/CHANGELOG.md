@@ -3,6 +3,11 @@ All notable changes to this project will be documented in this file. Items under
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+- Renamed `config.serializer_globs`to `config.dependency_globs`. [PR 165](https://github.com/shakacode/react_on_rails_pro/pull/165) by [judahmeek](https://github.com/judahmeek)
+
+### Upgrade Steps
+In your `config/initializers/react_on_rails_pro.rb`:
+1. Rename any references from `config.serializer_globs` to `config.dependency_globs`
 
 ## [2.0.0.beta.0] - 2020-12-03
 * Renamed VM Renderer to Node Renderer

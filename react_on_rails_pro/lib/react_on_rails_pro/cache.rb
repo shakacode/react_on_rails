@@ -45,17 +45,17 @@ module ReactOnRailsPro
         keys
       end
 
-      def serializers_cache_key
+      def dependencies_cache_key
         # https://github.com/shakacode/react_on_rails_pro/issues/32
         # https://github.com/shakacode/react_on_rails/issues/39#issuecomment-143472325
-        return @serializer_checksum if @serializer_checksum.present? && !Rails.env.development?
-        return nil unless ReactOnRailsPro.configuration.serializer_globs.present?
+        return @dependency_checksum if @dependency_checksum.present? && !Rails.env.development?
+        return nil unless ReactOnRailsPro.configuration.dependency_globs.present?
 
         # NOTE: Dir.glob is not stable between machines, even with same OS. So we must sort.
-        serializer_files = Dir.glob(ReactOnRailsPro.configuration.serializer_globs).sort
+        dependency_files = Dir.glob(ReactOnRailsPro.configuration.dependency_globs).sort
         digest = Digest::MD5.new
-        serializer_files.each { |f| digest.file(f) }
-        @serializer_checksum = digest.hexdigest
+        dependency_files.each { |f| digest.file(f) }
+        @dependency_checksum = digest.hexdigest
       end
 
       def react_component_cache_key(component_name, options)
@@ -69,7 +69,7 @@ module ReactOnRailsPro
         # NOTE: Rails seems to do this automatically: ActiveSupport::Cache.expand_cache_key(keys)
         [
           *base_cache_key("ror_component", prerender: options[:prerender]),
-          serializers_cache_key,
+          dependencies_cache_key,
           component_name,
           cache_key_value
         ].compact
