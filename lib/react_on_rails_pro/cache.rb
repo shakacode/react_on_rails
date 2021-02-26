@@ -51,11 +51,7 @@ module ReactOnRailsPro
         return @dependency_checksum if @dependency_checksum.present? && !Rails.env.development?
         return nil unless ReactOnRailsPro.configuration.dependency_globs.present?
 
-        # NOTE: Dir.glob is not stable between machines, even with same OS. So we must sort.
-        dependency_files = Dir.glob(ReactOnRailsPro.configuration.dependency_globs).sort
-        digest = Digest::MD5.new
-        dependency_files.each { |f| digest.file(f) }
-        @dependency_checksum = digest.hexdigest
+        @dependency_checksum = ReactOnRailsPro::Utils.digest_of_globs(ReactOnRailsPro.configuration.dependency_globs)
       end
 
       def react_component_cache_key(component_name, options)
