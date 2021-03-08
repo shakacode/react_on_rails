@@ -2,8 +2,12 @@
 
 module ReactOnRails
   module WebpackerUtils
+    # TODO: V13 code should be cleaned up so that the webpacker gem is required.
+    # This check should only be done at startup.
     def self.using_webpacker?
-      ReactOnRails::Utils.gem_available?("webpacker")
+      return @using_webpacker if defined?(@using_webpacker)
+
+      @using_webpacker = ReactOnRails::Utils.gem_available?("webpacker")
     end
 
     def self.webpacker_webpack_production_config_exists?

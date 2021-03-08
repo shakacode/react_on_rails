@@ -372,13 +372,13 @@ For more testimonials, see [Live Projects](https://github.com/shakacode/react_on
 
 # Supporters
 
-The following companies support this open source project, and ShakaCode uses their products! Justin writes React on Rails on [RubyMine](https://www.jetbrains.com/ruby/). We use [Scout](https://scoutapp.com/) to monitor the live performance of [HiChee.com](https://HiChee.com), [Rails AutoScale](https://railsautoscale.com) to scale the dynos of HiChee, [BrowserStack](https://www.browserstack.com) to solve problems with oddball browsers, and [CodersRank](https://codersrank.io/) to find candidates for our team.
+The following companies support this open source project, and ShakaCode uses their products! Justin writes React on Rails on [RubyMine](https://www.jetbrains.com/ruby/). We use [Scout](https://scoutapp.com/) to monitor the live performance of [HiChee.com](https://HiChee.com), [Rails AutoScale](https://railsautoscale.com) to scale the dynos of HiChee, [BrowserStack](https://www.browserstack.com) to solve problems with oddball browsers.
 
 [![2019-09-24_17-48-00](https://user-images.githubusercontent.com/1118459/65567887-96353780-def3-11e9-926d-4a55e2e186ff.png)](https://www.jetbrains.com/ruby/)
 [![Scout](https://user-images.githubusercontent.com/1118459/41828269-106b40f8-77d0-11e8-8d19-9c4b167ef9d8.png)](https://scoutapp.com/)
 [![2020-12-27_21-26-19](https://user-images.githubusercontent.com/1118459/103197530-48dc0e80-488a-11eb-8b1b-a16664b30274.png)](https://railsautoscale.com/)
 [![BrowserStack](https://cloud.githubusercontent.com/assets/1118459/23203304/1261e468-f886-11e6-819e-93b1a3f17da4.png)](https://www.browserstack.com)
-[![CodersRank](https://user-images.githubusercontent.com/1118459/55040254-ad8a7b00-4fcb-11e9-8936-c6765eb30698.png)](https://codersrank.io/?utm_source=github&utm_medium=banner&utm_campaign=shakacode)
+
 
 ## Clubhouse
 I've just moved ShakaCode's development to [ClubHouse](https://clubhouse.io/) from Trello. We're going to be doing this with all our projects. If you want to **try ClubHouse and get 2 months free beyond the 14-day trial period**, click [here to use ShakaCode's referral code](http://r.clbh.se/mvfoNeH). We're participating in their awesome triple-sided referral program, which you can read about [here](https://clubhouse.io/blog/clubhouse-referral-program-5f614bb437c3). By using our [referral code](http://r.clbh.se/mvfoNeH) you'll be supporting ShakaCode and, thus, React on Rails!

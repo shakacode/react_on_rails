@@ -16,6 +16,11 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+
+### [12.0.5] - 2021-03-07
+#### Fixed
+- Stop setting NODE_ENV value during precompile, as it interferred with rails/webpacker's setting of NODE_ENV to production by default. Fixes [#1334](https://github.com/shakacode/react_on_rails/issues/1334). [PR 1356: Don't set NODE_ENV in assets.rake](https://github.com/shakacode/react_on_rails/pull/1356) by [alexrozanski](https://github.com/alexrozanski).
+
 ### [12.0.4] - 2020-11-14
 #### Fixed
 - Install generator now specifies the version. Fixes [React on Rails Generator installs the older npm package #1336](https://github.com/shakacode/react_on_rails/issues/1336). [PR 1338Fix Generator to use Exact NPM Version](https://github.com/shakacode/react_on_rails/pull/1338) by [justin808](https://github.com/justin808).
