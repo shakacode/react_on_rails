@@ -158,23 +158,29 @@ module ReactOnRails
     end
 
     def self.gem_available?(name)
-      Gem::Specification.find_all_by_name(name).present?
+      Gem.loaded_specs[name].present?
     rescue Gem::LoadError
       false
     rescue StandardError
       Gem.available?(name).present?
     end
 
+    # Todo -- remove this for v13, as we don't need both boolean and number
     def self.react_on_rails_pro?
       return @react_on_rails_pro if defined?(@react_on_rails_pro)
 
-      @_eact_on_rails_pro = gem_available?("react_on_rails_pro")
+      @react_on_rails_pro = gem_available?("react_on_rails_pro")
     end
 
+    # Return an empty string if React on Rails Pro is not installed
     def self.react_on_rails_pro_version
       return @react_on_rails_pro_version if defined?(@react_on_rails_pro_version)
 
-      @react_on_rails_pro_version = Gem::Specification.find_all_by_name("react_on_rails_pro")[0].version.to_s
+      @react_on_rails_pro_version = if react_on_rails_pro?
+                                      Gem.loaded_specs["react_on_rails_pro"].version.to_s
+                                    else
+                                      ""
+                                    end
     end
 
     def self.smart_trim(str, max_length = 1000)
