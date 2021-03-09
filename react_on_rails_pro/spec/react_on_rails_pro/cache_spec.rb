@@ -10,7 +10,7 @@ describe ReactOnRailsPro::Cache, :caching do
       allow(Rails).to receive(:logger).and_return(logger_mock)
     end
 
-    it "fetches the value from the cache" do
+    it "fetches the value from the cache if the value is a string" do
       result = "<div>Something</div>"
       create_component_code = instance_double("create_component_code")
       allow(create_component_code).to receive(:call) { result }
@@ -32,6 +32,35 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(cache_data.keys.first)
         .to eq("ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/the_cache_key")
       expect(cache_data.values.first.value).to eq(result)
+    end
+
+    it "fetches the value from the cache if the value is a Hash" do
+      html = "<div>Something</div>"
+      ssr_result = { component_html: html }
+      create_component_code = instance_double("create_component_code")
+      allow(create_component_code).to receive(:call) { ssr_result }
+
+      result1 = described_class.fetch_react_component("MyComponent",
+                                                      if: true,
+                                                      cache_key: "the_cache_key") do
+        create_component_code.call
+      end
+
+      result2 = described_class.fetch_react_component("MyComponent",
+                                                      if: true,
+                                                      cache_key: "the_cache_key") do
+        create_component_code.call
+      end
+
+      expect(result1[:RORP_CACHE_HIT]).to eq(false)
+      expect(result2[:RORP_CACHE_HIT]).to eq(true)
+      expect(result2[:RORP_CACHE_KEY])
+        .to eq(described_class.react_component_cache_key("MyComponent", { cache_key: "the_cache_key" }))
+
+      expect(create_component_code).to have_received(:call).once
+      string_cache_key = "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/the_cache_key"
+      expect(cache_data.keys.first).to eq(string_cache_key)
+      expect(cache_data.values.first.value[:component_html]).to eq(html)
     end
 
     it "fetches the value from the cache if cache_key is a lambda" do
