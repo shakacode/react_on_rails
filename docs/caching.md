@@ -152,7 +152,7 @@ end %>
 And a fragment caching version for the `react_component_hash`:
 
 ```ruby
-<% react_helmet_app = cached_react_component_hash("ReactHelmetApp", cache_key: [@user, @post],
+<% result = cached_react_component_hash("ReactHelmetApp", cache_key: [@user, @post],
                                            id: "react-helmet-0") do
     some_slow_method_that_returns_props
    end %>
@@ -163,7 +163,11 @@ And a fragment caching version for the `react_component_hash`:
 
 <%= react_helmet_app["componentHtml"] %>
 
+<% printable_cache_key = ReactOnRailsPro::Utils.printable_cache_key(result[:RORP_CACHE_KEY]) %>
+<!-- <%= "CACHE_HIT: #{result[:RORP_CACHE_HIT]}, RORP_CACHE_KEY: #{printable_cache_key}" %> -->
 ````
+Note in the above example, React on Rails Pro returns both the raw cache key and whether or not there was a cache hit.
+
 
 ### Your JavaScript Bundles and Cache Keys 
 

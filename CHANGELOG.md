@@ -3,6 +3,7 @@ All notable changes to this project will be documented in this file. Items under
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+
 - Renamed `config.serializer_globs`to `config.dependency_globs`. [PR 165](https://github.com/shakacode/react_on_rails_pro/pull/165) by [judahmeek](https://github.com/judahmeek)
 
 ### Upgrade Steps
@@ -26,6 +27,18 @@ New
 ```js
 const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
 ```
+
+## [1.5.5-fixes] - 2021-03-02
+### Added
+- Improve cache information from react_component_hash. Hash result now includes 2 new keys
+  * RORP_CACHE_HIT
+  * RORP_CACHE_KEY
+  Additionally, ReactOnRailsPro::Utils.printable_cache_key(cache_key) added.
+
+ [PR 140](https://github.com/shakacode/react_on_rails_pro/pull/140) by [justin808](https://github.com/justin808).
+
+### Fixed
+- Cache key not stable between machines same deploy. [PR 159](https://github.com/shakacode/react_on_rails_pro/pull/136) by [justin808](https://github.com/justin808). 
 
 ## [1.5.6] - 2020-12-02
 Switched to releases being published packages.

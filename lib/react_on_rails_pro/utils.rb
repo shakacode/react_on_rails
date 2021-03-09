@@ -117,5 +117,20 @@ module ReactOnRailsPro
       extension = File.extname(filename)
       Rack::Mime.mime_type(extension)
     end
+
+    # TODO: write test
+    def self.printable_cache_key(cache_key)
+      cache_key.map do |key|
+        if key.is_a?(Enumerable)
+          printable_cache_key(key)
+        elsif key.respond_to?(:cache_key_with_version)
+          key.cache_key_with_version
+        elsif key.respond_to?(:cache_key)
+          key.cache_key
+        else
+          key.to_s
+        end
+      end.join("_").underscore
+    end
   end
 end

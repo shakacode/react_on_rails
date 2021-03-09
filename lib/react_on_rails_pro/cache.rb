@@ -7,12 +7,22 @@ module ReactOnRailsPro
     class << self
       # options[:cache_options] can include :compress, :expires_in, :race_condition_ttl and
       # other options
-      def fetch_react_component(component_name, options, &block)
+      def fetch_react_component(component_name, options)
         if use_cache?(options)
           cache_key = react_component_cache_key(component_name, options)
           Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
           cache_options = options[:cache_options]
-          Rails.cache.fetch(cache_key, cache_options, &block)
+          cache_hit = true
+          result = Rails.cache.fetch(cache_key, cache_options) do
+            cache_hit = false
+            yield
+          end
+          # Pass back the cache key in the results only if the result is a Hash
+          if result.is_a?(Hash)
+            result[:RORP_CACHE_KEY] = cache_key
+            result[:RORP_CACHE_HIT] = cache_hit
+          end
+          result
         else
           yield
         end
