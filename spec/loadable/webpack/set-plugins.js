@@ -59,9 +59,9 @@ function setPlugins(builderConfig, webpackConfig) {
     ifUseHmr(
       () =>
         new ReactRefreshWebpackPlugin({
-          // https://github.com/pmmmwh/react-refresh-webpack-plugin/issues/11
-          // https://github.com/pmmmwh/react-refresh-webpack-plugin/issues/15
-          disableRefreshCheck: true,
+          overlay: {
+            sockPort: devServer.port,
+          },
         }),
     ),
 
