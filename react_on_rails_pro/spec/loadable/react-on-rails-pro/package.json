@@ -10,6 +10,6 @@
   "scripts": {
     "node-renderer": "echo 'Starting React on Rails Pro Node Renderer.' && node ./react-on-rails-pro-node-renderer.js",
     "preinstall": "yarn run link-source && yalc add --link @shakacode-tools/react-on-rails-pro-node-renderer",
-    "link-source": "cd ../../../.. && yalc publish"
+    "link-source": "cd ../../.. && yalc publish"
   }
 }

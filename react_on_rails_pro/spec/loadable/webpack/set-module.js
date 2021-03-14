@@ -95,6 +95,28 @@ function setModule(builderConfig, webpackConfig) {
         ],
         exclude: /node_modules/,
       },
+      {
+        test: /\.css$/,
+        use: builderConfig.serverRendering
+          ? {
+              loader: 'css-loader',
+              options: {
+                modules: true,
+                importLoaders: 0,
+              },
+            }
+          : [
+              'style-loader',
+              {
+                loader: 'css-loader',
+                options: {
+                  modules: true,
+                  importLoaders: 1,
+                },
+              },
+            ],
+      },
+      /* example configuration
       // Support loading .gql files as GraphQL queries/mutations/fragments
       // https://github.com/apollographql/graphql-tag#webpack-preprocessing-with-graphql-tagloader
       {
@@ -133,7 +155,7 @@ function setModule(builderConfig, webpackConfig) {
             publicPath: `/webpack/${process.env.NODE_ENV}/`,
           },
         },
-      },
+      },*/
     ],
   };
 

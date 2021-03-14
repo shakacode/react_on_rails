@@ -3,6 +3,7 @@ import { BrowserRouter, StaticRouter } from 'react-router-dom';
 
 import Header from '../components/Header';
 import Routes from '../routes/Routes';
+import Letters from '../components/letters';
 
 const App = (props) => {
   if (typeof window === `undefined`) {
@@ -10,6 +11,7 @@ const App = (props) => {
       <StaticRouter location={props.path} context={{}}>
         <Header />
         <Routes />
+        <Letters />
       </StaticRouter>
     );
   }
@@ -17,6 +19,7 @@ const App = (props) => {
     <BrowserRouter>
       <Header />
       <Routes />
+      <Letters />
     </BrowserRouter>
   );
 };
