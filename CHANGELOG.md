@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file. Items under
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+- Added cache debugging info for simple prerender caching. RORP_CACHE_HIT and RORP_CACHE_KEY is returned
+  for prerender caching, which is only when there is no proper caching.
+
+- Renamed `config.serializer_globs`to `config.dependency_globs`. [PR 165](https://github.com/shakacode/react_on_rails_pro/pull/165) by [judahmeek](https://github.com/judahmeek)
+
 ### 2.0 Upgrade Steps
 In your `config/initializers/react_on_rails_pro.rb`:
 1. Rename any references from `config.serializer_globs` to `config.dependency_globs`
