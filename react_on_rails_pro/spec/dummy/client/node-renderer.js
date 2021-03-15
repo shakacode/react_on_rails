@@ -28,6 +28,15 @@ const config = {
   // Uncomment and change value for testing the honeybadger API integration
   honeybadgerApiKey: 'a602365c',
 
+  // This is a test account for React on Rails Pro
+  // https://sentry.io/settings/react-on-rails-pro/projects/nodejs/keys/
+  // Only project contributors have access to see the test errors.
+  sentryDSN: 'https://35ae284fec944acd89915dee2b9f3bc8@o504646.ingest.sentry.io/5591817',
+
+  sentryTracing: true,
+
+  sentryTracesSampleRate: 1,
+
   // supportModules should be set to true to allow the server-bundle code to see require, exports, etc.
   // false is like the ExecJS behavior
   // this option is required to equal `true` if you want to use loadable components

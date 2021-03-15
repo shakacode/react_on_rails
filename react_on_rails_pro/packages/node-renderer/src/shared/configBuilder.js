@@ -21,7 +21,7 @@ const DEFAULT_PORT = 3800;
 const DEFAULT_LOG_LEVEL = 'info';
 const { env } = process;
 const MAX_DEBUG_SNIPPET_LENGTH = 1000;
-const DEFAULT_SAMPLE_RATE = 0.5;
+const DEFAULT_SAMPLE_RATE = 0.1;
 
 let config;
 let userConfig;

@@ -160,12 +160,12 @@ describe "React Router", js: true, driver: js_errors_driver do
     it "clicking links correctly renders other pages" do
       click_link "Router First Page"
       expect(page).to have_current_path("/react_router/first_page")
-      first_page_header_text = page.find(:css, "h2").text
+      first_page_header_text = page.find(:css, "h2#first-page").text
       expect(first_page_header_text).to eq("React Router First Page")
 
       click_link "Router Second Page"
       expect(page).to have_current_path("/react_router/second_page")
-      second_page_header_text = page.find(:css, "h2").text
+      second_page_header_text = page.find(:css, "h2#second-page").text
       expect(second_page_header_text).to eq("React Router Second Page")
     end
   end
@@ -177,7 +177,7 @@ describe "Manual Rendering", :js do
   before { visit "/client_side_manual_render" }
 
   it "renderer function is called successfully" do
-    header_text = page.find(:css, "h1").text
+    header_text = page.find(:css, "h1#manual-render").text
     expect(header_text).to eq("Manual Render Example")
     expect(page).to have_text "If you can see this, you can register renderer functions."
   end
@@ -213,7 +213,7 @@ describe "generator function returns renderedHtml as an object with additional H
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
     subject { page }
 
-    before { visit react_helmet_path }
+    before { visit cached_react_helmet_path }
 
     it "renderedHtmls should not have any errors" do
       expect(page).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'

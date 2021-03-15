@@ -6,6 +6,9 @@ Rails.application.routes.draw do
 
   # You can have the root of your site routed with "root"
   root "pages#index"
+  get "server_side_redux_app_cached" => "pages#server_side_redux_app_cached"
+  get "cached_react_helmet" => "pages#cached_react_helmet"
+  get "loadable(/*all)" => "pages#loadable_component", as: :loadable_component
 
   get "client_side_hello_world" => "pages#client_side_hello_world"
   get "client_side_hello_world_shared_store" => "pages#client_side_hello_world_shared_store"
@@ -23,16 +26,13 @@ Rails.application.routes.draw do
   get "server_side_hello_world_es5" => "pages#server_side_hello_world_es5"
   get "server_side_redux_app" => "pages#server_side_redux_app"
   get "server_side_hello_world_with_options" => "pages#server_side_hello_world_with_options"
-  get "server_side_redux_app_cached" => "pages#server_side_redux_app_cached"
   get "client_side_manual_render" => "pages#client_side_manual_render"
   get "render_js" => "pages#render_js"
   get "react_router(/*all)" => "react_router#index", as: :react_router
   get "pure_component" => "pages#pure_component"
-  get "loadable(/*all)" => "pages#loadable_component", as: :loadable_component
   get "css_modules_images_fonts_example" => "pages#css_modules_images_fonts_example"
   get "turbolinks_cache_disabled" => "pages#turbolinks_cache_disabled"
   get "rendered_html" => "pages#rendered_html"
-  get "react_helmet" => "pages#react_helmet"
   get "broken_app" => "pages#broken_app"
   get "image_example" => "pages#image_example"
   get "server_render_with_timeout" => "pages#server_render_with_timeout"
