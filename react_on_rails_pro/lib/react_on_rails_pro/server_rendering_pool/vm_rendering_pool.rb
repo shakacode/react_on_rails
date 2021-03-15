@@ -52,6 +52,8 @@ module ReactOnRailsPro
             .set_request_digest_on_render_options(js_code, render_options)
 
           # TODO: Remove the request_digest. See https://github.com/shakacode/react_on_rails_pro/issues/119
+          # From the request path
+          # path = "/bundles/#{@bundle_update_utc_timestamp}/render"
           path = "/bundles/#{@bundle_update_utc_timestamp}/render/#{render_options.request_digest}"
 
           response = ReactOnRailsPro::Request.render_code(path, js_code, send_bundle)

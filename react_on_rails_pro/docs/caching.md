@@ -44,7 +44,7 @@ Completed 200 OK in 19ms (Views: 16.4ms | ActiveRecord: 0.0ms)
 1. It's much easier than configuring fragment caching. So long as you have some space in your Rails cache, "it should just work."
 
 ### Why not?
-I'm not sure any reasons to turn this off, other than you don't have the cache space available. 
+If you're using regular caching for most componentas (cached_react_component_hash), and you don't want to use caching for other components, then having prerender caching still results in caching for all your rendering calls, increasing the liklihood of premature cache ejection.
 
 In the future, React on Rails will allow stateful server rendering. Thus, your server side JavaScript depend on externalities, such as AJAX calls for
 GraphQL. In that case, you will set this caching to false.
@@ -65,6 +65,14 @@ Server rendering JavaScript evaluation requests are cached by a cache key that c
 
 1. Hash of the server bundle.
 2. The JavaScript code to evaluate.
+
+### Diagnostics
+if you're using `react_component_hash`, you'll get 2 extra keys returned:
+
+1. RORP_CACHE_KEY: the prerender cache key
+2. RORP_CACHE_HIT: whether or not there was a cache hit.
+
+It can be useful to log these to the rendered HTML page to debug caching issues.
 
 ## React on Rails Fragment Caching
 

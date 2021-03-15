@@ -20,12 +20,22 @@ module ReactOnRailsPro
           ::ReactOnRailsPro::Utils.with_trace(render_options.react_component_name) do
             # See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
             # the digest is on the render options.
+            # TODO: the request digest should be removed unless prerender caching is used
             set_request_digest_on_render_options(js_code, render_options)
             if ReactOnRailsPro.configuration.prerender_caching &&
                render_options.internal_option(:skip_prerender_cache).nil?
-              Rails.cache.fetch(cache_key(js_code, render_options)) do
+              prerender_cache_key = cache_key(js_code, render_options)
+              prerender_cache_hit = true
+              result = Rails.cache.fetch(prerender_cache_key) do
+                prerender_cache_hit = false
                 render_on_pool(js_code, render_options)
               end
+              # Pass back the cache key in the results only if the result is a Hash
+              if result.is_a?(Hash)
+                result[:RORP_CACHE_KEY] = prerender_cache_key
+                result[:RORP_CACHE_HIT] = prerender_cache_hit
+              end
+              result
             else
               render_on_pool(js_code, render_options)
             end
