@@ -1,0 +1,40 @@
+
+<% react_helmet_app = cached_react_component_hash("ReactHelmetApp",
+                                                  cache_key: "A",
+                                                  id: "react-helmet-0",
+                                                  trace: true) do
+  calc_slow_app_props_server_render
+end %>
+
+
+<% content_for :title do %>
+  <%= react_helmet_app['title'] %>
+<% end %>
+
+<%= react_helmet_app["componentHtml"] %>
+
+<hr/>
+
+This page demonstrates a generator function that returns htmlResult as an object
+with HTML strings on the server side. It is useful to manipulating &lt;head&gt;
+content. Check out the page title!
+
+<h2>
+  Notes on Fragment Caching
+</h2>
+<ol>
+  <li>
+    Toggle caching in development mode: `rails dev:cache`
+  </li>
+  <li>
+    Refresh this page and you will NOT see this print again in your console for your server.
+    This confirms that the fragment of HTML was cached and your calculation of props was not done again.
+    This can be a big performance boost!
+
+    <pre>
+      XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      calling slow calc_app_props_server_render
+      XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    </pre>
+  </li>
+</ol>

@@ -1,10 +1,18 @@
 import React from 'react';
 
+/**
+ * TODO: Node rendering server should handle a timeout.
+ */
 const SetTimeoutLoggingApp = (_props) => {
   // eslint-disable-next-line no-console
-  setTimeout(() => console.error('*****TIMEOUT DONE!*****'), 5000);
+  const component = () => <div>Called setTimeout and returned this.</div>;
+  const doIt = () => component;
+  console.log('ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ');
+  console.log('about to call setTimeout');
+  console.log('ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ');
 
-  return <div>Called setTimeout.</div>;
+  const promise = setTimeout(doIt, 5000);
+  return promise;
 };
 
 export default SetTimeoutLoggingApp;

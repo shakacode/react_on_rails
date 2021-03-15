@@ -1,4 +1,0 @@
-rails: DISABLE_TURBOLINKS=TRUE REACT_ON_RAILS_ENV= rails s -b 0.0.0.0
-rails-client-assets: sh -c 'yarn run build:dev:client'
-rails-server-assets: sh -c 'yarn run build:dev:server'
-node-renderer: yarn run node-renderer

@@ -107,18 +107,6 @@ jobs:
       - run: *lint-js
       - run: *format
 
-  prettier:
-    docker:
-      - image: *docker_image
-    parallelism: 1
-    steps:
-      - checkout
-      - restore_cache: *restore-package-node-modules-cache
-      - run:
-          name: prettier
-          command: yarn start format.listDifferent
-
-
   # Install Node modules for Renderer package with Yarn and save them to chache.
   install-package-node-packages:
     docker:
@@ -286,12 +274,6 @@ workflows:
           requires:
             - install-package-node-packages
             - install-package-ruby-gems
-      - prettier:
-          filters:
-            branches:
-              ignore: master
-          requires:
-            - install-package-node-packages
       - build-dummy-app-webpack-test-bundles:
           requires:
             - install-dummy-app-node-packages

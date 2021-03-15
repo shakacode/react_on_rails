@@ -1,3 +1,3 @@
 json.helloWorldData do
-  json.name @name
+  json.name name
 end

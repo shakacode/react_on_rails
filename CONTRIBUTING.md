@@ -1,16 +1,12 @@
 # Tips for Contributors
 
-## Install
+## Installation
 
-1. git clone
-
-```
+```sh
 cd react_on_rails_pro
-bundle && yarn
-cd spec/dummy
-bundle && yarn
-
+bundle && yarn && cd spec/dummy && bundle && yarn
 ```
+See the example apps under `/spec`
 
 ## Summary
 
