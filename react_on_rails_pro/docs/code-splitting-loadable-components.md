@@ -5,7 +5,7 @@ by ShakaCode
 
 ## Introduction
 The [React library recommends](https://loadable-components.com/docs/getting-started/) the use of React.lazy for code splitting with dynamic imports except
-when using server-side rendering. In that case, as of February, 2020, they recommend [Loadable Components](https://loadable-components.com)
+when using server-side rendering. In that case, as of February 2020, they recommend [Loadable Components](https://loadable-components.com)
 for server-side rendering with dynamic imports. 
 
 Note, in 2019 and prior, the code-splitting feature was implemented using `react-loadable`. The React
@@ -45,7 +45,7 @@ You need to configure 3 things:
 3. `plugins`
   a. server-side:  `new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 })`
 
-```
+```js
 {
   target: 'node',
   plugins: [
@@ -66,7 +66,7 @@ The react_on_rails_pro node-renderer expects only one single server-bundle. In o
 #### Client config
 
 For the client config we only need to add the plugin:
-```
+```js
 {
   plugins: [
     ...,
@@ -83,7 +83,7 @@ Per [the docs](https://loadable-components.com/docs/babel-plugin/#transformation
 > The plugin transforms your code to be ready for Server Side Rendering
 
 Add this to `babel.config.js`:
-```
+```js
 {
   "plugins": ["@loadable/babel-plugin"]
 }
@@ -95,16 +95,23 @@ https://loadable-components.com/docs/babel-plugin/
 
 Instead of importing the component directly, use a dynamic import:
 
-```
+```js
 import load from '@loadable/component'
 const MyComponent = load(() => import('./MyComponent'))
 ```
 
 ### Resolving issue with ChunkLoadError
 
-Sometimes chunks might not be loaded (network issues or others). This can be fixed by using retry loop:
+Sometimes chunks might not be loaded (network issues or others). You may get errors like this:
 
+```js
+ChunkLoadError: Loading chunk 6 failed.
+(error: https://www.cityfalcon.com/packs/js/News-58215546ef43bc340bac.chunk.js)
 ```
+
+This can be fixed by using a retry loop:
+
+```js
 // https://gist.github.com/briancavalier/842626
 const consoleDebug = (fn) => {
   if (typeof console.debug !== 'undefined') {
@@ -132,7 +139,7 @@ export default retry;
 
 Then use it in your component:
 
-```
+```js
 import retry from 'utils/retry';
 const HomePage = loadable(() => retry(() => import('./HomePage')));
 ```
@@ -217,7 +224,7 @@ ReactOnRails.register({
 ## Configure react_on_rails_pro
 
 ### React on Rails Pro
-You must sent `config.assets_top_copy` so that the node-renderer will have access to the loadable-stats.json.
+You must set `config.assets_top_copy` so that the node-renderer will have access to the loadable-stats.json.
 
 ```ruby
   config.assets_to_copy = Rails.root.join("public", "webpack", Rails.env, "loadable-stats.json")
@@ -260,3 +267,42 @@ reactOnRailsProNodeRenderer(config);
 
 <%= content_for :script_tags, res['scriptTags'] %>
 ```
+
+## Making HMR Work
+To make HMR work, it's best to disable loadable-components when using the Dev Server.
+
+Take a look at the code searches for ['imports-loadable'](https://github.com/shakacode/react_on_rails_pro/search?q=imports-loadable&type=code) and ['imports-hmr'](https://github.com/shakacode/react_on_rails_pro/search?q=imports-hmr&type=code)
+
+The general concept is that we have a non-loadable, HMR-ready, file that substitutes for the loadable-enabled one, with the suffixes `imports-hmr.js` instead of `imports-loadable.js`
+
+### Webpack configuration
+Use the [NormalModuleReplacement plugin](https://webpack.js.org/plugins/normal-module-replacement-plugin/):
+
+[code](https://github.com/shakacode/react_on_rails_pro/blob/a361f4e163b9170f180ae07ee312fb9b4c719fc3/spec/dummy/config/webpack/environment.js#L81-L91)
+```js
+if (isWebpackDevServer) {
+  environment.plugins.append(
+    'NormalModuleReplacement',
+    new webpack.NormalModuleReplacementPlugin(/(.*)\.imports-loadable(\.jsx)?/, (resource) => {
+      /* eslint-disable no-param-reassign */
+      resource.request = resource.request.replace(/imports-loadable/, 'imports-hmr');
+      /* eslint-enable no-param-reassign */
+      return resource.request;
+    }),
+  );
+}
+```
+
+And compare:
+
+### Routes file
+* [spec/dummy/client/app/routes/LoadableRoutes.imports-hmr.jsx](https://github.com/shakacode/react_on_rails_pro/blob/master/spec/dummy/client/app/routes/LoadableRoutes.imports-hmr.jsx)
+* [spec/dummy/client/app/routes/LoadableRoutes.imports-loadable.jsx](https://github.com/shakacode/react_on_rails_pro/blob/master/spec/dummy/client/app/routes/LoadableRoutes.imports-loadable.jsx)
+
+### Client-Side Startup
+* [spec/dummy/client/app/startup/loadable-client.imports-hmr.js](https://github.com/shakacode/react_on_rails_pro/blob/master/spec/dummy/client/app/startup/loadable-client.imports-hmr.js)
+* [spec/dummy/client/app/startup/loadable-client.imports-loadable.js](https://github.com/shakacode/react_on_rails_pro/blob/master/spec/dummy/client/app/startup/loadable-client.imports-loadable.js)
+
+### Server-Side Startup
+* [spec/dummy/client/app/startup/loadable-server.imports-hmr.jsx](https://github.com/shakacode/react_on_rails_pro/blob/master/spec/dummy/client/app/startup/loadable-server.imports-hmr.jsx)
+* [spec/dummy/client/app/startup/loadable-server.imports-loadable.jsx](https://github.com/shakacode/react_on_rails_pro/blob/master/spec/dummy/client/app/startup/loadable-server.imports-loadable.jsx)
