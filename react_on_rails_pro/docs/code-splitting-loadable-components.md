@@ -1,7 +1,7 @@
 # Server-side rendering with code-splitting using Loadable/Components
 by ShakaCode
 
-*Last updated March 17, 2020*
+*Last updated March 16, 2021*
 
 ## Introduction
 The [React library recommends](https://loadable-components.com/docs/getting-started/) the use of React.lazy for code splitting with dynamic imports except
@@ -98,6 +98,43 @@ Instead of importing the component directly, use a dynamic import:
 ```
 import load from '@loadable/component'
 const MyComponent = load(() => import('./MyComponent'))
+```
+
+### Resolving issue with ChunkLoadError
+
+Sometimes chunks might not be loaded (network issues or others). This can be fixed by using retry loop:
+
+```
+// https://gist.github.com/briancavalier/842626
+const consoleDebug = (fn) => {
+  if (typeof console.debug !== 'undefined') {
+    console.debug(fn());
+  }
+};
+const retry = (fn, retryMessage = '', retriesLeft = 3, interval = 500) => new Promise((resolve, reject) => {
+  fn()
+    .then(resolve)
+    .catch(() => {
+      setTimeout(() => {
+        if (retriesLeft === 1) {
+          console.warn(`Maximum retries exceeded, retryMessage: ${retryMessage}. Reloading page...`);
+          window.location.reload();
+          return;
+        }
+        // Passing on "reject" is the important part
+        consoleDebug(() => `Trying request, retryMessage: ${retryMessage}, retriesLeft: ${retriesLeft - 1}`);
+        retry(fn, retryMessage, retriesLeft - 1, interval).then(resolve, reject);
+      }, interval);
+    });
+});
+export default retry;
+```
+
+Then use it in your component:
+
+```
+import retry from 'utils/retry';
+const HomePage = loadable(() => retry(() => import('./HomePage')));
 ```
 
 **Please note that babel must not be configured to strip comments, since the chunk name is defined in a comment.**
