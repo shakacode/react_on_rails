@@ -1,13 +1,16 @@
 # Change Log
-All notable changes to this project will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version.
+All notable changes to this project will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next v
+
+## Gem and Package Versions
+Gem and package versions are the same except for beta releases where the gem uses a `.beta` and the package uses a `-beta`.
+
+**Gem**: 2.0.0.beta.1
+**Package**: 2.0.0-beta.1
+
+----
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
-
-- Added cache debugging info for simple prerender caching. RORP_CACHE_HIT and RORP_CACHE_KEY is returned
-  for prerender caching, which is only when there is no proper caching.
-
-- Renamed `config.serializer_globs`to `config.dependency_globs`. [PR 165](https://github.com/shakacode/react_on_rails_pro/pull/165) by [judahmeek](https://github.com/judahmeek)
 
 ### 2.0 Upgrade Steps
 In your `config/initializers/react_on_rails_pro.rb`:
@@ -25,25 +28,19 @@ New
 const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
 ```
 
-## [2.0.0.beta.1] - 2021-01
+## [2.0.0.beta.1] - 2021-03-14
 * Added Sentry Tracing support. [PR 150](https://github.com/shakacode/react_on_rails_pro/pull/150) by [ashgaliyev](https://github.com/ashgaliyev). To use this feature, you need to add `config.sentryTracing = true` (or ENV `SENTRY_TRACING=true`) and optionally the `config.sentryTracesSampleRate = 0.5` (or ENV `SENTRY_TRACES_SAMPLE_RATE=0.5`). The value of the sample rate is the percentage of requests to trace. For documentation of Sentry Tracing, see the [Sentry Performance Monitoring Docs](https://docs.sentry.io/platforms/ruby/performance/), the [Sentry Distributed Tracing Docs](https://docs.sentry.io/product/performance/distributed-tracing/), and the [Sentry Sampling Transactions Docs](https://docs.sentry.io/platforms/ruby/performance/sampling/). The default **config.sentryTracesSampleRate** is **0.1**.
 
-
 - Renamed `config.serializer_globs`to `config.dependency_globs`. [PR 165](https://github.com/shakacode/react_on_rails_pro/pull/165) by [judahmeek](https://github.com/judahmeek)
-
-
-## [2.0.0.beta.0] - 2020-12-03
-* Renamed VM Renderer to Node Renderer
-
-
-## [1.5.5-fixes] - 2021-03-02
-### Added
+- RORP_CACHE_HIT and RORP_CACHE_KEY is returned for prerender caching, which is only when there is no fragment caching.
 - Improve cache information from react_component_hash. Hash result now includes 2 new keys
   * RORP_CACHE_HIT
   * RORP_CACHE_KEY
   Additionally, ReactOnRailsPro::Utils.printable_cache_key(cache_key) added.
+- [PR 170](https://github.com/shakacode/react_on_rails_pro/pull/170) by [justin808](https://github.com/justin808).
 
- [PR 140](https://github.com/shakacode/react_on_rails_pro/pull/140) by [justin808](https://github.com/justin808).
+## [2.0.0.beta.0] - 2020-12-03
+* Renamed VM Renderer to Node Renderer. [PR 140](https://github.com/shakacode/react_on_rails_pro/pull/140) by [justin808](https://github.com/justin808).
 
 ### Fixed
 - Cache key not stable between machines same deploy. [PR 159](https://github.com/shakacode/react_on_rails_pro/pull/136) by [justin808](https://github.com/justin808). 
@@ -170,6 +167,7 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - advanced error handling
 
 [Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0.beta.0...HEAD
+[2.0.0.beta.1]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0.beta.0...2.0.0.beta.1
 [2.0.0.beta.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.6...2.0.0.beta.0
 [1.5.6]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.5...1.5.6
 [1.5.5]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.4...1.5.5
