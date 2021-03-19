@@ -47,9 +47,13 @@ namespace :react_on_rails do
     DESC
     task webpack: :locale do
       if ReactOnRails.configuration.build_production_command.present?
-        sh ReactOnRails::Utils.prepend_cd_node_modules_directory(
-          ReactOnRails.configuration.build_production_command
-        ).to_s
+        if ReactOnRails.configuration.build_production_command.is_a?(String)
+          sh ReactOnRails::Utils.prepend_cd_node_modules_directory(
+            ReactOnRails.configuration.build_production_command
+          ).to_s
+        elsif ReactOnRails.configuration.build_production_command.is_a?(Proc) && ReactOnRails.configuration.build_production_command.lambda?
+          ReactOnRails.configuration.build_production_command.call
+        end
       else
         msg = <<~MSG
           React on Rails is aborting webpack compilation from task react_on_rails:assets:webpack
