@@ -18,6 +18,8 @@ In your `config/initializers/react_on_rails_pro.rb`:
 1. Rename any references from `vm-renderer` to `node-renderer`
 1. Rename `vmRenderer` to `NodeRenderer`
 1. Be sure to namespace the package like `require('@shakacode-tools/react-on-rails-pro-node-renderer');`
+1. Add the Honeybadger ("honeybadger") or Sentry ("@sentry/node") NPM packages, as those used to be **dependencies**. Now they are optional.
+1. Add the `@sentry/tracing` package if you want to try Sentry tracing. See [Error Reporting and Tracing for Sentry and HoneyBadger](./docs/node-renderer/error-reporting-and-tracing.md).
 
 For example, the old code might be:
 ```js
