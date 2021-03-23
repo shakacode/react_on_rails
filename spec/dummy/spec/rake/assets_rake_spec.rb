@@ -7,7 +7,7 @@ require "rails_helper"
 
 # can't use it as a closure like you can a lambda
 module CustomModule
-  def self.custom_method(_context)
+  def self.custom_command
     FileUtils.touch(Rails.root.join("tmp", "module_token_file"))
   end
 end
@@ -38,18 +38,6 @@ describe "assets:webpack task" do
     expect(File).not_to exist(filepath)
 
     ReactOnRails.configuration.build_production_command = "touch #{filepath}"
-
-    Rake::Task["react_on_rails:assets:webpack"].execute
-
-    expect(File).to exist(filepath)
-  end
-
-  it "calls build_production_command if build_production_command is a lambda" do
-    filepath = Rails.root.join("tmp", "lambda_token_file")
-    FileUtils.rm_f(filepath)
-    expect(File).not_to exist(filepath)
-
-    ReactOnRails.configuration.build_production_command = -> { FileUtils.touch(filepath) }
 
     Rake::Task["react_on_rails:assets:webpack"].execute
 

@@ -51,10 +51,10 @@ namespace :react_on_rails do
           sh ReactOnRails::Utils.prepend_cd_node_modules_directory(
             ReactOnRails.configuration.build_production_command
           ).to_s
-        elsif ReactOnRails.configuration.build_production_command.is_a?(Proc) && ReactOnRails.configuration.build_production_command.lambda?
-          ReactOnRails.configuration.build_production_command.call
-        elsif ReactOnRails.configuration.build_production_command&.methods.include?(:custom_method)
-          ReactOnRails.configuration.build_production_command.custom_method(self)
+        elsif ReactOnRails.configuration.build_production_command&.methods&.include?(:custom_command)
+          ReactOnRails.configuration.build_production_command.custom_command
+        else
+          raise("ReactonRails.configuration.build_production_command is present but is not properly configured")
         end
       else
         msg = <<~MSG
