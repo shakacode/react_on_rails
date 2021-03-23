@@ -53,6 +53,8 @@ namespace :react_on_rails do
           ).to_s
         elsif ReactOnRails.configuration.build_production_command.is_a?(Proc) && ReactOnRails.configuration.build_production_command.lambda?
           ReactOnRails.configuration.build_production_command.call
+        elsif ReactOnRails.configuration.build_production_command&.methods.include?(:custom_method)
+          ReactOnRails.configuration.build_production_command.custom_method(self)
         end
       else
         msg = <<~MSG
