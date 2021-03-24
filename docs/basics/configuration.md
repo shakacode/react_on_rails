@@ -213,7 +213,8 @@ Example of a CustomModule for `config_production_build`:
 
 ```ruby
 module CustomModule
-  def self.custom_command # a method with the name of custom_command must exist!
+  # a method with the name of custom_production_build_command must exist!
+  def self.custom_production_build_command
     # use complex or conditional logic all in one ruby file
   end
 end

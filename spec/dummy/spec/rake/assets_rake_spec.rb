@@ -7,7 +7,7 @@ require "rails_helper"
 
 # can't use it as a closure like you can a lambda
 module CustomModule
-  def self.custom_command
+  def self.custom_production_build_command
     FileUtils.touch(Rails.root.join("tmp", "module_token_file"))
   end
 end
