@@ -17,7 +17,10 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
-### [12.0.5] - 2021-03-07
+### [12.1.0] - 2021-03-23
+#### Added
+- Added the ability to assign a module with a `call` method to `config.build_production_command`. See [the configuration docs](./docs/basics/configuration.md). [PR 1362: Accept custom module for config.build_production_command](https://github.com/shakacode/react_on_rails/pull/1362).
+
 #### Fixed
 - Stop setting NODE_ENV value during precompile, as it interferred with rails/webpacker's setting of NODE_ENV to production by default. Fixes [#1334](https://github.com/shakacode/react_on_rails/issues/1334). [PR 1356: Don't set NODE_ENV in assets.rake](https://github.com/shakacode/react_on_rails/pull/1356) by [alexrozanski](https://github.com/alexrozanski).
 
@@ -35,7 +38,7 @@ Changes since last non-beta release.
 
 ### [12.0.2] - 2020-07-09
 #### Fixed
-- Remove dependency upon Redux for Typescript types. [PR 1323](https://github.com/shakacode/react_on_rails/pull/1306) by [justin808](https://github.com/justin808). 
+- Remove dependency upon Redux for Typescript types. [PR 1323](https://github.com/shakacode/react_on_rails/pull/1306) by [justin808](https://github.com/justin808).
 
 ### [12.0.1] - 2020-07-09
 #### Fixed
@@ -61,8 +64,8 @@ invoked to return the React component. In that case, you won't need to pass any 
 See [docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rails.md#upgrading-to-v12)
 for details.         
 
-#### Other Updates 
-* `react_on_rails` fully supports `rails/webpacker`. The example test app in `spec/dummy` was recently converted over to use rails/webpacker v4+. It's a good example of how to leverage rails/webpacker's webpack configuration for server-side rendering. 
+#### Other Updates
+* `react_on_rails` fully supports `rails/webpacker`. The example test app in `spec/dummy` was recently converted over to use rails/webpacker v4+. It's a good example of how to leverage rails/webpacker's webpack configuration for server-side rendering.
 * Changed the precompile task to use the rails/webpacker one by default
 * Updated generators to use React hooks
 * Requires the use of rails/webpacker view helpers
@@ -77,19 +80,19 @@ for details.
 * Added configuration option `same_bundle_for_client_and_server` with default `false` because
 
   1. Production applications would typically have a server bundle that differs from the client bundle
-  2. This change only affects trying to use HMR with react_on_rails with rails/webpacker. 
-  
-  The previous behavior was to always go to the webpack-dev-server for the server bundle if the 
-  webpack-dev-server was running _and_ the server bundle was found in the `manifest.json`. 
-  
+  2. This change only affects trying to use HMR with react_on_rails with rails/webpacker.
+
+  The previous behavior was to always go to the webpack-dev-server for the server bundle if the
+  webpack-dev-server was running _and_ the server bundle was found in the `manifest.json`.
+
   If you are using the **same bundle for client and server rendering**, then set this configuration option
   to `true`. By [justin808](https://github.com/shakacode/react_on_rails/pull/1240).
-  
+
 * Added support to export locales in JSON format. New option added `i18n_output_format` which allows to
   specify locales format either `JSON` or `JS`. **`JSON` format is now the default.**
- 
+
   **Use this config setting to get the old behavior: config.i18n_output_format = 'js'**
-  
+
   [PR 1271](https://github.com/shakacode/react_on_rails/pull/1271) by [ashgaliyev](https://github.com/ashgaliyev).
 
 - Added Typescript definitions to the Node package. By [justin808](https://github.com/justin808) and [judahmeek](https://github.com/judahmeek) in [PR 1287](https://github.com/shakacode/react_on_rails/pull/1287).
@@ -951,7 +954,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.0.4...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.1.0...master
+[12.1.0]: https://github.com/shakacode/react_on_rails/compare/12.0.4...12.1.0
 [12.0.4]: https://github.com/shakacode/react_on_rails/compare/12.0.3...12.0.4
 [12.0.3]: https://github.com/shakacode/react_on_rails/compare/12.0.2...12.0.3
 [12.0.2]: https://github.com/shakacode/react_on_rails/compare/12.0.1...12.0.2

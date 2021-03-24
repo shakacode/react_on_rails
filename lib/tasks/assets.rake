@@ -46,10 +46,20 @@ namespace :react_on_rails do
       configuration file config/webpack/production.js exists.
     DESC
     task webpack: :locale do
-      if ReactOnRails.configuration.build_production_command.present?
-        sh ReactOnRails::Utils.prepend_cd_node_modules_directory(
-          ReactOnRails.configuration.build_production_command
-        ).to_s
+      build_production_command = ReactOnRails.configuration.build_production_command
+      if build_production_command.present?
+        if build_production_command.is_a?(String)
+          sh ReactOnRails::Utils.prepend_cd_node_modules_directory(
+            build_production_command
+          ).to_s
+        elsif build_production_command.methods.include?(:call)
+          build_production_command.call
+        else
+          msg = "ReactonRails.configuration.build_production_command is improperly configured. "\
+                "Value = #{build_production_command} with class #{build_production_command.class}"
+          puts Rainbow(msg).red
+          exit!(1)
+        end
       else
         msg = <<~MSG
           React on Rails is aborting webpack compilation from task react_on_rails:assets:webpack
