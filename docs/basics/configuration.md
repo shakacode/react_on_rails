@@ -12,7 +12,7 @@ default: &default
   # public_output_path folder
   manifest: manifest.json
   cache_manifest: false
-  
+
   # Source path is used to check if webpack compilation needs to be run for `compile: true`
   source_path: client/app
 
@@ -24,7 +24,7 @@ development:
 test:
   <<: *default
   # Ensure that webpacker invokes webpack to build files for tests if not using the
-  #   ReactOnRails rspec helper. 
+  #   ReactOnRails rspec helper.
   compile: true
 
   # Generated files for tests, in /public/webpack/test
@@ -49,7 +49,7 @@ for all client files, including your sources and node_modules.
 ReactOnRails.configure do |config|
   # `trace`: General debugging flag.
   # The default is true for development, off otherwise.
-  # With true, you get detailed logs of rendering and stack traces if you call setTimout, 
+  # With true, you get detailed logs of rendering and stack traces if you call setTimout,
   # setInterval, clearTimout when server rendering.
   config.trace = Rails.env.development? # default
 
@@ -57,22 +57,27 @@ ReactOnRails.configure do |config|
   # false ==> Sets the dom id to "#{react_component_name}-react-component"
   # true ==> Adds "-#{SecureRandom.uuid}" to that ID
   # If you might use multiple instances of the same React component on a Rails page, then
-  # it is convenient to set this to true or else you have to either manually set the ids to 
+  # it is convenient to set this to true or else you have to either manually set the ids to
   # avoid collisions. Most newer apps will have only one instance of a component on a page,
   # so this should be false in most cases.
   # This value can be overridden for a given call to react_component
   config.random_dom_id = true # default
 
-  # defaults to "" (top level)	
-  config.node_modules_location = "client" # If using webpacker you should use "".	
-  
-  # This configures the script to run to build the production assets by webpack . Set this to nil	
-  # if you don't want react_on_rails building this file for you.	
-  # Note, if you want to use this command then you should remove the file	
-  # config/webpack/production.js	
-  # If that file exists, React on Rails thinks that you'll use the rails/webpacker bin/webpack compiler.	
+  # defaults to "" (top level)
+  config.node_modules_location = "client" # If using webpacker you should use "".
+
+  # This configures the script to run to build the production assets by webpack . Set this to nil
+  # if you don't want react_on_rails building this file for you.
+  # Note, if you want to use this command then you should remove the file
+  # config/webpack/production.js
+  # If that file exists, React on Rails thinks that you'll use the rails/webpacker bin/webpack compiler.
   config.build_production_command = "RAILS_ENV=production bin/webpack"
 
+  # Alternatively, you can also specify a module containing a class method `call` 
+  # In this example, the module BuildProductionCommand would have a class method `call`.
+  # See bottom for an example of the BuildProductionCommand module.
+  # config.build_production_command = BuildProductionCommand
+   
   ################################################################################
   ################################################################################
   # SERVER RENDERING OPTIONS
@@ -89,9 +94,9 @@ ReactOnRails.configure do |config|
   # you should include a name that matches your bundle name in your webpack config.
   config.server_bundle_js_file = "server-bundle.js"
 
-  # THE BELOW OPTIONS FOR SERVER-SIDE RENDERING RARELY NEED CHANGING 
+  # THE BELOW OPTIONS FOR SERVER-SIDE RENDERING RARELY NEED CHANGING
   #
-  # This value only affects server-side rendering when using the webpack-dev-server 
+  # This value only affects server-side rendering when using the webpack-dev-server
   # If you are hashing the server bundle and you want to use the same bundle for client and server,
   # you'd set this to `true` so that React on Rails reads the server bundle from the webpack-dev-server.
   # Normally, you have different bundles for client and server, thus, the default is false.
@@ -101,7 +106,7 @@ ReactOnRails.configure do |config|
   # If true, ensure that in config/webpacker.yml that you have both dev_server.hmr and
   # dev_server.inline set to false.
   config.same_bundle_for_client_and_server = false
-  
+
   # If set to true, this forces Rails to reload the server bundle if it is modified
   # Default value is Rails.env.development?
   # You probably will never change this.
@@ -119,16 +124,16 @@ ReactOnRails.configure do |config|
 
   # Default is true only for development? to raise exception on server if the JS code throws for
   # server rendering. The reason is that the server logs will show the error and force you to fix
-  # any server rendering issues immediately during development. 
-  config.raise_on_prerender_error = Rails.env.development? 
+  # any server rendering issues immediately during development.
+  config.raise_on_prerender_error = Rails.env.development?
 
   ################################################################################
   # Server Renderer Configuration for ExecJS
   ################################################################################
   # The default server rendering is ExecJS, probably using the mini_racer gem
-  # If you wish to use an alternative Node server rendering for higher performance, 
+  # If you wish to use an alternative Node server rendering for higher performance,
   # contact justin@shakacode.com for details.
-  # 
+  #
   # For ExecJS:
   # You can configure your pool of JS virtual machines and specify where it should load code:
   # On MRI, use `mini_racer` for the best performance
@@ -153,7 +158,7 @@ ReactOnRails.configure do |config|
   # By default(without this option) all yaml files from Rails.root.join("config", "locales")
   # and installed gems are loaded
   config.i18n_yml_dir = Rails.root.join("config", "locales")
-  
+
   # Possible output formats are js and json
   # The default format is json
   config.i18n_output_format = 'json'
@@ -178,13 +183,13 @@ ReactOnRails.configure do |config|
   # TEST CONFIGURATION OPTIONS
   # Below options are used with the use of this test helper:
   # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
-  # 
+  #
   # NOTE:
   # Instead of using this test helper, you may ensure fresh test files using rails/webpacker via:
   # 1. Have `config/webpacker/test.js` exporting an array of objects to configure both client and server bundles.
   # 2. Set the compile option to true in config/webpacker.yml for env test
   ################################################################################
-  
+
   # If you are using this in your spec_helper.rb (or rails_helper.rb):
   #
   # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
@@ -194,7 +199,7 @@ ReactOnRails.configure do |config|
   #
   config.build_test_command = "RAILS_ENV=test bin/webpack"
 
-  # CONFIGURE YOUR SOURCE FILES 
+  # CONFIGURE YOUR SOURCE FILES
   # The test helper needs to know where your JavaScript files exist. The value is configured
   # by your config/webpacker.yml source_path:
   # source_path: client/app # if using recommended /client directory
@@ -202,10 +207,22 @@ ReactOnRails.configure do |config|
   # Define the files we need to check for webpack compilation when running tests.
   # The default is `%w( manifest.json )` as will be sufficient for most webpacker builds.
   # However, if you are generated a server bundle that is NOT hashed (present in manifest.json),
-  # then include the file in this list like this: 
+  # then include the file in this list like this:
   config.webpack_generated_files = %w( server-bundle.js manifest.json )
   # Note, be sure NOT to include your server-bundle.js if it is hashed, or else React on Rails will
-  # think the server-bundle.js is missing every time for test runs. 
+  # think the server-bundle.js is missing every time for test runs.
+end
+```
+
+Example of a ReactOnRailsConfig module for `production_build_command`:
+
+```ruby
+module BuildProductionCommand
+  include FileUtils
+  # Method with the name of call will be called during assets:precompile
+  def self.call
+    sh "bin/webpack"
+  end
 end
 ```
 
