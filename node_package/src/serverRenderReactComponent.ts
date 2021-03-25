@@ -7,7 +7,7 @@ import isCreateReactElementResultNonReactComponent from
     './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
-import type { RenderParams } from './types/index';
+import type { RenderParams, RenderResult } from './types/index';
 
 export default function serverRenderReactComponent(options: RenderParams): string {
   const { name, domNodeId, trace, props, railsContext, throwJsErrors } = options;
@@ -88,7 +88,7 @@ Function Component.`);
     html: htmlResult,
     consoleReplayScript,
     hasErrors,
-  };
+  } as RenderResult;
 
   if (renderingError) {
     result.renderingError = {

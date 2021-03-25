@@ -1,8 +1,6 @@
 import RenderUtils from './RenderUtils';
 import scriptSanitizedVal from './scriptSanitizedVal';
 
-declare let debugConsole: any;
-
 declare global {
   interface Console {
     history?: {

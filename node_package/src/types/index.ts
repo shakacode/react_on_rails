@@ -99,6 +99,18 @@ export interface ErrorOptions {
   serverSide: boolean;
 }
 
+export interface RenderingError {
+  message: string;
+  stack: string;
+}
+
+export interface RenderResult {
+  html: string;
+  consoleReplayScript: string;
+  hasErrors: boolean;
+  renderingError?: RenderingError;
+}
+
 export interface ReactOnRails {
   register(components: { [id: string]: ReactComponentOrRenderFunction }): void;
   registerStore(stores: { [id: string]: Store }): void;
