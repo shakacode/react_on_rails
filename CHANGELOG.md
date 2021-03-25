@@ -20,8 +20,8 @@ Changes since last non-beta release.
 ### [12.2.0] - 2021-03-25
 #### Added
 - Ability to configure server react rendering to throw rather than just logging the error. Useful for
-  React on Rails Pro Node rendering
-
+  React on Rails Pro Node rendering [PR 1365](https://github.com/shakacode/react_on_rails/pull/1365) by [justin808](https://github.com/justin808).
+  
 ### [12.1.0] - 2021-03-23
 #### Added
 - Added the ability to assign a module with a `call` method to `config.build_production_command`. See [the configuration docs](./docs/basics/configuration.md). [PR 1362: Accept custom module for config.build_production_command](https://github.com/shakacode/react_on_rails/pull/1362).
@@ -31,7 +31,7 @@ Changes since last non-beta release.
 
 ### [12.0.4] - 2020-11-14
 #### Fixed
-- Install generator now specifies the version. Fixes [React on Rails Generator installs the older npm package #1336](https://github.com/shakacode/react_on_rails/issues/1336). [PR 1338Fix Generator to use Exact NPM Version](https://github.com/shakacode/react_on_rails/pull/1338) by [justin808](https://github.com/justin808).
+- Install generator now specifies the version. Fixes [React on Rails Generator installs the older npm package #1336](https://github.com/shakacode/react_on_rails/issues/1336). [PR 1338: Fix Generator to use Exact NPM Version](https://github.com/shakacode/react_on_rails/pull/1338) by [justin808](https://github.com/justin808).
 
 ### [12.0.3] - 2020-09-20
 #### Fixed

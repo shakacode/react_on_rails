@@ -21,7 +21,7 @@ for the node package version. This only makes a difference for pre-release
 versions such as `3.0.0.beta.1` (yarn version would be `3.0.0-beta.1`).
 
 This task depends on the gem-release (ruby gem) and release-it (node package)
-which are installed via `bundle install` and `yarn`
+which are installed via `bundle install` and `yarn global add release-it`
 
 1st argument: The new version in rubygem format (no dashes). Pass no argument to
               automatically perform a patch version bump.
@@ -58,9 +58,9 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   bundle_install_in(dummy_app_dir)
 
   # Will bump the yarn version, commit, tag the commit, push to repo, and release on yarn
-  release_it_command = +"$(yarn bin)/release-it"
+  release_it_command = +"release-it"
   release_it_command << " #{npm_version}" unless npm_version.strip.empty?
-  release_it_command << " --non-interactive --npm.publish"
+  release_it_command << " --non-interactive --npm.publish --no-git.requireCleanWorkingDir"
   release_it_command << " --dry-run --verbose" if is_dry_run
   sh_in_dir(gem_root, release_it_command)
 
