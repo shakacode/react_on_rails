@@ -97,6 +97,5 @@ Function Component.`);
     }
   }
 
-
   return JSON.stringify(result);
 }
