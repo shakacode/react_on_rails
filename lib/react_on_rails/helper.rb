@@ -201,7 +201,7 @@ module ReactOnRails
             (function() {
               return #{js_expression};
             })();
-        } catch(e) {#{'  '}
+        } catch(e) {
           renderingError = e;
           if (#{render_options.throw_js_errors}) {
             throw e;
