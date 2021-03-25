@@ -60,7 +60,7 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   # Will bump the yarn version, commit, tag the commit, push to repo, and release on yarn
   release_it_command = +"release-it"
   release_it_command << " #{npm_version}" unless npm_version.strip.empty?
-  release_it_command << " --non-interactive --npm.publish --no-git.requireCleanWorkingDir"
+  release_it_command << " --ci --npm.publish --no-git.requireCleanWorkingDir"
   release_it_command << " --dry-run --verbose" if is_dry_run
   sh_in_dir(gem_root, release_it_command)
 
