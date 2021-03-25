@@ -79,6 +79,7 @@ interface Params {
 
 export interface RenderParams extends Params {
   name: string;
+  throwJsErrors: boolean;
 }
 
 export interface CreateParams extends Params {

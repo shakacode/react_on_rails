@@ -11,6 +11,7 @@ module ReactOnRails
 
       NO_PROPS = {}.freeze
 
+      # TODO: remove the required for named params
       def initialize(react_component_name: required("react_component_name"), options: required("options"))
         @react_component_name = react_component_name.camelize
         @options = options
@@ -18,12 +19,16 @@ module ReactOnRails
 
       attr_reader :react_component_name
 
+      def throw_js_errors
+        options.fetch(:throw_js_errors, false)
+      end
+
       def props
         options.fetch(:props) { NO_PROPS }
       end
 
       def random_dom_id
-        retrieve_key(:random_dom_id)
+        retrieve_configuration_value_for(:random_dom_id)
       end
 
       def dom_id
@@ -49,23 +54,23 @@ module ReactOnRails
       end
 
       def prerender
-        retrieve_key(:prerender)
+        retrieve_configuration_value_for(:prerender)
       end
 
       def trace
-        retrieve_key(:trace)
+        retrieve_configuration_value_for(:trace)
       end
 
       def replay_console
-        retrieve_key(:replay_console)
+        retrieve_configuration_value_for(:replay_console)
       end
 
       def raise_on_prerender_error
-        retrieve_key(:raise_on_prerender_error)
+        retrieve_configuration_value_for(:raise_on_prerender_error)
       end
 
       def logging_on_server
-        retrieve_key(:logging_on_server)
+        retrieve_configuration_value_for(:logging_on_server)
       end
 
       def to_s
@@ -74,6 +79,10 @@ module ReactOnRails
 
       def internal_option(key)
         options[key]
+      end
+
+      def set_option(key, value)
+        options[key] = value
       end
 
       private
@@ -88,7 +97,7 @@ module ReactOnRails
         "#{base_dom_id}-#{SecureRandom.uuid}"
       end
 
-      def retrieve_key(key)
+      def retrieve_configuration_value_for(key)
         options.fetch(key) do
           ReactOnRails.configuration.public_send(key)
         end
