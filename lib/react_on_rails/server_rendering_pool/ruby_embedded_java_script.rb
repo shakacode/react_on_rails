@@ -187,8 +187,10 @@ module ReactOnRails
         end
 
         # Reimplement console methods for replaying on the client
+        # Save a handle to the original console if needed.
         def console_polyfill
           <<~JS
+            var debugConsole = console;
             var console = { history: [] };
             ['error', 'log', 'info', 'warn'].forEach(function (level) {
               console[level] = function () {

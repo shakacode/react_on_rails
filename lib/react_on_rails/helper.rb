@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 # rubocop:disable Metrics/ModuleLength
+# rubocop:disable Metrics/MethodLength
 # NOTE:
 # For any heredoc JS:
 # 1. The white spacing in this file matters!
@@ -182,7 +183,7 @@ module ReactOnRails
     # Helper method to take javascript expression and returns the output from evaluating it.
     # If you have more than one line that needs to be executed, wrap it in an IIFE.
     # JS exceptions are caught and console messages are handled properly.
-    # Options include:{ prerender:, trace:, raise_on_prerender_error: }
+    # Options include:{ prerender:, trace:, raise_on_prerender_error:, throw_js_errors: }
     def server_render_js(js_expression, options = {})
       render_options = ReactOnRails::ReactComponent::RenderOptions
                        .new(react_component_name: "generic-js", options: options)
@@ -192,6 +193,8 @@ module ReactOnRails
         var htmlResult = '';
         var consoleReplayScript = '';
         var hasErrors = false;
+        var renderingError = null;
+        var renderingErrorObject = {};
 
         try {
           htmlResult =
@@ -199,9 +202,17 @@ module ReactOnRails
               return #{js_expression};
             })();
         } catch(e) {
+          renderingError = e;
+          if (#{render_options.throw_js_errors}) {
+            throw e;
+          }
           htmlResult = ReactOnRails.handleError({e: e, name: null,
             jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
           hasErrors = true;
+          renderingErrorObject = {
+            message: renderingError.message,
+            stack: renderingError.stack,
+          }
         }
 
         consoleReplayScript = ReactOnRails.buildConsoleReplay();
@@ -209,7 +220,8 @@ module ReactOnRails
         return JSON.stringify({
             html: htmlResult,
             consoleReplayScript: consoleReplayScript,
-            hasErrors: hasErrors
+            hasErrors: hasErrors,
+            renderingError: renderingErrorObject
         });
 
       })()
@@ -527,3 +539,4 @@ module ReactOnRails
   end
 end
 # rubocop:enable Metrics/ModuleLength
+# rubocop:enable Metrics/MethodLength

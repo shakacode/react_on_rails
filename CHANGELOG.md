@@ -17,6 +17,11 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [12.2.0] - 2021-03-25
+#### Added
+- Ability to configure server react rendering to throw rather than just logging the error. Useful for
+  React on Rails Pro Node rendering
+
 ### [12.1.0] - 2021-03-23
 #### Added
 - Added the ability to assign a module with a `call` method to `config.build_production_command`. See [the configuration docs](./docs/basics/configuration.md). [PR 1362: Accept custom module for config.build_production_command](https://github.com/shakacode/react_on_rails/pull/1362).
@@ -954,7 +959,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.1.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.2.0...master
+[12.2.0]: https://github.com/shakacode/react_on_rails/compare/12.1.0...12.2.0
 [12.1.0]: https://github.com/shakacode/react_on_rails/compare/12.0.4...12.1.0
 [12.0.4]: https://github.com/shakacode/react_on_rails/compare/12.0.3...12.0.4
 [12.0.3]: https://github.com/shakacode/react_on_rails/compare/12.0.2...12.0.3

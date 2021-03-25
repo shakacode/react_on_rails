@@ -7,13 +7,14 @@ import isCreateReactElementResultNonReactComponent from
     './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
-import type { RenderParams } from './types/index';
+import type { RenderParams, RenderResult } from './types/index';
 
 export default function serverRenderReactComponent(options: RenderParams): string {
-  const { name, domNodeId, trace, props, railsContext } = options;
+  const { name, domNodeId, trace, props, railsContext, throwJsErrors } = options;
 
   let htmlResult = '';
   let hasErrors = false;
+  let renderingError = null;
 
   try {
     const componentObj = ComponentRegistry.get(name);
@@ -68,19 +69,33 @@ Function Component.`);
       }
     }
   } catch (e) {
+    if (throwJsErrors) {
+      throw e;
+    }
+
     hasErrors = true;
     htmlResult = handleError({
       e,
       name,
       serverSide: true,
     });
+    renderingError = e;
   }
 
   const consoleReplayScript = buildConsoleReplay();
 
-  return JSON.stringify({
+  const result = {
     html: htmlResult,
     consoleReplayScript,
     hasErrors,
-  });
+  } as RenderResult;
+
+  if (renderingError) {
+    result.renderingError = {
+      message: renderingError.message,
+      stack: renderingError.stack,
+    }
+  }
+
+  return JSON.stringify(result);
 }

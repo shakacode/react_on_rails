@@ -21,6 +21,9 @@ export function consoleReplay(): string {
       let val;
       try {
         val = (typeof arg === 'string' || arg instanceof String) ? arg : JSON.stringify(arg);
+        if (val === undefined) {
+          val = 'undefined';
+        }
       } catch (e) {
         val = `${e.message}: ${arg}`;
       }

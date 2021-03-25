@@ -79,6 +79,7 @@ interface Params {
 
 export interface RenderParams extends Params {
   name: string;
+  throwJsErrors: boolean;
 }
 
 export interface CreateParams extends Params {
@@ -96,6 +97,18 @@ export interface ErrorOptions {
   name?: string;
   jsCode?: string;
   serverSide: boolean;
+}
+
+export interface RenderingError {
+  message: string;
+  stack: string;
+}
+
+export interface RenderResult {
+  html: string;
+  consoleReplayScript: string;
+  hasErrors: boolean;
+  renderingError?: RenderingError;
 }
 
 export interface ReactOnRails {
