@@ -40,7 +40,6 @@ utils.smartTrim = function smartTrim(value, maxLength = getConfig().maxDebugSnip
 
 utils.errorResponseResult = function errorResponseResult(msg) {
   errorReporter.notify(msg);
-  log.error(`Error ${msg}`);
   return {
     headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
     status: 400,

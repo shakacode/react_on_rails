@@ -10,8 +10,8 @@
     "@loadable/server": "^5.14.0",
     "@loadable/webpack-plugin": "^5.14.0",
     "@rails/webpacker": "^5.2.1",
-    "@sentry/node": "^5.30.0",
-    "@sentry/tracing": "^5.30.0",
+    "@sentry/node": "^6.2.3",
+    "@sentry/tracing": "^6.2.3",
     "@shakacode-tools/react-on-rails-pro-node-renderer": "link:.yalc/@shakacode-tools/react-on-rails-pro-node-renderer",
     "babel-plugin-module-resolver": "^4.0.0",
     "core-js": "3",
@@ -19,6 +19,7 @@
     "es5-shim": "^4.5.9",
     "expose-loader": "^1.0.3",
     "history": "^4.6.3",
+    "honeybadger": "^1.4.0",
     "imports-loader": "^1.2.0",
     "jquery": "^3.4.1",
     "jquery-ujs": "^1.2.2",
@@ -29,7 +30,7 @@
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
     "react-helmet": "^6.0.0-beta.2",
-    "react-on-rails": "12.0.4",
+    "react-on-rails": "12.2.0",
     "react-proptypes": "^1.0.0",
     "react-redux": "^5.0.5",
     "react-refresh": "^0.8.1",
@@ -64,8 +65,8 @@
     "build:dev:watch": "RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
     "build:production": "RAILS_ENV=production NODE_ENV=production bin/webpack -p",
     "build:clean": "rm -rf public/webpack || true",
-    "node-renderer-debug": "RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE ndb client/node-renderer.js",
-    "node-renderer": "RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE node client/node-renderer.js"
+    "node-renderer-debug": "RENDERER_PORT=3800 ndb client/node-renderer.js",
+    "node-renderer": "RENDERER_PORT=3800 node client/node-renderer.js"
   },
   "license": "UNLICENSED",
   "repository": {

@@ -42,7 +42,9 @@ Note that the webpack configuration substitutes files with the extension `import
 To toggle caching in development, as explained in [this article](http://guides.rubyonrails.org/caching_with_rails.html#caching-in-development)
 `rails dev:cache`
 
+## Error Handling
 
+This sample app includes both Honeybadger and Sentry integration, including Sentry tracing integration.
 
 ## Starting the Sample App
                              

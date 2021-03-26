@@ -34,7 +34,7 @@ function setHeaders(headers, res) {
 const setResponse = (result, res) => {
   const { status, data, headers } = result;
   if (status !== 200 && status !== 410) {
-    log.info(data);
+    log.info(`Sending non-200, non-410 data back: ${data}`);
   }
   setHeaders(headers, res);
   res.status(status);

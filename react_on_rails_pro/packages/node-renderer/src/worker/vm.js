@@ -195,10 +195,9 @@ ${smartTrim(result)}`);
 
     replayVmConsole();
     return Promise.resolve(result);
-  } catch (e) {
-    const exceptionMessage = formatExceptionMessage(renderingRequest, e);
-    log.error(`Caught execution error:\n${exceptionMessage}`);
-    errorReporter.notify(exceptionMessage);
+  } catch (exception) {
+    const exceptionMessage = formatExceptionMessage(renderingRequest, exception);
+    log.debug('Caught exception in rendering request', exceptionMessage);
     return Promise.resolve({ exceptionMessage });
   }
 };

@@ -19,7 +19,8 @@ module ReactOnRailsPro
             domNodeId: '#{render_options.dom_id}',
             props: props,
             trace: #{render_options.trace},
-            railsContext: railsContext
+            railsContext: railsContext,
+            throwJsErrors: #{ReactOnRailsPro.configuration.throw_js_errors}
           });
         })()
         JS

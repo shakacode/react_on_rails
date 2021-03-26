@@ -40,7 +40,12 @@ ReactOnRailsPro.configure do |config|
   # mini_racer rendering. Other option is NodeRenderer
   # Default for `server_renderer` is "ExecJS"
   config.server_renderer = "NodeRenderer"
-
+  
+  # If you're using the NodeRenderer, a value of true allows errors to be thrown from the bundle
+  # code for SSR so that an error tracking system on the NodeRender can use the exceptions.
+  # This value defaults to false. It should only be set to true when using the NodeRender.
+  config.throw_js_errors = false
+  
   # You may provide a password and/or a port that will be sent to renderer for simple authentication.
   # `https://:<password>@url:<port>`. For example: https://:myPassword1@renderer:3800. Don't forget
   # the leading `:` before the password. Your password must also not contain certain characters that

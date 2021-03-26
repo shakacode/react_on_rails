@@ -7,7 +7,7 @@ namespace :react_on_rails_pro do
   task pre_stage_bundle_for_vm_renderer: :environment do
     # TODO: temporarily hardcoding tmp/bundles directory. renderer and rails should read from a Yaml file
     src_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
-    renderer_bundle_file_name = ReactOnRailsPro::ServerRenderingPool::VmRenderingPool.renderer_bundle_file_name
+    renderer_bundle_file_name = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.renderer_bundle_file_name
     dest_path = ENV["RENDERER_BUNDLE_PATH"].presence || Rails.root.join("tmp", "bundles").to_s
     bundle_dest_path = File.join(dest_path, renderer_bundle_file_name.to_s).to_s
     puts "[ReactOnRailsPro] Copying assets to local node-renderer, path #{dest_path}"

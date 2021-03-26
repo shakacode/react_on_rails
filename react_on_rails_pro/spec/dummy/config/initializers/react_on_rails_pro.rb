@@ -6,6 +6,8 @@ ReactOnRailsPro.configure do |config|
   config.tracing = true
 
   config.server_renderer = "NodeRenderer"
+  # If you want Honeybadger or Sentry on the Node renderer side to report rendering errors
+  config.throw_js_errors = false
 
   config.renderer_password = "myPassword1"
 

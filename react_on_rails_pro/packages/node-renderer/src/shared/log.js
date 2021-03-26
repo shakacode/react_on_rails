@@ -16,7 +16,7 @@ const transports = [
 /* eslint-disable-next-line no-multi-assign */
 const logger = (module.exports = winston.createLogger({
   transports,
-  format: combine(label({ label: 'ROR-VM' }), splat(), colorize(), myFormat),
+  format: combine(label({ label: 'RORP' }), splat(), colorize(), myFormat),
   exitOnError: false,
 }));
 
@@ -24,7 +24,7 @@ logger.configureLogger = function configureLogger(theLogger, logLevel) {
   theLogger.configure({
     level: logLevel,
     transports,
-    format: combine(label({ label: 'ROR-VM' }), splat(), colorize(), myFormat),
+    format: combine(label({ label: 'RORP' }), splat(), colorize(), myFormat),
     exitOnError: false,
   });
 };
