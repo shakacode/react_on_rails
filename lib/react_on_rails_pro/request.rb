@@ -76,7 +76,7 @@ module ReactOnRailsPro
         form = common_form_data
         form["renderingRequest"] = js_code
         if send_bundle
-          renderer_bundle_file_name = ReactOnRailsPro::ServerRenderingPool::VmRenderingPool.renderer_bundle_file_name
+          renderer_bundle_file_name = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.renderer_bundle_file_name
           form["bundle"] = UploadIO.new(
             File.new(ReactOnRails::Utils.server_bundle_js_file_path),
             "application/javascript",
@@ -111,7 +111,7 @@ module ReactOnRailsPro
         src_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
         raise ReactOnRails::Error, "Bundle not found #{src_bundle_path}" unless File.exist?(src_bundle_path)
 
-        renderer_bundle_file_name = ReactOnRailsPro::ServerRenderingPool::VmRenderingPool.renderer_bundle_file_name
+        renderer_bundle_file_name = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.renderer_bundle_file_name
         form["bundle"] = UploadIO.new(File.new(src_bundle_path), "application/javascript",
                                       renderer_bundle_file_name)
         form

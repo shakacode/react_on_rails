@@ -20,7 +20,7 @@ const config = {
   // be set if you wish to have automatic worker restarting, say to clear memory leaks.
 
   // time in minutes between restarting all workers
-  allWorkersRestartInterval: (env.CI && 2) || 10,
+  allWorkersRestartInterval: (env.CI && 2) || env.RENDERER_ALL_WORKERS_RESTART_INTERVAL || 10,
 
   // time in minutes between each worker restarting when restarting all workers
   delayBetweenIndividualWorkerRestarts: (env.CI && 0.01) || 1,
@@ -28,10 +28,11 @@ const config = {
   // Uncomment and change value for testing the honeybadger API integration
   honeybadgerApiKey: 'a602365c',
 
-  // This is a test account for React on Rails Pro
-  // https://sentry.io/settings/react-on-rails-pro/projects/nodejs/keys/
+  // This is a test account for React on Rails Pro.
+  // Substitute your own DSN.
+  // https://sentry.io/organizations/react-on-rails-pro/issues/?project=5591817
   // Only project contributors have access to see the test errors.
-  sentryDSN: 'https://35ae284fec944acd89915dee2b9f3bc8@o504646.ingest.sentry.io/5591817',
+  sentryDsn: 'https://35ae284fec944acd89915dee2b9f3bc8@o504646.ingest.sentry.io/5591817',
 
   sentryTracing: true,
 

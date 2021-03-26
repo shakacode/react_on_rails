@@ -8,7 +8,7 @@ PATH
       multipart-post (~> 2)
       persistent_http (~> 2)
       rainbow
-      react_on_rails (>= 11.3)
+      react_on_rails (>= 12.2)
 
 GEM
   remote: https://rubygems.org/
@@ -143,7 +143,9 @@ GEM
     marcel (0.3.3)
       mimemagic (~> 0.3.2)
     method_source (1.0.0)
-    mimemagic (0.3.5)
+    mimemagic (0.3.9)
+      nokogiri (~> 1)
+      rake
     mini_mime (1.0.2)
     mini_portile2 (2.5.0)
     mini_racer (0.3.1)
@@ -214,7 +216,7 @@ GEM
     rb-fsevent (0.10.4)
     rb-inotify (0.10.1)
       ffi (~> 1.0)
-    react_on_rails (12.0.4)
+    react_on_rails (12.2.0)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -365,7 +367,7 @@ DEPENDENCIES
   pry-rescue
   puma
   rails
-  react_on_rails (= 12.0.4)
+  react_on_rails (= 12.2.0)
   react_on_rails_pro!
   rspec-rails
   rspec-retry

@@ -56,7 +56,8 @@ const defaultConfig = {
   supportModules: env.RENDERER_SUPPORT_MODULES || null,
 
   // Workers count defaults to number of CPUs minus 1
-  workersCount: env.RENDERER_WORKERS_COUNT || defaultWorkersCount(),
+  workersCount:
+    (env.RENDERER_WORKERS_COUNT && parseInt(env.RENDERER_WORKERS_COUNT, 10)) || defaultWorkersCount(),
 
   // No default for password, means no auth
   password: env.RENDERER_PASSWORD,
@@ -64,10 +65,13 @@ const defaultConfig = {
   // Next 2 params, allWorkersRestartInterval and delayBetweenIndividualWorkerRestarts must both
   // be set if you wish to have automatic worker restarting, say to clear memory leaks.
   // time in minutes between restarting all workers
-  allWorkersRestartInterval: env.RENDERER_ALL_WORKERS_RESTART_INTERVAL,
+  allWorkersRestartInterval:
+    env.RENDERER_ALL_WORKERS_RESTART_INTERVAL && parseInt(env.RENDERER_ALL_WORKERS_RESTART_INTERVAL, 10),
 
   // time in minutes between each worker restarting when restarting all workers
-  delayBetweenIndividualWorkerRestarts: env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS,
+  delayBetweenIndividualWorkerRestarts:
+    env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS &&
+    parseInt(env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS, 10),
 
   maxDebugSnippetLength: MAX_DEBUG_SNIPPET_LENGTH,
 
@@ -108,11 +112,11 @@ configBuilder.logSanitizedConfig = function logSanitizedConfig() {
   log.info(`Node Renderer v${packageJson.version}, protocol v${packageJson.protocolVersion}`);
   log.info('NOTE: renderer settings names do not have prefix "RENDERER_"');
   log.info('Default values for settings:\n%O', defaultConfig);
+  log.info('ENV values used for settings (use "RENDERER_" prefix):\n%O', envValuesUsed());
   log.info(
-    'Customized values for settings from config object:\n%O',
+    'Customized values for settings from config object (overides ENV):\n%O',
     sanitizedSettings(configBuilder.getConfig()),
   );
-  log.info('ENV values used for settings (use "RENDERER_" prefix):\n%O', envValuesUsed());
   log.info('Final renderer settings used:\n%O', sanitizedSettings(config, '<NOT PROVIDED>'));
 };
 
@@ -160,13 +164,11 @@ configBuilder.buildConfig = function buildConfig(providedUserConfig) {
         tracing: config.sentryTracing,
         tracesSampleRate: sampleRate,
       });
+
+      tracing.setSentry(Sentry);
     } else {
       errorReporter.addSentryDsn(config.sentryDsn);
     }
-  }
-
-  if (config.sentryTracing) {
-    tracing.setSentry(Sentry);
   }
 
   configureLogger(log, config.logLevel);

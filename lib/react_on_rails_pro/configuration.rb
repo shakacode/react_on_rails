@@ -20,7 +20,8 @@ module ReactOnRailsPro
       dependency_globs: Configuration::DEFAULT_DEPENDENCY_GLOBS,
       ssr_pre_hook_js: nil,
       assets_to_copy: nil,
-      renderer_request_retry_limit: Configuration::DEFAULT_RENDERER_REQUEST_RETRY_LIMIT
+      renderer_request_retry_limit: Configuration::DEFAULT_RENDERER_REQUEST_RETRY_LIMIT,
+      throw_js_errors: Configuration::DEFAULT_THROW_JS_ERRORS
     )
   end
 
@@ -35,19 +36,20 @@ module ReactOnRailsPro
     DEFAULT_TRACING = false
     DEFAULT_DEPENDENCY_GLOBS = nil
     DEFAULT_RENDERER_REQUEST_RETRY_LIMIT = 5
+    DEFAULT_THROW_JS_ERRORS = false
 
     attr_accessor :renderer_url, :renderer_password, :tracing,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
                   :renderer_http_pool_size, :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout,
                   :dependency_globs, :ssr_pre_hook_js, :assets_to_copy,
-                  :renderer_request_retry_limit
+                  :renderer_request_retry_limit, :throw_js_errors
 
     def initialize(renderer_url: nil, renderer_password: nil, server_renderer: nil,
                    renderer_use_fallback_exec_js: nil, prerender_caching: nil,
                    renderer_http_pool_size: nil, renderer_http_pool_timeout: nil,
                    renderer_http_pool_warn_timeout: nil, tracing: nil,
                    dependency_globs: nil, ssr_pre_hook_js: nil, assets_to_copy: nil,
-                   renderer_request_retry_limit: nil)
+                   renderer_request_retry_limit: nil, throw_js_errors: nil)
       self.renderer_url = renderer_url
       self.renderer_password = renderer_password
       self.server_renderer = server_renderer
@@ -61,6 +63,7 @@ module ReactOnRailsPro
       self.ssr_pre_hook_js = ssr_pre_hook_js
       self.assets_to_copy = assets_to_copy
       self.renderer_request_retry_limit = renderer_request_retry_limit
+      self.throw_js_errors = throw_js_errors
     end
 
     def setup_config_values
