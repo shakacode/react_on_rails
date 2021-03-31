@@ -92,7 +92,10 @@ module ReactOnRailsPro
         if ReactOnRailsPro.configuration.assets_to_copy.present?
           ReactOnRailsPro.configuration.assets_to_copy.each_with_index do |asset_path, idx|
             Rails.logger.info { "[ReactOnRailsPro] Uploading asset #{asset_path}" }
-            raise ReactOnRails::Error, "Asset not found #{asset_path}" unless File.exist?(asset_path)
+            unless File.exist?(asset_path)
+              warn "Asset not found #{asset_path}"
+              next
+            end
 
             content_type = ReactOnRailsPro::Utils.mine_type_from_file_name(asset_path)
 

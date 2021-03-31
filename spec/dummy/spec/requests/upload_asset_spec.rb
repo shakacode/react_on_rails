@@ -53,12 +53,12 @@ describe "Upload asset" do
   end
 
   context("when assets don't exist") do
-    it "throws error if asset not found" do
+    it "prints warning if asset not found" do
       first_asset_path = Rails.root.join("public", "webpack", "production", asset_filename)
       File.delete(first_asset_path) if File.exist?(first_asset_path)
       expect do
         ReactOnRailsPro::Request.upload_assets
-      end.to raise_error("Asset not found #{first_asset_path}")
+      end.to output("Asset not found #{first_asset_path}\n").to_stderr
     end
   end
 
