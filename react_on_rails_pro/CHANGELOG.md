@@ -37,6 +37,10 @@ const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails
 ```
 ------
 
+## [2.0.0.beta.3] - 2021-03-31
+#### Improved
+- Warn, do not raise on missing assets [PR 176](https://github.com/shakacode/react_on_rails_pro/pull/176) by [Romex91](https://github.com/Romex91)
+
 ## [2.0.0.beta.2] - 2021-03-23
 #### Added
 - Added option `config.throw_js_errors` so that any errors in SSR will go to the console plus HoneyBadger/Sentry. [PR 174](https://github.com/shakacode/react_on_rails_pro/pull/174) by [justin808](https://github.com/justin808).
