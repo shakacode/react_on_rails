@@ -16,12 +16,14 @@ Gem and package versions are the same except for beta releases where the gem use
 
 ### 2.0 Upgrade Steps
 1. Update React on Rails to 12.2.0
+2. Be sure to use an API key that has the Github package access and know your API key username. For questions, message Justin Gordon on Slack or [justin@shakacode.com](mailto:justin@shakacode.com).
+
 
 In your `config/initializers/react_on_rails_pro.rb`:
 1. Rename any references from `config.serializer_globs` to `config.dependency_globs`
 1. Rename any references from `vm-renderer` to `node-renderer`
 1. Rename `vmRenderer` to `NodeRenderer`
-  
+
 Follow the steps for the new installation that uses Github Packages: [docs/installation.md](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/installation.md).
 1. Be sure to namespace the package like `require('@shakacode-tools/react-on-rails-pro-node-renderer');`
 1. Add the Honeybadger ("honeybadger") or Sentry ("@sentry/node") NPM packages, as those used to be **dependencies**. Now they are optional.
@@ -36,6 +38,8 @@ New
 const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
 ```
 ------
+## [2.0.0] - 2021-04-02
+- See 2.0 Upgrade steps!
 
 ## [2.0.0.beta.3] - 2021-03-31
 #### Improved
@@ -186,7 +190,9 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0.beta.2...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0...HEAD
+[2.0.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.6...2.0.0
+[2.0.0.beta.3]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0.beta.2...2.0.0.beta.3
 [2.0.0.beta.2]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0.beta.1...2.0.0.beta.2
 [2.0.0.beta.1]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0.beta.0...2.0.0.beta.1
 [2.0.0.beta.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.6...2.0.0.beta.0
