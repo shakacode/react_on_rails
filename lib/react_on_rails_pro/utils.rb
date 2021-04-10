@@ -26,7 +26,7 @@ module ReactOnRailsPro
       # We've tested it to make sure that it adds less than a second even in the case of thousands of files
       files = Dir.glob(globs).uniq.sort!
       digest = Digest::MD5.new
-      files.each { |f| digest.file(f) }
+      files.each { |f| digest.file(f) unless File.directory?(f) }
       digest.hexdigest
     end
 
