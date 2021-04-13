@@ -23,7 +23,7 @@ Uncommonly used options:
 ```
 
 - **component_name:** Can be a React component, created using a React Function Component, an ES6 class or a Render-Function that returns a React component (or, only on the server side, an object with shape { redirectLocation, error, renderedHtml }), or a "renderer function" that manually renders a React component to the dom (client side only). Note, a "renderer function" is a special type of "Render-Function." A "renderer function" takes a 3rd param of a DOM ID.
-  All options except `props, id, html_options` will inherit from your `react_on_rails.rb` initializer, as described [here](https://www.shakacode.com/react-on-rails/docs/basics/configuration).
+  All options except `props, id, html_options` will inherit from your `react_on_rails.rb` initializer, as described [here](https://www.shakacode.com/react-on-rails/docs/guides/configuration).
 - **general options:**
   - **props:** Ruby Hash which contains the properties to pass to the react object, or a JSON string. If you pass a string, we'll escape it for you.
   - **prerender:** enable server-side rendering of a component. Set to false when debugging!

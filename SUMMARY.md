@@ -4,17 +4,17 @@
 
 ## **Basics**
   + [React on Rails Basic Installation Tutorial](./docs/tutorial.md)
-  + [Webpack Configuration](./docs/basics/webpack-configuration.md)
+  + [Webpack Configuration](./docs/guides/webpack-configuration.md)
   + [How React on Rails Works](docs/outdated/how-react-on-rails-works.md)
-  + [Client vs. Server Rendering](./docs/basics/client-vs-server-rendering.md)
-  + [React Server Rendering](./docs/basics/react-server-rendering.md)
-  + [Render-Functions and the RailsContext](docs/basics/render-functions-and-railscontext.md)
+  + [Client vs. Server Rendering](./docs/guides/client-vs-server-rendering.md)
+  + [React Server Rendering](./docs/guides/react-server-rendering.md)
+  + [Render-Functions and the RailsContext](docs/guides/render-functions-and-railscontext.md)
   + [Caching and Performance: React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
-  + [Deployment](docs/basics/deployment.md).
-  + [React on Rails Internationalization (I18n, localization)](docs/basics/i18n.md)
-  + [RSpec Test Helpers Configuration](docs/basics/rspec-configuration.md)
-  + [Minitest Configuration](docs/basics/minitest-configuration.md)
-  + [Upgrading React on Rails](docs/basics/upgrading-react-on-rails.md)
+  + [Deployment](docs/guides/deployment.md).
+  + [React on Rails Internationalization (I18n, localization)](docs/guides/i18n.md)
+  + [RSpec Test Helpers Configuration](docs/guides/rspec-configuration.md)
+  + [Minitest Configuration](docs/guides/minitest-configuration.md)
+  + [Upgrading React on Rails](docs/guides/upgrading-react-on-rails.md)
   
 ## **API**
   - [View Helpers API](./docs/api/view-helpers-api.md)
@@ -22,8 +22,8 @@
   - [Redux Store API](./docs/api/redux-store-api.md)
 
 ## **Additional Details**
-  + [Migration from react-rails](./docs/basics/migrating-from-react-rails.md)
-  + [Generator Details](docs/basics/generator-details.md)
+  + [Migration from react-rails](./docs/guides/migrating-from-react-rails.md)
+  + [Generator Details](docs/guides/generator-details.md)
   + [Updating Dependencies](./docs/additional-reading/updating-dependencies.md)
   + [Manual Installation Overview](docs/outdated/manual-installation-overview.md)
   + [Upgrading from rails/webpacker v3 to v4](docs/additional-reading/upgrade-webpacker-v3-to-v4.md)
@@ -45,7 +45,7 @@
   + [AngularJS Integration and Migration to React on Rails](./docs/additional-reading/angular-js-integration-migration.md)
 
 ## **Deployment**
-  + [Heroku Deployment](docs/basics/heroku-deployment.md)
+  + [Heroku Deployment](docs/guides/heroku-deployment.md)
   + [Elastic Beanstalk Deployment](./docs/additional-reading/elastic-beanstalk.md)
 
 ## Outdated Non-Webpack Docs

@@ -6,7 +6,7 @@
 * [Webpacker Lite: Why Fork Webpacker?](https://blog.shakacode.com/webpacker-lite-why-fork-webpacker-f0a7707fac92)
 * [React on Rails, 2000+ 🌟 Stars](https://medium.com/shakacode/react-on-rails-2000-stars-32ff5cfacfbf#.6gmfb2gpy)
 * [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724)
-* [Simple Tutorial](https://www.shakacode.com/react-on-rails/docs/basics/tutorial).
+* [Simple Tutorial](https://www.shakacode.com/react-on-rails/docs/guides/tutorial).
 
 ## Videos
 

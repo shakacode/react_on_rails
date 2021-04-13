@@ -25,16 +25,15 @@ yarn run dummy:install
 ## Hot Reloading of Rails Assets
 
 ```sh
-foreman start -f Procfile.hot
+foreman start -f Procfile.dev
 ```
 
 ## Static Loading of Rails Assets
 ```sh
-foreman start -f Procfile.dev
+foreman start -f Procfile.dev-static
 ```
 
 ## Creating Assets for Tests
 ```sh
 foreman start -f Procfile.spec
 ```
-

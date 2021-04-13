@@ -1,5 +1,5 @@
 # RSpec Configuration
-_Click [here for minitest](https://www.shakacode.com/react-on-rails/docs/basics/minitest-configuration)_
+_Click [here for minitest](https://www.shakacode.com/react-on-rails/docs/guides/minitest-configuration)_
 
 # If your webpack configurations correspond to rails/webpacker's default setup
 If you're able to configure your webpack configuration to be run by having your webpack configuration
@@ -9,7 +9,7 @@ compiled by webpack before running tests and during production deployment:
 1. **Use rails/webpacker's compile option**: Configure your `config/webpacker.yml` so that `compile: true` is for `test` and `production`
    environments. Ensure that your `source_path` is correct, or else `rails/webpacker` won't correctly
    detect changes.
-2. **Use the react_on_rails settings and helpers**. Use the settings in `config/initializers/react_on_rails.rb`. Refer to [docs/configuration](https://www.shakacode.com/react-on-rails/docs/basics/configuration).
+2. **Use the react_on_rails settings and helpers**. Use the settings in `config/initializers/react_on_rails.rb`. Refer to [docs/configuration](https://www.shakacode.com/react-on-rails/docs/guides/configuration).
 
 ```yml
   config.build_test_command = "NODE_ENV=test RAILS_ENV=test bin/webpack"

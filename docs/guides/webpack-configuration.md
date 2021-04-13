@@ -22,7 +22,7 @@ A key decision in your use React on Rails is whether you go with the rails/webpa
 
 ## Option 1: Default Generator Setup: rails/webpacker app/javascript
 
-Typical rails/webpacker apps have a standard directory structure as documented [here](https://github.com/rails/webpacker/blob/5-x-stable/docs/recommended-project-structure.md). If you follow the steps in the the [basic tutorial](https://www.shakacode.com/react-on-rails/docs/basics/tutorial), you will see this pattern in action. In order to customize the Webpack configuration, you need to consult with the [rails/webpacker Webpack configuration](https://www.shakacode.com/react-on-rails/docs/javascript/webpack).
+Typical rails/webpacker apps have a standard directory structure as documented [here](https://github.com/rails/webpacker/blob/5-x-stable/docs/recommended-project-structure.md). If you follow the steps in the the [basic tutorial](https://www.shakacode.com/react-on-rails/docs/guides/tutorial), you will see this pattern in action. In order to customize the Webpack configuration, you need to consult with the [rails/webpacker Webpack configuration](https://www.shakacode.com/react-on-rails/docs/javascript/webpack).
 
 The *advantage* of using rails/webpacker to configure Webpack is that there is very little code needed to get started and you don't need to understand really anything about Webpack customization.
 

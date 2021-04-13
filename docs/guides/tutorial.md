@@ -1,7 +1,5 @@
 # React on Rails Basic Tutorial
 
------
-
 **November 11, 2020**: See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) for a new way to setup the creation of your SSR bundle with `rails/webpacker`. This file will be update shortly. Most of it is still relevant.
 
 -----
@@ -292,8 +290,8 @@ versus with server rendering:
 
 For more details on server rendering, see:
 
-  + [Client vs. Server Rendering](https://www.shakacode.com/react-on-rails/docs/basics/client-vs-server-rendering)
-  + [React Server Rendering](https://www.shakacode.com/react-on-rails/docs/basics/react-server-rendering)
+  + [Client vs. Server Rendering](https://www.shakacode.com/react-on-rails/docs/guides/client-vs-server-rendering)
+  + [React Server Rendering](https://www.shakacode.com/react-on-rails/docs/guides/react-server-rendering)
 
 ## Moving from the Rails default `/app/javascript` to the recommended `/client` structure
 

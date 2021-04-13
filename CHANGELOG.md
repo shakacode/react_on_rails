@@ -1,7 +1,7 @@
 # Change Log
 All notable changes to this project's source code will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version. NOTE: major versions of the npm module and the gem must be kept in sync.
 
-Migration instructions for the major updates can be found [here](docs/basics/upgrading-react-on-rails.md#upgrading-to-version-9.md). Some smaller migration information can be found here.
+Migration instructions for the major updates can be found [here](docs/guides/upgrading-react-on-rails.md#upgrading-to-version-9.md). Some smaller migration information can be found here.
 
 ## Need Help Migrating?
 If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for information about our [React on Rails Pro Support Options](https://www.shakacode.com/react-on-rails-pro).
@@ -24,7 +24,7 @@ Changes since last non-beta release.
   
 ### [12.1.0] - 2021-03-23
 #### Added
-- Added the ability to assign a module with a `call` method to `config.build_production_command`. See [the configuration docs](./docs/basics/configuration.md). [PR 1362: Accept custom module for config.build_production_command](https://github.com/shakacode/react_on_rails/pull/1362).
+- Added the ability to assign a module with a `call` method to `config.build_production_command`. See [the configuration docs](./docs/guides/configuration.md). [PR 1362: Accept custom module for config.build_production_command](https://github.com/shakacode/react_on_rails/pull/1362).
 
 #### Fixed
 - Stop setting NODE_ENV value during precompile, as it interferred with rails/webpacker's setting of NODE_ENV to production by default. Fixes [#1334](https://github.com/shakacode/react_on_rails/issues/1334). [PR 1356: Don't set NODE_ENV in assets.rake](https://github.com/shakacode/react_on_rails/pull/1356) by [alexrozanski](https://github.com/alexrozanski).
@@ -50,7 +50,7 @@ Changes since last non-beta release.
 - Changed invocation of webpacker:clean to use a very large number of versions so it does not acidentally delete the server-bundle.js. [PR 1306](https://github.com/shakacode/react_on_rails/pull/1306) by By [justin808](https://github.com/justin808).
 
 ### [12.0.0] - 2020-07-08
-For upgrade instructions, see [docs/basics/upgrading-react-on-rails.md](./docs/basics/upgrading-react-on-rails.md).
+For upgrade instructions, see [docs/basics/upgrading-react-on-rails.md](./docs/guides/upgrading-react-on-rails.md).
 
 #### Major Improvements
 1. **React Hooks Support** for top level components
@@ -66,7 +66,7 @@ set JavaScript property `renderFunction` on the function for which you want to r
 invoked to return the React component. In that case, you won't need to pass any unused params.
 [PR 1268](https://github.com/shakacode/react_on_rails/pull/1268) by [justin808](https://github.com/justin808)
 
-See [docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rails.md#upgrading-to-v12)
+See [docs/basics/upgrading-react-on-rails](./docs/guides/upgrading-react-on-rails.md#upgrading-to-v12)
 for details.         
 
 #### Other Updates
@@ -335,7 +335,7 @@ Updated React on Rails to depend on [rails/webpacker](https://github.com/rails/w
 
 
 #### 9.0 from 8.x. Upgrade Instructions
-Moved to [our documentation](docs/basics/upgrading-react-on-rails.md#upgrading-to-version-9).
+Moved to [our documentation](docs/guides/upgrading-react-on-rails.md#upgrading-to-version-9).
 
 ### [8.0.7] - 2017-08-16
 #### Fixed

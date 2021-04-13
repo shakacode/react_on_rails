@@ -1,6 +1,6 @@
 # Getting Started with an existing Rails app
 
-**Also consult the instructions for installing on a fresh Rails app**, see the [React on Rails Basic Tutorial](https://www.shakacode.com/react-on-rails/docs/basics/tutorial).
+**Also consult the instructions for installing on a fresh Rails app**, see the [React on Rails Basic Tutorial](https://www.shakacode.com/react-on-rails/docs/guides/tutorial).
 
 **If you have rails-5 API only project**, first [convert the rails-5 API only app to rails app](#convert-rails-5-api-only-app-to-rails-app) before [getting started](#getting-started-with-an-existing-rails-app).
 
