@@ -54,18 +54,13 @@ module ReactOnRails
       end
 
       def locale_files
-        # rubocop:disable Layout/IndentationWidth, Style/RedundantBegin
-        @locale_files ||= begin
-                            if i18n_yml_dir.present?
-                              Dir["#{i18n_yml_dir}/**/*.yml"]
-                            else
-                             ReactOnRails::Utils.truthy_presence(
-                               Rails.application && Rails.application.config.i18n.load_path
-                             ).presence
-                            end
-        end
-
-        # rubocop:enable Layout/IndentationWidth, Style/RedundantBegin
+        @locale_files ||= if i18n_yml_dir.present?
+                            Dir["#{i18n_yml_dir}/**/*.yml"]
+                          else
+                            ReactOnRails::Utils.truthy_presence(
+                              Rails.application && Rails.application.config.i18n.load_path
+                            ).presence
+                          end
       end
 
       def i18n_dir
