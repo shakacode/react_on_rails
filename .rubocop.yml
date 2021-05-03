@@ -36,6 +36,7 @@ AllCops:
 Naming/FileName:
   Exclude:
     - '**/Gemfile'
+    - '**/Rakefile'
 
 Layout/LineLength:
   Max: 120
