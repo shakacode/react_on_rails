@@ -132,7 +132,7 @@ module ReactOnRails
       # From https://github.com/rails/rails/blob/4c940b2dbfb457f67c6250b720f63501d74a45fd/railties/lib/rails/generators/rails/app/app_generator.rb
       def app_name
         @app_name ||= (defined_app_const_base? ? defined_app_name : File.basename(destination_root))
-                      .tr('\\', "").tr(". ", "_")
+                      .tr("\\", "").tr(". ", "_")
       end
 
       def defined_app_name
