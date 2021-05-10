@@ -343,7 +343,7 @@ DEPENDENCIES
   rspec-rails
   rspec-retry
   rspec_junit_formatter
-  rubocop
+  rubocop (= 1.14.0)
   rubocop-performance
   rubocop-rspec
   sass-rails
