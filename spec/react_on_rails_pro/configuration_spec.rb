@@ -32,6 +32,58 @@ module ReactOnRailsPro
       end
     end
 
+    describe ".remote_bundle_cache_adapter" do
+      it "throws if any value besides a module is assigned" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.remote_bundle_cache_adapter = "invalid value"
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /config.remote_bundle_cache_adapter can only have a module or class assigned/)
+      end
+
+      context "when assigned a module" do
+        it "throws if the assigned module does not have a class method named 'build'" do
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.remote_bundle_cache_adapter = Class.new
+            end
+          end.to raise_error(ReactOnRailsPro::Error,
+                             /config.remote_bundle_cache_adapter must have a class method named 'build'/)
+        end
+
+        it "throws if the assigned module does not have a class method named 'fetch'" do
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.remote_bundle_cache_adapter = Class.new do
+                def self.build(*)
+                  true
+                end
+              end
+            end
+          end.to raise_error(ReactOnRailsPro::Error,
+                             /config.remote_bundle_cache_adapter must have a class method named 'fetch'/)
+        end
+
+        it "throws if the assigned module does not have a class method named 'upload'" do
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.remote_bundle_cache_adapter = Class.new do
+                def self.build(*)
+                  true
+                end
+
+                def self.fetch(*)
+                  true
+                end
+              end
+            end
+          end.to raise_error(ReactOnRailsPro::Error,
+                             /config.remote_bundle_cache_adapter must have a class method named 'upload'/)
+        end
+      end
+    end
+
     describe ".renderer_url" do
       it "is the renderer_url if provided" do
         url = "http://something.com:1234"

@@ -176,19 +176,16 @@ describe ReactOnRailsPro::Cache, :caching do
   end
 
   describe ".dependencies_cache_key" do
-    let(:md5_instance) { instance_double(Digest::MD5) }
-
     context "when dependency_globs is defined" do
-      it "returns an MD5 based on the files" do
+      it "calls Utils::digest_of_globs" do
         dependency_glob = File.join(FixturesHelper.fixtures_dir, "app", "views", "**", "*.jbuilder")
         allow(ReactOnRailsPro.configuration).to receive(:dependency_globs).and_return(dependency_glob)
-        allow(Digest::MD5).to receive(:new).and_return(md5_instance)
-        allow(md5_instance).to receive(:file)
-        allow(md5_instance).to receive(:hexdigest).and_return("eb3dc8ec96886ec81203c9e13f0277a7")
 
-        result = described_class.dependencies_cache_key
+        allow(ReactOnRailsPro::Utils).to receive(:digest_of_globs).and_return("result")
 
-        expect(result).to eq("eb3dc8ec96886ec81203c9e13f0277a7")
+        expect(ReactOnRailsPro::Utils).to receive(:digest_of_globs).once
+
+        described_class.dependencies_cache_key
       end
     end
 

@@ -12,6 +12,10 @@ module ReactOnRailsPro
     # PUBLIC API
     ###########################################################
 
+    def self.rorp_puts(message)
+      puts "[ReactOnRailsPro] #{message}"
+    end
+
     def self.copy_assets
       return if ReactOnRailsPro.configuration.assets_to_copy.blank?
 
@@ -24,7 +28,14 @@ module ReactOnRailsPro
       # .uniq was added to remove redundancies in the case digest_of_globs is used on a union of
       # dependency_globs & source code in order to create a cache key for production bundles
       # We've tested it to make sure that it adds less than a second even in the case of thousands of files
-      files = Dir.glob(globs).uniq.sort!
+      files = Dir.glob(globs).uniq
+      excluded_dependency_globs = ReactOnRailsPro.configuration.excluded_dependency_globs
+      if excluded_dependency_globs.present?
+        excluded_files = Dir.glob(excluded_dependency_globs).uniq
+        files -= excluded_files
+      end
+      files.sort!
+
       digest = Digest::MD5.new
       files.each { |f| digest.file(f) unless File.directory?(f) }
       digest.hexdigest
