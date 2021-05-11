@@ -23,8 +23,18 @@
   "directories": {
     "doc": "docs"
   },
+  "resolutions": {
+    "diff": "^3.5.0",
+    "ini": "^1.3.6",
+    "is-svg": "^4.2.2",
+    "lodash": "^4.17.21",
+    "node-notifier": "^8.0.1",
+    "sockjs": "^0.3.20",
+    "url-parse": "^1.5.0",
+    "yargs-parser": "^5.0.0-security.0",
+    "y18n": "^3.2.2 || ^4.0.1"
+  },
   "dependencies": {
-    "concurrently": "^4.0.1",
     "console.history": "^1.5.0",
     "express": "^4.15.2",
     "express-busboy": "^7.0.1",
@@ -42,6 +52,7 @@
     "@sentry/tracing": "^6.2.3",
     "babel-eslint": "^10.0.1",
     "babel-jest": "^26.6.3",
+    "concurrently": "^4.0.1",
     "eslint": "^7.17.0",
     "eslint-config-prettier": "^7.1.0",
     "eslint-config-shakacode": "^17.0.0",
@@ -60,7 +71,7 @@
     "prettier-eslint-cli": "^5.0.0",
     "release-it": "^14.4.1",
     "supertest": "^4.0.2",
-    "tap-diff": "^0.1.1",
+    "tap-diff": "https://github.com/vaguilera/tap-diff",
     "tap-spec": "^5.0.0",
     "tape-async": "^2.3.0",
     "touch": "^3.1.0",
