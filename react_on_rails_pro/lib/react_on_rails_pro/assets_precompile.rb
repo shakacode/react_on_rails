@@ -128,7 +128,7 @@ module ReactOnRailsPro
       ReactOnRailsPro::Utils.rorp_puts "Bundles will be uploaded to remote bundle cache as #{zipped_bundles_filename}"
       begin
         remote_bundle_cache_adapter.upload(zipped_bundles_filepath)
-      rescue RuntimeError => err
+      rescue RuntimeError
         message = "An error was raised by the custom config.remote_bundle_cache_adapter 'upload'"\
                   " method when called with zipped_bundles_filepath: #{zipped_bundles_filepath}"
         ReactOnRailsPro::Utils.rorp_puts message
