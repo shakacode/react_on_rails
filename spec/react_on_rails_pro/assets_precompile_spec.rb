@@ -168,7 +168,7 @@ describe ReactOnRailsPro::AssetsPrecompile do # rubocop:disable Metrics/BlockLen
 
       expect(instance.fetch_bundles).to be_truthy
 
-      expect(adapter_double).to have_received(:fetch).with({ zipped_bundles_filename: unique_variable })
+      expect(adapter_double).to have_received(:fetch).with(unique_variable)
     end
   end
 
@@ -242,7 +242,7 @@ describe ReactOnRailsPro::AssetsPrecompile do # rubocop:disable Metrics/BlockLen
 
       expect(instance.cache_bundles).to be_truthy
 
-      expect(adapter_double).to have_received(:upload).with({ zipped_bundles_filepath: unique_variable })
+      expect(adapter_double).to have_received(:upload).with(unique_variable)
     end
   end
 end
