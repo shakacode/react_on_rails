@@ -12,6 +12,14 @@ Gem and package versions are the same except for beta releases where the gem use
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [2.1.0.beta.0] - 2021-05-10
+
+### Added
+- Optional production bundle caching. [PR 179](https://github.com/shakacode/react_on_rails_pro/pull/179) by [judahmeek](https://github.com/judahmeek).
+- Added configurations:
+  - `excluded_dependency_globs`: don't include these in caches
+  - `remote_bundle_cache_adapter`: See `docs/bundle-caching.md
+
 ------
 
 ### 2.0 Upgrade Steps

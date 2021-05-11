@@ -22,6 +22,12 @@ ReactOnRailsPro.configure do |config|
   # generate the JSON props, webpack and/or webpacker configuration files, and npm package lockfiles.
   config.dependency_globs = [ File.join(Rails.root, "app", "views", "**", "*.jbuilder") ]
 
+  # Array of globs to exclude from config.dependency_globs for ReactOnRailsPro cache key hashing
+  config.excluded_dependency_globs = [ File.join(Rails.root, "app", "views", "**", "dont_hash_this.jbuilder") ]
+
+  # Remote bundle caching saves deployment time by caching bundles.
+  # See /docs/bundle-caching.md for usage and an example of a module called S3BundleCacheAdapter.
+  config.remote_bundle_cache_adapter = nil
 
   # ALL OPTIONS BELOW ONLY APPLY IF SERVER RENDERING
 
@@ -40,12 +46,12 @@ ReactOnRailsPro.configure do |config|
   # mini_racer rendering. Other option is NodeRenderer
   # Default for `server_renderer` is "ExecJS"
   config.server_renderer = "NodeRenderer"
-  
+
   # If you're using the NodeRenderer, a value of true allows errors to be thrown from the bundle
   # code for SSR so that an error tracking system on the NodeRender can use the exceptions.
   # This value defaults to false. It should only be set to true when using the NodeRender.
   config.throw_js_errors = false
-  
+
   # You may provide a password and/or a port that will be sent to renderer for simple authentication.
   # `https://:<password>@url:<port>`. For example: https://:myPassword1@renderer:3800. Don't forget
   # the leading `:` before the password. Your password must also not contain certain characters that
