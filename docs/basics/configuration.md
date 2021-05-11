@@ -73,11 +73,14 @@ ReactOnRails.configure do |config|
   # If that file exists, React on Rails thinks that you'll use the rails/webpacker bin/webpack compiler.
   config.build_production_command = "RAILS_ENV=production bin/webpack"
 
-  # Alternatively, you can also specify a module containing a class method `call` 
+  # Alternatively, you can also specify a module containing a class method `call`
   # In this example, the module BuildProductionCommand would have a class method `call`.
   # See bottom for an example of the BuildProductionCommand module.
   # config.build_production_command = BuildProductionCommand
-   
+  # If you wish to utilize ReactOnRailsPro production bundle caching logic, then use
+  # config.build_production_command = ReactOnRailsPro::AssetsPrecompile
+  # and be sure to check ReactOnRailsPro's configuration documentation!
+
   ################################################################################
   ################################################################################
   # SERVER RENDERING OPTIONS
