@@ -42,6 +42,9 @@ For more details, see [Rails Configuration](./docs/configuration.md).
 The "React on Rails Pro Node Renderer" provides more efficient server rendering on a standalone Node JS server.
 See the [Node Renderer Docs](docs/node-renderer/basics.md).
 
+### Bundle Caching
+Don't wait for the same webpack bundles to built over and over. See the [bundle-caching docs](./docs/bundle-caching.md).
+
 ## Other Utility Methods
 See the [Ruby API](docs/ruby-api.md).
 
