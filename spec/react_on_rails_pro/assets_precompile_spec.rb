@@ -208,7 +208,7 @@ describe ReactOnRailsPro::AssetsPrecompile do # rubocop:disable Metrics/BlockLen
     it "calls remote_bundle_cache_adapter.upload with zipped_bundles_filepath" do
       webpacker_stub = Module.new do
         def self.public_output_path
-          "a"
+          Dir.tmpdir
         end
 
         def self.config
@@ -233,16 +233,16 @@ describe ReactOnRailsPro::AssetsPrecompile do # rubocop:disable Metrics/BlockLen
       adapter_double = class_double(adapter)
       allow(adapter_double).to receive(:upload).and_return(true)
 
-      unique_variable = { another_unique_key: "another unique value" }
+      zipped_bundles_filepath = Pathname.new(Dir.tmpdir).join("foobar")
 
       instance = described_class.instance
       allow(instance).to receive(:remote_bundle_cache_adapter).and_return(adapter_double)
       allow(instance).to receive(:zipped_bundles_filename).and_return("zipped_bundles_filename")
-      allow(instance).to receive(:zipped_bundles_filepath).and_return(unique_variable)
+      allow(instance).to receive(:zipped_bundles_filepath).and_return(zipped_bundles_filepath)
 
       expect(instance.cache_bundles).to be_truthy
 
-      expect(adapter_double).to have_received(:upload).with(unique_variable)
+      expect(adapter_double).to have_received(:upload).with(zipped_bundles_filepath)
     end
   end
 end

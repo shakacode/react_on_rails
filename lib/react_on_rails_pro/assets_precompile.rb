@@ -115,16 +115,24 @@ module ReactOnRailsPro
 
       if File.exist?(zipped_bundles_filepath)
         ReactOnRailsPro::Utils.rorp_puts "gunzipping bundle cache: #{zipped_bundles_filepath}"
-        Rake.sh "tar -xzf #{zipped_bundles_filepath}"
-        ReactOnRailsPro::Utils.rorp_puts "gunzipped bundle cache: #{zipped_bundles_filepath}"
+        public_output_path = Webpacker.config.public_output_path
+        FileUtils.mkdir_p(public_output_path)
+        Dir.chdir(public_output_path) do
+          Rake.sh "tar -xzf #{zipped_bundles_filepath}"
+        end
+        ReactOnRailsPro::Utils.rorp_puts "gunzipped bundle cache: #{zipped_bundles_filepath} to #{public_output_path}"
       end
       result
     end
 
     def cache_bundles
-      ReactOnRailsPro::Utils.rorp_puts "Gzipping built bundles to #{zipped_bundles_filepath}."
-      Rake.sh "tar -czf #{zipped_bundles_filepath} --auto-compress #{Webpacker.config.public_output_path}"
-
+      public_output_path = Webpacker.config.public_output_path
+      ReactOnRailsPro::Utils.rorp_puts "Gzipping built bundles to #{zipped_bundles_filepath} with "\
+        "files in #{public_output_path}"
+      Dir.chdir(public_output_path) do
+        Rake.sh "tar -czf #{zipped_bundles_filepath} --auto-compress -C "\
+                "#{Webpacker.config.public_output_path} ."
+      end
       ReactOnRailsPro::Utils.rorp_puts "Bundles will be uploaded to remote bundle cache as #{zipped_bundles_filename}"
       begin
         remote_bundle_cache_adapter.upload(zipped_bundles_filepath)
