@@ -29,7 +29,7 @@ module ReactOnRailsPro
         begin
           ReactOnRailsPro::Utils.rorp_puts "Calculating digest of bundle dependencies."
           starting = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          cache_dependencies = [Webpacker.config.source_path.join("**/*.*")]
+          cache_dependencies = [Webpacker.config.source_path.join("**", "*")]
                                .union(ReactOnRailsPro.configuration.dependency_globs)
           # Note, digest_of_globs removes excluded globs
           result = ReactOnRailsPro::Utils.digest_of_globs(cache_dependencies)
