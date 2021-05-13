@@ -34,7 +34,11 @@ module ReactOnRailsPro
           # Note, digest_of_globs removes excluded globs
           digest = ReactOnRailsPro::Utils.digest_of_globs(cache_dependencies)
           # Include the NODE_ENV and RAILS_ENV in the digest
-          [ENV["NODE_ENV"], Rails.env].compact.each { |value| digest.update(value) }
+          [
+            ReactOnRailsPro::VERSION,
+            ENV["NODE_ENV"],
+            Rails.env
+          ].compact.each { |value| digest.update(value) }
 
           result = digest.hexdigest
           ending = Process.clock_gettime(Process::CLOCK_MONOTONIC)
