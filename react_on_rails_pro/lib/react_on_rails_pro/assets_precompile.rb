@@ -32,7 +32,11 @@ module ReactOnRailsPro
           cache_dependencies = [Webpacker.config.source_path.join("**", "*")]
                                .union(ReactOnRailsPro.configuration.dependency_globs)
           # Note, digest_of_globs removes excluded globs
-          result = ReactOnRailsPro::Utils.digest_of_globs(cache_dependencies)
+          digest = ReactOnRailsPro::Utils.digest_of_globs(cache_dependencies)
+          # Include the NODE_ENV and RAILS_ENV in the digest
+          [ENV["NODE_ENV"], Rails.env].compact.each { |value| digest.update(value) }
+
+          result = digest.hexdigest
           ending = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           elapsed = (ending - starting).round(2)
           ReactOnRailsPro::Utils.rorp_puts "Completed calculating digest of bundle dependencies in #{elapsed} seconds."

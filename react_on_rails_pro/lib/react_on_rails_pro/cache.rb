@@ -61,7 +61,10 @@ module ReactOnRailsPro
         return @dependency_checksum if @dependency_checksum.present? && !Rails.env.development?
         return nil unless ReactOnRailsPro.configuration.dependency_globs.present?
 
-        @dependency_checksum = ReactOnRailsPro::Utils.digest_of_globs(ReactOnRailsPro.configuration.dependency_globs)
+        @dependency_checksum =
+          ReactOnRailsPro::Utils.digest_of_globs(
+            ReactOnRailsPro.configuration.dependency_globs
+          ).hexdigest
       end
 
       def react_component_cache_key(component_name, options)

@@ -22,7 +22,7 @@ module ReactOnRailsPro
       ReactOnRailsPro::Request.upload_assets
     end
 
-    # takes an array of globs & returns a md5 hash
+    # takes an array of globs, removes excluded_dependency_globs & returns a digest
     def self.digest_of_globs(globs)
       # NOTE: Dir.glob is not stable between machines, even with same OS. So we must sort.
       # .uniq was added to remove redundancies in the case digest_of_globs is used on a union of
@@ -38,7 +38,7 @@ module ReactOnRailsPro
 
       digest = Digest::MD5.new
       files.each { |f| digest.file(f) unless File.directory?(f) }
-      digest.hexdigest
+      digest
     end
 
     # Returns a string which should be used as a component in any cache key for

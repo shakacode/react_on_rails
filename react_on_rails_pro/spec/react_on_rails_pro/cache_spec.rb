@@ -181,7 +181,7 @@ describe ReactOnRailsPro::Cache, :caching do
         dependency_glob = File.join(FixturesHelper.fixtures_dir, "app", "views", "**", "*.jbuilder")
         allow(ReactOnRailsPro.configuration).to receive(:dependency_globs).and_return(dependency_glob)
 
-        allow(ReactOnRailsPro::Utils).to receive(:digest_of_globs).and_return("result")
+        allow(ReactOnRailsPro::Utils).to receive(:digest_of_globs).and_return(Digest::MD5.new)
 
         expect(ReactOnRailsPro::Utils).to receive(:digest_of_globs).once
 
