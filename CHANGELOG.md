@@ -43,7 +43,7 @@ Changes since last non-beta release.
 
 ### [12.0.2] - 2020-07-09
 #### Fixed
-- Remove dependency upon Redux for Typescript types. [PR 1323](https://github.com/shakacode/react_on_rails/pull/1306) by [justin808](https://github.com/justin808).
+- Remove dependency upon Redux for Typescript types. [PR 1323](https://github.com/shakacode/react_on_rails/pull/1323) by [justin808](https://github.com/justin808).
 
 ### [12.0.1] - 2020-07-09
 #### Fixed
