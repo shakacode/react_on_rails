@@ -38,7 +38,10 @@ module ReactOnRailsPro
             ReactOnRailsPro::VERSION,
             ENV["NODE_ENV"]
           ]
-          env_cache_keys += remote_bundle_cache_adapter.cache_keys
+
+          if remote_bundle_cache_adapter.respond_to?(:cache_keys)
+            env_cache_keys += remote_bundle_cache_adapter.cache_keys
+          end
           env_cache_keys.compact.each { |value| digest.update(value) }
 
           result = digest.hexdigest
