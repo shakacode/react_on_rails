@@ -10,8 +10,10 @@ change to production, but you will have to wait minutes for your bundles to be b
 React on Rails 2.1.0 introduces bundle caching based on a digest of all the source files, defined
 in the `config/webpacker.yml` file, plus other files defined with `config.dependency_globs` and
 excluding any files from `config.excluded_dependency_globs`. Creating this hash key takes at most a
-few seconds for even large projects. Additionally, the cache key takes into account the NODE_ENV and
-the RAILS_ENV.
+few seconds for even large projects. Additionally, the cache key includes 
+1. NODE_ENV
+2. Version of React on Rails Pro
+3. Configurable additional env values by supplying an array in method cache_keys on the `remote_bundle_cache_adapter`.
 
 This cache key is used for saving files to some remote storage, typically S3.
 
@@ -33,7 +35,25 @@ say called S3BundleCacheAdapter.
 config.remote_bundle_cache_adapter = S3BundleCacheAdapter
 ```
 
-This module needs three class methods: `build`, `fetch`, `upload`. See two examples of this below.
+This module needs four class methods: `cache_keys`, `build`, `fetch`, `upload`. See two examples of this below.
+
+#### Custom ENV cache keys
+Check your webpack config for the webpack.DefinePlugin. That allows JS code to use
+`process.env.MY_ENV_VAR` resulting in bundles that differ depending on the ENV value set.
+
+Thus, if you access these `process.env.MY_ENV_VAR` in your JS code, then you need to include such
+ENV vars in return value of the `cache keys` method.
+
+A much better approach than accessing `process.env` is to use the
+`config/initializers/react_on_rails.rb` setting for the`config.rendering_extension` to always
+pass some values into the rendering props.
+
+https://www.shakacode.com/react-on-rails/docs/basics/render-functions-and-railscontext/#customization-of-the-railscontext
+
+Also, if your webpack build process depends on any ENV values, then you will also need to add those
+to return value of the `cache_keys` method.
+
+Note, the NODE_ENV value is always included in the cache_keys.
 
 ## Disabling via an ENV value
 Once configured for bundle caching, ReactOnRailsPro::AssetsPrecompile's caching functionality
@@ -48,6 +68,17 @@ Note, S3UploadService is your own code that fetches and uploads.
 
 ```ruby
 class S3BundleCacheAdapter
+  # return an Array of Strings that should get added to the cache key.
+  # These are values to put in the cache key based on either using the webpack.DefinePlugin
+  # or webpack compilation varying by the ENV values.
+  # See the use of the webpack.DefinePlugin. That allows JS code to use
+  # process.env.MY_ENV_VAR resulting in bundles that differ depending on the ENV value set
+  # when building the bundles.
+  # Note, NODE_ENV is automatically included in the default cache key.
+  def self.cache_keys
+    [Rails.env, ENV['SOME_ENV_VALUE']]
+  end
+  
   # return value is unused
   # This command should build the bundles
   def self.build
@@ -85,6 +116,11 @@ remotely. Only local files are used.
 
 ```ruby
 class LocalBundleCacheAdapter
+  def self.cache_keys
+    # if no additional cache keys, return an empty array
+    []
+  end
+  
   def self.build
     Rake.sh(ReactOnRails::Utils.prepend_cd_node_modules_directory('yarn start build.prod').to_s)
   end

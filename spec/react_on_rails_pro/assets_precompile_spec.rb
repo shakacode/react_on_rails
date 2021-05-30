@@ -48,13 +48,25 @@ describe ReactOnRailsPro::AssetsPrecompile do # rubocop:disable Metrics/BlockLen
 
       allow(ror_pro_config).to receive(:dependency_globs).and_return([expected_parameters.last])
 
+      adapter = Module.new do
+        def self.cache_keys
+          %w[a b]
+        end
+
+        def self.build(_filename)
+          true
+        end
+      end
+
+      allow(ror_pro_config).to receive(:remote_bundle_cache_adapter).and_return(adapter)
+
       allow(ReactOnRailsPro).to receive(:configuration).and_return(ror_pro_config)
 
       allow(ReactOnRailsPro::Utils).to receive(:digest_of_globs).with(expected_parameters).and_return(Digest::MD5.new)
 
       ENV["NODE_ENV"] = "production"
 
-      described_class.instance.bundles_cache_key
+      expect(described_class.instance.bundles_cache_key).to eq("27068ea70ce38aae39876fc596ec37de")
     end
   end
 
@@ -69,6 +81,10 @@ describe ReactOnRailsPro::AssetsPrecompile do # rubocop:disable Metrics/BlockLen
 
     it "returns configuration.remote_bundle_cache_adapter" do
       adapter = Module.new do
+        def self.cache_keys
+          %w[a b]
+        end
+
         def self.build(_filename)
           true
         end
