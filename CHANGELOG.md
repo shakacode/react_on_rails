@@ -12,6 +12,9 @@ Gem and package versions are the same except for beta releases where the gem use
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [2.1.1] - 2021-05-29
+- Add optional extra cache values for bundle caching. The cache adapter can now provide a method cache_keys. [PR 196](https://github.com/shakacode/react_on_rails_pro/pull/196) by [justin@shakacode.com](mailto:justin@shakacode.com).
+
 ## [2.1.0] - 2021-05-15
 
 ### Added
@@ -198,7 +201,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/2.1.0...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/2.1.1...HEAD
+[2.1.1]: https://github.com/shakacode/react_on_rails_pro/compare/2.1.0...2.1.1
 [2.1.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.6...2.0.0
 [2.0.0.beta.3]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0.beta.2...2.0.0.beta.3

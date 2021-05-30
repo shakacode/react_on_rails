@@ -35,7 +35,7 @@ say called S3BundleCacheAdapter.
 config.remote_bundle_cache_adapter = S3BundleCacheAdapter
 ```
 
-This module needs four class methods: `cache_keys`, `build`, `fetch`, `upload`. See two examples of this below.
+This module needs four class methods: `cache_keys` (optional), `build`, `fetch`, `upload`. See two examples of this below.
 
 #### Custom ENV cache keys
 Check your webpack config for the webpack.DefinePlugin. That allows JS code to use
@@ -68,6 +68,7 @@ Note, S3UploadService is your own code that fetches and uploads.
 
 ```ruby
 class S3BundleCacheAdapter
+  # Optional
   # return an Array of Strings that should get added to the cache key.
   # These are values to put in the cache key based on either using the webpack.DefinePlugin
   # or webpack compilation varying by the ENV values.
