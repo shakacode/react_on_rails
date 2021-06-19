@@ -76,7 +76,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         it "is memoized" do
           opts = described_class.new(the_attrs)
 
-          expect(opts.dom_id).to eq opts.dom_id
+          expect(opts.dom_id).to eq opts.dom_id # rubocop:disable RSpec/IdenticalEqualityAssertion
         end
       end
 
