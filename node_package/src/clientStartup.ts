@@ -59,10 +59,11 @@ function turbolinksInstalled(): boolean {
 }
 
 function turboInstalled() {
-  var context = findContext();
+  const context = findContext();
   if (context.ReactOnRails) {
     return context.ReactOnRails.option('turbo') === true;
   }
+  return false;
 }
 
 function reactOnRailsHtmlElements(): HTMLCollectionOf<Element>  {
