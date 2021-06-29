@@ -75,8 +75,13 @@ describe ReactOnRails::ReactComponent::RenderOptions do
 
         it "is memoized" do
           opts = described_class.new(the_attrs)
+          generated_value = opts.dom_id
 
-          expect(opts.dom_id).to eq opts.dom_id
+          expect(opts.instance_variable_get(:@dom_id)).to eq generated_value
+          expect(opts.instance_variable_get(:@dom_id)).to eq opts.dom_id
+
+          opts.instance_variable_set(:@dom_id, "1234")
+          expect(opts.dom_id).to eq "1234"
         end
       end
 

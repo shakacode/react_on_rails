@@ -75,13 +75,21 @@ ctx.ReactOnRails = {
    * Set options for ReactOnRails, typically before you call ReactOnRails.register
    * Available Options:
    * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
+   * `turbo: true|false Turbo (the follower of Turbolinks) events will be registered, if set to true.
    */
-  setOptions(newOptions: {traceTurbolinks?: boolean}): void {
+  setOptions(newOptions: {traceTurbolinks?: boolean, turbo?: boolean }): void {
     if (typeof newOptions.traceTurbolinks !== 'undefined') {
       this.options.traceTurbolinks = newOptions.traceTurbolinks;
 
       // eslint-disable-next-line no-param-reassign
       delete newOptions.traceTurbolinks;
+    }
+
+    if (typeof newOptions.turbo !== 'undefined') {
+      this.options.turbo = newOptions.turbo;
+
+      // eslint-disable-next-line no-param-reassign
+      delete newOptions.turbo;
     }
 
     if (Object.keys(newOptions).length > 0) {

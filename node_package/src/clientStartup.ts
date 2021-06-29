@@ -58,6 +58,14 @@ function turbolinksInstalled(): boolean {
   return (typeof Turbolinks !== 'undefined');
 }
 
+function turboInstalled() {
+  const context = findContext();
+  if (context.ReactOnRails) {
+    return context.ReactOnRails.option('turbo') === true;
+  }
+  return false;
+}
+
 function reactOnRailsHtmlElements(): HTMLCollectionOf<Element>  {
   return document.getElementsByClassName('js-react-on-rails-component');
 }
@@ -221,13 +229,20 @@ function renderInit(): void {
   // Install listeners when running on the client (browser).
   // We must do this check for turbolinks AFTER the document is loaded because we load the
   // Webpack bundles first.
-  if (!turbolinksInstalled() || !turbolinksSupported()) {
+  if ((!turbolinksInstalled() || !turbolinksSupported()) && !turboInstalled()) {
     debugTurbolinks('NOT USING TURBOLINKS: calling reactOnRailsPageLoaded');
     reactOnRailsPageLoaded();
     return;
   }
 
-  if (turbolinksVersion5()) {
+  if (turboInstalled()) {
+    debugTurbolinks(
+      'USING TURBO: document added event listeners ' +
+      'turbo:before-render and turbo:render.');
+    document.addEventListener('turbo:before-render', reactOnRailsPageUnloaded);
+    document.addEventListener('turbo:render', reactOnRailsPageLoaded);
+    reactOnRailsPageLoaded();
+  } else if (turbolinksVersion5()) {
     debugTurbolinks(
       'USING TURBOLINKS 5: document added event listeners ' +
       'turbolinks:before-render and turbolinks:render.');

@@ -17,11 +17,17 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+- Ability to use with Turbo (@hotwired/turbo), as Turbolinks gets obsolete.
+  React on Rails Pro Node rendering [PR ...](https://github.com/shakacode/react_on_rails/pull/...) by [pgruener](https://github.com/pgruener).
+
+  To configure turbo the following option can be set:
+  `ReactOnRails.setOptions({ turbo: true })`
+
 ### [12.2.0] - 2021-03-25
 #### Added
 - Ability to configure server react rendering to throw rather than just logging the error. Useful for
   React on Rails Pro Node rendering [PR 1365](https://github.com/shakacode/react_on_rails/pull/1365) by [justin808](https://github.com/justin808).
-  
+
 ### [12.1.0] - 2021-03-23
 #### Added
 - Added the ability to assign a module with a `call` method to `config.build_production_command`. See [the configuration docs](./docs/basics/configuration.md). [PR 1362: Accept custom module for config.build_production_command](https://github.com/shakacode/react_on_rails/pull/1362).
@@ -67,7 +73,7 @@ invoked to return the React component. In that case, you won't need to pass any 
 [PR 1268](https://github.com/shakacode/react_on_rails/pull/1268) by [justin808](https://github.com/justin808)
 
 See [docs/basics/upgrading-react-on-rails](./docs/basics/upgrading-react-on-rails.md#upgrading-to-v12)
-for details.         
+for details.
 
 #### Other Updates
 * `react_on_rails` fully supports `rails/webpacker`. The example test app in `spec/dummy` was recently converted over to use rails/webpacker v4+. It's a good example of how to leverage rails/webpacker's webpack configuration for server-side rendering.
