@@ -8,6 +8,7 @@ react.development.js:1465 Uncaught Error: Invalid hook call. Hooks can only be c
 See https://fb.me/react-invalid-hook-call for tips about how to debug and fix this problem.
 ```
 
+#### Check your `node_modules`
 The main reason to get this is due to multiple versions of React installed.
 
 ```
@@ -32,6 +33,7 @@ npm ERR! extraneous: react@16.13.1 /Users/justin/shakacode/react-on-rails/react_
 
 Make sure there is only one version of React installed!
 
+#### Linking packages
 If you used yarn link, then you'll have two versions of React installed.
 
 Instead use [Yalc](https://github.com/whitecolor/yalc).
@@ -42,4 +44,17 @@ yalc publish
 
 cd spec/dummy
 yalc link react-on-rails
+```
+
+#### Multiple `javascript_pag_tag`s
+
+According to [this issue](https://github.com/rails/webpacker/issues/2932#issuecomment-860590789), `javascript_pag_tag` will include vendor and shared bundles each time you call it, which can lead to multiple instances of React being included on your page. Until that issue is fixed, ensure you're only calling that once per page.
+
+```html
+<!-- NO -->
+<%= javascript_pack_tag 'application' %>
+<%= javascript_pack_tag 'some_components' %>
+
+<!-- YES -->
+<%= javascript_pack_tag 'application', 'some_components' %>
 ```
