@@ -30,6 +30,7 @@ if (ctx === undefined) {
 
 const DEFAULT_OPTIONS = {
   traceTurbolinks: false,
+  turbo: false,
 };
 
 ctx.ReactOnRails = {
