@@ -13,7 +13,7 @@ excluding any files from `config.excluded_dependency_globs`. Creating this hash 
 few seconds for even large projects. Additionally, the cache key includes 
 1. NODE_ENV
 2. Version of React on Rails Pro
-3. Configurable additional env values by supplying an array in method cache_keys on the `remote_bundle_cache_adapter`.
+3. Configurable additional env values by supplying an array in method cache_keys on the `remote_bundle_cache_adapter`. See examples below.
 
 This cache key is used for saving files to some remote storage, typically S3.
 
@@ -35,7 +35,8 @@ say called S3BundleCacheAdapter.
 config.remote_bundle_cache_adapter = S3BundleCacheAdapter
 ```
 
-This module needs four class methods: `cache_keys` (optional), `build`, `fetch`, `upload`. See two examples of this below.
+This module needs four class methods: `cache_keys` (optional), `build`, `fetch`, `upload`. See two
+examples of this below.
 
 #### Custom ENV cache keys
 Check your webpack config for the webpack.DefinePlugin. That allows JS code to use
@@ -54,6 +55,9 @@ Also, if your webpack build process depends on any ENV values, then you will als
 to return value of the `cache_keys` method.
 
 Note, the NODE_ENV value is always included in the cache_keys.
+
+Another use of the ENV values would be a cache version, so incrementing this ENV value
+would force a new cache value.
 
 ## Disabling via an ENV value
 Once configured for bundle caching, ReactOnRailsPro::AssetsPrecompile's caching functionality
@@ -76,6 +80,8 @@ class S3BundleCacheAdapter
   # process.env.MY_ENV_VAR resulting in bundles that differ depending on the ENV value set
   # when building the bundles.
   # Note, NODE_ENV is automatically included in the default cache key.
+  # Also, we can have an ENV value be a cache version, so incrementing this ENV value
+  # would force a new cache value.
   def self.cache_keys
     [Rails.env, ENV['SOME_ENV_VALUE']]
   end
