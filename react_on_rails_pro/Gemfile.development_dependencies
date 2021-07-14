@@ -42,14 +42,16 @@ group :development do
 end
 
 group :development, :test do
-  gem "pry"
   gem "pry-byebug"
-  gem "pry-doc"
+  gem "pry", github: "pry/pry"
   gem "pry-rails"
+  gem "pry-doc", github: "pry/pry-doc"
+  gem "pry-theme"
   gem "pry-rescue"
-  gem "rubocop", require: false
-  gem 'rubocop-performance', require: false
-  gem 'rubocop-rspec', require: false
+
+  gem "rubocop", "1.18.3", require: false
+  gem 'rubocop-performance', "1.11.4", require: false
+  gem 'rubocop-rspec', "2.4.0", require: false
   gem "scss_lint", require: false
 end
 

@@ -140,7 +140,7 @@ module ReactOnRailsPro
     def cache_bundles
       public_output_path = Webpacker.config.public_output_path
       ReactOnRailsPro::Utils.rorp_puts "Gzipping built bundles to #{zipped_bundles_filepath} with "\
-        "files in #{public_output_path}"
+                                       "files in #{public_output_path}"
       Dir.chdir(public_output_path) do
         Rake.sh "tar -czf #{zipped_bundles_filepath} --auto-compress -C "\
                 "#{Webpacker.config.public_output_path} ."

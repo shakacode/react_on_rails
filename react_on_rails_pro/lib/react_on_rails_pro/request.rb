@@ -46,7 +46,7 @@ module ReactOnRailsPro
             # https://github.com/shakacode/react_on_rails_pro/pull/136#issue-463421204
             if available_retries.zero?
               raise ReactOnRailsPro::Error, "Time out error when getting the response on: #{path}.\n"\
-                  "Original error:\n#{e}\n#{e.backtrace}"
+                                            "Original error:\n#{e}\n#{e.backtrace}"
             end
             available_retries -= 1
             Rails.logger.info do
@@ -56,7 +56,7 @@ module ReactOnRailsPro
             next
           rescue StandardError => e
             raise ReactOnRailsPro::Error, "Can't connect to NodeRenderer renderer: #{path}.\n"\
-                "Original error:\n#{e}\n#{e.backtrace}"
+                                          "Original error:\n#{e}\n#{e.backtrace}"
           end
         end
 
