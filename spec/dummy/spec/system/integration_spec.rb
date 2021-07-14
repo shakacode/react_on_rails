@@ -75,7 +75,7 @@ describe "Pages/Index", :js do
 
     it "adds a value to the cache" do
       base_cache_key_with_prerender = "#{base_component_cache_key}/"\
-        "#{ReactOnRailsPro::Utils.bundle_hash}/#{dependencies_cache_key}"
+                                      "#{ReactOnRailsPro::Utils.bundle_hash}/#{dependencies_cache_key}"
       expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReduxApp})
     end
   end
@@ -129,7 +129,7 @@ describe "Pages/server_side_log_throw_raise", :js do
   it "redirects to /client_side_hello_world and flashes an error" do
     flash_message = page.find(:css, ".flash").text
     expect(flash_message).to eq("Error prerendering in react_on_rails. Redirected back to"\
-      " '/server_side_log_throw_raise_invoker'. See server logs for output.")
+                                " '/server_side_log_throw_raise_invoker'. See server logs for output.")
     expect(page).to have_current_path("/server_side_log_throw_raise_invoker")
   end
 end
