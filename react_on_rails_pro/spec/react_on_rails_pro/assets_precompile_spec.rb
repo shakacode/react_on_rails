@@ -60,13 +60,15 @@ describe ReactOnRailsPro::AssetsPrecompile do # rubocop:disable Metrics/BlockLen
 
       allow(ror_pro_config).to receive(:remote_bundle_cache_adapter).and_return(adapter)
 
+      stub_const("ReactOnRailsPro::VERSION", "2.2.0")
+
       allow(ReactOnRailsPro).to receive(:configuration).and_return(ror_pro_config)
 
       allow(ReactOnRailsPro::Utils).to receive(:digest_of_globs).with(expected_parameters).and_return(Digest::MD5.new)
 
       ENV["NODE_ENV"] = "production"
 
-      expect(described_class.instance.bundles_cache_key).to eq("d91fce3a1ee60d62951cb6bab94d77bd")
+      expect(described_class.instance.bundles_cache_key).to eq("0f923bb82b2fc3bfcbe53c6854d9ca72")
     end
   end
 
