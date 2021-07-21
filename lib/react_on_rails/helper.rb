@@ -536,6 +536,12 @@ module ReactOnRails
 
       controller.is_a?(ActionMailer::Base)
     end
+
+    if defined?(ScoutApm)
+      include ScoutApm::Tracer
+      instrument_method :react_component, type: "ReactOnRails", name: "react_component"
+      instrument_method :react_component_hash, type: "ReactOnRails", name: "react_component_hash"
+    end
   end
 end
 # rubocop:enable Metrics/ModuleLength
