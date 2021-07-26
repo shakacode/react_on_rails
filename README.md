@@ -379,7 +379,7 @@ The following companies support this open source project, and ShakaCode uses the
 [![Rails AutoScale](https://user-images.githubusercontent.com/1118459/103197530-48dc0e80-488a-11eb-8b1b-a16664b30274.png)](https://railsautoscale.com/)
 [![BrowserStack](https://cloud.githubusercontent.com/assets/1118459/23203304/1261e468-f886-11e6-819e-93b1a3f17da4.png)](https://www.browserstack.com)
 [![HoneyBadger](https://user-images.githubusercontent.com/1118459/114100696-63962a00-9860-11eb-8ac1-75ca02856d8e.png)](https://www.honeybadger.io/)
-[![StatusHero](https://user-images.githubusercontent.com/1118459/114100685-5ed17600-9860-11eb-839a-e335f335462a.png)](https://statushero.com/)
+[![StatusHero](https://user-images.githubusercontent.com/1118459/126868048-3fe64e54-4d6d-4066-9df2-8cf6fbaeb314.png)](https://statushero.com/)
 
 ShakaCode's favorite project tracking tool is [ClubHouse](https://clubhouse.io/). If you want to **try ClubHouse and get 2 months free beyond the 14-day trial period**, click [here to use ShakaCode's referral code](http://r.clbh.se/mvfoNeH). We're participating in their awesome triple-sided referral program, which you can read about [here](https://clubhouse.io/referral/). By using our [referral code](http://r.clbh.se/mvfoNeH) you'll be supporting ShakaCode and, thus, React on Rails!
 
