@@ -17,8 +17,10 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
-- Ability to use with Turbo (@hotwired/turbo), as Turbolinks gets obsolete.
-  React on Rails Pro Node rendering [PR ...](https://github.com/shakacode/react_on_rails/pull/...) by [pgruener](https://github.com/pgruener).
+### [12.3.0] - 2021-07-26
+#### Added
+
+- Ability to use with Turbo (@hotwired/turbo), as Turbolinks gets obsolete. [PR 1374](https://github.com/shakacode/react_on_rails/pull/1374) by [pgruener](https://github.com/pgruener) and [PR 1377](https://github.com/shakacode/react_on_rails/pull/1377) by [mdesantis](https://github.com/mdesantis).
 
   To configure turbo the following option can be set:
   `ReactOnRails.setOptions({ turbo: true })`
@@ -965,7 +967,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.2.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.3.0...master
+[12.3.0]: https://github.com/shakacode/react_on_rails/compare/12.2.0...12.3.0
 [12.2.0]: https://github.com/shakacode/react_on_rails/compare/12.1.0...12.2.0
 [12.1.0]: https://github.com/shakacode/react_on_rails/compare/12.0.4...12.1.0
 [12.0.4]: https://github.com/shakacode/react_on_rails/compare/12.0.3...12.0.4

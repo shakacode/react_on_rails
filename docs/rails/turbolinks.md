@@ -1,4 +1,15 @@
-# Turbolinks
+# Turbolinks and Turbo
+
+## Updated to support Turbo
+* See [PR 1374](https://github.com/shakacode/react_on_rails/pull/1374).
+* Ability to use with Turbo (@hotwired/turbo), as Turbolinks gets obsolete.
+
+To configure turbo the following option can be set:
+  `ReactOnRails.setOptions({ turbo: true })`
+
+Turbo is not auto-detected like older Turbolinks.
+
+*Below docs maybe outdated*
 
 * See [Turbolinks on Github](https://github.com/rails/turbolinks)
 * React on Rails currently supports 2.5.x of Turbolinks and 5.0.0 of Turbolinks 5.
@@ -73,6 +84,7 @@ To turn on tracing of Turbolinks events, put this in your registration file, whe
 ```js
    ReactOnRails.setOptions({
      traceTurbolinks: true,
+     turbo: true,
    });
 ```
 
