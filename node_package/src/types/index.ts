@@ -80,6 +80,7 @@ interface Params {
 export interface RenderParams extends Params {
   name: string;
   throwJsErrors: boolean;
+  returnPromise: boolean;
 }
 
 export interface CreateParams extends Params {
@@ -127,7 +128,7 @@ export interface ReactOnRails {
     name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean
   ): void | Element | Component;
   getComponent(name: string): RegisteredComponent;
-  serverRenderReactComponent(options: RenderParams): string;
+  serverRenderReactComponent(options: RenderParams): string | Promise<RenderResult>;
   handleError(options: ErrorOptions): string | undefined;
   buildConsoleReplay(): string;
   registeredComponents(): Map<string, RegisteredComponent>;
