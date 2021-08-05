@@ -9,8 +9,8 @@ import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import type { RenderParams, RenderResult } from './types/index';
 
-export default function serverRenderReactComponent(options: RenderParams): string {
-  const { name, domNodeId, trace, props, railsContext, throwJsErrors } = options;
+export default function serverRenderReactComponent(options: RenderParams): string | Promise<RenderResult> {
+  const { name, domNodeId, trace, props, railsContext, returnPromise, throwJsErrors } = options;
 
   let htmlResult = '';
   let hasErrors = false;
@@ -63,7 +63,7 @@ ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redire
         console.error(
             `Invalid call to renderToString. Possibly you have a renderFunction, a function that already
 calls renderToString, that takes one parameter. You need to add an extra unused
-parameter to identify this function as a renderFunction and not a simple React 
+parameter to identify this function as a renderFunction and not a simple React
 Function Component.`);
         throw error;
       }
@@ -95,6 +95,10 @@ Function Component.`);
       message: renderingError.message,
       stack: renderingError.stack,
     }
+  }
+
+  if(returnPromise) {
+    return Promise.resolve(result);
   }
 
   return JSON.stringify(result);
