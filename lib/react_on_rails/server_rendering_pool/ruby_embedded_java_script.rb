@@ -150,6 +150,10 @@ module ReactOnRails
         end
 
         def execjs_timer_polyfills
+          if ReactOnRails::Utils.react_on_rails_pro? && ReactOnRailsPro.configuration.server_renderer == "NodeRenderer"
+            return ""
+          end
+
           <<~JS
             function getStackTrace () {
               var stack;
