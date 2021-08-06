@@ -29,10 +29,10 @@
     <pre>
 <%%= redux_store("SharedReduxStore", props: @app_props_server_render, defer: true) %>
 
-<%%= react_component("ReduxSharedStoreApp", prerender: false, trace: true, id: "ReduxSharedStoreApp-react-component-0") %>
+<%%= react_component("ReduxSharedStoreApp", prerender: true, trace: true, id: "ReduxSharedStoreApp-react-component-0") %>
 
 Second Hello World
-<%%= react_component("ReduxSharedStoreApp", prerender: false, trace: true, id: "ReduxSharedStoreApp-react-component-1") %>
+<%%= react_component("ReduxSharedStoreApp", prerender: true, trace: true, id: "ReduxSharedStoreApp-react-component-1") %>
     </pre>
   </li>
 </ol>
