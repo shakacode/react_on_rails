@@ -1,20 +1,20 @@
 import ReactDOMServer from 'react-dom/server';
-import type { ReactElement } from 'react';
+import type { ReactElement, Component } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
 import createReactOutput from './createReactOutput';
-import isCreateReactElementResultNonReactComponent from
+import {isServerRenderHash, isPromise} from
     './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import type { RenderParams, RenderResult } from './types/index';
 
-export default function serverRenderReactComponent(options: RenderParams): string | Promise<RenderResult> {
+export default function serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult> {
   const { name, domNodeId, trace, props, railsContext, returnPromise, throwJsErrors } = options;
 
-  let htmlResult = '';
+  let renderResult: null | string | Promise<string> = null;
   let hasErrors = false;
-  let renderingError = null;
+  let renderingError: any = null;
 
   try {
     const componentObj = ComponentRegistry.get(name);
@@ -32,7 +32,7 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
       railsContext,
     });
 
-    if (isCreateReactElementResultNonReactComponent(reactElementOrRouterResult)) {
+    if (isServerRenderHash(reactElementOrRouterResult)) {
       // We let the client side handle any redirect
       // Set hasErrors in case we want to throw a Rails exception
       hasErrors = !!(reactElementOrRouterResult as {routeError: Error}).routeError;
@@ -54,11 +54,13 @@ ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redire
         // For redirects on server rendering, we can't stop Rails from returning the same result.
         // Possibly, someday, we could have the rails server redirect.
       } else {
-        htmlResult = (reactElementOrRouterResult as { renderedHtml: string }).renderedHtml;
+        renderResult = (reactElementOrRouterResult as { renderedHtml: string }).renderedHtml;
       }
+    } else if (isPromise(reactElementOrRouterResult)) {
+      renderResult = reactElementOrRouterResult;
     } else {
       try {
-        htmlResult = ReactDOMServer.renderToString(reactElementOrRouterResult as ReactElement);
+        renderResult = ReactDOMServer.renderToString(reactElementOrRouterResult as ReactElement);
       } catch (error) {
         console.error(
             `Invalid call to renderToString. Possibly you have a renderFunction, a function that already
@@ -74,7 +76,7 @@ Function Component.`);
     }
 
     hasErrors = true;
-    htmlResult = handleError({
+    renderResult = handleError({
       e,
       name,
       serverSide: true,
@@ -83,23 +85,41 @@ Function Component.`);
   }
 
   const consoleReplayScript = buildConsoleReplay();
+  const addRenderingErrors = (resultObject: RenderResult) => {
+    resultObject.renderingError = {
+      message: renderingError.message,
+      stack: renderingError.stack,
+    };
+    return resultObject;
+  }
+
+  if(returnPromise) {
+    const resolveRenderResult = async () => {
+      const promiseResult = {
+        html: await renderResult,
+        consoleReplayScript,
+        hasErrors,
+      };
+
+      if (renderingError) {
+        addRenderingErrors(promiseResult);
+      };
+
+      return promiseResult;
+    };
+
+    return resolveRenderResult();
+  }
 
   const result = {
-    html: htmlResult,
+    html: renderResult,
     consoleReplayScript,
     hasErrors,
   } as RenderResult;
 
   if (renderingError) {
-    result.renderingError = {
-      message: renderingError.message,
-      stack: renderingError.stack,
-    }
-  }
-
-  if(returnPromise) {
-    return Promise.resolve(result);
-  }
+    addRenderingErrors(result);
+  };
 
   return JSON.stringify(result);
 }

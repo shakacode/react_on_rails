@@ -8,7 +8,7 @@ import type {
 } from './types/index';
 
 import createReactOutput from './createReactOutput';
-import isServerRenderResult from './isServerRenderResult';
+import {isServerRenderHash} from './isServerRenderResult';
 
 declare global {
   interface Window {
@@ -161,7 +161,7 @@ function render(el: Element, railsContext: RailsContext): void {
         shouldHydrate,
       });
 
-      if (isServerRenderResult(reactElementOrRouterResult)) {
+      if (isServerRenderHash(reactElementOrRouterResult)) {
         throw new Error(`\
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);

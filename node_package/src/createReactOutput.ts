@@ -3,7 +3,7 @@
 import React from 'react';
 import type { ServerRenderResult,
   CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index';
-import isServerRenderResult from "./isServerRenderResult";
+import {isServerRenderHash, isPromise} from "./isServerRenderResult";
 
 /**
  * Logic to either call the renderFunction or call React.createElement to get the
@@ -44,10 +44,16 @@ export default function createReactOutput({
       console.log(`${name} is a renderFunction`);
     }
     const renderFunctionResult = (component as RenderFunction)(props, railsContext);
-    if (isServerRenderResult(renderFunctionResult as CreateReactOutputResult)) {
+    if (isServerRenderHash(renderFunctionResult as CreateReactOutputResult)) {
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
       return (renderFunctionResult as ServerRenderResult);
+    }
+
+    if (isPromise(renderFunctionResult as CreateReactOutputResult)) {
+      // We just return at this point, because calling function knows how to handle this case and
+      // we can't call React.createElement with this type of Object.
+      return (renderFunctionResult as Promise<string>);
     }
 
     if (React.isValidElement(renderFunctionResult)) {
