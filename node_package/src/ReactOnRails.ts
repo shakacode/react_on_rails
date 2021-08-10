@@ -205,7 +205,7 @@ ctx.ReactOnRails = {
    * Used by server rendering by Rails
    * @param options
    */
-  serverRenderReactComponent(options: RenderParams): string | Promise<RenderResult> {
+  serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult> {
     return serverRenderReactComponent(options);
   },
 
