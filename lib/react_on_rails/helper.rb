@@ -188,8 +188,6 @@ module ReactOnRails
       render_options = ReactOnRails::ReactComponent::RenderOptions
                        .new(react_component_name: "generic-js", options: options)
 
-      return_type = ReactOnRails::Utils.react_on_rails_pro? ? "Promise.resolve" : "JSON.stringify"
-
       js_code = <<-JS.strip_heredoc
       (function() {
         var htmlResult = '';
@@ -219,7 +217,7 @@ module ReactOnRails
 
         consoleReplayScript = ReactOnRails.buildConsoleReplay();
 
-        return #{return_type}({
+        return JSON.stringify({
             html: htmlResult,
             consoleReplayScript: consoleReplayScript,
             hasErrors: hasErrors,

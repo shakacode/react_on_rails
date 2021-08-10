@@ -1,5 +1,5 @@
 import ReactDOMServer from 'react-dom/server';
-import type { ReactElement, Component } from 'react';
+import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
 import createReactOutput from './createReactOutput';
@@ -7,14 +7,14 @@ import {isServerRenderHash, isPromise} from
     './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
-import type { RenderParams, RenderResult } from './types/index';
+import type { RenderParams, RenderResult, RenderingError } from './types/index';
 
 export default function serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult> {
   const { name, domNodeId, trace, props, railsContext, returnPromise, throwJsErrors } = options;
 
   let renderResult: null | string | Promise<string> = null;
   let hasErrors = false;
-  let renderingError: any = null;
+  let renderingError: null | RenderingError = null;
 
   try {
     const componentObj = ComponentRegistry.get(name);
@@ -85,12 +85,11 @@ Function Component.`);
   }
 
   const consoleReplayScript = buildConsoleReplay();
-  const addRenderingErrors = (resultObject: RenderResult) => {
-    resultObject.renderingError = {
-      message: renderingError.message,
-      stack: renderingError.stack,
+  const addRenderingErrors = (resultObject: RenderResult, renderError: RenderingError) => {
+    resultObject.renderingError = { // eslint-disable-line no-param-reassign
+      message: renderError.message,
+      stack: renderError.stack,
     };
-    return resultObject;
   }
 
   if(returnPromise) {
@@ -101,9 +100,9 @@ Function Component.`);
         hasErrors,
       };
 
-      if (renderingError) {
-        addRenderingErrors(promiseResult);
-      };
+      if (renderingError !== null) {
+        addRenderingErrors(promiseResult, renderingError);
+      }
 
       return promiseResult;
     };
@@ -118,8 +117,8 @@ Function Component.`);
   } as RenderResult;
 
   if (renderingError) {
-    addRenderingErrors(result);
-  };
+    addRenderingErrors(result, renderingError);
+  }
 
   return JSON.stringify(result);
 }
