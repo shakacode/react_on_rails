@@ -37,7 +37,6 @@ Rails.application.routes.draw do
   get "react_helmet_broken" => "pages#react_helmet_broken"
   get "broken_app" => "pages#broken_app"
   get "image_example" => "pages#image_example"
-  get "server_render_with_timeout" => "pages#server_render_with_timeout"
   get "context_function_return_jsx" => "pages#context_function_return_jsx"
   get "pure_component_wrapped_in_function" => "pages#pure_component_wrapped_in_function"
 end
