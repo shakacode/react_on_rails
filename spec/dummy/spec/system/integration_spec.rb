@@ -214,7 +214,7 @@ describe "Manual client hydration", :js, type: :system do
   end
 end
 
-describe "returns hash if hash_result == true even with prerendering error", :js do
+describe "returns hash if hash_result == true even with prerendering error", :js, :ignore_js_errors do
   subject { page }
 
   before do
@@ -233,7 +233,7 @@ describe "generator function returns renderedHtml as an object with additional H
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
     subject { page }
 
-    before { visit cached_react_helmet_path }
+    before { visit react_helmet_path }
 
     it "renderedHtmls should not have any errors" do
       expect(page).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
@@ -274,15 +274,6 @@ describe "display images", :js do
   it "image_example should not have any errors" do
     expect(page).to have_text "Here is a label with a background-image from the CSS modules imported"
     expect(page.html).to include("[SERVER] RENDERED ImageExample to dom node with id")
-  end
-end
-
-describe "loadable components", :js do
-  before { visit "loadable/page-a" }
-
-  it "displays the proper text" do
-    expect(page).to have_text "This is Page A."
-    expect(page.html).to include("[SERVER] RENDERED Loadable")
   end
 end
 

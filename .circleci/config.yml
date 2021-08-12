@@ -287,7 +287,7 @@ jobs:
       - store_test_results:
           path: ~/rspec
       - store_artifacts:
-          path: spec/dummy/tmp/capybara
+          path: spec/dummy/tmp/screenshots
       - store_artifacts:
           path: spec/dummy/log/test.log
       - store_artifacts:
