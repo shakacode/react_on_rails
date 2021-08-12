@@ -76,7 +76,9 @@ describe "Pages/Index", :js do
   end
 end
 
-context "when Server Rendering with Options" do
+context "when Server Rendering with Options", :js do
+  subject { page }
+
   before do
     visit server_side_hello_world_with_options_path
   end
@@ -95,12 +97,12 @@ describe "Turbolinks across pages", :js do
   end
 end
 
-describe "Pages/client_side_log_throw", :js do
+describe "Pages/client_side_log_throw", :js, :ignore_js_errors do
   subject { page }
 
   before { visit "/client_side_log_throw" }
 
-  it "client side logging and error handling", driver: js_errors_driver do
+  it "client side logging and error handling", :js do
     expect(page).to have_text "This example demonstrates client side logging and error handling."
   end
 end
@@ -113,7 +115,7 @@ describe "Pages/Pure Component", :js do
   it { is_expected.to have_text "This is a Pure Component!" }
 end
 
-describe "Pages/server_side_log_throw", :js do
+describe "Pages/server_side_log_throw", :js, :ignore_js_errors do
   subject { page }
 
   before { visit "/server_side_log_throw" }
@@ -149,7 +151,7 @@ describe "Pages/index after using browser's back button", :js do
   include_examples "React Component", "div#ReduxApp-react-component-0"
 end
 
-describe "React Router", js: true, driver: js_errors_driver do
+describe "React Router", :js do
   subject { page }
 
   before do
@@ -174,7 +176,7 @@ describe "React Router", js: true, driver: js_errors_driver do
   end
 end
 
-describe "Manual Rendering", :js do
+describe "Manual Rendering", :js, type: :system do
   subject { page }
 
   before { visit "/client_side_manual_render" }

@@ -129,8 +129,4 @@ RSpec.configure do |config|
   # save_and_open_page, meaning that relative links will be loaded from the
   # development server if it is running.
   Capybara.asset_host = "http://localhost:3000"
-
-  def js_errors_driver
-    Capybara.javascript_driver
-  end
 end
