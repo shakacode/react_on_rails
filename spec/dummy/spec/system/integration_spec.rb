@@ -231,7 +231,7 @@ describe "returns hash if hash_result == true even with prerendering error", :js
   end
 end
 
-describe "generator function returns renderedHtml as an object with additional HTML markups" do
+describe "generator function returns renderedHtml as an object with additional HTML markups", :focus do
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
     subject { page }
 
@@ -242,20 +242,6 @@ describe "generator function returns renderedHtml as an object with additional H
       expect(page).to have_css "title", text: /\ACustom page title\z/, visible: :hidden
       expect(page.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
       change_text_expect_dom_selector("div#react-helmet-0")
-    end
-  end
-
-  shared_examples "renderedHtmls should have errors" do
-    subject { page }
-
-    before { visit react_helmet_broken_path }
-
-    it "renderedHtmls should have errors" do
-      puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
-      puts "integration_spec.rb: #{__LINE__},  method: #{__method__}"
-      puts "subject.html = #{subject.html.ai}"
-      puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
-      expect(subject.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
     end
   end
 
