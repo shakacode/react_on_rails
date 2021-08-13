@@ -107,7 +107,7 @@ RSpec.configure do |config|
 
   # https://github.com/mattheworiordan/capybara-screenshot/issues/243#issuecomment-620423225
   config.retry_callback = proc do |ex|
-    Capybara.reset_sessions! if ex.metadata[:js] || ex.metadata[:reset]
+    Capybara.reset_sessions! if ex.metadata[:js]
   end
 
   # RSpec Rails can automatically mix in different behaviours to your tests

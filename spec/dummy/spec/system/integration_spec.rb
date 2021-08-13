@@ -231,7 +231,7 @@ describe "returns hash if hash_result == true even with prerendering error", :js
   end
 end
 
-describe "generator function returns renderedHtml as an object with additional HTML markups", :focus do
+describe "generator function returns renderedHtml as an object with additional HTML markups" do
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
     subject { page }
 
@@ -245,7 +245,7 @@ describe "generator function returns renderedHtml as an object with additional H
     end
   end
 
-  describe "with disabled JS", :reset, driver: :rack_test do
+  describe "with disabled JS", driver: :rack_test do
     include_examples "renderedHtmls should not have any errors and set correct page title"
   end
 
