@@ -245,7 +245,7 @@ describe "generator function returns renderedHtml as an object with additional H
     end
   end
 
-  describe "with disabled JS", driver: :rack_test do
+  describe "with disabled JS", :reset, driver: :rack_test do
     include_examples "renderedHtmls should not have any errors and set correct page title"
   end
 
