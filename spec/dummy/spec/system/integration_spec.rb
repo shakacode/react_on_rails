@@ -241,16 +241,18 @@ describe "generator function returns renderedHtml as an object with additional H
       expect(page).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
       expect(page).to have_css "title", text: /\ACustom page title\z/, visible: :hidden
       expect(page.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
-      change_text_expect_dom_selector("div#react-helmet-0")
     end
   end
 
-  describe "with disabled JS", driver: :rack_test do
+  describe "with disabled JS", :rack_test do
     include_examples "renderedHtmls should not have any errors and set correct page title"
   end
 
   describe "with enabled JS", :js do
     include_examples "renderedHtmls should not have any errors and set correct page title"
+    it "renders the name change" do
+      change_text_expect_dom_selector("div#react-helmet-0")
+    end
   end
 end
 

@@ -81,12 +81,10 @@ RSpec.configure do |config|
 
   supported_drivers = %i[selenium_chrome_headless selenium_chrome selenium selenium_headless]
   driver = ENV["DRIVER"].try(:to_sym).presence || default_driver
+  Capybara.javascript_driver = driver
   Capybara.default_driver = driver
 
   raise "Unsupported driver: #{driver} (supported = #{supported_drivers})" unless supported_drivers.include?(driver)
-
-  Capybara.javascript_driver = driver
-  Capybara.default_driver = driver
 
   Capybara.register_server(Capybara.javascript_driver) do |app, port|
     require "rack/handler/puma"
@@ -95,6 +93,10 @@ RSpec.configure do |config|
 
   config.before(:each, type: :system, js: true) do
     driven_by driver
+  end
+
+  config.before(:each, type: :system, rack_test: true) do
+    driven_by :rack_test
   end
 
   # Capybara.default_max_wait_time = 15
