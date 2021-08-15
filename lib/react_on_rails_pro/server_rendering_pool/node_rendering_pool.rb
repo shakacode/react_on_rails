@@ -91,6 +91,11 @@ module ReactOnRailsPro
           fallback_renderer.instance_variable_set(:@js_context_pool, nil)
           result
         end
+
+        if defined?(ScoutApm)
+          include ScoutApm::Tracer
+          instrument_method :exec_server_render_js, type: "ReactOnRails", name: "Node React Server Rendering"
+        end
       end
     end
   end

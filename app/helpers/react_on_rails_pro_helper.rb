@@ -59,6 +59,12 @@ module ReactOnRailsProHelper
     end
   end
 
+  if defined?(ScoutApm)
+    include ScoutApm::Tracer
+    instrument_method :cached_react_component, type: "ReactOnRails", name: "cached_react_component"
+    instrument_method :cached_react_component_hash, type: "ReactOnRails", name: "cached_react_component_hash"
+  end
+
   private
 
   def check_caching_options!(raw_options, block)
