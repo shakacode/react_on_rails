@@ -48,8 +48,6 @@ import ImageExample from '../components/ImageExample';
 
 import CacheDisabled from '../components/CacheDisabled';
 
-import SetTimeoutLoggingApp from '../startup/SetTimeoutLoggingApp';
-
 ReactOnRails.register({
   BrokenApp,
   HelloWorld,
@@ -69,7 +67,6 @@ ReactOnRails.register({
   ReactHelmetApp,
   ReactHelmetAppBroken,
   ImageExample,
-  SetTimeoutLoggingApp,
   HelloWorldHooks,
   HelloWorldHooksContext,
 });

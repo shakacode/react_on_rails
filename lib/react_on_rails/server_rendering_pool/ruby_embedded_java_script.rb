@@ -204,6 +204,11 @@ module ReactOnRails
           JS
         end
 
+        if defined?(ScoutApm)
+          include ScoutApm::Tracer
+          instrument_method :exec_server_render_js, type: "ReactOnRails", name: "ExecJs React Server Rendering"
+        end
+
         private
 
         def file_url_to_string(url)
