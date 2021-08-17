@@ -20,7 +20,7 @@
     Create store source: spec/dummy/client/app/stores/SharedReduxStore.jsx
   </li>
   <li>
-    Register the components: spec/dummy/client/app/startup/client-bundle.js
+    Register the component in the client-bundle & server-bundle entrypoint files: spec/dummy/client/app/packs/
   </li>
   <li>
     Register the the store in the controller spec/dummy/app/controllers/pages_controller.rb
@@ -35,10 +35,10 @@ redux_store("SharedReduxStore", props: @app_props_server_render)
     Place the components: spec/dummy/app/views/pages/server_side_hello_world_shared_store_controller.html.erb
     <br/>
     <pre>
-<%%= react_component("ReduxSharedStoreApp", prerender: false, trace: true, id: "ReduxSharedStoreApp-react-component-0") %>
+<%%= react_component("ReduxSharedStoreApp", prerender: true, trace: true, id: "ReduxSharedStoreApp-react-component-0") %>
 
 Second Hello World
-<%%= react_component("ReduxSharedStoreApp", prerender: false, trace: true, id: "ReduxSharedStoreApp-react-component-1") %>
+<%%= react_component("ReduxSharedStoreApp", prerender: true, trace: true, id: "ReduxSharedStoreApp-react-component-1") %>
     </pre>
   </li>
 </ol>
