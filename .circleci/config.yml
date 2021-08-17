@@ -289,6 +289,8 @@ jobs:
       - store_artifacts:
           path: spec/dummy/tmp/capybara
       - store_artifacts:
+          path: spec/dummy/tmp/screenshots
+      - store_artifacts:
           path: spec/dummy/log/test.log
       - store_artifacts:
           path: spec/dummy/yarn-error.log

@@ -21,13 +21,13 @@ This page demonstrates a few things the other pages do not show:
 </p>
 
 <pre>
-  <%%= react_component("ReduxApp", props: @app_props_server_render.merge(prerender: false), trace: true, prerender: false, id: "ReduxApp-react-component-0") %>
+  <%%= react_component("ReduxApp", props: @app_props_server_render.merge(prerender: true), trace: true, prerender: true, id: "ReduxApp-react-component-0") %>
 </pre>
 <p>
   That will generate this, which is done only once on the server side:
 </p>
 
-<%= react_component("ReduxApp", props: @app_props_server_render.merge(prerender: false), trace: true, prerender: false, id: "ReduxApp-react-component-0") %>
+<%= react_component("ReduxApp", props: @app_props_server_render.merge(prerender: true), trace: true, prerender: true, id: "ReduxApp-react-component-0") %>
 <hr/>
 
 <h1>Server Rendered React Component Without Redux</h1>
@@ -53,39 +53,39 @@ This page demonstrates a few things the other pages do not show:
 <pre>
     <%%= react_component("HelloWorldHooksContext", props: @app_props_server_render, prerender: true, trace: true, id: "HelloWorld-react-component-7") %><br/>
 </pre>
-<%= react_component("HelloWorldHooksContext", props: @app_props_server_render, prerender: false, trace: true, id: "HelloWorld-react-component-7") %>
+<%= react_component("HelloWorldHooksContext", props: @app_props_server_render, prerender: true, trace: true, id: "HelloWorld-react-component-7") %>
 <hr/>
 
 <h1>Simple Client Rendered Component</h1>
-<!-- Passing prerender: false to not render on server -->
+<!-- Passing prerender: true to not render on server -->
 <pre>
-  <%%= react_component("HelloWorldApp", props: @app_props_hello, prerender: false, trace: true, id: "HelloWorldApp-react-component-2") %>
+  <%%= react_component("HelloWorldApp", props: @app_props_hello, prerender: true, trace: true, id: "HelloWorldApp-react-component-2") %>
 </pre>
-<%= react_component("HelloWorldApp", props: @app_props_hello, prerender: false, trace: true, id: "HelloWorldApp-react-component-2") %>
+<%= react_component("HelloWorldApp", props: @app_props_hello, prerender: true, trace: true, id: "HelloWorldApp-react-component-2") %>
 <hr/>
 
 <h1>Showing you can put the same component twice on a page with different props</h1>
 <pre>
-  <%%= react_component("HelloWorldApp", props: @app_props_hello_again, prerender: false, trace: true, id: "HelloWorldApp-react-component-3") %>
+  <%%= react_component("HelloWorldApp", props: @app_props_hello_again, prerender: true, trace: true, id: "HelloWorldApp-react-component-3") %>
 </pre>
-<%= react_component("HelloWorldApp", props: @app_props_hello_again, prerender: false, trace: true, id: "HelloWorldApp-react-component-3") %>
+<%= react_component("HelloWorldApp", props: @app_props_hello_again, prerender: true, trace: true, id: "HelloWorldApp-react-component-3") %>
 <hr/>
 
 <h1>Component that returns string html on server</h1>
 <pre>
-  <%%= react_component("HelloWorld", props: @app_props_hello, prerender: false, trace: true, id: "HelloWorld-react-component-4") %>
-  <%%= react_component("HelloES5", props: @app_props_hello, prerender: false, trace: true, id: "HelloES5-react-component-5") %>
+  <%%= react_component("HelloWorld", props: @app_props_hello, prerender: true, trace: true, id: "HelloWorld-react-component-4") %>
+  <%%= react_component("HelloES5", props: @app_props_hello, prerender: true, trace: true, id: "HelloES5-react-component-5") %>
 </pre>
 <%= react_component("RenderedHtml", prerender: true, trace: true, id: "HelloWorld-react-component-4") %>
 <hr/>
 
 <h1>Simple Component Without Redux</h1>
 <pre>
-  <%%= react_component("HelloWorld", props: @app_props_hello, prerender: false, trace: true, id: "HelloWorld-react-component-5") %>
-  <%%= react_component("HelloES5", props: @app_props_hello, prerender: false, trace: true, id: "HelloES5-react-component-5") %>
+  <%%= react_component("HelloWorld", props: @app_props_hello, prerender: true, trace: true, id: "HelloWorld-react-component-5") %>
+  <%%= react_component("HelloES5", props: @app_props_hello, prerender: true, trace: true, id: "HelloES5-react-component-5") %>
 </pre>
-<%= react_component("HelloWorld", props: @app_props_hello, prerender: false, trace: true, id: "HelloWorld-react-component-5") %>
-<%= react_component("HelloWorldES5", props: @app_props_hello, prerender: false, trace: true, id: "HelloWorldES5-react-component-5") %>
+<%= react_component("HelloWorld", props: @app_props_hello, prerender: true, trace: true, id: "HelloWorld-react-component-5") %>
+<%= react_component("HelloWorldES5", props: @app_props_hello, prerender: true, trace: true, id: "HelloWorldES5-react-component-5") %>
 <hr/>
 
 <h1>Non-React Component</h1>

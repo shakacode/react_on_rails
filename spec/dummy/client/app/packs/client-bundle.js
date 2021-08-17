@@ -36,7 +36,6 @@ import ReactHelmetApp from '../startup/ReactHelmetClientApp';
 // Demonstrate using Images
 import ImageExample from '../components/ImageExample';
 
-import SetTimeoutLoggingApp from '../startup/SetTimeoutLoggingApp';
 ReactOnRails.setOptions({
   traceTurbolinks: true,
 });
@@ -58,7 +57,6 @@ ReactOnRails.register({
   RenderedHtml,
   ReactHelmetApp,
   ImageExample,
-  SetTimeoutLoggingApp,
   HelloWorldHooks,
   HelloWorldHooksContext,
   ContextFunctionReturnInvalidJSX,
