@@ -41,11 +41,11 @@ Given that `rails/webpacker` gem already provides basic React integration, why w
 1. Tight integration with [rails/webpacker](https://github.com/rails/webpacker).
 1. Server-Side Rendering (SSR), often used for SEO crawler indexing and UX performance, is not offered by `rails/webpacker`.
 1. [Redux](https://github.com/reactjs/redux) and [React Router](https://github.com/ReactTraining/react-router#readme) integration with server-side-rendering.
-1. [Internationalization (I18n) and (localization)](https://www.shakacode.com/react-on-rails/docs/basics/i18n)
+1. [Internationalization (I18n) and (localization)](https://www.shakacode.com/react-on-rails/docs/guides/i18n)
 1. A supportive community. This [web search shows how live public sites are using React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/).
 1. [Reason ML Support](https://github.com/shakacode/reason-react-on-rails-example).
 
-See [Rails/Webpacker React Integration Options](docs/guides/rails-webpacker-react-integration-options.md) for comparisons to other gems.
+See [Rails/Webpacker React Integration Options](https://www.shakacode.com/react-on-rails/docs/guides/rails-webpacker-react-integration-options.md) for comparisons to other gems.
 
 See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
 

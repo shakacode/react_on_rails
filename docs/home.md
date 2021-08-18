@@ -1,8 +1,8 @@
 # React on Rails
 
 ## Details
-1. [Overview](https://www.shakacode.com/react-on-rails/docs/guides/overview)
-1. [Getting Started](https://www.shakacode.com/react-on-rails/docs/guides/how-react-on-rails-works)
+1. [Overview](https://www.shakacode.com/react-on-rails/docs/guides/react-on-rails-overview)
+1. [Getting Started](https://www.shakacode.com/react-on-rails/docs/guides/getting-started)
 1. [How React on Rails Works](https://www.shakacode.com/react-on-rails/docs/guides/how-react-on-rails-works)
 1. [Webpack Configuration](https://www.shakacode.com/react-on-rails/docs/guides/webpack-configuration)
 1. [View Helpers API](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api)
@@ -19,5 +19,5 @@ that supports SSR.
 2. Example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) for a new way to setup the creation of your SSR bundle with `rails/webpacker`.
 3. Live, [open source](https://github.com/shakacode/react-webpack-rails-tutorial), example of this gem, see [reactrails.com](http://reactrails.com).
 
-# Other Resources 
+# Other Resources
 1. RailsConf 2020 talk: [Webpacker, It-Just-Works, But How?](http://railsconf.com/2020/video/justin-gordon-webpacker-it-just-works-but-how)

@@ -1,4 +1,4 @@
-# How to conditionally render server side based on the device type 
+# How to conditionally render server side based on the device type
 
 In general, we want to use CSS to do mobile responsive layouts.
 
@@ -27,13 +27,13 @@ end
 # Shown below are the defaults for configuration
 ReactOnRails.configure do |config|
   # See https://github.com/shakacode/react_on_rails/blob/master/docs/guides/configuration.md for the rest
- 
+
   # This allows you to add additional values to the Rails Context. Implement one static method
   # called `custom_context(view_context)` and return a Hash.
   config.rendering_extension = RenderingExtension
 end
 ```
 
-Note, full details of the React on Rails confguration are [here in docs/basics/configuration.md](https://github.com/shakacode/react_on_rails/blob/master/docs/guides/configuration.md).
+Note, full details of the React on Rails confguration are [here in docs/basics/configuration.md](https://shakacode.com/react_on_rails/docs/guides/configuration).
 
-See the doc file [docs/basics/generator-functions-and-railscontext.md](https://github.com/shakacode/react_on_rails/blob/master/docs/guides/generator-functions-and-railscontext.md#rails-context) for how your client-side code uses the device information
+See the doc file [docs/basics/generator-functions-and-railscontext.md](https://shakacode.com/react_on_rails/docs/guides/generator-functions-and-railscontext#rails-context) for how your client-side code uses the device information
