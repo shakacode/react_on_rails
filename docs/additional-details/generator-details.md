@@ -37,7 +37,7 @@ Then you may run
     `rails s`
 ```
 
-Another good option is to create a simple test app per the [Tutorial](https://www.shakacode.com/react-on-rails/docs/basics/tutorial).
+Another good option is to create a simple test app per the [Tutorial](https://www.shakacode.com/react-on-rails/docs/guides/tutorial).
 
 # Understanding the Organization of the Generated Client Code
 The generated client code follows our organization scheme. Each unique set of functionality, is given its own folder inside of `app/javascript/app/bundles`. Note, the recommended for bigger projects is `client/app/bundles`. This encourages for modularity of *domains*.

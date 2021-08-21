@@ -1,6 +1,6 @@
 # Client-Side Rendering vs. Server-Side Rendering
 
-*Also, see [our react server-rendering documentation](https://www.shakacode.com/react-on-rails/docs/basics/react-server-rendering).*
+*Also, see [our react server-rendering documentation](https://www.shakacode.com/react-on-rails/docs/guides/react-server-rendering).*
 
 In most cases, you should use the `prerender: false` (default behavior) with the provided helper method to render the React component from your Rails views. In some cases, such as when SEO is vital, or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
 
