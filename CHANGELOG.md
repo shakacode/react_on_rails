@@ -21,6 +21,8 @@ Changes since last non-beta release.
 
 - Ability to stop React on Rails from modifying or creating the `assets:precompile` task. [PR 1371](https://github.com/shakacode/react_on_rails/pull/1371) by [justin808](https://github.com/justin808). Thanks to [elstgav](https://github.com/elstgav) for [the suggestion](https://github.com/shakacode/react_on_rails/issues/1368)!
 
+- Ability to skip stubbing of setTimeout, setInterval, & clearTimeout polyfills when using properly configured React on Rails Pro Node Renderer. Also, added the ability to have render functions return a promise to be awaited by the React on Rails Pro Node Renderer. [PR 1380](https://github.com/shakacode/react_on_rails/pull/1380) by [judahmeek](https://github.com/judahmeek)
+
 ### [12.3.0] - 2021-07-26
 #### Added
 
