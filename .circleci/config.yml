@@ -69,25 +69,25 @@ aliases:
   - &restore-package-node-modules-cache
     name: Restore cached node_modules directory
     keys:
-      - v4-package-node-modules-cache-{{ checksum "yarn.lock" }}
+      - v5-package-node-modules-cache-{{ checksum "yarn.lock" }}
 
   # Restore spec/dummy/node_modules dir from cache using yarn.lock checksum as a key.
   - &restore-dummy-app-node-modules-cache
     name: Restore cached spec/dummy/node_modules directory
     keys:
-      - v4-dummy-app-node-modules-cache-{{ checksum "spec/dummy/yarn.lock" }}
+      - v5-dummy-app-node-modules-cache-{{ checksum "spec/dummy/yarn.lock" }}
 
   # Restore vendor/bundle dir from cache using Gemfile.lock checksum as a key.
   - &restore-dummy-app-gem-cache
     name: Restore cached Ruby Gems for dummy app
     keys:
-      - v4-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
+      - v5-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
 
   # Restore vendor/bundle dir from cache using react_on_rails.gemspec checksum as a key.
   - &restore-package-gem-cache
     name: Restore cached Ruby Gems for package
     keys:
-      - v4-package-app-gem-cache-{{ checksum "react_on_rails.gemspec" }}
+      - v5-package-app-gem-cache-{{ checksum "react_on_rails.gemspec" }}
 
     # NOTE: Sometimes CI generated docker images are not updated in time to keep up with the minimum required
     # by chromedriver versions of Chrome. Just bump here Chrome version if chromedriver raises errors
@@ -139,7 +139,7 @@ jobs:
       - run: *install-package-node-modules
       - save_cache:
           name: Save root node_modules to cache
-          key: v4-package-node-modules-cache-{{ checksum "yarn.lock" }}
+          key: v5-package-node-modules-cache-{{ checksum "yarn.lock" }}
           paths:
             - node_modules
 
@@ -157,7 +157,7 @@ jobs:
       - run: *install-dummy-app-node-modules
       - save_cache:
           name: Save spec/dummy/node_modules to cache
-          key: v4-dummy-app-node-modules-cache-{{ checksum "spec/dummy/yarn.lock" }}
+          key: v5-dummy-app-node-modules-cache-{{ checksum "spec/dummy/yarn.lock" }}
           paths:
             - spec/dummy/node_modules
             - spec/dummy/node_modules
@@ -172,7 +172,7 @@ jobs:
       - run: *install-package-ruby-gems
       - save_cache:
           name: Save dummy app ruby gems to cache
-          key: v4-package-app-gem-cache-{{ checksum "react_on_rails.gemspec" }}
+          key: v5-package-app-gem-cache-{{ checksum "react_on_rails.gemspec" }}
           paths:
             - vendor/bundle
 
@@ -186,7 +186,7 @@ jobs:
       - run: *install-dummy-app-ruby-gems
       - save_cache:
           name: Save dummy app ruby gems to cache
-          key: v4-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
+          key: v5-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
           paths:
             - spec/dummy/vendor/bundle
 
@@ -209,7 +209,7 @@ jobs:
           command: cd spec/dummy && yarn run build:test
       - save_cache:
           name: Save test webpack bundles to cache (for build number checksum used by rspec job)
-          key: v4-dummy-app-webpack-bundle-{{ .Revision }}
+          key: v5-dummy-app-webpack-bundle-{{ .Revision }}
           paths:
             - spec/dummy/public/webpack
   # Run JS unit tests for Renderer package.
@@ -249,7 +249,7 @@ jobs:
       - restore_cache: *restore-dummy-app-gem-cache
       - restore_cache:
           name: Restore cached webpack bundles for dummy app
-          key: v4-dummy-app-webpack-bundle-{{ .Revision }}
+          key: v5-dummy-app-webpack-bundle-{{ .Revision }}
       - restore_cache: *restore-dummy-app-node-modules-cache
       - restore_cache: *restore-package-node-modules-cache
       - run: *install-package-node-modules

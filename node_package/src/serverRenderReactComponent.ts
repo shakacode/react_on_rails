@@ -57,6 +57,9 @@ ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redire
         renderResult = (reactElementOrRouterResult as { renderedHtml: string }).renderedHtml;
       }
     } else if (isPromise(reactElementOrRouterResult)) {
+      if (!returnPromise) {
+        console.error(`Your render function returned a Promise, which is only supported by a node renderer, not ExceJS.`)
+      }
       renderResult = reactElementOrRouterResult;
     } else {
       try {

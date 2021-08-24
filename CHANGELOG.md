@@ -17,6 +17,10 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+#### Added
+
+- Ability to skip stubbing of setTimeout, setInterval, & clearTimeout polyfills when using properly configured React on Rails Pro. Also, ability to have render functions return a promise to be awaited by React on Rails Pro Node Renderer. [PR 1380](https://github.com/shakacode/react_on_rails/pull/1380) by [judahmeek](https://github.com/judahmeek)
+
 ### [12.3.0] - 2021-07-26
 #### Added
 
