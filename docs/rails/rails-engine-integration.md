@@ -20,7 +20,9 @@ Place `gem 'react_on_rails', '~> 6'` before the gem pointing at your engine in y
 
 Requiring `react_on_rails` and including the helper will get rid of any issues where react on rails or react_component is undefined.
 
-As far as solving the assets issue, `lib/tasks/assets.rake` in `react_on_rails` would somehow have to know that `react_on_rails` was included in an engine, and decide the path accordingly. This might be impossible, especially in the case of multiple engines using `react_on_rails` in a single application. Another solution would be to detach this rake task from the rails assets:precompile task, and let people use it separately.
+As far as solving the assets issue, `lib/tasks/assets.rake` in `react_on_rails` would somehow have to know that `react_on_rails` was included in an engine, and decide the path accordingly. This might be impossible, especially in the case of multiple engines using `react_on_rails` in a single application.
+
+Another solution would be to detach this rake task from the `rails assets:precompile` task. This can be done by adding `REACT_ON_RAILS_PRECOMPILE=false` to your environment. If you do so, then react assets will have to be bundled separately from `rails assets:precompile`.
 
 # Github Issues
 
