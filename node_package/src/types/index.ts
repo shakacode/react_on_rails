@@ -80,7 +80,7 @@ interface Params {
 export interface RenderParams extends Params {
   name: string;
   throwJsErrors: boolean;
-  returnPromise: boolean;
+  renderingReturnsPromises: boolean;
 }
 
 export interface CreateParams extends Params {
