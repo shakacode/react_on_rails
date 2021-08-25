@@ -16,7 +16,7 @@ describe('serverRenderReactComponent', () => {
     const X1 = () => <div>HELLO</div>;
     ComponentRegistry.register({ X1 });
 
-    const renderResult = serverRenderReactComponent({ name: 'X1', domNodeId: 'myDomId', trace: false })
+    const renderResult = serverRenderReactComponent({ name: 'X1', domNodeId: 'myDomId', trace: false });
     const { html, hasErrors } = JSON.parse(renderResult);
 
     const result = html.indexOf('>HELLO</div>') > 0;
@@ -34,7 +34,7 @@ describe('serverRenderReactComponent', () => {
 
     // Not testing the consoleReplayScript, as handleError is putting the console to the test
     // runner log.
-    const renderResult = serverRenderReactComponent({ name: 'X2', domNodeId: 'myDomId', trace: false })
+    const renderResult = serverRenderReactComponent({ name: 'X2', domNodeId: 'myDomId', trace: false });
     const { html, hasErrors } = JSON.parse(renderResult);
 
     const result = html.indexOf('XYZ') > 0 && html.indexOf('Exception in rendering!') > 0;
@@ -49,7 +49,7 @@ describe('serverRenderReactComponent', () => {
 
     ComponentRegistry.register({ X3 });
 
-    const renderResult = serverRenderReactComponent({ name: 'X3', domNodeId: 'myDomId', trace: false })
+    const renderResult = serverRenderReactComponent({ name: 'X3', domNodeId: 'myDomId', trace: false });
     const { html, hasErrors, renderedHtml } = JSON.parse(renderResult);
 
     expect(html).toEqual(expectedHtml);
@@ -61,7 +61,7 @@ describe('serverRenderReactComponent', () => {
     const X4 = (a1, a2, a3) => null;
     ComponentRegistry.register({ X4 });
 
-    const renderResult = serverRenderReactComponent({ name: 'X4', domNodeId: 'myDomId', trace: false })
+    const renderResult = serverRenderReactComponent({ name: 'X4', domNodeId: 'myDomId', trace: false });
     const { html } = JSON.parse(renderResult);
 
     const result = html.indexOf('renderer') > 0 && html.indexOf('Exception in rendering!') > 0;
@@ -75,10 +75,15 @@ describe('serverRenderReactComponent', () => {
 
     ComponentRegistry.register({ X5 });
 
-    const renderResult = await serverRenderReactComponent({ name: 'X5', domNodeId: 'myDomId', trace: false, renderingReturnsPromises: true })
-    const html = await renderResult.html
+    const renderResult = await serverRenderReactComponent({
+      name: 'X5',
+      domNodeId: 'myDomId',
+      trace: false,
+      renderingReturnsPromises: true,
+    });
+    const html = await renderResult.html;
 
-    expect(html).toEqual(expectedHtml)
+    expect(html).toEqual(expectedHtml);
     expect(renderResult.hasErrors).toBeFalsy();
   });
 });
