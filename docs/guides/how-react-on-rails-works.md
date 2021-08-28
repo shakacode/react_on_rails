@@ -41,3 +41,5 @@ However, if you want to run a custom command to run webpack to build your bundle
 Then React on Rails modifies the `assets:precompile` task to run your `build_production_command`.
 
 If you have used the provided generator, these bundles will automatically be added to your `.gitignore` to prevent extraneous noise from re-generated code in your pull requests. You will want to do this manually if you do not use the provided generator.
+
+You can stop React on Rails from modifying or creating the `assets:precompile` task, by setting a `REACT_ON_RAILS_PRECOMPILE` environment variable to `no`, `false`, `n` or `f`.

@@ -7,7 +7,9 @@ require "active_support"
 
 ENV["RAILS_ENV"] ||= ENV["RACK_ENV"] || "development"
 
-unless ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
+skip_react_on_rails_precompile = %w[no false n f].include?(ENV["REACT_ON_RAILS_PRECOMPILE"])
+
+if !skip_react_on_rails_precompile && !ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
   # Ensure that rails/webpacker does not call bin/webpack if we're providing
   # the build command.
   ENV["WEBPACKER_PRECOMPILE"] = "false"

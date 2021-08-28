@@ -17,6 +17,10 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+#### Added
+
+- Ability to stop React on Rails from modifying or creating the `assets:precompile` task. [PR 1371](https://github.com/shakacode/react_on_rails/pull/1371) by [justin808](https://github.com/justin808). Thanks to [elstgav](https://github.com/elstgav) for [the suggestion](https://github.com/shakacode/react_on_rails/issues/1368)!
+
 ### [12.3.0] - 2021-07-26
 #### Added
 
