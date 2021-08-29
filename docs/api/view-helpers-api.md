@@ -23,7 +23,7 @@ Uncommonly used options:
 ```
 
 - **component_name:** Can be a React component, created using a React Function Component, an ES6 class or a Render-Function that returns a React component (or, only on the server side, an object with shape { redirectLocation, error, renderedHtml }), or a "renderer function" that manually renders a React component to the dom (client side only). Note, a "renderer function" is a special type of "Render-Function." A "renderer function" takes a 3rd param of a DOM ID.
-  All options except `props, id, html_options` will inherit from your `react_on_rails.rb` initializer, as described [here](https://www.shakacode.com/react-on-rails/docs/guides/configuration).
+  All options except `props, id, html_options` will inherit from your `react_on_rails.rb` initializer, as described [here](https://www.shakacode.com/react-on-rails/docs/guides/configuration/).
 - **general options:**
   - **props:** Ruby Hash which contains the properties to pass to the react object, or a JSON string. If you pass a string, we'll escape it for you.
   - **prerender:** enable server-side rendering of a component. Set to false when debugging!
@@ -100,7 +100,7 @@ You can call `rails_context` or `rails_context(server_side: true|false)` from yo
 
 A "renderer function" is a Render-Function that accepts three arguments (rather than 2): `(props, railsContext, domNodeId) => { ... }`. Instead of returning a React component, a renderer is responsible for installing a callback that will call `ReactDOM.render` (in React 16+, `ReactDOM.hydrate`) to render a React component into the DOM. The "renderer function" is called at the same time the document ready event would instantate the React components into the DOM.
 
-Why would you want to call `ReactDOM.hydrate` yourself? One possible use case is [code splitting](https://www.shakacode.com/react-on-rails/docs/javascript/code-splitting). In a nutshell, you don't want to load the React component on the DOM node yet. So you want to install some handler that will call `ReactDOM.hydrate` at a later time. In the case of code splitting with server rendering, the server rendered code has any async code loaded and used to server render. Thus, the client code must also fully load any asynch code before server rendering. Otherwise, the client code would first render partially, not matching the server rendering, and then a second later, the full code would render, resulting in an unpleasant flashing on the screen.
+Why would you want to call `ReactDOM.hydrate` yourself? One possible use case is [code splitting](https://www.shakacode.com/react-on-rails/docs/javascript/code-splitting/). In a nutshell, you don't want to load the React component on the DOM node yet. So you want to install some handler that will call `ReactDOM.hydrate` at a later time. In the case of code splitting with server rendering, the server rendered code has any async code loaded and used to server render. Thus, the client code must also fully load any asynch code before server rendering. Otherwise, the client code would first render partially, not matching the server rendering, and then a second later, the full code would render, resulting in an unpleasant flashing on the screen.
 
 Renderer functions are not meant to be used on the server since there's no DOM on the server. Instead, use a Render-Function. Attempting to server render with a renderer function will throw an error.
 
@@ -110,9 +110,9 @@ Renderer functions are not meant to be used on the server since there's no DOM o
 
 [React Router](https://github.com/reactjs/react-router) is supported, including server-side rendering! See:
 
-1. [React on Rails docs for react-router](https://www.shakacode.com/react-on-rails/docs/javascript/react-router)
+1. [React on Rails docs for react-router](https://www.shakacode.com/react-on-rails/docs/javascript/react-router/)
 2. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/ServerRouterApp.jsx).
-3. [Code Splitting docs](https://www.shakacode.com/react-on-rails/docs/javascript/code-splitting) for information about how to set up code splitting for server rendered routes.
+3. [Code Splitting docs](https://www.shakacode.com/react-on-rails/docs/javascript/code-splitting/) for information about how to set up code splitting for server rendered routes.
 
 ------------
 

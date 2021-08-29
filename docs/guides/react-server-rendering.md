@@ -1,6 +1,6 @@
 # React Server Rendering
 
-See also [Client vs. Server Rendering](https://www.shakacode.com/react-on-rails/docs/guides/client-vs-server-rendering).
+See also [Client vs. Server Rendering](https://www.shakacode.com/react-on-rails/docs/guides/client-vs-server-rendering/).
 
 ## What is the easiest way to setup a webpack configuration for server-side-rendering?
 See the example webpack setup here: [github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh).
@@ -13,7 +13,7 @@ During the Rails rendering of HTML per a browser request, the Rails server will 
 
 The default JavaScript interpretter is [ExecJS](https://github.com/rails/execjs). If you want to maximize the perfomance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
 
-See [this note](https://www.shakacode.com/react-on-rails/docs/guides/client-vs-server-rendering).
+See [this note](https://www.shakacode.com/react-on-rails/docs/guides/client-vs-server-rendering/).
 
 ## How do you do Server Rendering with React on Rails?
 1. The `react_component` view helper method provides the `prerender:` option to switch on or off server rendering.
