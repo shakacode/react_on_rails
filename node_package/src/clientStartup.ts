@@ -145,6 +145,12 @@ function render(el: Element, railsContext: RailsContext): void {
     const domNode = document.getElementById(domNodeId);
     if (domNode) {
       const componentObj = context.ReactOnRails.getComponent(name);
+      if(railsContext.use_app_registry === 'true') {
+        const { AppRegistry } = import("react-native")
+        props.railsContext = railsContext
+        console.log(`ClientStartup using RNW\'s AppRegistry with ${name} & ${JSON.stringify({ rootTag: domNode, hydrate: true, initialProps: props })}`)
+        AppRegistry.runApplication(name, { rootTag: domNode, hydrate: true, initialProps: props })
+      } else {
       if (delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) {
         return;
       }
@@ -169,6 +175,7 @@ You should return a React.Component always for the client side entry point.`);
         ReactDOM.hydrate(reactElementOrRouterResult as ReactElement, domNode);
       } else {
         ReactDOM.render(reactElementOrRouterResult as ReactElement, domNode);
+      }
       }
     }
   } catch (e) {
