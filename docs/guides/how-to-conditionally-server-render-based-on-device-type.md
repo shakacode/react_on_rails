@@ -34,6 +34,6 @@ ReactOnRails.configure do |config|
 end
 ```
 
-Note, full details of the React on Rails confguration are [here in docs/basics/configuration.md](https://shakacode.com/react_on_rails/docs/guides/configuration).
+Note, full details of the React on Rails confguration are [here in docs/basics/configuration.md](https://shakacode.com/react-on-rails/docs/guides/configuration/).
 
-See the doc file [docs/basics/generator-functions-and-railscontext.md](https://shakacode.com/react_on_rails/docs/guides/generator-functions-and-railscontext#rails-context) for how your client-side code uses the device information
+See the doc file [docs/basics/generator-functions-and-railscontext.md](https://shakacode.com/react-on-rails/docs/guides/generator-functions-and-railscontext/#rails-context) for how your client-side code uses the device information

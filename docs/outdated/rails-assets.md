@@ -30,7 +30,7 @@ will have the Webpack digested name (MD5 hash). Since the Webpack generated CSS 
 just one level of "digesting", this "double-digesting" from Rails will cause such these assets
 fail to load.
 
-_If you are interested in learning how to use assets in your React components, read this doc: [Webpack, the Asset Pipeline, and Using Assets w/ React](https://www.shakacode.com/react-on-rails/docs/outdated/rails-assets-relative-paths)_
+_If you are interested in learning how to use assets in your React components, read this doc: [Webpack, the Asset Pipeline, and Using Assets w/ React](https://www.shakacode.com/react-on-rails/docs/outdated/rails-assets-relative-paths/)_
 
 ## The Solution: Symlink Original File Names to New File Names
 _Note, this solution was removed in v14. If you're intersted in this symlink solution, please create

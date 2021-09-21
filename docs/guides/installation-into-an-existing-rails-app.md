@@ -1,8 +1,8 @@
 # Getting Started with an existing Rails app
 
-**Also consult the instructions for installing on a fresh Rails app**, see the [React on Rails Basic Tutorial](https://www.shakacode.com/react-on-rails/docs/guides/tutorial).
+**Also consult the instructions for installing on a fresh Rails app**, see the [React on Rails Basic Tutorial](https://www.shakacode.com/react-on-rails/docs/guides/tutorial/).
 
-**If you have rails-5 API only project**, first [convert the rails-5 API only app to rails app](https://www.shakacode.com/react-on-rails/docs/rails/convert-rails-5-api-only-app-to-rails-app).
+**If you have rails-5 API only project**, first [convert the rails-5 API only app to rails app](https://www.shakacode.com/react-on-rails/docs/rails/convert-rails-5-api-only-app-to-rails-app/).
 
 1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `package.json` file.
 
@@ -52,7 +52,7 @@ bundle add react_on_rails --version=12.0.4 --strict
 
 ## Installation
 
-See the [Installation Overview](https://www.shakacode.com/react-on-rails/docs/additional-details/manual-installation-overview) for a concise set summary of what's in a React on Rails installation.
+See the [Installation Overview](https://www.shakacode.com/react-on-rails/docs/additional-details/manual-installation-overview/) for a concise set summary of what's in a React on Rails installation.
 
 
 ## NPM

@@ -25,7 +25,7 @@ If you still need that feature, please file an issue.
 In order to solve the issues regarding React Hooks compatibility, the number of parameters
 for functions is used to determine if you have a Render-Function that will get invoked to
 return a React component, or you are registering a React component defined by a function.
-Please see [Render-Functions and the Rails Context](https://www.shakacode.com/react-on-rails/docs/guides/render-functions-and-railscontext) for
+Please see [Render-Functions and the Rails Context](https://www.shakacode.com/react-on-rails/docs/guides/render-functions-and-railscontext/) for
 more information on what a Render-Function is.
 
 ##### Update required for registered functions taking exactly 2 params.

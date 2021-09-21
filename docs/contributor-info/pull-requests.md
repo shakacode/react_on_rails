@@ -36,7 +36,7 @@ When making doc changes, we want the change to work on both the gitbook and the 
 
 ### Links to other docs:
 * When making references to doc files, use a relative URL path like:
-`[Installation Overview](https://www.shakacode.com/react-on-rails/docs/additional-details/manual-installation-overview)`
+`[Installation Overview](https://www.shakacode.com/react-on-rails/docs/additional-details/manual-installation-overview/)`
 
 * When making references to source code files, use a full url path like:
 `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb)`

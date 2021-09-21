@@ -7,7 +7,7 @@ Support React on Rails development [by becoming a Github sponsor](https://github
 2. React on Rails Pro Software that extends React on Rails with Node server rendering,
    fragment caching, code-splitting, and other performance enhancements for React on Rails.
 
-See the [React on Rails Pro Support Plan](https://www.shakacode.com/react-on-rails-pro).
+See the [React on Rails Pro Support Plan](https://www.shakacode.com/react-on-rails-pro/).
 
 ShakaCode can also help you with your custom software development needs. We specialize in
 marketplace and e-commerce applications that utilize both Rails and React.
@@ -18,7 +18,7 @@ maintainer of React on Rails, for more information.
 
 ### Pro: Fragment Caching
 
-Fragment caching is a [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro) feature. Fragment caching is a **HUGE** performance booster for your apps. Use the `cached_react_component` and `cached_react_component_hash`. The API is the same as `react_component` and `react_component_hash`, but for 2 differences:
+Fragment caching is a [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) feature. Fragment caching is a **HUGE** performance booster for your apps. Use the `cached_react_component` and `cached_react_component_hash`. The API is the same as `react_component` and `react_component_hash`, but for 2 differences:
 
 1. The `cache_key` takes the same parameters as any Rails `cache` view helper.
 1. The **props** are passed via a block so that evaluation of the props is not done unless the cache is broken. Suppose you put your props calculation into some method called `some_slow_method_that_returns_props`:

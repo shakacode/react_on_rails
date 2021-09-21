@@ -2,14 +2,14 @@
 
 Note, the best way to understand how to use ReactOnRails is to study a few simple examples. You can do a quick demo setup, either on your existing app or on a new Rails app.
 
-1. Do the quick [tutorial](https://www.shakacode.com/react-on-rails/docs/guides/tutorial).
-2. Add React on Rails to an existing Rails app per [the instructions](https://www.shakacode.com/react-on-rails/docs/guides/installation-into-an-existing-rails-app).
+1. Do the quick [tutorial](https://www.shakacode.com/react-on-rails/docs/guides/tutorial/).
+2. Add React on Rails to an existing Rails app per [the instructions](https://www.shakacode.com/react-on-rails/docs/guides/installation-into-an-existing-rails-app/).
 3. Look at [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy), a simple, no DB example.
 3. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full-featured example live at [www.reactrails.com](http://reactrails.com).
 
 ## Basic Installation
 
-*See also [the instructions for installing into an existing Rails app](https://www.shakacode.com/react-on-rails/docs/guides/installation-into-an-existing-rails-app).*
+*See also [the instructions for installing into an existing Rails app](https://www.shakacode.com/react-on-rails/docs/guides/installation-into-an-existing-rails-app/).*
 
 1. Add the `react_on_rails` gem to Gemfile:
 
@@ -56,7 +56,7 @@ issue.
 
 ### Configuration
 
-* Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](https://www.shakacode.com/react-on-rails/docs/guides/configuration) for documentation of all configuration options.
+* Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](https://www.shakacode.com/react-on-rails/docs/guides/configuration/) for documentation of all configuration options.
 * Configure `config/webpacker.yml`. If you used the generator and the default webpacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/webpacker.yml](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/webpacker.yml) example or the official default [webpacker.yml](https://github.com/rails/webpacker/blob/master/lib/install/config/webpacker.yml).
 * Most apps should rely on the rails/webpacker setup for Webpack. v6 of rails/webpacker includes support for v5 of webpack.
 
@@ -91,7 +91,7 @@ issue.
     <%= react_component("HelloWorld", props: { name: "Stranger" }) %>
   ```
 
-- This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://reactjs.org/docs/context.html). See [Render-Functions and the RailsContext](https://www.shakacode.com/react-on-rails/docs/guides/render-functions-and-railscontext) for more details on this topic.
+- This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://reactjs.org/docs/context.html). See [Render-Functions and the RailsContext](https://www.shakacode.com/react-on-rails/docs/guides/render-functions-and-railscontext/) for more details on this topic.
 
   ```js
   import React from 'react';
@@ -107,7 +107,7 @@ issue.
   };
   ```
 
-See the [View Helpers API](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api) for more details on `react_component` and its sibling function `react_component_hash`.
+See the [View Helpers API](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/) for more details on `react_component` and its sibling function `react_component_hash`.
 
 ## Globally Exposing Your React Components
 
@@ -136,7 +136,7 @@ For details on techniques to use different code for client and server rendering,
 
 You have two ways to specify your React components. You can either register the React component (either function or class component) directly, or you can create a function that returns a React component, which we using the name of a "render-function". Creating a render-function allows:
 
-1. You to have access to the `railsContext`. See [documentation for the railsContext](https://www.shakacode.com/react-on-rails/docs/guides/render-functions-and-railscontext) in terms of why you might need it. You **need** a Render-Function to access the `railsContext`.
+1. You to have access to the `railsContext`. See [documentation for the railsContext](https://www.shakacode.com/react-on-rails/docs/guides/render-functions-and-railscontext/) in terms of why you might need it. You **need** a Render-Function to access the `railsContext`.
 2. You can use the passed-in props to initialize a redux store or set up react-router.
 3. You can return different components depending on what's in the props.
 
@@ -170,7 +170,7 @@ For server rendering, if you wish to return multiple HTML strings from a Render-
 { renderedHtml: { componentHtml, customKey1, customKey2} }
 ```
 
-For details on using react_component_hash with react-helmet, see [our react-helmet documentation](https://www.shakacode.com/react-on-rails/docs/additional-reading/react-helmet).
+For details on using react_component_hash with react-helmet, see [our react-helmet documentation](https://www.shakacode.com/react-on-rails/docs/additional-reading/react-helmet/).
 
 ## Error Handling
 
@@ -180,4 +180,4 @@ For details on using react_component_hash with react-helmet, see [our react-helm
 ## I18n
 
 React on Rails provides an option for automatic conversions of Rails `*.yml` locale files into `*.json` or `*.js*.
-See the [How to add I18n](https://www.shakacode.com/react-on-rails/docs/guides/i18n) for a summary of adding I18n.
+See the [How to add I18n](https://www.shakacode.com/react-on-rails/docs/guides/i18n/) for a summary of adding I18n.
