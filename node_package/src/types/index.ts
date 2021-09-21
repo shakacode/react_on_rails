@@ -39,9 +39,9 @@ interface ServerRenderResult {
   error?: Error;
 }
 
-type CreateReactOutputResult = ServerRenderResult | ReactElement;
+type CreateReactOutputResult = ServerRenderResult | ReactElement | Promise<string>;
 
-type RenderFunctionResult = ReactComponent | ServerRenderResult;
+type RenderFunctionResult = ReactComponent | ServerRenderResult | Promise<string>;
 
 interface RenderFunction {
   (props?: Record<string, unknown>, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
@@ -80,6 +80,7 @@ interface Params {
 export interface RenderParams extends Params {
   name: string;
   throwJsErrors: boolean;
+  renderingReturnsPromises: boolean;
 }
 
 export interface CreateParams extends Params {
@@ -105,7 +106,7 @@ export interface RenderingError {
 }
 
 export interface RenderResult {
-  html: string;
+  html: string | null;
   consoleReplayScript: string;
   hasErrors: boolean;
   renderingError?: RenderingError;
@@ -127,7 +128,7 @@ export interface ReactOnRails {
     name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean
   ): void | Element | Component;
   getComponent(name: string): RegisteredComponent;
-  serverRenderReactComponent(options: RenderParams): string;
+  serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;
   handleError(options: ErrorOptions): string | undefined;
   buildConsoleReplay(): string;
   registeredComponents(): Map<string, RegisteredComponent>;

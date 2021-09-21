@@ -13,6 +13,7 @@ import context from './context';
 import type {
   RegisteredComponent,
   RenderParams,
+  RenderResult,
   ErrorOptions,
   ReactComponentOrRenderFunction,
   AuthenticityHeaders,
@@ -204,7 +205,7 @@ ctx.ReactOnRails = {
    * Used by server rendering by Rails
    * @param options
    */
-  serverRenderReactComponent(options: RenderParams): string {
+  serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult> {
     return serverRenderReactComponent(options);
   },
 
