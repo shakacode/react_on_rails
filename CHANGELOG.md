@@ -17,7 +17,9 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [12.4.0] - 2021-09-22
 #### Added
+- ScoutAPM tracing support for server rendering [PR 1379](https://github.com/shakacode/react_on_rails/pull/1379) by [justin808](https://github.com/justin808).
 
 - Ability to stop React on Rails from modifying or creating the `assets:precompile` task. [PR 1371](https://github.com/shakacode/react_on_rails/pull/1371) by [justin808](https://github.com/justin808). Thanks to [elstgav](https://github.com/elstgav) for [the suggestion](https://github.com/shakacode/react_on_rails/issues/1368)!
 
@@ -25,7 +27,6 @@ Changes since last non-beta release.
 
 ### [12.3.0] - 2021-07-26
 #### Added
-
 - Ability to use with Turbo (@hotwired/turbo), as Turbolinks gets obsolete. [PR 1374](https://github.com/shakacode/react_on_rails/pull/1374) by [pgruener](https://github.com/pgruener) and [PR 1377](https://github.com/shakacode/react_on_rails/pull/1377) by [mdesantis](https://github.com/mdesantis).
 
   To configure turbo the following option can be set:
