@@ -174,6 +174,8 @@ module ReactOnRailsPro
     end
 
     def extract_extra_files_from_cache_dir
+      return unless File.exist?(extra_files_path)
+
       extracted_extra_files_paths = []
       Dir.each_child(extra_files_path) do |file_name|
         file_path_parts = file_name.split("---")
@@ -219,7 +221,7 @@ module ReactOnRailsPro
     end
 
     def remove_extra_files_cache_dir
-      FileUtils.remove_dir(extra_files_path)
+      FileUtils.remove_dir(extra_files_path) if File.exist?(extra_files_path)
     end
   end
 end
