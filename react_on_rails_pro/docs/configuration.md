@@ -28,7 +28,7 @@ ReactOnRailsPro.configure do |config|
   # Remote bundle caching saves deployment time by caching bundles.
   # See /docs/bundle-caching.md for usage and an example of a module called S3BundleCacheAdapter.
   config.remote_bundle_cache_adapter = nil
-
+  
   # ALL OPTIONS BELOW ONLY APPLY IF SERVER RENDERING
 
   # If true, then cache the evaluation of JS for prerendering using the standard Rails cache.

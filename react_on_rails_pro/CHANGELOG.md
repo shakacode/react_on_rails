@@ -11,6 +11,17 @@ Gem and package versions are the same except for beta releases where the gem use
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+
+### Added
+- Added optional method `extra_files_to_cache` to the definition of the module for the configuration of
+  the remote_bundle_cache_adapter. This allows files outside of the regular build directory to be
+  placed in the cached zip file and then extracted and restored when the cache is restored. The use
+  case for this is some files created during the build process that belongs to a location outside of
+  the regular deployment directory for files produced by the `build` method of the module.
+
+  [PR 221](https://github.com/shakacode/react_on_rails_pro/pull/221) by
+  [justin808](https://github.com/justin808) and [ershadul1](https://github.com/ershadul1).
+
 ## [2.2.0] - 2021-07-13
 - Change rake react_on_rails_pro:pre_stage_bundle_for_vm_renderer to use symlinks to save slug size. [PR 202](https://github.com/shakacode/react_on_rails_pro/pull/202) by [justin808](https://github.com/justin808).
 
