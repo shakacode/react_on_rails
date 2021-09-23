@@ -12,6 +12,8 @@ Gem and package versions are the same except for beta releases where the gem use
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [2.3.0] - 2021-09-22
+
 ### Added
 - Added optional method `extra_files_to_cache` to the definition of the module for the configuration of
   the remote_bundle_cache_adapter. This allows files outside of the regular build directory to be
@@ -214,7 +216,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/2.2.0...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/2.3.0...HEAD
+[2.3.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.2.0...2.3.0
 [2.2.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.1.1...2.2.0
 [2.1.1]: https://github.com/shakacode/react_on_rails_pro/compare/2.1.0...2.1.1
 [2.1.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0...2.1.0
