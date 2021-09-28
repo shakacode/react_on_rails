@@ -3,11 +3,6 @@
 class PagesController < ApplicationController
   XSS_PAYLOAD = { "<script>window.alert('xss1');</script>" => '<script>window.alert("xss2");</script>' }.freeze
   PROPS_NAME = "Mr. Server Side Rendering"
-  APP_PROPS_SERVER_RENDER = {
-    helloWorldData: {
-      name: PROPS_NAME
-    }.merge(XSS_PAYLOAD)
-  }.freeze
 
   include ReactOnRails::Controller
 
@@ -19,6 +14,18 @@ class PagesController < ApplicationController
 
   before_action :initialize_shared_store, only: %i[client_side_hello_world_shared_store_controller
                                                    server_side_hello_world_shared_store_controller]
+
+  def cached_react_helmet
+    render "/pages/pro/cached_react_helmet"
+  end
+
+  def loadable_component
+    render "/pages/pro/loadable_component"
+  end
+
+  def cached_redux_component
+    render "/pages/pro/cached_redux_component"
+  end
 
   # See files in spec/dummy/app/views/pages
 
@@ -33,7 +40,7 @@ class PagesController < ApplicationController
       XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
     MSG
     Rails.logger.info msg
-    render_to_string(template: "/pages/serialize_props.json.jbuilder",
+    render_to_string(template: "/pages/pro/serialize_props.json.jbuilder",
                      locals: { name: PROPS_NAME }, format: :json)
   end
 
@@ -43,7 +50,11 @@ class PagesController < ApplicationController
 
   def data
     # This is the props used by the React component.
-    @app_props_server_render = APP_PROPS_SERVER_RENDER
+    @app_props_server_render = {
+      helloWorldData: {
+        name: PROPS_NAME
+      }.merge(XSS_PAYLOAD)
+    }
 
     @app_props_hello = {
       helloWorldData: {

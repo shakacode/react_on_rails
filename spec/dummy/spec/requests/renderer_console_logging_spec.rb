@@ -11,7 +11,7 @@ describe "Console logging from server" do
     before { ReactOnRails.configuration.replay_console = true }
 
     it "has server log messages in the script generated" do
-      get shared_redux_store_path
+      get server_side_hello_world_shared_store_path
       html_nodes = Nokogiri::HTML(response.body)
       expected = <<~JS
         console.log.apply(console, ["[SERVER] RENDERED ReduxSharedStoreApp to dom node with id: ReduxSharedStoreApp-react-component-0"]);

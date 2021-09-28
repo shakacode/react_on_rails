@@ -1,5 +1,7 @@
 import 'core-js/stable';
 import 'regenerator-runtime/runtime';
+import 'jquery';
+import 'jquery-ujs';
 
 import ReactOnRails from 'react-on-rails';
 
@@ -9,6 +11,8 @@ import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 import HelloWorldES5 from '../components/HelloWorldES5';
 import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
 import HelloWorldApp from '../startup/HelloWorldApp';
+import HelloWorldHooks from '../components/HelloWorldHooks';
+import HelloWorldHooksContext from '../components/HelloWorldHooksContext';
 import BrokenApp from '../startup/BrokenApp';
 
 import ReduxApp from '../startup/ClientReduxApp';
@@ -32,8 +36,6 @@ import ImageExample from '../components/ImageExample';
 
 import SetTimeoutLoggingApp from '../startup/SetTimeoutLoggingApp';
 
-import ComponentWithLodashApp from '../startup/ComponentWithLodashApp';
-
 import Loadable from '../startup/loadable-client.imports-loadable';
 
 ReactOnRails.setOptions({
@@ -46,6 +48,8 @@ ReactOnRails.register({
   HelloWorldWithLogAndThrow,
   HelloWorldES5,
   HelloWorldRehydratable,
+  HelloWorldHooksContext,
+  HelloWorldHooks,
   ReduxApp,
   ReduxSharedStoreApp,
   HelloWorldApp,
@@ -58,7 +62,6 @@ ReactOnRails.register({
   ReactHelmetApp,
   ImageExample,
   SetTimeoutLoggingApp,
-  ComponentWithLodashApp,
   Loadable,
 });
 

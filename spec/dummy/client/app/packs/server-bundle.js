@@ -10,6 +10,8 @@ import HelloWorld from '../components/HelloWorld';
 import HelloWorldES5 from '../components/HelloWorldES5';
 import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
 import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
+import HelloWorldHooks from '../components/HelloWorldHooks';
+import HelloWorldHooksContext from '../components/HelloWorldHooksContext';
 
 // Generator function
 import HelloWorldApp from '../startup/HelloWorldApp';
@@ -53,6 +55,8 @@ ReactOnRails.register({
   HelloWorldWithLogAndThrow,
   HelloWorldES5,
   HelloWorldRehydratable,
+  HelloWorldHooksContext,
+  HelloWorldHooks,
   ReduxApp,
   ReduxSharedStoreApp,
   HelloWorldApp,

@@ -1,11 +1,11 @@
 import PropTypes from 'prop-types';
 import React from 'react';
-import _ from 'lodash';
+import { transform } from 'lodash';
 
 function renderContextRows(railsContext) {
   // eslint-disable-next-line no-console
   console.log('railsContext.serverSide is ', railsContext.serverSide);
-  return _.transform(
+  return transform(
     railsContext,
     (accum, value, key) => {
       if (key !== 'serverSide') {
