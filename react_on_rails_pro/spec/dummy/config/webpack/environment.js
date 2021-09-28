@@ -70,14 +70,6 @@ environment.splitChunks();
 // add aliases to config
 environment.config.merge(aliasConfig);
 
-environment.plugins.append(
-  'Provide',
-  new webpack.ProvidePlugin({
-    $: 'jquery',
-    jQuery: 'jquery',
-  }),
-);
-
 if (isWebpackDevServer) {
   environment.plugins.append(
     'NormalModuleReplacement',
@@ -89,6 +81,14 @@ if (isWebpackDevServer) {
     }),
   );
 }
+
+environment.plugins.append(
+  'Provide',
+  new webpack.ProvidePlugin({
+    $: 'jquery',
+    jQuery: 'jquery',
+  }),
+);
 
 environment.loaders.append('expose', {
   test: require.resolve('jquery'),

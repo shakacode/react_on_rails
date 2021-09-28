@@ -34,7 +34,6 @@ require "capybara-screenshot/rspec"
 
 # Checks for pending migrations before tests are run.
 # If you are not using ActiveRecord, you can remove this line.
-# No DB for these tests
 # ActiveRecord::Migration.maintain_test_schema!
 
 # Requires supporting files with custom matchers and macros, etc,
@@ -44,18 +43,20 @@ Dir[Rails.root.join("spec", "support", "**", "*.rb")].sort.each { |f| require f 
 require_relative "../../react_on_rails_pro/support/caching"
 RSpec.configure do |config|
   # Ensure that if we are running js tests, we are using latest webpack assets
-  # This is commented out since we're using rails/webpacker webpacker.yml test.compile == true
+  # This is false since we're using rails/webpacker webpacker.yml test.compile == true
   # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :requires_webpack_assets)
-  # config.define_derived_metadata(file_path: %r{spec/(system|requests)}) do |metadata|
+  # config.define_derived_metadata(file_path: %r{spec/(system|requests|helpers)}) do |metadata|
   #   metadata[:requires_webpack_assets] = true
   # end
 
   # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
-  # config.fixture_path = "#{::Rails.root}/spec/fixtures"
+  # For React on Rails Pro, using loadable-stats.json
+  config.fixture_path = "#{::Rails.root}/spec/fixtures"
 
   # If you're not using ActiveRecord, or you'd prefer not to run each of your
   # examples within a transaction, remove the following line or assign false
   # instead of true.
+  # Tests do not hit the DB
   # config.use_transactional_fixtures = true
 
   # RSpec Rails can automatically mix in different behaviours to your tests
@@ -81,12 +82,10 @@ RSpec.configure do |config|
 
   supported_drivers = %i[selenium_chrome_headless selenium_chrome selenium selenium_headless]
   driver = ENV["DRIVER"].try(:to_sym).presence || default_driver
+  Capybara.javascript_driver = driver
   Capybara.default_driver = driver
 
   raise "Unsupported driver: #{driver} (supported = #{supported_drivers})" unless supported_drivers.include?(driver)
-
-  Capybara.javascript_driver = driver
-  Capybara.default_driver = driver
 
   Capybara.register_server(Capybara.javascript_driver) do |app, port|
     require "rack/handler/puma"
@@ -95,6 +94,10 @@ RSpec.configure do |config|
 
   config.before(:each, type: :system, js: true) do
     driven_by driver
+  end
+
+  config.before(:each, type: :system, rack_test: true) do
+    driven_by :rack_test
   end
 
   # Capybara.default_max_wait_time = 15
@@ -107,7 +110,7 @@ RSpec.configure do |config|
 
   # https://github.com/mattheworiordan/capybara-screenshot/issues/243#issuecomment-620423225
   config.retry_callback = proc do |ex|
-    Capybara.reset! if ex.metadata[:js]
+    Capybara.reset_sessions! if ex.metadata[:js]
   end
 
   # RSpec Rails can automatically mix in different behaviours to your tests
@@ -129,8 +132,4 @@ RSpec.configure do |config|
   # save_and_open_page, meaning that relative links will be loaded from the
   # development server if it is running.
   Capybara.asset_host = "http://localhost:3000"
-
-  def js_errors_driver
-    Capybara.javascript_driver
-  end
 end

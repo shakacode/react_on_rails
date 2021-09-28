@@ -13,6 +13,16 @@ def change_text_expect_dom_selector(dom_selector)
   end
 end
 
+def wait_for_ajax
+  Timeout.timeout(Capybara.default_max_wait_time) do
+    loop until finished_all_ajax_requests?
+  end
+end
+
+def finished_all_ajax_requests?
+  page.evaluate_script("jQuery.active").zero?
+end
+
 shared_examples "React Component" do |dom_selector|
   scenario { is_expected.to have_css dom_selector }
 
@@ -53,31 +63,45 @@ describe "Pages/Index", :js do
     context "with Non-React Component" do
       it { is_expected.to have_content "Time to visit Maui" }
     end
+
+    context "when rendering React Hooks" do
+      context "with Simple stateless component" do
+        include_examples "React Component", "div#HelloWorld-react-component-6"
+      end
+
+      context "with Render-Function that takes props" do
+        include_examples "React Component", "div#HelloWorld-react-component-7"
+      end
+    end
+  end
+end
+
+context "when Server Rendering with Options", :js do
+  subject { page }
+
+  before do
+    visit server_side_hello_world_with_options_path
   end
 
-  context "when Server Rendering with Options" do
-    before do
-      visit server_side_hello_world_with_options_path
-    end
+  include_examples "React Component", "div#my-hello-world-id"
+end
 
-    include_examples "React Component", "div#my-hello-world-id"
+context "when Server Rendering Cached", :caching, :js do
+  subject { page }
+
+  let(:dependencies_cache_key) { ReactOnRailsPro::Cache.dependencies_cache_key }
+  let(:base_component_cache_key) { "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}" }
+
+  before do
+    visit cached_redux_component_path
   end
 
-  context "when Server Rendering Cached", :caching do
-    let(:dependencies_cache_key) { ReactOnRailsPro::Cache.dependencies_cache_key }
-    let(:base_component_cache_key) { "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}" }
+  include_examples "React Component", "div#ReduxApp-react-component-0"
 
-    before do
-      visit server_side_redux_app_cached_path
-    end
-
-    include_examples "React Component", "div#ReduxApp-react-component-0"
-
-    it "adds a value to the cache" do
-      base_cache_key_with_prerender = "#{base_component_cache_key}/"\
-                                      "#{ReactOnRailsPro::Utils.bundle_hash}/#{dependencies_cache_key}"
-      expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReduxApp})
-    end
+  it "adds a value to the cache" do
+    base_cache_key_with_prerender = "#{base_component_cache_key}/"\
+                                    "#{ReactOnRailsPro::Utils.bundle_hash}/#{dependencies_cache_key}"
+    expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReduxApp})
   end
 end
 
@@ -97,7 +121,7 @@ describe "Pages/client_side_log_throw", :js do
 
   before { visit "/client_side_log_throw" }
 
-  it "client side logging and error handling", driver: js_errors_driver do
+  it "demonstrates client side logging and error handling" do
     expect(page).to have_text "This example demonstrates client side logging and error handling."
   end
 end
@@ -146,7 +170,7 @@ describe "Pages/index after using browser's back button", :js do
   include_examples "React Component", "div#ReduxApp-react-component-0"
 end
 
-describe "React Router", js: true, driver: js_errors_driver do
+describe "React Router", :js do
   subject { page }
 
   before do
@@ -194,6 +218,23 @@ describe "renderedHtml from generator function", :js do
   end
 end
 
+describe "Manual client hydration", :js, type: :system do
+  before { visit "/xhr_refresh" }
+
+  it "HelloWorldRehydratable onChange should trigger" do
+    within("form") do
+      click_button "refresh"
+    end
+    wait_for_ajax
+    within("#HelloWorldRehydratable-react-component-1") do
+      find("input").set "Should update"
+      within("h3") do
+        expect(page).to have_content "Should update"
+      end
+    end
+  end
+end
+
 describe "returns hash if hash_result == true even with prerendering error", :js do
   subject { page }
 
@@ -213,22 +254,24 @@ describe "generator function returns renderedHtml as an object with additional H
   shared_examples "renderedHtmls should not have any errors and set correct page title" do
     subject { page }
 
-    before { visit cached_react_helmet_path }
+    before { visit react_helmet_path }
 
     it "renderedHtmls should not have any errors" do
       expect(page).to have_text 'Props: {"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
       expect(page).to have_css "title", text: /\ACustom page title\z/, visible: :hidden
       expect(page.html).to include("[SERVER] RENDERED ReactHelmetApp to dom node with id")
-      change_text_expect_dom_selector("div#react-helmet-0")
     end
   end
 
-  describe "with disabled JS" do
+  describe "with disabled JS", :rack_test do
     include_examples "renderedHtmls should not have any errors and set correct page title"
   end
 
   describe "with enabled JS", :js do
     include_examples "renderedHtmls should not have any errors and set correct page title"
+    it "renders the name change" do
+      change_text_expect_dom_selector("div#react-helmet-0")
+    end
   end
 end
 

@@ -1,0 +1,45 @@
+<!-- print statements to show when server rendering is happening -->
+<%= cached_react_component("ReduxApp", cache_key: "A", prerender: true,
+                           trace: true, id: "ReduxApp-react-component-0") do
+   calc_slow_app_props_server_render
+end %>
+
+<hr/>
+
+<h1>Server Rendered/Cached React/Redux Component</h1>
+<p>
+  This example demonstrates server side rendering with the `cached_react_component` helper.
+</p>
+
+<hr/>
+<h2>Setup</h2>
+Place the component on the view: spec/dummy/app/views/pages/server_side_redux_app_cached.html.erb.
+Note the cache block.
+<br/>
+<pre>
+<%% cached_react_component("ReduxApp", cache_key: "A", prerender: true, trace: true, id: "ReduxApp-react-component-0") do %>
+<%%  @app_props_server_render %>
+<%% end %>
+</pre>
+
+<hr/>
+
+<h2>
+  Notes on Fragment Caching
+</h2>
+<ol>
+  <li>
+    Toggle caching in development mode: `rails dev:cache`
+  </li>
+  <li>
+    Refresh this page and you will NOT see this print again in your console for your server.
+    This confirms that the fragment of HTML was cached and your calculation of props was not done again.
+    This can be a big performance boost!
+
+    <pre>
+      XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      calling slow calc_app_props_server_render
+      XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    </pre>
+  </li>
+</ol>
