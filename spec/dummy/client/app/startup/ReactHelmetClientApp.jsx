@@ -2,4 +2,8 @@
 import React from 'react';
 import ReactHelmet from '../components/ReactHelmet';
 
-export default (props, _railsContext) => () => <ReactHelmet {...props} />;
+const stubbedResponse = { name: 'ReactOnRails', country: [] };
+
+export default (props, _railsContext) => () => (
+  <ReactHelmet {...props} apiRequestResponse={stubbedResponse} />
+);

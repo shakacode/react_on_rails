@@ -21,6 +21,12 @@ const createVmBundleForTest = () => createVmBundle(testName);
 const { getVmBundleFilePath } = require('../src/worker/vm');
 const handleRenderRequest = require('../src/worker/handleRenderRequest');
 
+const renderResult = {
+  status: 200,
+  headers: { 'Cache-Control': 'public, max-age=31536000' },
+  data: JSON.stringify({ html: 'Dummy Object' }),
+};
+
 describe(testName, () => {
   beforeEach(async () => {
     await resetForTest(testName);
@@ -40,11 +46,7 @@ describe(testName, () => {
       providedNewBundle: { file: uploadedBundlePathForTest() },
     });
 
-    expect(result).toEqual({
-      status: 200,
-      headers: { 'Cache-Control': 'public, max-age=31536000' },
-      data: { html: 'Dummy Object' },
-    });
+    expect(result).toEqual(renderResult);
     expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, `./tmp/${testName}/1495063024898.js`));
   });
 
@@ -72,11 +74,7 @@ describe(testName, () => {
       bundleTimestamp: BUNDLE_TIMESTAMP,
     });
 
-    expect(result).toEqual({
-      status: 200,
-      headers: { 'Cache-Control': 'public, max-age=31536000' },
-      data: { html: 'Dummy Object' },
-    });
+    expect(result).toEqual(renderResult);
   });
 
   test('If lockfile exists, and is stale', async () => {
@@ -95,11 +93,7 @@ describe(testName, () => {
       providedNewBundle: { file: uploadedBundlePathForTest() },
     });
 
-    expect(result).toEqual({
-      status: 200,
-      headers: { 'Cache-Control': 'public, max-age=31536000' },
-      data: { html: 'Dummy Object' },
-    });
+    expect(result).toEqual(renderResult);
     expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, `./tmp/${testName}/1495063024898.js`));
   });
 
@@ -126,11 +120,7 @@ describe(testName, () => {
       providedNewBundle: { file: uploadedBundlePathForTest() },
     });
 
-    expect(result).toEqual({
-      status: 200,
-      headers: { 'Cache-Control': 'public, max-age=31536000' },
-      data: { html: 'Dummy Object' },
-    });
+    expect(result).toEqual(renderResult);
     expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, `./tmp/${testName}/1495063024898.js`));
   });
 });

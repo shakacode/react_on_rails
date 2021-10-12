@@ -40,17 +40,21 @@ aliases:
   - &install-dummy-app-ruby-gems
     name: Install Ruby Gems for dummy app
     command: |
-      gem install bundler
+      gem install bundler -v "2.2.28"
       echo "Bundler version: "; bundle --version
-      cd spec/dummy && bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+      bundle config set --local path 'vendor/bundle'
+      bundle config set --local disable_checksum_validation true
+      cd spec/dummy && bundle _2.2.28_ check || bundle _2.2.28_ install --jobs=4 --retry=3
 
   # Install ruby gems unless existing set of gems is satisfying bundler.
   - &install-package-ruby-gems
     name: Install Ruby Gems for package
     command: |
-      gem install bundler
+      gem install bundler -v "2.2.28"
       echo "Bundler version: "; bundle --version
-      bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+      bundle config set --local path 'vendor/bundle'
+      bundle config set --local disable_checksum_validation true
+      bundle _2.2.28_ check || bundle _2.2.28_ install --jobs=4 --retry=3
 
   # Restore node_modules dir from cache using yarn.lock checksum as a key.
   - &restore-package-node-modules-cache

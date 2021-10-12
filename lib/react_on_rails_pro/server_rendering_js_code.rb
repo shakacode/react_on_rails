@@ -20,7 +20,8 @@ module ReactOnRailsPro
             props: props,
             trace: #{render_options.trace},
             railsContext: railsContext,
-            throwJsErrors: #{ReactOnRailsPro.configuration.throw_js_errors}
+            throwJsErrors: #{ReactOnRailsPro.configuration.throw_js_errors},
+            renderingReturnsPromises: #{ReactOnRailsPro.configuration.rendering_returns_promises}
           });
         })()
         JS

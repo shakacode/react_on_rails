@@ -1,7 +1,9 @@
 # Keep in sync with https://github.com/shakacode/react_on_rails/blob/master/Gemfile.development_dependencies
 # frozen_string_literal: true
 
-gem "react_on_rails", "12.2.0" # keep in sync with package.json files
+git_source(:github) { |repo| "https://github.com/#{repo}.git" }
+
+gem "react_on_rails", "12.4.0" # keep in sync with package.json files
 
 # For local development
 # gem "react_on_rails", path: "../react_on_rails"
