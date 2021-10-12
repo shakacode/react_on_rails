@@ -56,7 +56,7 @@ describe('express worker', () => {
       .end((_err, res) => {
         expect(res.headers['cache-control']).toBe('public, max-age=31536000');
         expect(res.status).toBe(200);
-        expect(res.body).toEqual({ html: 'Dummy Object' });
+        expect(res.text).toEqual('{"html":"Dummy Object"}');
         expect(fs.existsSync(vmBundlePath(testName))).toEqual(true);
         expect(fs.existsSync(assetPath(testName))).toEqual(true);
         expect(fs.existsSync(assetPathOther(testName))).toEqual(true);
@@ -151,7 +151,7 @@ describe('express worker', () => {
         .end((_err, res) => {
           expect(res.headers['cache-control']).toBe('public, max-age=31536000');
           expect(res.status).toBe(200);
-          expect(res.body).toEqual({ html: 'Dummy Object' });
+          expect(res.text).toEqual('{"html":"Dummy Object"}');
           done();
         });
     },
@@ -181,7 +181,7 @@ describe('express worker', () => {
         .end((_err, res) => {
           expect(res.headers['cache-control']).toBe('public, max-age=31536000');
           expect(res.status).toBe(200);
-          expect(res.body).toEqual({ html: 'Dummy Object' });
+          expect(res.text).toEqual('{"html":"Dummy Object"}');
           done();
         });
     },

@@ -60,7 +60,7 @@ describe('buildVM and runInVM', () => {
     await buildVM(uploadedBundlePathForTest());
 
     let result = await runInVM('ReactOnRails');
-    expect(result).toEqual({ dummy: { html: 'Dummy Object' } });
+    expect(result).toEqual(JSON.stringify({ dummy: { html: 'Dummy Object' } }));
 
     expect(global.ReactOnRails === undefined).toBeTruthy();
 
@@ -131,7 +131,7 @@ describe('buildVM and runInVM', () => {
     await buildVM(uploadedBundlePathForTest());
 
     const result = await runInVM('ReactOnRails');
-    expect(result).toEqual({ dummy: { html: 'Dummy Object' } });
+    expect(result).toEqual(JSON.stringify({ dummy: { html: 'Dummy Object' } }));
 
     resetVM();
 
@@ -144,7 +144,9 @@ describe('buildVM and runInVM', () => {
     await buildVM(uploadedBundlePathForTest());
 
     const vmResult = await runInVM('console.log("Console message inside of VM") || console.history;');
-    const consoleHistory = [{ level: 'log', arguments: ['[SERVER] Console message inside of VM'] }];
+    const consoleHistory = JSON.stringify([
+      { level: 'log', arguments: ['[SERVER] Console message inside of VM'] },
+    ]);
 
     expect(vmResult).toEqual(consoleHistory);
   });

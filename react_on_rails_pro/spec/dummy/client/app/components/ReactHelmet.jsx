@@ -9,6 +9,7 @@ const ReactHelmet = (props) => (
     </Helmet>
     Props: {JSON.stringify(props)}
     <HelloWorld {...props} />
+    <div>result from api request during server rendering: {JSON.stringify(props.apiRequestResponse)}</div>
   </div>
 );
 

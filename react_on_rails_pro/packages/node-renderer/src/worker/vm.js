@@ -183,8 +183,11 @@ ${smartTrim(renderingRequest)}`);
 
     vm.runInContext('console.history = []', context);
 
-    const result = vm.runInContext(renderingRequest, context);
-
+    let result = vm.runInContext(renderingRequest, context);
+    if (typeof result !== 'string') {
+      const objectResult = await result;
+      result = JSON.stringify(objectResult);
+    }
     if (log.level === 'debug') {
       log.debug(`result from JS:
 ${smartTrim(result)}`);
