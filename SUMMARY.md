@@ -1,5 +1,14 @@
 # Table of Contents
 
+Doccumentation for React on Rails has moved!
+
+Here is the new link:
+
+**[React on Rails Documentation Link](https://www.shakacode.com/react-on-rails/docs/)**
+
+-----
+
+## **OLD DOCS BELOW**
 + [Home](./README.md)
 
 ## **Basics**
