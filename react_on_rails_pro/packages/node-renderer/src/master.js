@@ -6,6 +6,7 @@ const cluster = require('cluster');
 const log = require('./shared/log');
 const { buildConfig, logSanitizedConfig } = require('./shared/configBuilder');
 const restartWorkers = require('./master/restartWorkers');
+const errorReporter = require('./shared/errorReporter');
 
 const MILLISECONDS_IN_MINUTE = 60000;
 
@@ -29,7 +30,10 @@ module.exports = function masterRun(runningConfig) {
     if (worker.isScheduledRestart) {
       log.info('Restarting worker #%d on schedule', worker.id);
     } else {
-      log.warn('Worker #%d died UNEXPECTEDLY :(, restarting', worker.id);
+      // TODO: Track last rendering request per worker.id
+      // TODO: Consider blocking a given rendering request if it kills a worker more than X times
+      const msg = `Worker ${worker.id} died UNEXPECTEDLY :(, restarting`;
+      errorReporter.notify(msg);
     }
     // Replace the dead worker:
     cluster.fork();

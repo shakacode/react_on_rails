@@ -20,6 +20,7 @@ module ReactOnRailsPro
       dependency_globs: Configuration::DEFAULT_DEPENDENCY_GLOBS,
       excluded_dependency_globs: Configuration::DEFAULT_EXCLUDED_DEPENDENCY_GLOBS,
       remote_bundle_cache_adapter: Configuration::DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER,
+      ssr_timeout: Configuration::DEFAULT_SSR_TIMEOUT,
       ssr_pre_hook_js: nil,
       assets_to_copy: nil,
       renderer_request_retry_limit: Configuration::DEFAULT_RENDERER_REQUEST_RETRY_LIMIT,
@@ -36,6 +37,7 @@ module ReactOnRailsPro
     DEFAULT_RENDERER_HTTP_POOL_SIZE = 10
     DEFAULT_RENDERER_HTTP_POOL_TIMEOUT = 5
     DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT = 0.25
+    DEFAULT_SSR_TIMEOUT = 5
     DEFAULT_PRERENDER_CACHING = false
     DEFAULT_TRACING = false
     DEFAULT_DEPENDENCY_GLOBS = nil
@@ -51,7 +53,7 @@ module ReactOnRailsPro
                   :renderer_http_pool_size, :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout,
                   :dependency_globs, :excluded_dependency_globs, :rendering_returns_promises,
                   :remote_bundle_cache_adapter, :ssr_pre_hook_js, :assets_to_copy,
-                  :renderer_request_retry_limit, :throw_js_errors
+                  :renderer_request_retry_limit, :throw_js_errors, :ssr_timeout
 
     def initialize(renderer_url: nil, renderer_password: nil, server_renderer: nil,
                    renderer_use_fallback_exec_js: nil, prerender_caching: nil,
@@ -59,7 +61,7 @@ module ReactOnRailsPro
                    renderer_http_pool_warn_timeout: nil, tracing: nil, include_execjs_polyfills: nil,
                    dependency_globs: nil, excluded_dependency_globs: nil, rendering_returns_promises: nil,
                    remote_bundle_cache_adapter: nil, ssr_pre_hook_js: nil, assets_to_copy: nil,
-                   renderer_request_retry_limit: nil, throw_js_errors: nil)
+                   renderer_request_retry_limit: nil, throw_js_errors: nil, ssr_timeout: nil)
       self.renderer_url = renderer_url
       self.renderer_password = renderer_password
       self.server_renderer = server_renderer
@@ -78,6 +80,7 @@ module ReactOnRailsPro
       self.assets_to_copy = assets_to_copy
       self.renderer_request_retry_limit = renderer_request_retry_limit
       self.throw_js_errors = throw_js_errors
+      self.ssr_timeout = ssr_timeout
     end
 
     def setup_config_values

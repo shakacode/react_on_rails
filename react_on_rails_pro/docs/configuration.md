@@ -76,11 +76,16 @@ ReactOnRailsPro.configure do |config|
   # Default for `renderer_password` is ""
   # config.renderer_password = ENV["RENDERER_PASSWORD"]
 
+  # Set the `ssr_timeout` configuration so the Rails server will not wait more than this many seconds
+  # for a SSR request to return once issued. 
+  config.ssr_timeout = 5
+  
   # If false, then crash if no backup rendering when the remote renderer is not available
   # Can be useful to set to false in development or testing to make sure that the remote renderer
   # works and any non-availability of the remote renderer does not just do ExecJS.
-  # Default for `renderer_use_fallback_exec_js` is true.
-  config.renderer_use_fallback_exec_js = true
+  # Suggest setting this to false if the SSR JS code cannot run in ExecJS
+  # Default for `renderer_use_fallback_exec_js` is false.
+  config.renderer_use_fallback_exec_js = false
 
   # The maximum size of the http connection pool,
   # Set +pool_size+ to limit the maximum number of connections allowed.

@@ -16,6 +16,8 @@ ReactOnRailsPro.configure do |config|
   # that the remote renderer works for CI.
   config.renderer_use_fallback_exec_js = false
 
+  config.ssr_timeout = 3
+
   # If true, then cache the evaluation of JS for prerendering using the standard Rails cache.
   # Applies to all rendering engines.
   # Default for `prerender_caching` is false.
