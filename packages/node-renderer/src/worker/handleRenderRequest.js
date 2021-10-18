@@ -208,7 +208,6 @@ module.exports = async function handleRenderRequest({
       error,
       'Caught top level error in handleRenderRequest',
     );
-    log.error(msg);
     errorReporter.notify(msg);
     return Promise.reject(error);
   }

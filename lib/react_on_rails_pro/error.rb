@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
 module ReactOnRailsPro
-  class Error < StandardError
+  class Error < ::ReactOnRails::Error
   end
 end

@@ -52,6 +52,10 @@ module ReactOnRailsPro
           ReactOnRailsPro::ServerRenderingPool::ProRendering
             .set_request_digest_on_render_options(js_code, render_options)
 
+          # In case this method is called with simple, raw JS, not depending on the bundle, next line
+          # is needed.
+          @bundle_update_utc_timestamp ||= bundle_utc_timestamp
+
           # TODO: Remove the request_digest. See https://github.com/shakacode/react_on_rails_pro/issues/119
           # From the request path
           # path = "/bundles/#{@bundle_update_utc_timestamp}/render"

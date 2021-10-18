@@ -13,7 +13,7 @@ const config = {
   bundlePath: path.resolve(__dirname, '../tmp/bundles'),
 
   // Listen at RENDERER_PORT env value or default port 3800
-  logLevel: env.RENDERER_LOG_LEVEL || 'debug', // show all logs
+  logLevel: env.RENDERER_LOG_LEVEL || 'info', // show all logs
 
   // See value in /config/initializers/react_on_rails_pro.rb. Should use env
   // value in real app.
