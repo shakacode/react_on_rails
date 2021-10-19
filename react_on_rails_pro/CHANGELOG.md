@@ -12,7 +12,7 @@ Gem and package versions are the same except for beta releases where the gem use
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
-## [2.4.0.rc.0] - 2021-10-18
+## [2.4.0.rc.1] - 2021-10-18
 
 ### Added
 - Add `ssr_timeout` configuration so the Rails server will not wait more than this many seconds for a SSR request to return once issued.
@@ -236,8 +236,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/2.4.0.rc.0...HEAD
-[2.4.0.rc.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.3.0...2.4.0.rc.0
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/2.4.0-rc.1...HEAD
+[2.4.0-rc.1]: https://github.com/shakacode/react_on_rails_pro/compare/2.3.0...2.4.0-rc.1
 [2.3.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.2.0...2.3.0
 [2.2.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.1.1...2.2.0
 [2.1.1]: https://github.com/shakacode/react_on_rails_pro/compare/2.1.0...2.1.1
