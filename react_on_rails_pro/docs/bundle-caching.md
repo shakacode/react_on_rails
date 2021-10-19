@@ -17,6 +17,18 @@ few seconds for even large projects. Additionally, the cache key includes
 
 This cache key is used for saving files to some remote storage, typically S3.
 
+## Bonus for local development with multiple directories building production builds
+Bundle caching can help save time if you have multiple directories for the same repository.
+
+The bundles are cached in `Rails.root.join('tmp', 'bundle_cache')`
+
+So, if you have sibling directories for the same project, you can make a sym link so both directories use the same bundle cache directory.
+
+```
+cd my_project2/tmp
+ln -s ../../my_project/tmp/bundle_cache
+```
+
 ## Configuration
 
 ### 1. React on Rails Configuration

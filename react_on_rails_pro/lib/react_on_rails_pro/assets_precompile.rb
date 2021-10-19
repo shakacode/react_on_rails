@@ -33,7 +33,7 @@ module ReactOnRailsPro
                                .union(ReactOnRailsPro.configuration.dependency_globs)
           # Note, digest_of_globs removes excluded globs
           digest = ReactOnRailsPro::Utils.digest_of_globs(cache_dependencies)
-          # Include the NODE_ENV and RAILS_ENV in the digest
+          # Include the NODE_ENV in the digest
           env_cache_keys = [
             ReactOnRailsPro::VERSION,
             ENV["NODE_ENV"]
