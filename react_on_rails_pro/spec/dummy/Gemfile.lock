@@ -9,14 +9,14 @@ GIT
 PATH
   remote: ../..
   specs:
-    react_on_rails_pro (12.4.0.rc.0)
+    react_on_rails_pro (2.4.0.rc.1)
       addressable
       connection_pool
       execjs (~> 2.5)
       multipart-post (~> 2)
       persistent_http (~> 2)
       rainbow
-      react_on_rails (>= 12.2)
+      react_on_rails (>= 12.4)
 
 GEM
   remote: https://rubygems.org/
