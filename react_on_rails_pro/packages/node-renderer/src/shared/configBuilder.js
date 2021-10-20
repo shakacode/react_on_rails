@@ -15,8 +15,7 @@ const truthy = require('./truthy');
 const Sentry = requireOptional('@sentry/node');
 
 const DEFAULT_TMP_DIR = '/tmp/react-on-rails-pro-node-renderer-bundles';
-// usually remote renderers are on staging or production,
-// so, use production folder always
+// usually remote renderers are on staging or production, so, use production folder always
 const DEFAULT_PORT = 3800;
 const DEFAULT_LOG_LEVEL = 'info';
 const { env } = process;
