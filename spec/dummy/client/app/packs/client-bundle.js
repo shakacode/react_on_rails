@@ -11,6 +11,7 @@ import HelloWorldHooksContext from '../components/HelloWorldHooksContext';
 import ContextFunctionReturnInvalidJSX from '../components/ContextFunctionReturnInvalidJSX';
 import PureComponentWrappedInFunction from '../components/PureComponentWrappedInFunction';
 
+import {make as HelloWorldReScript} from '../components/HelloWorldReScript.bs';
 import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
 import HelloWorldES5 from '../components/HelloWorldES5';
 import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
@@ -43,7 +44,7 @@ ReactOnRails.setOptions({
 ReactOnRails.register({
   BrokenApp,
   HelloWorld,
-  HelloWorldReason,
+  HelloWorldReScript,
   HelloWorldWithLogAndThrow,
   HelloWorldES5,
   HelloWorldRehydratable,
