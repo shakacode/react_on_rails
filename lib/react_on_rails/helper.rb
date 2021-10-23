@@ -54,6 +54,17 @@ module ReactOnRails
     # random_dom_id can be set to override the default from the config/initializers. That's only
     # used if you have multiple instance of the same component on the Rails view.
     def react_component(component_name, options = {})
+      config_server_bundle_js = ReactOnRails.configuration.server_bundle_js_file
+      if options[:prerender] == true && (config_server_bundle_js.nil? || config_server_bundle_js == "")
+        msg = <<~MSG
+          The `prerender` option to allow Server Side Rendering is marked as true but the ReactOnRails configuration
+          for `server_bundle_js_file` is nil or not present in `config/initializers/react_on_rails.rb`.
+          Set `config.server_bundle_js_file` to your javascript bundle to allow server side rendering.
+          Read more at https://www.shakacode.com/react-on-rails/docs/guides/react-server-rendering/
+        MSG
+        raise ReactOnRails::Error, msg
+      end
+
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
