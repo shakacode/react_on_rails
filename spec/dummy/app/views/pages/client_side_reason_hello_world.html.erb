@@ -1,0 +1,36 @@
+<%= react_component("HelloWorldReason", props: @app_props_server_render, prerender: false, trace: true, id: "HelloWorld-react-component-0") %>
+<hr/>
+
+<h1>React Rails Client Side Only Rendering</h1>
+<p>
+  This example demonstrates client side only rendering.<br/><br/>
+  The source HTML of this page will only show a DIV with an ID matching HelloWorld.<br/>
+  <pre>
+    <%= "<div id=\"HelloWorld-reason-react-component-0\"></div>" %>
+  </pre><br/><br/>
+  Compare this to the HTML created for server rendering.<br/>
+</p>
+
+<hr/>
+<h2>Setup</h2>
+<ol>
+  <li>
+    Create component source: spec/dummy/client/app/components/HelloWorldReason.bs.js
+  </li>
+  <li>
+    Expose the HelloWorld Component: spec/dummy/client/app/startup/clientRegistration.jsx
+    <br/>
+    <pre>
+      import HelloWorldReason from '../components/HelloWorldReason';
+      import ReactOnRails from 'react-on-rails';
+      ReactOnRails.register({ HelloWorldReason });
+    </pre>
+  </li>
+  <li>
+    Place the component on the view: spec/dummy/app/views/pages/client_side_reason_hello_world.html.erb
+    <br/>
+    <pre>
+      <%%= react_component("HelloWorldReason", props: @app_props_server_render, prerender: false, trace: true, id: "HelloWorld-reason-react-component-0") %>
+    </pre>
+  </li>
+</ol>

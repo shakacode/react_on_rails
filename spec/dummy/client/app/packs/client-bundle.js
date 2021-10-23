@@ -43,6 +43,7 @@ ReactOnRails.setOptions({
 ReactOnRails.register({
   BrokenApp,
   HelloWorld,
+  HelloWorldReason,
   HelloWorldWithLogAndThrow,
   HelloWorldES5,
   HelloWorldRehydratable,

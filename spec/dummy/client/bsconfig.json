@@ -1,0 +1,23 @@
+{
+  "name": "app",
+  "sources": [
+    {
+      "dir": "app/components",
+      "subdirs": true
+    }
+  ],
+  "bs-dependencies": [
+    "reason-react",
+    "bs-react-on-rails"
+  ],
+  "reason": {
+    "react-jsx": 2
+  },
+  "refmt": 3,
+  "bsc-flags": ["-bs-super-errors"],
+  "suffix": ".bs.js",
+  "package-specs": {
+    "module": "commonjs",
+    "in-source": true
+  }
+}
