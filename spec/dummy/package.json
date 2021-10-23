@@ -9,6 +9,7 @@
   "dependencies": {
     "@babel/preset-react": "^7.10.4",
     "@rails/webpacker": "^5.2.1",
+    "@rescript/react": "^0.10.3",
     "babel-plugin-module-resolver": "^4.0.0",
     "core-js": "3",
     "create-react-class": "^15.6.3",
@@ -33,6 +34,7 @@
     "react-router-dom": "^5.2.0",
     "redux": "^4.0.1",
     "redux-thunk": "^2.2.0",
+    "rescript": "^9.1.4",
     "resolve-url-loader": "^3.1.1",
     "sass-resources-loader": "^2.1.0",
     "url-loader": "^4.0.0",
@@ -55,7 +57,9 @@
     "build:dev": "rm -rf public/webpack/develoment && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
     "build:dev:server": "rm -rf public/webpack/develoment && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
     "build:dev:watch": "RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
-    "build:clean": "rm -rf public/webpack || true"
+    "build:clean": "rm -rf public/webpack || true",
+    "re:build": "rescript build",
+    "re:start": "rescript build -w"
   },
   "version": "0.0.0"
 }

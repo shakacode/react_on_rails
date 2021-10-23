@@ -1,0 +1,24 @@
+{
+  "name": "react_on_rails",
+  "sources": [
+    {
+      "dir": "client/app/components",
+      "subdirs": true
+    }
+  ],
+  "reason": {
+    "react-jsx": 3
+  },
+  "bsc-flags": ["-bs-super-errors"],
+  "suffix": ".bs.js",
+  "namespace": true,
+  "package-specs": [
+    {
+      "module": "commonjs",
+      "in-source": true
+    }
+  ],
+  "bs-dependencies": [
+    "@rescript/react"
+  ]
+}
