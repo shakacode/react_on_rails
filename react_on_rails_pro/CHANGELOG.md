@@ -12,7 +12,7 @@ Gem and package versions are the same except for beta releases where the gem use
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
-## [3.0.0.rc.0] - 2021-10-27
+## [3.0.0-rc.0] - 2021-10-27
 
 ### Upgrading to 3.0
 1. Changed rake task name from vm to node:
@@ -245,17 +245,17 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/2.4.0-rc.1...HEAD
-[2.4.0-rc.1]: https://github.com/shakacode/react_on_rails_pro/compare/2.3.0...2.4.0-rc.1
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.4.0-rc.0...HEAD
+[3.0.0-rc.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.3.0...3.0.0-rc.0
 [2.3.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.2.0...2.3.0
 [2.2.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.1.1...2.2.0
 [2.1.1]: https://github.com/shakacode/react_on_rails_pro/compare/2.1.0...2.1.1
 [2.1.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.6...2.0.0
-[2.0.0.beta.3]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0.beta.2...2.0.0.beta.3
-[2.0.0.beta.2]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0.beta.1...2.0.0.beta.2
-[2.0.0.beta.1]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0.beta.0...2.0.0.beta.1
-[2.0.0.beta.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.6...2.0.0.beta.0
+[2.0.0.beta.3]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0-beta.2...2.0.0-beta.3
+[2.0.0.beta.2]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0-beta.1...2.0.0-beta.2
+[2.0.0.beta.1]: https://github.com/shakacode/react_on_rails_pro/compare/2.0.0-beta.0...2.0.0-beta.1
+[2.0.0.beta.0]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.6...2.0.0-beta.0
 [1.5.6]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.5...1.5.6
 [1.5.5]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.4...1.5.5
 [1.5.4]: https://github.com/shakacode/react_on_rails_pro/compare/1.5.3...1.5.4
