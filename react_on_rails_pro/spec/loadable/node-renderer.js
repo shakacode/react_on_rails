@@ -11,7 +11,7 @@ const config = {
   port: process.env.PORT || 3800,
 
   logLevel: process.env.VM_RENDERER_DEBUG_LEVEL || 'debug', // Show all logs
-  workersCount: Number(process.env.VM_RENDERER_CONCURRENCY || 3),
+  workersCount: Number(process.env.NODE_RENDERER_CONCURRENCY || 3),
   // If the renderer is running out of memory, enable these below.
   // Note, Heroku restarts the renderer every day: https://devcenter.heroku.com/articles/dynos#restarting
   // allWorkersRestartInterval: 15, // in minutes
