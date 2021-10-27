@@ -7,7 +7,7 @@ module ReactOnRailsPro
 
       class << self
         def pool
-          @pool ||= if ReactOnRailsPro.configuration.server_renderer == "NodeRenderer"
+          @pool ||= if ReactOnRailsPro.configuration.node_renderer?
                       ::ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
                     else
                       ::ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript

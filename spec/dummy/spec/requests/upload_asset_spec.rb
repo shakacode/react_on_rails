@@ -8,8 +8,8 @@ describe "Upload asset" do
   let(:fixture_path) { File.expand_path("./spec/fixtures/#{asset_filename}") }
   let(:fixture_path2) { File.expand_path("./spec/fixtures/#{asset_filename2}") }
   let(:non_exist_fixture_path) { File.expand_path("./spec/fixtures/sample99.json") }
-  let(:asset_path_expanded) { File.expand_path(asset_filename, "#{__dir__}/../../tmp/bundles") }
-  let(:asset_path_expanded2) { File.expand_path(asset_filename2, "#{__dir__}/../../tmp/bundles") }
+  let(:asset_path_expanded) { File.expand_path(asset_filename, "#{__dir__}/../../.node-renderer-bundles") }
+  let(:asset_path_expanded2) { File.expand_path(asset_filename2, "#{__dir__}/../../.node-renderer-bundles") }
 
   before do
     dbl_configuration = instance_double("Configuration",

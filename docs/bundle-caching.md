@@ -39,6 +39,27 @@ First, we need to tell React on Rails to use a custom build module. In
 config.build_production_command = ReactOnRailsPro::AssetsPrecompile
 ```
 
+Alternatively, if you need to run something after the files are built or extracted from the cache, you can do something like this:
+
+```ruby
+ReactOnRails.configure do |config|
+  # This configures the script to run to build the production assets by webpack. Set this to nil
+  # if you don't want react_on_rails building this file for you.
+  config.build_production_command = CustomBuildCommand
+end
+```
+
+And define it like this:   
+
+```ruby
+module CustomBuildCommand
+  def self.call
+    ReactOnRailsPro::AssetsPrecompile.call
+    Rake::Task['react_on_rails_pro:pre_stage_bundle_for_vm_renderer'].invoke
+  end
+end
+```
+
 ### 2. React on Rails Pro Configuration
 Next, we need to configure the `config/initializers/react_on_rails_pro.rb` with some module,
 say called S3BundleCacheAdapter.
@@ -49,6 +70,12 @@ config.remote_bundle_cache_adapter = S3BundleCacheAdapter
 
 This module needs four class methods: `cache_keys` (optional), `build`, `fetch`, `upload`. See two
 examples of this below.
+
+### 3. Remove any call to rake task `react_on_rails_pro:pre_stage_bundle_for_node_renderer`
+This task is called automaticaly if you're using bundle caching.
+```ruby
+  Rake::Task['react_on_rails_pro:pre_stage_bundle_for_node_renderer'].invoke
+```
 
 #### Custom ENV cache keys
 Check your webpack config for the webpack.DefinePlugin. That allows JS code to use

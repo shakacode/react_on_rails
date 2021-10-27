@@ -5,7 +5,7 @@ const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails
 
 const config = {
   // tmp/bundles path must be kept in sync with /lib/tasks/asset.raie
-  bundlePath: path.resolve(__dirname, './tmp/bundles'), // Save bundle to "tmp/" dir of our dummy app
+  bundlePath: path.resolve(__dirname, './.node-renderer-bundles'), // Save bundle to "tmp/" dir of our dummy app
 
   // For production, we want process.env.PORT
   port: process.env.PORT || 3800,

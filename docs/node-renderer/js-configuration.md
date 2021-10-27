@@ -11,7 +11,7 @@ Here are the options available for the JavaScript renderer configuration object,
 1. **port** (default: `process.env.RENDERER_PORT || 3800`) - The port renderer should listen to. 
    If setting the port, you might want to ensure the port uses `process.env.PORT` so it will use port number provided by **Heroku** environment. 
 1. **logLevel** (default: `process.env.RENDERER_LOG_LEVEL || 'info'`) - Log lever for renderer. Set it to `'error'` to turn logging off. Available levels are: `{ error: 0, warn: 1, info: 2, verbose: 3, debug: 4, silly: 5 }`
-1. **bundlePath** (default: `process.env.RENDERER_BUNDLE_PATH || '/tmp/react-on-rails-pro-node-renderer-bundles'` ) - path to temp directory where uploaded bundle files will be stored. For example you can set it to `path.resolve(__dirname, './tmp/bundles')` if you configured renderer from the `/` directory of your app. 
+1. **bundlePath** (default: `process.env.RENDERER_BUNDLE_PATH || '/tmp/react-on-rails-pro-node-renderer-bundles'` ) - path to temp directory where uploaded bundle files will be stored. For example you can set it to `path.resolve(__dirname, './.node-renderer-bundles')` if you configured renderer from the `/` directory of your app. 
 1. **workersCount** (default: `env.RENDERER_WORKERS_COUNT || defaultWorkersCount()` where default is your CPUs count - 1) - Number of workers that will be forked to serve rendering requests. If you set this manually make sure that value is a **Number** and is `>= 1`.
 1. **password** (default: `env.RENDERER_PASSWORD`) - Password expected to receive form **Rails client** to authenticate rendering requests. If no password set, no authentication will be required.
 1. **allWorkersRestartInterval** (default: `env.RENDERER_ALL_WORKERS_RESTART_INTERVAL`) - Interval in minutes between scheduled restarts of all cluster of workers. By default restarts are not enabled. If restarts are enabled, `delayBetweenIndividualWorkerRestarts` should also be set.
@@ -36,8 +36,8 @@ import path from 'path';
 import { reactOnRailsProNodeRenderer } from '@shakacode-tools/react-on-rails-pro-node-renderer';
 
 const config = {
-  // Save bundles to relative "./tmp/bundles" dir of our app 
-  bundlePath: path.resolve(__dirname, './tmp/bundles'), 
+  // Save bundles to relative "./.node-renderer-bundles" dir of our app 
+  bundlePath: path.resolve(__dirname, './.node-renderer-bundles'), 
   
   // All other values are the defaults, as described above 
 };
@@ -62,4 +62,3 @@ And add this line to your `scripts` section of `package.json`
 ```
 
 `yarn start` will run the renderer.
-
