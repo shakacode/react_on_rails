@@ -20,7 +20,7 @@ See [docs/installation.md](../installation.md).
     * `RENDERER_SUPPORT_MODULES`
 2. Configure ENV values and run the command. Note, you can set port with args `-p <PORT>`. For example, assuming node-renderer is in your path:
    ```
-   RENDERER_BUNDLE_PATH=/tmp/bundle-path node-renderer
+   RENDERER_BUNDLE_PATH=/app/.node-renderer-bundles node-renderer
    ```
 3. You can use a command line argument of `-p SOME_PORT` to override any ENV value for the PORT.
 
@@ -45,7 +45,7 @@ For the most control over the setup, create a JavaScript file to start the NodeR
    import reactOnRailsProNodeRenderer from '@shakacode-tools/react-on-rails-pro-node-renderer';
 
    const config = {
-     bundlePath: path.resolve(__dirname, '../tmp/bundles'),
+     bundlePath: path.resolve(__dirname, '../.node-renderer-bundles'),
    };
 
    reactOnRailsProNodeRenderer(config);

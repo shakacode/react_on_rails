@@ -61,6 +61,8 @@ module ReactOnRailsPro
 
     def self.call
       instance.build_or_fetch_bundles
+
+      ReactOnRailsPro::PrepareNodeRenderBundles.call if ReactOnRailsPro.configuration.node_renderer?
     end
 
     def build_or_fetch_bundles

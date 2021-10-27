@@ -12,7 +12,17 @@ Gem and package versions are the same except for beta releases where the gem use
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
-## [2.4.0.rc.1] - 2021-10-18
+### Changed
+- Moved default location of placed node renderer sym links to be /.node-renderer-bundles as the /tmp directory is typically
+  cleared during slug trimming
+  
+
+### Upgrading
+1. Changed rake task name from vm to node:
+   Rename react_on_rails_pro:pre_stage_bundle_for_vm_renderer to react_on_rails_pro:pre_stage_bundle_for_node_renderer 
+2. **Bundle Caching**: ReactOnRailsPro::AssetsPrecompile will automatically pre_stage_bundle_for_node_renderer if using the node_renderer. So don't do this twice in another place if using ReactOnRailsPro::AssetsPrecompile for bundle caching.
+
+## [2.4.0.rc.2] - 2021-10-18
 
 ### Added
 - Add `ssr_timeout` configuration so the Rails server will not wait more than this many seconds for a SSR request to return once issued.

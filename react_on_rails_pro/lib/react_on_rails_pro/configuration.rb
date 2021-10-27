@@ -91,6 +91,10 @@ module ReactOnRailsPro
       setup_assets_to_copy
     end
 
+    def node_renderer?
+      ReactOnRailsPro.configuration.server_renderer == "NodeRenderer"
+    end
+
     private
 
     def setup_assets_to_copy

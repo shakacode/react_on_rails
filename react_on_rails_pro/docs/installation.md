@@ -96,7 +96,7 @@ const {
 const env = process.env
 
 const config = {
-  bundlePath: path.resolve(__dirname, '../tmp/bundles'),
+  bundlePath: path.resolve(__dirname, '../.node-renderer-bundles'),
 
   // Listen at RENDERER_PORT env value or default port 3800
   logLevel: env.RENDERER_LOG_LEVEL || 'debug', // show all logs
