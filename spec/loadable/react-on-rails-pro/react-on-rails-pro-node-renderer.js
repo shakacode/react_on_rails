@@ -30,7 +30,7 @@ const config = {
   supportModules: true,
 
   // workersCount defaults to the number of CPUs minus 1
-  workersCount: Number(process.env.VM_RENDERER_CONCURRENCY || 3),
+  workersCount: Number(process.env.NODE_RENDERER_CONCURRENCY || 3),
 
   // Next 2 params, allWorkersRestartInterval and
   // delayBetweenIndividualWorkerRestarts must both should be set if you wish
