@@ -37,14 +37,6 @@ module ReactOnRails
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
-      def copy_js_bundle_files
-        base_path = "base/base/"
-        base_files = %w[app/javascript/packs/server-bundle.js
-                        app/javascript/bundles/HelloWorld/components/HelloWorldServer.js
-                        app/javascript/bundles/HelloWorld/components/HelloWorld.module.css]
-        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
-      end
-
       def copy_webpack_config
         puts "Adding Webpack config"
         base_path = "base/base/"
@@ -54,7 +46,6 @@ module ReactOnRails
                         config/webpack/development.js
                         config/webpack/production.js
                         config/webpack/serverWebpackConfig.js
-                        config/webpack/test.js
                         config/webpack/webpackConfig.js]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
