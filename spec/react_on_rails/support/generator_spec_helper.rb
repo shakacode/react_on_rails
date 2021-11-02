@@ -26,7 +26,7 @@ def simulate_existing_rails_files(options)
   simulate_existing_file("Gemfile", "")
   simulate_existing_file("config/routes.rb", "Rails.application.routes.draw do\nend\n")
   simulate_existing_file("config/application.rb",
-                         "module Gentest\nclass Application < Rails::Application\nend\nend)")
+                         "module Gentest\nclass Application < Rails::Application\nend\nend")
 
   return unless options.fetch(:spec, true)
 
