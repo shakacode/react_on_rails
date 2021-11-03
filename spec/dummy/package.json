@@ -11,6 +11,7 @@
     "@rails/webpacker": "^5.2.1",
     "@rescript/react": "^0.10.3",
     "babel-plugin-module-resolver": "^4.0.0",
+    "babel-plugin-transform-react-remove-prop-types": "^0.4.24",
     "core-js": "3",
     "create-react-class": "^15.6.3",
     "eslint-plugin-prettier": "^3.1.0",
