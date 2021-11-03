@@ -21,3 +21,8 @@
 /public/webpack/*
 
 /spec/examples.txt
+
+#Ignore ReScript build files
+/.merlin
+/lib/bs/
+/.bsb.lock

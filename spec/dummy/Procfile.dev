@@ -2,6 +2,9 @@
 
 rails: rails s -p 3000
 
+# Bundle ReScript .res files
+rescript: yarn re:start
+
 # Run the hot reload server for client development
 webpack-dev-server: bin/webpack-dev-server
 
