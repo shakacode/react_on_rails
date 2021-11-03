@@ -26,3 +26,4 @@
 /.merlin
 /lib/bs/
 /.bsb.lock
+*.bs.js
