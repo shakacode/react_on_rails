@@ -4,6 +4,4 @@
 
 import { make as HelloWorldReScript } from '../components/HelloWorldReScript.bs';
 
-export {
-  HelloWorldReScript,
-}
+export { HelloWorldReScript };
