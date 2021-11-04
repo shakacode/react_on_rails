@@ -54,13 +54,13 @@
     "lint": "cd ../.. && yarn run lint",
     "format": "cd ../.. && yarn start format",
     "test": "yarn run build:test && yarn run lint && rspec",
-    "build:test": "rm -rf public/webpack/test && RAILS_ENV=test NODE_ENV=test bin/webpack",
-    "build:dev": "rm -rf public/webpack/develoment && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
-    "build:dev:server": "rm -rf public/webpack/develoment && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
-    "build:dev:watch": "RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
-    "build:clean": "rm -rf public/webpack || true",
-    "re:build": "rescript build",
-    "re:start": "rescript build -w"
+    "build:test": "rm -rf public/webpack/test && rescript build && RAILS_ENV=test && NODE_ENV=test bin/webpack",
+    "build:dev": "rm -rf public/webpack/develoment && rescript build && RAILS_ENV=development && NODE_ENV=development bin/webpack --watch",
+    "build:dev:server": "rm -rf public/webpack/develoment && rescript build && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
+    "build:dev:watch": "rescript build -w && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
+    "build:clean": "rescript clean && rm -rf public/webpack || true",
+    "build:rescript": "rescript clean && rescript build",
+    "build:rescript:dev": "rescript build -w"
   },
   "version": "0.0.0"
 }
