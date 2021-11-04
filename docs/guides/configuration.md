@@ -66,11 +66,8 @@ ReactOnRails.configure do |config|
   # defaults to "" (top level)
   config.node_modules_location = "client" # If using webpacker you should use "".
 
-  # This configures the script to run to build the production assets by webpack . Set this to nil
+  # This configures the script to run to build the production assets by webpack. Set this to nil
   # if you don't want react_on_rails building this file for you.
-  # Note, if you want to use this command then you should remove the file
-  # config/webpack/production.js
-  # If that file exists, React on Rails thinks that you'll use the rails/webpacker bin/webpack compiler.
   config.build_production_command = "RAILS_ENV=production bin/webpack"
 
   # Alternatively, you can also specify a module containing a class method `call`
