@@ -11,7 +11,6 @@
     "@rails/webpacker": "^5.2.1",
     "@rescript/react": "^0.10.3",
     "babel-plugin-module-resolver": "^4.0.0",
-    "babel-plugin-transform-react-remove-prop-types": "^0.4.24",
     "core-js": "3",
     "create-react-class": "^15.6.3",
     "eslint-plugin-prettier": "^3.1.0",
@@ -55,11 +54,11 @@
     "format": "cd ../.. && yarn start format",
     "test": "yarn run build:test && yarn run lint && rspec",
     "build:test": "rm -rf public/webpack/test && yarn build:rescript && RAILS_ENV=test && NODE_ENV=test bin/webpack",
-    "build:dev": "rm -rf public/webpack/develoment && yarn build:rescript && RAILS_ENV=development && NODE_ENV=development bin/webpack --watch",
-    "build:dev:server": "rm -rf public/webpack/develoment && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
+    "build:dev": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development && NODE_ENV=development bin/webpack --watch",
+    "build:dev:server": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
     "build:dev:watch": "rescript build -w && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
     "build:clean": "yarn build:rescript && rm -rf public/webpack || true",
-    "build:rescript": "rescript clean && rescript build",
+    "build:rescript": "rescript clean && rescript build -with-deps",
     "build:rescript:dev": "rescript build -w"
   },
   "version": "0.0.0"
