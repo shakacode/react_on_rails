@@ -3,7 +3,7 @@
 // And make sure the props passed to make match the shape of the prop passed on the view.
 
 @react.component
-let make = (~helloWorldData: {..}) => {
+let default = (~helloWorldData: {..}) => {
   let (nameState, setNameState) = React.useState(_ => helloWorldData["name"])
   <div>
     <h3> {("Hello from ReScript, " ++ nameState ++ ` 🤙`)->React.string} </h3>
