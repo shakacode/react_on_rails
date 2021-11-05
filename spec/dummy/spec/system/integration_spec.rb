@@ -120,7 +120,7 @@ describe "Pages/Hello World ReScript Component", :js do
 
   before { visit "/client_side_rescript_hello_world" }
 
-  it { is_expected.to have_text "Hello from ReScript" }
+  it { change_text_expect_dom_selector("#HelloWorld-rescript-react-component-0") }
 end
 
 describe "Pages/server_side_log_throw", :js, :ignore_js_errors do

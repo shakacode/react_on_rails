@@ -1,6 +1,6 @@
-// The compiled JavaScript will always extract your props passed to make from Props, where Props
+// The compiled JavaScript will always extract your props passed to the compiled file from Props, where Props
 // is the same hash passed to react_component method on the view. Log the Props in the compiled JS
-// And make sure the props passed to make match the shape of the prop passed on the view.
+// and make sure the props passed to the component below match the shape of the prop passed on the view.
 
 @react.component
 let default = (~helloWorldData: {..}) => {
