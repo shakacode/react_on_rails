@@ -82,7 +82,7 @@ module ReactOnRails
         end
 
         puts "Adding React dependencies"
-        run "yarn add react react-dom @babel/preset-react prop-types babel-plugin-transform-react-remove-prop-types
+        run "yarn add react react-dom @babel/preset-react prop-types babel-plugin-transform-react-remove-prop-types \
             babel-plugin-macros"
 
         puts "Adding TypeScript dependencies"
