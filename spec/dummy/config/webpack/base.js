@@ -8,6 +8,9 @@ const rules = environment.loaders;
 const fileLoader = rules.get('file');
 const ManifestPlugin = environment.plugins.get('Manifest');
 
+//  static_assets_extensions: .jpg .jpeg .png .gif .tiff .ico .svg .eot .otf .svg .ttf .woff .woff2 .ttf .eot .svg
+//  extensions: .mjs .js .jsx .module.sass .module.scss .module.css .sass .scss .css .png .svg .gif .jpeg .jpg
+
 // For details on the pros and cons of inlining images:
 // https://developers.google.com/web/fundamentals/design-and-ux/responsive/images
 // https://survivejs.com/webpack/loading/images/

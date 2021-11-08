@@ -7,12 +7,14 @@
   },
   "private": true,
   "dependencies": {
+    "@babel/core": "^7.16.0",
     "@babel/preset-react": "^7.10.4",
-    "@rails/webpacker": "^5.2.1",
+    "@rails/webpacker": "^6.0.0-rc.6",
     "babel-plugin-module-resolver": "^4.0.0",
     "core-js": "3",
     "create-react-class": "^15.6.3",
-    "eslint-plugin-prettier": "^3.1.0",
+    "css-loader": "^6.5.1",
+    "css-minimizer-webpack-plugin": "^3.1.1",
     "expose-loader": "^1.0.3",
     "history": "^4.6.3",
     "imports-loader": "^1.2.0",
@@ -20,9 +22,15 @@
     "jquery-ujs": "^1.2.2",
     "loader-utils": "^2.0.0",
     "lodash": "^4.17.4",
+    "mini-css-extract-plugin": "^2.4.4",
     "node-libs-browser": "^2.2.1",
     "nps": "^5.10.0",
     "null-loader": "^4.0.0",
+    "postcss": "^8.3.11",
+    "postcss-flexbugs-fixes": "^5.0.2",
+    "postcss-import": "^14.0.2",
+    "postcss-loader": "^6.2.0",
+    "postcss-preset-env": "^6.7.0",
     "prop-types": "^15.7.2",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
@@ -34,14 +42,19 @@
     "redux": "^4.0.1",
     "redux-thunk": "^2.2.0",
     "resolve-url-loader": "^3.1.1",
+    "sass": "^1.43.4",
+    "sass-loader": "^12.3.0",
     "sass-resources-loader": "^2.1.0",
+    "style-loader": "^3.3.1",
     "url-loader": "^4.0.0",
+    "webpack": "^5.62.1",
+    "webpack-cli": "^4.8.0",
     "webpack-merge": "^5.1.4"
   },
   "devDependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "0.4.2",
     "react-refresh": "^0.8.1",
-    "webpack-dev-server": "^3.2.1"
+    "webpack-dev-server": "^4.2.1"
   },
   "browser": {
     "fs": false

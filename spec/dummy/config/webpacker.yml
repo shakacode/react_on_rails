@@ -6,52 +6,14 @@ default: &default
   public_root_path: public
 
   cache_path: tmp/cache/webpacker
-  check_yarn_integrity: false
   webpack_compile_output: false
 
   # Additional paths webpack should lookup modules
   # ['app/assets', 'engine/foo/app/assets']
-  resolved_paths: []
+  additional_paths: []
 
   # Reload manifest.json on all requests so we reload latest compiled packs
   cache_manifest: false
-
-  # Extract and emit a css file
-  extract_css: true
-
-  static_assets_extensions:
-    - .jpg
-    - .jpeg
-    - .png
-    - .gif
-    - .tiff
-    - .ico
-    - .svg
-    - .eot
-    - .otf
-    - .svg
-    - .ttf
-    - .woff
-    - .woff2
-    - .ttf
-    - .eot
-    - .svg
-
-  extensions:
-    - .mjs
-    - .js
-    - .jsx
-    - .module.sass
-    - .module.scss
-    - .module.css
-    - .sass
-    - .scss
-    - .css
-    - .png
-    - .svg
-    - .gif
-    - .jpeg
-    - .jpg
 
 development:
   <<: *default
@@ -59,31 +21,35 @@ development:
   # bundles need building. Also, remove the customization to spec/rails_helper.rb.
   compile: false
 
-  extract_css: false
-
   public_output_path: webpack/development
-
-  # Verifies that correct packages and versions are installed by inspecting package.json, yarn.lock, and node_modules
-  check_yarn_integrity: false
 
   # Reference: https://webpack.js.org/configuration/dev-server/
   dev_server:
     https: false
     host: localhost
     port: 3035
-    public: localhost:3035
+    # Hot Module Replacement updates modules while the application is running without a full reload
     hmr: true
-    # Inline should be set to true if using HMR
-    inline: true
-    overlay: true
+    # Defaults to the inverse of hmr. Uncomment to manually set this.
+    # live_reload: true
+    client:
+      # Should we show a full-screen overlay in the browser when there are compiler errors or warnings?
+      overlay: true
+      # May also be a string
+      # webSocketURL:
+      #  hostname: "0.0.0.0"
+      #  pathname: "/ws"
+      #  port: 8080
+    # Should we use gzip compression?
     compress: true
-    disable_host_check: true
-    use_local_ip: false
-    quiet: false
+    # Note that apps that do not check the host are vulnerable to DNS rebinding attacks
+    allowed_hosts: "all"
+    pretty: true
     headers:
       'Access-Control-Allow-Origin': '*'
-    watch_options:
-      ignored: '**/node_modules/**'
+    static:
+      watch:
+        ignored: '**/node_modules/**'
 
 
 test:
@@ -100,9 +66,6 @@ production:
 
   # Production depends on precompilation of packs prior to booting for performance.
   compile: false
-
-  # Extract and emit a css file
-  extract_css: true
 
   # Cache manifest.json for performance
   cache_manifest: true
