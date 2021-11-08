@@ -10,7 +10,7 @@ const HelloWorld = (props) => {
       <h3>Hello, {name}!</h3>
       <hr />
       <form>
-        <label className={style.bold} htmlFor="name">
+        <label className={style.bright} htmlFor="name">
           Say hello to:
           <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
         </label>
