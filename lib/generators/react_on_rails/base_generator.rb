@@ -85,14 +85,11 @@ module ReactOnRails
         run "yarn add react react-dom @babel/preset-react prop-types babel-plugin-transform-react-remove-prop-types \
             babel-plugin-macros"
 
-        puts "Adding TypeScript dependencies"
-        run "yarn add typescript @babel/preset-typescript @types/react @types/react-dom"
-
         puts "Adding CSS handlers"
         run "yarn add css-loader css-minimizer-webpack-plugin mini-css-extract-plugin style-loader"
 
         puts "Adding dev dependencies"
-        run "yarn add -D @pmmmwh/react-refresh-webpack-plugin fork-ts-checker-webpack-plugin react-refresh"
+        run "yarn add -D @pmmmwh/react-refresh-webpack-plugin react-refresh"
       end
 
       def append_to_spec_rails_helper
