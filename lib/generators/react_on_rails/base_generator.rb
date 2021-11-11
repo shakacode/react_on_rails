@@ -33,7 +33,7 @@ module ReactOnRails
                         app/views/layouts/hello_world.html.erb
                         config/initializers/react_on_rails.rb
                         Procfile.dev
-                        Procfile.dev-hmr]
+                        Procfile.dev-static]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
@@ -154,10 +154,10 @@ module ReactOnRails
             - Alternately, you may turn off compile in config/webpacker.yml and run the foreman
               command to start the rails server and run webpack in watch mode.
 
-                foreman start -f Procfile.dev
+                foreman start -f Procfile.dev-static
 
             - To turn on HMR, edit config/webpacker.yml and set HMR to true. Restart the rails server
-              and bin/webpack-dev-server. Or use Procfile.dev-hmr.
+              and bin/webpack-dev-server. Or use Procfile.dev.
 
             - To server render, change this line app/views/hello_world/index.html.erb to
               `prerender: true` to see server rendering (right click on page and select "view source").

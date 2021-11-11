@@ -20,6 +20,6 @@ shared_examples "base_generator" do
        app/javascript/bundles/HelloWorld/components/HelloWorld.jsx
        config/initializers/react_on_rails.rb
        Procfile.dev
-       Procfile.dev-hmr].each { |file| assert_file(file) }
+       Procfile.dev-static].each { |file| assert_file(file) }
   end
 end

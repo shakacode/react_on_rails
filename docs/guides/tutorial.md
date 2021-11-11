@@ -4,7 +4,7 @@
 
 -----
 
-*Updated for Ruby 2.7.1, Rails 6.0.3.1, and React on Rails v12.0.0*
+*Updated for Ruby 2.7.1, Rails 6.0.3.1, React on Rails v12.0.0, and Webpacker v6*
 
 This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
@@ -42,7 +42,7 @@ gem install foreman             # download and install Foreman
 ```
 
 ## Create a new Ruby on Rails App
-Then we need to create a fresh Rails application with webpacker react support as following.
+Then we need to create a fresh Rails application as following.
 
 First be sure to run `rails -v` and check you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with react per the instructions [here](https://github.com/rails/webpacker).
 
@@ -51,10 +51,9 @@ cd <directory where you want to create your new Rails app>
 
 # Any name you like for the rails app
 # Skip javascript so will add that next and get the current version
-rails new --skip-sprockets -J --skip-turbolinks test-react-on-rails-v12-no-sprockets
+rails new --skip-sprockets --skip-turbolinks test-react-on-rails
 
 cd test-react-on-rails
-bundle
 ```
 
 ## Add the webpacker and react_on_rails gems
@@ -63,23 +62,29 @@ of both the gem and npm package. In other words, don't use the `^` or `~` in the
 _Use the latest version for react_on_rails._
 
 ```
-gem 'react_on_rails', '12.0.4'         # prefer exact gem version to match npm version
+gem 'react_on_rails', '12.4.0'         # prefer exact gem version to match npm version
 ```
 
 Note: The latest released React On Rails version is considered stable. Please use the latest
 version to ensure you get all the security patches and the best support.
 
 ```bash
-bundle add webpacker                 
-bundle add react_on_rails --version=12.0.4 --strict
+bundle add react_on_rails --version=12.4.0 --strict
+```
+
+Update the version of Webpacker in the `Gemfile` to 6 or above 
+
+```ruby
+gem 'webpacker', '6.0.0.rc.6'
 ```
 
 ## Run the webpacker generator
 
-```
+```terminal
 bundle exec rails webpacker:install
-bundle exec rails webpacker:install:react
 ```
+
+Enter `a` to replace all files.
 
 Let's commit everything before installing React on Rails.
 
@@ -101,17 +106,27 @@ If you want the redux install: `rails generate react_on_rails:install --redux`
 rails generate react_on_rails:install
 ```
 
-Then run server with a static client bundle. Static means that the bundle is saved in your
-public/webpack/packs directory.
+Now let's delete the `.browserslistrc` file. On webpacker v6 the content of `.browserslistrc` is added to your `package.json` file.
 
+Next add the following packages for rails support.
+
+```terminal
+yarn add @rails/activestorage @rails/ujs
+```
+
+Alternatively, if those dependencies are not needed for your project, remove those from from `app/javascript/packs/application.js`
+
+Then run the server with one of the following options:
+
+## Running with HMR
 ```
 foreman start -f Procfile.dev
 ```
 
-## To run with the webpack-dev-server:
+## Running without HMR, statically creating the bundles
 ```
-foreman start -f Procfile.dev-hmr
-```
+foreman start -f Procfile.dev-static
+```                          
 
 Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) and see your **React On Rails** app running!
 
@@ -312,7 +327,7 @@ mv app/javascript client
 
 ## Using HMR with the rails/webpacker setup
 
-Start the app using `foreman start -f Procfile.dev-hmr`.
+Start the app using `foreman start -f Procfile.dev`.
 
 When you change a JSX file and save, the browser will automatically refresh!
 
