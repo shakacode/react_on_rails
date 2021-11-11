@@ -47,16 +47,20 @@ module ReactOnRails
 
       def copy_webpack_config
         puts "Adding Webpack config"
-        base_path = "base/base/"
+        base_path = "base/base"
         base_files = %w[babel.config.js
                         config/webpack/clientWebpackConfig.js
                         config/webpack/commonWebpackConfig.js
                         config/webpack/development.js
                         config/webpack/production.js
                         config/webpack/serverWebpackConfig.js
-                        config/webpack/test.js
                         config/webpack/webpackConfig.js]
-        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
+        config = {
+          message: "// The source code including full typescript support is available at:"
+        }
+        base_files.each do |file|
+          template("#{base_path}/#{file}.tt", file, config)
+        end
       end
 
       def copy_webpacker_config
