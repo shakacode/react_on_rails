@@ -52,7 +52,7 @@ module ReactOnRails
       attr_writer :rails_options
 
       def rails_options
-        @rails_options ||= "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record"
+        @rails_options ||= "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record -J"
       end
 
       %w[gen clobber npm_install build_webpack_bundles].each do |task_type|

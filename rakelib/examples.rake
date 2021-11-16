@@ -33,9 +33,10 @@ namespace :examples do # rubocop:disable Metrics/BlockLength
       example_type.rails_options += " --webpack" if Rails.version >= "5.1" && Rails.version < "6"
       sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options}")
       sh_in_dir(example_type.dir, "touch .gitignore")
+      copy_generator_webpacker_yml_to(example_type.dir)
+      sh_in_dir(example_type.dir, "bundle add webpacker --version 6.0.0.rc.6")
       sh_in_dir(example_type.dir, "rake webpacker:install")
       sh_in_dir(example_type.dir, "bundle binstubs --path=#{example_type.dir}/bin webpacker")
-      sh_in_dir(example_type.dir, "rake webpacker:install:react")
       append_to_gemfile(example_type.gemfile, example_type.required_gems)
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, example_type.generator_shell_commands)

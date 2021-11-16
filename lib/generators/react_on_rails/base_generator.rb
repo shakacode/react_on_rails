@@ -71,7 +71,7 @@ module ReactOnRails
       end
 
       def add_base_gems_to_gemfile
-        gem "mini_racer", platforms: :ruby
+        gem "mini_racer", "0.4.0", platforms: :ruby
         run "bundle"
       end
 
