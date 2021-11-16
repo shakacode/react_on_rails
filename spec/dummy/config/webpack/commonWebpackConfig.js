@@ -67,12 +67,6 @@ baseClientWebpackConfig.plugins.push(
 
 baseClientWebpackConfig.module.rules.push(urlLoader, exposeJQuery, jqueryUjsLoader, fileLoader);
 
-baseClientWebpackConfig.module.rules.forEach((rule) => {
-  if (rule.test === /css/) {
-    rule.use.push(resolveUrlLoader);
-  }
-});
-
 const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptions);
 
 module.exports = commonWebpackConfig;
