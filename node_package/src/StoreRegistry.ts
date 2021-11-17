@@ -41,7 +41,7 @@ export default {
 
     const storeKeys = Array.from(hydratedStores.keys()).join(', ');
 
-    if (storeKeys.length === 0) {
+    if (storeKeys.length === 0 && throwIfMissing) {
       const msg =
 `There are no stores hydrated and you are requesting the store ${name}.
 This can happen if you are server rendering and either:
