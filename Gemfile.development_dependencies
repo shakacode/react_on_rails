@@ -20,6 +20,8 @@ gem "sdoc", group: :doc
 gem "sprockets"
 
 gem "amazing_print"
+
+# Locking due to issue, check https://github.com/rubyjs/mini_racer/issues/218
 gem "mini_racer", "0.4.0"
 
 group :development, :test do

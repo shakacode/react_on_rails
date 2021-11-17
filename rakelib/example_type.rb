@@ -52,6 +52,9 @@ module ReactOnRails
       attr_writer :rails_options
 
       def rails_options
+        # For Rails 7 the -J option to skip javascript should be updated
+        # At this time Javascript is being skipped just because webpacker is currently at 6.0.0.rc.6
+        # and it's not possible to update it through bundler
         @rails_options ||= "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record -J"
       end
 
