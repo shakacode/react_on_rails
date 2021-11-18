@@ -2,7 +2,6 @@
 const { webpackConfig: baseClientWebpackConfig, merge } = require('@rails/webpacker');
 
 const webpack = require('webpack');
-const { resolve } = require('path');
 
 const aliasConfig = require('./alias.js');
 
@@ -12,42 +11,20 @@ const commonOptions = {
   },
 };
 
-const fileLoader = {
-  test: /(.jpg|.jpeg|.png|.gif|.tiff|.ico|.svg|.eot|.otf|.svg|.ttf|.woff|.woff2|.ttf|.eot|.svg)$/i,
-  use: [
-    {
-      loader: 'file-loader',
-      options: {
-        esModule: false,
-        context: 'client/app',
-      },
-    },
-  ],
-};
-
-const urlFileSizeCutover = 10000;
-
-const urlLoaderOptions = Object.assign(
-  { limit: urlFileSizeCutover, esModule: false },
-  fileLoader.use[0].options,
-);
-
-const urlLoader = {
-  test: fileLoader.test,
-  use: {
-    loader: 'url-loader',
-    options: urlLoaderOptions,
-  },
-};
-
-const root = resolve(__dirname, '../../client/app');
-const resolveUrlLoader = {
-  loader: 'resolve-url-loader',
+// add sass resource loader
+const sassLoaderConfig = {
+  loader: 'sass-resources-loader',
   options: {
-    root,
+    resources: './client/app/assets/styles/app-variables.scss',
   },
 };
 
+const scssConfigIndex = baseClientWebpackConfig.module.rules.findIndex((config) =>
+  '.scss'.match(config.test),
+);
+baseClientWebpackConfig.module.rules[scssConfigIndex].use.push(sassLoaderConfig);
+
+// add jquery
 const exposeJQuery = {
   test: require.resolve('jquery'),
   use: [{ loader: 'expose-loader', options: { exposes: ['$', 'jQuery'] } }],
@@ -65,8 +42,8 @@ baseClientWebpackConfig.plugins.push(
   }),
 );
 
-baseClientWebpackConfig.module.rules.push(urlLoader, exposeJQuery, jqueryUjsLoader, fileLoader);
+baseClientWebpackConfig.module.rules.push(exposeJQuery, jqueryUjsLoader);
 
-const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptions);
+const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptions, aliasConfig);
 
 module.exports = commonWebpackConfig;

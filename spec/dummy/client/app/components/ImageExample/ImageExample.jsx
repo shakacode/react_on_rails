@@ -2,9 +2,9 @@ import React from 'react';
 
 // Note the global alias for image
 // eslint-disable-next-line import/no-unresolved
-import logo from '../../assets/images/256egghead.png';
+import logo from 'Assets/images/256egghead.png';
 // eslint-disable-next-line import/no-unresolved
-import legoIcon from '../../assets/images/lego_icon.svg';
+import legoIcon from 'Assets/images/lego_icon.svg';
 
 import css from './ImageExample.module.scss';
 import bowerLogo from './bower.png';
