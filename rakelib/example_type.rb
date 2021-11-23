@@ -55,7 +55,11 @@ module ReactOnRails
         # For Rails 7 the -J option to skip javascript should be updated
         # At this time Javascript is being skipped just because webpacker is currently at 6.0.0.rc.6
         # and it's not possible to update it through bundler
-        @rails_options ||= "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record -J"
+        @rails_options ||= if ReactOnRails::Utils.rails_version_less_than(7)
+                             "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record -J"
+                           else
+                             "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record -j webpack"
+                           end
       end
 
       %w[gen clobber npm_install build_webpack_bundles].each do |task_type|
