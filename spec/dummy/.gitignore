@@ -21,3 +21,8 @@
 /public/webpack/*
 
 /spec/examples.txt
+
+# Webpack v6 installer additions
+/yarn-error.log
+yarn-debug.log*
+.yarn-integrity
