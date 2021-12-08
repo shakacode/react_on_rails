@@ -1,5 +1,5 @@
 // Test out a custom font
-
+@use "sass:math";
 
 // TODO: Figure out how to get this in a global spot
 $font-family-sans-serif: 'OpenSans-Light';  // apply custom font
@@ -33,9 +33,9 @@ $hookipa-beach-height: 373px;
 .beachImage {
   display: inline-block;
   background: $hookipa-beach-svg;
-  background-size: $hookipa-beach-width/2 $hookipa-beach-height/2;
-  width: $hookipa-beach-width/2;
-  height: $hookipa-beach-height/2;
+  background-size: math.div($hookipa-beach-width, 2) math.div($hookipa-beach-height, 2);
+  width: math.div($hookipa-beach-width, 2);
+  height: math.div($hookipa-beach-height, 2);
 }
 
 // This is an absolute path to the image, defined in app-variables.scss
