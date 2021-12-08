@@ -43,16 +43,12 @@
     "sass-loader": "^12.3.0",
     "sass-resources-loader": "^2.1.0",
     "style-loader": "^3.3.1",
-    "url-loader": "^4.0.0",
-    "webpack": "^5.53.0",
-    "webpack-cli": "^4.8.0",
-    "webpack-dev-server": "^4.5.0",
-    "webpack-merge": "^5.1.4"
+    "url-loader": "^4.0.0"
   },
   "devDependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "0.4.2",
-    "@webpack-cli/serve": "^1.6.0",
-    "react-refresh": "^0.8.1"
+    "react-refresh": "^0.8.1",
+    "webpack-dev-server": "^4.5.0"
   },
   "browser": {
     "fs": false
