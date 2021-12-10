@@ -11,6 +11,13 @@
 
 [![License](https://img.shields.io/badge/license-mit-green.svg)](LICENSE.md) [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![](https://ruby-gem-downloads-badge.herokuapp.com/react_on_rails?type=total)](https://rubygems.org/gems/react_on_rails)
 
+# React and Webpack with Ruby on Rails
+The current version of https://github.com/rails/webpacker will soon ship. While it won't be the default for Rails 7, it is not "deprecated." The core webpack configuration has become slimmer, allowing easier extension. If you want to get started today, use the master branch of  [shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) with `gem "webpacker", "6.0.0.rc.6"` Any updates to get to v6 from this point forward should be simple.
+
+If you have time, please comment on Justin's final proposals for Webpacker v6: [webpacker/pulls/justin808](https://github.com/rails/webpacker/pulls/justin808).
+
+-----
+
 *These are the docs for React on Rails 12. To see the version 11 docs, [click here](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
 
 #### About
@@ -18,12 +25,12 @@ React on Rails integrates Rails with (server rendering of) Facebook's [React](ht
 
 This project is maintained by the software consulting firm [ShakaCode](https://www.shakacode.com). We focus on Ruby on Rails applications with React front-ends, often using TypeScript or ReScript (ReasonML). We also build React Native apps and Gatsby sites. See [our recent work](https://www.shakacode.com/recent-work) for examples of what we do. ShakaCode.com (HiChee.com) is [hiring developers that like working on open-source](https://www.shakacode.com/career/).
 
-Interested in optimizing your webpack setup for React on Rails including code
+Are you interested in optimizing your webpack setup for React on Rails including code
 splitting with [react-router](https://github.com/ReactTraining/react-router#readme) and
  [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers?
 We did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://www.shakacode.com/recent-work/popmenu/). Check out [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/).
 
-Feel free to contact Justin Gordon, [justin@shakacode.com](mailto:justin@shakacode.com), maintainer of React on Rails, for more information.
+For more information, feel free to contact Justin Gordon, [justin@shakacode.com](mailto:justin@shakacode.com), maintainer of React on Rails.
 
 # Documentation
 
@@ -31,7 +38,7 @@ See the documentation at [shakacode.com/react-on-rails/docs](https://www.shakaco
 
 ## Project Objective
 
-To provide a high performance framework for integrating Ruby on Rails with React via the [**Webpacker**](https://github.com/rails/webpacker) gem especially in regards to React Server-Side Rendering for better SEO and improved performance.
+To provide a high performance framework for integrating Ruby on Rails with React via the [**Webpacker**](https://github.com/rails/webpacker) gem, especially regarding React Server-Side Rendering for better SEO and improved performance.
 
 ## Features and Why React on Rails?
 
@@ -85,12 +92,12 @@ The following companies support this open source project, and ShakaCode uses the
 [![HoneyBadger](https://user-images.githubusercontent.com/1118459/114100696-63962a00-9860-11eb-8ac1-75ca02856d8e.png)](https://www.honeybadger.io/)
 [![StatusHero](https://user-images.githubusercontent.com/1118459/126868048-3fe64e54-4d6d-4066-9df2-8cf6fbaeb314.png)](https://statushero.com/)
 
-ShakaCode's favorite project tracking tool is [ClubHouse](https://clubhouse.io/). If you want to **try ClubHouse and get 2 months free beyond the 14-day trial period**, click [here to use ShakaCode's referral code](http://r.clbh.se/mvfoNeH). We're participating in their awesome triple-sided referral program, which you can read about [here](https://clubhouse.io/referral/). By using our [referral code](http://r.clbh.se/mvfoNeH) you'll be supporting ShakaCode and, thus, React on Rails!
+ShakaCode's favorite project tracking tool is [Shortcut](https://shortcut.com/). If you want to **try Shortcut and get 2 months free beyond the 14-day trial period**, click [here to use ShakaCode's referral code](http://r.clbh.se/mvfoNeH). We're participating in their awesome triple-sided referral program, which you can read about [here](https://clubhouse.io/referral/). By using our [referral code](http://r.clbh.se/mvfoNeH) you'll be supporting ShakaCode and, thus, React on Rails!
 
 Aloha and best wishes from Justin and the ShakaCode team!
 
 # Work with Us
-ShakaCode is **[hiring passionate software engineers](http://www.shakacode.com/career)** to work on our projects, including [HiChee](https://hichee.com).
+ShakaCode is **[hiring passionate software engineers](http://www.shakacode.com/career)** to work on our projects, including [HiChee](https://hichee.com)!
 
 # License
 
