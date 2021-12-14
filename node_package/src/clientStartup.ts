@@ -170,7 +170,8 @@ function render(el: Element, railsContext: RailsContext): void {
       }
 
       // Hydrate if available and was server rendered
-      const shouldHydrate = !!ReactDOM.hydrate && !!domNode.innerHTML;
+      // @ts-expect-error potentially present if React 18 or greater
+      const shouldHydrate = !!(ReactDOM.hydrate || ReactDOM.hydrateRoot) && !!domNode.innerHTML;
 
       const reactElementOrRouterResult = createReactOutput({
         componentObj,
