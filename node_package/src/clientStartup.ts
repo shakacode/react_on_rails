@@ -9,6 +9,8 @@ import type {
 
 import createReactOutput from './createReactOutput';
 import {isServerRenderHash} from './isServerRenderResult';
+import reactHydrate from './reactHydrate';
+import reactRender from './reactRender';
 
 declare global {
   interface Window {
@@ -128,26 +130,6 @@ function domNodeIdForEl(el: Element): string {
   return el.getAttribute('data-dom-id') || "";
 }
 
-function hydrateWithLegacyReactSupport(domNode : Element, reactElement : ReactElement) {
-  // @ts-expect-error potentially present if React 18 or greater
-  if (ReactDOM.hydrateRoot) {
-    // @ts-expect-error potentially present if React 18 or greater
-    return ReactDOM.hydrateRoot(domNode, reactElement)
-  }
-  return ReactDOM.hydrate(reactElement, domNode)
-}
-
-function renderWithLegacyReactSupport(domNode : Element, reactElement: ReactElement) {
-  // @ts-expect-error potentially present if React 18 or greater
-  if (ReactDOM.createRoot) {
-    // @ts-expect-error potentially present if React 18 or greater
-    const root = ReactDOM.createRoot(domNode)
-    root.render(reactElement)
-  } else {
-    ReactDOM.render(reactElement, domNode)
-  }
-}
-
 /**
  * Used for client rendering by ReactOnRails. Either calls ReactDOM.hydrate, ReactDOM.render, or
  * delegates to a renderer registered by the user.
@@ -187,9 +169,9 @@ function render(el: Element, railsContext: RailsContext): void {
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);
       } else if (shouldHydrate) {
-        hydrateWithLegacyReactSupport(domNode, reactElementOrRouterResult as ReactElement);
+        reactHydrate(domNode, reactElementOrRouterResult as ReactElement);
       } else {
-        renderWithLegacyReactSupport(domNode, reactElementOrRouterResult as ReactElement);
+        reactRender(domNode, reactElementOrRouterResult as ReactElement);
       }
     }
   } catch (e) {
