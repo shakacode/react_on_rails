@@ -4,7 +4,7 @@
 
 -----
 
-*Updated for Ruby 2.7.1, Rails 6.0.3.1, React on Rails v12.5.0, and Webpacker v6*
+*Updated for Ruby 2.7.1, Rails 6.0.3.1, React on Rails v12.4.0, and Webpacker v6*
 
 This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
@@ -62,15 +62,15 @@ of both the gem and npm package. In other words, don't use the `^` or `~` in the
 _Use the latest version for react_on_rails._
 
 ```
-gem 'react_on_rails', '12.5.0'         # prefer exact gem version to match npm version
+gem 'react_on_rails', '12.4.0'         # prefer exact gem version to match npm version
 ```
 
 Note: The latest released React On Rails version is considered stable. Please use the latest
 version to ensure you get all the security patches and the best support.
 
 ```bash
-bundle add react_on_rails --version=12.5.0 --strict
-bundle add webpacker --version=6.0.0.rc.6
+bundle add webpacker --git=https://github.com/rails/webpacker.git
+bundle add react_on_rails --version=12.4.0 --strict
 ```
 
 ## Run the webpacker generator
@@ -98,6 +98,7 @@ If you want the redux install: `rails generate react_on_rails:install --redux`
 ```
 rails generate react_on_rails:install
 ```
+Enter `a` to replace all configuration files required by the project.
 
 Then run the server with one of the following options:
 
@@ -247,6 +248,8 @@ heroku open
 ```
 
 and you will see your live app and you can share this URL with your friends. Congrats!
+
+A deployed version of the project `spec/dummy` which demonstrates several uses of `react_on_rails` is available on heroku [through this link](https://ror-spec-dummy.herokuapp.com/)
 
 ## Turning on Server Rendering
 
