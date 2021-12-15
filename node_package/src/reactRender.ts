@@ -1,9 +1,9 @@
 import ReactDOM from 'react-dom';
 import { ReactElement, Component } from 'react';
+import supportsReactCreateRoot from './supportsReactCreateRoot';
 
 export default function reactRender(domNode: Element, reactElement: ReactElement): void | Element | Component {
-  // @ts-expect-error potentially present if React 18 or greater
-  if (ReactDOM.createRoot) {
+  if (supportsReactCreateRoot) {
     // @ts-expect-error potentially present if React 18 or greater
     const root = ReactDOM.createRoot(domNode);
     root.render(reactElement);
