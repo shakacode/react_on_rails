@@ -71,8 +71,7 @@ module ReactOnRails
       end
 
       def add_base_gems_to_gemfile
-        # Locking due to issue, check https://github.com/rubyjs/mini_racer/issues/218
-        gem "mini_racer", "0.4.0", platforms: :ruby
+        gem "mini_racer", platforms: :ruby
         run "bundle"
       end
 

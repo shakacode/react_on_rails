@@ -333,7 +333,7 @@ DEPENDENCIES
   jquery-rails
   launchy
   listen
-  mini_racer (= 0.4.0)
+  mini_racer
   pry
   pry-byebug
   pry-doc

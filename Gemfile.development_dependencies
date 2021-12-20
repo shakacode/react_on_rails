@@ -21,8 +21,7 @@ gem "sprockets"
 
 gem "amazing_print"
 
-# Locking due to issue, check https://github.com/rubyjs/mini_racer/issues/218
-gem "mini_racer", "0.4.0"
+gem "mini_racer"
 
 group :development, :test do
   gem "listen"
