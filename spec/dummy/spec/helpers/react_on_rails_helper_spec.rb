@@ -277,7 +277,7 @@ describe ReactOnRailsHelper, type: :helper do
     let(:react_store_script) do
       '<script type="application/json" data-js-react-on-rails-store="reduxStore">'\
         '{"name":"My Test Name"}'\
-        "</script>"
+      "</script>"
     end
 
     it { expect(self).to respond_to :redux_store }
