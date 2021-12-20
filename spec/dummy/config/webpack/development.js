@@ -5,9 +5,6 @@ const { devServer, inliningCss } = require('@rails/webpacker');
 const webpackConfig = require('./webpackConfig');
 
 const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
-  // eslint-disable-next-line no-unused-vars
-  const isWebpackDevServer = process.env.WEBPACK_DEV_SERVER;
-
   // plugins
   if (inliningCss) {
     // Note, when this is run, we're building the server and client bundles in separate processes.
