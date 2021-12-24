@@ -1,4 +1,3 @@
-import ReactDOM from 'react-dom';
 import type { ReactElement, Component } from 'react';
 
 import * as ClientStartup from './clientStartup';
@@ -19,6 +18,8 @@ import type {
   AuthenticityHeaders,
   StoreGenerator
 } from './types/index';
+import reactHydrate from './reactHydrate';
+import reactRender from './reactRender';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Store = any;
@@ -187,9 +188,9 @@ ctx.ReactOnRails = {
     const componentObj = ComponentRegistry.get(name);
     const reactElement = createReactOutput({ componentObj, props, domNodeId });
 
-    const render = hydrate ? ReactDOM.hydrate : ReactDOM.render;
+    const render = hydrate ? reactHydrate : reactRender;
     // eslint-disable-next-line react/no-render-return-value
-    return render(reactElement as ReactElement, document.getElementById(domNodeId));
+    return render(document.getElementById(domNodeId) as Element, reactElement as ReactElement);
   },
 
   /**
