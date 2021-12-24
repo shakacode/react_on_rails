@@ -7,7 +7,7 @@ PATH
       execjs (~> 2.5)
       rails (>= 3.2)
       rainbow (~> 3.0)
-      webpacker (>= 4.0)
+      webpacker (= 6.0.0.rc.6)
 
 GEM
   remote: https://rubygems.org/
@@ -125,7 +125,7 @@ GEM
     json (2.5.1)
     launchy (2.5.0)
       addressable (~> 2.7)
-    libv8 (8.4.255.0)
+    libv8-node (15.14.0.1)
     listen (3.4.1)
       rb-fsevent (~> 0.10, >= 0.10.3)
       rb-inotify (~> 0.9, >= 0.9.10)
@@ -141,8 +141,8 @@ GEM
       nokogiri (~> 1)
     mini_mime (1.0.2)
     mini_portile2 (2.5.0)
-    mini_racer (0.3.1)
-      libv8 (~> 8.4.255)
+    mini_racer (0.4.0)
+      libv8-node (~> 15.14.0.0)
     minitest (5.14.4)
     msgpack (1.4.2)
     nio4r (2.5.7)
@@ -171,7 +171,7 @@ GEM
       nio4r (~> 2.0)
     racc (1.5.2)
     rack (2.2.3)
-    rack-proxy (0.6.5)
+    rack-proxy (0.7.0)
       rack
     rack-test (1.1.0)
       rack (>= 1.0, < 3)
@@ -305,7 +305,7 @@ GEM
       nokogiri (~> 1.6)
       rubyzip (~> 1.0)
       selenium-webdriver (~> 3.0)
-    webpacker (5.2.1)
+    webpacker (6.0.0.rc.6)
       activesupport (>= 5.2)
       rack-proxy (>= 0.6.1)
       railties (>= 5.2)
@@ -358,7 +358,7 @@ DEPENDENCIES
   turbolinks
   uglifier
   webdrivers (= 3.9.4)
-  webpacker
+  webpacker (= 6.0.0.rc.6)
 
 BUNDLED WITH
    2.1.4

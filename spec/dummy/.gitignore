@@ -6,6 +6,7 @@
 
 # Ignore bundler config.
 /.bundle
+/vendor/bundle
 
 # Ignore the default SQLite database.
 /db/*.sqlite3
@@ -21,3 +22,8 @@
 /public/webpack/*
 
 /spec/examples.txt
+
+# Webpack v6 installer additions
+/yarn-error.log
+yarn-debug.log*
+.yarn-integrity

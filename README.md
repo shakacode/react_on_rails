@@ -56,6 +56,10 @@ See [Rails/Webpacker React Integration Options](https://www.shakacode.com/react-
 
 See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
 
+## Online demo
+
+A deployed version of the project `spec/dummy` which demonstrates several uses of `react_on_rails` is available on heroku [through this link](https://ror-spec-dummy.herokuapp.com/)
+
 ## ShakaCode Forum Premium Content
 _Requires creating a free account._
 

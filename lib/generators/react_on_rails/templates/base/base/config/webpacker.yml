@@ -1,12 +1,12 @@
 # Note: You must restart bin/webpack-dev-server for changes to take effect
 
 default: &default
-  source_path: client/app
+  source_path: app/javascript
   source_entry_path: packs
   public_root_path: public
-
-  cache_path: tmp/cache/webpacker
-  webpack_compile_output: false
+  public_output_path: packs
+  cache_path: tmp/webpacker
+  webpack_compile_output: true
 
   # Additional paths webpack should lookup modules
   # ['app/assets', 'engine/foo/app/assets']
@@ -17,11 +17,8 @@ default: &default
 
 development:
   <<: *default
-  # Turn this to true if you want to use the rails/webpacker check that the test
-  # bundles need building. Also, remove the customization to spec/rails_helper.rb.
+  # This is false since we're running `bin/webpack -w` in Procfile.dev-setic
   compile: false
-
-  public_output_path: webpack/development
 
   # Reference: https://webpack.js.org/configuration/dev-server/
   dev_server:
@@ -30,8 +27,6 @@ development:
     port: 3035
     # Hot Module Replacement updates modules while the application is running without a full reload
     hmr: true
-    # Defaults to the inverse of hmr. Uncomment to manually set this.
-    # live_reload: true
     client:
       # Should we show a full-screen overlay in the browser when there are compiler errors or warnings?
       overlay: true
@@ -40,10 +35,9 @@ development:
       #  hostname: "0.0.0.0"
       #  pathname: "/ws"
       #  port: 8080
-    # Should we use gzip compression?
     compress: true
     # Note that apps that do not check the host are vulnerable to DNS rebinding attacks
-    allowed_hosts: "all"
+    allowed_hosts: [ 'localhost' ]
     pretty: true
     headers:
       'Access-Control-Allow-Origin': '*'
@@ -51,18 +45,15 @@ development:
       watch:
         ignored: '**/node_modules/**'
 
-
 test:
   <<: *default
   compile: true
 
   # Compile test packs to a separate directory
-  public_output_path: webpack/test
+  public_output_path: packs-test
 
 production:
   <<: *default
-
-  public_output_path: webpack/production
 
   # Production depends on precompilation of packs prior to booting for performance.
   compile: false

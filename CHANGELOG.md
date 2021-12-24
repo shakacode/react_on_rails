@@ -17,6 +17,9 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+#### Added
+- Added webpack configuration files as part of the generator and updated webpacker to version 6 [PR 1404](https://github.com/shakacode/react_on_rails/pull/1404) by [gscarv13](https://github.com/gscarv13).
+
 ### [12.4.0] - 2021-09-22
 #### Added
 - ScoutAPM tracing support for server rendering [PR 1379](https://github.com/shakacode/react_on_rails/pull/1379) by [justin808](https://github.com/justin808).

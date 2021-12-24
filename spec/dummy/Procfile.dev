@@ -1,9 +1,5 @@
-# Procfile for development with hot reloading of JavaScript and CSS
-
-rails: rails s -p 3000
-
-# Run the hot reload server for client development
-webpack-dev-server: bin/webpack-dev-server
-
-# Keep the JS fresh for server rendering. Remove if not server rendering
-rails-server-assets: SERVER_BUNDLE_ONLY=yes bin/webpack --watch
+# Procfile for development using HMR
+# You can run these commands in separate shells
+rails: bundle exec rails s -p 3000
+wp-client: bin/webpack-dev-server
+wp-server: SERVER_BUNDLE_ONLY=yes bin/webpack --watch

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-gem "webpacker"
+gem "webpacker", "6.0.0.rc.6"
 gem "bootsnap", require: false
 gem "rails"
 gem "sqlite3"
@@ -20,6 +20,7 @@ gem "sdoc", group: :doc
 gem "sprockets"
 
 gem "amazing_print"
+
 gem "mini_racer"
 
 group :development, :test do

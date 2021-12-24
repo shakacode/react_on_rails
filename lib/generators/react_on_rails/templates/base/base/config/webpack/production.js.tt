@@ -1,3 +1,5 @@
+<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh/blob/master/config/webpack/production.js") %>
+
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 
 const webpackConfig = require('./webpackConfig');

@@ -1,5 +1,7 @@
 ---
-extends: eslint-config-shakacode
+extends: 
+  - eslint-config-shakacode
+  - prettier
 
 plugins:
   - react
