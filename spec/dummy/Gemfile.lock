@@ -7,7 +7,7 @@ PATH
       execjs (~> 2.5)
       rails (>= 3.2)
       rainbow (~> 3.0)
-      webpacker (= 6.0.0.rc.6)
+      webpacker (>= 4.0)
 
 GEM
   remote: https://rubygems.org/
