@@ -51,7 +51,7 @@ cd <directory where you want to create your new Rails app>
 
 # Any name you like for the rails app
 # Skip javascript so will add that next and get the current version
-rails new --skip-sprockets --skip-turbolinks -J test-react-on-rails
+rails new --skip-sprockets --skip-turbolinks --javascript=webpack test-react-on-rails
 
 cd test-react-on-rails
 ```
