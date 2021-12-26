@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "pathname"
+
 module ReactOnRailsPro
   class PrepareNodeRenderBundles
     include FileUtils
@@ -15,8 +17,9 @@ module ReactOnRailsPro
       mkdir_p(dest_path)
 
       File.delete(bundle_dest_path) if File.exist?(bundle_dest_path)
-      symlink(src_bundle_path, bundle_dest_path)
-      puts "[ReactOnRailsPro] Symlinked #{src_bundle_path} to #{bundle_dest_path}"
+      relative_source_path = Pathname.new(src_bundle_path).relative_path_from(Pathname.new(bundle_dest_path).dirname)
+      symlink(relative_source_path, bundle_dest_path)
+      puts "[ReactOnRailsPro] Symlinked #{relative_source_path} to #{bundle_dest_path}"
 
       return unless ReactOnRailsPro.configuration.assets_to_copy.present?
 
