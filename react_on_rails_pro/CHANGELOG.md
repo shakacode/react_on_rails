@@ -12,6 +12,12 @@ Gem and package versions are the same except for beta releases where the gem use
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+### Added
+- New configuration `config.client_props_extension = PropsExtension` enabling a callback to adjust the props used for client side hydration (PENDING).
+
+### Fixed
+- Use relative source path for bundle symlink which conflicted with extraction of (Heroku) slugs caching resulting in incorrect extraction of the slugs due to absolute paths in the symlinks. [PR 231](https://github.com/shakacode/react_on_rails_pro/pull/231) by [judahmeek](https://github.com/judahmeek).
+
 ## [3.0.0-rc.0] - 2021-10-27
 
 ### Upgrading to 3.0
@@ -24,13 +30,12 @@ Gem and package versions are the same except for beta releases where the gem use
   cleared during slug trimming
 
 ### Added
-- Add `ssr_timeout` configuration so the Rails server will not wait more than this many seconds for a SSR request to return once issued.
-- Change default for `renderer_use_fallback_exec_js` to `false`.
-- Change default log level to info.
-  [PR 220](https://github.com/shakacode/react_on_rails_pro/pull/220) by
-  [justin808](https://github.com/justin808).
-
-- Add support for render functions to be async (returning promises). Also add `include_execjs_polyfills` option to configuration for React on Rails to optionally stop stubbing of setTimeout, setInterval, & clearTimeout polyfills while using NodeRenderer. [PR 210](https://github.com/shakacode/react_on_rails_pro/pull/210) by [judahmeek](https://github.com/judahmeek)
+- [PR 220](https://github.com/shakacode/react_on_rails_pro/pull/220) by [justin808](https://github.com/justin808).
+  - **Add `ssr_timeout` configuration** so the Rails server will not wait more than this many seconds for a SSR request to return once issued.
+  - Change default for `renderer_use_fallback_exec_js` to `false`.
+  - Change default log level to info.
+  
+- Add support for render functions to be async (returning promises). Also add `include_execjs_polyfills` option to configuration for React on Rails to optionally stop stubbing of setTimeout, setInterval, & clearTimeout polyfills while using NodeRenderer. [PR 210](https://github.com/shakacode/react_on_rails_pro/pull/210) by [judahmeek](https://github.com/judahmeek).
 
 ### Fixed
 - Ability to call `server_render_js(raw_js)` fixed. Previously, always errored.
