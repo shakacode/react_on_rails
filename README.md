@@ -11,8 +11,9 @@
 
 [![License](https://img.shields.io/badge/license-mit-green.svg)](LICENSE.md) [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![](https://ruby-gem-downloads-badge.herokuapp.com/react_on_rails?type=total)](https://rubygems.org/gems/react_on_rails)
 
-# React and Webpack with Ruby on Rails
-The current version of https://github.com/rails/webpacker will soon ship. While it won't be the default for Rails 7, it is not "deprecated." The core webpack configuration has become slimmer, allowing easier extension. If you want to get started today, use the master branch of  [shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) with `gem "webpacker", "6.0.0.rc.6"` Any updates to get to v6 from this point forward should be simple.
+# News
+* Project is updated to support Rails 7!
+* **React and Webpack with Ruby on Rails**: The current version of https://github.com/rails/webpacker will soon ship. While it won't be the default for Rails 7, it is not "deprecated." The core webpack configuration has become slimmer, allowing easier extension. If you want to get started today, use the master branch of  [shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) with `gem "webpacker", "6.0.0.rc.6"` Any updates to get to v6 from this point forward should be simple.
 
 If you have time, please comment on Justin's final proposals for Webpacker v6: [webpacker/pulls/justin808](https://github.com/rails/webpacker/pulls/justin808).
 
