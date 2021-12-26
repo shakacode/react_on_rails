@@ -3,10 +3,10 @@
 rails: rails s -p 3000
 
 # Run the hot reload server for client development
-webpack-dev-server: bin/webpack-dev-server
+webpack-dev-server: HMR=true bin/webpack-dev-server
 
 # Keep the JS fresh for server rendering. Remove if not server rendering
-rails-server-assets: SERVER_BUNDLE_ONLY=yes bin/webpack --watch
+rails-server-assets: HMR=true SERVER_BUNDLE_ONLY=yes bin/webpack --watch
 
 # Start Node server for server rendering.
 node-renderer: RENDERER_LOG_LEVEL=debug yarn run node-renderer

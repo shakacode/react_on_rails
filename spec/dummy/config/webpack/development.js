@@ -1,19 +1,14 @@
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
-const { devServer } = require('@rails/webpacker');
+const { devServer, inliningCss } = require('@rails/webpacker');
+
 const webpackConfig = require('./webpackConfig');
 
-module.exports = webpackConfig();
-
-const developmentOnly = () => {
-  const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
-  const environment = require('./environment');
-  const isWebpackDevServer = process.env.WEBPACK_DEV_SERVER;
-
-  //plugins
-  if (isWebpackDevServer) {
-    environment.plugins.append(
-      'ReactRefreshWebpackPlugin',
+const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
+  if (inliningCss) {
+    // eslint-disable-next-line global-require
+    const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
+    clientWebpackConfig.plugins.push(
       new ReactRefreshWebpackPlugin({
         overlay: {
           sockPort: devServer.port,
@@ -23,4 +18,4 @@ const developmentOnly = () => {
   }
 };
 
-module.exports = webpackConfig(developmentOnly);
+module.exports = webpackConfig(developmentEnvOnly);
