@@ -13,16 +13,6 @@ def change_text_expect_dom_selector(dom_selector)
   end
 end
 
-def wait_for_ajax
-  Timeout.timeout(Capybara.default_max_wait_time) do
-    loop until finished_all_ajax_requests?
-  end
-end
-
-def finished_all_ajax_requests?
-  page.evaluate_script("jQuery.active").zero?
-end
-
 shared_examples "React Component" do |dom_selector|
   scenario { is_expected.to have_css dom_selector }
 
@@ -225,7 +215,6 @@ describe "Manual client hydration", :js, type: :system do
     within("form") do
       click_button "refresh"
     end
-    wait_for_ajax
     within("#HelloWorldRehydratable-react-component-1") do
       find("input").set "Should update"
       within("h3") do

@@ -6,11 +6,11 @@
 /doc/
 /pkg/
 /spec/reports/
-/tmp/
 *.gem
 /vendor/
+tmp
 
-/spec/examples.txt
+**/spec/examples.txt
 /spec/dummy/client/node_modules
 /spec/dummy/app/assets/webpack/
 /spec/dummy/coverage/
@@ -40,3 +40,8 @@ spec/dummy/client/npm-debug.log*
 
 .yalc
 yalc.lock
+
+**/.node-renderer-bundles/**
+**/db/*.sqlite3
+**/log/*.log
+**/public/webpack/**

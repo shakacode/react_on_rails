@@ -8,7 +8,7 @@ gem "react_on_rails", "12.4.0" # keep in sync with package.json files
 # For local development
 # gem "react_on_rails", path: "../react_on_rails"
 
-gem "webpacker"
+gem "webpacker", "6.0.0.rc.6"
 gem "bootsnap", require: false
 gem "rails"
 gem "puma"
