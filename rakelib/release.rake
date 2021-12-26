@@ -27,6 +27,8 @@ which are installed via `bundle install` and `yarn global add release-it`
               automatically perform a patch version bump.
 2nd argument: Perform a dry run by passing 'true' as a second argument.
 
+Note, accept defaults for npmjs options. Script will pause to get 2FA tokens.
+
 Example: `rake release[2.1.0,false]`")
 task :release, %i[gem_version dry_run tools_install] do |_t, args|
   include ReactOnRails::TaskHelpers

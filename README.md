@@ -35,7 +35,7 @@ For more information, feel free to contact Justin Gordon, [justin@shakacode.com]
 
 # Documentation
 
-See the documentation at [shakacode.com/react-on-rails/docs](https://www.shakacode.com/react-on-rails/docs/).
+See the documentation at **[shakacode.com/react-on-rails/docs](https://www.shakacode.com/react-on-rails/docs/)**.
 
 ## Project Objective
 
@@ -55,11 +55,9 @@ Given that `rails/webpacker` gem already provides basic React integration, why w
 
 See [Rails/Webpacker React Integration Options](https://www.shakacode.com/react-on-rails/docs/guides/rails-webpacker-react-integration-options) for comparisons to other gems.
 
-See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
-
 ## Online demo
-
-A deployed version of the project `spec/dummy` which demonstrates several uses of `react_on_rails` is available on heroku [through this link](https://ror-spec-dummy.herokuapp.com/)
+* See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
+* A deployed version of the project `spec/dummy` which demonstrates several uses of `react_on_rails` is available on heroku [through this link](https://ror-spec-dummy.herokuapp.com/)
 
 ## ShakaCode Forum Premium Content
 _Requires creating a free account._
@@ -67,10 +65,9 @@ _Requires creating a free account._
 * [How to use different versions of a file for client and server rendering](https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352)
 * [How to conditionally render server side based on the device type](https://forum.shakacode.com/t/how-to-conditionally-render-server-side-based-on-the-device-type/1473)
 
-
 ## Prerequisites
 
-Ruby on Rails >=5 and rails/webpacker 4.2+.
+Ruby on Rails >=5, rails/webpacker >= 4.2, Ruby >= 2.7
 
 # Support
 

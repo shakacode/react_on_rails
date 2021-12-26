@@ -20,7 +20,8 @@ Changes since last non-beta release.
 ### [12.5.0] - 2021-12-26
 
 #### Added
-- Added webpack configuration files as part of the generator and updated webpacker to version 6 [PR 1404](https://github.com/shakacode/react_on_rails/pull/1404) by [gscarv13](https://github.com/gscarv13).
+- Support for React 18, including the changed SSR API. [PR 1409](https://github.com/shakacode/react_on_rails/pull/1409) by [kylemellander](https://github.com/kylemellander).
+- Added webpack configuration files as part of the generator and updated webpacker to version 6. [PR 1404](https://github.com/shakacode/react_on_rails/pull/1404) by [gscarv13](https://github.com/gscarv13).
 - Supports Rails 7.
 
 #### Changed
