@@ -41,9 +41,9 @@ end
 namespace :react_on_rails do
   namespace :assets do
     desc <<~DESC.strip_heredoc
-            If config.build_production_command is defined, this command is automatically
-            added to task assets:precompile and the regular webpacker compile will not run.
-            The defined command is either a script or a module with a method `call`.
+      If config.build_production_command is defined, this command is automatically
+      added to task assets:precompile and the regular webpacker compile will not run.
+      The defined command is either a script or a module with a method `call`.
     DESC
     task webpack: :locale do
       build_production_command = ReactOnRails.configuration.build_production_command
