@@ -20,11 +20,12 @@ const loadableApp = (props, _railsContext) => {
     renderedHtml: {
       componentHtml,
       link: helmet.link.toString(),
-      linkTags: extractor.getLinkTags(),
       meta: helmet.meta.toString(),
-      scriptTags: extractor.getScriptTags(),
       style: helmet.style.toString(),
       title: helmet.title.toString(),
+      linkTags: extractor.getLinkTags(),
+      scriptTags: extractor.getScriptTags(),
+      styleTags: extractor.getStyleTags(),
     },
   };
 };

@@ -43,6 +43,7 @@ module.exports = function (api) {
         useBuiltIns: true,
       },
     ],
+    '@loadable/babel-plugin',
     '@babel/plugin-syntax-dynamic-import',
     '@babel/plugin-transform-arrow-functions',
     '@babel/plugin-transform-async-to-generator',
