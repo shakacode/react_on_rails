@@ -20,6 +20,9 @@ Changes since last non-beta release.
 #### Added
 - Added webpack configuration files as part of the generator and updated webpacker to version 6 [PR 1404](https://github.com/shakacode/react_on_rails/pull/1404) by [gscarv13](https://github.com/gscarv13).
 
+#### Changed
+- Changed logic of determining the usage of the default rails/webpacker webpack config or a custom command to only check if the config.build_production_command is defined. [PR 1402](https://github.com/shakacode/react_on_rails/pull/1402)by [justin808](https://github.com/justin808) and [gscarv13](https://github.com/gscarv13).
+
 ### [12.4.0] - 2021-09-22
 #### Added
 - ScoutAPM tracing support for server rendering [PR 1379](https://github.com/shakacode/react_on_rails/pull/1379) by [justin808](https://github.com/justin808).
