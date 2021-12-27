@@ -17,6 +17,8 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [12.5.1] - 2021-12-27
+
 ### Fixed
 - A fatal server rendering error if running an ReactOnRails >=12.4.0 with ReactOnRails Pro <2.4.0. [PR 1412](https://github.com/shakacode/react_on_rails/pull/1412) by [judahmeek](https://github.com/judahmeek)
 
@@ -96,7 +98,7 @@ invoked to return the React component. In that case, you won't need to pass any 
 [PR 1268](https://github.com/shakacode/react_on_rails/pull/1268) by [justin808](https://github.com/justin808)
 
 See [docs/guides/upgrading-react-on-rails](https://www.shakacode.com/react-on-rails/docs/guides/upgrading-react-on-rails#upgrading-to-v12)
-for details.         
+for details.
 
 #### Other Updates
 * `react_on_rails` fully supports `rails/webpacker`. The example test app in `spec/dummy` was recently converted over to use rails/webpacker v4+. It's a good example of how to leverage rails/webpacker's webpack configuration for server-side rendering.
@@ -988,7 +990,9 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.4.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.5.1...master
+[12.5.1]: https://github.com/shakacode/react_on_rails/compare/12.5.0...12.5.1
+[12.5.0]: https://github.com/shakacode/react_on_rails/compare/12.4.0...12.5.0
 [12.4.0]: https://github.com/shakacode/react_on_rails/compare/12.3.0...12.4.0
 [12.3.0]: https://github.com/shakacode/react_on_rails/compare/12.2.0...12.3.0
 [12.2.0]: https://github.com/shakacode/react_on_rails/compare/12.1.0...12.2.0
