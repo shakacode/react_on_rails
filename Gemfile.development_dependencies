@@ -2,9 +2,9 @@
 
 gem "webpacker", "6.0.0.rc.6"
 gem "bootsnap", require: false
-gem "rails"
+gem "rails", "~> 7.0"
 gem "sqlite3"
-gem "sass-rails"
+gem "sass-rails", "~> 6.0"
 gem "uglifier"
 gem "jquery-rails"
 gem "puma"
@@ -17,11 +17,11 @@ gem "jbuilder"
 # bundle exec rake doc:rails generates the API under doc/api.
 gem "sdoc", group: :doc
 
-gem "sprockets"
+gem "sprockets", "~> 4.0"
 
 gem "amazing_print"
 
-gem "mini_racer"
+gem "mini_racer", "~> 0.5"
 
 group :development, :test do
   gem "listen"
@@ -34,7 +34,7 @@ group :development, :test do
   gem "rubocop-performance", require: false
   gem "rubocop-rspec", require: false
   gem "scss_lint", require: false
-  gem "spring"
+  gem "spring", "~> 4.0"
 end
 
 group :test do
