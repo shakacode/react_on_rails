@@ -55,7 +55,7 @@ aliases:
     command: |
       gem install bundler
       echo "Bundler version: "; bundle --version
-      cd spec/dummy && bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+      cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
 
   # Install ruby gems unless existing set of gems is satisfying bundler.
   - &install-package-ruby-gems
@@ -63,6 +63,7 @@ aliases:
     command: |
       gem install bundler
       echo "Bundler version: "; bundle --version
+      bundle lock --add-platform 'x86_64-linux'
       bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
 
   # Restore node_modules dir from cache using yarn.lock checksum as a key.
