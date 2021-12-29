@@ -19,7 +19,9 @@
 
 /node_modules
 
-/public/webpack/*
+/public/webpack/
+/public/assets/
+/coverage/
 
 /spec/examples.txt
 
