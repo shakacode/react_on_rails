@@ -1,14 +1,9 @@
 # frozen_string_literal: true
 
-# Important: The default assets:precompile is modified ONLY if the rails/webpacker webpack config
-# does not exist!
-
-require "active_support/core_ext/string/strip"
-
 # rubocop:disable Metrics/BlockLength
 namespace :react_on_rails do
   namespace :assets do
-    desc <<~DESC.strip_heredoc
+    desc <<~DESC
       If config.build_production_command is defined, this command is automatically
       added to task assets:precompile and the regular webpacker compile will not run.
       The defined command is either a script or a module with a method `call`.
