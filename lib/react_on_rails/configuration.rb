@@ -112,9 +112,41 @@ module ReactOnRails
       check_server_render_method_is_only_execjs
       error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
       check_deprecated_settings
+      adjust_precompile_task
     end
 
     private
+
+    def adjust_precompile_task
+      skip_react_on_rails_precompile = %w[no false n f].include?(ENV["REACT_ON_RAILS_PRECOMPILE"])
+
+      return unless !skip_react_on_rails_precompile && build_production_command.present?
+
+      # Ensure that rails/webpacker does not call bin/webpack if we're providing
+      # the build command.
+      ENV["WEBPACKER_PRECOMPILE"] = "false"
+
+      precompile_tasks = lambda {
+        Rake::Task["react_on_rails:assets:webpack"].invoke
+        puts "Invoking task webpacker:clean from React on Rails"
+
+        # VERSIONS is per the rails/webpacker clean method definition.
+        # We set it very big so that it is not used, and then clean just
+        # removes files older than 1 hour.
+        versions = 100_000
+        Rake::Task["webpacker:clean"].invoke(versions)
+      }
+
+      if Rake::Task.task_defined?("assets:precompile")
+        Rake::Task["assets:precompile"].enhance do
+          precompile_tasks.call
+        end
+      else
+        Rake::Task.define_task("assets:precompile") do
+          precompile_tasks.call
+        end
+      end
+    end
 
     def check_deprecated_settings
       if build_production_command.present? &&
