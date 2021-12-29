@@ -72,6 +72,18 @@ module ReactOnRails
       end
     end
 
+    describe ".build_production_command", :focus do
+      it "if configured, ENV[\"WEBPACKER_PRECOMPILE\"] gets set to \"false\"" do
+        expect(ENV["WEBPACKER_PRECOMPILE"]).to be_nil
+
+        ReactOnRails.configure do |config|
+          config.build_production_command = "a string or a module"
+        end
+
+        ENV["WEBPACKER_PRECOMPILE"] = "false"
+      end
+    end
+
     describe ".i18n_dir" do
       let(:i18n_dir) { existing_path }
 
