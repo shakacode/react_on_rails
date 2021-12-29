@@ -72,7 +72,7 @@ module ReactOnRails
       end
     end
 
-    describe ".build_production_command", :focus do
+    describe ".build_production_command" do
       it "if configured, ENV[\"WEBPACKER_PRECOMPILE\"] gets set to \"false\"" do
         expect(ENV["WEBPACKER_PRECOMPILE"]).to be_nil
 
