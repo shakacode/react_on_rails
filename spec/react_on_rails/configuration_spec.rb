@@ -80,7 +80,7 @@ module ReactOnRails
           config.build_production_command = "a string or a module"
         end
 
-        ENV["WEBPACKER_PRECOMPILE"] = "false"
+        expect(ENV["WEBPACKER_PRECOMPILE"]).to eq("false")
       end
     end
 
