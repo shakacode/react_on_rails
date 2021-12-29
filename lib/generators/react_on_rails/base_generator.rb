@@ -33,7 +33,40 @@ module ReactOnRails
                         app/views/layouts/hello_world.html.erb
                         config/initializers/react_on_rails.rb
                         Procfile.dev
-                        Procfile.dev-hmr]
+                        Procfile.dev-static]
+        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
+      end
+
+      def copy_js_bundle_files
+        base_path = "base/base/"
+        base_files = %w[app/javascript/packs/server-bundle.js
+                        app/javascript/bundles/HelloWorld/components/HelloWorldServer.js
+                        app/javascript/bundles/HelloWorld/components/HelloWorld.module.css]
+        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
+      end
+
+      def copy_webpack_config
+        puts "Adding Webpack config"
+        base_path = "base/base"
+        base_files = %w[babel.config.js
+                        config/webpack/clientWebpackConfig.js
+                        config/webpack/commonWebpackConfig.js
+                        config/webpack/development.js
+                        config/webpack/production.js
+                        config/webpack/serverWebpackConfig.js
+                        config/webpack/webpackConfig.js]
+        config = {
+          message: "// The source code including full typescript support is available at:"
+        }
+        base_files.each do |file|
+          template("#{base_path}/#{file}.tt", file, config)
+        end
+      end
+
+      def copy_webpacker_config
+        puts "Adding Webpacker v6 config"
+        base_path = "base/base/"
+        base_files = %w[config/webpacker.yml]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
@@ -51,6 +84,16 @@ module ReactOnRails
           puts "Adding the lastest react-on-rails NPM module. Double check this is correct in package.json"
           run "yarn add react-on-rails --exact"
         end
+
+        puts "Adding React dependencies"
+        run "yarn add react react-dom @babel/preset-react prop-types babel-plugin-transform-react-remove-prop-types \
+            babel-plugin-macros"
+
+        puts "Adding CSS handlers"
+        run "yarn add css-loader css-minimizer-webpack-plugin mini-css-extract-plugin style-loader"
+
+        puts "Adding dev dependencies"
+        run "yarn add -D @pmmmwh/react-refresh-webpack-plugin react-refresh"
       end
 
       def append_to_spec_rails_helper
@@ -111,10 +154,10 @@ module ReactOnRails
             - Alternately, you may turn off compile in config/webpacker.yml and run the foreman
               command to start the rails server and run webpack in watch mode.
 
-                foreman start -f Procfile.dev
+                foreman start -f Procfile.dev-static
 
             - To turn on HMR, edit config/webpacker.yml and set HMR to true. Restart the rails server
-              and bin/webpack-dev-server. Or use Procfile.dev-hmr.
+              and bin/webpack-dev-server. Or use Procfile.dev.
 
             - To server render, change this line app/views/hello_world/index.html.erb to
               `prerender: true` to see server rendering (right click on page and select "view source").

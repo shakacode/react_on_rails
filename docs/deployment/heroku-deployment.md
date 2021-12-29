@@ -16,9 +16,20 @@ For more information, see [Using Multiple Buildpacks for an App](https://devcent
 
 ### rails/webpacker webpack configuration
 If you're using the standard rails/webpacker configuration of webpack, then rails/webpacker
-will automatically modify or create an assets:precompile task to build your assets.
+will automatically modify or create an assets:precompile task to build your assets. 
 
-### custom webpack configuration
-If you're a custom webpack configuration, and you **do not have the default
-`config/webpack/production.js`** file, then the `config/initializers/react_on_rails.rb`
-configuration `config.build_production_command` will be used.
+Alternatively, you can specify `config.build_production_command` to have
+react_on_rails invoke a command for you during assets:precompile.
+
+```
+config.build_production_command = "RAILS_ENV=production bin/webpack"
+```
+
+### Consider Removing Webpacker's clean task
+
+If you are deploying on Heroku, then you don't need Webpacker's clean task which
+might delete files that you need.
+
+```
+Rake::Task['webpacker:clean'].clear
+```

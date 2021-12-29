@@ -9,6 +9,8 @@ import type {
 
 import createReactOutput from './createReactOutput';
 import {isServerRenderHash} from './isServerRenderResult';
+import reactHydrate from './reactHydrate';
+import reactRender from './reactRender';
 
 declare global {
   interface Window {
@@ -150,7 +152,8 @@ function render(el: Element, railsContext: RailsContext): void {
       }
 
       // Hydrate if available and was server rendered
-      const shouldHydrate = !!ReactDOM.hydrate && !!domNode.innerHTML;
+      // @ts-expect-error potentially present if React 18 or greater
+      const shouldHydrate = !!(ReactDOM.hydrate || ReactDOM.hydrateRoot) && !!domNode.innerHTML;
 
       const reactElementOrRouterResult = createReactOutput({
         componentObj,
@@ -166,9 +169,9 @@ function render(el: Element, railsContext: RailsContext): void {
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);
       } else if (shouldHydrate) {
-        ReactDOM.hydrate(reactElementOrRouterResult as ReactElement, domNode);
+        reactHydrate(domNode, reactElementOrRouterResult as ReactElement);
       } else {
-        ReactDOM.render(reactElementOrRouterResult as ReactElement, domNode);
+        reactRender(domNode, reactElementOrRouterResult as ReactElement);
       }
     }
   } catch (e) {

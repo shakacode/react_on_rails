@@ -150,7 +150,9 @@ module ReactOnRails
         end
 
         def execjs_timer_polyfills
-          if ReactOnRails::Utils.react_on_rails_pro? && ReactOnRailsPro.configuration.include_execjs_polyfills == false
+          if ReactOnRails::Utils.react_on_rails_pro? &&
+             ReactOnRailsPro.configuration.respond_to?(:include_execjs_polyfills) &&
+             ReactOnRailsPro.configuration.include_execjs_polyfills == false
             return ""
           end
 

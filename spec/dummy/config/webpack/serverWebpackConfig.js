@@ -1,23 +1,38 @@
-const { config } = require('@rails/webpacker');
-const environment = require('./environment');
-const { merge } = require('webpack-merge');
+const { merge, config } = require('@rails/webpacker');
+const commonWebpackConfig = require('./commonWebpackConfig');
+
 const webpack = require('webpack');
 
-const clientConfigObject = environment.toWebpackConfig();
-// React Server Side Rendering webpacker config
-// Builds a Node compatible file that React on Rails can load, never served to the client.
 const configureServer = () => {
   // We need to use "merge" because the clientConfigObject, EVEN after running
   // toWebpackConfig() is a mutable GLOBAL. Thus any changes, like modifying the
   // entry value will result in changing the client config!
   // Using webpack-merge into an empty object avoids this issue.
-  const serverWebpackConfig = merge({}, clientConfigObject);
+  const serverWebpackConfig = commonWebpackConfig();
 
   // We just want the single server bundle entry
   const serverEntry = {
-    'server-bundle': environment.entry.get('server-bundle'),
+    'server-bundle': serverWebpackConfig.entry['server-bundle'],
   };
+
+  if (!serverEntry['server-bundle']) {
+    throw new Error(
+      "Create a pack with the file name 'server-bundle.js' containing all the server rendering files",
+    );
+  }
+
   serverWebpackConfig.entry = serverEntry;
+
+  // Remove the mini-css-extract-plugin from the style loaders because
+  // the client build will handle exporting CSS.
+  // replace file-loader with null-loader
+  serverWebpackConfig.module.rules.forEach((loader) => {
+    if (loader.use && loader.use.filter) {
+      loader.use = loader.use.filter(
+        (item) => !(typeof item === 'string' && item.match(/mini-css-extract-plugin/)),
+      );
+    }
+  });
 
   // No splitting of chunks for a server bundle
   serverWebpackConfig.optimization = {
@@ -65,27 +80,24 @@ const configureServer = () => {
       });
       const cssLoader = rule.use.find((item) => {
         let testValue;
+
         if (typeof item === 'string') {
           testValue = item;
         } else if (typeof item.loader === 'string') {
           testValue = item.loader;
         }
-        return testValue === 'css-loader';
+
+        return testValue.includes('css-loader');
       });
-      if (cssLoader && cssLoader.options.modules) {
-        cssLoader.options.onlyLocals = true;
-        // when the cssLoader goes to 4.x:
-        // cssLoader.options.modules.exportOnlyLocals = true;
+      if (cssLoader && cssLoader.options) {
+        cssLoader.options.modules = { exportOnlyLocals: true };
       }
 
       // Skip writing image files during SSR by setting emitFile to false
-    } else if (rule.use.loader === 'url-loader' || rule.use.loader === 'file-loader') {
+    } else if (rule.use && (rule.use.loader === 'url-loader' || rule.use.loader === 'file-loader')) {
       rule.use.options.emitFile = false;
     }
   });
-
-  // Critical due to https://github.com/rails/webpacker/pull/2644
-  delete serverWebpackConfig.devServer;
 
   // eval works well for the SSR bundle because it's the fastest and shows
   // lines in the server bundle which is good for debugging SSR

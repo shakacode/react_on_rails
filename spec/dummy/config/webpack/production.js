@@ -2,8 +2,8 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 
 const webpackConfig = require('./webpackConfig');
 
-const productionOnly = () => {
+const productionEnvOnly = (_clientWebpackConfig, _serverWebpackConfig) => {
   // place any code here that is for production only
 };
 
-module.exports = webpackConfig(productionOnly);
+module.exports = webpackConfig(productionEnvOnly);

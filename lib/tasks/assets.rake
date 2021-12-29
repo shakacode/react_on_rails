@@ -9,7 +9,7 @@ ENV["RAILS_ENV"] ||= ENV["RACK_ENV"] || "development"
 
 skip_react_on_rails_precompile = %w[no false n f].include?(ENV["REACT_ON_RAILS_PRECOMPILE"])
 
-if !skip_react_on_rails_precompile && !ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
+if !skip_react_on_rails_precompile && ReactOnRails.configuration.build_production_command.present?
   # Ensure that rails/webpacker does not call bin/webpack if we're providing
   # the build command.
   ENV["WEBPACKER_PRECOMPILE"] = "false"
@@ -40,12 +40,10 @@ end
 # rubocop:disable Metrics/BlockLength
 namespace :react_on_rails do
   namespace :assets do
-    desc <<-DESC.strip_heredoc
-      Compile assets with webpack
-      Uses command defined with ReactOnRails.configuration.build_production_command
-      sh "#{ReactOnRails::Utils.prepend_cd_node_modules_directory('<ReactOnRails.configuration.build_production_command>')}"
-      Note: This command is not automatically added to assets:precompile if the rails/webpacker
-      configuration file config/webpack/production.js exists.
+    desc <<~DESC.strip_heredoc
+      If config.build_production_command is defined, this command is automatically
+      added to task assets:precompile and the regular webpacker compile will not run.
+      The defined command is either a script or a module with a method `call`.
     DESC
     task webpack: :locale do
       build_production_command = ReactOnRails.configuration.build_production_command
@@ -63,6 +61,7 @@ namespace :react_on_rails do
           exit!(1)
         end
       else
+        # Left in this warning message in case this rake task is run directly
         msg = <<~MSG
           React on Rails is aborting webpack compilation from task react_on_rails:assets:webpack
           because you do not have the `config.build_production_command` defined.

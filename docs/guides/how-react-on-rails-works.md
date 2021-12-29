@@ -35,7 +35,6 @@ For example, you might create a [Procfile.dev](https://github.com/shakacode/reac
 On production deployments that use asset precompilation, such as Heroku deployments, `rails/webpacker`, by default, will automatically run webpack to build your JavaScript bundles, running the command `bin/webpack` in your app.
 
 However, if you want to run a custom command to run webpack to build your bundles, then you will:
-1. Ensure you do not have a `config/webpack/production.js` file
 1. Define `config.build_production_command` in your [config/initializers/react_on_rails.rb](https://www.shakacode.com/react-on-rails/docs/guides/configuration/)
 
 Then React on Rails modifies the `assets:precompile` task to run your `build_production_command`.

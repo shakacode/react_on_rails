@@ -9,12 +9,12 @@
 
   <%= yield :head %>
 
-  <%= stylesheet_packs_with_chunks_tag('client-bundle',
-                                       media: 'all',
-                                       'data-turbolinks-track': true) %>
+  <%= stylesheet_pack_tag('client-bundle',
+                          media: 'all',
+                          'data-turbolinks-track': true) %>
 
   <!--  NOTE: Must use defer and not async to keep async scripts loading in correct order  -->
-  <%= javascript_packs_with_chunks_tag('client-bundle', 'data-turbolinks-track': true, defer: true) %>
+  <%= javascript_pack_tag('client-bundle', 'data-turbolinks-track': true, defer: true) %>
 
   <%= csrf_meta_tags %>
 </head>

@@ -12,6 +12,13 @@ module ReactOnRails
       File.join(gem_root, "gen-examples", "examples")
     end
 
+    # This method is used to prevent an error that when installing webpacker 6.0.0.rc.6
+    # without a previous config/webpacker.yml will throw and error
+    def copy_generator_webpacker_yml_to(destination)
+      webpacker_file = File.join(gem_root, "lib/generators/react_on_rails/templates/base/base/config/webpacker.yml")
+      sh %( cp #{webpacker_file} #{destination}/config/webpacker.yml )
+    end
+
     def dummy_app_dir
       File.join(gem_root, "spec/dummy")
     end

@@ -52,4 +52,8 @@ module GeneratorHelper
     empty_directory(parent_directories) unless dest_dir_exists?(parent_directories)
     copy_file source_file, destination_file
   end
+
+  def add_documentation_reference(message, source)
+    "#{message} \n#{source}"
+  end
 end

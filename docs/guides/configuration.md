@@ -66,15 +66,14 @@ ReactOnRails.configure do |config|
   # defaults to "" (top level)
   config.node_modules_location = "client" # If using webpacker you should use "".
 
-  # This configures the script to run to build the production assets by webpack . Set this to nil
-  # if you don't want react_on_rails building this file for you.
-  # Note, if you want to use this command then you should remove the file
-  # config/webpack/production.js
-  # If that file exists, React on Rails thinks that you'll use the rails/webpacker bin/webpack compiler.
+  # If you're using the standard rails/webpacker configuration of webpack, then rails/webpacker
+  # will automatically modify or create an assets:precompile task to build your assets. If so,
+  # set this value to nil.  Alternatively, you can specify `config.build_production_command` 
+  # to have react_on_rails invoke a command for you during assets:precompile.
+  # The command is either a script or a module containing a class method `call`
+  # In this example, the module BuildProductionCommand would have a class method `call`.
   config.build_production_command = "RAILS_ENV=production bin/webpack"
 
-  # Alternatively, you can also specify a module containing a class method `call`
-  # In this example, the module BuildProductionCommand would have a class method `call`.
   # See bottom for an example of the BuildProductionCommand module.
   # config.build_production_command = BuildProductionCommand
   # If you wish to utilize ReactOnRailsPro production bundle caching logic, then use
@@ -86,7 +85,7 @@ ReactOnRails.configure do |config|
   # SERVER RENDERING OPTIONS
   ################################################################################
   # This is the file used for server rendering of React when using `(prerender: true)`
-  # If you are never using server rendering, you should set this to "".
+  # If you are not using server rendering, you should set this to `nil`.
   # Note, there is only one server bundle, unlike JavaScript where you want to minimize the size
   # of the JS sent to the client. For the server rendering, React on Rails creates a pool of
   # JavaScript execution instances which should handle any component requested.
