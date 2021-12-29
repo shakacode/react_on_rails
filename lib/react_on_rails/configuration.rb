@@ -111,7 +111,7 @@ module ReactOnRails
       check_i18n_yml_directory_exists
       check_server_render_method_is_only_execjs
       error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
-      check_deprecated_settings
+      # check_deprecated_settings
       adjust_precompile_task
     end
 
@@ -148,19 +148,20 @@ module ReactOnRails
       end
     end
 
-    def check_deprecated_settings
-      if build_production_command.present? &&
-         ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
-        msg = <<~MSG
-          Setting ReactOnRails configuration for `build_production_command` is
-          not necessary if you have config/webpack/production.js. When that file
-          exists, React on Rails DOES NOT modify the standard assets:precompile.
-          If you want React on Rails to modify to the standard assets:precompile
-          to use your config/initializers/react_on_rails.rb config.build_production_command
-          then delete the config/webpack/production.js.
-        MSG
-        Rails.logger.warn(msg)
-      end
+    # Pending updates to rails/webpacker v6, we may have some message that prints after configuration runs.
+    # def check_deprecated_settings
+    #   if build_production_command.present? &&
+    #      ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
+    #     msg = <<~MSG
+    #       Setting ReactOnRails configuration for `build_production_command` is
+    #       not necessary if you have config/webpack/production.js. When that file
+    #       exists, React on Rails DOES NOT modify the standard assets:precompile.
+    #       If you want React on Rails to modify to the standard assets:precompile
+    #       to use your config/initializers/react_on_rails.rb config.build_production_command
+    #       then delete the config/webpack/production.js.
+    #     MSG
+    #     Rails.logger.warn(msg)
+    #  end
       #
       # msg = <<~MSG
       #   ReactOnRails configuration for `build_production_command` is removed.
@@ -181,7 +182,7 @@ module ReactOnRails
       #   Move this command into `bin/webpack` converting the script to a shell script.
       # MSG
       # raise ReactOnRails::Error, msg
-    end
+    # end
 
     def error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
       return unless ReactOnRails::WebpackerUtils.using_webpacker?
