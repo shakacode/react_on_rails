@@ -3,7 +3,7 @@
 # Important: The default assets:precompile is modified ONLY if the rails/webpacker webpack config
 # does not exist!
 
-require "active_support"
+require "active_support/core_ext/string/strip"
 
 # rubocop:disable Metrics/BlockLength
 namespace :react_on_rails do

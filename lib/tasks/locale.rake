@@ -3,7 +3,7 @@
 require "react_on_rails/locales/base"
 require "react_on_rails/locales/to_js"
 require "react_on_rails/locales/to_json"
-require "active_support"
+require "active_support/core_ext/string/strip"
 
 namespace :react_on_rails do
   desc <<-DESC.strip_heredoc
