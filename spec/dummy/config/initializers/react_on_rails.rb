@@ -16,8 +16,6 @@ module RenderingExtension
 end
 
 ReactOnRails.configure do |config|
-  config.build_production_command = "yarn build:rescript"
-
   config.server_bundle_js_file = "server-bundle.js"
   config.random_dom_id = false # default is true
 
