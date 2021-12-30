@@ -120,7 +120,7 @@ module ReactOnRails
     def adjust_precompile_task
       skip_react_on_rails_precompile = %w[no false n f].include?(ENV["REACT_ON_RAILS_PRECOMPILE"])
 
-      return unless !skip_react_on_rails_precompile && build_production_command.present?
+      return if skip_react_on_rails_precompile || build_production_command.blank?
 
       # Ensure that rails/webpacker does not call bin/webpack if we're providing
       # the build command.
