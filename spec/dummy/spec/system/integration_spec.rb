@@ -115,6 +115,14 @@ describe "Pages/Pure Component", :js do
   it { is_expected.to have_text "This is a Pure Component!" }
 end
 
+describe "Pages/Hello World ReScript Component", :js do
+  subject { page }
+
+  before { visit "/client_side_rescript_hello_world" }
+
+  it { change_text_expect_dom_selector("#HelloWorld-rescript-react-component-0") }
+end
+
 describe "Pages/server_side_log_throw", :js, :ignore_js_errors do
   subject { page }
 

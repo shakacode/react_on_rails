@@ -1,2 +1,4 @@
 node_modules
 public/webpack/
+*.bs.js
+lib/bs/**

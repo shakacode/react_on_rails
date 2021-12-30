@@ -29,3 +29,9 @@
 /yarn-error.log
 yarn-debug.log*
 .yarn-integrity
+
+#Ignore ReScript build files
+/.merlin
+/lib/bs/
+/.bsb.lock
+*.bs.js

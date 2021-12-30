@@ -8,6 +8,7 @@ Rails.application.routes.draw do
   root "pages#index"
 
   get "client_side_hello_world" => "pages#client_side_hello_world"
+  get "client_side_rescript_hello_world" => "pages#client_side_rescript_hello_world"
   get "client_side_hello_world_shared_store" => "pages#client_side_hello_world_shared_store"
   get "client_side_hello_world_shared_store_controller" => "pages#client_side_hello_world_shared_store_controller"
   get "client_side_hello_world_shared_store_defer" => "pages#client_side_hello_world_shared_store_defer"

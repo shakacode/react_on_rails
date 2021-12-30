@@ -9,6 +9,7 @@
   "dependencies": {
     "@babel/preset-react": "^7.10.4",
     "@rails/webpacker": "^6.0.0-rc.6",
+    "@rescript/react": "^0.10.3",
     "babel-plugin-macros": "^3.1.0",
     "babel-plugin-module-resolver": "^4.0.0",
     "core-js": "3",
@@ -38,6 +39,7 @@
     "react-router-dom": "^5.2.0",
     "redux": "^4.0.1",
     "redux-thunk": "^2.2.0",
+    "rescript": "^9.1.4",
     "resolve-url-loader": "^3.1.1",
     "sass": "^1.43.4",
     "sass-loader": "^12.3.0",
@@ -58,11 +60,13 @@
     "lint": "cd ../.. && yarn run lint",
     "format": "cd ../.. && yarn start format",
     "test": "yarn run build:test && yarn run lint && rspec",
-    "build:test": "rm -rf public/webpack/test && RAILS_ENV=test NODE_ENV=test bin/webpack",
-    "build:dev": "rm -rf public/webpack/develoment && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
-    "build:dev:server": "rm -rf public/webpack/develoment && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
-    "build:dev:watch": "RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
-    "build:clean": "rm -rf public/webpack || true"
+    "build:test": "rm -rf public/webpack/test && yarn build:rescript && RAILS_ENV=test NODE_ENV=test bin/webpack",
+    "build:dev": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
+    "build:dev:server": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
+    "build:dev:watch": "rescript build -w && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
+    "build:clean": "yarn build:rescript && rm -rf public/webpack || true",
+    "build:rescript": "rescript clean && rescript build -with-deps",
+    "build:rescript:dev": "rescript build -w"
   },
   "version": "0.0.0"
 }
