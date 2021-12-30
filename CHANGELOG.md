@@ -16,11 +16,14 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+### [12.5.2] - 2021-12-29
+### Fixed
+- Usage of config.build_production_command for custom command for production builds fixed. [PR 1415](https://github.com/shakacode/react_on_rails/pull/1415) by [judahmeek](https://github.com/judahmeek).
 
 ### [12.5.1] - 2021-12-27
 
 ### Fixed
-- A fatal server rendering error if running an ReactOnRails >=12.4.0 with ReactOnRails Pro <2.4.0. [PR 1412](https://github.com/shakacode/react_on_rails/pull/1412) by [judahmeek](https://github.com/judahmeek)
+- A fatal server rendering error if running an ReactOnRails >=12.4.0 with ReactOnRails Pro <2.4.0. [PR 1412](https://github.com/shakacode/react_on_rails/pull/1412) by [judahmeek](https://github.com/judahmeek).
 
 ### [12.5.0] - 2021-12-26
 
@@ -990,7 +993,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.5.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.5.2...master
+[12.5.2]: https://github.com/shakacode/react_on_rails/compare/12.5.1...12.5.2
 [12.5.1]: https://github.com/shakacode/react_on_rails/compare/12.5.0...12.5.1
 [12.5.0]: https://github.com/shakacode/react_on_rails/compare/12.4.0...12.5.0
 [12.4.0]: https://github.com/shakacode/react_on_rails/compare/12.3.0...12.4.0
