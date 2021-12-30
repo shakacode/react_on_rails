@@ -81,6 +81,15 @@ module ReactOnRails
         end
 
         expect(ENV["WEBPACKER_PRECOMPILE"]).to eq("false")
+        ENV["WEBPACKER_PRECOMPILE"] = nil
+      end
+
+      it "if not configured, ENV[\"WEBPACKER_PRECOMPILE\"] remains nil" do
+        expect(ENV["WEBPACKER_PRECOMPILE"]).to be_nil
+
+        ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
+
+        expect(ENV["WEBPACKER_PRECOMPILE"]).to be_nil
       end
     end
 
