@@ -1,46 +1,9 @@
 # frozen_string_literal: true
 
-# Important: The default assets:precompile is modified ONLY if the rails/webpacker webpack config
-# does not exist!
-
-require "active_support"
-
-ENV["RAILS_ENV"] ||= ENV["RACK_ENV"] || "development"
-
-skip_react_on_rails_precompile = %w[no false n f].include?(ENV["REACT_ON_RAILS_PRECOMPILE"])
-
-if !skip_react_on_rails_precompile && ReactOnRails.configuration.build_production_command.present?
-  # Ensure that rails/webpacker does not call bin/webpack if we're providing
-  # the build command.
-  ENV["WEBPACKER_PRECOMPILE"] = "false"
-
-  precompile_tasks = lambda {
-    Rake::Task["react_on_rails:assets:webpack"].invoke
-    puts "Invoking task webpacker:clean from React on Rails"
-
-    # VERSIONS is per the rails/webpacker clean method definition.
-    # We set it very big so that it is not used, and then clean just
-    # removes files older than 1 hour.
-    versions = 100_000
-    Rake::Task["webpacker:clean"].invoke(versions)
-  }
-
-  if Rake::Task.task_defined?("assets:precompile")
-    Rake::Task["assets:precompile"].enhance do
-      precompile_tasks.call
-    end
-  else
-    Rake::Task.define_task("assets:precompile") do
-      precompile_tasks.call
-    end
-  end
-end
-
-# Sprockets independent tasks
 # rubocop:disable Metrics/BlockLength
 namespace :react_on_rails do
   namespace :assets do
-    desc <<~DESC.strip_heredoc
+    desc <<~DESC
       If config.build_production_command is defined, this command is automatically
       added to task assets:precompile and the regular webpacker compile will not run.
       The defined command is either a script or a module with a method `call`.
@@ -65,10 +28,6 @@ namespace :react_on_rails do
         msg = <<~MSG
           React on Rails is aborting webpack compilation from task react_on_rails:assets:webpack
           because you do not have the `config.build_production_command` defined.
-
-          Note, this task may have run as part of `assets:precompile`. If file
-          config/webpack/production.js does not exist, React on Rails will modify
-          the default `asset:precompile` to run task `react_on_rails:assets:webpack`.
         MSG
         puts Rainbow(msg).red
         exit!(1)

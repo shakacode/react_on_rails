@@ -3,10 +3,9 @@
 require "react_on_rails/locales/base"
 require "react_on_rails/locales/to_js"
 require "react_on_rails/locales/to_json"
-require "active_support"
 
 namespace :react_on_rails do
-  desc <<-DESC.strip_heredoc
+  desc <<~DESC
     Generate i18n javascript files
     This task generates javascript locale files: `translations.js` & `default.js` and places them in
     the "ReactOnRails.configuration.i18n_dir".

@@ -20,6 +20,7 @@ ReactOnRails.configure do |config|
   config.random_dom_id = false # default is true
 
   # config.build_test_command = "yarn run build:test"
+  # config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpack"
   # config.webpack_generated_files = %w[server-bundle.js manifest.json]
   config.rendering_extension = RenderingExtension
 end

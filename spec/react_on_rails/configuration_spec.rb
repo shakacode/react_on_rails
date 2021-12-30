@@ -72,6 +72,27 @@ module ReactOnRails
       end
     end
 
+    describe ".build_production_command" do
+      it "if configured, ENV[\"WEBPACKER_PRECOMPILE\"] gets set to \"false\"" do
+        expect(ENV["WEBPACKER_PRECOMPILE"]).to be_nil
+
+        ReactOnRails.configure do |config|
+          config.build_production_command = "a string or a module"
+        end
+
+        expect(ENV["WEBPACKER_PRECOMPILE"]).to eq("false")
+        ENV["WEBPACKER_PRECOMPILE"] = nil
+      end
+
+      it "if not configured, ENV[\"WEBPACKER_PRECOMPILE\"] remains nil" do
+        expect(ENV["WEBPACKER_PRECOMPILE"]).to be_nil
+
+        ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
+
+        expect(ENV["WEBPACKER_PRECOMPILE"]).to be_nil
+      end
+    end
+
     describe ".i18n_dir" do
       let(:i18n_dir) { existing_path }
 
