@@ -1,9 +1,10 @@
 import helloWorldReducer from './HelloWorldReducer';
-import railsContextReducer from './RailsContextReducer';
+import nullReducer from './nullReducer';
 
 // This is how you do a directory of reducers.
 // The `import * as reducers` does not work for a directory, but only with a single file
 export default {
   helloWorldData: helloWorldReducer,
-  railsContext: railsContextReducer,
+  railsContext: nullReducer,
+  modificationTarget: nullReducer,
 };

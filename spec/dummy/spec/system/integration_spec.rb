@@ -275,6 +275,17 @@ describe "display images", :js do
   end
 end
 
+describe "use different props for server/client", :js do
+  subject { page }
+
+  before { visit "/server_side_hello_world_props" }
+
+  it "image_example should not have any errors" do
+    expect(page.html).to include("[SERVER] HelloWorldProps modification target prop value: server-only")
+    expect(page.text).to include("Value of modification target prop: client-only")
+  end
+end
+
 shared_examples "React Component Shared Store" do |url|
   subject { page }
 
