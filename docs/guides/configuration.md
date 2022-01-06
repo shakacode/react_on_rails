@@ -68,7 +68,7 @@ ReactOnRails.configure do |config|
 
   # If you're using the standard rails/webpacker configuration of webpack, then rails/webpacker
   # will automatically modify or create an assets:precompile task to build your assets. If so,
-  # set this value to nil.  Alternatively, you can specify `config.build_production_command` 
+  # set this value to nil.  Alternatively, you can specify `config.build_production_command`
   # to have react_on_rails invoke a command for you during assets:precompile.
   # The command is either a script or a module containing a class method `call`
   # In this example, the module BuildProductionCommand would have a class method `call`.
@@ -129,6 +129,11 @@ ReactOnRails.configure do |config|
   # any server rendering issues immediately during development.
   config.raise_on_prerender_error = Rails.env.development?
 
+  # This configuration allows logic to be applied to client rendered props, such as stripping props that are only used during server rendering.
+  # Add a module with an adjust_props_for_client_side_hydration method that expects the component's name & props hash
+  # See below for an example definition of RenderingPropsExtension
+  config.rendering_props_extension = RenderingPropsExtension
+
   ################################################################################
   # Server Renderer Configuration for ExecJS
   ################################################################################
@@ -176,9 +181,8 @@ ReactOnRails.configure do |config|
 
   # You can optionally add values to your rails_context. This object is passed
   # every time a component renders.
-  # See example below for an example definition of RenderingExtension
-  #
-  # config.rendering_extension = RenderingExtension
+  # See below for an example definition of RenderingExtension
+  config.rendering_extension = RenderingExtension
 
   ################################################################################
   ################################################################################
@@ -216,12 +220,23 @@ ReactOnRails.configure do |config|
 end
 ```
 
+Example of a ReactOnRailsConfig module for `client_props_extension`:
+
+```ruby
+module RenderingPropsExtension
+  # The modify_props method will be called by ReactOnRails::ReactComponent::RenderOptions if config.client_props_extension is defined
+  def self.adjust_props_for_client_side_hydration(component_name, props)
+    component_name == 'HelloWorld' ? props.except(:server_side_only) : props
+  end
+end
+```
+
 Example of a ReactOnRailsConfig module for `production_build_command`:
 
 ```ruby
 module BuildProductionCommand
   include FileUtils
-  # Method with the name of call will be called during assets:precompile
+  # The call method will be called during assets:precompile
   def self.call
     sh "bin/webpack"
   end

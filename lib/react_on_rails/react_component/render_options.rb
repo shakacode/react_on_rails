@@ -27,6 +27,20 @@ module ReactOnRails
         options.fetch(:props) { NO_PROPS }
       end
 
+      def client_props
+        props_extension = ReactOnRails.configuration.rendering_props_extension
+        if props_extension.present?
+          if props_extension.respond_to?(:adjust_props_for_client_side_hydration)
+            return props_extension.adjust_props_for_client_side_hydration(react_component_name,
+                                                                          props.clone)
+          end
+
+          raise ReactOnRails::Error, "ReactOnRails: your rendering_props_extension module is missing the "\
+                                "required adjust_props_for_client_side_hydration method & can not be used"
+        end
+        props
+      end
+
       def random_dom_id
         retrieve_configuration_value_for(:random_dom_id)
       end

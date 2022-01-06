@@ -6,6 +6,7 @@ import HelloString from '../non_react/HelloString';
 
 // React components
 import HelloWorld from '../components/HelloWorld';
+import HelloWorldProps from '../components/HelloWorldProps';
 import HelloWorldHooks from '../components/HelloWorldHooks';
 import HelloWorldHooksContext from '../components/HelloWorldHooksContext';
 
@@ -69,6 +70,7 @@ ReactOnRails.register({
   ImageExample,
   HelloWorldHooks,
   HelloWorldHooksContext,
+  HelloWorldProps,
 });
 
 ReactOnRails.registerStore({

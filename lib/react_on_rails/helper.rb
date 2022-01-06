@@ -413,7 +413,7 @@ module ReactOnRails
       # Setup the page_loaded_js, which is the same regardless of prerendering or not!
       # The reason is that React is smart about not doing extra work if the server rendering did its job.
       component_specification_tag = content_tag(:script,
-                                                json_safe_and_pretty(render_options.props).html_safe,
+                                                json_safe_and_pretty(render_options.client_props).html_safe,
                                                 type: "application/json",
                                                 class: "js-react-on-rails-component",
                                                 "data-component-name" => render_options.react_component_name,

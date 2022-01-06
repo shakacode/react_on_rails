@@ -17,6 +17,7 @@ Rails.application.routes.draw do
   get "server_side_hello_world_shared_store_defer" => "pages#server_side_hello_world_shared_store_defer"
   get "server_side_hello_world" => "pages#server_side_hello_world"
   get "server_side_hello_world_hooks" => "pages#server_side_hello_world_hooks"
+  get "server_side_hello_world_props" => "pages#server_side_hello_world_props"
   get "client_side_log_throw" => "pages#client_side_log_throw"
   get "server_side_log_throw" => "pages#server_side_log_throw"
   get "server_side_log_throw_plain_js" => "pages#server_side_log_throw_plain_js"
