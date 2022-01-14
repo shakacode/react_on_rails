@@ -61,7 +61,8 @@ The best source of docs is the main [ReactOnRails.js](https://github.com/shakaco
   /**
    * Set options for ReactOnRails, typically before you call ReactOnRails.register
    * Available Options:
-   * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
+   * `traceTurbolinks: true|false` Gives you debugging messages on Turbolinks events
+   * `turbo: true|false` enables Turbo, which is not auto-detected like the Turbolinks library is
    */
   setOptions(options)
 
