@@ -241,16 +241,16 @@ function renderInit(): void {
   if (turboInstalled()) {
     debugTurbolinks(
       'USING TURBO: document added event listeners ' +
-      'turbo:before-render and turbo:render.');
-    document.addEventListener('turbo:before-render', reactOnRailsPageUnloaded);
-    document.addEventListener('turbo:render', reactOnRailsPageLoaded);
+      'turbo:before-visit and turbo:load.');
+    document.addEventListener('turbo:before-visit', reactOnRailsPageUnloaded);
+    document.addEventListener('turbo:load', reactOnRailsPageLoaded);
     reactOnRailsPageLoaded();
   } else if (turbolinksVersion5()) {
     debugTurbolinks(
       'USING TURBOLINKS 5: document added event listeners ' +
-      'turbolinks:before-render and turbolinks:render.');
-    document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
-    document.addEventListener('turbolinks:render', reactOnRailsPageLoaded);
+      'turbolinks:before-visit and turbolinks:load.');
+    document.addEventListener('turbolinks:before-visit', reactOnRailsPageUnloaded);
+    document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
     reactOnRailsPageLoaded();
   } else {
     debugTurbolinks(
