@@ -90,7 +90,7 @@ module ReactOnRails
             babel-plugin-macros"
 
         puts "Adding CSS handlers"
-        run "yarn add css-loader css-minimizer-webpack-plugin mini-css-extract-plugin style-loader"
+        run "yarn add css-loader css-minimizer-webpack-plugin mini-css-extract-plugin@2.4.5 style-loader"
 
         puts "Adding dev dependencies"
         run "yarn add -D @pmmmwh/react-refresh-webpack-plugin react-refresh"
