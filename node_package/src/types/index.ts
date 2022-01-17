@@ -116,7 +116,7 @@ export interface ReactOnRails {
   register(components: { [id: string]: ReactComponentOrRenderFunction }): void;
   registerStore(stores: { [id: string]: Store }): void;
   getStore(name: string, throwIfMissing: boolean): Store | undefined;
-  setOptions(newOptions: {traceTurbolinks: boolean}): void;
+  setOptions(newOptions: {traceTurbolinks?: boolean, turbo?: boolean}): void;
   reactOnRailsPageLoaded(): void;
   authenticityToken(): string | null;
   authenticityHeaders(otherHeaders: { [id: string]: string }): AuthenticityHeaders;
