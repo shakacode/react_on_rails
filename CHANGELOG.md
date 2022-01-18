@@ -16,7 +16,7 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 ### Fixed
-- Double rendering of components with using Turbo or Turbolinks. [PR 1421](https://github.com/shakacode/react_on_rails/pull/1421) by  [judahmeek](https://github.com/judahmeek).
+- Double rendering of components with using Turbo or Turbolinks. Also, updated relevant Typescript definitions. [PR 1421](https://github.com/shakacode/react_on_rails/pull/1421) by  [judahmeek](https://github.com/judahmeek).
 
 *Please add entries here for your pull requests that are not yet released.*
 ### [12.5.2] - 2021-12-29
