@@ -15,6 +15,7 @@ import reactRender from './reactRender';
 declare global {
   interface Window {
       ReactOnRails: ReactOnRailsType;
+      firstTurboRender?: boolean;
       __REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__?: boolean;
   }
   namespace NodeJS {
@@ -197,13 +198,14 @@ function parseRailsContext(): RailsContext | null {
 }
 
 export function reactOnRailsPageLoaded(): void {
+  if(window.firstTurboRender) {
+    return;
+  }
+
   debugTurbolinks('reactOnRailsPageLoaded');
-
   const railsContext = parseRailsContext();
-
   // If no react on rails components
   if (!railsContext) return;
-
   forEachStore(railsContext);
   forEachReactOnRailsComponentInitialize(render, railsContext);
 }
@@ -221,11 +223,20 @@ function unmount(el: Element): void {
 }
 
 function reactOnRailsPageUnloaded(): void {
+  if(window.firstTurboRender) {
+    window.firstTurboRender = false;
+    return;
+  }
+
   debugTurbolinks('reactOnRailsPageUnloaded');
   const els = reactOnRailsHtmlElements();
   for (let i = 0; i < els.length; i += 1) {
     unmount(els[i]);
   }
+}
+
+function resetCounters(): void {
+  window.firstTurboRender = true;
 }
 
 function renderInit(): void {
@@ -238,12 +249,15 @@ function renderInit(): void {
     return;
   }
 
+  resetCounters();
+
   if (turboInstalled()) {
     debugTurbolinks(
       'USING TURBO: document added event listeners ' +
       'turbo:before-render and turbo:render.');
     document.addEventListener('turbo:before-render', reactOnRailsPageUnloaded);
     document.addEventListener('turbo:render', reactOnRailsPageLoaded);
+    document.addEventListener('turbo:load', resetCounters);
     reactOnRailsPageLoaded();
   } else if (turbolinksVersion5()) {
     debugTurbolinks(
@@ -251,6 +265,7 @@ function renderInit(): void {
       'turbolinks:before-render and turbolinks:render.');
     document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
     document.addEventListener('turbolinks:render', reactOnRailsPageLoaded);
+    document.addEventListener('turbolinks:load', resetCounters);
     reactOnRailsPageLoaded();
   } else {
     debugTurbolinks(
