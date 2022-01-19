@@ -3,12 +3,15 @@ Since the repository is private, you will get a **GitHub Personal Access Token**
 
 Check the [CHANGELOG](https://github.com/shakacode/react_on_rails_pro/blob/master/CHANGELOG.md) to see what version you want.
 
+# Version
+
+For the below docs, find the desired `<version>` in the CHANGELOG. Note, for pre-release versions, gems have all periods, and node packages uses a dash, like gem `3.0.0.rc.0` and node package `3.0.0-rc.0`.
+
 # Ruby
 ## Gem Installation
 1. Ensure your **Rails** app is using the **react_on_rails** gem, version greater than 11.0.7.
 1. Add the `react_on_rails_pro` gem to your **Gemfile**. Substitute the appropriate version number. 
    
-
 ## Gemfile Change
 
 Replace the following in the snippet for the Gemfile
@@ -27,13 +30,13 @@ end
 
 ```ruby
 source "https://rubygems.pkg.github.com/shakacode-tools" do
-  gem "react_on_rails_pro", "1.5.4"
+  gem "react_on_rails_pro", "<version>"
 end
 ```
 Or use the `gem install` command:
 
 ```bash
-gem install react_on_rails_pro --version "1.5.6" --source "https://rubygems.pkg.github.com/shakacode-tools"
+gem install react_on_rails_pro --version "<version>> --source "https://rubygems.pkg.github.com/shakacode-tools"
 ```
 
 Then edit your permissions for bundler at the command line:
@@ -45,7 +48,7 @@ bundle config set rubygems.pkg.github.com <username>:<token>
 ## Using a branch in your Gemfile
 Note, you should probably use an ENV value for the token so that you don't check this into your source code.
    ```ruby
-   gem "react_on_rails_pro", version: "1.5.4", git: "https://[your-github-token]:x-oauth-basic@github.com/shakacode/react_on_rails_pro.git", tag: "1.5.4"
+   gem "react_on_rails_pro", version: "<version>", git: "https://[your-github-token]:x-oauth-basic@github.com/shakacode/react_on_rails_pro.git", tag: "<version>"
    ```
 
 ## Rails Configuration
@@ -71,7 +74,7 @@ always-auth=true
 {
   "private": true,
   "dependencies": {
-    "@shakacode-tools/react-on-rails-pro-node-renderer": "1.5.4"
+    "@shakacode-tools/react-on-rails-pro-node-renderer": "<version>"
   },
   "scripts": {
     "node-renderer": "echo 'Starting React on Rails Pro Node Renderer.' && node ./react-on-rails-pro-node-renderer.js"
@@ -152,12 +155,12 @@ This installs a binary `node-renderer`.
 Login into npm
 
 ```bash
-npm install @shakacode-tools/react-on-rails-pro-node-renderer@1.5.4
+npm install @shakacode-tools/react-on-rails-pro-node-renderer@<version>
 ```                      
 
 or edit package.json directly
 ```json
-"@shakacode-tools/react-on-rails-pro-node-renderer": "1.5.4"
+"@shakacode-tools/react-on-rails-pro-node-renderer": "<version>"
 ```                     
 
 ### Configuration
