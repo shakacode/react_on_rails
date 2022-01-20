@@ -14,6 +14,8 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ## Versions
 ### [Unreleased]
 Changes since last non-beta release.
+### Added
+- A `rendering_props_extension` configuration which takes a module with an `adjust_props_for_client_side_hydration` method, which is used to process props differently for server/client if `prerender` is set to `true`. [PR 1413](https://github.com/shakacode/react_on_rails/pull/1413) by [gscarv13](https://github.com/gscarv13) & [judahmeek](https://github.com/judahmeek).
 
 *Please add entries here for your pull requests that are not yet released.*
 ### [12.5.2] - 2021-12-29
