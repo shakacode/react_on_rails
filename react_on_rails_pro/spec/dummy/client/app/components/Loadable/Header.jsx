@@ -7,8 +7,8 @@ const Header = () => (
     <Helmet>
       <title>Index Page</title>
     </Helmet>
-    <ActiveLink to="/page-a" text="Path A" />
-    <ActiveLink to="/page-b" text="Path B" />
+    <ActiveLink to="/A" text="Path A" />
+    <ActiveLink to="/B" text="Path B" />
   </div>
 );
 

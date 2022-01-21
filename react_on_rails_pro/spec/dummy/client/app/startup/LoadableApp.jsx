@@ -1,8 +1,9 @@
 import React from 'react';
 import { BrowserRouter, StaticRouter } from 'react-router-dom';
 
-import Header from '../components/Loadable/Header';
-import Routes from '../routes/LoadableRoutes';
+import Header from '../components/loadable/Header';
+import Routes from '../components/loadable/routes/Routes';
+import Letters from '../components/loadable/letters';
 
 const basename = 'loadable';
 
@@ -12,6 +13,7 @@ const LoadableApp = (props) => {
       <StaticRouter basename={basename} location={props.path} context={{}}>
         <Header />
         <Routes />
+        <Letters />
       </StaticRouter>
     );
   }
@@ -19,6 +21,7 @@ const LoadableApp = (props) => {
     <BrowserRouter basename={basename}>
       <Header />
       <Routes />
+      <Letters />
     </BrowserRouter>
   );
 };
