@@ -60,6 +60,7 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   # Update dummy app's Gemfile.lock
   bundle_install_in(dummy_app_dir)
 
+  puts "Carefully add your OTP for NPM. If you get an error, 'git reset --hard' and start over."
   # Will bump the yarn version, commit, tag the commit, push to repo, and release on yarn
   release_it_command = +"release-it"
   release_it_command << " #{npm_version}" unless npm_version.strip.empty?
@@ -68,6 +69,8 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   sh_in_dir(gem_root, release_it_command)
 
   # Release the new gem version
+
+  puts "Carefully add your OTP for Rubygems. If you get an error, run 'gem release' again."
   sh_in_dir(gem_root, "gem release") unless is_dry_run
 
   msg = <<~MSG
