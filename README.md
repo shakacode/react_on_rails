@@ -12,6 +12,7 @@
 [![License](https://img.shields.io/badge/license-mit-green.svg)](LICENSE.md) [![Build Status](https://travis-ci.org/shakacode/react_on_rails.svg?branch=master)](https://travis-ci.org/shakacode/react_on_rails) [![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![](https://ruby-gem-downloads-badge.herokuapp.com/react_on_rails?type=total)](https://rubygems.org/gems/react_on_rails)
 
 # News
+* ShakaCode now maintains the official successor to `rails/webpacker`, [`shakapacker`](https://github.com/shakacode/shakapacker).
 * Project is updated to support Rails 7!
 * **React and Webpack with Ruby on Rails**: The current version of https://github.com/rails/webpacker will soon ship. While it won't be the default for Rails 7, it is not "deprecated." The core webpack configuration has become slimmer, allowing easier extension. If you want to get started today, use the master branch of  [shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) with `gem "webpacker", "6.0.0.rc.6"` Any updates to get to v6 from this point forward should be simple.
 
@@ -29,9 +30,9 @@ This project is maintained by the software consulting firm [ShakaCode](https://w
 Are you interested in optimizing your webpack setup for React on Rails including code
 splitting with [react-router](https://github.com/ReactTraining/react-router#readme) and
  [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers?
-We did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://www.shakacode.com/recent-work/popmenu/). Check out [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/).
+We did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://www.shakacode.com/recent-work/popmenu/). Several years later, Popmenu is serving millions of SSR requests per day React on Rails.
 
-For more information, feel free to contact Justin Gordon, [justin@shakacode.com](mailto:justin@shakacode.com), maintainer of React on Rails.
+Check out [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/). For more information, feel free to contact Justin Gordon, [justin@shakacode.com](mailto:justin@shakacode.com), maintainer of React on Rails.
 
 # Documentation
 
@@ -73,11 +74,11 @@ Ruby on Rails >=5, rails/webpacker >= 4.2, Ruby >= 2.7
 
 * [Click to join **React + Rails Slack**](https://reactrails.slack.com/join/shared_invite/enQtNjY3NTczMjczNzYxLTlmYjdiZmY3MTVlMzU2YWE0OWM0MzNiZDI0MzdkZGFiZTFkYTFkOGVjODBmOWEyYWQ3MzA2NGE1YWJjNmVlMGE).
 - [**Subscribe**](https://app.mailerlite.com/webforms/landing/l1d9x5) for announcements of new releases of React on Rails and of our latest [blog articles](https://blog.shakacode.com) and tutorials.
-- **[forum.shakacode.com](https://forum.shakacode.com)**: Post your questions
+- [Discussions](https://github.com/shakacode/react_on_rails/discussions): Post your questions regarding React on Rails
+- **[forum.shakacode.com](https://forum.shakacode.com)**: Other discussions
 - **[@railsonmaui on Twitter](https://twitter.com/railsonmaui)**
 - *See [NEWS.md](https://github.com/shakacode/react_on_rails/tree/master/NEWS.md) for more notes over time.*
 - See [Projects](https://github.com/shakacode/react_on_rails/tree/master/PROJECTS.md) using and [KUDOS](https://github.com/shakacode/react_on_rails/tree/master/KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
-- *See [NEWS.md](https://github.com/shakacode/react_on_rails/tree/master/NEWS.md) for more notes over time.*
 
 ## Contributing
 
