@@ -16,7 +16,7 @@ namespace :examples do # rubocop:disable Metrics/BlockLength
   # Loads data from examples_config.yml and instantiates corresponding ExampleType objects
   examples_config_file = File.expand_path("examples_config.yml", __dir__)
   examples_config = symbolize_keys(YAML.safe_load(File.read(examples_config_file)))
-  examples_config[:example_type_data].each { |example_type_data| ExampleType.new(symbolize_keys(example_type_data)) }
+  examples_config[:example_type_data].each { |example_type_data| ExampleType.new(**symbolize_keys(example_type_data)) }
 
   # Define tasks for each example type
   ExampleType.all.each do |example_type|
