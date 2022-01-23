@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "bundler"
 require_relative "task_helpers"
 require_relative File.join(gem_root, "lib", "react_on_rails", "version_syntax_converter")
 require_relative File.join(gem_root, "lib", "react_on_rails", "git_utils")
