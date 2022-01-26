@@ -1,4 +1,4 @@
-const { webpackConfig: baseClientWebpackConfig, merge } = require('@rails/webpacker');
+const { webpackConfig: baseClientWebpackConfig, merge } = require('shakapacker');
 const webpack = require('webpack');
 
 const sassResources = ['./client/app/assets/styles/app-variables.scss'];

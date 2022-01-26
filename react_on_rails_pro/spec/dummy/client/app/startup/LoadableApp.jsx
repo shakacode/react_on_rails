@@ -1,9 +1,9 @@
 import React from 'react';
 import { BrowserRouter, StaticRouter } from 'react-router-dom';
 
-import Header from '../components/loadable/Header';
-import Routes from '../components/loadable/routes/Routes';
-import Letters from '../components/loadable/letters';
+import Header from '../components/Loadable/Header';
+import Routes from '../components/Loadable/routes/Routes';
+import Letters from '../components/Loadable/letters';
 
 const basename = 'loadable';
 

@@ -279,7 +279,7 @@ describe "display images", :js do
 end
 
 describe "loadable components", :js do
-  before { visit "loadable/page-a" }
+  before { visit "loadable/A" }
 
   it "displays the proper text" do
     expect(page).to have_text "This is Page A."
