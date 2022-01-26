@@ -3,12 +3,14 @@
 
 git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
+ruby '2.7.5'
+
 gem "react_on_rails", "12.4.0" # keep in sync with package.json files
 
 # For local development
 # gem "react_on_rails", path: "../react_on_rails"
 
-gem "webpacker", "6.0.0.rc.6"
+gem "shakapacker", ">= 6.0.0"
 gem "bootsnap", require: false
 gem "rails"
 gem "puma"

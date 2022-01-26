@@ -1,8 +1,8 @@
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
-const { devServer, inliningCss } = require('@rails/webpacker');
+const { devServer, inliningCss } = require('shakapacker');
 
-const webpackConfig = require('./webpackConfig');
+const webpackConfig = require('./ServerClientOrBoth');
 
 const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
   if (inliningCss) {

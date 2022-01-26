@@ -1,4 +1,4 @@
-const { merge, config } = require('@rails/webpacker');
+const { merge, config } = require('shakapacker');
 const commonWebpackConfig = require('./commonWebpackConfig');
 
 const webpack = require('webpack');
