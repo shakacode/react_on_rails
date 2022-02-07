@@ -42,7 +42,7 @@ Dir[Rails.root.join("spec", "support", "**", "*.rb")].sort.each { |f| require f 
 
 RSpec.configure do |config|
   # Ensure that if we are running js tests, we are using latest webpack assets
-  # This is false since we're using rails/webpacker webpacker.yml test.compile == true
+  # This is false since we're using shakacode/shakapacker webpacker.yml test.compile == true
   # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :requires_webpack_assets)
   # config.define_derived_metadata(file_path: %r{spec/(system|requests|helpers)}) do |metadata|
   #   metadata[:requires_webpack_assets] = true

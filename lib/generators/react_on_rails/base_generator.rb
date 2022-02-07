@@ -136,7 +136,7 @@ module ReactOnRails
 
           What to do next:
 
-            - See the documentation on https://github.com/rails/webpacker/blob/master/docs/webpack.md
+            - See the documentation on https://github.com/shakacode/shakapacker/blob/master/docs/webpack.md
               for how to customize the default webpack configuration.
 
             - Include your webpack assets to your application layout.

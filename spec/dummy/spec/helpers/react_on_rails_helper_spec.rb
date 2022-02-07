@@ -11,9 +11,10 @@ end
 describe ReactOnRailsHelper, type: :helper do
   before do
     allow(self).to receive(:request) {
-      OpenStruct.new(
-        original_url: "http://foobar.com/development",
-        env: { "HTTP_ACCEPT_LANGUAGE" => "en" }
+      Struct.new("Request", :original_url, :env)
+      Struct::Request.new(
+        "http://foobar.com/development",
+        { "HTTP_ACCEPT_LANGUAGE" => "en" }
       )
     }
   end
@@ -277,7 +278,7 @@ describe ReactOnRailsHelper, type: :helper do
     let(:react_store_script) do
       '<script type="application/json" data-js-react-on-rails-store="reduxStore">'\
         '{"name":"My Test Name"}'\
-      "</script>"
+        "</script>"
     end
 
     it { expect(self).to respond_to :redux_store }

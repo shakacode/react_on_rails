@@ -33,7 +33,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
         let(:fixture_dirname) { "assets_with_manifest_exist" }
 
         before do
-          require "webpacker"
+          require "shakapacker"
           allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(true)
           allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
             .with("manifest.json")
@@ -51,7 +51,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
         let(:fixture_dirname) { "assets_with_missing_manifest" }
 
         before do
-          require "webpacker"
+          require "shakapacker"
           allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(false)
         end
 
@@ -63,7 +63,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
         let(:fixture_dirname) { "assets_with_manifest_exist_server_bundle_separate" }
 
         before do
-          require "webpacker"
+          require "shakapacker"
           allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(true)
           allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_public_output_path)
             .and_return(generated_assets_full_path)

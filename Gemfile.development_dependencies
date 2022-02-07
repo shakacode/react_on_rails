@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-gem "webpacker", "6.0.0.rc.6"
+gem "shakapacker", ">= 6.1.1"
 gem "bootsnap", require: false
 gem "rails", "~> 7.0"
 gem "sqlite3"

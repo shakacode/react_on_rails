@@ -4,7 +4,7 @@
 
 -----
 
-*Updated for Ruby 2.7.1, Rails 6.0.3.1, React on Rails v12.5.0, and Webpacker v6*
+*Updated for Ruby 2.7.1, Rails 6.0.3.1, React on Rails v12.5.0, and Shakapacker v6*
 
 This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
@@ -21,18 +21,16 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 * https://rubygems.org/gems/react_on_rails
 * https://www.npmjs.com/package/react-on-rails
 
-_Note: some of the screen images below show the "npm" command. react_on_rails 6.6.0 and greater uses `yarn`._
-
 ## Setting up your environment
 
-Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 6.x and node version 13+. I recommend `rvm` and `nvm` to install Ruby and Node, and [brew](https://brew.sh/) to install [yarn](https://yarnpkg.com/en/docs/install#mac-tab). Rails can be installed as an ordinary gem.
+Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 6.x and node version 14+. I recommend `rvm` or `rbevn` and `nvm` to install Ruby and Node. Rails can be installed as an ordinary gem.
 
 ```
 nvm install node                # download and install latest stable Node
 nvm alias default node          # make it default version
 nvm list                        # check
 
-brew install yarn               # you can use other installer if desired
+brew install yarn               # you can use other installer if desired, such as yvm
 rvm install 2.7                 # download and install latest stable Ruby (update to exact version)
 rvm use 2.7 --default           # use it and make it default
 rvm list                        # check
@@ -62,15 +60,15 @@ of both the gem and npm package. In other words, don't use the `^` or `~` in the
 _Use the latest version for react_on_rails._
 
 ```
-gem 'react_on_rails', '12.5.0'         # prefer exact gem version to match npm version
+gem 'react_on_rails', '13.0.0'         # prefer exact gem version to match npm version
 ```
 
 Note: The latest released React On Rails version is considered stable. Please use the latest
 version to ensure you get all the security patches and the best support.
 
 ```bash
-bundle add webpacker --git=https://github.com/rails/webpacker.git
-bundle add react_on_rails --version=12.5.0 --strict
+bundle add shakapacker --strict
+bundle add react_on_rails --strict
 ```
 
 ## Run the webpacker generator

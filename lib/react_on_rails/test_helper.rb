@@ -72,8 +72,8 @@ module ReactOnRails
         unless @printed_once
           puts
           puts "====> React On Rails: Checking files in "\
-            "#{webpack_assets_status_checker.generated_assets_full_path} for "\
-            "outdated/missing bundles based on source_path #{source_path}"
+               "#{webpack_assets_status_checker.generated_assets_full_path} for "\
+               "outdated/missing bundles based on source_path #{source_path}"
           puts
           @printed_once = true
 

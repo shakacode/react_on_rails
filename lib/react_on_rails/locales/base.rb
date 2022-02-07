@@ -85,9 +85,7 @@ module ReactOnRails
 
       def generate_file(template, path)
         result = ERB.new(template).result()
-        File.open(path, "w") do |f|
-          f.write(result)
-        end
+        File.write(path, result)
       end
 
       def generate_translations
