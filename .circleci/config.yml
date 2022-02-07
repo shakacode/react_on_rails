@@ -317,6 +317,7 @@ workflows:
       - build-dummy-app-webpack-test-bundles:
           requires:
             - install-dummy-app-node-packages
+            - install-dummy-app-ruby-gems
       - package-js-tests:
           requires:
             - install-package-node-packages
