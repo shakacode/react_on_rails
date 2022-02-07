@@ -11,10 +11,10 @@ The webpack-dev-server provides:
    For use with webpack, see **Client Side rendering and HMR using react-refresh-webpack-plugin** section bellow or visit [react-refresh-webpack-plugin](https://github.com/pmmmwh/react-refresh-webpack-plugin) for additional details.
 
 If you are ***not*** using server-side rendering (***not*** using `prerender: true`),
-then you can follow all the regular docs for using the `bin/webpack-dev-server` 
+then you can follow all the regular docs for using the `bin/webpacker-dev-server` 
 during development.
 
-# Server Side Rendering with the Default rails/webpacker bin/webpack-dev-server
+# Server Side Rendering with the Default rails/webpacker bin/webpacker-dev-server
 
 If you are using server-side rendering, then you have a couple options. The
 recommended technique is to have a different webpack configuration for server
@@ -41,7 +41,7 @@ If you don't configure these two to false, you'll see errors like:
 
 # Client Side rendering with HMR using react-refresh-webpack-plugin
 ## Basic installation
-To enable HMR functionality you have to use `./bin/webpack-dev-server`
+To enable HMR functionality you have to use `./bin/webpacker-dev-server`
 1. In `config/webpacker.yml` set **hmr** and **inline** `dev_server` properties to true. 
     ```
     dev_server:
@@ -59,7 +59,7 @@ To enable HMR functionality you have to use `./bin/webpack-dev-server`
 
 3. HMR is for use with the webpack-dev-server, so we only add this for the webpack-dev-server.
    ```
-   const { devServer } = require('@rails/webpacker')
+   const { devServer } = require('shakapacker')
 
    const isWebpackDevServer = process.env.WEBPACK_DEV_SERVER
 

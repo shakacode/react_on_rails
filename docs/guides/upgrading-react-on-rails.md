@@ -5,6 +5,21 @@ If you would like help in migrating between React on Rails versions or help with
 
 We specialize in helping companies to quickly and efficiently upgrade. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4+ for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
 
+## Upgrading to v13
+
+### Breaking Change
+Previously, the gem `webpacker` was a Gem dependency.
+
+v13 has changed slightly to switch to `shakapacker`.
+
+For details, see see the [Shakapacker guide to upgrading](https://github.com/shakacode/shakapacker/blob/master/docs/v6_upgrade.md)
+
+In summary:
+
+1. Change the gem reference from 'webpacker' to 'shakapacker'
+2. Change the npm reference from '@rails/webpacker' to 'shakapacker'
+3. Other updates, depending on what version of rails/webpacker that you had.
+
 ## Upgrading to v12
 ### Recent versions
 Make sure that you are on a relatively more recent version of rails and webpacker. Yes, the [rails/webpacker](https://github.com/rails/webpacker) gem is required!

@@ -6,4 +6,4 @@ web: rails s -p 3000
 # upon saving rather than when you refresh your browser page.
 # Note, if using React on Rails localization you will need to run
 # `bundle exec rake react_on_rails:locale` before you run bin/webpack
-webpack: sh -c 'rm -rf public/packs/* || true && bin/webpack -w'
+webpack: sh -c 'rm -rf public/packs/* || true && bin/webpacker -w'

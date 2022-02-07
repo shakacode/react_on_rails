@@ -6,5 +6,5 @@
 2. Search the rails/webpacker repo for anything you're not sure about in terms of package names.
 3. run `bin/webpack` and make sure there are zero errors
 4. update webpack plugins and loaders to current or close to current
-5. Make sure that your bin/webpack and bin/webpacker match the latest on
+5. Make sure that your bin/webpacker and bin/webpacker match the latest on
 https://github.com/rails/webpacker/tree/master/lib/install/bin

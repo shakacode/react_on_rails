@@ -7,7 +7,6 @@ PATH
       execjs (~> 2.5)
       rails (>= 5.2)
       rainbow (~> 3.0)
-      webpacker (>= 4.2)
 
 GEM
   remote: https://rubygems.org/
@@ -138,7 +137,7 @@ GEM
     method_source (1.0.0)
     mini_mime (1.1.2)
     mini_portile2 (2.6.1)
-    mini_racer (0.5.0)
+    mini_racer (0.6.2)
       libv8-node (~> 16.10.0.0)
     minitest (5.15.0)
     msgpack (1.4.2)
@@ -168,7 +167,7 @@ GEM
       nio4r (~> 2.0)
     racc (1.6.0)
     rack (2.2.3)
-    rack-proxy (0.7.0)
+    rack-proxy (0.7.2)
       rack
     rack-test (1.1.0)
       rack (>= 1.0, < 3)
@@ -269,6 +268,11 @@ GEM
       childprocess (>= 0.5, < 4.0)
       rubyzip (>= 1.2.2)
     semantic_range (3.0.0)
+    shakapacker (6.1.1)
+      activesupport (>= 5.2)
+      rack-proxy (>= 0.6.1)
+      railties (>= 5.2)
+      semantic_range (>= 2.3.0)
     simplecov (0.16.1)
       docile (~> 1.1)
       json (>= 1.8, < 3)
@@ -302,11 +306,6 @@ GEM
       nokogiri (~> 1.6)
       rubyzip (~> 1.0)
       selenium-webdriver (~> 3.0)
-    webpacker (6.0.0.rc.6)
-      activesupport (>= 5.2)
-      rack-proxy (>= 0.6.1)
-      railties (>= 5.2)
-      semantic_range (>= 2.3.0)
     websocket-driver (0.7.5)
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.5)
@@ -330,7 +329,7 @@ DEPENDENCIES
   jquery-rails
   launchy
   listen
-  mini_racer (~> 0.5)
+  mini_racer (>= 0.6.2)
   pry
   pry-byebug
   pry-doc
@@ -349,13 +348,13 @@ DEPENDENCIES
   scss_lint
   sdoc
   selenium-webdriver
+  shakapacker (>= 6.1.1)
   spring (~> 4.0)
   sprockets (~> 4.0)
   sqlite3
   turbolinks
   uglifier
   webdrivers (= 3.9.4)
-  webpacker (= 6.0.0.rc.6)
 
 BUNDLED WITH
    2.3.5

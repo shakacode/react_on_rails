@@ -1,8 +1,8 @@
 # Procfile for development using HMR
 # You can run these commands in separate shells
 rails: bundle exec rails s -p 3000
-wp-client: bin/webpack-dev-server
-wp-server: SERVER_BUNDLE_ONLY=yes bin/webpack --watch
+wp-client: bin/webpacker-dev-server
+wp-server: SERVER_BUNDLE_ONLY=yes bin/webpacker --watch
 
 # Bundle ReScript .res files
 rescript: yarn build:rescript:dev

@@ -14,13 +14,10 @@
 # News
 * ShakaCode now maintains the official successor to `rails/webpacker`, [`shakapacker`](https://github.com/shakacode/shakapacker).
 * Project is updated to support Rails 7!
-* **React and Webpack with Ruby on Rails**: The current version of https://github.com/rails/webpacker will soon ship. While it won't be the default for Rails 7, it is not "deprecated." The core webpack configuration has become slimmer, allowing easier extension. If you want to get started today, use the master branch of  [shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) with `gem "webpacker", "6.0.0.rc.6"` Any updates to get to v6 from this point forward should be simple.
-
-If you have time, please comment on Justin's final proposals for Webpacker v6: [webpacker/pulls/justin808](https://github.com/rails/webpacker/pulls/justin808).
 
 -----
 
-*These are the docs for React on Rails 12. To see the version 11 docs, [click here](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
+*These are the docs for React on Rails 13. To see the older docs: [v12](https://github.com/shakacode/react_on_rails/tree/12.6.0) and [v11](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
 
 #### About
 React on Rails integrates Rails with (server rendering of) Facebook's [React](https://github.com/facebook/react) front-end framework.

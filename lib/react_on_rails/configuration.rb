@@ -124,7 +124,7 @@ module ReactOnRails
 
       return if skip_react_on_rails_precompile || build_production_command.blank?
 
-      # Ensure that shakacode/shakapacker does not call bin/webpack if we're providing
+      # Ensure that shakacode/shakapacker does not call bin/webpacker if we're providing
       # the build command.
       ENV["WEBPACKER_PRECOMPILE"] = "false"
 

@@ -1,4 +1,4 @@
-# Note: You must restart bin/webpack-dev-server for changes to take effect
+# Note: You must restart bin/webpacker-dev-server for changes to take effect
 
 default: &default
   source_path: app/javascript
@@ -17,7 +17,7 @@ default: &default
 
 development:
   <<: *default
-  # This is false since we're running `bin/webpack -w` in Procfile.dev-setic
+  # This is false since we're running `bin/webpacker -w` in Procfile.dev-setic
   compile: false
 
   # Reference: https://webpack.js.org/configuration/dev-server/

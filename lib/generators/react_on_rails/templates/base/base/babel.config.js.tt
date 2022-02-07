@@ -1,15 +1,32 @@
 <%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh/blob/master/babel.config.js") %>
 
-const defaultConfigFunc = require('@rails/webpacker/package/babel/preset.js');
-
 module.exports = function (api) {
-  const resultConfig = defaultConfigFunc(api);
+  const defaultConfigFunc = require('shakapacker/package/babel/preset.js')
+  const resultConfig = defaultConfigFunc(api)
+  const isProductionEnv = api.env('production')
 
   const changesOnDefault = {
-    plugins: [process.env.WEBPACK_SERVE && 'react-refresh/babel'].filter(Boolean),
-  };
+    presets: [
+      [
+        '@babel/preset-react',
+        {
+          development: !isProductionEnv,
+          useBuiltIns: true
+        }
+      ]
+    ].filter(Boolean),
+    plugins: [
+      process.env.WEBPACK_SERVE && 'react-refresh/babel',
+      isProductionEnv && ['babel-plugin-transform-react-remove-prop-types',
+        {
+          removeImport: true
+        }
+      ]
+    ].filter(Boolean),
+  }
 
-  resultConfig.plugins = [...resultConfig.plugins, ...changesOnDefault.plugins];
+  resultConfig.presets = [...resultConfig.presets, ...changesOnDefault.presets]
+  resultConfig.plugins = [...resultConfig.plugins, ...changesOnDefault.plugins ]
 
-  return resultConfig;
-};
+  return resultConfig
+}
