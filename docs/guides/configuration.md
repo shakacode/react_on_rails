@@ -72,7 +72,7 @@ ReactOnRails.configure do |config|
   # to have react_on_rails invoke a command for you during assets:precompile.
   # The command is either a script or a module containing a class method `call`
   # In this example, the module BuildProductionCommand would have a class method `call`.
-  config.build_production_command = "RAILS_ENV=production bin/webpack"
+  config.build_production_command = "RAILS_ENV=production bin/webpacker"
 
   # See bottom for an example of the BuildProductionCommand module.
   # config.build_production_command = BuildProductionCommand
@@ -203,7 +203,7 @@ ReactOnRails.configure do |config|
   # with rspec then this controls what yarn command is run
   # to automatically refresh your webpack assets on every test run.
   #
-  config.build_test_command = "RAILS_ENV=test bin/webpack"
+  config.build_test_command = "RAILS_ENV=test bin/webpacker"
 
   # CONFIGURE YOUR SOURCE FILES
   # The test helper needs to know where your JavaScript files exist. The value is configured
@@ -238,7 +238,7 @@ module BuildProductionCommand
   include FileUtils
   # The call method will be called during assets:precompile
   def self.call
-    sh "bin/webpack"
+    sh "bin/webpacker"
   end
 end
 ```

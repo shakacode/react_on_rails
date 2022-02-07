@@ -150,42 +150,6 @@ module ReactOnRails
       end
     end
 
-    # Pending updates to shakacode/shakapacker v6, we may have some message that prints after configuration runs.
-    # def check_deprecated_settings
-    #   if build_production_command.present? &&
-    #      ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
-    #     msg = <<~MSG
-    #       Setting ReactOnRails configuration for `build_production_command` is
-    #       not necessary if you have config/webpack/production.js. When that file
-    #       exists, React on Rails DOES NOT modify the standard assets:precompile.
-    #       If you want React on Rails to modify to the standard assets:precompile
-    #       to use your config/initializers/react_on_rails.rb config.build_production_command
-    #       then delete the config/webpack/production.js.
-    #     MSG
-    #     Rails.logger.warn(msg)
-    #  end
-    #
-    # msg = <<~MSG
-    #   ReactOnRails configuration for `build_production_command` is removed.
-    #   Move this command into `bin/webpack` converting the script to a shell script.
-    # MSG
-    # raise ReactOnRails::Error, msg
-    # Commenting out until v13 when
-    # https://github.com/rails/webpacker/issues/2640 gets resolved
-    # if node_modules_location.present?
-    #   Rails.logger.warn("ReactOnRails configuration for `node_modules_location` is deprecated. "\
-    #    "Instead, prepend a `cd client` (or whichever location) before your test command.")
-    # end
-    #
-    # return unless build_production_command.present?
-    #
-    # msg = <<~MSG
-    #   ReactOnRails configuration for `build_production_command` is removed.
-    #   Move this command into `bin/webpack` converting the script to a shell script.
-    # MSG
-    # raise ReactOnRails::Error, msg
-    # end
-
     def error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
       return unless ReactOnRails::WebpackerUtils.using_webpacker?
 
