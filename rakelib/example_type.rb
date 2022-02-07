@@ -78,7 +78,7 @@ module ReactOnRails
       # Assumes we are inside a rails app's folder and necessary gems have been installed
       def generator_shell_commands
         shell_commands = []
-        shell_commands << "rails generate react_on_rails:install #{generator_options} --ignore-warnings"
+        shell_commands << "rails generate react_on_rails:install #{generator_options} --ignore-warnings --force"
         shell_commands << "rails generate react_on_rails:dev_tests #{generator_options}"
       end
 

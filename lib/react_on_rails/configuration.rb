@@ -171,7 +171,7 @@ module ReactOnRails
     # MSG
     # raise ReactOnRails::Error, msg
     # Commenting out until v13 when
-    # https://github.com/shakacode/shakapacker/issues/2640 gets resolved
+    # https://github.com/rails/webpacker/issues/2640 gets resolved
     # if node_modules_location.present?
     #   Rails.logger.warn("ReactOnRails configuration for `node_modules_location` is deprecated. "\
     #    "Instead, prepend a `cd client` (or whichever location) before your test command.")

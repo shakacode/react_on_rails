@@ -67,7 +67,7 @@ def run_generator_test_with_args(args, options = {})
 
   Dir.chdir(destination_root) do
     # WARNING: std out is swallowed from running the generator during tests
-    run_generator(args + ["--ignore-warnings"])
+    run_generator(args + ["--ignore-warnings", "--force"])
   end
 end
 
