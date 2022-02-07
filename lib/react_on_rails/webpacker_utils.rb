@@ -7,13 +7,8 @@ module ReactOnRails
     def self.using_webpacker?
       return @using_webpacker if defined?(@using_webpacker)
 
-      @using_webpacker = ReactOnRails::Utils.gem_available?("webpacker")
-    end
-
-    def self.webpacker_webpack_production_config_exists?
-      webpacker_webpack_config_abs_path = File.join(Rails.root,
-                                                    "config/webpack/production.js")
-      File.exist?(webpacker_webpack_config_abs_path)
+      @using_webpacker = ReactOnRails::Utils.gem_available?("webpacker") ||
+                         ReactOnRails::Utils.gem_available?("shakapacker")
     end
 
     def self.dev_server_running?

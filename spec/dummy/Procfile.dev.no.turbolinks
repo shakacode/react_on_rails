@@ -1,4 +1,4 @@
 # Same as Procfile.dev, but disable turbolinks.
 rails: DISABLE_TURBOLINKS=TRUE bin/rails s -p 3000
 # Build client and server assets, watching for changes.
-webpack: sh -c 'rm -rf public/webpack/development/*' || true && bin/webpack --watch
+webpack: sh -c 'rm -rf public/webpack/development/*' || true && bin/webpacker --watch

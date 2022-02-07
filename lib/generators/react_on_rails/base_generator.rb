@@ -54,6 +54,7 @@ module ReactOnRails
                         config/webpack/development.js
                         config/webpack/production.js
                         config/webpack/serverWebpackConfig.js
+                        config/webpack/webpack.config.js
                         config/webpack/webpackConfig.js]
         config = {
           message: "// The source code including full typescript support is available at:"
@@ -136,28 +137,28 @@ module ReactOnRails
 
           What to do next:
 
-            - See the documentation on https://github.com/rails/webpacker/blob/master/docs/webpack.md
+            - See the documentation on https://github.com/shakacode/shakapacker#webpack-configuration
               for how to customize the default webpack configuration.
 
             - Include your webpack assets to your application layout.
 
                 <%= javascript_pack_tag 'hello-world-bundle' %>
 
-            - Run `rails s` to start the Rails server and use Webpacker's default lazy compilation.
+            - Run `rails s` to start the Rails server.
 
-            - Visit http://localhost:3000/hello_world and see your React On Rails app running!
-
-            - Run bin/webpack-dev-server to start the Webpack dev server for compilation of Webpack
+            - Run bin/webpacker-dev-server to start the Webpack dev server for compilation of Webpack
               assets as soon as you save. This default setup with the dev server does not work
               for server rendering
 
-            - Alternately, you may turn off compile in config/webpacker.yml and run the foreman
-              command to start the rails server and run webpack in watch mode.
+            - Visit http://localhost:3000/hello_world and see your React On Rails app running!
+
+            - Alternately, run the foreman command to start the rails server and run webpack#{' '}
+              in watch mode.
 
                 foreman start -f Procfile.dev-static
 
             - To turn on HMR, edit config/webpacker.yml and set HMR to true. Restart the rails server
-              and bin/webpack-dev-server. Or use Procfile.dev.
+              and bin/webpacker-dev-server. Or use Procfile.dev.
 
             - To server render, change this line app/views/hello_world/index.html.erb to
               `prerender: true` to see server rendering (right click on page and select "view source").

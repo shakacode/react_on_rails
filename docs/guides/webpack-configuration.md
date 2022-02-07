@@ -33,7 +33,7 @@ Until version 9, all React on Rails apps used the `/client` directory for config
 You can access values in the `config/webpacker.yml`
 
 ```js
-const { config, devServer } = require('@rails/webpacker');
+const { config, devServer } = require('shakapacker');
 ```
 
 You will want consider using some of the same values set in these files:

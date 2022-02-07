@@ -22,7 +22,7 @@ Alternatively, you can specify `config.build_production_command` to have
 react_on_rails invoke a command for you during assets:precompile.
 
 ```
-config.build_production_command = "RAILS_ENV=production bin/webpack"
+config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
 ```
 
 ### Consider Removing Webpacker's clean task

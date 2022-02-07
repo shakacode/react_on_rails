@@ -45,7 +45,10 @@ module ReactOnRails
       # Gems we need to add to the Gemfile before bundle installing
       def required_gems
         relative_gem_root = Pathname(gem_root).relative_path_from(Pathname(dir))
-        ["gem 'react_on_rails', path: '#{relative_gem_root}'"]
+        [
+          "gem 'react_on_rails', path: '#{relative_gem_root}'",
+          "gem 'shakapacker'"
+        ]
       end
 
       # Options we pass when running `rails new` from the command-line.
@@ -78,7 +81,7 @@ module ReactOnRails
       # Assumes we are inside a rails app's folder and necessary gems have been installed
       def generator_shell_commands
         shell_commands = []
-        shell_commands << "rails generate react_on_rails:install #{generator_options} --ignore-warnings"
+        shell_commands << "rails generate react_on_rails:install #{generator_options} --ignore-warnings --force"
         shell_commands << "rails generate react_on_rails:dev_tests #{generator_options}"
       end
 

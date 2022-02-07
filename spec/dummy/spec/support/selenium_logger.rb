@@ -26,7 +26,8 @@ RSpec.configure do |config|
     # https://stackoverflow.com/questions/60114639/timed-out-receiving-message-from-renderer-0-100-log-messages-using-chromedriver
     clean_errors = errors.reject do |err_msg|
       err_msg.include?("Timed out receiving message from renderer: 0.100") ||
-        err_msg.include?("SharedArrayBuffer will require cross-origin isolation")
+        err_msg.include?("SharedArrayBuffer will require cross-origin isolation") ||
+        err_msg.include?("You are currently using minified code outside of NODE_ENV === \\\"production\\\"")
     end
 
     raise("Java Script Error(s) on the page:\n\n#{errors.join("\n")}") if clean_errors.present?

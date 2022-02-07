@@ -124,7 +124,7 @@ module ReactOnRails
 
       return if skip_react_on_rails_precompile || build_production_command.blank?
 
-      # Ensure that rails/webpacker does not call bin/webpack if we're providing
+      # Ensure that shakacode/shakapacker does not call bin/webpacker if we're providing
       # the build command.
       ENV["WEBPACKER_PRECOMPILE"] = "false"
 
@@ -132,7 +132,7 @@ module ReactOnRails
         Rake::Task["react_on_rails:assets:webpack"].invoke
         puts "Invoking task webpacker:clean from React on Rails"
 
-        # VERSIONS is per the rails/webpacker clean method definition.
+        # VERSIONS is per the shakacode/shakapacker clean method definition.
         # We set it very big so that it is not used, and then clean just
         # removes files older than 1 hour.
         versions = 100_000
@@ -150,42 +150,6 @@ module ReactOnRails
       end
     end
 
-    # Pending updates to rails/webpacker v6, we may have some message that prints after configuration runs.
-    # def check_deprecated_settings
-    #   if build_production_command.present? &&
-    #      ReactOnRails::WebpackerUtils.webpacker_webpack_production_config_exists?
-    #     msg = <<~MSG
-    #       Setting ReactOnRails configuration for `build_production_command` is
-    #       not necessary if you have config/webpack/production.js. When that file
-    #       exists, React on Rails DOES NOT modify the standard assets:precompile.
-    #       If you want React on Rails to modify to the standard assets:precompile
-    #       to use your config/initializers/react_on_rails.rb config.build_production_command
-    #       then delete the config/webpack/production.js.
-    #     MSG
-    #     Rails.logger.warn(msg)
-    #  end
-    #
-    # msg = <<~MSG
-    #   ReactOnRails configuration for `build_production_command` is removed.
-    #   Move this command into `bin/webpack` converting the script to a shell script.
-    # MSG
-    # raise ReactOnRails::Error, msg
-    # Commenting out until v13 when
-    # https://github.com/rails/webpacker/issues/2640 gets resolved
-    # if node_modules_location.present?
-    #   Rails.logger.warn("ReactOnRails configuration for `node_modules_location` is deprecated. "\
-    #    "Instead, prepend a `cd client` (or whichever location) before your test command.")
-    # end
-    #
-    # return unless build_production_command.present?
-    #
-    # msg = <<~MSG
-    #   ReactOnRails configuration for `build_production_command` is removed.
-    #   Move this command into `bin/webpack` converting the script to a shell script.
-    # MSG
-    # raise ReactOnRails::Error, msg
-    # end
-
     def error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
       return unless ReactOnRails::WebpackerUtils.using_webpacker?
 
@@ -195,7 +159,7 @@ module ReactOnRails
 
       if File.expand_path(generated_assets_dir) == webpacker_public_output_path.to_s
         Rails.logger.warn("You specified generated_assets_dir in `config/initializers/react_on_rails.rb` "\
-        "with Webpacker. Remove this line from your configuration file.")
+                          "with Webpacker. Remove this line from your configuration file.")
       else
         msg = <<~MSG
           Error configuring /config/initializers/react_on_rails.rb: You are using webpacker
@@ -257,19 +221,19 @@ module ReactOnRails
       if ReactOnRails::WebpackerUtils.using_webpacker?
         webpacker_public_output_path = ReactOnRails::WebpackerUtils.webpacker_public_output_path
         Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the "\
-        "generated_assets_dirs no the generated_assets_dir when using Webpacker. This is defined by "\
-        "public_output_path specified in webpacker.yml = #{webpacker_public_output_path}."
+                          "generated_assets_dirs no the generated_assets_dir when using Webpacker. This is defined by "\
+                          "public_output_path specified in webpacker.yml = #{webpacker_public_output_path}."
         return
       end
 
       Rails.logger.warn "[DEPRECATION] ReactOnRails: Use config.generated_assets_dir rather than "\
-        "generated_assets_dirs"
+                        "generated_assets_dirs"
       if generated_assets_dir.blank?
         self.generated_assets_dir = generated_assets_dirs
       else
         Rails.logger.warn "[DEPRECATION] ReactOnRails. You have both generated_assets_dirs and "\
-          "generated_assets_dir defined. Define ONLY generated_assets_dir if NOT using Webpacker"\
-          " and define neither if using Webpacker"
+                          "generated_assets_dir defined. Define ONLY generated_assets_dir if NOT using Webpacker"\
+                          " and define neither if using Webpacker"
       end
     end
 

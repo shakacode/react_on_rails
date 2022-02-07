@@ -5,5 +5,5 @@ web: rails s -p 3000
 # When making frequent changes to client side assets, you will prefer building webpack assets
 # upon saving rather than when you refresh your browser page.
 # Note, if using React on Rails localization you will need to run
-# `bundle exec rake react_on_rails:locale` before you run bin/webpack
-webpack: sh -c 'rm -rf public/packs/* || true && bin/webpack -w'
+# `bundle exec rake react_on_rails:locale` before you run bin/webpacker
+webpack: sh -c 'rm -rf public/packs/* || true && bin/webpacker -w'

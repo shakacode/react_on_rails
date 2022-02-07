@@ -6,7 +6,7 @@
 ReactOnRails.configure do |config|
   # This configures the script to run to build the production assets by webpack. Set this to nil
   # if you don't want react_on_rails building this file for you.
-  # If nil, then the standard rails/webpacker assets:precompile will run
+  # If nil, then the standard shakacode/shakapacker assets:precompile will run
   # config.build_production_command = nil
 
   ################################################################################
@@ -25,7 +25,7 @@ ReactOnRails.configure do |config|
   #
   # Alternately, you can remove the `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`
   # and set the config/webpacker.yml option for test to true.
-  config.build_test_command = "RAILS_ENV=test bin/webpack"
+  config.build_test_command = "RAILS_ENV=test bin/webpacker"
 
   ################################################################################
   ################################################################################

@@ -30,19 +30,12 @@ namespace :examples do # rubocop:disable Metrics/BlockLength
     desc "Generates #{example_type.name_pretty}"
     task example_type.gen_task_name_short => example_type.clobber_task_name do
       mkdir_p(example_type.dir)
-      if Rails::VERSION::MAJOR < 6
-        example_type.rails_options += " --webpack"
-      elsif Rails::VERSION::MAJOR >= 7
-        example_type.rails_options += "--javascript=webpack"
-      end
+      example_type.rails_options += "--skip-javascript"
       sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options}")
       sh_in_dir(example_type.dir, "touch .gitignore")
-      copy_generator_webpacker_yml_to(example_type.dir)
-      sh_in_dir(example_type.dir, "bundle add webpacker --version 6.0.0.rc.6")
-      sh_in_dir(example_type.dir, "rake webpacker:install")
-      sh_in_dir(example_type.dir, "bundle binstubs --path=#{example_type.dir}/bin webpacker")
       append_to_gemfile(example_type.gemfile, example_type.required_gems)
       bundle_install_in(example_type.dir)
+      sh_in_dir(example_type.dir, "rake webpacker:install")
       sh_in_dir(example_type.dir, example_type.generator_shell_commands)
       sh_in_dir(example_type.dir, "yarn")
     end

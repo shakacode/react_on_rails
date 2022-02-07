@@ -4,7 +4,7 @@
 
 -----
 
-*Updated for Ruby 2.7.1, Rails 6.0.3.1, React on Rails v12.5.0, and Webpacker v6*
+*Updated for Ruby 2.7.1, Rails 6.0.3.1, React on Rails v12.5.0, and Shakapacker v6*
 
 This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
@@ -21,18 +21,16 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 * https://rubygems.org/gems/react_on_rails
 * https://www.npmjs.com/package/react-on-rails
 
-_Note: some of the screen images below show the "npm" command. react_on_rails 6.6.0 and greater uses `yarn`._
-
 ## Setting up your environment
 
-Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 6.x and node version 13+. I recommend `rvm` and `nvm` to install Ruby and Node, and [brew](https://brew.sh/) to install [yarn](https://yarnpkg.com/en/docs/install#mac-tab). Rails can be installed as an ordinary gem.
+Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 6.x and node version 14+. I recommend `rvm` or `rbevn` and `nvm` to install Ruby and Node. Rails can be installed as an ordinary gem.
 
 ```
 nvm install node                # download and install latest stable Node
 nvm alias default node          # make it default version
 nvm list                        # check
 
-brew install yarn               # you can use other installer if desired
+brew install yarn               # you can use other installer if desired, such as yvm
 rvm install 2.7                 # download and install latest stable Ruby (update to exact version)
 rvm use 2.7 --default           # use it and make it default
 rvm list                        # check
@@ -46,40 +44,37 @@ Then we need to create a fresh Rails application as following.
 
 First be sure to run `rails -v` and check you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with react per the instructions [here](https://github.com/rails/webpacker).
 
-```
+```bash
 cd <directory where you want to create your new Rails app>
 
 # Any name you like for the rails app
 # Skip javascript so will add that next and get the current version
-rails new --skip-sprockets --skip-turbolinks --javascript=webpack test-react-on-rails
+rails new --skip-turbolinks --skip-javascript test-react-on-rails
 
 cd test-react-on-rails
 ```
 
-## Add the webpacker and react_on_rails gems
+## Add the shakapacker and react_on_rails gems
 To avoid issues regarding inconsistent gem and npm versions, you should specify the exact versions
 of both the gem and npm package. In other words, don't use the `^` or `~` in the version specifications.
-_Use the latest version for react_on_rails._
+_Use the latest version for `react_on_rails` and `shakapacker`._
 
 ```
-gem 'react_on_rails', '12.5.0'         # prefer exact gem version to match npm version
+gem 'react_on_rails', '13.0.0'         # prefer exact gem version to match npm version
+gem 'shakapacker', '6.1.1'             # prefer exact gem version to match npm version
+
 ```
 
 Note: The latest released React On Rails version is considered stable. Please use the latest
 version to ensure you get all the security patches and the best support.
 
-```bash
-bundle add webpacker --git=https://github.com/rails/webpacker.git
-bundle add react_on_rails --version=12.5.0 --strict
-```
-
-## Run the webpacker generator
+## Run the webpacker (shakapacker) generator
 
 ```terminal
 bundle exec rails webpacker:install
 ```
 
-Let's commit everything before installing React on Rails.
+**Let's commit everything before installing React on Rails.**
 
 ```
 # Here are git commands to make a new git repo and commit everything.
@@ -98,10 +93,11 @@ If you want the redux install: `rails generate react_on_rails:install --redux`
 The generator will add `mini_racer`'s latest version. If you're using linux & encounter issues installing `libv8`, here's [a common solution](https://github.com/rubyjs/mini_racer/issues/218).
 
 ```
-rails generate react_on_rails:install
+bundle exec rails generate react_on_rails:install
 ```
 
-Enter `a` to replace all configuration files required by the project.
+Enter `a` to replace all configuration files required by the project. You can check the diffs
+before you commit to see what changed.
 
 Then run the server with one of the following options:
 

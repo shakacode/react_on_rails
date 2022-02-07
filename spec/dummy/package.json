@@ -7,11 +7,17 @@
   },
   "private": true,
   "dependencies": {
+    "@babel/core": "7",
+    "@babel/plugin-transform-runtime": "7",
+    "@babel/preset-env": "7",
     "@babel/preset-react": "^7.10.4",
-    "@rails/webpacker": "^6.0.0-rc.6",
+    "@babel/runtime": "7",
+    "shakapacker ": "^6.1.1",
     "@rescript/react": "^0.10.3",
+    "babel-loader": "8",
     "babel-plugin-macros": "^3.1.0",
     "babel-plugin-module-resolver": "^4.0.0",
+    "compression-webpack-plugin": "9",
     "core-js": "3",
     "create-react-class": "^15.6.3",
     "css-loader": "^6.5.1",
@@ -44,13 +50,19 @@
     "sass": "^1.43.4",
     "sass-loader": "^12.3.0",
     "sass-resources-loader": "^2.1.0",
+    "shakapacker": "6.0.2",
     "style-loader": "^3.3.1",
-    "url-loader": "^4.0.0"
+    "terser-webpack-plugin": "5",
+    "url-loader": "^4.0.0",
+    "webpack": "5",
+    "webpack-assets-manifest": "5",
+    "webpack-cli": "4",
+    "webpack-merge": "5"
   },
   "devDependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.1",
     "react-refresh": "^0.11.0",
-    "webpack-dev-server": "^4.5.0"
+    "webpack-dev-server": "^4.7.3"
   },
   "browser": {
     "fs": false
@@ -60,10 +72,10 @@
     "lint": "cd ../.. && yarn run lint",
     "format": "cd ../.. && yarn start format",
     "test": "yarn run build:test && yarn run lint && rspec",
-    "build:test": "rm -rf public/webpack/test && yarn build:rescript && RAILS_ENV=test NODE_ENV=test bin/webpack",
-    "build:dev": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
-    "build:dev:server": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
-    "build:dev:watch": "rescript build -w && RAILS_ENV=development NODE_ENV=development bin/webpack --watch",
+    "build:test": "rm -rf public/webpack/test && yarn build:rescript && RAILS_ENV=test NODE_ENV=test bin/webpacker",
+    "build:dev": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/webpacker --watch",
+    "build:dev:server": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/webpacker --watch",
+    "build:dev:watch": "rescript build -w && RAILS_ENV=development NODE_ENV=development bin/webpacker --watch",
     "build:clean": "yarn build:rescript && rm -rf public/webpack || true",
     "build:rescript": "rescript clean && rescript build -with-deps",
     "build:rescript:dev": "rescript build -w"

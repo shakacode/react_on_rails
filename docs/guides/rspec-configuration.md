@@ -12,7 +12,7 @@ compiled by webpack before running tests and during production deployment:
 2. **Use the react_on_rails settings and helpers**. Use the settings in `config/initializers/react_on_rails.rb`. Refer to [docs/configuration](https://www.shakacode.com/react-on-rails/docs/guides/configuration/).
 
 ```yml
-  config.build_test_command = "NODE_ENV=test RAILS_ENV=test bin/webpack"
+  config.build_test_command = "NODE_ENV=test RAILS_ENV=test bin/webpacker"
 ```
 
 Which should you use? If you're already using the `rails/webpacker` way to configure webpack, then
