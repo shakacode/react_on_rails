@@ -135,6 +135,10 @@ function domNodeIdForEl(el: Element): string {
  * delegates to a renderer registered by the user.
  * @param el
  */
+
+type ComponentCache = { [key: string]: boolean };
+let components: { [key: string]: ComponentCache; } = {};
+
 function render(el: Element, railsContext: RailsContext): void {
   const context = findContext();
   // This must match lib/react_on_rails/helper.rb
@@ -142,6 +146,20 @@ function render(el: Element, railsContext: RailsContext): void {
   const domNodeId = domNodeIdForEl(el);
   const props = (el.textContent !== null) ? JSON.parse(el.textContent) : {};
   const trace = el.getAttribute('data-trace') === "true";
+  const path = window.location.pathname;
+  const locationMounted = components[path];
+
+  if (locationMounted) {
+    const componentMounted = locationMounted[props.componentName];
+    if (componentMounted) return;
+
+    components[path] = {
+      ...components[path],
+      [props.componentName]: true,
+    }
+  } else {
+    components[path] = { [props.componentName]: true };
+  }
 
   try {
     const domNode = document.getElementById(domNodeId);
@@ -238,19 +256,17 @@ function renderInit(): void {
     return;
   }
 
+  components = {};
+
   if (turboInstalled()) {
     debugTurbolinks(
-      'USING TURBO: document added event listeners ' +
-      'turbo:before-render and turbo:render.');
-    document.addEventListener('turbo:before-render', reactOnRailsPageUnloaded);
-    document.addEventListener('turbo:render', reactOnRailsPageLoaded);
+      'USING TURBO: document added event listener turbo:load.');
+    document.addEventListener('turbo:load', reactOnRailsPageLoaded);
     reactOnRailsPageLoaded();
   } else if (turbolinksVersion5()) {
     debugTurbolinks(
-      'USING TURBOLINKS 5: document added event listeners ' +
-      'turbolinks:before-render and turbolinks:render.');
-    document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
-    document.addEventListener('turbolinks:render', reactOnRailsPageLoaded);
+      'USING TURBOLINKS 5: document added event listener turbolinks:load.');
+    document.addEventListener('turbolinks:load', reactOnRailsPageLoaded);
     reactOnRailsPageLoaded();
   } else {
     debugTurbolinks(
