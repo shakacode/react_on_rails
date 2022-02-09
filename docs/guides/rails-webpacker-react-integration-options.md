@@ -1,4 +1,4 @@
-# Rails/Webpacker React Integration Options
+# Shakapacker (Rails/Webpacker) React Integration Options
 
 You only _need_ props hydration if you need SSR. However, there's no good reason to
 have your app make a second round trip to the Rails server to get initialization props.
@@ -81,7 +81,7 @@ Webpack's HMR allows the replacement of modules for React in-place without reloa
 ### React Refresh Webpack Plugin
 [github.com/pmmmwh/react-refresh-webpack-plugin](https://github.com/pmmmwh/react-refresh-webpack-plugin)
 
-You can see an example commit of adding this [here](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh/commit/7e53803fce7034f5ecff335db1f400a5743a87e7).
+You can see an example commit of adding this [here](https://github.com/shakacode/react_on_rails_demo_ssr_hmr/commit/7e53803fce7034f5ecff335db1f400a5743a87e7).
 
 1. Add react refresh packages:
    `yarn add @pmmmwh/react-refresh-webpack-plugin react-refresh -D`
@@ -110,6 +110,8 @@ You can see an example commit of adding this [here](https://github.com/shakacode
        );
    }
    ```
+
+---
 
 ### React Hot Loader (Deprecated)
 
@@ -179,4 +181,3 @@ module.exports = environment.toWebpackConfig()
 
 module.exports = environment;
 ```
-

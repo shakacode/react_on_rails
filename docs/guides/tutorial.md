@@ -1,10 +1,10 @@
 # React on Rails Basic Tutorial
 
-**November 11, 2020**: See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) for a new way to setup the creation of your SSR bundle with `rails/webpacker`. This file will be update shortly. Most of it is still relevant.
+_Also see the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_demo_ssr_hmr)_ 
 
 -----
 
-*Updated for Ruby 2.7.1, Rails 6.0.3.1, React on Rails v12.5.0, and Shakapacker v6*
+*Updated for Ruby 2.7, Rails 7, React on Rails v13, and Shakapacker v6*
 
 This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
@@ -23,7 +23,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 
 ## Setting up your environment
 
-Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 6.x and node version 14+. I recommend `rvm` or `rbevn` and `nvm` to install Ruby and Node. Rails can be installed as an ordinary gem.
+Trying out **React on Rails** is super easy, so long as you have the basic prerequisites. This includes the basics for Rails 6.x and node version 14+. I recommend `rvm` or `rbenv` and `nvm` to install Ruby and Node. Rails can be installed as an ordinary gem.
 
 ```
 nvm install node                # download and install latest stable Node
@@ -49,6 +49,7 @@ cd <directory where you want to create your new Rails app>
 
 # Any name you like for the rails app
 # Skip javascript so will add that next and get the current version
+# This is for Rails 7
 rails new --skip-turbolinks --skip-javascript test-react-on-rails
 
 cd test-react-on-rails
@@ -60,7 +61,7 @@ of both the gem and npm package. In other words, don't use the `^` or `~` in the
 _Use the latest version for `react_on_rails` and `shakapacker`._
 
 ```
-gem 'react_on_rails', '13.0.0'         # prefer exact gem version to match npm version
+gem 'react_on_rails', '13.0.1'         # prefer exact gem version to match npm version
 gem 'shakapacker', '6.1.1'             # prefer exact gem version to match npm version
 
 ```
@@ -68,7 +69,7 @@ gem 'shakapacker', '6.1.1'             # prefer exact gem version to match npm v
 Note: The latest released React On Rails version is considered stable. Please use the latest
 version to ensure you get all the security patches and the best support.
 
-## Run the webpacker (shakapacker) generator
+## Run the shakapacker (webpacker) generator
 
 ```terminal
 bundle exec rails webpacker:install

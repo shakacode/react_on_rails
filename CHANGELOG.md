@@ -16,9 +16,13 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+### [13.0.1] - 2022-02-09
+#### Improved
+- Updated the default generator [PR 1431](https://github.com/shakacode/react_on_rails/pull/1431) by [justin808](https://github.com/justin808).
+
 ### [13.0.0] - 2022-02-08
 #### Breaking
-- Removed webpacker as a dependency. Add gem Shakapacker to your project.
+- Removed webpacker as a dependency. Add gem Shakapacker to your project, and update your package.json to also use shakapacker.
 
 #### Fixed
 - Propper throwing of exceptions.
@@ -46,7 +50,7 @@ Changes since last non-beta release.
 - Supports Rails 7.
 
 #### Changed
-- Changed logic of determining the usage of the default rails/webpacker webpack config or a custom command to only check if the config.build_production_command is defined. [PR 1402](https://github.com/shakacode/react_on_rails/pull/1402)by [justin808](https://github.com/justin808) and [gscarv13](https://github.com/gscarv13).
+- Changed logic of determining the usage of the default rails/webpacker webpack config or a custom command to only check if the config.build_production_command is defined. [PR 1402](https://github.com/shakacode/react_on_rails/pull/1402) by [justin808](https://github.com/justin808) and [gscarv13](https://github.com/gscarv13).
 - Minimimum required Ruby is 2.7 to match lastest rails/webpacker.
 
 ### [12.4.0] - 2021-09-22
@@ -1006,7 +1010,9 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/12.6.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.0.1...master
+[13.0.1]: https://github.com/shakacode/react_on_rails/compare/13.0.0...13.0.1
+[13.0.0]: https://github.com/shakacode/react_on_rails/compare/12.6.0...13.0.0
 [12.6.0]: https://github.com/shakacode/react_on_rails/compare/12.5.2...12.6.0
 [12.5.2]: https://github.com/shakacode/react_on_rails/compare/12.5.1...12.5.2
 [12.5.1]: https://github.com/shakacode/react_on_rails/compare/12.5.0...12.5.1

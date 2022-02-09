@@ -11,7 +11,7 @@
 
 To get a deeper understanding of `rails/webpacker`, watch [RailsConf 2020 CE - Webpacker, It-Just-Works, But How? by Justin Gordon](https://youtu.be/sJLoOpc5LD8)
 
-Per the example repo [shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh),
+Per the example repo [shakacode/react_on_rails_demo_ssr_hmr](https://github.com/shakacode/react_on_rails_demo_ssr_hmr),
 you should consider keeping your codebase mostly consistent with the defaults for [rails/webpacker](https://github.com/rails/webpacker).
 
 # React on Rails
