@@ -13,7 +13,7 @@
 
 # News
 * ShakaCode now maintains the official successor to `rails/webpacker`, [`shakapacker`](https://github.com/shakacode/shakapacker).
-* Project is updated to support Rails 7!
+* Project is updated to support Rails 7 and Shakapacker v6+!
 
 -----
 
@@ -44,12 +44,12 @@ To provide a high performance framework for integrating Ruby on Rails with React
 Given that `rails/webpacker` gem already provides basic React integration, why would you use "React on Rails"?
 
 1. Easy passing of props directly from your Rails view to your React components rather than having your Rails view load and then make a separate request to your API.
-1. Tight integration with [rails/webpacker](https://github.com/rails/webpacker).
-1. Server-Side Rendering (SSR), often used for SEO crawler indexing and UX performance, is not offered by `rails/webpacker`.
+1. Tight integration with [shakapacker](https://github.com/shakacode/shakapacker) (or it's predecessor [rails/webpacker](https://github.com/rails/webpacker].
+1. Server-Side Rendering (SSR), often used for SEO crawler indexing and UX performance.
 1. [Redux](https://github.com/reactjs/redux) and [React Router](https://github.com/ReactTraining/react-router#readme) integration with server-side-rendering.
 1. [Internationalization (I18n) and (localization)](https://www.shakacode.com/react-on-rails/docs/guides/i18n)
 1. A supportive community. This [web search shows how live public sites are using React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/).
-1. [Reason ML Support](https://github.com/shakacode/reason-react-on-rails-example).
+1. [ReScript Support](https://github.com/shakacode/rescript-react-on-rails-example).
 
 See [Rails/Webpacker React Integration Options](https://www.shakacode.com/react-on-rails/docs/guides/rails-webpacker-react-integration-options) for comparisons to other gems.
 

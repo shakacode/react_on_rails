@@ -16,7 +16,7 @@
 ## Example Apps
 1. [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) example repo for a simple configuration of webpack via the rails/webpacker gem
 that supports SSR.
-2. Example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) for a new way to setup the creation of your SSR bundle with `rails/webpacker`.
+2. Example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_demo_ssr_hmr) for a new way to setup the creation of your SSR bundle with `rails/webpacker`.
 3. Live, [open source](https://github.com/shakacode/react-webpack-rails-tutorial), example of this gem, see [reactrails.com](http://reactrails.com).
 
 # Other Resources

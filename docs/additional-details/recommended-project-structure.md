@@ -12,7 +12,7 @@ app/javascript:
   │   └── hello-world-bundle.js
 ```
 
-Per the example repo [shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh),
+Per the example repo [shakacode/react_on_rails_demo_ssr_hmr](https://github.com/shakacode/react_on_rails_demo_ssr_hmr),
 you should consider keeping your codebase mostly consistent with the defaults for [rails/webpacker](https://github.com/rails/webpacker).
 
 ## Steps to convert from the generator defaults to use a `/client` directory for source code 
