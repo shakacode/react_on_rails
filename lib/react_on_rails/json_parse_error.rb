@@ -4,7 +4,7 @@ module ReactOnRails
   class JsonParseError < ::ReactOnRails::Error
     attr_reader :json
 
-    def initialize(parse_error, json)
+    def initialize(parse_error:, json:)
       @json = json
       @original_error = parse_error
       super(parse_error.message)

@@ -1,7 +1,5 @@
 <%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh/blob/master/config/webpack/development.js") %>
 
-process.env.NODE_ENV = process.env.NODE_ENV || 'development';
-
 const { devServer, inliningCss } = require('shakapacker');
 
 const webpackConfig = require('./webpackConfig');

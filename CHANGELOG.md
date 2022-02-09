@@ -16,6 +16,13 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+### [13.0.0] - 2022-02-08
+#### Breaking
+- Removed webpacker as a dependency. Add gem Shakapacker to your project.
+
+#### Fixed
+- Propper throwing of exceptions.
+- Default configuration better handles test env.
 
 ### [12.6.0] - 2022-01-22
 

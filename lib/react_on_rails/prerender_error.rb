@@ -49,10 +49,13 @@ module ReactOnRails
       message = +"ERROR in SERVER PRERENDERING\n"
       if err
         message << <<~MSG
-          Encountered error: \"#{err}\"
+          Encountered error:
+
+          #{err}
+
         MSG
 
-        backtrace = err.backtrace.join("\n")
+        backtrace = err.backtrace.first(15).join("\n")
       else
         backtrace = nil
       end
