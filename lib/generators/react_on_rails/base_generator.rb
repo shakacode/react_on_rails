@@ -51,6 +51,7 @@ module ReactOnRails
         base_files = %w[babel.config.js
                         config/webpack/clientWebpackConfig.js
                         config/webpack/commonWebpackConfig.js
+                        config/webpack/test.js
                         config/webpack/development.js
                         config/webpack/production.js
                         config/webpack/serverWebpackConfig.js

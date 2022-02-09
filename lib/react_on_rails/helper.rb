@@ -234,9 +234,9 @@ module ReactOnRails
       console_log_script = result["consoleLogScript"]
       raw("#{html}#{render_options.replay_console ? console_log_script : ''}")
     rescue ExecJS::ProgramError => err
-      raise ReactOnRails::PrerenderError, component_name: "N/A (server_render_js called)",
-                                          err: err,
-                                          js_code: js_code
+      raise ReactOnRails::PrerenderError.new(component_name: "N/A (server_render_js called)",
+                                             err: err,
+                                             js_code: js_code)
     end
 
     def json_safe_and_pretty(hash_or_string)
@@ -309,6 +309,7 @@ module ReactOnRails
 
       @rails_context.merge(serverSide: server_side)
     end
+
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
     private
@@ -483,21 +484,21 @@ module ReactOnRails
         result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(js_code, render_options)
       rescue StandardError => err
         # This error came from the renderer
-        raise ReactOnRails::PrerenderError, component_name: react_component_name,
-                                            # Sanitize as this might be browser logged
-                                            props: sanitized_props_string(props),
-                                            err: err,
-                                            js_code: js_code
+        raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
+                                               # Sanitize as this might be browser logged
+                                               props: sanitized_props_string(props),
+                                               err: err,
+                                               js_code: js_code)
       end
 
       if result["hasErrors"] && render_options.raise_on_prerender_error
         # We caught this exception on our backtrace handler
-        raise ReactOnRails::PrerenderError, component_name: react_component_name,
-                                            # Sanitize as this might be browser logged
-                                            props: sanitized_props_string(props),
-                                            err: nil,
-                                            js_code: js_code,
-                                            console_messages: result["consoleReplayScript"]
+        raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
+                                               # Sanitize as this might be browser logged
+                                               props: sanitized_props_string(props),
+                                               err: nil,
+                                               js_code: js_code,
+                                               console_messages: result["consoleReplayScript"])
 
       end
       result

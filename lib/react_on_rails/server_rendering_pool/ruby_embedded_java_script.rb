@@ -47,7 +47,7 @@ module ReactOnRails
         # Note, js_code does not have to be based on React.
         # js_code MUST RETURN json stringify Object
         # Calling code will probably call 'html_safe' on return value before rendering to the view.
-        # rubocop:disable Metrics/CyclomaticComplexity
+        # rubocop:disable Metrics/CyclomaticComplexity, Metrics/AbcSize, Metrics/PerceivedComplexity
         def exec_server_render_js(js_code, render_options, js_evaluator = nil)
           js_evaluator ||= self
           if render_options.trace
@@ -56,12 +56,27 @@ module ReactOnRails
                                "tmp/server-generated-#{@file_index % 10}.js")
             @file_index += 1
           end
-          json_string = js_evaluator.eval_js(js_code, render_options)
+          begin
+            json_string = js_evaluator.eval_js(js_code, render_options)
+          rescue StandardError => err
+            msg = <<~MSG
+              Error evaluating server bundle. Check your webpack configuration.
+              ===============================================================
+              Caught error:
+              #{err.message}
+              ===============================================================
+            MSG
+
+            if err.message.include?("ReferenceError: self is not defined")
+              msg << "\nError indicates that you may have code-splitting incorrectly enabled.\n"
+            end
+            raise ReactOnRails::Error, msg, err.backtrace
+          end
           result = nil
           begin
             result = JSON.parse(json_string)
           rescue JSON::ParserError => e
-            raise ReactOnRails::JsonParseError.new(e, json_string)
+            raise ReactOnRails::JsonParseError.new(parse_error: e, json: json_string)
           end
 
           if render_options.logging_on_server
@@ -76,7 +91,7 @@ module ReactOnRails
           end
           result
         end
-        # rubocop:enable Metrics/CyclomaticComplexity
+        # rubocop:enable Metrics/CyclomaticComplexity, Metrics/AbcSize, Metrics/PerceivedComplexity
 
         def trace_js_code_used(msg, js_code, file_name = "tmp/server-generated.js", force: false)
           return unless ReactOnRails.configuration.trace || force
