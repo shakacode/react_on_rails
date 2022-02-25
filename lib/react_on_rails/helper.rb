@@ -279,8 +279,9 @@ module ReactOnRails
           # URLs as UTF-8. This situation can occur in browsers that do not encode the
           # entire URL as UTF-8 already, mostly on the Windows platform (IE11 and lower).
           original_url_normalized = request.original_url
-          if original_url_normalized.encoding.to_s == "ASCII-8BIT"
-            original_url_normalized = original_url_normalized.force_encoding("ISO-8859-1").encode("UTF-8")
+          if original_url_normalized.encoding == Encoding::BINARY
+            original_url_normalized = original_url_normalized.force_encoding(Encoding::ISO_8859_1)
+                                                             .encode(Encoding::UTF_8)
           end
 
           # Using Addressable instead of standard URI to better deal with
