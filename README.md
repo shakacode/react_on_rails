@@ -44,7 +44,7 @@ To provide a high performance framework for integrating Ruby on Rails with React
 Given that `rails/webpacker` gem already provides basic React integration, why would you use "React on Rails"?
 
 1. Easy passing of props directly from your Rails view to your React components rather than having your Rails view load and then make a separate request to your API.
-1. Tight integration with [shakapacker](https://github.com/shakacode/shakapacker) (or it's predecessor [rails/webpacker](https://github.com/rails/webpacker].
+1. Tight integration with [shakapacker](https://github.com/shakacode/shakapacker) (or it's predecessor [rails/webpacker](https://github.com/rails/webpacker)).
 1. Server-Side Rendering (SSR), often used for SEO crawler indexing and UX performance.
 1. [Redux](https://github.com/reactjs/redux) and [React Router](https://github.com/ReactTraining/react-router#readme) integration with server-side-rendering.
 1. [Internationalization (I18n) and (localization)](https://www.shakacode.com/react-on-rails/docs/guides/i18n)
