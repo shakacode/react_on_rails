@@ -16,9 +16,13 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+### [13.0.2] - 2022-03-09
+#### Fixed
+- React 16 doesn't support version property, causing problems loading React on Rails. [PR 1435](https://github.com/shakacode/react_on_rails/pull/1435) by [justin808](https://github.com/justin808).
+ 
 ### [13.0.1] - 2022-02-09
 #### Improved
-- Updated the default generator [PR 1431](https://github.com/shakacode/react_on_rails/pull/1431) by [justin808](https://github.com/justin808).
+- Updated the default generator. [PR 1431](https://github.com/shakacode/react_on_rails/pull/1431) by [justin808](https://github.com/justin808).
 
 ### [13.0.0] - 2022-02-08
 #### Breaking
