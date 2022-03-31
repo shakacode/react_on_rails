@@ -109,8 +109,6 @@ module ReactOnRails
       configure_generated_assets_dirs_deprecation
       configure_skip_display_none_deprecation
       ensure_generated_assets_dir_present
-      check_i18n_directory_exists
-      check_i18n_yml_directory_exists
       check_server_render_method_is_only_execjs
       error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
       # check_deprecated_settings
@@ -180,30 +178,6 @@ module ReactOnRails
       Error configuring /config/initializers/react_on_rails.rb: invalid value for `config.server_render_method`.
       If you wish to use a server render method other than ExecJS, contact justin@shakacode.com
       for details.
-      MSG
-      raise ReactOnRails::Error, msg
-    end
-
-    def check_i18n_directory_exists
-      return if i18n_dir.nil?
-      return if Dir.exist?(i18n_dir)
-
-      msg = <<-MSG.strip_heredoc
-      Error configuring /config/initializers/react_on_rails.rb: invalid value for `config.i18n_dir`.
-      Directory does not exist: #{i18n_dir}. Set to value to nil or comment it
-      out if not using the React on Rails i18n feature.
-      MSG
-      raise ReactOnRails::Error, msg
-    end
-
-    def check_i18n_yml_directory_exists
-      return if i18n_yml_dir.nil?
-      return if Dir.exist?(i18n_yml_dir)
-
-      msg = <<-MSG.strip_heredoc
-      Error configuring /config/initializers/react_on_rails.rb: invalid value for `config.i18n_yml_dir`.
-      Directory does not exist: #{i18n_yml_dir}. Set to value to nil or comment it
-      out if not using this i18n with React on Rails, or if you want to use all translation files.
       MSG
       raise ReactOnRails::Error, msg
     end

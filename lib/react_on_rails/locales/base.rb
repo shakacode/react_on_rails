@@ -4,7 +4,34 @@ require "erb"
 
 module ReactOnRails
   module Locales
+
+    def self.check_i18n_directory_exists
+      return if ReactOnRails.configuration.i18n_dir.nil?
+      return if Dir.exist?(ReactOnRails.configuration.i18n_dir)
+
+      msg = <<-MSG.strip_heredoc
+      Error configuring /config/initializers/react_on_rails.rb: invalid value for `config.i18n_dir`.
+      Directory does not exist: #{ReactOnRails.configuration.i18n_dir}. Set to value to nil or comment it
+      out if not using the React on Rails i18n feature.
+      MSG
+      raise ReactOnRails::Error, msg
+    end
+
+    def self.check_i18n_yml_directory_exists
+      return if ReactOnRails.configuration.i18n_yml_dir.nil?
+      return if Dir.exist?(ReactOnRails.configuration.i18n_yml_dir)
+
+      msg = <<-MSG.strip_heredoc
+      Error configuring /config/initializers/react_on_rails.rb: invalid value for `config.i18n_yml_dir`.
+      Directory does not exist: #{ReactOnRails.configuration.i18n_yml_dir}. Set to value to nil or comment it
+      out if not using this i18n with React on Rails, or if you want to use all translation files.
+      MSG
+      raise ReactOnRails::Error, msg
+    end
+
     def self.compile
+      self.check_i18n_directory_exists
+      self.check_i18n_yml_directory_exists
       if ReactOnRails.configuration.i18n_output_format&.downcase == "js"
         ReactOnRails::Locales::ToJs.new
       else
