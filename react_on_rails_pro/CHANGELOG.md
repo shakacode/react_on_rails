@@ -2,10 +2,12 @@
 All notable changes to this project will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next release.
 
 ## Gem and Package Versions
-Gem and package versions are the same except for beta releases where the gem uses a `.beta` and the package uses a `-beta`.
+Gem and package versions are the same except for beta releases where the gem uses a `.beta` and the package uses a `-beta` (same for `rc`).
 
-**Gem**: 2.0.0.beta.2
-**Package**: 2.0.0-beta.2
+1. **Gem**: `3.0.0.rc.1`
+2. **Package**: `3.0.0-rc.1`
+
+You can find the **package** version numbers from this repo's tags and below in this file.
 
 ----
 
@@ -14,6 +16,8 @@ Gem and package versions are the same except for beta releases where the gem use
 
 ### Added
 - New configuration `config.client_props_extension = PropsExtension` enabling a callback to adjust the props used for client side hydration (PENDING).
+
+## [3.0.0-rc.1] - 2022-02-26
 
 ### Fixed
 - Use relative source path for bundle symlink which conflicted with extraction of (Heroku) slugs caching resulting in incorrect extraction of the slugs due to absolute paths in the symlinks. [PR 231](https://github.com/shakacode/react_on_rails_pro/pull/231) by [judahmeek](https://github.com/judahmeek).
@@ -250,7 +254,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.4.0-rc.0...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.1...HEAD
+[3.0.0-rc.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.0...3.0.0-rc.1
 [3.0.0-rc.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.3.0...3.0.0-rc.0
 [2.3.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.2.0...2.3.0
 [2.2.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.1.1...2.2.0
