@@ -14,8 +14,10 @@ You can find the **package** version numbers from this repo's tags and below in 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
-### Added
-- New configuration `config.client_props_extension = PropsExtension` enabling a callback to adjust the props used for client side hydration (PENDING).
+## [3.0.0-rc.2] - 2022-04-14
+
+### Fixed
+- Fix prepare_node_renderer script. [PR 254](https://github.com/shakacode/react_on_rails_pro/pull/254) by [judahmeek](https://github.com/judahmeek).
 
 ## [3.0.0-rc.1] - 2022-02-26
 
@@ -254,7 +256,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.1...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.2...HEAD
+[3.0.0-rc.2]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.1...3.0.0-rc.2
 [3.0.0-rc.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.0...3.0.0-rc.1
 [3.0.0-rc.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.3.0...3.0.0-rc.0
 [2.3.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.2.0...2.3.0
