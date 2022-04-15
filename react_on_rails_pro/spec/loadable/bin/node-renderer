@@ -1,1 +1,0 @@
-cd react-on-rails-pro && PORT=3800 node react-on-rails-pro-node-renderer.js

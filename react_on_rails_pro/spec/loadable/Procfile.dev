@@ -1,3 +1,0 @@
-renderer: bin/node-renderer
-web: RENDERER_URL=http://localhost:3800 rails s -p 3000
-webpack: nps build.dev.watch

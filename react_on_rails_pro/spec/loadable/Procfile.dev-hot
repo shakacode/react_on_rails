@@ -1,6 +1,0 @@
-# You can run these commands in separate shells
-# wp means webpack
-web: HMR=true RENDERER_URL=http://localhost:3800 rails s -p 3000
-wp-dev-server: HMR=true nps webpack-dev-server
-wp-server-bundle: HMR=true nps build.dev.server.watch
-renderer: bin/node-renderer
