@@ -24,7 +24,7 @@ export function consoleReplay(): string {
         if (val === undefined) {
           val = 'undefined';
         }
-      } catch (e) {
+      } catch (e: any) {
         val = `${e.message}: ${arg}`;
       }
 
