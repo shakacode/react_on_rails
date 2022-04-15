@@ -5,7 +5,7 @@ require "active_support"
 namespace :react_on_rails_pro do
   desc "Copy assets to local node-renderer"
   task pre_stage_bundle_for_node_renderer: :environment do
-    ReactOnRailsPro::PrepareNodeRenderBundles.new.call
+    ReactOnRailsPro::PrepareNodeRenderBundles.call
   end
 
   desc "Copy assets to remote node-renderer"
