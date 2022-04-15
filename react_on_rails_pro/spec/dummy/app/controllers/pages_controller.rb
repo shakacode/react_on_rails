@@ -48,8 +48,8 @@ class PagesController < ApplicationController
       XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
     MSG
     Rails.logger.info msg
-    render_to_string(template: "/pages/pro/serialize_props.json.jbuilder",
-                     locals: { name: PROPS_NAME }, format: :json)
+    render_to_string(template: "/pages/pro/serialize_props",
+                     locals: { name: PROPS_NAME }, formats: :json)
   end
 
   def initialize_shared_store
