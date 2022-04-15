@@ -9,7 +9,7 @@ module.exports = function checkProtocolVersion(req) {
     return {
       headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
       status: 412,
-      data: `Unsupported renderer protocol version, request protocol ${req.body.protocolVersion} does not
+      data: `Unsupported renderer protocol version ${req.body.protocolVersion ? `request protocol ${req.body.protocolVersion}` : `MISSING with body ${req.body}`} does not
 match installed renderer protocol ${packageJson.protocolVersion} for version ${packageJson.version}.
 Update either the renderer or the Rails server`,
     };
