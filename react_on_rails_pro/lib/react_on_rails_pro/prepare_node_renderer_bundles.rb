@@ -4,10 +4,10 @@ require "pathname"
 
 module ReactOnRailsPro
   class PrepareNodeRenderBundles
-    include FileUtils
+    extend FileUtils
 
     # rubocop:disable Metrics/AbcSize
-    def call
+    def self.call
       # TODO: temporarily hardcoding tmp/bundles directory. renderer and rails should read from a Yaml file
       src_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
       renderer_bundle_file_name = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.renderer_bundle_file_name
