@@ -1,3 +1,0 @@
-run: NODE_ENV=production RAILS_ENV=production RENDERER_URL=http://localhost:3800 \
-     bundle exec puma -p $PORT -e $RACK_ENV -C config/puma.rb
-renderer: cd react-on-rails-pro && NODE_ENV=production RAILS_ENV=production PORT=3800 node react-on-rails-pro-node-renderer.js

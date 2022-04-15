@@ -1,8 +1,0 @@
-# frozen_string_literal: true
-
-source "https://rubygems.org"
-
-ENV["SPEC_LOADABLE"] = "yes"
-eval_gemfile File.expand_path("../../Gemfile.development_dependencies", __dir__)
-
-gem "react_on_rails_pro", path: "../.."
