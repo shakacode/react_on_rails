@@ -18,6 +18,7 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ### Fixed
 - Fix prepare_node_renderer script. [PR 254](https://github.com/shakacode/react_on_rails_pro/pull/254) by [judahmeek](https://github.com/judahmeek).
+- Better logging for error 'Request protocol undefined does not match installed renderer protocol'. [PR 252](https://github.com/shakacode/react_on_rails_pro/pull/252) by [justin808](https://github.com/justin808).
 
 ## [3.0.0-rc.1] - 2022-02-26
 
