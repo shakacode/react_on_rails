@@ -1,4 +1,3 @@
-// See spec/loadable/README.md for details regarding **.imports-X.** file extension & duplicate file structure.
 import React from 'react';
 import { ChunkExtractor } from '@loadable/server';
 import { renderToString } from 'react-dom/server';

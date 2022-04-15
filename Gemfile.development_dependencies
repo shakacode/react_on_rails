@@ -22,16 +22,13 @@ unless ENV['SPEC_DUMMY'] == 'yes'
   gem "pg"
 end
 
-# Skip these for spec/loadable
-unless ENV['SPEC_LOADABLE'] == 'yes'
-  # Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
-  gem "turbolinks"
-  gem "sqlite3"
-  gem "uglifier"
-  gem "jquery-rails"
-  gem "sprockets"
-  gem "sass-rails"
-end
+# Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
+gem "turbolinks"
+gem "sqlite3"
+gem "uglifier"
+gem "jquery-rails"
+gem "sprockets"
+gem "sass-rails"
 
 gem "amazing_print"
 gem "mini_racer"

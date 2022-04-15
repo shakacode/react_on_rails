@@ -8,18 +8,15 @@ Node rendering and caching performance enhancements for [React on Rails](https:/
 
 ## Getting Started
 The best way to see how React on Rails Pro works is to install this repo locally and take a look at
-the two example applications:
+the example application:
 
-1. [spec/dummy](./spec/dummy/README.md)
-   1. Uses a @rails/webpacker standard configuration.
-   1. Has pages that demonstrate:
-      1. caching
-      2. loadable-components
-   1. Has all the basic react_on_rails specs that run against the Node Renderer 
-2. [spec/loadable](./spec/loadable/README.md): 
-   1. Uses a custom webpack configuration.
-   2. Demonstrates using HMR and loadable-components.
-   3. Has almost same the example that is present in [loadable-components for SSR](https://github.com/gregberge/loadable-components/tree/main/examples/server-side-rendering)
+[spec/dummy](./spec/dummy/README.md)
+1. Uses a @rails/webpacker standard configuration.
+1. Has pages that demonstrate:
+   1. caching
+   2. loadable-components
+1. Has all the basic react_on_rails specs that run against the Node Renderer 
+1. Demonstrates using HMR and loadable-components with almost same the example that is present in [loadable-components for SSR](https://github.com/gregberge/loadable-components/tree/main/examples/server-side-rendering)
    
 See the README.md in those sample apps for more details.
 

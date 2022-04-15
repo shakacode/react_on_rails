@@ -26,8 +26,6 @@ AllCops:
     - 'spec/fixtures/**/*'
     - 'spec/dummy/db/schema.rb'
     - 'spec/dummy/bin/**/*'
-    - 'spec/loadable/bin/**/*'
-    - 'spec/loadable/db/schema.rb'
     - 'node_modules/**/*'
     - 'coverage/**/*'
     - 'bin/**/*'
