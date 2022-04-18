@@ -2,7 +2,7 @@
 
 ## Details
 1. [Overview](https://www.shakacode.com/react-on-rails/docs/guides/react-on-rails-overview/)
-1. [Getting Started](https://www.shakacode.com/react-on-rails/docs/guides/getting-started/)
+1. [Getting Started](https://www.shakacode.com/react-on-rails/docs/getting-started/)
 1. [How React on Rails Works](https://www.shakacode.com/react-on-rails/docs/guides/how-react-on-rails-works/)
 1. [Webpack Configuration](https://www.shakacode.com/react-on-rails/docs/guides/webpack-configuration/)
 1. [View Helpers API](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/)
