@@ -9,8 +9,7 @@ import type {
 
 import createReactOutput from './createReactOutput';
 import {isServerRenderHash} from './isServerRenderResult';
-import reactHydrate from './reactHydrate';
-import reactRender from './reactRender';
+import { reactHydrate, reactRender, canHydrate } from './helpers/renderHelper';
 
 declare global {
   interface Window {
@@ -152,8 +151,7 @@ function render(el: Element, railsContext: RailsContext): void {
       }
 
       // Hydrate if available and was server rendered
-      // @ts-expect-error potentially present if React 18 or greater
-      const shouldHydrate = !!(ReactDOM.hydrate || ReactDOM.hydrateRoot) && !!domNode.innerHTML;
+      const shouldHydrate = canHydrate && !!domNode.innerHTML;
 
       const reactElementOrRouterResult = createReactOutput({
         componentObj,
@@ -213,6 +211,7 @@ function unmount(el: Element): void {
   const domNode = document.getElementById(domNodeId);
   if(domNode === null){return;}
   try {
+    // Might need updating? https://reactjs.org/blog/2022/03/08/react-18-upgrade-guide.html
     ReactDOM.unmountComponentAtNode(domNode);
   } catch (e) {
     console.info(`Caught error calling unmountComponentAtNode: ${e.message} for domNode`,

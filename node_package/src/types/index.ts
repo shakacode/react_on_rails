@@ -52,6 +52,10 @@ interface RenderFunction {
 
 type ReactComponentOrRenderFunction = ReactComponent | RenderFunction;
 
+type RootRenderFunction = (domNode: Element, reactElement: ReactElement) => void | Element | Component;
+
+type RootHydrateFunction = RootRenderFunction;
+
 export type { // eslint-disable-line import/prefer-default-export
   ReactComponentOrRenderFunction,
   ReactComponent,
@@ -61,6 +65,8 @@ export type { // eslint-disable-line import/prefer-default-export
   StoreGenerator,
   CreateReactOutputResult,
   ServerRenderResult,
+  RootRenderFunction,
+  RootHydrateFunction,
 }
 
 export interface RegisteredComponent {

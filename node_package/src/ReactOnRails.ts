@@ -18,8 +18,7 @@ import type {
   AuthenticityHeaders,
   StoreGenerator
 } from './types/index';
-import reactHydrate from './reactHydrate';
-import reactRender from './reactRender';
+import { reactHydrate, reactRender } from './helpers/renderHelper';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Store = any;
