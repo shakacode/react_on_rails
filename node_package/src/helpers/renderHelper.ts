@@ -6,9 +6,9 @@ import * as modernRootHandler from './modernRootHandler';
 let toExport;
 
 if (supportsReactCreateRoot) {
-  toExport = legacyRootHandler;
-} else {
   toExport = modernRootHandler;
+} else {
+  toExport = legacyRootHandler;
 }
 
 export const {
