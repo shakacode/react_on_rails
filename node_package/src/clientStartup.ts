@@ -9,7 +9,7 @@ import type {
 
 import createReactOutput from './createReactOutput';
 import {isServerRenderHash} from './isServerRenderResult';
-import { reactHydrate, reactRender, canHydrate } from './helpers/renderHelper';
+import renderHelperPromise from './helpers/renderHelper';
 
 declare global {
   interface Window {
@@ -137,46 +137,59 @@ function domNodeIdForEl(el: Element): string {
 function render(el: Element, railsContext: RailsContext): void {
   const context = findContext();
   // This must match lib/react_on_rails/helper.rb
-  const name = el.getAttribute('data-component-name') || "";
+  const name = el.getAttribute('data-component-name') || '';
   const domNodeId = domNodeIdForEl(el);
-  const props = (el.textContent !== null) ? JSON.parse(el.textContent) : {};
-  const trace = el.getAttribute('data-trace') === "true";
+  const props = el.textContent !== null ? JSON.parse(el.textContent) : {};
+  const trace = el.getAttribute('data-trace') === 'true';
 
-  try {
-    const domNode = document.getElementById(domNodeId);
-    if (domNode) {
-      const componentObj = context.ReactOnRails.getComponent(name);
-      if (delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) {
-        return;
-      }
+  renderHelperPromise.then(({ canHydrate, reactHydrate, reactRender }) => {
+    try {
+      const domNode = document.getElementById(domNodeId);
+      if (domNode) {
+        const componentObj = context.ReactOnRails.getComponent(name);
+        if (
+          delegateToRenderer(
+            componentObj,
+            props,
+            railsContext,
+            domNodeId,
+            trace
+          )
+        ) {
+          return;
+        }
 
-      // Hydrate if available and was server rendered
-      const shouldHydrate = canHydrate && !!domNode.innerHTML;
+        // Hydrate if available and was server rendered
+        const shouldHydrate = canHydrate && !!domNode.innerHTML;
 
-      const reactElementOrRouterResult = createReactOutput({
-        componentObj,
-        props,
-        domNodeId,
-        trace,
-        railsContext,
-        shouldHydrate,
-      });
+        const reactElementOrRouterResult = createReactOutput({
+          componentObj,
+          props,
+          domNodeId,
+          trace,
+          railsContext,
+          shouldHydrate,
+        });
 
-      if (isServerRenderHash(reactElementOrRouterResult)) {
-        throw new Error(`\
-You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
+        if (isServerRenderHash(reactElementOrRouterResult)) {
+          throw new Error(`\
+You returned a server side type of react-router error: ${JSON.stringify(
+            reactElementOrRouterResult
+          )}
 You should return a React.Component always for the client side entry point.`);
-      } else if (shouldHydrate) {
-        reactHydrate(domNode, reactElementOrRouterResult as ReactElement);
-      } else {
-        reactRender(domNode, reactElementOrRouterResult as ReactElement);
+        } else if (shouldHydrate) {
+          reactHydrate(domNode, reactElementOrRouterResult as ReactElement);
+        } else {
+          reactRender(domNode, reactElementOrRouterResult as ReactElement);
+        }
       }
+    } catch (e: any) {
+      e.message =
+        `ReactOnRails encountered an error while rendering component: ${name}.\n` +
+        `Original message: ${e.message}`;
+      throw e;
     }
-  } catch (e) {
-    e.message = `ReactOnRails encountered an error while rendering component: ${name}.\n` +
-      `Original message: ${e.message}`;
-    throw e;
-  }
+  });
 }
 
 function parseRailsContext(): RailsContext | null {
@@ -213,7 +226,7 @@ function unmount(el: Element): void {
   try {
     // Might need updating? https://reactjs.org/blog/2022/03/08/react-18-upgrade-guide.html
     ReactDOM.unmountComponentAtNode(domNode);
-  } catch (e) {
+  } catch (e: any) {
     console.info(`Caught error calling unmountComponentAtNode: ${e.message} for domNode`,
       domNode, e);
   }
