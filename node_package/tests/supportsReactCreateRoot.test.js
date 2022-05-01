@@ -1,5 +1,5 @@
 import ReactDOM from 'react-dom';
-import { isVersionGreaterThanOrEqualTo18 } from '../src/supportsReactCreateRoot';
+import { isVersionGreaterThanOrEqualTo18 } from '../src/helpers/supportsReactCreateRoot';
 
 describe('supportsReactCreateRoot', () => {
   it('returns false for ReactDOM v16, no version', () => {

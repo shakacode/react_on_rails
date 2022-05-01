@@ -16,9 +16,10 @@ import type {
   ErrorOptions,
   ReactComponentOrRenderFunction,
   AuthenticityHeaders,
-  StoreGenerator
+  StoreGenerator,
+  RootHydrateFunction
 } from './types/index';
-import { reactHydrate, reactRender } from './helpers/renderHelper';
+import renderHelperPromise from './helpers/renderHelper';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Store = any;
@@ -183,13 +184,16 @@ ctx.ReactOnRails = {
    * @param hydrate Pass truthy to update server rendered html. Default is falsy
    * @returns {virtualDomElement} Reference to your component's backing instance
    */
-  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): void | Element | Component {
+  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): Promise<void | Element | Component> {
     const componentObj = ComponentRegistry.get(name);
     const reactElement = createReactOutput({ componentObj, props, domNodeId });
 
-    const render = hydrate ? reactHydrate : reactRender;
-    // eslint-disable-next-line react/no-render-return-value
-    return render(document.getElementById(domNodeId) as Element, reactElement as ReactElement);
+    let rendered: ReturnType<RootHydrateFunction>
+
+    return renderHelperPromise.then(({ reactHydrate, reactRender }) => {
+      const render = hydrate ? reactHydrate : reactRender;
+      return render(document.getElementById(domNodeId) as Element, reactElement as ReactElement);
+    })
   },
 
   /**
