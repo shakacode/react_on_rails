@@ -32,6 +32,7 @@ overrides:
     rules:
       "@typescript-eslint/no-namespace": 0
       "@typescript-eslint/no-shadow": ["error"]
+      "@typescript-eslint/no-var-requires": 0
 
 rules:
   no-shadow: 0
