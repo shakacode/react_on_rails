@@ -27,7 +27,7 @@ This project is maintained by the software consulting firm [ShakaCode](https://w
 Are you interested in optimizing your webpack setup for React on Rails including code
 splitting with [react-router](https://github.com/ReactTraining/react-router#readme) and
  [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers?
-We did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://www.shakacode.com/recent-work/popmenu/). Several years later, Popmenu is serving millions of SSR requests per day React on Rails.
+We did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://www.shakacode.com/recent-work/popmenu/). Several years later, Popmenu is serving millions of SSR requests per day with React on Rails.
 
 Check out [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/). For more information, feel free to contact Justin Gordon, [justin@shakacode.com](mailto:justin@shakacode.com), maintainer of React on Rails.
 
