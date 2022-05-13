@@ -24,6 +24,7 @@ Changes since last non-beta release.
 
   To migrate this change, remove `mini_racer` gem from your `Gemfile` and test your app for correct behaviour. You can continue using `mini_racer` and it will be still picked as the default `ExecJS` runtime, if present in your app `Gemfile`.
 
+
 ### [13.0.2] - 2022-03-09
 #### Fixed
 - React 16 doesn't support version property, causing problems loading React on Rails. [PR 1435](https://github.com/shakacode/react_on_rails/pull/1435) by [justin808](https://github.com/justin808).
