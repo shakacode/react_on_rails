@@ -4,6 +4,8 @@ require "fileutils"
 
 module ReactOnRails
   class PacksGenerator
+    ENDS_WITH_CLIENT_OR_SERVER_REGEX = /\.server$|\.client$/.freeze
+
     def self.generate
       return unless ReactOnRails::WebpackerUtils.using_webpacker?
 
@@ -12,11 +14,14 @@ module ReactOnRails
     end
 
     def self.generate_packs
-      components_directory = ReactOnRails.configuration.components_directory
-      source_path = ReactOnRails::WebpackerUtils.webpacker_source_path
+      is_server_rendering_enabled = ReactOnRails.configuration.server_bundle_js_file.present?
 
-      registered_component_paths = Dir.glob("#{source_path}/**/#{components_directory}/*")
-      registered_component_paths.each { |p| create_pack(p) }
+      return common_components.each_value { |p| create_pack(p) } unless is_server_rendering_enabled
+
+      client_components.each_value { |p| create_pack(p) }
+
+      # TODO: Add Support for automated server bundle registry
+      # server_components.each { |k, v| pp("#{k} => #{v}") }
     end
 
     def self.create_pack(file_path)
@@ -31,12 +36,12 @@ module ReactOnRails
     end
 
     def self.pack_file_contents(file_path)
-      component_name = file_name(file_path)
+      registered_component_name = component_name(file_path)
       <<~FILE_CONTENT
         import ReactOnRails from 'react-on-rails';
-        import #{component_name} from '#{relative_component_path(file_path)}';
+        import #{registered_component_name} from '#{relative_component_path(file_path)}';
 
-        ReactOnRails.register({#{component_name}});
+        ReactOnRails.register({#{registered_component_name}});
       FILE_CONTENT
     end
 
@@ -60,11 +65,42 @@ module ReactOnRails
     end
 
     def self.generated_pack_path(file_path)
-      "#{generated_packs_directory}/#{file_name(file_path)}.jsx"
+      "#{generated_packs_directory}/#{component_name(file_path)}.jsx"
     end
 
-    def self.file_name(file_path)
-      File.basename(file_path, File.extname(file_path))
+    def self.component_name(file_path)
+      basename = File.basename(file_path, File.extname(file_path))
+
+      basename.sub(ENDS_WITH_CLIENT_OR_SERVER_REGEX, "")
+    end
+
+    def self.component_name_path_hash(paths)
+      paths.to_h { |path| [component_name(path), path] }
+    end
+
+    def self.common_components
+      common_components_paths = Dir.glob("#{components_search_path}/*")
+      component_name_path_hash(common_components_paths)
+    end
+
+    def self.client_components
+      client_render_components_paths = Dir.glob("#{components_search_path}/*.client.*")
+      client_specific_components = component_name_path_hash(client_render_components_paths)
+      common_components.merge(client_specific_components)
+    end
+
+    def self.server_components
+      server_render_components_paths = Dir.glob("#{components_search_path}/*.server.*")
+      server_specific_components = component_name_path_hash(server_render_components_paths)
+
+      common_components.merge(server_specific_components)
+    end
+
+    def self.components_search_path
+      components_directory = ReactOnRails.configuration.components_directory
+      source_path = ReactOnRails::WebpackerUtils.webpacker_source_path
+
+      "#{source_path}/**/#{components_directory}"
     end
   end
 end
