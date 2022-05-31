@@ -22,7 +22,7 @@
     "compression-webpack-plugin": "9",
     "core-js": "3",
     "create-react-class": "^15.6.3",
-    "cross-fetch": "^3.1.4",
+    "cross-fetch": "^3.1.5",
     "css-loader": "^6.5.1",
     "css-minimizer-webpack-plugin": "^3.1.4",
     "es5-shim": "^4.5.9",
