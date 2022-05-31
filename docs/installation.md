@@ -52,7 +52,7 @@ Note, you should probably use an ENV value for the token so that you don't check
    ```
 
 ## Rails Configuration
-You don't need to create a initializer if you are satisfied with the default as described in 
+You don't need to create an initializer if you are satisfied with the default as described in 
 [Configuration](./configuration.md)
 
 # Node Package
