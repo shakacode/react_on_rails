@@ -16,12 +16,27 @@ module ReactOnRails
     def self.generate_packs
       is_server_rendering_enabled = ReactOnRails.configuration.server_bundle_js_file.present?
 
+      pp "ReactOnRails.configuration.server_bundle_js_file => #{ReactOnRails.configuration.server_bundle_js_file}"
+
       return common_components.each_value { |p| create_pack(p) } unless is_server_rendering_enabled
 
       client_components.each_value { |p| create_pack(p) }
 
-      # TODO: Add Support for automated server bundle registry
-      # server_components.each { |k, v| pp("#{k} => #{v}") }
+      create_server_pack
+    end
+
+    def self.create_server_pack
+      server_bundle_file_name = ReactOnRails.configuration.server_bundle_js_file
+      defined_server_bundle_file = Dir.glob(server_bundle_file_name).first
+      generated_server_bundle_file = Pathname.new "#{generated_packs_directory}/"
+
+      <<~FILE_CONTENT
+        import ReactOnRails from 'react-on-rails';
+        #{}
+        import #{registered_component_name} from '#{relative_component_path(file_path)}';
+
+        ReactOnRails.register({#{registered_component_name}});
+      FILE_CONTENT
     end
 
     def self.create_pack(file_path)
