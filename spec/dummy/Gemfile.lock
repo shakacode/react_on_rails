@@ -268,7 +268,7 @@ GEM
       childprocess (>= 0.5, < 4.0)
       rubyzip (>= 1.2.2)
     semantic_range (3.0.0)
-    shakapacker (6.1.1)
+    shakapacker (6.4.0)
       activesupport (>= 5.2)
       rack-proxy (>= 0.6.1)
       railties (>= 5.2)
@@ -348,7 +348,7 @@ DEPENDENCIES
   scss_lint
   sdoc
   selenium-webdriver
-  shakapacker (>= 6.1.1)
+  shakapacker (>= 6.4.0)
   spring (~> 4.0)
   sprockets (~> 4.0)
   sqlite3
