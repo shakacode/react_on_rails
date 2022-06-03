@@ -62,7 +62,7 @@ _Use the latest version for `react_on_rails` and `shakapacker`._
 
 ```
 gem 'react_on_rails', '13.0.1'         # prefer exact gem version to match npm version
-gem 'shakapacker', '6.1.1'             # prefer exact gem version to match npm version
+gem 'shakapacker', '6.4.0'             # prefer exact gem version to match npm version
 
 ```
 
