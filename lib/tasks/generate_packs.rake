@@ -6,7 +6,7 @@ namespace :react_on_rails do
     registers the component for usage with react_component_with_bundle helper.
   DESC
 
-  task :generate_packs do
+  task generate_packs: :environment do
     ReactOnRails::PacksGenerator.generate
   end
 end
