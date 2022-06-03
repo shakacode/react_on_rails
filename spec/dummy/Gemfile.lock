@@ -124,7 +124,6 @@ GEM
     json (2.5.1)
     launchy (2.5.0)
       addressable (~> 2.7)
-    libv8-node (16.10.0.0)
     listen (3.4.1)
       rb-fsevent (~> 0.10, >= 0.10.3)
       rb-inotify (~> 0.9, >= 0.9.10)
@@ -137,8 +136,6 @@ GEM
     method_source (1.0.0)
     mini_mime (1.1.2)
     mini_portile2 (2.6.1)
-    mini_racer (0.6.2)
-      libv8-node (~> 16.10.0.0)
     minitest (5.15.0)
     msgpack (1.4.2)
     nio4r (2.5.8)
@@ -329,7 +326,6 @@ DEPENDENCIES
   jquery-rails
   launchy
   listen
-  mini_racer (>= 0.6.2)
   pry
   pry-byebug
   pry-doc

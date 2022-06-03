@@ -2,9 +2,6 @@
 
 For the best performance with Server Rendering, consider using [React on Rails Pro]
 
-Be sure to use mini_racer. See [issues/428](https://github.com/shakacode/react_on_rails/issues/428).
-
-
 
 ## General Tips
 - Your code can't reference `document`. Server side JS execution does not have access to `document`,

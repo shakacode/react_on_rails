@@ -91,8 +91,6 @@ Install React on Rails: `rails generate react_on_rails:install`. You need to fir
 Note, using `redux` is no longer recommended as the basic installer uses React Hooks.
 If you want the redux install: `rails generate react_on_rails:install --redux`
 
-The generator will add `mini_racer`'s latest version. If you're using linux & encounter issues installing `libv8`, here's [a common solution](https://github.com/rubyjs/mini_racer/issues/218).
-
 ```
 bundle exec rails generate react_on_rails:install
 ```

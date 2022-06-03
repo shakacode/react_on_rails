@@ -21,8 +21,6 @@ gem "sprockets", "~> 4.0"
 
 gem "amazing_print"
 
-gem "mini_racer", ">= 0.6.2"
-
 group :development, :test do
   gem "listen"
   gem "pry"
