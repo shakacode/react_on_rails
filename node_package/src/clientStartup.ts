@@ -174,7 +174,7 @@ You should return a React.Component always for the client side entry point.`);
         reactRender(domNode, reactElementOrRouterResult as ReactElement);
       }
     }
-  } catch (e) {
+  } catch (e: any) {
     e.message = `ReactOnRails encountered an error while rendering component: ${name}.\n` +
       `Original message: ${e.message}`;
     throw e;
@@ -214,7 +214,7 @@ function unmount(el: Element): void {
   if(domNode === null){return;}
   try {
     ReactDOM.unmountComponentAtNode(domNode);
-  } catch (e) {
+  } catch (e: any) {
     console.info(`Caught error calling unmountComponentAtNode: ${e.message} for domNode`,
       domNode, e);
   }

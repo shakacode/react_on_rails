@@ -83,7 +83,7 @@ as a renderFunction and not a simple React Function Component.`);
     } else {
       renderResult = processReactElement();
     }
-  } catch (e) {
+  } catch (e: any) {
     if (throwJsErrors) {
       throw e;
     }
@@ -115,7 +115,7 @@ as a renderFunction and not a simple React Function Component.`);
           consoleReplayScript,
           hasErrors,
         };
-      } catch (e) {
+      } catch (e: any) {
         if (throwJsErrors) {
           throw e;
         }
