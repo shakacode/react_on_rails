@@ -16,6 +16,15 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+
+#### Improved
+- Remove addition of `mini_racer` gem by default. [PR 1453](https://github.com/shakacode/react_on_rails/pull/1453) by [vtamara](https://github.com/vtamara) and [tomdracz](https://github.com/tomdracz).
+
+  Using `mini_racer` makes most sense when deploying or building in environments that do not have Javascript runtime present. Since `react_on_rails` requires Node.js, there's no reason to override `ExecJS` runtime with `mini_racer`.
+
+  To migrate this change, remove `mini_racer` gem from your `Gemfile` and test your app for correct behaviour. You can continue using `mini_racer` and it will be still picked as the default `ExecJS` runtime, if present in your app `Gemfile`.
+
+
 ### [13.0.2] - 2022-03-09
 #### Fixed
 - React 16 doesn't support version property, causing problems loading React on Rails. [PR 1435](https://github.com/shakacode/react_on_rails/pull/1435) by [justin808](https://github.com/justin808).

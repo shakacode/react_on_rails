@@ -137,14 +137,14 @@ ReactOnRails.configure do |config|
   ################################################################################
   # Server Renderer Configuration for ExecJS
   ################################################################################
-  # The default server rendering is ExecJS, probably using the mini_racer gem
+  # The default server rendering is ExecJS, by default using Node.js runtime
   # If you wish to use an alternative Node server rendering for higher performance,
   # contact justin@shakacode.com for details.
   #
   # For ExecJS:
   # You can configure your pool of JS virtual machines and specify where it should load code:
-  # On MRI, use `mini_racer` for the best performance
-  # (see [discussion](https://github.com/reactjs/react-rails/pull/290))
+  # On MRI, use `node.js` runtime for the best performance
+  # (see [issues](https://github.com/shakacode/react_on_rails/issues/1438))
   # On MRI, you'll get a deadlock with `pool_size` > 1
   # If you're using JRuby, you can increase `pool_size` to have real multi-threaded rendering.
   config.server_renderer_pool_size = 1 # increase if you're on JRuby
