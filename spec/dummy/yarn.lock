@@ -6983,20 +6983,11 @@ sha.js@^2.4.0, sha.js@^2.4.8:
     inherits "^2.0.1"
     safe-buffer "^5.0.1"
 
-"shakapacker @6.4.0":
+shakapacker@6.4.0:
   name shakapacker
   version "6.4.0"
   resolved "https://registry.yarnpkg.com/shakapacker/-/shakapacker-6.4.0.tgz#f49ad8bb51eb1a151b190b588ad467c6e6f62e69"
   integrity sha512-bxxi7Lla3n2fnFjxVv6BtD2vcTEZIm2eb29WkJqZBmpFVT9tnwbd3XQISD9eOst6kTEJu2ruUp7dGvuEjpxwkg==
-  dependencies:
-    glob "^7.2.0"
-    js-yaml "^4.1.0"
-    path-complete-extname "^1.0.0"
-
-shakapacker@6.0.2:
-  version "6.0.2"
-  resolved "https://registry.yarnpkg.com/shakapacker/-/shakapacker-6.0.2.tgz#338cf65267dab94fb5f1f5432f192b745bc55164"
-  integrity sha512-gCNBjwcy/+WA4At1YP+pKgNzG8UsIDtLZiJ+Ezipm6quONfXyFS8C4yj/cMU7A1mt2ejosYO7pwRZG1Z0t9EfA==
   dependencies:
     glob "^7.2.0"
     js-yaml "^4.1.0"
