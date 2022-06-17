@@ -39,12 +39,14 @@ module ReactOnRails
       already_present_server_bundle_relative_path = relative_component_path(defined_server_bundle_file, generated_server_bundle_file)
 
       content = <<~FILE_CONTENT
+        /* eslint-disable */
         import ReactOnRails from 'react-on-rails';
         import "#{already_present_server_bundle_relative_path}"
 
         #{server_component_imports.join("\n")}
 
         ReactOnRails.register({#{component_names.join(",\n")}});
+        /* eslint-enable */
       FILE_CONTENT
 
       f = File.new(generated_server_bundle_file, "w")
@@ -68,10 +70,12 @@ module ReactOnRails
     def self.pack_file_contents(file_path)
       registered_component_name = component_name(file_path)
       <<~FILE_CONTENT
+        /* eslint-disable */
         import ReactOnRails from 'react-on-rails';
         import #{registered_component_name} from '#{relative_component_path(file_path)}';
 
         ReactOnRails.register({#{registered_component_name}});
+        /* eslint-enable */
       FILE_CONTENT
     end
 
