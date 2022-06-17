@@ -9,7 +9,7 @@ module ReactOnRails
     def self.generate
       return unless ReactOnRails::WebpackerUtils.using_webpacker?
 
-      recreate_generated_packs_directory
+      clean_generated_packs_directory
       generate_packs
     end
 
@@ -19,23 +19,18 @@ module ReactOnRails
       return common_components.each_value { |p| create_pack(p) } unless is_server_rendering_enabled
 
       client_components.each_value { |p| create_pack(p) }
-
       create_server_pack
     end
 
     def self.create_server_pack
-      server_bundle_file_name = ReactOnRails.configuration.server_bundle_js_file
-      source_entry_path = ReactOnRails::WebpackerUtils.webpacker_source_entry_path
-      defined_server_bundle_file = Dir.glob("#{source_entry_path}/**/#{server_bundle_file_name}").first
-      generated_server_bundle_file_name = component_name(defined_server_bundle_file.sub('.js', '-genrated.js'))
+      generated_server_bundle_file_name = component_name(defined_server_bundle_file.sub(".js", "-genrated.js"))
       generated_server_bundle_file = "#{generated_packs_directory}/#{generated_server_bundle_file_name}.js"
 
       server_component_imports = server_components.map do |_p,v|
         "import #{component_name(v)} from '#{relative_component_path(v, generated_server_bundle_file)}';"
       end
 
-      component_names = server_components.map { |_p,v| component_name(v)  }
-
+      components_to_register = server_components.map { |_p, v| component_name(v)}
       already_present_server_bundle_relative_path = relative_component_path(defined_server_bundle_file, generated_server_bundle_file)
 
       content = <<~FILE_CONTENT
@@ -45,7 +40,7 @@ module ReactOnRails
 
         #{server_component_imports.join("\n")}
 
-        ReactOnRails.register({#{component_names.join(",\n")}});
+        ReactOnRails.register({#{components_to_register.join(",\n")}});
         /* eslint-enable */
       FILE_CONTENT
 
@@ -79,14 +74,23 @@ module ReactOnRails
       FILE_CONTENT
     end
 
-    def self.recreate_generated_packs_directory
+    def self.clean_generated_packs_directory
       FileUtils.rm_rf(generated_packs_directory)
       FileUtils.mkdir_p generated_packs_directory
     end
 
+    def defined_server_bundle_file
+      server_bundle_file_name = ReactOnRails.configuration.server_bundle_js_file
+
+      Dir.glob("#{source_entry_path}/**/#{server_bundle_file_name}").first
+    end
+
     def self.generated_packs_directory
-      source_entry_path = ReactOnRails::WebpackerUtils.webpacker_source_entry_path
       "#{source_entry_path}/generated"
+    end
+
+    def source_entry_path
+      ReactOnRails::WebpackerUtils.webpacker_source_entry_path
     end
 
     def self.relative_component_path(file_path, source_path = nil)
