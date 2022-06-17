@@ -90,14 +90,6 @@ module ReactOnRails
       end
     end
 
-    # TODO: Update Description for Method
-    # react_component_with_bundle is used to add a react_component in rails view, along with it's auto-genearated pack
-    # tag
-    def react_component_with_bundle(component_name, options = {})
-      append_javascript_pack_tag("generated/#{component_name}")
-      react_component(component_name, options)
-    end
-
     # react_component_hash is used to return multiple HTML strings for server rendering, such as for
     # adding meta-tags to a page.
     # It is exactly like react_component except for the following:
