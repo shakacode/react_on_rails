@@ -20,6 +20,7 @@ module ReactOnRails
       generated_assets_dir: "",
       server_bundle_js_file: "",
       prerender: false,
+      load_bundle: false,
       replay_console: true,
       logging_on_server: true,
       raise_on_prerender_error: Rails.env.development?,
@@ -51,7 +52,7 @@ module ReactOnRails
                   :webpack_generated_files, :rendering_extension, :build_test_command,
                   :build_production_command,
                   :i18n_dir, :i18n_yml_dir, :i18n_output_format,
-                  :server_render_method, :random_dom_id,
+                  :server_render_method, :random_dom_id, :load_bundle,
                   :same_bundle_for_client_and_server, :rendering_props_extension, :components_directory
 
     # rubocop:disable Metrics/AbcSize
@@ -67,7 +68,7 @@ module ReactOnRails
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
-                   components_directory: nil)
+                   components_directory: nil, load_bundle: false)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir
@@ -102,6 +103,7 @@ module ReactOnRails
 
       self.server_render_method = server_render_method
       self.components_directory = components_directory
+      self.load_bundle = load_bundle
     end
     # rubocop:enable Metrics/AbcSize
 

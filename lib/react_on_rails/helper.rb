@@ -58,6 +58,8 @@ module ReactOnRails
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
 
+      load_pack_for_component(component_name) if render_options.load_bundle
+      
       case server_rendered_html
       when String
         build_react_component_result_for_server_rendered_string(
@@ -88,6 +90,11 @@ module ReactOnRails
         MSG
         raise ReactOnRails::Error, msg
       end
+    end
+
+    def load_pack_for_component(component_name)
+      append_javascript_pack_tag("generated/#{component_name}")
+      append_stylesheet_pack_tag("generated/#{component_name}")
     end
 
     # react_component_hash is used to return multiple HTML strings for server rendering, such as for
