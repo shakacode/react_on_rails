@@ -3,7 +3,7 @@
 require_relative "spec_helper"
 
 module ReactOnRails
-  RSpec.describe Configuration do
+  RSpec.describe Configuration do # rubocop:disable Metrics/BlockLength
     let(:existing_path) { Pathname.new(Dir.mktmpdir) }
     let(:not_existing_path) { "/path/to/#{SecureRandom.hex(4)}" }
     let(:using_webpacker) { false }
@@ -109,6 +109,9 @@ module ReactOnRails
           ReactOnRails.configure do |config|
             config.i18n_dir = ""
           end
+        end.not_to raise_error
+        expect do
+          ReactOnRails::Locales.compile
         end.to raise_error(ReactOnRails::Error, /invalid value for `config\.i18n_dir`/)
       end
 
@@ -117,6 +120,9 @@ module ReactOnRails
           ReactOnRails.configure do |config|
             config.i18n_dir = not_existing_path
           end
+        end.not_to raise_error
+        expect do
+          ReactOnRails::Locales.compile
         end.to raise_error(ReactOnRails::Error, /invalid value for `config\.i18n_dir`/)
       end
     end
@@ -130,6 +136,9 @@ module ReactOnRails
             config.i18n_yml_dir = i18n_yml_dir
           end
         end.not_to raise_error
+        expect do
+          ReactOnRails::Locales.compile
+        end.not_to raise_error
       end
 
       it "fails with empty string value" do
@@ -137,6 +146,9 @@ module ReactOnRails
           ReactOnRails.configure do |config|
             config.i18n_yml_dir = ""
           end
+        end.not_to raise_error
+        expect do
+          ReactOnRails::Locales.compile
         end.to raise_error(ReactOnRails::Error, /invalid value for `config\.i18n_yml_dir`/)
       end
 
@@ -145,6 +157,9 @@ module ReactOnRails
           ReactOnRails.configure do |config|
             config.i18n_yml_dir = not_existing_path
           end
+        end.not_to raise_error
+        expect do
+          ReactOnRails::Locales.compile
         end.to raise_error(ReactOnRails::Error, /invalid value for `config\.i18n_yml_dir`/)
       end
     end

@@ -5,12 +5,35 @@ require "erb"
 module ReactOnRails
   module Locales
     def self.compile
-      if ReactOnRails.configuration.i18n_output_format&.downcase == "js"
+      config = ReactOnRails.configuration
+      check_config_directory_exists(
+        directory: config.i18n_dir, key_name: "config.i18n_dir",
+        remove_if: "not using the React on Rails i18n feature"
+      )
+      check_config_directory_exists(
+        directory: config.i18n_yml_dir, key_name: "config.i18n_yml_dir",
+        remove_if: "not using this i18n with React on Rails, or if you want to use all translation files"
+      )
+      if config.i18n_output_format&.downcase == "js"
         ReactOnRails::Locales::ToJs.new
       else
         ReactOnRails::Locales::ToJson.new
       end
     end
+
+    def self.check_config_directory_exists(directory:, key_name:, remove_if:)
+      return if directory.nil?
+      return if Dir.exist?(directory)
+
+      msg = <<~MSG
+        Error configuring /config/initializers/react_on_rails.rb: invalid value for `#{key_name}`.
+        Directory does not exist: #{directory}. Set to value to nil or comment it
+        out if #{remove_if}.
+      MSG
+      raise ReactOnRails::Error, msg
+    end
+
+    private_class_method :check_config_directory_exists
 
     class Base
       def initialize
