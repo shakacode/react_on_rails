@@ -9,8 +9,7 @@ import type {
 
 import createReactOutput from './createReactOutput';
 import {isServerRenderHash} from './isServerRenderResult';
-import reactHydrate from './reactHydrate';
-import reactRender from './reactRender';
+import reactHydrateOrRender from './reactHydrateOrRender';
 
 declare global {
   interface Window {
@@ -168,10 +167,8 @@ function render(el: Element, railsContext: RailsContext): void {
         throw new Error(`\
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);
-      } else if (shouldHydrate) {
-        reactHydrate(domNode, reactElementOrRouterResult as ReactElement);
       } else {
-        reactRender(domNode, reactElementOrRouterResult as ReactElement);
+        reactHydrateOrRender(domNode, reactElementOrRouterResult as ReactElement, shouldHydrate);
       }
     }
   } catch (e: any) {
