@@ -100,7 +100,7 @@ before you commit to see what changed.
 
 ## Setting up your environment variables
 
-Create `.env` file on the root directory if you don't have one already and add the following:
+Add the following variable to your environment:
 
 ```
 EXECJS_RUNTIME=Node
