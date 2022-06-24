@@ -144,7 +144,8 @@ ReactOnRails.configure do |config|
   # For ExecJS:
   # You can configure your pool of JS virtual machines and specify where it should load code:
   # On MRI, use `node.js` runtime for the best performance
-  # (see [issues](https://github.com/shakacode/react_on_rails/issues/1438))
+  # (see https://github.com/shakacode/react_on_rails/issues/1438)
+  # Also see https://github.com/shakacode/react_on_rails/issues/1457#issuecomment-1165026717 if using `mini_racer`
   # On MRI, you'll get a deadlock with `pool_size` > 1
   # If you're using JRuby, you can increase `pool_size` to have real multi-threaded rendering.
   config.server_renderer_pool_size = 1 # increase if you're on JRuby
@@ -173,7 +174,7 @@ ReactOnRails.configure do |config|
   ################################################################################
   ################################################################################
   # CLIENT RENDERING OPTIONS
-  # Below options can be overriden by passing options to the react_on_rails
+  # Below options can be overridden by passing options to the react_on_rails
   # `render_component` view helper method.
   ################################################################################
   # default is false
