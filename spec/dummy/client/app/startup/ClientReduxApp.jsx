@@ -6,7 +6,7 @@ import React from 'react';
 import { combineReducers, applyMiddleware, createStore } from 'redux';
 import { Provider } from 'react-redux';
 import thunkMiddleware from 'redux-thunk';
-import ReactDOM from 'react-dom';
+import ReactDOMClient from 'react-dom/client';
 
 import reducers from '../reducers/reducersIndex';
 import composeInitialState from '../store/composeInitialState';
@@ -20,8 +20,12 @@ import HelloWorldContainer from '../components/HelloWorldContainer';
  *
  */
 export default (props, railsContext, domNodeId) => {
-  const render = props.prerender ? ReactDOM.hydrate : ReactDOM.render;
-
+  const render = props.prerender
+    ? ReactDOMClient.hydrateRoot
+    : (domNode, element) => {
+        const root = ReactDOMClient.createRoot(domNode);
+        root.render(element);
+      };
   // eslint-disable-next-line no-param-reassign
   delete props.prerender;
 
@@ -44,7 +48,7 @@ export default (props, railsContext, domNodeId) => {
       </Provider>
     );
 
-    render(element, document.getElementById(domNodeId));
+    render(document.getElementById(domNodeId), element);
   };
 
   renderApp(HelloWorldContainer);
