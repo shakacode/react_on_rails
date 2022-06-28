@@ -37,7 +37,9 @@ declare const ReactOnRails: ReactOnRailsType;
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
-function findContext(): Window | NodeJS.Global {
+type Context = Window | NodeJS.Global;
+
+function findContext(): Context {
   if (typeof window.ReactOnRails !== 'undefined') {
     return window;
   } else if (typeof ReactOnRails !== 'undefined') {
@@ -76,15 +78,7 @@ function reactOnRailsHtmlElements(): HTMLCollectionOf<Element> {
   return document.getElementsByClassName('js-react-on-rails-component');
 }
 
-function forEachReactOnRailsComponentInitialize(fn: (element: Element, railsContext: RailsContext) => void, railsContext: RailsContext): void {
-  const els = reactOnRailsHtmlElements();
-  for (let i = 0; i < els.length; i += 1) {
-    fn(els[i], railsContext);
-  }
-}
-
-function initializeStore(el: Element, railsContext: RailsContext): void {
-  const context = findContext();
+function initializeStore(el: Element, context: Context, railsContext: RailsContext): void {
   const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
   const props = (el.textContent !== null) ? JSON.parse(el.textContent) : {};
   const storeGenerator = context.ReactOnRails.getStoreGenerator(name);
@@ -92,10 +86,10 @@ function initializeStore(el: Element, railsContext: RailsContext): void {
   context.ReactOnRails.setStore(name, store);
 }
 
-function forEachStore(railsContext: RailsContext): void {
+function forEachStore(context: Context, railsContext: RailsContext): void {
   const els = document.querySelectorAll(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`);
   for (let i = 0; i < els.length; i += 1) {
-    initializeStore(els[i], railsContext);
+    initializeStore(els[i], context, railsContext);
   }
 }
 
@@ -137,10 +131,8 @@ function domNodeIdForEl(el: Element): string {
 /**
  * Used for client rendering by ReactOnRails. Either calls ReactDOM.hydrate, ReactDOM.render, or
  * delegates to a renderer registered by the user.
- * @param el
  */
-function render(el: Element, railsContext: RailsContext): void {
-  const context = findContext();
+function render(el: Element, context: Context, railsContext: RailsContext): void {
   // This must match lib/react_on_rails/helper.rb
   const name = el.getAttribute('data-component-name') || '';
   const domNodeId = domNodeIdForEl(el);
@@ -186,6 +178,13 @@ You should return a React.Component always for the client side entry point.`);
   }
 }
 
+function forEachReactOnRailsComponentRender(context: Context, railsContext: RailsContext): void {
+  const els = reactOnRailsHtmlElements();
+  for (let i = 0; i < els.length; i += 1) {
+    render(els[i], context, railsContext);
+  }
+}
+
 function parseRailsContext(): RailsContext | null {
   const el = document.getElementById('js-react-on-rails-context');
   if (!el) {
@@ -209,11 +208,12 @@ export function reactOnRailsPageLoaded(): void {
   // If no react on rails components
   if (!railsContext) return;
 
-  forEachStore(railsContext);
+  const context = findContext();
   if (supportsRootApi) {
-    findContext().roots = [];
+    context.roots = [];
   }
-  forEachReactOnRailsComponentInitialize(render, railsContext);
+  forEachStore(context, railsContext);
+  forEachReactOnRailsComponentRender(context, railsContext);
 }
 
 function unmount(el: Element): void {
@@ -277,11 +277,11 @@ function renderInit(): void {
   }
 }
 
-function isWindow(context: Window | NodeJS.Global): context is Window {
+function isWindow(context: Context): context is Window {
   return (context as Window).document !== undefined;
 }
 
-export function clientStartup(context: Window | NodeJS.Global): void {
+export function clientStartup(context: Context): void {
   // Check if server rendering
   if (!isWindow(context)) {
     return;
