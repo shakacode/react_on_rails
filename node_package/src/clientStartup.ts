@@ -8,17 +8,18 @@ import type {
 } from './types/index';
 
 import createReactOutput from './createReactOutput';
-import {isServerRenderHash} from './isServerRenderResult';
+import { isServerRenderHash } from './isServerRenderResult';
 import reactHydrateOrRender from './reactHydrateOrRender';
 
 declare global {
   interface Window {
-      ReactOnRails: ReactOnRailsType;
-      __REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__?: boolean;
+    ReactOnRails: ReactOnRailsType;
+    __REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__?: boolean;
   }
+
   namespace NodeJS {
     interface Global {
-        ReactOnRails: ReactOnRailsType;
+      ReactOnRails: ReactOnRailsType;
     }
   }
   namespace Turbolinks {
@@ -67,7 +68,7 @@ function turboInstalled() {
   return false;
 }
 
-function reactOnRailsHtmlElements(): HTMLCollectionOf<Element>  {
+function reactOnRailsHtmlElements(): HTMLCollectionOf<Element> {
   return document.getElementsByClassName('js-react-on-rails-component');
 }
 
@@ -80,7 +81,7 @@ function forEachReactOnRailsComponentInitialize(fn: (element: Element, railsCont
 
 function initializeStore(el: Element, railsContext: RailsContext): void {
   const context = findContext();
-  const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || "";
+  const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
   const props = (el.textContent !== null) ? JSON.parse(el.textContent) : {};
   const storeGenerator = context.ReactOnRails.getStoreGenerator(name);
   const store = storeGenerator(props, railsContext);
@@ -107,7 +108,7 @@ function delegateToRenderer(
   props: Record<string, string>,
   railsContext: RailsContext,
   domNodeId: string,
-  trace: boolean
+  trace: boolean,
 ): boolean {
   const { name, component, isRenderer } = componentObj;
 
@@ -115,7 +116,7 @@ function delegateToRenderer(
     if (trace) {
       console.log(`\
 DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, railsContext:`,
-      props, railsContext);
+        props, railsContext);
     }
 
     (component as RenderFunction)(props, railsContext, domNodeId);
@@ -126,7 +127,7 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
 }
 
 function domNodeIdForEl(el: Element): string {
-  return el.getAttribute('data-dom-id') || "";
+  return el.getAttribute('data-dom-id') || '';
 }
 
 /**
@@ -137,10 +138,10 @@ function domNodeIdForEl(el: Element): string {
 function render(el: Element, railsContext: RailsContext): void {
   const context = findContext();
   // This must match lib/react_on_rails/helper.rb
-  const name = el.getAttribute('data-component-name') || "";
+  const name = el.getAttribute('data-component-name') || '';
   const domNodeId = domNodeIdForEl(el);
   const props = (el.textContent !== null) ? JSON.parse(el.textContent) : {};
-  const trace = el.getAttribute('data-trace') === "true";
+  const trace = el.getAttribute('data-trace') === 'true';
 
   try {
     const domNode = document.getElementById(domNodeId);
@@ -187,7 +188,7 @@ function parseRailsContext(): RailsContext | null {
   }
 
   if (!el.textContent) {
-    throw new Error("The HTML element with ID 'js-react-on-rails-context' has no textContent");
+    throw new Error('The HTML element with ID \'js-react-on-rails-context\' has no textContent');
   }
 
   return JSON.parse(el.textContent);
@@ -208,7 +209,9 @@ export function reactOnRailsPageLoaded(): void {
 function unmount(el: Element): void {
   const domNodeId = domNodeIdForEl(el);
   const domNode = document.getElementById(domNodeId);
-  if(domNode === null){return;}
+  if (domNode === null) {
+    return;
+  }
   try {
     ReactDOM.unmountComponentAtNode(domNode);
   } catch (e: any) {
@@ -258,7 +261,7 @@ function renderInit(): void {
   }
 }
 
-function isWindow (context: Window | NodeJS.Global): context is Window {
+function isWindow(context: Window | NodeJS.Global): context is Window {
   return (context as Window).document !== undefined;
 }
 
