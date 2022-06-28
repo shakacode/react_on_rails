@@ -5,21 +5,25 @@ import type {
   ReactOnRails as ReactOnRailsType,
   RegisteredComponent,
   RenderFunction,
-} from './types/index';
+  Root,
+} from './types';
 
 import createReactOutput from './createReactOutput';
 import { isServerRenderHash } from './isServerRenderResult';
 import reactHydrateOrRender from './reactHydrateOrRender';
+import { supportsRootApi } from './reactApis';
 
 declare global {
   interface Window {
     ReactOnRails: ReactOnRailsType;
     __REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__?: boolean;
+    roots: Root[];
   }
 
   namespace NodeJS {
     interface Global {
       ReactOnRails: ReactOnRailsType;
+      roots: Root[];
     }
   }
   namespace Turbolinks {
@@ -169,7 +173,10 @@ function render(el: Element, railsContext: RailsContext): void {
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);
       } else {
-        reactHydrateOrRender(domNode, reactElementOrRouterResult as ReactElement, shouldHydrate);
+        const rootOrElement = reactHydrateOrRender(domNode, reactElementOrRouterResult as ReactElement, shouldHydrate);
+        if (supportsRootApi) {
+          context.roots.push(rootOrElement as Root);
+        }
       }
     }
   } catch (e: any) {
@@ -203,6 +210,9 @@ export function reactOnRailsPageLoaded(): void {
   if (!railsContext) return;
 
   forEachStore(railsContext);
+  if (supportsRootApi) {
+    findContext().roots = [];
+  }
   forEachReactOnRailsComponentInitialize(render, railsContext);
 }
 
@@ -222,9 +232,15 @@ function unmount(el: Element): void {
 
 function reactOnRailsPageUnloaded(): void {
   debugTurbolinks('reactOnRailsPageUnloaded');
-  const els = reactOnRailsHtmlElements();
-  for (let i = 0; i < els.length; i += 1) {
-    unmount(els[i]);
+  if (supportsRootApi) {
+    for (const root of findContext().roots) {
+      root.unmount();
+    }
+  } else {
+    const els = reactOnRailsHtmlElements();
+    for (let i = 0; i < els.length; i += 1) {
+      unmount(els[i]);
+    }
   }
 }
 
