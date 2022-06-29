@@ -38,10 +38,12 @@ Before this command can be run:
 //npm.pkg.github.com/:_authToken=<TOKEN>
 always-auth=true
 ```
-3. Ensure that you set the ENV value when you will run the script. A `.envrc` is convenient for this.
-```
-export GITHUB_TOKEN=<TOKEN>
-```
+3. You would create or edit a ~/.gem/credentials to include the following, replacing TOKEN with your personal access token.
+
+---
+:github: Bearer TOKEN
+
+   Details: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-rubygems-registry#authenticating-with-a-personal-access-token
 ")
 
 task :release, %i[gem_version dry_run tools_install] do |_t, args|
