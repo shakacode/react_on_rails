@@ -13,8 +13,12 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+## [3.0.0-rc.4] - 2022-06-28
+### Fixed
+- Add RAILS_ENV to bundle cache key. This ensures a development bundle will never get accidentally deployed to production. [PR 270](https://github.com/shakacode/react_on_rails_pro/pull/270) by [justin808](https://github.com/justin808).
+- Replace use of utc_timestamp with Utils.bundle_hash. Important fix as timestamps are not stable between build time and the deployment of a Heroku slug. [PR 269](https://github.com/shakacode/react_on_rails_pro/pull/269) by [Judahmeek](https://github.com/Judahmeek).
 
-## [3.0.0-rc.2] - 2022-04-14
+## [3.0.0-rc.3] - 2022-04-14
 
 ### Fixed
 - Fix prepare_node_renderer script. [PR 254](https://github.com/shakacode/react_on_rails_pro/pull/254) by [judahmeek](https://github.com/judahmeek).
@@ -257,8 +261,9 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.2...HEAD
-[3.0.0-rc.2]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.1...3.0.0-rc.2
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.4...HEAD
+[3.0.0-rc.4]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.3...3.0.0-rc.4
+[3.0.0-rc.3]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.1...3.0.0-rc.3
 [3.0.0-rc.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.0...3.0.0-rc.1
 [3.0.0-rc.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.3.0...3.0.0-rc.0
 [2.3.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.2.0...2.3.0

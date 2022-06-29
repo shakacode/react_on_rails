@@ -36,6 +36,7 @@ module ReactOnRailsPro
           # Include the NODE_ENV in the digest
           env_cache_keys = [
             ReactOnRailsPro::VERSION,
+            ENV["RAILS_ENV"],
             ENV["NODE_ENV"]
           ]
 
