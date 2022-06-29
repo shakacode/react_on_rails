@@ -7,7 +7,7 @@ module ReactOnRailsPro
       RENDERED_HTML_KEY = "renderedHtml"
 
       class << self
-        attr_accessor :bundle_update_utc_timestamp
+        attr_accessor :bundle_hash
 
         def reset_pool
           ReactOnRailsPro::Request.reset_connection
@@ -17,20 +17,13 @@ module ReactOnRailsPro
           # Resetting the pool for server bundle modifications is accomplished by changing the mtime
           # of the server bundle in the request to the remote rendering server.
           # In non-development mode, we don't need to re-read this value.
-          if @bundle_update_utc_timestamp.present? && !ReactOnRails.configuration.development_mode
-            return @bundle_update_utc_timestamp
-          end
+          return @bundle_hash if @bundle_hash.present? && !ReactOnRails.configuration.development_mode
 
-          @bundle_update_utc_timestamp = bundle_utc_timestamp
+          @bundle_hash = ReactOnRailsPro::Utils.bundle_hash
         end
 
         def renderer_bundle_file_name
-          "#{bundle_utc_timestamp}.js"
-        end
-
-        def bundle_utc_timestamp
-          bundle_update_time = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
-          (bundle_update_time.utc.to_f * 1000).to_i
+          "#{ReactOnRailsPro::Utils.bundle_hash}.js"
         end
 
         # js_code: JavaScript expression that returns a string.
@@ -54,12 +47,12 @@ module ReactOnRailsPro
 
           # In case this method is called with simple, raw JS, not depending on the bundle, next line
           # is needed.
-          @bundle_update_utc_timestamp ||= bundle_utc_timestamp
+          @bundle_hash ||= ReactOnRailsPro::Utils.bundle_hash
 
           # TODO: Remove the request_digest. See https://github.com/shakacode/react_on_rails_pro/issues/119
           # From the request path
-          # path = "/bundles/#{@bundle_update_utc_timestamp}/render"
-          path = "/bundles/#{@bundle_update_utc_timestamp}/render/#{render_options.request_digest}"
+          # path = "/bundles/#{@bundle_hash}/render"
+          path = "/bundles/#{@bundle_hash}/render/#{render_options.request_digest}"
 
           response = ReactOnRailsPro::Request.render_code(path, js_code, send_bundle)
 
