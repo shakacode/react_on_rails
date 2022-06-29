@@ -1,4 +1,4 @@
-import type { ReactElement, Component, FunctionComponent, ComponentClass } from 'react';
+import type { ReactElement, ReactNode, Component, FunctionComponent, ComponentClass } from 'react';
 
 // Don't import redux just for the type definitions
 // See https://github.com/shakacode/react_on_rails/issues/1321
@@ -112,6 +112,14 @@ export interface RenderResult {
   renderingError?: RenderingError;
 }
 
+// from react-dom 18
+export interface Root {
+  render(children: ReactNode): void;
+  unmount(): void;
+}
+
+export type RenderReturnType = void | Element | Component | Root;
+
 export interface ReactOnRails {
   register(components: { [id: string]: ReactComponentOrRenderFunction }): void;
   registerStore(stores: { [id: string]: Store }): void;
@@ -126,7 +134,7 @@ export interface ReactOnRails {
   clearHydratedStores(): void;
   render(
     name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean
-  ): void | Element | Component;
+  ): RenderReturnType;
   getComponent(name: string): RegisteredComponent;
   serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;
   handleError(options: ErrorOptions): string | undefined;

@@ -24,6 +24,16 @@ Changes since last non-beta release.
 
   To migrate this change, remove `mini_racer` gem from your `Gemfile` and test your app for correct behaviour. You can continue using `mini_racer` and it will be still picked as the default `ExecJS` runtime, if present in your app `Gemfile`.
 
+- Fixed the `You are importing hydrateRoot from "react-dom" [...] You should instead import it from "react-dom/client"` warning under React 18 ([#1441](https://github.com/shakacode/react_on_rails/issues/1441)). [PR 1460](https://github.com/shakacode/react_on_rails/pull/1460) by [alexeyr](https://github.com/alexeyr).
+
+  In exchange, you may see a warning like this when building a Webpack bundle under React 16:
+  ```
+  WARNING in ./node_modules/react-on-rails/node_package/lib/reactHydrateOrRender.js19:25-52
+  Module not found: Error: Can't resolve 'react-dom/client' in '/home/runner/work/react_on_rails/react_on_rails/spec/dummy/node_modules/react-on-rails/node_package/lib'
+   @ ./node_modules/react-on-rails/node_package/lib/ReactOnRails.js 34:45-78
+   @ ./client/app/packs/client-bundle.js 5:0-42 32:0-23 35:0-21 59:0-26
+  ```
+  It can be safely [suppressed](https://webpack.js.org/configuration/other-options/#ignorewarnings) in your Webpack configuration.
 
 ### [13.0.2] - 2022-03-09
 #### Fixed
@@ -1023,7 +1033,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.0.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.0.2...master
+[13.0.2]: https://github.com/shakacode/react_on_rails/compare/13.0.1...13.0.2
 [13.0.1]: https://github.com/shakacode/react_on_rails/compare/13.0.0...13.0.1
 [13.0.0]: https://github.com/shakacode/react_on_rails/compare/12.6.0...13.0.0
 [12.6.0]: https://github.com/shakacode/react_on_rails/compare/12.5.2...12.6.0

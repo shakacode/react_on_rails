@@ -1,4 +1,4 @@
-import type { ReactElement, Component } from 'react';
+import type { ReactElement } from 'react';
 
 import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
@@ -13,13 +13,13 @@ import type {
   RegisteredComponent,
   RenderParams,
   RenderResult,
+  RenderReturnType,
   ErrorOptions,
   ReactComponentOrRenderFunction,
   AuthenticityHeaders,
-  StoreGenerator
-} from './types/index';
-import reactHydrate from './reactHydrate';
-import reactRender from './reactRender';
+  StoreGenerator,
+} from './types';
+import reactHydrateOrRender from './reactHydrateOrRender';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Store = any;
@@ -172,25 +172,35 @@ ctx.ReactOnRails = {
   },
 
   /**
+   * @example
    * ReactOnRails.render("HelloWorldApp", {name: "Stranger"}, 'app');
    *
    * Does this:
-   *   ReactDOM.render(React.createElement(HelloWorldApp, {name: "Stranger"}),
-   *     document.getElementById('app'))
+   * ```js
+   * ReactDOM.render(React.createElement(HelloWorldApp, {name: "Stranger"}),
+   *   document.getElementById('app'))
+   * ```
+   * under React 16/17 and
+   * ```js
+   * const root = ReactDOMClient.createRoot(document.getElementById('app'))
+   * root.render(React.createElement(HelloWorldApp, {name: "Stranger"}))
+   * return root
+   * ```
+   * under React 18+.
    *
    * @param name Name of your registered component
    * @param props Props to pass to your component
    * @param domNodeId
    * @param hydrate Pass truthy to update server rendered html. Default is falsy
-   * @returns {virtualDomElement} Reference to your component's backing instance
+   * @returns {Root|ReactComponent|ReactElement} Under React 18+: the created React root
+   *   (see "What is a root?" in https://github.com/reactwg/react-18/discussions/5).
+   *   Under React 16/17: Reference to your component's backing instance or `null` for stateless components.
    */
-  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): void | Element | Component {
+  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): RenderReturnType {
     const componentObj = ComponentRegistry.get(name);
     const reactElement = createReactOutput({ componentObj, props, domNodeId });
 
-    const render = hydrate ? reactHydrate : reactRender;
-    // eslint-disable-next-line react/no-render-return-value
-    return render(document.getElementById(domNodeId) as Element, reactElement as ReactElement);
+    return reactHydrateOrRender(document.getElementById(domNodeId) as Element, reactElement as ReactElement, hydrate);
   },
 
   /**
