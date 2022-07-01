@@ -24,6 +24,9 @@ Changes since last non-beta release.
 
   To migrate this change, remove `mini_racer` gem from your `Gemfile` and test your app for correct behaviour. You can continue using `mini_racer` and it will be still picked as the default `ExecJS` runtime, if present in your app `Gemfile`.
 
+#### Fixed
+- Correctly unmount roots under React 18. [PR 1466](https://github.com/shakacode/react_on_rails/pull/1466) by [alexeyr](https://github.com/alexeyr).
+
 - Fixed the `You are importing hydrateRoot from "react-dom" [...] You should instead import it from "react-dom/client"` warning under React 18 ([#1441](https://github.com/shakacode/react_on_rails/issues/1441)). [PR 1460](https://github.com/shakacode/react_on_rails/pull/1460) by [alexeyr](https://github.com/alexeyr).
 
   In exchange, you may see a warning like this when building a Webpack bundle under React 16:
