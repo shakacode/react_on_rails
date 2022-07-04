@@ -39,12 +39,15 @@ Note, the best way to understand how to use ReactOnRails is to study a few simpl
 With the code from running the React on Rails generator above:
 
 1. Edit `app/views/hello_world/index.html.erb` and set the `prerender` option to `true`.
+
+    You may need to use `Node` as your js runtime environment by setting `EXECJS_RUNTIME=Node` into your environment variables.
+
 2. Refresh the page.
 
 Below is the line where you turn server rendering on by setting `prerender` to true:
 
 ```erb
-<%= react_component("HelloWorld", props: @hello_world_props, prerender: false) %>
+<%= react_component("HelloWorld", props: @hello_world_props, prerender: true) %>
 ```
 
 Note, if you got an error in your console regarding "ReferenceError: window is not defined",
