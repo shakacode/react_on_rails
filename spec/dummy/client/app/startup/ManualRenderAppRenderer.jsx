@@ -1,9 +1,7 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import ReactDOMClient from 'react-dom/client';
 
 export default (props, _railsContext, domNodeId) => {
-  const render = props.prerender ? ReactDOM.hydrate : ReactDOM.render;
-
   const reactElement = (
     <div>
       <h1 id="manual-render">Manual Render Example</h1>
@@ -11,5 +9,11 @@ export default (props, _railsContext, domNodeId) => {
     </div>
   );
 
-  render(reactElement, document.getElementById(domNodeId));
+  const domNode = document.getElementById(domNodeId);
+  if (props.prerender) {
+    ReactDOMClient.hydrateRoot(domNode, reactElement);
+  } else {
+    const root = ReactDOMClient.createRoot(domNode);
+    root.render(reactElement);
+  }
 };

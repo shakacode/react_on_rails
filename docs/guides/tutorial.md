@@ -98,6 +98,14 @@ bundle exec rails generate react_on_rails:install
 Enter `a` to replace all configuration files required by the project. You can check the diffs
 before you commit to see what changed.
 
+## Setting up your environment variables
+
+Add the following variable to your environment:
+
+```
+EXECJS_RUNTIME=Node
+```
+
 Then run the server with one of the following options:
 
 ## Running with HMR
