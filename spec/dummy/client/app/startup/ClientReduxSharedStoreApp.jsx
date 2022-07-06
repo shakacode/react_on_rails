@@ -4,7 +4,7 @@
 import React from 'react';
 import { Provider } from 'react-redux';
 import ReactOnRails from 'react-on-rails';
-import ReactDOM from 'react-dom';
+import ReactDOMClient from 'react-dom/client';
 
 import HelloWorldContainer from '../components/HelloWorldContainer';
 
@@ -14,7 +14,12 @@ import HelloWorldContainer from '../components/HelloWorldContainer';
  *  React will see that the state is the same and not do anything.
  */
 export default (props, _railsContext, domNodeId) => {
-  const render = props.prerender ? ReactDOM.hydrate : ReactDOM.render;
+  const render = props.prerender
+    ? ReactDOMClient.hydrateRoot
+    : (domNode, element) => {
+        const root = ReactDOMClient.createRoot(domNode);
+        root.render(element);
+      };
   // eslint-disable-next-line no-param-reassign
   delete props.prerender;
 
@@ -32,7 +37,7 @@ export default (props, _railsContext, domNodeId) => {
         <Komponent />
       </Provider>
     );
-    render(element, document.getElementById(domNodeId));
+    render(document.getElementById(domNodeId), element);
   };
 
   renderApp(HelloWorldContainer);

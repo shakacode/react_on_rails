@@ -29,6 +29,8 @@
   <li>
     <p>A renderer is a function that accepts props, railsContext, domNodeId:</p>
     <pre>
+  import ReactDOMClient from 'react-dom/client';
+
   const ManualRenderApp = (props, railsContext, domNodeId) => {
     const reactElement = (
       <%= '<div>' %>
@@ -37,7 +39,8 @@
       <%= '</div>' %>
     );
 
-    ReactDOM.render(reactElement, document.getElementById(domNodeId));
+    const root = ReactDOMClient.createRoot(document.getElementById(domNodeId));
+    root.render(reactElement);
   };
     </pre>
     <h4>spec/dummy/client/app/startup/ManualRenderAppRenderer.jsx</h4>
