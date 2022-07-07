@@ -57,16 +57,17 @@ module ReactOnRails
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
+      render_options = internal_result[:render_options]
 
       load_pack_for_component(component_name) if render_options.load_bundle
-      
+
       case server_rendered_html
       when String
         build_react_component_result_for_server_rendered_string(
           server_rendered_html: server_rendered_html,
           component_specification_tag: internal_result[:tag],
           console_script: console_script,
-          render_options: internal_result[:render_options]
+          render_options: render_options
         )
       when Hash
         msg = <<~MSG
@@ -119,6 +120,9 @@ module ReactOnRails
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
+      render_options = internal_result[:render_options]
+
+      load_pack_for_component(component_name) if render_options.load_bundle
 
       if server_rendered_html.is_a?(String) && internal_result[:result]["hasErrors"]
         server_rendered_html = { COMPONENT_HTML_KEY => internal_result[:result]["html"] }
@@ -129,7 +133,7 @@ module ReactOnRails
           server_rendered_html: server_rendered_html,
           component_specification_tag: internal_result[:tag],
           console_script: console_script,
-          render_options: internal_result[:render_options]
+          render_options: render_options
         )
       else
         msg = <<~MSG

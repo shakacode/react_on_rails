@@ -68,7 +68,7 @@ module ReactOnRails
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
-                   components_directory: nil, load_bundle: false)
+                   components_directory: nil, load_bundle: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir

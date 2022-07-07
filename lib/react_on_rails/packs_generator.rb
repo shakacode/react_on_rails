@@ -26,12 +26,13 @@ module ReactOnRails
       generated_server_bundle_file_name = component_name(defined_server_bundle_file.sub(".js", "-genrated.js"))
       generated_server_bundle_file = "#{generated_packs_directory}/#{generated_server_bundle_file_name}.js"
 
-      server_component_imports = server_components.map do |_p,v|
+      server_component_imports = server_components.map do |_p, v|
         "import #{component_name(v)} from '#{relative_component_path(v, generated_server_bundle_file)}';"
       end
 
-      components_to_register = server_components.map { |_p, v| component_name(v)}
-      already_present_server_bundle_relative_path = relative_component_path(defined_server_bundle_file, generated_server_bundle_file)
+      components_to_register = server_components.map { |_p, v| component_name(v) }
+      already_present_server_bundle_relative_path = relative_component_path(defined_server_bundle_file,
+                                                                            generated_server_bundle_file)
 
       content = <<~FILE_CONTENT
         /* eslint-disable */
