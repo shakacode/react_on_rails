@@ -55,7 +55,7 @@ And define it like this:
 module CustomBuildCommand
   def self.call
     ReactOnRailsPro::AssetsPrecompile.call
-    Rake::Task['react_on_rails_pro:pre_stage_bundle_for_vm_renderer'].invoke
+    Rake::Task['react_on_rails_pro:pre_stage_bundle_for_node_renderer'].invoke
   end
 end
 ```
