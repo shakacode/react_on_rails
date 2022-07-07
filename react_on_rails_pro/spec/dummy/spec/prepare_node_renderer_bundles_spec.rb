@@ -8,8 +8,8 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
   let(:fixture_path) { File.expand_path("./spec/fixtures/#{asset_filename}") }
   let(:fixture_path2) { File.expand_path("./spec/fixtures/#{asset_filename2}") }
   let(:non_exist_fixture_path) { File.expand_path("./spec/fixtures/sample99.json") }
-  let(:asset_path_expanded) { Rails.root.join(".node-renderer-bundles", asset_filename) }
-  let(:asset_path_expanded2) { Rails.root.join(".node-renderer-bundles", asset_filename2) }
+  let(:asset_path_expanded) { path_in_bundles_folder(asset_filename) }
+  let(:asset_path_expanded2) { path_in_bundles_folder(asset_filename2) }
 
   before do
     dbl_configuration = instance_double("Configuration",
@@ -18,8 +18,8 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
                                         renderer_url: "http://localhost:3800",
                                         renderer_request_retry_limit: 5,
                                         assets_to_copy: [
-                                          Rails.root.join("public", "webpack", "production", "loadable-stats2.json"),
-                                          Rails.root.join("public", "webpack", "production", "loadable-stats3.json")
+                                          path_in_webpack_folder(asset_filename),
+                                          path_in_webpack_folder(asset_filename2)
                                         ])
     allow(ReactOnRailsPro).to receive(:configuration).and_return(dbl_configuration)
     FileUtils.mkdir_p(Rails.root.join("public", "webpack", "production"))
@@ -29,8 +29,8 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
 
   context("when assets exist") do
     before do
-      FileUtils.cp(fixture_path, Rails.root.join("public", "webpack", "production", asset_filename))
-      FileUtils.cp(fixture_path2, Rails.root.join("public", "webpack", "production", asset_filename2))
+      FileUtils.cp(fixture_path, path_in_webpack_folder(asset_filename))
+      FileUtils.cp(fixture_path2, path_in_webpack_folder(asset_filename2))
     end
 
     it "copying asset to public folder" do
@@ -39,12 +39,14 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
       described_class.call
       expect(asset_exist_on_renderer?(asset_filename)).to eq(true)
       expect(asset_exist_on_renderer?(asset_filename2)).to eq(true)
+      expect(Pathname.new(File.readlink(asset_path_expanded)).relative?).to eq(true)
+      expect(File.realpath(asset_path_expanded)).to eq(path_in_webpack_folder(asset_filename).to_s)
     end
   end
 
   context("when assets don't exist") do
     it "prints warning if asset not found" do
-      first_asset_path = Rails.root.join("public", "webpack", "production", asset_filename)
+      first_asset_path = path_in_webpack_folder(asset_filename)
       File.delete(first_asset_path) if File.exist?(first_asset_path)
       expect do
         described_class.call
@@ -54,7 +56,15 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
     end
   end
 
+  def path_in_bundles_folder(filename)
+    Rails.root.join(".node-renderer-bundles", filename)
+  end
+
+  def path_in_webpack_folder(filename)
+    Rails.root.join("public", "webpack", "production", filename)
+  end
+
   def asset_exist_on_renderer?(filename)
-    File.exist?(Rails.root.join(".node-renderer-bundles", filename))
+    File.exist?(path_in_bundles_folder(filename))
   end
 end
