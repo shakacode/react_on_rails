@@ -1,16 +1,15 @@
 import type { ReactElement } from 'react';
 import ReactDOM from 'react-dom';
 import type { RenderReturnType } from './types';
+import { supportsRootApi } from './reactApis';
 
 type HydrateOrRenderType = (domNode: Element, reactElement: ReactElement) => RenderReturnType;
-const supportsReactCreateRoot = ReactDOM.version &&
-  parseInt(ReactDOM.version.split('.')[0], 10) >= 18;
 
 // TODO: once React dependency is updated to >= 18, we can remove this and just
 // import ReactDOM from 'react-dom/client';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let reactDomClient: any;
-if (supportsReactCreateRoot) {
+if (supportsRootApi) {
   // This will never throw an exception, but it's the way to tell Webpack the dependency is optional
   // https://github.com/webpack/webpack/issues/339#issuecomment-47739112
   // Unfortunately, it only converts the error to a warning.
@@ -24,12 +23,12 @@ if (supportsReactCreateRoot) {
   }
 }
 
-export const reactHydrate: HydrateOrRenderType = supportsReactCreateRoot ?
+export const reactHydrate: HydrateOrRenderType = supportsRootApi ?
   reactDomClient.hydrateRoot :
   (domNode, reactElement) => ReactDOM.hydrate(reactElement, domNode);
 
 export function reactRender(domNode: Element, reactElement: ReactElement): RenderReturnType {
-  if (supportsReactCreateRoot) {
+  if (supportsRootApi) {
     const root = reactDomClient.createRoot(domNode);
     root.render(reactElement);
     return root;
