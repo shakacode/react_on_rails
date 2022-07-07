@@ -18,11 +18,13 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 
 #### Improved
-- Remove addition of `mini_racer` gem by default. [PR 1453](https://github.com/shakacode/react_on_rails/pull/1453) by [vtamara](https://github.com/vtamara) and [tomdracz](https://github.com/tomdracz).
+- Removed addition of `mini_racer` gem by default. [PR 1453](https://github.com/shakacode/react_on_rails/pull/1453) by [vtamara](https://github.com/vtamara) and [tomdracz](https://github.com/tomdracz).
 
   Using `mini_racer` makes most sense when deploying or building in environments that do not have Javascript runtime present. Since `react_on_rails` requires Node.js, there's no reason to override `ExecJS` runtime with `mini_racer`.
 
   To migrate this change, remove `mini_racer` gem from your `Gemfile` and test your app for correct behaviour. You can continue using `mini_racer` and it will be still picked as the default `ExecJS` runtime, if present in your app `Gemfile`.
+
+- Upgraded the example test app in `spec/dummy` to React 18. [PR 1463](https://github.com/shakacode/react_on_rails/pull/1463) by [alexeyr](https://github.com/alexeyr).
 
 #### Fixed
 - Correctly unmount roots under React 18. [PR 1466](https://github.com/shakacode/react_on_rails/pull/1466) by [alexeyr](https://github.com/alexeyr).
@@ -51,7 +53,7 @@ Changes since last non-beta release.
 - Removed webpacker as a dependency. Add gem Shakapacker to your project, and update your package.json to also use shakapacker.
 
 #### Fixed
-- Propper throwing of exceptions.
+- Proper throwing of exceptions.
 - Default configuration better handles test env.
 
 ### [12.6.0] - 2022-01-22
