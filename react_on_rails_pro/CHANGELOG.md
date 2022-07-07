@@ -13,6 +13,11 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+
+## [3.0.0] - 2022-07-07
+### Fixed
+- Make asset paths in PrepareNodeRenderBundles relative too. The symlink to the bundle itself was made relative in #231, but asset symlinks remained absolute. This makes them relative too. Fixes #272. [PR 273](https://github.com/shakacode/react_on_rails_pro/pull/273) by [alexeyr-ci1](https://github.com/alexeyr-ci1).
+
 ## [3.0.0-rc.4] - 2022-06-28
 ### Fixed
 - Add RAILS_ENV to bundle cache key. This ensures a development bundle will never get accidentally deployed to production. [PR 270](https://github.com/shakacode/react_on_rails_pro/pull/270) by [justin808](https://github.com/justin808).
@@ -261,7 +266,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.4...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0...HEAD
+[3.0.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.3.0...3.0.0
 [3.0.0-rc.4]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.3...3.0.0-rc.4
 [3.0.0-rc.3]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.1...3.0.0-rc.3
 [3.0.0-rc.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.0...3.0.0-rc.1
