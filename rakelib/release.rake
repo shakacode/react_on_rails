@@ -38,7 +38,7 @@ Before this command can be run:
 //npm.pkg.github.com/:_authToken=<TOKEN>
 always-auth=true
 ```
-3. You would create or edit a ~/.gem/credentials to include the following, replacing TOKEN with your personal access token.
+3. Create or edit a ~/.gem/credentials to include the following, replacing TOKEN with your personal access token.
 
 ---
 :github: Bearer TOKEN
