@@ -73,14 +73,14 @@ module ReactOnRails
                                                                generated_server_bundle_file_path)
       content = <<~FILE_CONTENT
         // eslint-disable-next-line import/extensions
-        import  "./#{relative_path_to_generated_server_bundle}"\n
+        import "./#{relative_path_to_generated_server_bundle}"\n
       FILE_CONTENT
 
       prepend_to_file_if_not_present(defined_server_bundle_file_path, content)
     end
 
     def self.generated_server_bundle_file_path
-      generated_server_bundle_file_name = component_name(defined_server_bundle_file_path.sub(".js", "-genrated.js"))
+      generated_server_bundle_file_name = component_name(defined_server_bundle_file_path.sub(".js", "-generated.js"))
 
       "#{source_entry_path}/#{generated_server_bundle_file_name}.js"
     end
