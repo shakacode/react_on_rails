@@ -14,6 +14,7 @@ You can find the **package** version numbers from this repo's tags and below in 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [3.0.1] - 2022-07-011
 ### Fixed
 - Fix possible `uninitialized constant ReactOnRails (NameError)` in `lib/react_on_rails_pro/error.rb:4`. [PR 277](https://github.com/shakacode/react_on_rails_pro/pull/273) by [alexeyr](https://github.com/alexeyr).
 
@@ -269,7 +270,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.1...HEAD
+[3.0.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0...3.0.1
 [3.0.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.3.0...3.0.0
 [3.0.0-rc.4]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.3...3.0.0-rc.4
 [3.0.0-rc.3]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0-rc.1...3.0.0-rc.3
