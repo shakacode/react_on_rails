@@ -14,9 +14,12 @@ You can find the **package** version numbers from this repo's tags and below in 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+### Fixed
+- Fix possible `uninitialized constant ReactOnRails (NameError)` in `lib/react_on_rails_pro/error.rb:4`. [PR 277](https://github.com/shakacode/react_on_rails_pro/pull/273) by [alexeyr](https://github.com/alexeyr).
+
 ## [3.0.0] - 2022-07-07
 ### Fixed
-- Make asset paths in PrepareNodeRenderBundles relative too. The symlink to the bundle itself was made relative in #231, but asset symlinks remained absolute. This makes them relative too. Fixes #272. [PR 273](https://github.com/shakacode/react_on_rails_pro/pull/273) by [alexeyr-ci1](https://github.com/alexeyr-ci1).
+- Make asset paths in PrepareNodeRenderBundles relative too. The symlink to the bundle itself was made relative in #231, but asset symlinks remained absolute. This makes them relative too. Fixes #272. [PR 273](https://github.com/shakacode/react_on_rails_pro/pull/273) by [alexeyr](https://github.com/alexeyr).
 
 ## [3.0.0-rc.4] - 2022-06-28
 ### Fixed
