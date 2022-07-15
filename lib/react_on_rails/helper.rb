@@ -93,13 +93,13 @@ module ReactOnRails
 
     def load_pack_for_component(component_name)
       component_pack_file = generated_components_pack component_name
-      is_component_pack_present = File.exist?(component_pack_file)
+      is_component_pack_present = File.exist? component_pack_file
       is_development = ENV["RAILS_ENV"] == "development"
 
       ReactOnRails::PacksGenerator.generate_packs if is_development && !is_component_pack_present
 
-      append_javascript_pack_tag("generated/#{component_name}")
-      append_stylesheet_pack_tag("generated/#{component_name}")
+      append_javascript_pack_tag "generated/#{component_name}"
+      append_stylesheet_pack_tag "generated/#{component_name}"
     end
 
     def generated_components_pack(component_name)
@@ -442,7 +442,7 @@ module ReactOnRails
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
 
-      load_pack_for_component(component_name) if render_options.auto_load_bundle
+      load_pack_for_component component_name if render_options.auto_load_bundle
 
       {
         render_options: render_options,

@@ -15,27 +15,27 @@ module ReactOnRails
     end
 
     def self.generate_packs
-      client_component_to_path.each_value { |component_path| create_pack(component_path) }
+      client_component_to_path.each_value { |component_path| create_pack component_path }
       create_server_pack if ReactOnRails.configuration.server_bundle_js_file.present?
     end
 
     def self.create_pack(file_path)
-      output_path = generated_pack_path(file_path)
-      content = pack_file_contents(file_path)
+      output_path = generated_pack_path file_path
+      content = pack_file_contents file_path
 
       f = File.new(output_path, "w")
-      f.puts(content)
+      f.puts content
       f.close
 
       puts(Rainbow("Generated Packs: #{output_path}").yellow)
     end
 
     def self.pack_file_contents(file_path)
-      registered_component_name = component_name(file_path)
+      registered_component_name = component_name file_path
       <<~FILE_CONTENT
         /* eslint-disable */
         import ReactOnRails from 'react-on-rails';
-        import #{registered_component_name} from '#{relative_component_path_from_generated_pack(file_path)}';
+        import #{registered_component_name} from '#{relative_component_path_from_generated_pack file_path}';
 
         ReactOnRails.register({#{registered_component_name}});
         /* eslint-enable */
@@ -44,7 +44,7 @@ module ReactOnRails
 
     def self.create_server_pack
       f = File.new(generated_server_bundle_file_path, "w")
-      f.puts(generated_server_pack_file_content)
+      f.puts generated_server_pack_file_content
       f.close
 
       add_generated_pack_to_server_bundle
@@ -81,7 +81,7 @@ module ReactOnRails
     end
 
     def self.generated_server_bundle_file_path
-      generated_server_bundle_file_name = component_name(defined_server_bundle_file_path.sub(".js", "-generated.js"))
+      generated_server_bundle_file_name = component_name defined_server_bundle_file_path.sub(".js", "-generated.js")
 
       "#{source_entry_path}/#{generated_server_bundle_file_name}.js"
     end
@@ -107,7 +107,7 @@ module ReactOnRails
 
     def self.relative_component_path_from_generated_pack(ror_component_path)
       component_file_path = Pathname.new ror_component_path
-      generated_pack_path = Pathname.new generated_pack_path(ror_component_path)
+      generated_pack_path = Pathname.new generated_pack_path ror_component_path
 
       relative_path(generated_pack_path, component_file_path)
     end
@@ -122,7 +122,7 @@ module ReactOnRails
     end
 
     def self.generated_pack_path(file_path)
-      "#{generated_packs_directory_path}/#{component_name(file_path)}.jsx"
+      "#{generated_packs_directory_path}/#{component_name file_path}.jsx"
     end
 
     def self.component_name(file_path)
@@ -173,7 +173,7 @@ module ReactOnRails
       return if content.start_with? str
 
       File.open(file, "w") do |fd|
-        fd.write(str + content)
+        fd.write str + content
       end
     end
   end
