@@ -191,7 +191,7 @@ module ReactOnRails
         config.auto_load_bundle = false
       end
 
-      expect(ReactOnRails.configuration.load_bundle).to eq(false)
+      expect(ReactOnRails.configuration.auto_load_bundle).to eq(false)
     end
 
     it "changes the configuration of the gem, such as setting the auto_load_bundle option to true" do
@@ -199,7 +199,7 @@ module ReactOnRails
         config.auto_load_bundle = true
       end
 
-      expect(ReactOnRails.configuration.load_bundle).to eq(true)
+      expect(ReactOnRails.configuration.auto_load_bundle).to eq(true)
     end
 
     it "has a default configuration of the gem" do

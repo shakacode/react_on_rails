@@ -11,6 +11,7 @@ module ReactOnRails
 
     before do
       ReactOnRails.configuration.server_bundle_js_file = server_bundle_js_file
+      ReactOnRails.configuration.components_directory = "ror_components"
       allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
       allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_path).and_return(webpacker_source_path)
       allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_entry_path)

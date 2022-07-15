@@ -7,7 +7,7 @@ module ReactOnRails
   end
 
   DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
-  DEFAULT_COMPONENTS_DIR = "ror_components"
+  DEFAULT_COMPONENTS_DIR = nil
   DEFAULT_SERVER_RENDER_TIMEOUT = 20
   DEFAULT_POOL_SIZE = 1
   DEFAULT_RANDOM_DOM_ID = true # for backwards compatability

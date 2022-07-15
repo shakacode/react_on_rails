@@ -2,8 +2,7 @@
 
 namespace :react_on_rails do
   desc <<~DESC
-    If there is a jsx file inside config.components_directory, this command generates corresponding packs and#{' '}
-    registers the component for usage with react_component_with_bundle helper.
+    If there is a jsx file inside config.components_directory, this command generates corresponding packs.
   DESC
 
   task generate_packs: :environment do

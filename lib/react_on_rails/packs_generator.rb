@@ -7,6 +7,7 @@ module ReactOnRails
     ENDS_WITH_CLIENT_OR_SERVER_REGEX = /\.server$|\.client$/.freeze
 
     def self.generate
+      return unless components_directory.present?
       return unless ReactOnRails::WebpackerUtils.using_webpacker?
 
       clean_generated_packs_directory
@@ -153,10 +154,13 @@ module ReactOnRails
     end
 
     def self.components_search_path
-      components_directory = ReactOnRails.configuration.components_directory
       source_path = ReactOnRails::WebpackerUtils.webpacker_source_path
 
       "#{source_path}/**/#{components_directory}"
+    end
+
+    def self.components_directory
+      ReactOnRails.configuration.components_directory
     end
 
     def self.prepend_to_file_if_not_present(file, str)

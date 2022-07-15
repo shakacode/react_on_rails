@@ -93,8 +93,10 @@ module ReactOnRails
 
     def load_pack_for_component(component_name)
       component_pack_file = generated_components_pack component_name
+      is_component_pack_present = File.exist?(component_pack_file)
+      is_development = ENV["RAILS_ENV"] == "development"
 
-      ReactOnRails::PacksGenerator.generate_packs unless File.exist?(component_pack_file)
+      ReactOnRails::PacksGenerator.generate_packs if is_development && !is_component_pack_present
 
       append_javascript_pack_tag("generated/#{component_name}")
       append_stylesheet_pack_tag("generated/#{component_name}")
