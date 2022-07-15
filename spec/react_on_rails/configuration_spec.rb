@@ -186,17 +186,17 @@ module ReactOnRails
       expect(ReactOnRails.configuration.random_dom_id).to eq(false)
     end
 
-    it "changes the configuration of the gem, such as setting the load_bundle option to false" do
+    it "changes the configuration of the gem, such as setting the auto_load_bundle option to false" do
       ReactOnRails.configure do |config|
-        config.load_bundle = false
+        config.auto_load_bundle = false
       end
 
       expect(ReactOnRails.configuration.load_bundle).to eq(false)
     end
 
-    it "changes the configuration of the gem, such as setting the load_bundle option to true" do
+    it "changes the configuration of the gem, such as setting the auto_load_bundle option to true" do
       ReactOnRails.configure do |config|
-        config.load_bundle = true
+        config.auto_load_bundle = true
       end
 
       expect(ReactOnRails.configuration.load_bundle).to eq(true)

@@ -59,8 +59,6 @@ module ReactOnRails
       console_script = internal_result[:result]["consoleReplayScript"]
       render_options = internal_result[:render_options]
 
-      load_pack_for_component(component_name) if render_options.load_bundle
-
       case server_rendered_html
       when String
         build_react_component_result_for_server_rendered_string(
@@ -121,8 +119,6 @@ module ReactOnRails
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
       render_options = internal_result[:render_options]
-
-      load_pack_for_component(component_name) if render_options.load_bundle
 
       if server_rendered_html.is_a?(String) && internal_result[:result]["hasErrors"]
         server_rendered_html = { COMPONENT_HTML_KEY => internal_result[:result]["html"] }
@@ -435,6 +431,8 @@ module ReactOnRails
 
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
+
+      load_pack_for_component(component_name) if render_options.auto_load_bundle
 
       {
         render_options: render_options,
