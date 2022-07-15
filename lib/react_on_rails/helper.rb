@@ -92,8 +92,16 @@ module ReactOnRails
     end
 
     def load_pack_for_component(component_name)
+      component_pack_file = generated_components_pack component_name
+
+      ReactOnRails::PacksGenerator.generate_packs unless File.exist?(component_pack_file)
+
       append_javascript_pack_tag("generated/#{component_name}")
       append_stylesheet_pack_tag("generated/#{component_name}")
+    end
+
+    def generated_components_pack(component_name)
+      "#{ReactOnRails::WebpackerUtils.webpacker_source_entry_path}/generated/#{component_name}"
     end
 
     # react_component_hash is used to return multiple HTML strings for server rendering, such as for

@@ -86,7 +86,7 @@ module ReactOnRails
     end
 
     def self.clean_generated_packs_directory
-      FileUtils.rm_rf(generated_packs_directory_path)
+      FileUtils.rm_rf generated_packs_directory_path
       FileUtils.mkdir_p generated_packs_directory_path
     end
 

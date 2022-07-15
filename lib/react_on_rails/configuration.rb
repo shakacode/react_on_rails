@@ -131,6 +131,7 @@ module ReactOnRails
       ENV["WEBPACKER_PRECOMPILE"] = "false"
 
       precompile_tasks = lambda {
+        Rake::Task["react_on_rails:generate_packs"].invoke
         Rake::Task["react_on_rails:assets:webpack"].invoke
         puts "Invoking task webpacker:clean from React on Rails"
 
