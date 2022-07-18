@@ -21,6 +21,9 @@ module ReactOnRails
     end
 
     after do
+      ReactOnRails.configuration.server_bundle_js_file = nil
+      ReactOnRails.configuration.components_directory = nil
+
       FileUtils.rm_rf("#{webpacker_source_entry_path}/generated")
       FileUtils.rm(generated_server_bundle_file_path)
       File.truncate("#{webpacker_source_entry_path}/#{server_bundle_js_file}", 0)

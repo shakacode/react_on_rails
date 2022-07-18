@@ -136,7 +136,7 @@ module ReactOnRails
     end
 
     def self.common_component_to_path
-      common_components_paths = Dir.glob("#{components_search_path}/*[!]*")
+      common_components_paths = Dir.glob("#{components_search_path}/*[!(.server.|.client.)]*")
       component_name_to_path(common_components_paths)
     end
 
