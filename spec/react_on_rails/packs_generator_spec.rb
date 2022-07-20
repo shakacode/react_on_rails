@@ -94,7 +94,7 @@ module ReactOnRails
       end
     end
 
-    context "when component with server and common File" do
+    context "when component with server and common file" do
       let(:component_name) { "ComponentWithServerAndCommon" }
       let(:component_pack) { "#{generated_directory}/#{component_name}.jsx" }
 
@@ -119,7 +119,7 @@ module ReactOnRails
       end
     end
 
-    context "when component with server, client and common File" do
+    context "when component with server, client and common file" do
       let(:component_name) { "ComponentWithCommonClientAndServer" }
       let(:component_pack) { "#{generated_directory}/#{component_name}.jsx" }
 
