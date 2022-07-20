@@ -4,7 +4,7 @@ require "fileutils"
 
 module ReactOnRails
   class PacksGenerator
-    ENDS_WITH_CLIENT_OR_SERVER_REGEX = /\.server$|\.client$/.freeze
+    CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/.freeze
 
     def self.generate
       return unless components_directory.present?
@@ -128,7 +128,7 @@ module ReactOnRails
     def self.component_name(file_path)
       basename = File.basename(file_path, File.extname(file_path))
 
-      basename.sub(ENDS_WITH_CLIENT_OR_SERVER_REGEX, "")
+      basename.sub(CONTAINS_CLIENT_OR_SERVER_REGEX, "")
     end
 
     def self.component_name_to_path(paths)
@@ -137,7 +137,7 @@ module ReactOnRails
 
     def self.common_component_to_path
       common_components_paths = Dir.glob("#{components_search_path}/*").reject do |f|
-        f.include?(".client.") || f.include?(".server.")
+        CONTAINS_CLIENT_OR_SERVER_REGEX.match?(f)
       end
       component_name_to_path(common_components_paths)
     end
