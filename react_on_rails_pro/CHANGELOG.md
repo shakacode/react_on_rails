@@ -13,6 +13,8 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+### Improvement
+- Warn, do not raise on missing assets [PR 280](https://github.com/shakacode/react_on_rails_pro/pull/280) by [Romex91](https://github.com/Romex91)
 
 ## [3.0.1] - 2022-07-011
 ### Fixed

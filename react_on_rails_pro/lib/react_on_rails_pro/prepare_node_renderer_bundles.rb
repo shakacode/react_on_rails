@@ -27,7 +27,10 @@ module ReactOnRailsPro
       return unless ReactOnRailsPro.configuration.assets_to_copy.present?
 
       ReactOnRailsPro.configuration.assets_to_copy.each do |asset_path|
-        raise ReactOnRails::Error, "Asset not found #{asset_path}" unless File.exist?(asset_path)
+        unless File.exist?(asset_path)
+          warn "Asset not found #{asset_path}"
+          next
+        end
 
         destination_full_path = File.join(dest_path, asset_path.basename.to_s)
         make_relative_symlink(asset_path, destination_full_path)

@@ -50,9 +50,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
       File.delete(first_asset_path) if File.exist?(first_asset_path)
       expect do
         described_class.call
-      end.to raise_error(ReactOnRails::Error) { |error|
-               expect(error.message).to eq "Asset not found #{first_asset_path}"
-             }
+      end.to output("Asset not found #{first_asset_path}\n").to_stderr
     end
   end
 
