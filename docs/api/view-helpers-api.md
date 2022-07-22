@@ -1,7 +1,7 @@
 # View and Controller Helpers
 ##  View Helpers API
 
-Once the bundled files have been generated in your `app/assets/webpack` folder and you have registered your components, you will want to render these components on your Rails views using the included helper method, `react_component`.
+Once the bundled files have been generated in your `app/assets/webpack` folder and you have registered your components, you will want to render these components on your Rails views using the included helper method, [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component).
 
 ------------
 
