@@ -13,7 +13,7 @@ default:
   nested_entries: true
 ```
 
-For more details, see [Configuration and Code ](https://github.com/shakacode/shakapacker#configuration-and-code) section in [shakapacker](https://github.com/shakacode/shakapacker/).
+For more details, see [Configuration and Code](https://github.com/shakacode/shakapacker#configuration-and-code) section in [shakapacker](https://github.com/shakacode/shakapacker/).
 
 ### Configure Components Directory
 `components_directory` is the name for directories containing components which can be automatically registered and used in Rails views.
@@ -122,7 +122,9 @@ the default value of the auto_load_bundle parameter can be specified by setting 
 
 ### Server Rendering and Client Rendering Components
 
-If server rendering is enabled, the component will be registered for the usage both on server and client rendering. In order to have separate definitions for client and server rendering, Name the components files as `Component_Name.server.jsx` and `Component_Name.client.jsx`. During the server rendering, the `Component_Name.server.jsx` definition will be used, and for client rendering, `Component_Name.client.jsx` file will be used.
+If server rendering is enabled, the component will be registered for the usage both on server and client rendering. In order to have separate definitions for client and server rendering, name the components files as `Component_Name.server.jsx` and `Component_Name.client.jsx`. During the server rendering, the `Component_Name.server.jsx` definition will be used, and for client rendering, `Component_Name.client.jsx` file will be used.
+
+*Note: If specifying separate definitions for client and server rendering, please ensue to delete the generalized `Component_Name.jsx` file.*
 
 ### Using Automated Bundle Generation Feature with already defined packs
 

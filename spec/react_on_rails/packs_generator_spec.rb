@@ -123,9 +123,7 @@ module ReactOnRails
       end
 
       it "raises an error for definition override" do
-        msg = <<~MSG
-          /Please delete the common definition and have separate server and client files/
-        MSG
+        msg =  /Please delete the common definition and have separate server and client files/
         expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
       end
     end

@@ -55,8 +55,8 @@ module ReactOnRails
     end
 
     def self.generated_server_pack_file_content
-      common_components_for_server_bundle = common_component_to_path.delete_if { |k| server_component_to_path.key?(k) }
-      component_for_server_registration_to_path = common_components_for_server_bundle.merge(server_component_to_path)
+      common_components_for_server_bundle = common_component_to_path.delete_if { |k| server_component_to_path.key? k }
+      component_for_server_registration_to_path = common_components_for_server_bundle.merge server_component_to_path
 
       server_component_imports = component_for_server_registration_to_path.map do |name, component_path|
         "import #{name} from '#{relative_path(generated_server_bundle_file_path, component_path)}';"
