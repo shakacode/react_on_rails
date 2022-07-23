@@ -3,6 +3,7 @@
 require "fileutils"
 
 module ReactOnRails
+  # rubocop:disable Metrics/ClassLength
   class PacksGenerator
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/.freeze
 
@@ -15,7 +16,9 @@ module ReactOnRails
     end
 
     def self.generate_packs
+      common_component_to_path.each_value { |component_path| create_pack component_path }
       client_component_to_path.each_value { |component_path| create_pack component_path }
+
       create_server_pack if ReactOnRails.configuration.server_bundle_js_file.present?
     end
 
@@ -52,11 +55,14 @@ module ReactOnRails
     end
 
     def self.generated_server_pack_file_content
-      server_component_imports = server_component_to_path.map do |name, component_path|
+      common_components_for_server_bundle = common_component_to_path.delete_if { |k| server_component_to_path.key?(k) }
+      component_for_server_registration_to_path = common_components_for_server_bundle.merge(server_component_to_path)
+
+      server_component_imports = component_for_server_registration_to_path.map do |name, component_path|
         "import #{name} from '#{relative_path(generated_server_bundle_file_path, component_path)}';"
       end
 
-      components_to_register = server_component_to_path.keys
+      components_to_register = component_for_server_registration_to_path.keys
 
       <<~FILE_CONTENT
         /* eslint-disable */
@@ -145,14 +151,25 @@ module ReactOnRails
     def self.client_component_to_path
       client_render_components_paths = Dir.glob("#{components_search_path}/*.client.*")
       client_specific_components = component_name_to_path(client_render_components_paths)
-      common_component_to_path.merge(client_specific_components)
+
+      duplicate_components = common_component_to_path.slice(*client_specific_components.keys)
+      duplicate_components.each_key { |component| raise_client_component_overrides_common component }
+
+      client_specific_components
     end
 
     def self.server_component_to_path
       server_render_components_paths = Dir.glob("#{components_search_path}/*.server.*")
       server_specific_components = component_name_to_path(server_render_components_paths)
 
-      common_component_to_path.merge(server_specific_components)
+      duplicate_components = common_component_to_path.slice(*server_specific_components.keys)
+      duplicate_components.each_key { |component| raise_server_component_overrides_common component }
+
+      server_specific_components.each_key do |k|
+        raise_missing_client_component(k) unless client_component_to_path.key? k
+      end
+
+      server_specific_components
     end
 
     def self.components_search_path
@@ -163,6 +180,35 @@ module ReactOnRails
 
     def self.components_directory
       ReactOnRails.configuration.components_directory
+    end
+
+    def self.raise_client_component_overrides_common(component_name)
+      msg = <<~MSG
+        **ERROR** ReactOnRails: client specific definition for Component '#{component_name}' overrides the
+        common definition. Please delete the common definition and have separate server and client files. For more
+        information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+      MSG
+
+      raise ReactOnRails::Error, msg
+    end
+
+    def self.raise_server_component_overrides_common(component_name)
+      msg = <<~MSG
+        **ERROR** ReactOnRails: server specific definition for Component '#{component_name}' overrides the
+        common definition. Please delete the common definition and have separate server and client files. For more
+        information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+      MSG
+
+      raise ReactOnRails::Error, msg
+    end
+
+    def self.raise_missing_client_component(component_name)
+      msg = <<~MSG
+        **ERROR** ReactOnRails: Component '#{component_name}' is missing a client specific file. For more
+        information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+      MSG
+
+      raise ReactOnRails::Error, msg
     end
 
     def self.prepend_to_file_if_not_present(file, str)
@@ -179,4 +225,5 @@ module ReactOnRails
       end
     end
   end
+  # rubocop:enable Metrics/ClassLength
 end

@@ -3,6 +3,7 @@
 require_relative "spec_helper"
 
 module ReactOnRails
+  # rubocop:disable Metrics/BlockLength
   describe PacksGenerator do
     let(:webpacker_source_path) { File.expand_path("fixtures/automated_packs_generation", __dir__) }
     let(:webpacker_source_entry_path) { File.expand_path("fixtures/automated_packs_generation/packs", __dir__) }
@@ -13,43 +14,46 @@ module ReactOnRails
       ReactOnRails.configuration.server_bundle_js_file = server_bundle_js_file
       ReactOnRails.configuration.components_directory = "ror_components"
       allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
-      allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_path).and_return(webpacker_source_path)
       allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_entry_path)
         .and_return(webpacker_source_entry_path)
-
-      described_class.generate
     end
 
     after do
       ReactOnRails.configuration.server_bundle_js_file = nil
       ReactOnRails.configuration.components_directory = nil
 
-      FileUtils.rm_rf("#{webpacker_source_entry_path}/generated")
-      FileUtils.rm(generated_server_bundle_file_path)
+      FileUtils.rm_rf "#{webpacker_source_entry_path}/generated"
+      FileUtils.rm_rf generated_server_bundle_file_path
       File.truncate("#{webpacker_source_entry_path}/#{server_bundle_js_file}", 0)
-    end
-
-    it "creates generated pack directory" do
-      expect(Pathname.new(generated_directory)).to be_directory
-    end
-
-    it "creates generated server bundle file" do
-      expect(File.exist?(generated_server_bundle_file_path)).to eq(true)
-    end
-
-    it "imports generated server bundle to original server bundle" do
-      server_bundle_file_path = "#{webpacker_source_entry_path}/#{server_bundle_js_file}"
-      server_bundle_content = File.read(server_bundle_file_path)
-
-      expect(server_bundle_content).to include("import \"./server-bundle-generated.js\"")
     end
 
     context "when component with common file only" do
       let(:component_name) { "ComponentWithCommonOnly" }
       let(:component_pack) { "#{generated_directory}/#{component_name}.jsx" }
 
+      before do
+        stub_webpacker_source_path(component_name: component_name,
+                                   webpacker_source_path: webpacker_source_path)
+        described_class.generate
+      end
+
+      it "creates generated pack directory" do
+        expect(Pathname.new(generated_directory)).to be_directory
+      end
+
+      it "creates generated server bundle file" do
+        expect(File.exist?(generated_server_bundle_file_path)).to eq(true)
+      end
+
       it "creates pack for ComponentWithCommonOnly" do
         expect(File.exist?(component_pack)).to eq(true)
+      end
+
+      it "imports generated server bundle to original server bundle" do
+        server_bundle_file_path = "#{webpacker_source_entry_path}/#{server_bundle_js_file}"
+        server_bundle_content = File.read(server_bundle_file_path)
+
+        expect(server_bundle_content).to include("import \"./server-bundle-generated.js\"")
       end
 
       it "generated pack for ComponentWithCommonOnly uses common file for pack" do
@@ -73,24 +77,19 @@ module ReactOnRails
       let(:component_name) { "ComponentWithClientAndCommon" }
       let(:component_pack) { "#{generated_directory}/#{component_name}.jsx" }
 
-      it "creates pack for ComponentWithClientAndCommon" do
-        expect(File.exist?(component_pack)).to eq(true)
+      before do
+        stub_webpacker_source_path(component_name: component_name,
+                                   webpacker_source_path: webpacker_source_path)
       end
 
-      it "generated pack for ComponentWithClientAndCommon uses client specific file for pack" do
-        pack_content = File.read(component_pack)
+      it "raises an error for definition override" do
+        msg = <<~MSG
+          **ERROR** ReactOnRails: client specific definition for Component '#{component_name}' overrides the
+          common definition. Please delete the common definition and have separate server and client files. For more
+          information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+        MSG
 
-        expect(pack_content).to include("#{component_name}.client.jsx")
-        expect(pack_content).not_to include("#{component_name}.server.jsx")
-        expect(pack_content).not_to include("#{component_name}.jsx")
-      end
-
-      it "generated server bundle uses common file" do
-        generated_server_bundle_content = File.read(generated_server_bundle_file_path)
-
-        expect(generated_server_bundle_content).to include("#{component_name}.jsx")
-        expect(generated_server_bundle_content).not_to include("#{component_name}.client.jsx")
-        expect(generated_server_bundle_content).not_to include("#{component_name}.server.jsx")
+        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
       end
     end
 
@@ -98,24 +97,19 @@ module ReactOnRails
       let(:component_name) { "ComponentWithServerAndCommon" }
       let(:component_pack) { "#{generated_directory}/#{component_name}.jsx" }
 
-      it "creates pack for ComponentWithServerAndCommon" do
-        expect(File.exist?(component_pack)).to eq(true)
+      before do
+        allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_path)
+          .and_return("#{webpacker_source_path}/components/#{component_name}")
       end
 
-      it "generated pack for ComponentWithServerAndCommon uses the common file for pack" do
-        pack_content = File.read(component_pack)
+      it "raises an error for definition override" do
+        msg = <<~MSG
+          **ERROR** ReactOnRails: server specific definition for Component '#{component_name}' overrides the
+          common definition. Please delete the common definition and have separate server and client files. For more
+          information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+        MSG
 
-        expect(pack_content).to include("#{component_name}.jsx")
-        expect(pack_content).not_to include("#{component_name}.client.jsx")
-        expect(pack_content).not_to include("#{component_name}.server.jsx")
-      end
-
-      it "generated server bundle uses server specific file" do
-        generated_server_bundle_content = File.read(generated_server_bundle_file_path)
-
-        expect(generated_server_bundle_content).to include("#{component_name}.server.jsx")
-        expect(generated_server_bundle_content).not_to include("#{component_name}.jsx")
-        expect(generated_server_bundle_content).not_to include("#{component_name}.client.jsx")
+        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
       end
     end
 
@@ -123,11 +117,61 @@ module ReactOnRails
       let(:component_name) { "ComponentWithCommonClientAndServer" }
       let(:component_pack) { "#{generated_directory}/#{component_name}.jsx" }
 
-      it "creates pack for ComponentWithCommonClientAndServer" do
+      before do
+        stub_webpacker_source_path(component_name: component_name,
+                                   webpacker_source_path: webpacker_source_path)
+      end
+
+      it "raises an error for definition override" do
+        msg = <<~MSG
+          /Please delete the common definition and have separate server and client files/
+        MSG
+        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
+      end
+    end
+
+    context "when component with server only" do
+      let(:component_name) { "ComponentWithServerOnly" }
+      let(:component_pack) { "#{generated_directory}/#{component_name}.jsx" }
+
+      before do
+        stub_webpacker_source_path(component_name: component_name,
+                                   webpacker_source_path: webpacker_source_path)
+      end
+
+      it "raises missing client file error" do
+        msg = <<~MSG
+          **ERROR** ReactOnRails: Component '#{component_name}' is missing a client specific file. For more
+          information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+        MSG
+
+        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
+      end
+    end
+
+    context "when component with client only" do
+      let(:component_name) { "ComponentWithClientOnly" }
+      let(:component_pack) { "#{generated_directory}/#{component_name}.jsx" }
+
+      before do
+        stub_webpacker_source_path(component_name: component_name,
+                                   webpacker_source_path: webpacker_source_path)
+        described_class.generate
+      end
+
+      it "creates generated pack directory" do
+        expect(Pathname.new(generated_directory)).to be_directory
+      end
+
+      it "creates generated server bundle file" do
+        expect(File.exist?(generated_server_bundle_file_path)).to eq(true)
+      end
+
+      it "creates pack for ComponentWithClientOnly" do
         expect(File.exist?(component_pack)).to eq(true)
       end
 
-      it "generated pack for ComponentWithCommonClientAndServer uses client file for pack" do
+      it "generated pack for ComponentWithClientOnly uses client file for pack" do
         pack_content = File.read(component_pack)
 
         expect(pack_content).to include("#{component_name}.client.jsx")
@@ -135,17 +179,23 @@ module ReactOnRails
         expect(pack_content).not_to include("#{component_name}.server.jsx")
       end
 
-      it "generated server bundle uses server specific file" do
+      it "generated server bundle do not have ComponentWithClientOnly registered" do
         generated_server_bundle_content = File.read(generated_server_bundle_file_path)
 
-        expect(generated_server_bundle_content).to include("#{component_name}.server.jsx")
         expect(generated_server_bundle_content).not_to include("#{component_name}.jsx")
         expect(generated_server_bundle_content).not_to include("#{component_name}.client.jsx")
+        expect(generated_server_bundle_content).not_to include("#{component_name}.server.jsx")
       end
     end
 
     def generated_server_bundle_file_path
       "#{webpacker_source_entry_path}/server-bundle-generated.js"
     end
+
+    def stub_webpacker_source_path(webpacker_source_path:, component_name:)
+      allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_path)
+        .and_return("#{webpacker_source_path}/components/#{component_name}")
+    end
   end
+  # rubocop:enable Metrics/BlockLength
 end
