@@ -122,9 +122,9 @@ the default value of the auto_load_bundle parameter can be specified by setting 
 
 ### Server Rendering and Client Rendering Components
 
-If server rendering is enabled, the component will be registered for the usage both on server and client rendering. In order to have separate definitions for client and server rendering, name the components files as `Component_Name.server.jsx` and `Component_Name.client.jsx`. During the server rendering, the `Component_Name.server.jsx` definition will be used, and for client rendering, `Component_Name.client.jsx` file will be used.
+If server rendering is enabled, the component will be registered for usage both in server and client rendering. In order to have separate definitions for client and server rendering, name the component files as `Component_Name.server.jsx` and `Component_Name.client.jsx`. The `Component_Name.server.jsx` file will be used for server rendering, and the `Component_Name.client.jsx` file for client rendering. If you don't want the component to be rendered on server, you should only have the `Component_Name.client.jsx` file.
 
-*Note: If specifying separate definitions for client and server rendering, please ensue to delete the generalized `Component_Name.jsx` file.*
+*Note: If specifying separate definitions for client and server rendering, please make sure to delete the generalized `Component_Name.jsx` file.*
 
 ### Using Automated Bundle Generation Feature with already defined packs
 
