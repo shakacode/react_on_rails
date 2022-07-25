@@ -16,7 +16,7 @@ default:
 For more details, see [Configuration and Code](https://github.com/shakacode/shakapacker#configuration-and-code) section in [shakapacker](https://github.com/shakacode/shakapacker/).
 
 ### Configure Components Directory
-`components_directory` is the name for directories containing components which can be automatically registered and used in Rails views.
+`components_directory` is the directories containing components that can be automatically registered and used in Rails views.
 Configure `config/initializers/react_on_rails`
 to set the name for `components_directory`. 
 
@@ -24,15 +24,15 @@ to set the name for `components_directory`.
 config.components_directory = "ror_components"
 ```
 
-Now all React components inside the directories called `ror_components` will automatically be registered for the usage with [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) helper methods provided by React on Rails.
+Now all React components inside the directories called `ror_components` will automatically be registered for usage with [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) helper methods provided by React on Rails.
 
 ### Configure `auto_load_bundle` Option
 
 For automated component registry, [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper method tries to load generated bundle for component from the generated directory automatically per `auto_load_bundle` option. `auto_load_bundle` option in `config/initializers/react_on_rails` configures the default value that will be passed to component helpers. The default is `false`, and the parameter can be passed explicitly for each call.
 
-*Note: Starting from React on Rails version 14.0.0, the default value for `auto_load_bundle` option will be `true`.*
+*Note: Starting from React on Rails version 14.0.0, the default value for the `auto_load_bundle` option will be `true`.*
 
-You can change the value in `config/initializers/react_on_rails` by updating as follows:
+You can change the value in `config/initializers/react_on_rails` by updating it as follows:
 
 ```rb
 config.auto_load_bundle = true
@@ -52,7 +52,7 @@ packs/generated
 
 ### Basic usage
 
-if the `webpacker.yml` file is configured as instructed [here](https://github.com/shakacode/shakapacker#configuration-and-code), with following configurations
+if the `webpacker.yml` file is configured as instructed [here](https://github.com/shakacode/shakapacker#configuration-and-code), with the following configurations
 
 ```yml
 default: &default
@@ -78,7 +78,7 @@ app/javascript:
       └── logo.svg
 ```
 
-Now, to automatically register, `A_ComponentOne`, `B_ComponentOne`, `B_ComponentTwo` for the usage with [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) helpers, create directory structure as mentioned below:
+Now, to automatically register `A_ComponentOne`, `B_ComponentOne` and `B_ComponentTwo` for the usage with [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) helpers, create a directory structure as mentioned below:
 
 ```
 app/javascript:
@@ -96,7 +96,7 @@ app/javascript:
   │   │   │ └── B_ComponentTwo.jsx       
 ```
 
-To register react component, it is no longer needed to create a pack entry and manually register it by calling `ReactOnRails.register`. With automatically generated packs, you can directly use `A_ComponentOne`, `B_ComponentOne` and `B_ComponentTwo` in Rails view using:
+To register a React component, creating a pack entry and manually registering it by calling `ReactOnRails.register` is no longer needed. With automatically generated packs, you can directly use `A_ComponentOne`, `B_ComponentOne` and `B_ComponentTwo` in Rails view using:
 
 ```erb
     <%= react_component("A_ComponentOne", {}, auto_load_bundle: true) %>    
@@ -104,7 +104,7 @@ To register react component, it is no longer needed to create a pack entry and m
     <%= react_component("B_ComponentTwo", {}, auto_load_bundle: true) %>    
 ```
 
-If `A_ComponentOne` uses multiple HTML strings for server rendering, [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper can be used on Rails view as illustrated below.
+If `A_ComponentOne` uses multiple HTML strings for server rendering, the [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper can be used on the Rails view, as illustrated below.
 
 ```erb
 <% A_ComponentOne = react_component_hash("A_ComponentOne", 
@@ -122,12 +122,12 @@ the default value of the auto_load_bundle parameter can be specified by setting 
 
 ### Server Rendering and Client Rendering Components
 
-If server rendering is enabled, the component will be registered for usage both in server and client rendering. In order to have separate definitions for client and server rendering, name the component files as `Component_Name.server.jsx` and `Component_Name.client.jsx`. The `Component_Name.server.jsx` file will be used for server rendering, and the `Component_Name.client.jsx` file for client rendering. If you don't want the component to be rendered on server, you should only have the `Component_Name.client.jsx` file.
+If server rendering is enabled, the component will be registered for usage both in server and client rendering. In order to have separate definitions for client and server rendering, name the component files as `Component_Name.server.jsx` and `Component_Name.client.jsx`. The `Component_Name.server.jsx` file will be used for server rendering and the `Component_Name.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `Component_Name.client.jsx` file.
 
 *Note: If specifying separate definitions for client and server rendering, please make sure to delete the generalized `Component_Name.jsx` file.*
 
 ### Using Automated Bundle Generation Feature with already defined packs
 
-To use Automated Bundle Generation feature with already defined packs, `config/initializers/react_on_rails` should explicitly be configured with `config.auto_load_bundle = false` and you can explicitly pass `auto_load_bundle` option in [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and  [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) for the components using this feature.
+To use the Automated Bundle Generation feature with already defined packs, `config/initializers/react_on_rails` should explicitly be configured with `config.auto_load_bundle = false` and you can explicitly pass `auto_load_bundle` option in [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and  [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) for the components using this feature.
 
 
