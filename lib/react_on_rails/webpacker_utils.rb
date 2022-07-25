@@ -17,6 +17,12 @@ module ReactOnRails
       Webpacker.dev_server.running?
     end
 
+    def self.shakapacker_version
+      return nil unless ReactOnRails::Utils.gem_available?("shakapacker")
+
+      Gem.loaded_specs["shakapacker"].version.to_s
+    end
+
     # This returns either a URL for the webpack-dev-server, non-server bundle or
     # the hashed server bundle if using the same bundle for the client.
     # Otherwise returns a file path.

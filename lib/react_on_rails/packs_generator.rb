@@ -6,10 +6,13 @@ module ReactOnRails
   # rubocop:disable Metrics/ClassLength
   class PacksGenerator
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/.freeze
+    MINIMUM_SHAKAPACKER_MAJOR_VERSION = 6
+    MINIMUM_SHAKAPACKER_MINOR_VERSION = 5
 
     def self.generate
       return unless components_directory.present?
-      return unless ReactOnRails::WebpackerUtils.using_webpacker?
+      raise raise_webpacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
+      raise raise_shakapacker_version_incompatible unless shackapacker_version_requirement_met?
 
       clean_generated_packs_directory
       generate_packs
@@ -209,6 +212,38 @@ module ReactOnRails
       MSG
 
       raise ReactOnRails::Error, msg
+    end
+
+    def self.raise_shakapacker_version_incompatible
+      msg = <<~MSG
+        **ERROR** ReactOnRails: Please upgrade Shakapacker to version v6.5.0 or above to use the automated bundle
+        generation feature. The currently installed version is #{ReactOnRails::WebpackerUtils.shakapacker_version}.
+      MSG
+
+      raise ReactOnRails::Error, msg
+    end
+
+    def self.raise_webpacker_not_installed
+      msg = <<~MSG
+        **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker v6.5.0 or above to use the#{' '}
+        automated bundle generation feature.
+      MSG
+
+      raise ReactOnRails::Error, msg
+    end
+
+    def self.shakapacker_major_minor_version
+      shakapacker_version = ReactOnRails::WebpackerUtils.shakapacker_version
+      match = shakapacker_version.match(ReactOnRails::VersionChecker::MAJOR_MINOR_PATCH_VERSION_REGEX)
+
+      [match[1].to_i, match[2].to_i]
+    end
+
+    def self.shackapacker_version_requirement_met?
+      major = shakapacker_major_minor_version[0]
+      minor = shakapacker_major_minor_version[1]
+
+      major >= MINIMUM_SHAKAPACKER_MAJOR_VERSION && minor >= MINIMUM_SHAKAPACKER_MINOR_VERSION
     end
 
     def self.prepend_to_file_if_not_present(file, str)

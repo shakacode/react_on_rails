@@ -1,6 +1,6 @@
 # File-System-Based Automated Bundle Generation
 
-To use the automated bundle generation feature introduced in React on Rails v14.0.0, please upgrade to use [Shakapacker v6.5.0](https://github.com/shakacode/shakapacker/tree/v6.5.0) at least. If you are currently using webpacker, please follow the migration steps available [here](https://github.com/shakacode/shakapacker/blob/master/docs/v6_upgrade.md).
+To use the automated bundle generation feature introduced in React on Rails v13.1.0, please upgrade to use [Shakapacker v6.5.0](https://github.com/shakacode/shakapacker/tree/v6.5.0) at least. If you are currently using webpacker, please follow the migration steps available [here](https://github.com/shakacode/shakapacker/blob/master/docs/v6_upgrade.md).
 
 ## Configuration
 
@@ -30,7 +30,7 @@ Now all React components inside the directories called `ror_components` will aut
 
 For automated component registry, [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper method tries to load generated bundle for component from the generated directory automatically per `auto_load_bundle` option. `auto_load_bundle` option in `config/initializers/react_on_rails` configures the default value that will be passed to component helpers. The default is `false`, and the parameter can be passed explicitly for each call.
 
-*Note: Starting from React on Rails version 15.0.0, the default value for `auto_load_bundle` option will be `true`.*
+*Note: Starting from React on Rails version 14.0.0, the default value for `auto_load_bundle` option will be `true`.*
 
 You can change the value in `config/initializers/react_on_rails` by updating as follows:
 

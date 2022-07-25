@@ -16,6 +16,7 @@ module ReactOnRails
       allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
       allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_entry_path)
         .and_return(webpacker_source_entry_path)
+      allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.0")
     end
 
     after do
@@ -25,6 +26,36 @@ module ReactOnRails
       FileUtils.rm_rf "#{webpacker_source_entry_path}/generated"
       FileUtils.rm_rf generated_server_bundle_file_path
       File.truncate("#{webpacker_source_entry_path}/#{server_bundle_js_file}", 0)
+    end
+
+    context "when webpacker is not installed" do
+      before do
+        allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(false)
+      end
+
+      it "raises an error" do
+        msg = <<~MSG
+          **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker v6.5.0 or above to use the#{' '}
+          automated bundle generation feature.
+        MSG
+
+        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
+      end
+    end
+
+    context "when shakapacker version requirements not met" do
+      before do
+        allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.1.0")
+      end
+
+      it "raises an error" do
+        msg = <<~MSG
+          **ERROR** ReactOnRails: Please upgrade Shakapacker to version v6.5.0 or above to use the automated bundle
+          generation feature. The currently installed version is 6.1.0.
+        MSG
+
+        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
+      end
     end
 
     context "when component with common file only" do
