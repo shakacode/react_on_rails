@@ -78,7 +78,7 @@ app/javascript:
       └── logo.svg
 ```
 
-Now, to automatically register `A_ComponentOne`, `B_ComponentOne` and `B_ComponentTwo` for the usage with [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) helpers, create a directory structure as mentioned below:
+Now, to automatically register `FooComponentOne`, `BarComponentOne` and `BarComponentTwo` for the usage with [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) helpers, create a directory structure as mentioned below:
 
 ```
 app/javascript:
@@ -86,36 +86,36 @@ app/javascript:
   │   └── application.js     
   │   └── application.css
   └── src:                   
-  │   └── A
+  │   └── Foo
   │   │ └── ...
   │   │ └── ror_components          # configured as `components_directory`
-  │   │   └── A_ComponentOne.jsx
-  │   └── B
+  │   │   └── FooComponentOne.jsx
+  │   └── Bar
   │   │ └── ror_components          # configured as `components_directory`
-  │   │   │ └── B_ComponentOne.jsx
-  │   │   │ └── B_ComponentTwo.jsx       
+  │   │   │ └── BarComponentOne.jsx
+  │   │   │ └── BarComponentTwo.jsx       
 ```
 
-To register a React component, creating a pack entry and manually registering it by calling `ReactOnRails.register` is no longer needed. With automatically generated packs, you can directly use `A_ComponentOne`, `B_ComponentOne` and `B_ComponentTwo` in Rails view using:
+To register a React component, creating a pack entry and manually registering it by calling `ReactOnRails.register` is no longer needed. With automatically generated packs, you can directly use `FooComponentOne`, `BarComponentOne` and `BarComponentTwo` in Rails view using:
 
 ```erb
-    <%= react_component("A_ComponentOne", {}, auto_load_bundle: true) %>    
-    <%= react_component("B_ComponentOne", {}, auto_load_bundle: true) %>    
-    <%= react_component("B_ComponentTwo", {}, auto_load_bundle: true) %>    
+    <%= react_component("FooComponentOne", {}, auto_load_bundle: true) %>    
+    <%= react_component("BarComponentOne", {}, auto_load_bundle: true) %>    
+    <%= react_component("BarComponentTwo", {}, auto_load_bundle: true) %>    
 ```
 
-If `A_ComponentOne` uses multiple HTML strings for server rendering, the [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper can be used on the Rails view, as illustrated below.
+If `FooComponentOne` uses multiple HTML strings for server rendering, the [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper can be used on the Rails view, as illustrated below.
 
 ```erb
-<% A_ComponentOne = react_component_hash("A_ComponentOne", 
+<% foo_component_one_data = react_component_hash("FooComponentOne", 
                                              prerender: true,
                                              auto_load_bundle: true
                                              props: {}
                                           ) %>   
 <% content_for :title do %>
-   <%= A_ComponentOne['title'] %>
+   <%= foo_component_one_data['title'] %>
 <% end %>
-<%= A_ComponentOne["componentHtml"] %>
+<%= foo_component_one_data["componentHtml"] %>
 ```
 
 the default value of the `auto_load_bundle` parameter can be specified by setting `config.auto_load_bundle` in `config/initializers/react_on_rails.rb`.
