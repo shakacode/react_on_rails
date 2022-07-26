@@ -55,6 +55,10 @@ module ReactOnRails
       Webpacker.config.source_entry_path
     end
 
+    def self.nested_entries?
+      Webpacker.config.nested_entries
+    end
+
     def self.webpacker_public_output_path
       # Webpacker has the full absolute path of webpacker output files in a Pathname
       Webpacker.config.public_output_path.to_s

@@ -11,8 +11,10 @@ module ReactOnRails
 
     def self.generate
       return unless components_directory.present?
-      raise raise_webpacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
-      raise raise_shakapacker_version_incompatible unless shackapacker_version_requirement_met?
+
+      raise_webpacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
+      raise_shakapacker_version_incompatible unless shackapacker_version_requirement_met?
+      raise_nested_enteries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
 
       clean_generated_packs_directory
       generate_packs
@@ -225,7 +227,7 @@ module ReactOnRails
 
     def self.raise_webpacker_not_installed
       msg = <<~MSG
-        **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker v6.5.0 or above to use the#{' '}
+        **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker v6.5.0 or above to use the
         automated bundle generation feature.
       MSG
 
@@ -237,6 +239,16 @@ module ReactOnRails
       match = shakapacker_version.match(ReactOnRails::VersionChecker::MAJOR_MINOR_PATCH_VERSION_REGEX)
 
       [match[1].to_i, match[2].to_i]
+    end
+
+    def self.raise_nested_enteries_disabled
+      msg = <<~MSG
+        **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update#{' '}
+        webpacker.yml to enable nested enteries. for more information read#{' '}
+        https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
+      MSG
+
+      raise ReactOnRails::Error, msg
     end
 
     def self.shackapacker_version_requirement_met?

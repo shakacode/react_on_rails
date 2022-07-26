@@ -2,6 +2,7 @@
 
 require_relative "spec_helper"
 
+# rubocop:disable Metrics/ModuleLength
 module ReactOnRails
   # rubocop:disable Metrics/BlockLength
   describe PacksGenerator do
@@ -14,6 +15,7 @@ module ReactOnRails
       ReactOnRails.configuration.server_bundle_js_file = server_bundle_js_file
       ReactOnRails.configuration.components_directory = "ror_components"
       allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
+      allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(true)
       allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_entry_path)
         .and_return(webpacker_source_entry_path)
       allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.0")
@@ -35,7 +37,7 @@ module ReactOnRails
 
       it "raises an error" do
         msg = <<~MSG
-          **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker v6.5.0 or above to use the#{' '}
+          **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker v6.5.0 or above to use the
           automated bundle generation feature.
         MSG
 
@@ -48,10 +50,34 @@ module ReactOnRails
         allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.1.0")
       end
 
+      after do
+        allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.0")
+      end
+
       it "raises an error" do
         msg = <<~MSG
           **ERROR** ReactOnRails: Please upgrade Shakapacker to version v6.5.0 or above to use the automated bundle
           generation feature. The currently installed version is 6.1.0.
+        MSG
+
+        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
+      end
+    end
+
+    context "when nested enteries not enabled" do
+      before do
+        allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(false)
+      end
+
+      after do
+        allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(true)
+      end
+
+      it "raises an error" do
+        msg = <<~MSG
+          **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update#{' '}
+          webpacker.yml to enable nested enteries. for more information read#{' '}
+          https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
         MSG
 
         expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
@@ -228,3 +254,4 @@ module ReactOnRails
   end
   # rubocop:enable Metrics/BlockLength
 end
+# rubocop:enable Metrics/ModuleLength
