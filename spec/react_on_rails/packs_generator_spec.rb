@@ -18,7 +18,7 @@ module ReactOnRails
       allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(true)
       allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_entry_path)
         .and_return(webpacker_source_entry_path)
-      allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.0")
+      allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.1")
     end
 
     after do
@@ -37,7 +37,8 @@ module ReactOnRails
 
       it "raises an error" do
         msg = <<~MSG
-          **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker v6.5.0 or above to use the
+          **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker \
+          6.5.1 or above to use the \
           automated bundle generation feature.
         MSG
 
@@ -47,17 +48,18 @@ module ReactOnRails
 
     context "when shakapacker version requirements not met" do
       before do
-        allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.1.0")
+        allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.0")
       end
 
       after do
-        allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.0")
+        allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.1")
       end
 
       it "raises an error" do
         msg = <<~MSG
-          **ERROR** ReactOnRails: Please upgrade Shakapacker to version v6.5.0 or above to use the automated bundle
-          generation feature. The currently installed version is 6.1.0.
+          **ERROR** ReactOnRails: Please upgrade Shakapacker to version 6.5.1 or \
+          above to use the automated bundle generation feature. The currently installed version is \
+          6.5.0.
         MSG
 
         expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
@@ -75,8 +77,8 @@ module ReactOnRails
 
       it "raises an error" do
         msg = <<~MSG
-          **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update#{' '}
-          webpacker.yml to enable nested enteries. for more information read#{' '}
+          **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
+          webpacker.yml to enable nested enteries. for more information read
           https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
         MSG
 
@@ -141,8 +143,8 @@ module ReactOnRails
 
       it "raises an error for definition override" do
         msg = <<~MSG
-          **ERROR** ReactOnRails: client specific definition for Component '#{component_name}' overrides the
-          common definition. Please delete the common definition and have separate server and client files. For more
+          **ERROR** ReactOnRails: client specific definition for Component '#{component_name}' overrides the \
+          common definition. Please delete the common definition and have separate server and client files. For more \
           information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
         MSG
 
@@ -161,8 +163,8 @@ module ReactOnRails
 
       it "raises an error for definition override" do
         msg = <<~MSG
-          **ERROR** ReactOnRails: server specific definition for Component '#{component_name}' overrides the
-          common definition. Please delete the common definition and have separate server and client files. For more
+          **ERROR** ReactOnRails: server specific definition for Component '#{component_name}' overrides the \
+          common definition. Please delete the common definition and have separate server and client files. For more \
           information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
         MSG
 
@@ -196,7 +198,7 @@ module ReactOnRails
 
       it "raises missing client file error" do
         msg = <<~MSG
-          **ERROR** ReactOnRails: Component '#{component_name}' is missing a client specific file. For more
+          **ERROR** ReactOnRails: Component '#{component_name}' is missing a client specific file. For more \
           information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
         MSG
 

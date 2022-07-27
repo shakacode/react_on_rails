@@ -56,7 +56,7 @@ module ReactOnRails
     end
 
     def self.nested_entries?
-      Webpacker.config.nested_entries
+      Webpacker.config.nested_entries?
     end
 
     def self.webpacker_public_output_path

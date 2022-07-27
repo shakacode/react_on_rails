@@ -93,10 +93,15 @@ module ReactOnRails
 
     def load_pack_for_component(component_name)
       component_pack_file = generated_components_pack component_name
-      is_component_pack_present = File.exist? component_pack_file
+      is_component_pack_present = File.exist? "#{component_pack_file}.jsx"
       is_development = ENV["RAILS_ENV"] == "development"
 
-      ReactOnRails::PacksGenerator.generate_packs if is_development && !is_component_pack_present
+      if is_development && !is_component_pack_present
+        ReactOnRails::PacksGenerator.generate
+        raise_generated_missing_pack_warning component_name
+      end
+
+      ReactOnRails::PacksGenerator.raise_nested_enteries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
 
       append_javascript_pack_tag "generated/#{component_name}"
       append_stylesheet_pack_tag "generated/#{component_name}"
@@ -442,7 +447,7 @@ module ReactOnRails
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
 
-      load_pack_for_component component_name if render_options.auto_load_bundle
+      load_pack_for_component react_component_name if render_options.auto_load_bundle
 
       {
         render_options: render_options,
@@ -545,6 +550,17 @@ module ReactOnRails
         JS
       end
       result
+    end
+
+    def raise_generated_missing_pack_warning(component_name)
+      msg = <<~MSG
+        **ERROR** ReactOnRails: Generated missing pack for Component: #{component_name}. Please refresh the webpage \
+        once webpack has finished generating the bundles. If the problem persists
+        1. Verify `components_directory` is configured in `config/initializers/react_on_rails`.
+        2. Component: #{component_name} is placed inside the configured `components_directory`.
+      MSG
+
+      raise ReactOnRails::Error, msg
     end
 
     def replay_console_option(val)

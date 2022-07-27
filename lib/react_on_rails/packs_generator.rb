@@ -8,6 +8,7 @@ module ReactOnRails
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/.freeze
     MINIMUM_SHAKAPACKER_MAJOR_VERSION = 6
     MINIMUM_SHAKAPACKER_MINOR_VERSION = 5
+    MINIMUM_SHAKAPACKER_PATCH_VERSION = 1
 
     def self.generate
       return unless components_directory.present?
@@ -189,8 +190,8 @@ module ReactOnRails
 
     def self.raise_client_component_overrides_common(component_name)
       msg = <<~MSG
-        **ERROR** ReactOnRails: client specific definition for Component '#{component_name}' overrides the
-        common definition. Please delete the common definition and have separate server and client files. For more
+        **ERROR** ReactOnRails: client specific definition for Component '#{component_name}' overrides the \
+        common definition. Please delete the common definition and have separate server and client files. For more \
         information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
       MSG
 
@@ -199,8 +200,8 @@ module ReactOnRails
 
     def self.raise_server_component_overrides_common(component_name)
       msg = <<~MSG
-        **ERROR** ReactOnRails: server specific definition for Component '#{component_name}' overrides the
-        common definition. Please delete the common definition and have separate server and client files. For more
+        **ERROR** ReactOnRails: server specific definition for Component '#{component_name}' overrides the \
+        common definition. Please delete the common definition and have separate server and client files. For more \
         information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
       MSG
 
@@ -209,7 +210,7 @@ module ReactOnRails
 
     def self.raise_missing_client_component(component_name)
       msg = <<~MSG
-        **ERROR** ReactOnRails: Component '#{component_name}' is missing a client specific file. For more
+        **ERROR** ReactOnRails: Component '#{component_name}' is missing a client specific file. For more \
         information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
       MSG
 
@@ -218,8 +219,9 @@ module ReactOnRails
 
     def self.raise_shakapacker_version_incompatible
       msg = <<~MSG
-        **ERROR** ReactOnRails: Please upgrade Shakapacker to version v6.5.0 or above to use the automated bundle
-        generation feature. The currently installed version is #{ReactOnRails::WebpackerUtils.shakapacker_version}.
+        **ERROR** ReactOnRails: Please upgrade Shakapacker to version #{minimum_required_shakapacker_version} or \
+        above to use the automated bundle generation feature. The currently installed version is \
+        #{ReactOnRails::WebpackerUtils.shakapacker_version}.
       MSG
 
       raise ReactOnRails::Error, msg
@@ -227,7 +229,8 @@ module ReactOnRails
 
     def self.raise_webpacker_not_installed
       msg = <<~MSG
-        **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker v6.5.0 or above to use the
+        **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker \
+        #{minimum_required_shakapacker_version} or above to use the \
         automated bundle generation feature.
       MSG
 
@@ -238,13 +241,13 @@ module ReactOnRails
       shakapacker_version = ReactOnRails::WebpackerUtils.shakapacker_version
       match = shakapacker_version.match(ReactOnRails::VersionChecker::MAJOR_MINOR_PATCH_VERSION_REGEX)
 
-      [match[1].to_i, match[2].to_i]
+      [match[1].to_i, match[2].to_i, match[3].to_i]
     end
 
     def self.raise_nested_enteries_disabled
       msg = <<~MSG
-        **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update#{' '}
-        webpacker.yml to enable nested enteries. for more information read#{' '}
+        **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
+        webpacker.yml to enable nested enteries. for more information read
         https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
       MSG
 
@@ -254,8 +257,14 @@ module ReactOnRails
     def self.shackapacker_version_requirement_met?
       major = shakapacker_major_minor_version[0]
       minor = shakapacker_major_minor_version[1]
+      patch = shakapacker_major_minor_version[2]
 
-      major >= MINIMUM_SHAKAPACKER_MAJOR_VERSION && minor >= MINIMUM_SHAKAPACKER_MINOR_VERSION
+      major >= MINIMUM_SHAKAPACKER_MAJOR_VERSION && minor >= MINIMUM_SHAKAPACKER_MINOR_VERSION &&
+        patch >= MINIMUM_SHAKAPACKER_PATCH_VERSION
+    end
+
+    def self.minimum_required_shakapacker_version
+      "#{MINIMUM_SHAKAPACKER_MAJOR_VERSION}.#{MINIMUM_SHAKAPACKER_MINOR_VERSION}.#{MINIMUM_SHAKAPACKER_PATCH_VERSION}"
     end
 
     def self.prepend_to_file_if_not_present(file, str)
