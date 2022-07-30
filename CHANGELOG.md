@@ -43,7 +43,7 @@ Changes since last non-beta release.
 ### [13.0.2] - 2022-03-09
 #### Fixed
 - React 16 doesn't support version property, causing problems loading React on Rails. [PR 1435](https://github.com/shakacode/react_on_rails/pull/1435) by [justin808](https://github.com/justin808).
- 
+
 ### [13.0.1] - 2022-02-09
 #### Improved
 - Updated the default generator. [PR 1431](https://github.com/shakacode/react_on_rails/pull/1431) by [justin808](https://github.com/justin808).
@@ -87,7 +87,7 @@ Changes since last non-beta release.
 
 - Ability to stop React on Rails from modifying or creating the `assets:precompile` task. [PR 1371](https://github.com/shakacode/react_on_rails/pull/1371) by [justin808](https://github.com/justin808). Thanks to [elstgav](https://github.com/elstgav) for [the suggestion](https://github.com/shakacode/react_on_rails/issues/1368)!
 
-- Ability to stop stubbing of setTimeout, setInterval, & clearTimeout conditional by setting `ReactOnRailsPro.config.include_execjs_polyfills = false` in the React on Rails Pro configuration file. Also, added the ability to have render functions return a promise to be awaited by React on Rails Pro Node Renderer. [PR 1380](https://github.com/shakacode/react_on_rails/pull/1380) by [judahmeek](https://github.com/judahmeek)
+- Added the ability to have render functions return a promise to be awaited by React on Rails Pro Node Renderer. [PR 1380](https://github.com/shakacode/react_on_rails/pull/1380) by [judahmeek](https://github.com/judahmeek)
 
 ### [12.3.0] - 2021-07-26
 #### Added
