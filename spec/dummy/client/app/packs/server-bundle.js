@@ -45,7 +45,7 @@ import ImageExample from '../components/ImageExample';
 
 import CacheDisabled from '../components/CacheDisabled';
 
-import SetTimeoutLoggingApp from '../startup/SetTimeoutLoggingApp';
+import SetTimeoutLoggingApp from '../startup/SetTimeoutServerApp';
 
 import Loadable from '../startup/loadable-server.imports-loadable';
 

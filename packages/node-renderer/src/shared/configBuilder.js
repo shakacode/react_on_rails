@@ -81,6 +81,9 @@ const defaultConfig = {
   sentryTracing: env.SENTRY_TRACING || null,
 
   sentryTracesSampleRate: env.SENTRY_TRACES_SAMPLE_RATE || DEFAULT_SAMPLE_RATE,
+
+  // // default to true if empty // otherwise it is set to false
+  includeTimerPolyfills: env.INCLUDE_TIMER_POLYFILLS === 'true' || !env.INCLUDE_TIMER_POLYFILLS,
 };
 
 function envValuesUsed() {

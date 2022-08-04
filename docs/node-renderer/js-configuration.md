@@ -8,10 +8,10 @@ The values in this file must be kept in sync with with the `config/initializers/
 
 Here are the options available for the JavaScript renderer configuration object, as well as the available default ENV values if using the command line program node-renderer.
 
-1. **port** (default: `process.env.RENDERER_PORT || 3800`) - The port renderer should listen to. 
-   If setting the port, you might want to ensure the port uses `process.env.PORT` so it will use port number provided by **Heroku** environment. 
+1. **port** (default: `process.env.RENDERER_PORT || 3800`) - The port renderer should listen to.
+   If setting the port, you might want to ensure the port uses `process.env.PORT` so it will use port number provided by **Heroku** environment.
 1. **logLevel** (default: `process.env.RENDERER_LOG_LEVEL || 'info'`) - Log lever for renderer. Set it to `'error'` to turn logging off. Available levels are: `{ error: 0, warn: 1, info: 2, verbose: 3, debug: 4, silly: 5 }`
-1. **bundlePath** (default: `process.env.RENDERER_BUNDLE_PATH || '/tmp/react-on-rails-pro-node-renderer-bundles'` ) - path to temp directory where uploaded bundle files will be stored. For example you can set it to `path.resolve(__dirname, './.node-renderer-bundles')` if you configured renderer from the `/` directory of your app. 
+1. **bundlePath** (default: `process.env.RENDERER_BUNDLE_PATH || '/tmp/react-on-rails-pro-node-renderer-bundles'` ) - path to temp directory where uploaded bundle files will be stored. For example you can set it to `path.resolve(__dirname, './.node-renderer-bundles')` if you configured renderer from the `/` directory of your app.
 1. **workersCount** (default: `env.RENDERER_WORKERS_COUNT || defaultWorkersCount()` where default is your CPUs count - 1) - Number of workers that will be forked to serve rendering requests. If you set this manually make sure that value is a **Number** and is `>= 1`.
 1. **password** (default: `env.RENDERER_PASSWORD`) - Password expected to receive form **Rails client** to authenticate rendering requests. If no password set, no authentication will be required.
 1. **allWorkersRestartInterval** (default: `env.RENDERER_ALL_WORKERS_RESTART_INTERVAL`) - Interval in minutes between scheduled restarts of all cluster of workers. By default restarts are not enabled. If restarts are enabled, `delayBetweenIndividualWorkerRestarts` should also be set.
@@ -21,10 +21,11 @@ Here are the options available for the JavaScript renderer configuration object,
 1. **sentryDsn**: - (default: `env.SENTRY_DSN || null`) - Enables server rendering errors catching with Sentry if the options is set. Add package `@sentry/node`.
 1. **sentryTracing** - (default: `env.SENTRY_TRACING || null`) - Should be set to `true` to enable adding trace context to the error. Requires **sentryDsn** to be set.
 1. **sentryTracesSampleRate** - (default: `env.SENTRY_TRACES_SAMPLE_RATE || 0.1`) - With this option set, every transaction created will have that percentage chance of being sent to Sentry. So, for example, if you set sentryTracesSampleRate to 0.2, approximately 20% of your transactions will get recorded and sent. See below for more details on Sentry Tracing. See [additional docs](./error-reporting-and-tracing.md).
+1. ** includeTimerPolyfills** - (default: `env.INCLUDE_TIMER_POLYFILLS || false`) - With this option set, use of `setTimeout`, `setInterval`, & `clearTimeout` functions will throw errors during server-rendering. Only use this option if you want to transition to using another javascript renderer such as mini_racer.
 
 ## Example Launch Files
 
-### Testing example: 
+### Testing example:
 
 [spec/dummy/client/node-renderer.js](../../spec/dummy/client/node-renderer.js)
 
@@ -36,10 +37,10 @@ import path from 'path';
 import { reactOnRailsProNodeRenderer } from '@shakacode-tools/react-on-rails-pro-node-renderer';
 
 const config = {
-  // Save bundles to relative "./.node-renderer-bundles" dir of our app 
-  bundlePath: path.resolve(__dirname, './.node-renderer-bundles'), 
-  
-  // All other values are the defaults, as described above 
+  // Save bundles to relative "./.node-renderer-bundles" dir of our app
+  bundlePath: path.resolve(__dirname, './.node-renderer-bundles'),
+
+  // All other values are the defaults, as described above
 };
 
 // Renderer detects a total number of CPUs on virtual hostings like Heroku or CircleCI instead
