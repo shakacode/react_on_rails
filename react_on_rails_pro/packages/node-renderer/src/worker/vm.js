@@ -62,7 +62,6 @@ function replayVmConsole() {
 /**
  *
  * @param filePath
- * @param supportModules if true, then allow exports, require, etc.
  * @returns {Promise<boolean>}
  */
 exports.buildVM = async function buildVM(filePath) {
@@ -71,10 +70,10 @@ exports.buildVM = async function buildVM(filePath) {
   }
 
   try {
-    const { supportModules } = getConfig();
+    const { supportModules, includeTimerPolyfills } = getConfig();
     vmBundleFilePath = undefined;
     if (supportModules) {
-      context = vm.createContext({ Buffer, process });
+      context = vm.createContext({ Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval });
     } else {
       context = vm.createContext();
     }
@@ -114,10 +113,12 @@ exports.buildVM = async function buildVM(filePath) {
       context,
     );
 
-    // Define timer polyfills:
-    vm.runInContext(`function setInterval() { ${undefinedForExecLogging('setInterval')} }`, context);
-    vm.runInContext(`function setTimeout() { ${undefinedForExecLogging('setTimeout')} }`, context);
-    vm.runInContext(`function clearTimeout() { ${undefinedForExecLogging('clearTimeout')} }`, context);
+    if (includeTimerPolyfills) {
+      // Define timer polyfills:
+      vm.runInContext(`function setInterval() { ${undefinedForExecLogging('setInterval')} }`, context);
+      vm.runInContext(`function setTimeout() { ${undefinedForExecLogging('setTimeout')} }`, context);
+      vm.runInContext(`function clearTimeout() { ${undefinedForExecLogging('clearTimeout')} }`, context);
+    }
 
     // Run bundle code in created context:
     const bundleContents = await readFileAsync(filePath, 'utf8');

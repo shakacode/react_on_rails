@@ -42,6 +42,9 @@ const config = {
   // false is like the ExecJS behavior
   // this option is required to equal `true` if you want to use loadable components
   supportModules: true,
+
+  // Required to use setTimeout, setInterval, & clearTimeout during server rendering
+  includeTimerPolyfills: false,
 };
 
 // Renderer detects a total number of CPUs on virtual hostings like Heroky or CircleCI instead

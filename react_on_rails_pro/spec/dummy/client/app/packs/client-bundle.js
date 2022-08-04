@@ -29,7 +29,7 @@ import ReactHelmetApp from '../startup/ReactHelmetClientApp';
 // Demonstrate using Images
 import ImageExample from '../components/ImageExample';
 
-import SetTimeoutLoggingApp from '../startup/SetTimeoutLoggingApp';
+import SetTimeoutLoggingApp from '../startup/SetTimeoutClientApp';
 
 import Loadable from '../startup/loadable-client.imports-loadable';
 

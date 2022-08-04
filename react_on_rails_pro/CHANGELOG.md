@@ -13,6 +13,10 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+## [3.1.0] - 2022-08-03
+### fixed
+- Removes `include_execjs_polyfills` options from RoRP gem configuration & adds `include_timer_polyfills` option for Node Renderer configuration, which enables use of setTimeout & other timer functions during server rendering. [PR 281](https://github.com/shakacode/react_on_rails_pro/pull/281) by [judahmeek](https://github.com/judahmeek).
+
 ### Improvement
 - Warn, do not raise on missing assets [PR 280](https://github.com/shakacode/react_on_rails_pro/pull/280) by [Romex91](https://github.com/Romex91)
 
@@ -56,7 +60,7 @@ You can find the **package** version numbers from this repo's tags and below in 
   - **Add `ssr_timeout` configuration** so the Rails server will not wait more than this many seconds for a SSR request to return once issued.
   - Change default for `renderer_use_fallback_exec_js` to `false`.
   - Change default log level to info.
-  
+
 - Add support for render functions to be async (returning promises). Also add `include_execjs_polyfills` option to configuration for React on Rails to optionally stop stubbing of setTimeout, setInterval, & clearTimeout polyfills while using NodeRenderer. [PR 210](https://github.com/shakacode/react_on_rails_pro/pull/210) by [judahmeek](https://github.com/judahmeek).
 
 ### Fixed

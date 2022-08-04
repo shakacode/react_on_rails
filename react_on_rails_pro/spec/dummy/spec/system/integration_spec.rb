@@ -267,6 +267,16 @@ describe "generator function returns renderedHtml as an object with additional H
   end
 end
 
+describe "setTimeout", :rack_test do
+  subject { page }
+
+  before { visit "/server_render_with_timeout" }
+
+  it "sets the variable correctly" do
+    expect(page).to have_text "this value is set by setTimeout during SSR"
+  end
+end
+
 describe "display images", :js do
   subject { page }
 
