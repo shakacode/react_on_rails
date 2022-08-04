@@ -18,7 +18,7 @@ calls renderToString, that takes one parameter. You need to add an extra unused 
 as a renderFunction and not a simple React Function Component.`);
     throw error;
   }
-};
+}
 
 export default function serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult> {
   const { name, domNodeId, trace, props, railsContext, renderingReturnsPromises, throwJsErrors } = options;
