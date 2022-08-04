@@ -9,6 +9,17 @@ import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import type { RenderParams, RenderResult, RenderingError } from './types/index';
 
+function processReactElement (element: ReactElement) {
+  try {
+    return ReactDOMServer.renderToString(element);
+  } catch (error) {
+    console.error(`Invalid call to renderToString. Possibly you have a renderFunction, a function that already
+calls renderToString, that takes one parameter. You need to add an extra unused parameter to identify this function
+as a renderFunction and not a simple React Function Component.`);
+    throw error;
+  }
+};
+
 export default function serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult> {
   const { name, domNodeId, trace, props, railsContext, renderingReturnsPromises, throwJsErrors } = options;
 
@@ -64,17 +75,6 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
       }
       return reactRenderingResult;
     }
-
-    const processReactElement = (element) => {
-      try {
-        return ReactDOMServer.renderToString(element as ReactElement);
-      } catch (error) {
-        console.error(`Invalid call to renderToString. Possibly you have a renderFunction, a function that already
-calls renderToString, that takes one parameter. You need to add an extra unused parameter to identify this function
-as a renderFunction and not a simple React Function Component.`);
-        throw error;
-      }
-    };
 
     if (isServerRenderHash(reactRenderingResult)) {
       renderResult = processServerRenderHash();
