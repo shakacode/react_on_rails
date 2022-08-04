@@ -2,6 +2,7 @@
 /* eslint-disable no-unused-vars */
 
 import React from 'react';
+import ReactDOMServer from 'react-dom/server';
 
 import serverRenderReactComponent from '../src/serverRenderReactComponent';
 import ComponentRegistry from '../src/ComponentRegistry';
@@ -68,7 +69,7 @@ describe('serverRenderReactComponent', () => {
     expect(result).toBeTruthy();
   });
 
-  it('serverRenderReactComponent renders promises', async () => {
+  it('serverRenderReactComponent renders promises that resolves to a string', async () => {
     expect.assertions(2);
     const expectedHtml = '<div>Hello</div>';
     const X5 = (props, _railsContext) => Promise.resolve(expectedHtml);
@@ -84,6 +85,25 @@ describe('serverRenderReactComponent', () => {
     const html = await renderResult.html;
 
     expect(html).toEqual(expectedHtml);
+    expect(renderResult.hasErrors).toBeFalsy();
+  });
+
+  it('serverRenderReactComponent renders promises that resolves to a react element', async () => {
+    expect.assertions(2);
+    const resolvedReact = () => <div>HELLO</div>;
+    const X6 = (props, _railsContext) => Promise.resolve(resolvedReact);
+
+    ComponentRegistry.register({ X6 });
+
+    const renderResult = await serverRenderReactComponent({
+      name: 'X6',
+      domNodeId: 'myDomId',
+      trace: false,
+      renderingReturnsPromises: true,
+    });
+    const html = await renderResult.html;
+
+    expect(html).toEqual(ReactDOMServer.renderToString(resolvedReact));
     expect(renderResult.hasErrors).toBeFalsy();
   });
 });
