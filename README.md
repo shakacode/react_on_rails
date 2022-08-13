@@ -70,7 +70,7 @@ _Requires creating a free account._
 
 ## Prerequisites
 
-Ruby on Rails >=5, rails/webpacker >= 4.2, Ruby >= 2.7
+Ruby on Rails >=5, rails/webpacker >= 4.2 or shakapacker > 6, Ruby >= 2.7
 
 # Support
 
