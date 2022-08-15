@@ -11,7 +11,7 @@ If you are using [react-rails](https://github.com/reactjs/react-rails) in your p
 //= require components
 ```
 
-- Follow our getting started guide: https://github.com/shakacode/react_on_rails#getting-started.
+- Follow our [getting started guide](https://www.shakacode.com/react-on-rails/docs/getting-started/).
 
 Note: If you have components from react-rails you want to use, then you will need to port them into react_on_rails which uses webpack instead of the asset pipeline.
 
