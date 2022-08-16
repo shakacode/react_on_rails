@@ -93,7 +93,7 @@ ShakaCode is **[hiring passionate software engineers](http://www.shakacode.com/c
 
 The gem is available as open source under the terms of the [MIT License](https://github.com/shakacode/react_on_rails/tree/master/LICENSE.md).
 
-## Supporters
+# Supporters
 
 <a href="https://www.jetbrains.com">
   <img src="https://user-images.githubusercontent.com/4244251/184881139-42e4076b-024b-4b30-8c60-c3cd0e758c0a.png" alt="JetBrains" height="120px">
