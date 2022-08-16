@@ -10,15 +10,23 @@ module ReactOnRails
     let(:webpacker_source_entry_path) { File.expand_path("fixtures/automated_packs_generation/packs", __dir__) }
     let(:generated_directory) { File.expand_path("fixtures/automated_packs_generation/packs/generated", __dir__) }
     let(:server_bundle_js_file) { "server-bundle.js" }
+    let(:generated_assets_full_path) do
+      File.expand_path("fixtures/automated_packs_generation/packs", __dir__)
+    end
+    let(:webpack_generated_files) { %w[manifest.json] }
 
     before do
       ReactOnRails.configuration.server_bundle_js_file = server_bundle_js_file
       ReactOnRails.configuration.components_directory = "ror_components"
+      ReactOnRails.configuration.webpack_generated_files = webpack_generated_files
+
+      allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(true)
       allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
       allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(true)
       allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_entry_path)
         .and_return(webpacker_source_entry_path)
       allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.1")
+      allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(generated_assets_full_path)
     end
 
     after do

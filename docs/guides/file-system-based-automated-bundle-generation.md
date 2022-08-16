@@ -68,10 +68,16 @@ the directory structure will look like this
 ```
 app/javascript:
   └── packs:               # sets up webpack entries
-  │   └── application.js   # references ../src/my_component.js
+  │   └── application.js   # references FooComponentOne.jsx, BarComponentOne.jsx and BarComponentTwo.jsx in `../src`
   │   └── application.css
   └── src:                 # any directory name is fine. Referenced files need to be under source_path
-  │   └── component.js
+  │   └── Foo
+  │   │   └── ...
+  │   │   └── FooComponentOne.jsx
+  │   └── Bar
+  │   │   └── ...
+  │   │   └── BarComponentOne.jsx
+  │   │   └── BarComponentTwo.jsx
   └── stylesheets:
   │   └── my_styles.css
   └── images:
@@ -82,8 +88,7 @@ Now, to automatically register `FooComponentOne`, `BarComponentOne` and `BarComp
 
 ```
 app/javascript:
-  └── packs:                   
-  │   └── application.js     
+  └── packs:                      
   │   └── application.css
   └── src:                   
   │   └── Foo
@@ -91,6 +96,7 @@ app/javascript:
   │   │ └── ror_components          # configured as `components_directory`
   │   │   └── FooComponentOne.jsx
   │   └── Bar
+  │   │ └── ...
   │   │ └── ror_components          # configured as `components_directory`
   │   │   │ └── BarComponentOne.jsx
   │   │   │ └── BarComponentTwo.jsx       

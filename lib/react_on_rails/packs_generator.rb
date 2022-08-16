@@ -17,6 +17,10 @@ module ReactOnRails
       raise_shakapacker_version_incompatible unless shackapacker_version_requirement_met?
       raise_nested_enteries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
 
+      is_generated_directory_present = Dir.exist?(generated_packs_directory_path)
+
+      return if is_generated_directory_present && webpack_assets_status_checker.stale_generated_component_packs.empty?
+
       clean_generated_packs_directory
       generate_packs
     end
@@ -186,6 +190,14 @@ module ReactOnRails
 
     def self.components_directory
       ReactOnRails.configuration.components_directory
+    end
+
+    def self.webpack_assets_status_checker
+      @webpack_assets_status_checker ||= ReactOnRails::TestHelper::WebpackAssetsStatusChecker.new(
+        source_path: ReactOnRails::Utils.source_path,
+        generated_assets_full_path: ReactOnRails::Utils.generated_assets_full_path,
+        webpack_generated_files: ReactOnRails.configuration.webpack_generated_files
+      )
     end
 
     def self.raise_client_component_overrides_common(component_name)
