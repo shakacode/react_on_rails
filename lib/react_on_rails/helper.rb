@@ -556,8 +556,8 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: Generated missing pack for Component: #{component_name}. Please refresh the webpage \
         once webpack has finished generating the bundles. If the problem persists
-        1. Verify `components_directory` is configured in `config/initializers/react_on_rails`.
-        2. Component: #{component_name} is placed inside the configured `components_directory`.
+        1. Verify `components_subdirectory` is configured in `config/initializers/react_on_rails`.
+        2. Component: #{component_name} is placed inside the configured `components_subdirectory`.
       MSG
 
       raise ReactOnRails::Error, msg

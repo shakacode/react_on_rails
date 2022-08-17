@@ -94,7 +94,7 @@ module ReactOnRails
       end
 
       def components_search_path
-        "#{source_path}/**/#{ReactOnRails.configuration.components_directory}"
+        "#{source_path}/**/#{ReactOnRails.configuration.components_subdirectory}"
       end
 
       def make_globs(dirs)

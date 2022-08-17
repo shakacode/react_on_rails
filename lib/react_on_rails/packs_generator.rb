@@ -11,7 +11,7 @@ module ReactOnRails
     MINIMUM_SHAKAPACKER_PATCH_VERSION = 1
 
     def self.generate
-      return unless components_directory.present?
+      return unless components_subdirectory.present?
 
       raise_webpacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
       raise_shakapacker_version_incompatible unless shackapacker_version_requirement_met?
@@ -185,11 +185,11 @@ module ReactOnRails
     def self.components_search_path
       source_path = ReactOnRails::WebpackerUtils.webpacker_source_path
 
-      "#{source_path}/**/#{components_directory}"
+      "#{source_path}/**/#{components_subdirectory}"
     end
 
-    def self.components_directory
-      ReactOnRails.configuration.components_directory
+    def self.components_subdirectory
+      ReactOnRails.configuration.components_subdirectory
     end
 
     def self.webpack_assets_status_checker

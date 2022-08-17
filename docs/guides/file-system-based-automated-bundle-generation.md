@@ -15,12 +15,12 @@ default:
 
 For more details, see [Configuration and Code](https://github.com/shakacode/shakapacker#configuration-and-code) section in [shakapacker](https://github.com/shakacode/shakapacker/).
 
-### Configure Components Directory
-`components_directory`  is the name of the directories that contain components that will be automatically registered and used in Rails views.
-For example, configure `config/initializers/react_on_rails` to set the name for `components_directory`.·
+### Configure Components Subdirectory
+`components_subdirectory`  is the name of the directories that contain components that will be automatically registered and used in Rails views.
+For example, configure `config/initializers/react_on_rails` to set the name for `components_subdirectory`.·
 
 ```rb
-config.components_directory = "ror_components"
+config.components_subdirectory = "ror_components"
 ```
 
 Now all React components inside the directories called `ror_components` will automatically be registered for usage with [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) helper methods provided by React on Rails.
@@ -98,11 +98,11 @@ app/javascript:
   └── src:                   
   │   └── Foo
   │   │ └── ...
-  │   │ └── ror_components          # configured as `components_directory`
+  │   │ └── ror_components          # configured as `components_subdirectory`
   │   │   └── FooComponentOne.jsx
   │   └── Bar
   │   │ └── ...
-  │   │ └── ror_components          # configured as `components_directory`
+  │   │ └── ror_components          # configured as `components_subdirectory`
   │   │   │ └── BarComponentOne.jsx
   │   │   │ └── BarComponentTwo.jsx       
 ```

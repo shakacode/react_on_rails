@@ -17,7 +17,7 @@ module ReactOnRails
 
     before do
       ReactOnRails.configuration.server_bundle_js_file = server_bundle_js_file
-      ReactOnRails.configuration.components_directory = "ror_components"
+      ReactOnRails.configuration.components_subdirectory = "ror_components"
       ReactOnRails.configuration.webpack_generated_files = webpack_generated_files
 
       allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(true)
@@ -31,7 +31,7 @@ module ReactOnRails
 
     after do
       ReactOnRails.configuration.server_bundle_js_file = nil
-      ReactOnRails.configuration.components_directory = nil
+      ReactOnRails.configuration.components_subdirectory = nil
 
       FileUtils.rm_rf "#{webpacker_source_entry_path}/generated"
       FileUtils.rm_rf generated_server_bundle_file_path

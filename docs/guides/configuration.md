@@ -155,9 +155,9 @@ ReactOnRails.configure do |config|
   ################################################################################
   # FILE SYSTEM BASED COMPONENT REGISTRY
   ################################################################################
-  # components_directory is the directory that is used to automatically detect and register components for the usage on
-  # the rails view. default is nil, you can enable the feature by updating it in the next line.
-  config.components_directory = "ror_components"
+  # components_subdirectory is the name of the directory that is used to automatically detect and register components 
+  # for the usage on the rails view. default is nil, you can enable the feature by updating it in the next line.
+  config.components_subdirectory = "ror_components"
   
   # For automated component registry, `render_component` view helper method tries to load bundle for component from
   # generated directory. default is false, you can pass option at the time of individual usage or update the default
