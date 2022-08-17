@@ -2,7 +2,7 @@
 
 namespace :react_on_rails do
   desc <<~DESC
-    If there is a jsx file inside config.components_subdirectory, this command generates corresponding packs.
+    If there is a file inside any directory matching config.components_subdirectory, this command generates corresponding packs.
   DESC
 
   task generate_packs: :environment do

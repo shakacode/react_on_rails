@@ -129,7 +129,7 @@ If `FooComponentOne` uses multiple HTML strings for server rendering, the [`reac
 <%= foo_component_one_data["componentHtml"] %>
 ```
 
-the default value of the `auto_load_bundle` parameter can be specified by setting `config.auto_load_bundle` in `config/initializers/react_on_rails.rb`.
+The default value of the `auto_load_bundle` parameter can be specified by setting `config.auto_load_bundle` in `config/initializers/react_on_rails.rb` and thus removed from each call to `react_component`.
 
 ### Server Rendering and Client Rendering Components
 

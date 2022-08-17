@@ -36,9 +36,7 @@ module ReactOnRails
       output_path = generated_pack_path file_path
       content = pack_file_contents file_path
 
-      f = File.new(output_path, "w")
-      f.puts content
-      f.close
+      File.write(output_path, content)
 
       puts(Rainbow("Generated Packs: #{output_path}").yellow)
     end
@@ -46,19 +44,15 @@ module ReactOnRails
     def self.pack_file_contents(file_path)
       registered_component_name = component_name file_path
       <<~FILE_CONTENT
-        /* eslint-disable */
         import ReactOnRails from 'react-on-rails';
         import #{registered_component_name} from '#{relative_component_path_from_generated_pack file_path}';
 
         ReactOnRails.register({#{registered_component_name}});
-        /* eslint-enable */
       FILE_CONTENT
     end
 
     def self.create_server_pack
-      f = File.new(generated_server_bundle_file_path, "w")
-      f.puts generated_server_pack_file_content
-      f.close
+      File.write(generated_server_bundle_file_path, generated_server_pack_file_content)
 
       add_generated_pack_to_server_bundle
       puts(Rainbow("Generated Server Bundle: #{generated_server_bundle_file_path}").orange)
@@ -75,13 +69,11 @@ module ReactOnRails
       components_to_register = component_for_server_registration_to_path.keys
 
       <<~FILE_CONTENT
-        /* eslint-disable */
         import ReactOnRails from 'react-on-rails';
 
         #{server_component_imports.join("\n")}
 
         ReactOnRails.register({#{components_to_register.join(",\n")}});
-        /* eslint-enable */
       FILE_CONTENT
     end
 
@@ -89,7 +81,6 @@ module ReactOnRails
       relative_path_to_generated_server_bundle = relative_path(defined_server_bundle_file_path,
                                                                generated_server_bundle_file_path)
       content = <<~FILE_CONTENT
-        // eslint-disable-next-line import/extensions
         import "./#{relative_path_to_generated_server_bundle}"\n
       FILE_CONTENT
 
@@ -108,9 +99,7 @@ module ReactOnRails
     end
 
     def self.defined_server_bundle_file_path
-      server_bundle_file_name = ReactOnRails.configuration.server_bundle_js_file
-
-      Dir.glob("#{source_entry_path}/**/#{server_bundle_file_name}").first
+      ReactOnRails::Utils.server_bundle_js_file_path
     end
 
     def self.generated_packs_directory_path
@@ -132,7 +121,6 @@ module ReactOnRails
       from_path = Pathname.new from
       to_path = Pathname.new to
 
-      # TODO: Debug Relative Path always has extra '../'
       relative_path = to_path.relative_path_from from_path
       relative_path.sub("../", "")
     end
@@ -279,18 +267,13 @@ module ReactOnRails
       "#{MINIMUM_SHAKAPACKER_MAJOR_VERSION}.#{MINIMUM_SHAKAPACKER_MINOR_VERSION}.#{MINIMUM_SHAKAPACKER_PATCH_VERSION}"
     end
 
-    def self.prepend_to_file_if_not_present(file, str)
-      content = ""
-      File.open(file, "r") do |fd|
-        contents = fd.read
-        content += contents
-      end
+    def self.prepend_to_file_if_not_present(file, text_to_prepend)
+      file_content = File.read(file)
 
-      return if content.start_with? str
+      return if file_content.include? text_to_prepend
 
-      File.open(file, "w") do |fd|
-        fd.write str + content
-      end
+      content_with_prepended_text = text_to_prepend + file_content
+      File.write(file, content_with_prepended_text)
     end
   end
   # rubocop:enable Metrics/ClassLength
