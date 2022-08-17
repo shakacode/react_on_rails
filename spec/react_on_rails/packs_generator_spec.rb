@@ -10,6 +10,9 @@ module ReactOnRails
     let(:webpacker_source_entry_path) { File.expand_path("fixtures/automated_packs_generation/packs", __dir__) }
     let(:generated_directory) { File.expand_path("fixtures/automated_packs_generation/packs/generated", __dir__) }
     let(:server_bundle_js_file) { "server-bundle.js" }
+    let(:server_bundle_js_file_path) do
+      File.expand_path("fixtures/automated_packs_generation/packs/#{server_bundle_js_file}", __dir__)
+    end
     let(:generated_assets_full_path) do
       File.expand_path("fixtures/automated_packs_generation/packs", __dir__)
     end
@@ -27,6 +30,7 @@ module ReactOnRails
         .and_return(webpacker_source_entry_path)
       allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.1")
       allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(generated_assets_full_path)
+      allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle_js_file_path)
     end
 
     after do
