@@ -26,11 +26,11 @@ module ReactOnRails
       end
 
       def stale_generated_webpack_files
-        stale_generated_files client_files
+        stale_generated_files(client_files)
       end
 
       def stale_generated_component_packs
-        stale_generated_files component_pack_files
+        stale_generated_files(component_pack_files)
       end
 
       def stale_generated_files(files)
@@ -39,7 +39,7 @@ module ReactOnRails
 
         return ["manifest.json"] if manifest_needed
 
-        most_recent_mtime = find_most_recent_mtime files
+        most_recent_mtime = find_most_recent_mtime(files)
         all_compiled_assets.each_with_object([]) do |webpack_generated_file, stale_gen_list|
           if !File.exist?(webpack_generated_file) ||
              File.mtime(webpack_generated_file) < most_recent_mtime

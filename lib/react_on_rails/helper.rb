@@ -92,13 +92,13 @@ module ReactOnRails
     end
 
     def load_pack_for_component(component_name)
-      component_pack_file = generated_components_pack component_name
-      is_component_pack_present = File.exist? "#{component_pack_file}.jsx"
+      component_pack_file = generated_components_pack(component_name)
+      is_component_pack_present = File.exist?("#{component_pack_file}.jsx")
       is_development = ENV["RAILS_ENV"] == "development"
 
       if is_development && !is_component_pack_present
         ReactOnRails::PacksGenerator.generate
-        raise_generated_missing_pack_warning component_name
+        raise_generated_missing_pack_warning(component_name)
       end
 
       ReactOnRails::PacksGenerator.raise_nested_enteries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?

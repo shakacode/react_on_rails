@@ -16,7 +16,7 @@ default:
 For more details, see [Configuration and Code](https://github.com/shakacode/shakapacker#configuration-and-code) section in [shakapacker](https://github.com/shakacode/shakapacker/).
 
 ### Configure Components Subdirectory
-`components_subdirectory`  is the name of the directories that contain components that will be automatically registered and used in Rails views.
+`components_subdirectory`  is the name of the matched directories containing components that will be automatically registered for use by the view helpers.
 For example, configure `config/initializers/react_on_rails` to set the name for `components_subdirectory`.·
 
 ```rb
