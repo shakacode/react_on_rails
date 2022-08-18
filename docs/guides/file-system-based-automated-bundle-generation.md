@@ -49,6 +49,7 @@ app/javascript/packs/generated
 
 ### Basic usage
 
+#### Background
 If the `webpacker.yml` file is configured as instructed [here](https://github.com/shakacode/shakapacker#configuration-and-code), with the following configurations
 
 ```yml
@@ -80,7 +81,8 @@ app/javascript:
       └── logo.svg
 ```
 
-Previously, the`application.js` file would manually register `FooComponentOne`, `BarComponentOne` and `BarComponentTwo` using `ReactOnRails.register` as follows:
+Previously, many applications would use one pack (webpack entrypoint) for many components. In this example, the`application.js` file manually registers server components, `FooComponentOne`, `BarComponentOne` and `BarComponentTwo`.
+
 ```jsx
 import ReactOnRails from 'react-on-rails';
 import FooComponentOne from '../src/Foo/FooComponentOne';
@@ -90,7 +92,49 @@ import BarComponentTwo from '../src/Foo/BarComponentTwo';
 ReactOnRails.register({ FooComponentOne, BarComponentOne, BarComponentTwo });
 ```
 
-Now, to automatically register `FooComponentOne`, `BarComponentOne` and `BarComponentTwo` for the usage with [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) helpers, delete the `application.js` file and create a directory structure as mentioned below:
+Your layout would contain:
+
+```erb
+  <%= javascript_pack_tag 'application' %>
+  <%= stylesheet_pack_tag 'application' %>
+```
+
+
+Suppose, you want to use bundle splitting to minimize unnecessary javascript loaded on each page, You would put each of your components in the `packs` directory. 
+```
+app/javascript:
+  └── packs:               # sets up webpack entries
+  │   └── FooComponentOne.jsx # Internally uses ReactOnRails.register
+  │   └── BarComponentOne.jsx # Internally uses ReactOnRails.register
+  │   └── BarComponentTwo.jsx # Internally uses ReactOnRails.register
+  └── src:                 # any directory name is fine. Referenced files need to be under source_path
+  │   └── Foo
+  │   │   └── ...
+  │   └── Bar
+  │   │   └── ...
+  └── stylesheets:
+  │   └── my_styles.css
+  └── images:
+      └── logo.svg
+```
+
+The tricky part is to figure out which bundles to load on any Rails view. [Shakapacker's `append_stylesheet_pack_tag` and `append_javascript_pack_tag` view helpers](https://github.com/shakacode/shakapacker#view-helper-append_javascript_pack_tag-and-append_stylesheet_pack_tag) enables Rails views to specify needed bundles for use by layout's call to `javascript_pack_tag` and `stylesheet_pack_tag`.
+
+#### Solution
+
+File-system-based automated pack generation simplifies this process with a new option for the view helpers. The steps to use it in this example are:
+
+1. Remove parameters passed directly to `javascript_pack_tag` and `stylesheet_pack_tag`.
+2. Remove parameters passed directly to `append_javascript_pack_tag` and `append_stylesheet_pack_tag`.
+
+Your layout would now contain:
+
+```erb
+  <%= javascript_pack_tag %>
+  <%= stylesheet_pack_tag %>
+```
+
+3. Create a directory structure as mentioned below:
 
 ```
 app/javascript:
@@ -107,7 +151,7 @@ app/javascript:
   │   │   │ └── BarComponentTwo.jsx       
 ```
 
-To register a React component, creating a pack entry and manually registering it by calling `ReactOnRails.register` is no longer needed. With automatically generated packs, you can directly use `FooComponentOne`, `BarComponentOne` and `BarComponentTwo` in Rails view using:
+4. You no longer need to register these React components nor directly add their bundles. For example you can have a Rails view using three components:
 
 ```erb
     <%= react_component("FooComponentOne", {}, auto_load_bundle: true) %>    
