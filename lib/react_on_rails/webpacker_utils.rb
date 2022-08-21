@@ -17,6 +17,12 @@ module ReactOnRails
       Webpacker.dev_server.running?
     end
 
+    def self.shakapacker_version
+      return nil unless ReactOnRails::Utils.gem_available?("shakapacker")
+
+      Gem.loaded_specs["shakapacker"].version.to_s
+    end
+
     # This returns either a URL for the webpack-dev-server, non-server bundle or
     # the hashed server bundle if using the same bundle for the client.
     # Otherwise returns a file path.
@@ -43,6 +49,14 @@ module ReactOnRails
 
     def self.webpacker_source_path
       Webpacker.config.source_path
+    end
+
+    def self.webpacker_source_entry_path
+      Webpacker.config.source_entry_path
+    end
+
+    def self.nested_entries?
+      Webpacker.config.nested_entries?
     end
 
     def self.webpacker_public_output_path

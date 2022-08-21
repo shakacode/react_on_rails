@@ -71,6 +71,10 @@ module ReactOnRails
         retrieve_configuration_value_for(:prerender)
       end
 
+      def auto_load_bundle
+        retrieve_configuration_value_for(:auto_load_bundle)
+      end
+
       def trace
         retrieve_configuration_value_for(:trace)
       end

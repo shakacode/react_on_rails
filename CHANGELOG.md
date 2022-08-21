@@ -26,6 +26,8 @@ Changes since last non-beta release.
 
 - Upgraded the example test app in `spec/dummy` to React 18. [PR 1463](https://github.com/shakacode/react_on_rails/pull/1463) by [alexeyr](https://github.com/alexeyr).
 
+- Added file-system-based automatic bundle generation feature. [PR 1455](https://github.com/shakacode/react_on_rails/pull/1455) by [pulkitkkr](https://github.com/pulkitkkr).
+
 #### Fixed
 - Correctly unmount roots under React 18. [PR 1466](https://github.com/shakacode/react_on_rails/pull/1466) by [alexeyr](https://github.com/alexeyr).
 

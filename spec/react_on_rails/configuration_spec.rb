@@ -186,6 +186,22 @@ module ReactOnRails
       expect(ReactOnRails.configuration.random_dom_id).to eq(false)
     end
 
+    it "changes the configuration of the gem, such as setting the auto_load_bundle option to false" do
+      ReactOnRails.configure do |config|
+        config.auto_load_bundle = false
+      end
+
+      expect(ReactOnRails.configuration.auto_load_bundle).to eq(false)
+    end
+
+    it "changes the configuration of the gem, such as setting the auto_load_bundle option to true" do
+      ReactOnRails.configure do |config|
+        config.auto_load_bundle = true
+      end
+
+      expect(ReactOnRails.configuration.auto_load_bundle).to eq(true)
+    end
+
     it "has a default configuration of the gem" do
       # rubocop:disable Lint/EmptyBlock
       ReactOnRails.configure do |_config|

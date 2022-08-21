@@ -57,6 +57,7 @@ module ReactOnRails
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
+      render_options = internal_result[:render_options]
 
       case server_rendered_html
       when String
@@ -64,7 +65,7 @@ module ReactOnRails
           server_rendered_html: server_rendered_html,
           component_specification_tag: internal_result[:tag],
           console_script: console_script,
-          render_options: internal_result[:render_options]
+          render_options: render_options
         )
       when Hash
         msg = <<~MSG
@@ -90,6 +91,26 @@ module ReactOnRails
       end
     end
 
+    def load_pack_for_component(component_name)
+      component_pack_file = generated_components_pack(component_name)
+      is_component_pack_present = File.exist?("#{component_pack_file}.jsx")
+      is_development = ENV["RAILS_ENV"] == "development"
+
+      if is_development && !is_component_pack_present
+        ReactOnRails::PacksGenerator.generate
+        raise_generated_missing_pack_warning(component_name)
+      end
+
+      ReactOnRails::PacksGenerator.raise_nested_enteries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
+
+      append_javascript_pack_tag "generated/#{component_name}"
+      append_stylesheet_pack_tag "generated/#{component_name}"
+    end
+
+    def generated_components_pack(component_name)
+      "#{ReactOnRails::WebpackerUtils.webpacker_source_entry_path}/generated/#{component_name}"
+    end
+
     # react_component_hash is used to return multiple HTML strings for server rendering, such as for
     # adding meta-tags to a page.
     # It is exactly like react_component except for the following:
@@ -112,6 +133,7 @@ module ReactOnRails
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
+      render_options = internal_result[:render_options]
 
       if server_rendered_html.is_a?(String) && internal_result[:result]["hasErrors"]
         server_rendered_html = { COMPONENT_HTML_KEY => internal_result[:result]["html"] }
@@ -122,7 +144,7 @@ module ReactOnRails
           server_rendered_html: server_rendered_html,
           component_specification_tag: internal_result[:tag],
           console_script: console_script,
-          render_options: internal_result[:render_options]
+          render_options: render_options
         )
       else
         msg = <<~MSG
@@ -425,6 +447,8 @@ module ReactOnRails
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
 
+      load_pack_for_component react_component_name if render_options.auto_load_bundle
+
       {
         render_options: render_options,
         tag: component_specification_tag,
@@ -526,6 +550,17 @@ module ReactOnRails
         JS
       end
       result
+    end
+
+    def raise_generated_missing_pack_warning(component_name)
+      msg = <<~MSG
+        **ERROR** ReactOnRails: Generated missing pack for Component: #{component_name}. Please refresh the webpage \
+        once webpack has finished generating the bundles. If the problem persists
+        1. Verify `components_subdirectory` is configured in `config/initializers/react_on_rails`.
+        2. Component: #{component_name} is placed inside the configured `components_subdirectory`.
+      MSG
+
+      raise ReactOnRails::Error, msg
     end
 
     def replay_console_option(val)

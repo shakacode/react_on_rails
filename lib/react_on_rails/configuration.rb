@@ -7,6 +7,7 @@ module ReactOnRails
   end
 
   DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
+  DEFAULT_COMPONENTS_SUBDIRECTORY = nil
   DEFAULT_SERVER_RENDER_TIMEOUT = 20
   DEFAULT_POOL_SIZE = 1
   DEFAULT_RANDOM_DOM_ID = true # for backwards compatability
@@ -19,6 +20,7 @@ module ReactOnRails
       generated_assets_dir: "",
       server_bundle_js_file: "",
       prerender: false,
+      auto_load_bundle: false,
       replay_console: true,
       logging_on_server: true,
       raise_on_prerender_error: Rails.env.development?,
@@ -36,7 +38,8 @@ module ReactOnRails
       build_production_command: "",
       random_dom_id: DEFAULT_RANDOM_DOM_ID,
       same_bundle_for_client_and_server: false,
-      i18n_output_format: nil
+      i18n_output_format: nil,
+      components_subdirectory: DEFAULT_COMPONENTS_SUBDIRECTORY
     )
   end
 
@@ -49,8 +52,8 @@ module ReactOnRails
                   :webpack_generated_files, :rendering_extension, :build_test_command,
                   :build_production_command,
                   :i18n_dir, :i18n_yml_dir, :i18n_output_format,
-                  :server_render_method, :random_dom_id,
-                  :same_bundle_for_client_and_server, :rendering_props_extension
+                  :server_render_method, :random_dom_id, :auto_load_bundle,
+                  :same_bundle_for_client_and_server, :rendering_props_extension, :components_subdirectory
 
     # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
@@ -64,7 +67,8 @@ module ReactOnRails
                    build_production_command: nil,
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil,
-                   random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil)
+                   random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
+                   components_subdirectory: nil, auto_load_bundle: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir
@@ -98,6 +102,8 @@ module ReactOnRails
       self.rendering_extension = rendering_extension
 
       self.server_render_method = server_render_method
+      self.components_subdirectory = components_subdirectory
+      self.auto_load_bundle = auto_load_bundle
     end
     # rubocop:enable Metrics/AbcSize
 
@@ -125,6 +131,7 @@ module ReactOnRails
       ENV["WEBPACKER_PRECOMPILE"] = "false"
 
       precompile_tasks = lambda {
+        Rake::Task["react_on_rails:generate_packs"].invoke
         Rake::Task["react_on_rails:assets:webpack"].invoke
         puts "Invoking task webpacker:clean from React on Rails"
 

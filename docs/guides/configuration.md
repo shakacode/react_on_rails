@@ -152,6 +152,19 @@ ReactOnRails.configure do |config|
   config.server_renderer_timeout = 20 # seconds
 
   ################################################################################
+  ################################################################################
+  # FILE SYSTEM BASED COMPONENT REGISTRY
+  ################################################################################
+  # components_subdirectory is the name of the subdirectory matched to detect and register components automatically
+  # The default is nil. You can enable the feature by updating it in the next line.
+  config.components_subdirectory = "ror_components"
+  
+  # For automated component registry, `render_component` view helper method tries to load bundle for component from
+  # generated directory. default is false, you can pass option at the time of individual usage or update the default
+  # in the following line
+  config.auto_load_bundle = false
+
+  ################################################################################
   # I18N OPTIONS
   ################################################################################
   # Replace the following line to the location where you keep translation.js & default.js for use
