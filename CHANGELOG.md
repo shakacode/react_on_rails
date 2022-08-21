@@ -17,6 +17,8 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [13.1.0] - 2022-08-20
+
 #### Improved
 - Removed addition of `mini_racer` gem by default. [PR 1453](https://github.com/shakacode/react_on_rails/pull/1453) by [vtamara](https://github.com/vtamara) and [tomdracz](https://github.com/tomdracz).
 
@@ -1041,6 +1043,7 @@ Best done with Object destructing:
 - Fix several generator related issues.
 
 [Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.0.2...master
+[13.1.0]: https://github.com/shakacode/react_on_rails/compare/13.0.2...13.1.0
 [13.0.2]: https://github.com/shakacode/react_on_rails/compare/13.0.1...13.0.2
 [13.0.1]: https://github.com/shakacode/react_on_rails/compare/13.0.0...13.0.1
 [13.0.0]: https://github.com/shakacode/react_on_rails/compare/12.6.0...13.0.0
