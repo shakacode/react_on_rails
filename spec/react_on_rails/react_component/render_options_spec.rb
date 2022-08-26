@@ -22,7 +22,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     attrs = the_attrs
 
     expect do
-      described_class.new(attrs)
+      described_class.new(**attrs)
     end.not_to raise_error
   end
 
@@ -31,7 +31,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
       it "returns empty hash" do
         attrs = the_attrs
 
-        opts = described_class.new(attrs)
+        opts = described_class.new(**attrs)
 
         expect(opts.props).to eq({})
       end
@@ -42,7 +42,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         props = { a_prop: 2 }
         attrs = the_attrs(options: { props: props })
 
-        opts = described_class.new(attrs)
+        opts = described_class.new(**attrs)
 
         expect(opts.props).to eq(props)
       end
@@ -54,7 +54,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
       react_component_name = "some_app"
       attrs = the_attrs(react_component_name: react_component_name)
 
-      opts = described_class.new(attrs)
+      opts = described_class.new(**attrs)
 
       expect(opts.react_component_name).to eq "SomeApp"
     end
@@ -65,7 +65,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
       context "with random_dom_id set to true" do
         it "returns a unique identifier" do
           attrs = the_attrs(react_component_name: "SomeApp", options: { random_dom_id: true })
-          opts = described_class.new(attrs)
+          opts = described_class.new(**attrs)
 
           allow(SecureRandom).to receive(:uuid).and_return("123456789")
           expect(SecureRandom).to receive(:uuid)
@@ -74,7 +74,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         end
 
         it "is memoized" do
-          opts = described_class.new(the_attrs)
+          opts = described_class.new(**the_attrs)
           generated_value = opts.dom_id
 
           expect(opts.instance_variable_get(:@dom_id)).to eq generated_value
@@ -88,7 +88,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
       context "with random_dom_id set to false" do
         it "returns a default identifier" do
           attrs = the_attrs(react_component_name: "SomeApp", options: { random_dom_id: false })
-          opts = described_class.new(attrs)
+          opts = described_class.new(**attrs)
           expect(opts.dom_id).to eq "SomeApp-react-component"
           expect(opts.random_dom_id?).to eq(false)
         end
@@ -100,7 +100,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         options = { id: "im-an-id" }
         attrs = the_attrs(options: options)
 
-        opts = described_class.new(attrs)
+        opts = described_class.new(**attrs)
 
         expect(opts.dom_id).to eq "im-an-id"
         expect(opts.random_dom_id?).to eq(false)
@@ -113,7 +113,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
       it "returns empty hash" do
         attrs = the_attrs
 
-        opts = described_class.new(attrs)
+        opts = described_class.new(**attrs)
 
         expect(opts.html_options).to eq({})
       end
@@ -125,7 +125,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         options = { html_options: html_options }
         attrs = the_attrs(options: options)
 
-        opts = described_class.new(attrs)
+        opts = described_class.new(**attrs)
 
         expect(opts.html_options).to eq html_options
       end
@@ -140,7 +140,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
           options[option] = false
           attrs = the_attrs(options: options)
 
-          opts = described_class.new(attrs)
+          opts = described_class.new(**attrs)
 
           expect(opts.public_send(option)).to be false
         end
@@ -151,7 +151,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
           ReactOnRails.configuration.public_send("#{option}=", true)
           attrs = the_attrs
 
-          opts = described_class.new(attrs)
+          opts = described_class.new(**attrs)
 
           expect(opts.public_send(option)).to be true
         end
