@@ -5,7 +5,8 @@ To use the automated bundle generation feature introduced in React on Rails v13.
 ## Configuration
 
 ### Enable nested_entries for Shakapacker
-To use the automated bundle generation feature, set nested_entries: true in the webpacker.yml file like this. The generated files will go in a nested directory.
+To use the automated bundle generation feature, set `nested_entries: true` in the `webpacker.yml` file like this.
+The generated files will go in a nested directory.
 
 ```yml
 default:
@@ -36,7 +37,7 @@ config.auto_load_bundle = true
 ```
 
 ### Update `.gitignore` file
-React on Rails automatically generates pack files for components to be registered in the `packs/generated` directory. To avoid committing generated files into the version control system, please update `.gitignore` to have 
+React on Rails automatically generates pack files for components to be registered in the `packs/generated` directory. To avoid committing generated files into the version control system, please update `.gitignore` to have
 
 ```gitignore
 # Generated React on Rails packs
@@ -55,11 +56,11 @@ If the `webpacker.yml` file is configured as instructed [here](https://github.co
 ```yml
 default: &default
   source_path: app/javascript
-  source_entry_path: packs 
+  source_entry_path: packs
   public_root_path: public
   public_output_path: packs
   nested_entries: true
-# And more 
+# And more
 ```
 
 the directory structure will look like this
@@ -100,7 +101,7 @@ Your layout would contain:
 ```
 
 
-Suppose, you want to use bundle splitting to minimize unnecessary javascript loaded on each page, You would put each of your components in the `packs` directory. 
+Suppose, you want to use bundle splitting to minimize unnecessary javascript loaded on each page, you would put each of your components in the `packs` directory.
 ```
 app/javascript:
   └── packs:               # sets up webpack entries
@@ -138,8 +139,8 @@ Your layout would now contain:
 
 ```
 app/javascript:
-  └── packs                      
-  └── src:                   
+  └── packs
+  └── src:
   │   └── Foo
   │   │ └── ...
   │   │ └── ror_components          # configured as `components_subdirectory`
@@ -148,25 +149,25 @@ app/javascript:
   │   │ └── ...
   │   │ └── ror_components          # configured as `components_subdirectory`
   │   │   │ └── BarComponentOne.jsx
-  │   │   │ └── BarComponentTwo.jsx       
+  │   │   │ └── BarComponentTwo.jsx
 ```
 
 4. You no longer need to register these React components nor directly add their bundles. For example you can have a Rails view using three components:
 
 ```erb
-    <%= react_component("FooComponentOne", {}, auto_load_bundle: true) %>    
-    <%= react_component("BarComponentOne", {}, auto_load_bundle: true) %>    
-    <%= react_component("BarComponentTwo", {}, auto_load_bundle: true) %>    
+    <%= react_component("FooComponentOne", {}, auto_load_bundle: true) %>
+    <%= react_component("BarComponentOne", {}, auto_load_bundle: true) %>
+    <%= react_component("BarComponentTwo", {}, auto_load_bundle: true) %>
 ```
 
 If `FooComponentOne` uses multiple HTML strings for server rendering, the [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper can be used on the Rails view, as illustrated below.
 
 ```erb
-<% foo_component_one_data = react_component_hash("FooComponentOne", 
+<% foo_component_one_data = react_component_hash("FooComponentOne",
                                              prerender: true,
                                              auto_load_bundle: true
                                              props: {}
-                                          ) %>   
+                                          ) %>
 <% content_for :title do %>
    <%= foo_component_one_data['title'] %>
 <% end %>

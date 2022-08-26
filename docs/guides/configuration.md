@@ -158,7 +158,7 @@ ReactOnRails.configure do |config|
   # components_subdirectory is the name of the subdirectory matched to detect and register components automatically
   # The default is nil. You can enable the feature by updating it in the next line.
   config.components_subdirectory = "ror_components"
-  
+
   # For automated component registry, `render_component` view helper method tries to load bundle for component from
   # generated directory. default is false, you can pass option at the time of individual usage or update the default
   # in the following line
@@ -226,7 +226,7 @@ ReactOnRails.configure do |config|
   #
   # Define the files we need to check for webpack compilation when running tests.
   # The default is `%w( manifest.json )` as will be sufficient for most webpacker builds.
-  # However, if you are generated a server bundle that is NOT hashed (present in manifest.json),
+  # However, if you are generating a server bundle that is NOT hashed (present in manifest.json),
   # then include the file in this list like this:
   config.webpack_generated_files = %w( server-bundle.js manifest.json )
   # Note, be sure NOT to include your server-bundle.js if it is hashed, or else React on Rails will

@@ -3,9 +3,9 @@
 You only _need_ props hydration if you need SSR. However, there's no good reason to
 have your app make a second round trip to the Rails server to get initialization props.
 
-**Server-Side Rendering (SSR)** results in Rails rendering HTML for your React components. The main reasons to use SSR are better SEO and pages display more quickly. 
+**Server-Side Rendering (SSR)** results in Rails rendering HTML for your React components. The main reasons to use SSR are better SEO and pages display more quickly.
 
-These gems provide advanced integration of React with [rails/webpacker](https://github.com/rails/webpacker): 
+These gems provide advanced integration of React with [rails/webpacker](https://github.com/rails/webpacker):
 
 | Gem | Props Hydration | Server-Side-Rendering (SSR) | SSR with HMR | SSR with React-Router | SSR with Code Splitting | Node SSR |
 | --- | --------------- | --- | --------------------- | ----------------------| ------------------------|----|
@@ -19,7 +19,7 @@ Note, Node SSR for React on Rails requires [React on Rails Pro](https://www.shak
 
 As mentioned, you don't _need_ to use a gem to integrate Rails with React.
 
-If you're not concerned with view helpers to pass props or server rendering, can do it yourself:
+If you're not concerned with view helpers to pass props or server rendering, you can do it yourself:
 
 ```erb
 <%# views/layouts/application.html.erb %>
@@ -71,7 +71,7 @@ development:
     inline: true
 ```
 
-This basic configuration alone will have HMR working with the default webpacker setup. However, an code saves will trigger a full page refresh each time you save a file.
+This basic configuration alone will have HMR working with the default webpacker setup. However, a code save will trigger a full page refresh each time you save a file.
 
 Webpack's HMR allows the replacement of modules for React in-place without reloading the browser. To do this, you have two options:
 
@@ -95,9 +95,9 @@ You can see an example commit of adding this [here](https://github.com/shakacode
    ```js
    const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
    const environment = require('./environment')
-   
+
    const isWebpackDevServer = process.env.WEBPACK_DEV_SERVER;
-   
+
    //plugins
    if (isWebpackDevServer) {
        environment.plugins.append(
@@ -164,11 +164,11 @@ const environment = require('./environment')
 + if (!module.hot) {
 +   environment.loaders.get('sass').use.find(item => item.loader === 'sass-loader').options.sourceMapContents = false
 + }
-+ 
++
 module.exports = environment.toWebpackConfig()
 ```
 
-5. Adjust your `config/webpack/environment.js` for a 
+5. Adjust your `config/webpack/environment.js` for a
 
 ```diff
 // config/webpack/environment.js
