@@ -12,7 +12,8 @@ const loadableApp = (props, _railsContext) => {
   // server-bundle.js. Thus, the __dirname of this code is where we can find loadable-stats.json.
   const statsFile = path.resolve(__dirname, 'loadable-stats.json');
   const extractor = new ChunkExtractor({ entrypoints: ['client-bundle'], statsFile });
-  const componentHtml = renderToString(extractor.collectChunks(<App {...props} />));
+  const { pathname } = _railsContext;
+  const componentHtml = renderToString(extractor.collectChunks(<App {...props} path={pathname} />));
   const helmet = Helmet.renderStatic();
 
   return {
@@ -20,6 +21,7 @@ const loadableApp = (props, _railsContext) => {
       componentHtml,
       link: helmet.link.toString(),
       linkTags: extractor.getLinkTags(),
+      styleTags: extractor.getStyleTags(),
       meta: helmet.meta.toString(),
       scriptTags: extractor.getScriptTags(),
       style: helmet.style.toString(),
