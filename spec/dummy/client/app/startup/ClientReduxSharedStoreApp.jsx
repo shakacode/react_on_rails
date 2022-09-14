@@ -4,9 +4,19 @@
 import React from 'react';
 import { Provider } from 'react-redux';
 import ReactOnRails from 'react-on-rails';
-import ReactDOM from 'react-dom';
+import { hydrateRoot, createRoot } from 'react-dom/client';
 
 import HelloWorldContainer from '../components/HelloWorldContainer';
+
+const hydrateOrRender = (domEl, reactEl, prerender) => {
+  if (prerender) {
+    return hydrateRoot(domEl, reactEl);
+  } else {
+    const root = createRoot(domEl);
+    root.render(reactEl);
+    return root;
+  }
+};
 
 /*
  *  Export a function that returns a ReactComponent, depending on a store named SharedReduxStore.
@@ -14,9 +24,7 @@ import HelloWorldContainer from '../components/HelloWorldContainer';
  *  React will see that the state is the same and not do anything.
  */
 export default (props, _railsContext, domNodeId) => {
-  const render = props.prerender ? ReactDOM.hydrate : ReactDOM.render;
-  // eslint-disable-next-line no-param-reassign
-  delete props.prerender;
+  const { prerender } = props;
 
   // This is where we get the existing store.
   const store = ReactOnRails.getStore('SharedReduxStore');
@@ -29,5 +37,5 @@ export default (props, _railsContext, domNodeId) => {
     </Provider>
   );
 
-  render(element, document.getElementById(domNodeId));
+  hydrateOrRender(document.getElementById(domNodeId), element, prerender);
 };

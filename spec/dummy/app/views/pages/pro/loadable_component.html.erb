@@ -1,6 +1,12 @@
 
 <% loadable_app = react_component_hash("Loadable", props: { title: "This is a Loadable Component!" }, prerender: true, trace: true, id: "LoadableComponent-react-component-0") %>
 
+<% content_for :head do %>
+  <%= loadable_app["linkTags"] %>
+  <%= loadable_app["scriptTags"] %>
+  <%= loadable_app["styleTags"] %>
+<% end %>
+
 <%= loadable_app["componentHtml"] %>
 
 <hr/>
