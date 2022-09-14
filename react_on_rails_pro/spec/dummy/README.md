@@ -50,10 +50,10 @@ This sample app includes both Honeybadger and Sentry integration, including Sent
                              
 ### Using HMR and no loadable-components
 ```sh
-foreman start -f Procfile.dev
+overmind start -f Procfile.dev
 ```
    
 ### Using loadable-components and no HMR
 ```sh
-foreman start -f Procfile.static
+overmind start -f Procfile.static
 ```

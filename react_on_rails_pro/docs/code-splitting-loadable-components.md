@@ -150,21 +150,21 @@ const HomePage = loadable(() => retry(() => import('./HomePage')));
 
 #### Client
 
-In the client bundle, we need to wrap the `hydrate` call into a `loadableReady` function.
+In the client bundle, we need to wrap the `hydrateRoot` call into a `loadableReady` function.
 So, hydration will be fired only after all necessary chunks preloads. In this example below,
 `ClientApp` is registering as `App`. 
 
 ```js
 import React from 'react';
 import ReactOnRails from 'react-on-rails';
-import { hydrate } from 'react-dom'
+import { hydrateRoot } from 'react-dom/client'
 import { loadableReady } from '@loadable/component'
 import App from './App';
 
 const ClientApp = (props, railsContext, domId) => {
   loadableReady(() => {
     const root = document.getElementById(domId)
-    hydrate(<App {...props} />, root)
+    hydrateRoot(root, <App {...props} />);
   })
 }
 

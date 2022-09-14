@@ -273,7 +273,7 @@ Change the Client.js to add the preloading of the required components:
 **Client.js**
 ```javascript
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { hydrateRoot } from 'react-dom/client';
 import Loadable from 'react-loadable'
 
 import App from './App';
@@ -297,7 +297,7 @@ const App = (props, railsContext, domNodeId) => {
   Promise.all(dynamicImports)
     .then(() => Loadable.preloadReady())
     .then(() => {
-      ReactDOM.hydrate(
+      hydrateRoot(
         <App
           {...props}
           components={{ MainPage, AboutPage }}

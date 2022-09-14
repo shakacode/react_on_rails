@@ -9,9 +9,6 @@
     <title>Dummy</title>
   <% end %>
 
-  <%= loadable_app["linkTags"] %>
-  <%= loadable_app["scriptTags"] %>
-  <%= loadable_app["styleTags"] %>
   <%= yield :head %>
 
   <%= stylesheet_pack_tag('client-bundle',

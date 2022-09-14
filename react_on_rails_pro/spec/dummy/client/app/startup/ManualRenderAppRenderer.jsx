@@ -1,8 +1,18 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot, hydrateRoot } from 'react-dom/client';
+
+const hydrateOrRender = (domEl, reactEl, prerender) => {
+  if (prerender) {
+    return hydrateRoot(domEl, reactEl);
+  } else {
+    const root = createRoot(domEl);
+    root.render(reactEl);
+    return root;
+  }
+};
 
 export default (props, _railsContext, domNodeId) => {
-  const render = props.prerender ? ReactDOM.hydrate : ReactDOM.render;
+  const { prerender } = props;
 
   const reactElement = (
     <div>
@@ -11,5 +21,5 @@ export default (props, _railsContext, domNodeId) => {
     </div>
   );
 
-  render(reactElement, document.getElementById(domNodeId));
+  hydrateOrRender(document.getElementById(domNodeId), reactElement, prerender);
 };

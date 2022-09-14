@@ -6,12 +6,22 @@ import React from 'react';
 import { combineReducers, applyMiddleware, createStore } from 'redux';
 import { Provider } from 'react-redux';
 import thunkMiddleware from 'redux-thunk';
-import ReactDOM from 'react-dom';
+import { hydrateRoot, createRoot } from 'react-dom/client';
 
 import reducers from '../reducers/reducersIndex';
 import composeInitialState from '../store/composeInitialState';
 
 import HelloWorldContainer from '../components/HelloWorldContainer';
+
+const hydrateOrRender = (domEl, reactEl, prerender) => {
+  if (prerender) {
+    return hydrateRoot(domEl, reactEl);
+  } else {
+    const root = createRoot(domEl);
+    root.render(reactEl);
+    return root;
+  }
+};
 
 /*
  *  Export a function that takes the props and returns a ReactComponent.
@@ -20,13 +30,10 @@ import HelloWorldContainer from '../components/HelloWorldContainer';
  *
  */
 export default (props, railsContext, domNodeId) => {
-  const render = props.prerender ? ReactDOM.hydrate : ReactDOM.render;
-
-  // eslint-disable-next-line no-param-reassign
-  delete props.prerender;
+  const { prerender, ...rest } = props;
 
   const combinedReducer = combineReducers(reducers);
-  const combinedProps = composeInitialState(props, railsContext);
+  const combinedProps = composeInitialState(rest, railsContext);
 
   // This is where we'll put in the middleware for the async function. Placeholder.
   // store will have helloWorldData as a top level property
@@ -40,5 +47,5 @@ export default (props, railsContext, domNodeId) => {
     </Provider>
   );
 
-  render(element, document.getElementById(domNodeId));
+  hydrateOrRender(document.getElementById(domNodeId), element, prerender);
 };
