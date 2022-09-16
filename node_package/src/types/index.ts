@@ -123,7 +123,7 @@ export type RenderReturnType = void | Element | Component | Root;
 export interface ReactOnRails {
   register(components: { [id: string]: ReactComponentOrRenderFunction }): void;
   registerStore(stores: { [id: string]: Store }): void;
-  getStore(name: string, throwIfMissing: boolean): Store | undefined;
+  getStore(name: string, throwIfMissing?: boolean): Store | undefined;
   setOptions(newOptions: {traceTurbolinks: boolean}): void;
   reactOnRailsPageLoaded(): void;
   authenticityToken(): string | null;
