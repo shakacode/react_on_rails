@@ -4,7 +4,7 @@ _See the [CHANGELOG](./CHANGELOG.md) for release updates and **upgrade** details
 
 # React on Rails Pro
 
-Node rendering and caching performance enhancements for [React on Rails](https://github.com/shakacode/react_on_rails).
+Node rendering and caching performance enhancements for [React on Rails](https://github.com/shakacode/react_on_rails). Now supports React 18 with updates to React on Rails! Check the [React on Rails CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details and the updates to the [loadable-components instructions](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/code-splitting-loadable-components.md).
 
 ## Getting Started
 The best way to see how React on Rails Pro works is to install this repo locally and take a look at
