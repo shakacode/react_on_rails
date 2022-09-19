@@ -13,6 +13,10 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+
+## Doc and Spec Only Updates
+React 18 is noow supported! Check the [React on Rails CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details and the updates to the [loadable-components instructions](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/code-splitting-loadable-components.md).
+
 ## [3.1.0] - 2022-08-03
 ### Fixed
 - Removes `include_execjs_polyfills` options from RoRP gem configuration & adds `include_timer_polyfills` option for Node Renderer configuration, which enables use of setTimeout & other timer functions during server rendering. [PR 281](https://github.com/shakacode/react_on_rails_pro/pull/281) by [judahmeek](https://github.com/judahmeek).
