@@ -59,6 +59,15 @@ The best source of docs is the main [ReactOnRails.js](https://github.com/shakaco
   getStore(name, throwIfMissing = true )
 
   /**
+   * Renders or hydrates the react element passed. In case react version is >=18 will use the new api.
+   * @param domNode
+   * @param reactElement
+   * @param hydrate if true will perform hydration, if false will render
+   * @returns {Root|ReactComponent|ReactElement|null}
+   */
+  reactHydrateOrRender(domNode, reactElement, hydrate)
+
+  /**
    * Set options for ReactOnRails, typically before you call ReactOnRails.register
    * Available Options:
    * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
