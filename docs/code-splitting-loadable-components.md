@@ -1,7 +1,7 @@
 # Server-side rendering with code-splitting using Loadable/Components
 by ShakaCode
 
-*Last updated March 16, 2021*
+*Last updated September 19, 2022*
 
 ## Introduction
 The [React library recommends](https://loadable-components.com/docs/getting-started/) the use of React.lazy for code splitting with dynamic imports except
