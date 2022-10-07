@@ -48,7 +48,7 @@ To provide a high performance framework for integrating Ruby on Rails with React
 
 Given that `rails/webpacker` gem already provides basic React integration, why would you use "React on Rails"?
 
-1. Automatic configuration of what bundles are added to the page based on what React components are on the page.
+1. Automatic configuration of what bundles are added to the page based on what React components are on the page. This results in faster browser loading time via smaller bundle sizes.
 1. Keep up with the latest changes of different versions of React. React 18 is supported.
 1. Easy passing of props directly from your Rails view to your React components rather than having your Rails view load and then make a separate request to your API.
 Tight integration with [shakapacker](https://github.com/shakacode/shakapacker) (or it's predecessor [rails/webpacker](https://github.com/rails/webpacker)).
