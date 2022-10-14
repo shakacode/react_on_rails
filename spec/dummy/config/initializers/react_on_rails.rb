@@ -15,6 +15,16 @@ module RenderingExtension
   end
 end
 
+module RenderingPropsExtension
+  def self.adjust_props_for_client_side_hydration(_component_name, props)
+    if props.instance_of?(Hash)
+      props.except(:ssrOnlyProps)
+    else
+      props
+    end
+  end
+end
+
 ReactOnRails.configure do |config|
   config.server_bundle_js_file = "server-bundle.js"
   config.random_dom_id = false # default is true
@@ -23,4 +33,6 @@ ReactOnRails.configure do |config|
   # config.build_test_command = "yarn run build:test"
   # config.webpack_generated_files = %w[server-bundle.js manifest.json]
   config.rendering_extension = RenderingExtension
+
+  config.rendering_props_extension = RenderingPropsExtension
 end

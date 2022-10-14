@@ -4,6 +4,9 @@ Rails.application.routes.draw do
   # The priority is based upon order of creation: first created -> highest priority.
   # See how all your routes lay out with "rake routes".
 
+  mount GraphiQL::Rails::Engine, at: "/graphiql", graphql_path: "graphql#execute" if Rails.env.development?
+  post "/graphql", to: "graphql#execute"
+
   # You can have the root of your site routed with "root"
   root "pages#index"
 
@@ -12,6 +15,7 @@ Rails.application.routes.draw do
   get "cached_react_helmet" => "pages#cached_react_helmet"
   get "loadable(/*all)" => "pages#loadable_component", as: :loadable_component
   get "cached_redux_component" => "pages#cached_redux_component"
+  get "apollo_graphql" => "pages#apollo_graphql", as: :apollo_graphql
 
   # routes copied over from react on rails
   get "client_side_hello_world" => "pages#client_side_hello_world"

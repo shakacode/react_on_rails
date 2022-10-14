@@ -49,6 +49,8 @@ import SetTimeoutLoggingApp from '../startup/SetTimeoutServerApp';
 
 import Loadable from '../startup/loadable-server.imports-loadable';
 
+import ApolloGraphQLApp from '../startup/ApolloGraphQLAppServer';
+
 ReactOnRails.register({
   BrokenApp,
   HelloWorld,
@@ -71,6 +73,7 @@ ReactOnRails.register({
   ImageExample,
   SetTimeoutLoggingApp,
   Loadable,
+  ApolloGraphQLApp,
 });
 
 ReactOnRails.registerStore({

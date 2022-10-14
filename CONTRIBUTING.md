@@ -6,6 +6,12 @@
 cd react_on_rails_pro
 bundle && yarn && cd spec/dummy && bundle && yarn
 ```
+To use the `React 18 Apollo with GraphQL` example you need to seed the testing database inside `spec/dummy` directory.
+```sh
+rake db:seed
+```
+
+
 See the example apps under `/spec`
 
 ## Summary

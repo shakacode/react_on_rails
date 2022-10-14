@@ -35,6 +35,11 @@ class PagesController < ApplicationController
   def server_render_with_timeout
     render "/pages/pro/server_render_with_timeout"
   end
+
+  def apollo_graphql
+    render "/pages/pro/apollo_graphql"
+  end
+
   # See files in spec/dummy/app/views/pages
 
   helper_method :calc_slow_app_props_server_render
