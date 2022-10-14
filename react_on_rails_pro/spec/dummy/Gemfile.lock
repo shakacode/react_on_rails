@@ -127,6 +127,8 @@ GEM
       nokogiri (>= 1.4.3)
     erubi (1.10.0)
     execjs (2.8.1)
+    faker (2.23.0)
+      i18n (>= 1.8.11, < 2)
     ffi (1.15.5)
     gene_pool (1.5.0)
       concurrent-ruby (>= 1.0)
@@ -135,6 +137,10 @@ GEM
       railties (>= 3.0.0)
     globalid (1.0.0)
       activesupport (>= 5.0)
+    graphiql-rails (1.8.0)
+      railties
+      sprockets-rails
+    graphql (2.0.14)
     hashdiff (1.0.1)
     i18n (1.10.0)
       concurrent-ruby (~> 1.0)
@@ -242,13 +248,12 @@ GEM
     rb-fsevent (0.11.0)
     rb-inotify (0.10.1)
       ffi (~> 1.0)
-    react_on_rails (12.4.0)
+    react_on_rails (13.1.0)
       addressable
       connection_pool
       execjs (~> 2.5)
-      rails (>= 3.2)
+      rails (>= 5.2)
       rainbow (~> 3.0)
-      webpacker (>= 4.0)
     regexp_parser (2.2.0)
     rexml (3.2.5)
     rspec-core (3.10.1)
@@ -365,11 +370,6 @@ GEM
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
       hashdiff (>= 0.4.0, < 2.0.0)
-    webpacker (5.4.3)
-      activesupport (>= 5.2)
-      rack-proxy (>= 0.6.1)
-      railties (>= 5.2)
-      semantic_range (>= 2.3.0)
     webrick (1.7.0)
     websocket-driver (0.7.5)
       websocket-extensions (>= 0.1.0)
@@ -390,7 +390,10 @@ DEPENDENCIES
   capybara-screenshot
   coveralls
   equivalent-xml
+  faker
   generator_spec
+  graphiql-rails
+  graphql
   jbuilder
   jquery-rails
   launchy
@@ -403,7 +406,7 @@ DEPENDENCIES
   pry-theme
   puma
   rails
-  react_on_rails (= 12.4.0)
+  react_on_rails (= 13.1.0)
   react_on_rails_pro!
   rspec-rails
   rspec-retry

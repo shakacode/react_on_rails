@@ -4,6 +4,7 @@
   "description": "example of server rendering",
   "main": "server.js",
   "dependencies": {
+    "@apollo/client": "^3.6.9",
     "@babel/core": "7",
     "@babel/plugin-transform-runtime": "7",
     "@babel/preset-env": "7",
@@ -28,6 +29,7 @@
     "es5-shim": "^4.5.9",
     "expose-loader": "1.0.3",
     "file-loader": "^6.2.0",
+    "graphql": "^16.6.0",
     "history": "^4.6.3",
     "honeybadger": "^1.4.0",
     "imports-loader": "^1.2.0",

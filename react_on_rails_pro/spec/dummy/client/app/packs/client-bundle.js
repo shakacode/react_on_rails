@@ -33,6 +33,8 @@ import SetTimeoutLoggingApp from '../startup/SetTimeoutClientApp';
 
 import Loadable from '../startup/loadable-client.imports-loadable';
 
+import ApolloGraphQLApp from '../startup/ApolloGraphQLAppClient';
+
 ReactOnRails.setOptions({
   traceTurbolinks: true,
 });
@@ -58,6 +60,7 @@ ReactOnRails.register({
   ImageExample,
   SetTimeoutLoggingApp,
   Loadable,
+  ApolloGraphQLApp,
 });
 
 ReactOnRails.registerStore({
