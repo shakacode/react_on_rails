@@ -3,16 +3,15 @@
 require "rails_helper"
 require "support/script_tag_utils"
 
+RequestDetails = Struct.new(:original_url, :env)
+
 describe ReactOnRailsProHelper, type: :helper do
   # In order to test the pro helper, we need to load the methods from the regular helper.
   # I couldn't see any easier way to do this.
   include ReactOnRails::Helper
   before do
     allow(self).to receive(:request) {
-      OpenStruct.new(
-        original_url: "http://foobar.com/development",
-        env: { "HTTP_ACCEPT_LANGUAGE" => "en" }
-      )
+      RequestDetails.new("http://foobar.com/development", { "HTTP_ACCEPT_LANGUAGE" => "en" })
     }
   end
 
@@ -25,7 +24,7 @@ describe ReactOnRailsProHelper, type: :helper do
   end
 
   let(:json_string_sanitized) do
-    '{"hello":"world","free":"of charge","x":"\\u003c/script\\u003e\\u003cscrip'\
+    '{"hello":"world","free":"of charge","x":"\\u003c/script\\u003e\\u003cscrip' \
       "t\\u003ealert('foo')\\u003c/script\\u003e\"}"
   end
 
@@ -40,7 +39,7 @@ describe ReactOnRailsProHelper, type: :helper do
       "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}"
     end
     let(:base_cache_key_with_prerender) do
-      "#{base_component_cache_key}/#{ReactOnRailsPro::Utils.bundle_hash}/"\
+      "#{base_component_cache_key}/#{ReactOnRailsPro::Utils.bundle_hash}/" \
         "#{ReactOnRailsPro::Cache.dependencies_cache_key}"
     end
     let(:base_cache_key_without_prerender) do

@@ -12,7 +12,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
   let(:asset_path_expanded2) { path_in_bundles_folder(asset_filename2) }
 
   before do
-    dbl_configuration = instance_double("Configuration",
+    dbl_configuration = instance_double(ReactOnRailsPro::Configuration,
                                         server_renderer: "NodeRenderer",
                                         renderer_password: "myPassword1",
                                         renderer_url: "http://localhost:3800",
@@ -23,8 +23,8 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
                                         ])
     allow(ReactOnRailsPro).to receive(:configuration).and_return(dbl_configuration)
     FileUtils.mkdir_p(Rails.root.join("public", "webpack", "production"))
-    File.delete(asset_path_expanded) if File.exist?(asset_path_expanded)
-    File.delete(asset_path_expanded2) if File.exist?(asset_path_expanded2)
+    FileUtils.rm_f(asset_path_expanded)
+    FileUtils.rm_f(asset_path_expanded2)
   end
 
   context("when assets exist") do
@@ -34,12 +34,12 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
     end
 
     it "copying asset to public folder" do
-      expect(asset_exist_on_renderer?(asset_filename)).to eq(false)
-      expect(asset_exist_on_renderer?(asset_filename2)).to eq(false)
+      expect(asset_exist_on_renderer?(asset_filename)).to be(false)
+      expect(asset_exist_on_renderer?(asset_filename2)).to be(false)
       described_class.call
-      expect(asset_exist_on_renderer?(asset_filename)).to eq(true)
-      expect(asset_exist_on_renderer?(asset_filename2)).to eq(true)
-      expect(Pathname.new(File.readlink(asset_path_expanded)).relative?).to eq(true)
+      expect(asset_exist_on_renderer?(asset_filename)).to be(true)
+      expect(asset_exist_on_renderer?(asset_filename2)).to be(true)
+      expect(Pathname.new(File.readlink(asset_path_expanded)).relative?).to be(true)
       expect(File.realpath(asset_path_expanded)).to eq(path_in_webpack_folder(asset_filename).to_s)
     end
   end
@@ -47,7 +47,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
   context("when assets don't exist") do
     it "prints warning if asset not found" do
       first_asset_path = path_in_webpack_folder(asset_filename)
-      File.delete(first_asset_path) if File.exist?(first_asset_path)
+      FileUtils.rm_f(first_asset_path)
       expect do
         described_class.call
       end.to output("Asset not found #{first_asset_path}\n").to_stderr

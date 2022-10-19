@@ -28,7 +28,7 @@ module ReactOnRailsPro
         ReactOnRailsPro.configure do |config|
           config.assets_to_copy = ""
         end
-        expect(ReactOnRailsPro.configuration.assets_to_copy).to eq(nil)
+        expect(ReactOnRailsPro.configuration.assets_to_copy).to be_nil
       end
     end
 
@@ -151,7 +151,7 @@ module ReactOnRailsPro
           config.renderer_url = "https://localhost:3800"
         end
 
-        expect(ReactOnRailsPro.configuration.renderer_password).to eq(nil)
+        expect(ReactOnRailsPro.configuration.renderer_password).to be_nil
       end
     end
   end
