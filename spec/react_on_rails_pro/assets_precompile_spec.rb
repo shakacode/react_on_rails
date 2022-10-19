@@ -3,7 +3,7 @@
 require_relative "./spec_helper"
 require_relative "../../lib/react_on_rails_pro/assets_precompile"
 
-describe ReactOnRailsPro::AssetsPrecompile do # rubocop:disable Metrics/BlockLength
+describe ReactOnRailsPro::AssetsPrecompile do
   describe ".zipped_bundles_filename" do
     it "returns a string dependant on bundles_cache_key" do
       instance = described_class.instance
@@ -183,8 +183,8 @@ describe ReactOnRailsPro::AssetsPrecompile do # rubocop:disable Metrics/BlockLen
       allow(instance).to receive(:zipped_bundles_filename).and_return(unique_variable)
       allow(instance).to receive(:zipped_bundles_filepath).and_return("zipped_bundles_filepath")
 
-      allow(File).to receive(:open).and_return(true)
-      expect(File).to receive(:open).once
+      allow(File).to receive(:binwrite).and_return(true)
+      expect(File).to receive(:binwrite).once
 
       expect(instance.fetch_bundles).to be_truthy
 
@@ -200,7 +200,7 @@ describe ReactOnRailsPro::AssetsPrecompile do # rubocop:disable Metrics/BlockLen
       allow(instance).to receive(:fetch_bundles).and_return(false)
       allow(instance).to receive(:zipped_bundles_filepath).and_return("a")
 
-      expect(instance.fetch_and_unzip_cached_bundles).to eq(false)
+      expect(instance.fetch_and_unzip_cached_bundles).to be(false)
     end
 
     it "does not try to fetch remote cache if local cache exists" do
@@ -210,7 +210,7 @@ describe ReactOnRailsPro::AssetsPrecompile do # rubocop:disable Metrics/BlockLen
       expect(instance).not_to receive(:fetch_bundles)
       allow(instance).to receive(:zipped_bundles_filepath).and_return("a")
 
-      expect(instance.fetch_and_unzip_cached_bundles).to eq(true)
+      expect(instance.fetch_and_unzip_cached_bundles).to be(true)
     end
 
     it "returns the same value as fetch_bundles" do
@@ -220,7 +220,7 @@ describe ReactOnRailsPro::AssetsPrecompile do # rubocop:disable Metrics/BlockLen
       allow(instance).to receive(:zipped_bundles_filepath).and_return("a")
       expect(instance).to receive(:fetch_bundles).once.and_return(true)
 
-      expect(instance.fetch_and_unzip_cached_bundles).to eq(true)
+      expect(instance.fetch_and_unzip_cached_bundles).to be(true)
     end
   end
 
@@ -297,8 +297,8 @@ describe ReactOnRailsPro::AssetsPrecompile do # rubocop:disable Metrics/BlockLen
 
       instance.copy_extra_files_to_cache_dir
 
-      expect(copied_gemfile_path.exist?).to eq(true)
-      expect(copied_assets_precompile_path.exist?).to eq(true)
+      expect(copied_gemfile_path.exist?).to be(true)
+      expect(copied_assets_precompile_path.exist?).to be(true)
     end
   end
 
@@ -327,7 +327,7 @@ describe ReactOnRailsPro::AssetsPrecompile do # rubocop:disable Metrics/BlockLen
 
       extracted_file_path = Pathname.new(Dir.pwd).join("extra_files_extract_destination", "extra_file_for_test.md")
 
-      expect(extracted_file_path.exist?).to eq(true)
+      expect(extracted_file_path.exist?).to be(true)
     end
   end
 end

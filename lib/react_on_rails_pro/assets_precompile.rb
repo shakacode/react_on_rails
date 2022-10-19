@@ -36,8 +36,8 @@ module ReactOnRailsPro
           # Include the NODE_ENV in the digest
           env_cache_keys = [
             ReactOnRailsPro::VERSION,
-            ENV["RAILS_ENV"],
-            ENV["NODE_ENV"]
+            ENV.fetch("RAILS_ENV", nil),
+            ENV.fetch("NODE_ENV", nil)
           ]
 
           if remote_bundle_cache_adapter.respond_to?(:cache_keys)
@@ -104,15 +104,15 @@ module ReactOnRailsPro
       begin
         fetch_result = remote_bundle_cache_adapter.fetch(zipped_bundles_filename)
       rescue RuntimeError
-        message = "An error was raised by the custom config.remote_bundle_cache_adapter 'fetch'"\
-                  " method when called with { zipped_bundles_filename: #{zipped_bundles_filename} }"
+        message = "An error was raised by the custom config.remote_bundle_cache_adapter 'fetch' " \
+                  "method when called with { zipped_bundles_filename: #{zipped_bundles_filename} }"
         ReactOnRailsPro::Utils.rorp_puts message
         raise
       end
 
       if fetch_result
         ReactOnRailsPro::Utils.rorp_puts "Remote bundle cache detected. Bundles will be restored to local cache."
-        File.open(zipped_bundles_filepath, "wb") { |file| file.write(fetch_result) }
+        File.binwrite(zipped_bundles_filepath, fetch_result)
         true
       else
         ReactOnRailsPro::Utils.rorp_puts "Remote bundle cache not found."
@@ -150,7 +150,7 @@ module ReactOnRailsPro
     def copy_extra_files_to_cache_dir
       return unless remote_bundle_cache_adapter.respond_to?(:extra_files_to_cache)
 
-      FileUtils.mkdir_p(extra_files_path) unless File.exist?(extra_files_path)
+      FileUtils.mkdir_p(extra_files_path)
       copied_extra_files_paths = []
 
       remote_bundle_cache_adapter.extra_files_to_cache.each do |file_path|
@@ -162,8 +162,8 @@ module ReactOnRailsPro
         end
       end
 
-      ReactOnRailsPro::Utils.rorp_puts "Copied extra files: #{copied_extra_files_paths.join(', ')}"\
-                                       " to extra_files cache dir"
+      ReactOnRailsPro::Utils.rorp_puts "Copied extra files: #{copied_extra_files_paths.join(', ')} " \
+                                       "to extra_files cache dir"
     end
 
     def copy_file_to_extra_files_cache_dir(source_path)
@@ -188,8 +188,8 @@ module ReactOnRailsPro
         extracted_extra_files_paths.push(destination_file_path.relative_path_from(Rails.root).to_s)
       end
 
-      ReactOnRailsPro::Utils.rorp_puts "Extracted extra files: #{extracted_extra_files_paths.join(', ')}"\
-                                       " from extra_files cache dir"
+      ReactOnRailsPro::Utils.rorp_puts "Extracted extra files: #{extracted_extra_files_paths.join(', ')} " \
+                                       "from extra_files cache dir"
       remove_extra_files_cache_dir
     end
 
@@ -197,10 +197,10 @@ module ReactOnRailsPro
       begin
         copy_extra_files_to_cache_dir
         public_output_path = Webpacker.config.public_output_path
-        ReactOnRailsPro::Utils.rorp_puts "Gzipping built bundles to #{zipped_bundles_filepath} with "\
+        ReactOnRailsPro::Utils.rorp_puts "Gzipping built bundles to #{zipped_bundles_filepath} with " \
                                          "files in #{public_output_path}"
         Dir.chdir(public_output_path) do
-          Rake.sh "tar -czf #{zipped_bundles_filepath} --auto-compress -C "\
+          Rake.sh "tar -czf #{zipped_bundles_filepath} --auto-compress -C " \
                   "#{Webpacker.config.public_output_path} ."
         end
       rescue StandardError => e
@@ -216,15 +216,15 @@ module ReactOnRailsPro
       begin
         remote_bundle_cache_adapter.upload(zipped_bundles_filepath)
       rescue RuntimeError
-        message = "An error was raised by the custom config.remote_bundle_cache_adapter 'upload'"\
-                  " method when called with zipped_bundles_filepath: #{zipped_bundles_filepath}"
+        message = "An error was raised by the custom config.remote_bundle_cache_adapter 'upload' " \
+                  "method when called with zipped_bundles_filepath: #{zipped_bundles_filepath}"
         ReactOnRailsPro::Utils.rorp_puts message
         raise
       end
     end
 
     def remove_extra_files_cache_dir
-      FileUtils.remove_dir(extra_files_path) if File.exist?(extra_files_path)
+      FileUtils.rm_f(extra_files_path)
     end
   end
 end

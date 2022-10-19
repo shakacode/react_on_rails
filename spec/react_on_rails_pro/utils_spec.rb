@@ -33,7 +33,7 @@ module ReactOnRailsPro
 
         describe ".bundle_hash" do
           context "with server bundle with hash in webpack output filename" do
-            it "returns path for server bundle file name " do
+            it "returns path for server bundle file name" do
               server_bundle_js_file = "/webpack/production/webpack-bundle-0123456789abcdef.js"
               server_bundle_js_file_path = File.expand_path("./public/#{server_bundle_js_file}")
               allow(Webpacker).to receive_message_chain("manifest.lookup!")
@@ -107,7 +107,7 @@ module ReactOnRailsPro
     end
 
     describe ".with_trace" do
-      let(:logger_mock) { instance_double("Rails.logger").as_null_object }
+      let(:logger_mock) { instance_double(ActiveSupport::Logger).as_null_object }
 
       context "with tracing on" do
         before do
@@ -198,7 +198,7 @@ module ReactOnRailsPro
       # http.rb uses a string for status
       raise "Use a string for status #{status}" unless status.is_a?(String)
 
-      resp = instance_double("response")
+      resp = instance_double(response)
       allow(resp).to receive(:code).and_return(status)
       allow(resp).to receive(:body).and_return(status == "200" ? "Ok" : "Server error")
       resp

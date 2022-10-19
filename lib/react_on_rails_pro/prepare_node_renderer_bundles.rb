@@ -7,7 +7,7 @@ module ReactOnRailsPro
     extend FileUtils
 
     def self.make_relative_symlink(source, destination)
-      File.delete(destination) if File.exist?(destination)
+      FileUtils.rm_f(destination)
       relative_source_path = Pathname.new(source).relative_path_from(Pathname.new(destination).dirname)
       File.symlink(relative_source_path, destination)
       puts "[ReactOnRailsPro] Symlinked #{relative_source_path} to #{destination}"

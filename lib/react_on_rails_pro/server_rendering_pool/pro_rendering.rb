@@ -49,8 +49,8 @@ module ReactOnRailsPro
 
           digest = if render_options.random_dom_id?
                      Rails.logger.info do
-                       "[ReactOnRailsPro] Rendering #{render_options.react_component_name}. "\
-                         "Suggest setting `id` on react_component or setting react_on_rails.rb initializer "\
+                       "[ReactOnRailsPro] Rendering #{render_options.react_component_name}. " \
+                         "Suggest setting `id` on react_component or setting react_on_rails.rb initializer " \
                          "config.random_dom_id to false for BETTER performance."
                      end
                      Digest::MD5.hexdigest(without_random_values(js_code))

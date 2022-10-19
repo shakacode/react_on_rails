@@ -12,7 +12,7 @@ describe "Upload asset" do
   let(:asset_path_expanded2) { File.expand_path(asset_filename2, "#{__dir__}/../../.node-renderer-bundles") }
 
   before do
-    dbl_configuration = instance_double("Configuration",
+    dbl_configuration = instance_double(ReactOnRailsPro::Configuration,
                                         server_renderer: "NodeRenderer",
                                         renderer_password: "myPassword1",
                                         renderer_url: "http://localhost:3800",
@@ -23,8 +23,8 @@ describe "Upload asset" do
                                         ])
     allow(ReactOnRailsPro).to receive(:configuration).and_return(dbl_configuration)
     FileUtils.mkdir_p(Rails.root.join("public", "webpack", "production"))
-    File.delete(asset_path_expanded) if File.exist?(asset_path_expanded)
-    File.delete(asset_path_expanded2) if File.exist?(asset_path_expanded2)
+    FileUtils.rm_f(asset_path_expanded)
+    FileUtils.rm_f(asset_path_expanded2)
   end
 
   context("when assets exist") do
@@ -34,12 +34,12 @@ describe "Upload asset" do
     end
 
     it "copying asset to public folder" do
-      expect(asset_exist_on_renderer?(asset_filename)).to eq(false)
-      expect(asset_exist_on_renderer?(asset_filename2)).to eq(false)
+      expect(asset_exist_on_renderer?(asset_filename)).to be(false)
+      expect(asset_exist_on_renderer?(asset_filename2)).to be(false)
       response = ReactOnRailsPro::Request.upload_assets
       expect(response.code).to eq("200")
-      expect(asset_exist_on_renderer?(asset_filename)).to eq(true)
-      expect(asset_exist_on_renderer?(asset_filename2)).to eq(true)
+      expect(asset_exist_on_renderer?(asset_filename)).to be(true)
+      expect(asset_exist_on_renderer?(asset_filename2)).to be(true)
     end
 
     it "throws error if can't connect to node-renderer" do
@@ -55,7 +55,7 @@ describe "Upload asset" do
   context("when assets don't exist") do
     it "prints warning if asset not found" do
       first_asset_path = Rails.root.join("public", "webpack", "production", asset_filename)
-      File.delete(first_asset_path) if File.exist?(first_asset_path)
+      FileUtils.rm_f(first_asset_path)
       expect do
         ReactOnRailsPro::Request.upload_assets
       end.to output("Asset not found #{first_asset_path}\n").to_stderr

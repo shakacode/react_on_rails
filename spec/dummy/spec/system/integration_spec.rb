@@ -14,9 +14,9 @@ def change_text_expect_dom_selector(dom_selector)
 end
 
 shared_examples "React Component" do |dom_selector|
-  scenario { is_expected.to have_css dom_selector }
+  it { is_expected.to have_css dom_selector }
 
-  scenario "changes name in message according to input" do
+  it "changes name in message according to input" do
     change_text_expect_dom_selector(dom_selector)
   end
 end
@@ -89,7 +89,7 @@ context "when Server Rendering Cached", :caching, :js do
   include_examples "React Component", "div#ReduxApp-react-component-0"
 
   it "adds a value to the cache" do
-    base_cache_key_with_prerender = "#{base_component_cache_key}/"\
+    base_cache_key_with_prerender = "#{base_component_cache_key}/" \
                                     "#{ReactOnRailsPro::Utils.bundle_hash}/#{dependencies_cache_key}"
     expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReduxApp})
   end
@@ -142,8 +142,8 @@ describe "Pages/server_side_log_throw_raise", :js do
 
   it "redirects to /client_side_hello_world and flashes an error" do
     flash_message = page.find(:css, ".flash").text
-    expect(flash_message).to eq("Error prerendering in react_on_rails. Redirected back to"\
-                                " '/server_side_log_throw_raise_invoker'. See server logs for output.")
+    expect(flash_message).to eq("Error prerendering in react_on_rails. Redirected back to " \
+                                "'/server_side_log_throw_raise_invoker'. See server logs for output.")
     expect(page).to have_current_path("/server_side_log_throw_raise_invoker")
   end
 end
@@ -246,7 +246,7 @@ describe "generator function returns renderedHtml as an object with additional H
     before { visit react_helmet_path }
 
     it "renderedHtmls should not have any errors" do
-      expected_text = 'Props: {"apiRequestResponse":{"country":[],"name":"ReactOnRails"},'\
+      expected_text = 'Props: {"apiRequestResponse":{"country":[],"name":"ReactOnRails"},' \
                       '"helloWorldData":{"name":"Mr. Server Side Rendering"}}'
       expect(page).to have_text expected_text
       expect(page).to have_css "title", text: /\ACustom page title\z/, visible: :hidden
@@ -303,7 +303,7 @@ shared_examples "React Component Shared Store" do |url|
   before { visit url }
 
   context url do
-    scenario "Type in one component changes the other component" do
+    it "Type in one component changes the other component" do
       expect(page).to have_current_path(url, ignore_query: true)
       new_text = "John Doe"
       new_text2 = "Jane Smith"
