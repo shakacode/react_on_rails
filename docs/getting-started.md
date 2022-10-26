@@ -11,13 +11,20 @@ Note, the best way to understand how to use ReactOnRails is to study a few simpl
 
 *See also [the instructions for installing into an existing Rails app](https://www.shakacode.com/react-on-rails/docs/guides/installation-into-an-existing-rails-app/).*
 
-1. Add the `react_on_rails` gem to Gemfile:
+1. Add the `shakapacker` and `react_on_rails` gem to Gemfile:
 
    ```bash
+   bundle add shakapacker
    bundle add react_on_rails --strict
    ```
 
-2. Commit this to git (or else you cannot run the generator unless you pass the option `--ignore-warnings`).
+2. Run installation command for webpacker:
+
+   ```bash
+   rails webpacker:install
+   ```
+
+3. Commit this to git (or else you cannot run the generator unless you pass the option `--ignore-warnings`).
 
 3. Run the generator:
 
@@ -27,9 +34,8 @@ Note, the best way to understand how to use ReactOnRails is to study a few simpl
 
 4. Start the app:
 
-   ```bash
-   rails s
-   ```
+   - Run `./bin/dev` for HMR
+   - Run `./bin/dev-static` for statically created bundles (no HMR)
 
 5. Visit http://localhost:3000/hello_world.
 
