@@ -50,7 +50,7 @@ cd <directory where you want to create your new Rails app>
 # Any name you like for the rails app
 # Skip javascript so will add that next and get the current version
 # This is for Rails 7
-rails new --skip-turbolinks --skip-javascript test-react-on-rails
+rails new test-react-on-rails --skip-turbolinks --skip-javascript
 
 cd test-react-on-rails
 ```
