@@ -17,7 +17,7 @@ application is not yet set up to use webpacker, please see
 1. Add the `shakapacker` and `react_on_rails` gem to Gemfile:
 
    ```bash
-   bundle add shakapacker
+   bundle add shakapacker --strict
    bundle add react_on_rails --strict
    ```
 

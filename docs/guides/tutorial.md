@@ -55,12 +55,13 @@ cd test-react-on-rails
 ```
 
 ## Add the shakapacker and react_on_rails gems
-We recomment to use latest version of these gems. Otherwise, specify the exact versions
-of both the gem and npm package. In other words, don't use the `^` or `~` in the version specifications.
+We recommend using the latest version of these gems. Otherwise, specify the
+exact versions of both gems. In other words, don't use the `>=` or `~>` in the
+version specifications.
 
 ```bash
-bundle add react_on_rails
-bundle add shakapacker
+bundle add react_on_rails --strict
+bundle add shakapacker --strict
 ```
 
 Note: The latest released React On Rails version is considered stable. Please use the latest
