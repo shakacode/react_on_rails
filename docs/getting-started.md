@@ -14,7 +14,7 @@ Note, the best way to understand how to use ReactOnRails is to study a few simpl
 1. Add the `shakapacker` and `react_on_rails` gem to Gemfile:
 
    ```bash
-   bundle add shakapacker
+   bundle add shakapacker --strict
    bundle add react_on_rails --strict
    ```
 
