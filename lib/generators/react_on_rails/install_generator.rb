@@ -79,7 +79,6 @@ module ReactOnRails
 
       def add_bin_scripts
         directory "#{__dir__}/bin", "bin"
-        chmod "bin", 0o755 & ~File.umask, verbose: false
       end
     end
   end
