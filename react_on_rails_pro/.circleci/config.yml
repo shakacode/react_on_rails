@@ -280,17 +280,16 @@ workflows:
             - install-package-ruby-gems
       - build-dummy-app-webpack-test-bundles:
           requires:
+            - install-package-node-packages
             - install-dummy-app-node-packages
+            - install-dummy-app-ruby-gems
       - package-js-tests:
           requires:
             - install-package-node-packages
       - rspec-package-specs:
           requires:
             - install-package-ruby-gems
-            - build-dummy-app-webpack-test-bundles
-            - install-dummy-app-ruby-gems
       - rspec-dummy-app-node-renderer:
           requires:
             - install-package-ruby-gems
             - build-dummy-app-webpack-test-bundles
-            - install-dummy-app-ruby-gems

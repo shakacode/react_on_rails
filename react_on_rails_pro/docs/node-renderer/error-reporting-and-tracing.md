@@ -18,5 +18,5 @@ For documentation of Sentry Tracing, see the
 * [Sentry Sampling Transactions Docs](https://docs.sentry.io/platforms/ruby/performance/sampling/).
 
 ## Honeybadger
-1. Install package: `honeybadger`
+1. Install package: `@honeybadger-io/js`
 2. Set the `honeybadgerApiKey` config value.

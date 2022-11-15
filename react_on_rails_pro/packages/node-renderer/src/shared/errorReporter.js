@@ -1,7 +1,7 @@
 const requireOptional = require('../shared/requireOptional');
 const log = require('./log');
 
-const Honeybadger = requireOptional('honeybadger');
+const Honeybadger = requireOptional('@honeybadger-io/js');
 const Sentry = requireOptional('@sentry/node');
 const SentryTracing = requireOptional('@sentry/tracing');
 
@@ -74,7 +74,7 @@ class ErrorReporter {
 
   setContext(context) {
     if (this.honeybadger) {
-      Honeybadger.setConext(context);
+      Honeybadger.setContext(context);
     }
   }
 
