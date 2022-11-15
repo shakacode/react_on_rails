@@ -12,8 +12,8 @@ gem "react_on_rails", "13.1.0" # keep in sync with package.json files
 
 gem "shakapacker", ">= 6.0.0"
 gem "bootsnap", require: false
-gem "rails"
-gem "puma"
+gem "rails", ">= 7.0.4"
+gem "puma", ">= 5.6.4"
 
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
 gem "jbuilder"
@@ -31,7 +31,6 @@ gem "sprockets"
 gem "sass-rails"
 
 gem "amazing_print"
-gem "mini_racer"
 
 group :development do
   # Access an interactive console on exception pages or by calling 'console' anywhere in the code.
