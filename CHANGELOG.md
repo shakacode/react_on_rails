@@ -19,6 +19,7 @@ Changes since last non-beta release.
 
 ### Added
 - Exposed `reactHydrateOrRender` utility via [PR 1481](https://github.com/shakacode/react_on_rails/pull/1481)
+- Added `./bin/dev` executable to ease and standardize running the dev server. [PR 1491](https://github.com/shakacode/react_on_rails/pull/1491) by [ahangarha](https://github.com/ahangarha)
 
 ### [13.1.0] - 2022-08-20
 
