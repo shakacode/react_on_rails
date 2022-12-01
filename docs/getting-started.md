@@ -9,7 +9,10 @@ Note, the best way to understand how to use ReactOnRails is to study a few simpl
 
 ## Basic Installation
 
-*See also [the instructions for installing into an existing Rails app](https://www.shakacode.com/react-on-rails/docs/guides/installation-into-an-existing-rails-app/).*
+These steps assume that you've got a rails application with webpacker (e.g. one
+generated using `rails new my_app --javascript=webpack`). If your
+application is not yet set up to use webpacker, please see 
+[the instructions for installing into an existing Rails app](https://www.shakacode.com/react-on-rails/docs/guides/installation-into-an-existing-rails-app/).*
 
 1. Add the `react_on_rails` gem to Gemfile:
 
