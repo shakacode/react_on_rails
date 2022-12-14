@@ -19,6 +19,8 @@ Changes since last non-beta release.
 
 ### Added
 - Exposed `reactHydrateOrRender` utility via [PR 1481](https://github.com/shakacode/react_on_rails/pull/1481)
+- Optimized `ReactOnRails::TestHelper`'s RSpec integration using
+  `when_first_matching_example_defined` via [PR 1496](https://github.com/shakacode/react_on_rails/pull/1496)
 
 ### [13.1.0] - 2022-08-20
 

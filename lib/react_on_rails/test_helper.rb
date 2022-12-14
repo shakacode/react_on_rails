@@ -35,8 +35,17 @@ module ReactOnRails
     def self.configure_rspec_to_compile_assets(config, *metatags)
       metatags = %i[js server_rendering controller] if metatags.empty?
 
+      # Supported since RSpec 3.5.0
+      supports_first_matching_example = config.respond_to?(:when_first_matching_example_defined)
+
       metatags.each do |metatag|
-        config.before(:example, metatag) { ReactOnRails::TestHelper.ensure_assets_compiled }
+        if supports_first_matching_example
+          config.when_first_matching_example_defined(metatag) do
+            ReactOnRails::TestHelper.ensure_assets_compiled
+          end
+        else
+          config.before(:example, metatag) { ReactOnRails::TestHelper.ensure_assets_compiled }
+        end
       end
     end
 
