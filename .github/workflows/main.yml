@@ -15,6 +15,10 @@ jobs:
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby }}
+    # libyaml-dev is needed for psych v5
+    # this gem depends on sdoc which depends on rdoc which depends on psych
+    - name: Fix dependency for libyaml-dev
+      run: sudo apt install libyaml-dev
     - name: Setup Node
       uses: actions/setup-node@v2-beta
       with:
