@@ -8,13 +8,17 @@ jobs:
       matrix:
         ruby: [2.7]
         node: [14]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby }}
+    # libyaml-dev is needed for psych v5
+    # this gem depends on sdoc which depends on rdoc which depends on psych
+    - name: Fix dependency for libyaml-dev
+      run: sudo apt install libyaml-dev
     - name: Setup Node
       uses: actions/setup-node@v2-beta
       with:
@@ -73,7 +77,7 @@ jobs:
         ruby: [2.7]
         node: [14]
         rake_task: ['run_rspec:all_dummy', 'run_rspec:all_but_examples', 'run_rspec:examples']
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
     - name: Setup Ruby
