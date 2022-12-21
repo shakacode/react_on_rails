@@ -18,6 +18,7 @@ Changes since last non-beta release.
 *Please add entries here for your pull requests that are not yet released.*
 
 ### Added
+- Fix reactOnRailsPageUnloaded when there is no component on the page. Important for apps using both hotwire and react_on_rails. [PR 1498](https://github.com/shakacode/react_on_rails/pull/1498) by [NhanHo](https://github.com/NhanHo).
 - Exposed `reactHydrateOrRender` utility via [PR 1481](https://github.com/shakacode/react_on_rails/pull/1481)
 
 ### [13.1.0] - 2022-08-20
