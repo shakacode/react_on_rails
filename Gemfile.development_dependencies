@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-gem "shakapacker", ">= 6.4.0"
+gem "shakapacker", "6.5.1"
 gem "bootsnap", require: false
 gem "rails", "~> 7.0"
 gem "sqlite3"
