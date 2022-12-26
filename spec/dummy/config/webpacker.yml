@@ -14,6 +14,7 @@ default: &default
 
   # Reload manifest.json on all requests so we reload latest compiled packs
   cache_manifest: false
+  nested_entries: true
 
 development:
   <<: *default
