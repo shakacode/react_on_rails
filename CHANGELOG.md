@@ -17,8 +17,14 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [13.2.0] - 2022-12-23
+                                           
+### Fixed
+- Fix reactOnRailsPageUnloaded when there is no component on the page. Important for apps using both hotwire and react_on_rails. [PR 1498](https://github.com/shakacode/react_on_rails/pull/1498) by [NhanHo](https://github.com/NhanHo).
+- Fixing wrong type. The throwIfMissing param of getStore should be optional as it defaults to true. [PR 1480](https://github.com/shakacode/react_on_rails/pull/1480) by [wouldntsavezion](https://github.com/wouldntsavezion).
+
 ### Added
-- Exposed `reactHydrateOrRender` utility via [PR 1481](https://github.com/shakacode/react_on_rails/pull/1481)
+- Exposed `reactHydrateOrRender` utility via [PR 1481](https://github.com/shakacode/react_on_rails/pull/1481) by [vaukalak](https://github.com/vaukalak).
 
 ### [13.1.0] - 2022-08-20
 
@@ -1045,7 +1051,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.0.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.2.0...master
+[13.2.0]: https://github.com/shakacode/react_on_rails/compare/13.1.0...13.2.0
 [13.1.0]: https://github.com/shakacode/react_on_rails/compare/13.0.2...13.1.0
 [13.0.2]: https://github.com/shakacode/react_on_rails/compare/13.0.1...13.0.2
 [13.0.1]: https://github.com/shakacode/react_on_rails/compare/13.0.0...13.0.1
