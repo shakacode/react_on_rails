@@ -233,7 +233,12 @@ function unmount(el: Element): void {
 function reactOnRailsPageUnloaded(): void {
   debugTurbolinks('reactOnRailsPageUnloaded');
   if (supportsRootApi) {
-    for (const root of findContext().roots) {
+    const { roots } = findContext();
+
+    // If no react on rails components
+    if (!roots) return;
+
+    for (const root of roots) {
       root.unmount();
     }
   } else {
