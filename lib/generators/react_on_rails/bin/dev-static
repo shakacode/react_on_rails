@@ -8,11 +8,12 @@ rescue Errno::ENOENT
 end
 
 def run(process)
-  argv = ARGV.join(" ")
+  args = [*ARGV]
+  args.shift
   puts "Using #{process}"
-  exec "#{process} start -f Procfile.dev-static", argv
+  exec "#{process} start -f Procfile.dev-static", args.join(" ")
 rescue Errno::ENOENT
-  puts <<~MSG
+  warn <<~MSG
     ERROR:
     Please ensure `Procfile.dev-static` exist in your project!
   MSG
@@ -24,7 +25,7 @@ if installed? "overmind"
 elsif installed? "foreman"
   run "foreman"
 else
-  puts <<~MSG
+  warn <<~MSG
     NOTICE:
     For this script to run, you need either 'overmind' or 'foreman' installed on your machine. Please try this script after installing one of them.
   MSG
