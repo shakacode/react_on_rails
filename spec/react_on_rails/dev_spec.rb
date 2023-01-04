@@ -1,21 +1,20 @@
 # frozen_string_literal: true
 
-# To suppress stdout during tests
-RSpec.configure do |config|
+RSpec.describe "bin/dev script" do
+  let(:script_path) { "lib/generators/react_on_rails/bin/dev" }
+
+  # To suppress stdout during tests
   original_stderr = $stderr
   original_stdout = $stdout
-  config.before(:all) do
+  before(:all) do
     $stderr = File.open(File::NULL, "w")
     $stdout = File.open(File::NULL, "w")
   end
-  config.after(:all) do
+
+  after(:all) do
     $stderr = original_stderr
     $stdout = original_stdout
   end
-end
-
-RSpec.describe "bin/dev script" do
-  let(:script_path) { "lib/generators/react_on_rails/bin/dev" }
 
   it "with Overmind installed, uses Overmind" do
     allow(IO).to receive(:popen).with("overmind -v").and_return("Some truthy result")
