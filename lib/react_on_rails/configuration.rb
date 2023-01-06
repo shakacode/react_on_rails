@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+# rubocop:disable Metrics/ClassLength
+
 module ReactOnRails
   def self.configure
     yield(configuration)
@@ -128,7 +130,20 @@ module ReactOnRails
 
       # Ensure that shakacode/shakapacker does not call bin/webpacker if we're providing
       # the build command.
-      ENV["WEBPACKER_PRECOMPILE"] = "false"
+      if Webpacker.config.webpacker_precompile?
+        msg = <<~MSG
+
+          React on Rails and Shakapacker error in configuration!
+          In order to use config/react_on_rails.rb config.build_production_command,
+          you must edit config/webpacker.yml to include this value in the default configuration:
+          'webpacker_precompile: false'
+
+          Alternatively, remove the config/react_on_rails.rb config.build_production_command and the
+          default bin/webpacker script will be used for assets:precompile.
+
+        MSG
+        raise msg
+      end
 
       precompile_tasks = lambda {
         Rake::Task["react_on_rails:generate_packs"].invoke
@@ -232,3 +247,4 @@ module ReactOnRails
     end
   end
 end
+# rubocop:enable Metrics/ClassLength
