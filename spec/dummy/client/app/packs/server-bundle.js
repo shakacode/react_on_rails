@@ -1,6 +1,6 @@
 // Shows the mapping from the exported object to the name used by the server rendering.
 import ReactOnRails from 'react-on-rails';
-import "./server-bundle-generated"
+import './server-bundle-generated';
 // Example of server rendering with no React
 import HelloString from '../non_react/HelloString';
 

@@ -5,7 +5,6 @@ import 'jquery-ujs';
 
 import ReactOnRails from 'react-on-rails';
 
-
 import SharedReduxStore from '../stores/SharedReduxStore';
 
 ReactOnRails.setOptions({
