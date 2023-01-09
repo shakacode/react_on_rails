@@ -45,25 +45,23 @@ Then we need to create a fresh Rails application as following.
 First be sure to run `rails -v` and check you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with react per the instructions [here](https://github.com/rails/webpacker).
 
 ```bash
-cd <directory where you want to create your new Rails app>
+# For Rails 6.x
+rails new test-react-on-rails --skip-javascript
 
-# Any name you like for the rails app
-# Skip javascript so will add that next and get the current version
-# This is for Rails 7
+# For Rails 7.x
 rails new test-react-on-rails --skip-turbolinks --skip-javascript
 
 cd test-react-on-rails
 ```
 
 ## Add the shakapacker and react_on_rails gems
-To avoid issues regarding inconsistent gem and npm versions, you should specify the exact versions
-of both the gem and npm package. In other words, don't use the `^` or `~` in the version specifications.
-_Use the latest version for `react_on_rails` and `shakapacker`._
+We recommend using the latest version of these gems. Otherwise, specify the
+exact versions of both the gem and npm package. In other words, don't use
+the `^` or `~` in the version specifications.
 
-```
-gem 'react_on_rails', '13.0.1'         # prefer exact gem version to match npm version
-gem 'shakapacker', '6.4.0'             # prefer exact gem version to match npm version
-
+```bash
+bundle add react_on_rails --strict
+bundle add shakapacker --strict
 ```
 
 Note: The latest released React On Rails version is considered stable. Please use the latest
@@ -71,32 +69,34 @@ version to ensure you get all the security patches and the best support.
 
 ## Run the shakapacker (webpacker) generator
 
-```terminal
+```bash
 bundle exec rails webpacker:install
 ```
 
-**Let's commit everything before installing React on Rails.**
+Commit all the changes so far to avoid getting errors in the next step.
 
+```bash
+git commit -am "Initial commit"
 ```
-# Here are git commands to make a new git repo and commit everything.
-# Newer versions of Rails create the git repo by default.
-git add -A
-git commit -m "Initial commit"
-```
+
+Alternatively you can use `--ignore-warnings` in the next step.
 
 ## Run the React on Rails Generator
 
-Install React on Rails: `rails generate react_on_rails:install`. You need to first git commit your files before running the generator, or else it will generate an error.
+```bash
+rails generate react_on_rails:install
+```
+
+You will be prompted to approve changes in certain files. Press `enter` to proceed
+one by one or enter `a` to replace all configuration files required by the project.
+You can check the diffs before you commit to see what changed.
 
 Note, using `redux` is no longer recommended as the basic installer uses React Hooks.
-If you want the redux install: `rails generate react_on_rails:install --redux`
+If you want the redux install, run:
 
+```bash
+rails generate react_on_rails:install --redux
 ```
-bundle exec rails generate react_on_rails:install
-```
-
-Enter `a` to replace all configuration files required by the project. You can check the diffs
-before you commit to see what changed.
 
 ## Setting up your environment variables
 
@@ -108,14 +108,18 @@ EXECJS_RUNTIME=Node
 
 Then run the server with one of the following options:
 
-## Running with HMR
-```
-foreman start -f Procfile.dev
+## Running the app
+
+### For HMR:
+
+```bash
+./bin/dev
 ```
 
-## Running without HMR, statically creating the bundles
-```
-foreman start -f Procfile.dev-static
+### Without HMR, statically creating the bundles
+
+```bash
+./bin/dev-static
 ```
 
 Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) and see your **React On Rails** app running!

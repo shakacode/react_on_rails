@@ -16,6 +16,7 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+- Added `./bin/dev` and `./bin/dev-static` executables to ease and standardize running the dev server. [PR 1491](https://github.com/shakacode/react_on_rails/pull/1491) by [ahangarha](https://github.com/ahangarha)
 
 ### [13.2.0] - 2022-12-23
                                            

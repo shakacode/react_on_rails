@@ -28,6 +28,7 @@ module ReactOnRails
       def run_generators
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
+          add_bin_scripts
         else
           error = "react_on_rails generator prerequisites not met!"
           GeneratorMessages.add_error(error)
@@ -74,6 +75,10 @@ module ReactOnRails
         error = "** nodejs is required. Please install it before continuing. https://nodejs.org/en/"
         GeneratorMessages.add_error(error)
         true
+      end
+
+      def add_bin_scripts
+        directory "#{__dir__}/bin", "bin"
       end
     end
   end

@@ -144,6 +144,21 @@ module ReactOnRails
 
                 <%= javascript_pack_tag 'hello-world-bundle' %>
 
+            - To start Rails server run:
+
+                ./bin/dev # Running with HMR
+
+              or
+
+                ./bin/dev # Running with statically created bundles, without HMR
+
+            - To server render, change this line app/views/hello_world/index.html.erb to
+              `prerender: true` to see server rendering (right click on page and select "view source").
+
+                <%= react_component("HelloWorldApp", props: @hello_world_props, prerender: true) %>
+
+          Alternative steps to run the app:
+
             - Run `rails s` to start the Rails server.
 
             - Run bin/webpacker-dev-server to start the Webpack dev server for compilation of Webpack
@@ -152,18 +167,8 @@ module ReactOnRails
 
             - Visit http://localhost:3000/hello_world and see your React On Rails app running!
 
-            - Alternately, run the foreman command to start the rails server and run webpack#{' '}
-              in watch mode.
-
-                foreman start -f Procfile.dev-static
-
             - To turn on HMR, edit config/webpacker.yml and set HMR to true. Restart the rails server
               and bin/webpacker-dev-server. Or use Procfile.dev.
-
-            - To server render, change this line app/views/hello_world/index.html.erb to
-              `prerender: true` to see server rendering (right click on page and select "view source").
-
-                <%= react_component("HelloWorldApp", props: @hello_world_props, prerender: true) %>
         MSG
       end
 
