@@ -15,13 +15,13 @@
 
    ```bash
    bundle add react_on_rails --version=13.1.0 --strict
-   bundle add shakapacker
+   bundle add shakapacker --strict
    ```
 
 2. Run the following 2 commands to install Webpacker with React. Note, if you are using an older version of Rails than 5.1, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
 
    ```bash
-   bundle exec rails webpacker:install
+   rails webpacker:install
    ```
 
 3. Commit this to git (or else you cannot run the generator unless you pass the option `--ignore-warnings`).
