@@ -128,8 +128,6 @@ module ReactOnRails
 
       return if skip_react_on_rails_precompile || build_production_command.blank?
 
-      # Ensure that shakacode/shakapacker does not call bin/webpacker if we're providing
-      # the build command.
       if Webpacker.config.webpacker_precompile?
         msg = <<~MSG
 
@@ -142,7 +140,7 @@ module ReactOnRails
           default bin/webpacker script will be used for assets:precompile.
 
         MSG
-        raise msg
+        raise ReactOnRails::Error, msg
       end
 
       precompile_tasks = lambda {
