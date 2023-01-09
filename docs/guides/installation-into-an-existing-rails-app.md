@@ -37,15 +37,16 @@
    ```bash
    rails generate react_on_rails:install --help
    ```
-5. Ensure that you have `foreman` installed: `gem install foreman`.
+5. Ensure that you have `overmind` or `foreman` installed
 
 6. Start your Rails server:
 
    ```bash
-   foreman start -f Procfile.dev
+   ./bin/dev
    ```
+   Note: `foreman` defaults to PORT 5000 unless you set the value of PORT in your environment. For example, you can `export PORT=3000` to use the Rails default port of 3000. For the hello_world example this is already set.
 
-7. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world). Note: `foreman` defaults to PORT 5000 unless you set the value of PORT in your environment. For example, you can `export PORT=3000` to use the Rails default port of 3000. For the hello_world example this is already set.
+7. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world).
 
 ## Installation
 
