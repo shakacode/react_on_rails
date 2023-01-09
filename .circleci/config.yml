@@ -206,6 +206,9 @@ jobs:
       - run: *install-dummy-app-node-modules
       - run: *install-dummy-app-ruby-gems
       - run:
+          name: generate file system-based packs
+          command: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+      - run:
           name: Build test bundles for dummy app
           command: cd spec/dummy && yarn run build:test
       - save_cache:
