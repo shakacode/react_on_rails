@@ -76,7 +76,6 @@ module ReactOnRails
     def create_server_pack
       File.write(generated_server_bundle_file_path, generated_server_pack_file_content)
 
-      add_generated_pack_to_server_bundle
       puts(Rainbow("Generated Server Bundle: #{generated_server_bundle_file_path}").orange)
     end
 
@@ -150,7 +149,7 @@ module ReactOnRails
     end
 
     def generated_pack_path(file_path)
-      "#{generated_packs_directory_path}/#{component_name(file_path)}.jsx"
+      "#{generated_packs_directory_path}/#{component_name(file_path)}.js"
     end
 
     def component_name(file_path)
