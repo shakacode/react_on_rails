@@ -74,6 +74,10 @@ ReactOnRails.configure do |config|
   # In this example, the module BuildProductionCommand would have a class method `call`.
   config.build_production_command = "RAILS_ENV=production bin/webpacker"
 
+  # NOTE:
+  # When specifying `build_production_command`, you need to disable `rails/webpacker` 
+  # configuration by setting `webpacker_precompile: false` in your `config/webpacker.yml` file.
+
   # See bottom for an example of the BuildProductionCommand module.
   # config.build_production_command = BuildProductionCommand
   # If you wish to utilize ReactOnRailsPro production bundle caching logic, then use

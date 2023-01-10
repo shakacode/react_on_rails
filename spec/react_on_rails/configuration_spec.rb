@@ -2,6 +2,8 @@
 
 require_relative "spec_helper"
 
+# rubocop:disable Metrics/ModuleLength
+
 module ReactOnRails
   RSpec.describe Configuration do # rubocop:disable Metrics/BlockLength
     let(:existing_path) { Pathname.new(Dir.mktmpdir) }
@@ -73,23 +75,40 @@ module ReactOnRails
     end
 
     describe ".build_production_command" do
-      it "if configured, ENV[\"WEBPACKER_PRECOMPILE\"] gets set to \"false\"" do
-        expect(ENV["WEBPACKER_PRECOMPILE"]).to be_nil
-
-        ReactOnRails.configure do |config|
-          config.build_production_command = "a string or a module"
-        end
-
-        expect(ENV["WEBPACKER_PRECOMPILE"]).to eq("false")
-        ENV["WEBPACKER_PRECOMPILE"] = nil
+      it "fails when \"webpacker_precompile\" is truly and \"build_production_command\" is truly" do
+        allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
+          .and_return(true)
+        expect do
+          ReactOnRails.configure do |config|
+            config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
+          end
+        end.to raise_error(ReactOnRails::Error, /webpacker_precompile: false/)
       end
 
-      it "if not configured, ENV[\"WEBPACKER_PRECOMPILE\"] remains nil" do
-        expect(ENV["WEBPACKER_PRECOMPILE"]).to be_nil
+      it "doesn't fail when \"webpacker_precompile\" is falsy and \"build_production_command\" is truly" do
+        allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
+          .and_return(false)
+        expect do
+          ReactOnRails.configure do |config|
+            config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
+          end
+        end.not_to raise_error
+      end
 
-        ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
+      it "doesn't fail when \"webpacker_precompile\" is truly and \"build_production_command\" is falsy" do
+        allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
+          .and_return(true)
+        expect do
+          ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
+        end.not_to raise_error
+      end
 
-        expect(ENV["WEBPACKER_PRECOMPILE"]).to be_nil
+      it "doesn't fail when \"webpacker_precompile\" is falsy and \"build_production_command\" is falsy" do
+        allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
+          .and_return(false)
+        expect do
+          ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
+        end.not_to raise_error
       end
     end
 
@@ -212,3 +231,5 @@ module ReactOnRails
     end
   end
 end
+
+# rubocop:enable Metrics/ModuleLength
