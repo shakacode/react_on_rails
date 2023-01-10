@@ -73,23 +73,40 @@ module ReactOnRails
     end
 
     describe ".build_production_command" do
-      it "fails when \"webpacker_precompile\" is truly" do
+
+      it "fails when \"webpacker_precompile\" is truly and \"build_production_command\" is truly" do
         allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
           .and_return(true)
         expect do
           ReactOnRails.configure do |config|
-            config.build_production_command = "a string or a module"
+            config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
           end
         end.to raise_error(ReactOnRails::Error, /webpacker_precompile: false/)
       end
 
-      it "doesn't fail when \"webpacker_precompile\" is falsy" do
+      it "doesn't fail when \"webpacker_precompile\" is falsy and \"build_production_command\" is truly" do
         allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
           .and_return(false)
         expect do
           ReactOnRails.configure do |config|
-            config.build_production_command = "a string or a module"
+            config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
           end
+        end.not_to raise_error
+      end
+
+      it "doesn't fail when \"webpacker_precompile\" is truly and \"build_production_command\" is falsy" do
+        allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
+          .and_return(true)
+        expect do
+          ReactOnRails.configure {}
+        end.not_to raise_error
+      end
+
+      it "doesn't fail when \"webpacker_precompile\" is falsy and \"build_production_command\" is falsy" do
+        allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
+          .and_return(false)
+        expect do
+          ReactOnRails.configure {}
         end.not_to raise_error
       end
     end

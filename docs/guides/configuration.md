@@ -78,7 +78,6 @@ ReactOnRails.configure do |config|
   # When specifying `build_production_command`, you need to disable `rails/webpacker` 
   # configuration by setting `webpacker_precompile: false` in your `config/webpacker.yml` file.
 
-
   # See bottom for an example of the BuildProductionCommand module.
   # config.build_production_command = BuildProductionCommand
   # If you wish to utilize ReactOnRailsPro production bundle caching logic, then use
