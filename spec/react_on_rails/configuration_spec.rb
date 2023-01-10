@@ -2,6 +2,8 @@
 
 require_relative "spec_helper"
 
+# rubocop:disable Metrics/ModuleLength
+
 module ReactOnRails
   RSpec.describe Configuration do # rubocop:disable Metrics/BlockLength
     let(:existing_path) { Pathname.new(Dir.mktmpdir) }
@@ -73,7 +75,6 @@ module ReactOnRails
     end
 
     describe ".build_production_command" do
-
       it "fails when \"webpacker_precompile\" is truly and \"build_production_command\" is truly" do
         allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
           .and_return(true)
@@ -98,7 +99,7 @@ module ReactOnRails
         allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
           .and_return(true)
         expect do
-          ReactOnRails.configure {}
+          ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
         end.not_to raise_error
       end
 
@@ -106,7 +107,7 @@ module ReactOnRails
         allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
           .and_return(false)
         expect do
-          ReactOnRails.configure {}
+          ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
         end.not_to raise_error
       end
     end
@@ -230,3 +231,5 @@ module ReactOnRails
     end
   end
 end
+
+# rubocop:enable Metrics/ModuleLength
