@@ -101,7 +101,7 @@ module ReactOnRails
         raise_generated_missing_pack_warning(component_name)
       end
 
-      ReactOnRails::PacksGenerator.raise_nested_enteries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
+      ReactOnRails::PacksGenerator.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
 
       append_javascript_pack_tag "generated/#{component_name}"
       append_stylesheet_pack_tag "generated/#{component_name}"
