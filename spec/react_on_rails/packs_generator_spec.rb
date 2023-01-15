@@ -78,7 +78,7 @@ module ReactOnRails
       end
     end
 
-    context "when nested enteries not enabled" do
+    context "when nested_entries not enabled" do
       before do
         allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(false)
       end
@@ -90,7 +90,7 @@ module ReactOnRails
       it "raises an error" do
         msg = <<~MSG
           **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
-          webpacker.yml to enable nested enteries. for more information read
+          webpacker.yml to enable nested entries. for more information read
           https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
         MSG
 
