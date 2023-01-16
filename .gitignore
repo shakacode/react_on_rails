@@ -14,6 +14,7 @@ tmp
 /spec/dummy/client/node_modules
 /spec/dummy/app/assets/webpack/
 /spec/dummy/coverage/
+/spec/dummy/public/assets
 
 # RVM
 .ruby-version

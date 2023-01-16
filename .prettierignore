@@ -6,3 +6,4 @@ packages/node-renderer/tests/fixtures/projects
 **/package.json
 vendor/bundle
 **/.node-renderer-bundles
+spec/dummy/.yalc/
