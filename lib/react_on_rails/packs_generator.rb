@@ -23,9 +23,7 @@ module ReactOnRails
     def verify_setup_and_generate_packs
       return unless components_subdirectory.present?
 
-      raise_webpacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
-      raise_shakapacker_version_incompatible unless shackapacker_version_requirement_met?
-      raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
+      verify_configuration
 
       is_generated_directory_present = Dir.exist?(generated_packs_directory_path)
       stale_packs = webpack_assets_status_checker.stale_generated_component_packs
@@ -306,6 +304,12 @@ module ReactOnRails
 
         missing_list << file unless  is_generated_pack_present
       end
+    end
+
+    def verify_configuration
+      raise_webpacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
+      raise_shakapacker_version_incompatible unless shackapacker_version_requirement_met?
+      raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
     end
   end
   # rubocop:enable Metrics/ClassLength
