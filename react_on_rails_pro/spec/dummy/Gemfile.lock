@@ -169,6 +169,8 @@ GEM
     minitest (5.16.3)
     msgpack (1.6.0)
     multipart-post (2.2.3)
+    net-http (0.3.2)
+      uri
     net-imap (0.3.1)
       net-protocol
     net-pop (0.1.2)
@@ -186,6 +188,7 @@ GEM
       ast (~> 2.4.1)
     persistent_http (2.0.3)
       gene_pool (>= 1.3)
+    pg (1.4.5)
     pry (0.14.1)
       coderay (~> 1.1)
       method_source (~> 1.0)
@@ -307,7 +310,7 @@ GEM
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
     semantic_range (3.0.0)
-    shakapacker (6.5.2)
+    shakapacker (6.5.5)
       activesupport (>= 5.2)
       rack-proxy (>= 0.6.1)
       railties (>= 5.2)
@@ -346,6 +349,7 @@ GEM
     uglifier (4.2.0)
       execjs (>= 0.3.0, < 3)
     unicode-display_width (2.3.0)
+    uri (0.10.0)
     web-console (4.2.0)
       actionview (>= 6.0.0)
       activemodel (>= 6.0.0)
@@ -388,6 +392,10 @@ DEPENDENCIES
   jquery-rails
   launchy
   listen
+  net-http
+  net-imap
+  net-smtp
+  pg
   pry (>= 0.14.1)
   pry-byebug!
   pry-doc
@@ -406,13 +414,14 @@ DEPENDENCIES
   sass-rails
   scss_lint
   selenium-webdriver
-  shakapacker (>= 6.0.0)
+  shakapacker (>= 6.5.5)
   spring
   spring-watcher-listen
   sprockets
   sqlite3
   turbolinks
   uglifier
+  uri (= 0.10.0)
   web-console
   webdrivers
   webmock
