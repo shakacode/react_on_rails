@@ -17,6 +17,7 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 - Added `./bin/dev` and `./bin/dev-static` executables to ease and standardize running the dev server. [PR 1491](https://github.com/shakacode/react_on_rails/pull/1491) by [ahangarha](https://github.com/ahangarha)
+- Fixed FS-based packs generation functionality to trigger pack generation  on the creation of a new react component inside `components_subdirectory`. [PR 1506](https://github.com/shakacode/react_on_rails/pull/1506) by [pulkitkkr](https://github.com/pulkitkkr)
 
 ### [13.2.0] - 2022-12-23
                                            
