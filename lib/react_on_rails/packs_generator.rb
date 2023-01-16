@@ -29,8 +29,9 @@ module ReactOnRails
       raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
 
       is_generated_directory_present = Dir.exist?(generated_packs_directory_path)
+      stale_packs = webpack_assets_status_checker.stale_generated_component_packs
 
-      return if is_generated_directory_present && webpack_assets_status_checker.stale_generated_component_packs.empty?
+      return if is_generated_directory_present && stale_packs.empty? && missing_packs.empty?
 
       clean_generated_packs_directory
       generate_packs
@@ -296,6 +297,16 @@ module ReactOnRails
       content_with_prepended_text = text_to_prepend + file_content
       File.write(file, content_with_prepended_text)
       puts "Prepended\n#{text_to_prepend}to #{file}."
+    end
+
+    def missing_packs
+      required_files = common_component_to_path.values + client_component_to_path.values
+
+      required_files.each_with_object([]) do |file, missing_list|
+        is_generated_pack_present = File.exist?(generated_pack_path(file))
+
+        missing_list << file unless  is_generated_pack_present
+      end
     end
   end
   # rubocop:enable Metrics/ClassLength
