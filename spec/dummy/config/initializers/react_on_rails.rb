@@ -34,6 +34,6 @@ ReactOnRails.configure do |config|
   config.rendering_extension = RenderingExtension
 
   config.rendering_props_extension = RenderingPropsExtension
-  config.components_subdirectory = "ror_components"
+  config.components_subdirectory = "startup"
   config.auto_load_bundle = true
 end
