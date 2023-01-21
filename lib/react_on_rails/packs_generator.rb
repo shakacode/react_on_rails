@@ -103,7 +103,8 @@ module ReactOnRails
       relative_path_to_generated_server_bundle = relative_path(defined_server_bundle_file_path,
                                                                generated_server_bundle_file_path)
       content = <<~FILE_CONTENT
-        import "./#{relative_path_to_generated_server_bundle}"\n
+        // import statement added by react_on_rails:generate_packs rake task
+        import "./#{relative_path_to_generated_server_bundle}"
       FILE_CONTENT
 
       prepend_to_file_if_not_present(defined_server_bundle_file_path, content)
@@ -124,7 +125,8 @@ module ReactOnRails
     end
 
     def defined_server_bundle_file_path
-      ReactOnRails::Utils.server_bundle_js_file_path
+      Rails.root.join(ReactOnRails::WebpackerUtils.webpacker_source_entry_path,
+                      ReactOnRails.configuration.server_bundle_js_file)
     end
 
     def generated_packs_directory_path
@@ -150,7 +152,7 @@ module ReactOnRails
     end
 
     def generated_pack_path(file_path)
-      "#{generated_packs_directory_path}/#{component_name(file_path)}.jsx"
+      "#{generated_packs_directory_path}/#{component_name(file_path)}.js"
     end
 
     def component_name(file_path)
@@ -292,6 +294,7 @@ module ReactOnRails
 
       content_with_prepended_text = text_to_prepend + file_content
       File.write(file, content_with_prepended_text)
+      puts "Prepended\n#{text_to_prepend}to #{file}."
     end
   end
   # rubocop:enable Metrics/ClassLength

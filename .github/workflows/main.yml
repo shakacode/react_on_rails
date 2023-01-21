@@ -8,7 +8,7 @@ jobs:
       matrix:
         ruby: [2.7]
         node: [14]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v2
     - name: Setup Ruby
@@ -36,7 +36,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: node_modules
-        key: v4-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+        key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji
@@ -48,7 +48,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: spec/dummy/node_modules
-        key: v4-dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/yarn.lock') }}
+        key: v5-dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/yarn.lock') }}
     - name: yalc add react-on-rails
       run: cd spec/dummy && yalc add react-on-rails
     - name: Install Node modules with Yarn for dummy app
@@ -57,9 +57,11 @@ jobs:
       uses: actions/cache@v2
       with:
         path: spec/dummy/vendor/bundle
-        key: v4-dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
+        key: v5-dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
     - name: Install Ruby Gems for dummy app
       run: cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+    - name: generate file system-based packs
+      run: cd spec/dummy && RAILS_ENV=test bundle exec rake react_on_rails:generate_packs
     - name: Build test bundles for dummy app
       run: cd spec/dummy && yarn run build:test
     - id: get-sha
@@ -68,7 +70,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: spec/dummy/public/webpack
-        key: v4-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
+        key: v5-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
 
   main:
     needs: build-dummy-app-webpack-test-bundles
@@ -77,7 +79,7 @@ jobs:
         ruby: [2.7]
         node: [14]
         rake_task: ['run_rspec:all_dummy', 'run_rspec:all_but_examples', 'run_rspec:examples']
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v2
     - name: Setup Ruby
@@ -101,29 +103,29 @@ jobs:
       uses: actions/cache@v2
       with:
         path: node_modules
-        key: v4-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+        key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
     - name: Save root ruby gems to cache
       uses: actions/cache@v2
       with:
         path: vendor/bundle
-        key: v4-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
+        key: v5-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
     - name: Save dummy app ruby gems to cache
       uses: actions/cache@v2
       with:
         path: spec/dummy/vendor/bundle
-        key: v4-dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
+        key: v5-dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
     - name: Save spec/dummy/node_modules to cache
       uses: actions/cache@v2
       with:
         path: spec/dummy/node_modules
-        key: v4-dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/yarn.lock') }}
+        key: v5-dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/yarn.lock') }}
     - id: get-sha
       run: echo "::set-output name=sha::$(git rev-parse HEAD)"
     - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
       uses: actions/cache@v2
       with:
         path: spec/dummy/public/webpack
-        key: v4-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
+        key: v5-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
 
     - name: Install Node modules with Yarn for renderer package
       run: |
@@ -157,9 +159,9 @@ jobs:
     - name: Increase the amount of inotify watchers
       run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
     - name: Prep for CI
-      run: bundle exec rake prepare_for_ci
+      run: bundle exec rails prepare_for_ci
     - name: Main CI
-      run: bundle exec rake ${{ matrix.rake_task }}
+      run: bundle exec rails ${{ matrix.rake_task }}
     - name: Store test results
       uses: actions/upload-artifact@v2
       with:

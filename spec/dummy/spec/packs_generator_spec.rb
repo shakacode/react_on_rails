@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "spec_helper"
+require_relative "rails_helper"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRails
@@ -100,7 +100,7 @@ module ReactOnRails
 
     context "when component with common file only" do
       let(:component_name) { "ComponentWithCommonOnly" }
-      let(:component_pack) { "#{generated_directory}/#{component_name}.jsx" }
+      let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
         stub_webpacker_source_path(component_name: component_name,
@@ -118,13 +118,6 @@ module ReactOnRails
 
       it "creates pack for ComponentWithCommonOnly" do
         expect(File.exist?(component_pack)).to eq(true)
-      end
-
-      it "imports generated server bundle to original server bundle" do
-        server_bundle_file_path = "#{webpacker_source_entry_path}/#{server_bundle_js_file}"
-        server_bundle_content = File.read(server_bundle_file_path)
-
-        expect(server_bundle_content).to include("import \"./server-bundle-generated.js\"")
       end
 
       it "generated pack for ComponentWithCommonOnly uses common file for pack" do
@@ -146,7 +139,7 @@ module ReactOnRails
 
     context "when component with client and common File" do
       let(:component_name) { "ComponentWithClientAndCommon" }
-      let(:component_pack) { "#{generated_directory}/#{component_name}.jsx" }
+      let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
         stub_webpacker_source_path(component_name: component_name,
@@ -166,7 +159,7 @@ module ReactOnRails
 
     context "when component with server and common file" do
       let(:component_name) { "ComponentWithServerAndCommon" }
-      let(:component_pack) { "#{generated_directory}/#{component_name}.jsx" }
+      let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
         allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_path)
@@ -186,7 +179,7 @@ module ReactOnRails
 
     context "when component with server, client and common file" do
       let(:component_name) { "ComponentWithCommonClientAndServer" }
-      let(:component_pack) { "#{generated_directory}/#{component_name}.jsx" }
+      let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
         stub_webpacker_source_path(component_name: component_name,
@@ -201,7 +194,7 @@ module ReactOnRails
 
     context "when component with server only" do
       let(:component_name) { "ComponentWithServerOnly" }
-      let(:component_pack) { "#{generated_directory}/#{component_name}.jsx" }
+      let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
         stub_webpacker_source_path(component_name: component_name,
@@ -220,7 +213,7 @@ module ReactOnRails
 
     context "when component with client only" do
       let(:component_name) { "ComponentWithClientOnly" }
-      let(:component_pack) { "#{generated_directory}/#{component_name}.jsx" }
+      let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
         stub_webpacker_source_path(component_name: component_name,

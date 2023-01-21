@@ -7,7 +7,7 @@ jobs:
     strategy:
       matrix:
         node: [12, 14]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v2
     - name: Setup Node
@@ -25,7 +25,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: node_modules
-        key: v4-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+        key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji

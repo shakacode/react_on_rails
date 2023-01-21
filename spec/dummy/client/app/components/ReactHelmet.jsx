@@ -1,6 +1,6 @@
 import React from 'react';
 import { Helmet } from 'react-helmet';
-import HelloWorld from './HelloWorld';
+import HelloWorld from '../startup/HelloWorld';
 
 const ReactHelmet = (props) => (
   <div>

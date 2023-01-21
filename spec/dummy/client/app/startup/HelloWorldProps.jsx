@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import css from './HelloWorld.module.scss';
+import css from '../components/HelloWorld.module.scss';
 
 function HelloWorldHooks(props) {
   console.log(`HelloWorldProps modification target prop value: ${props.modificationTarget}`);
