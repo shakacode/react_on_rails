@@ -106,7 +106,7 @@ module ReactOnRails
         // import statement added by react_on_rails:generate_packs rake task
         import "./#{relative_path_to_generated_server_bundle}"
       FILE_CONTENT
-      
+
       prepend_to_file_if_not_present(defined_server_bundle_file_path, content)
     end
 
@@ -125,7 +125,8 @@ module ReactOnRails
     end
 
     def defined_server_bundle_file_path
-      Rails.root.join(ReactOnRails::WebpackerUtils.webpacker_source_entry_path, ReactOnRails.configuration.server_bundle_js_file)
+      Rails.root.join(ReactOnRails::WebpackerUtils.webpacker_source_entry_path,
+                      ReactOnRails.configuration.server_bundle_js_file)
     end
 
     def generated_packs_directory_path
