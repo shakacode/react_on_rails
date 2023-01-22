@@ -2,8 +2,6 @@
 
 module ReactOnRails
   module WebpackerUtils
-    # TODO: V13 code should be cleaned up so that the webpacker gem is required.
-    # This check should only be done at startup.
     def self.using_webpacker?
       return @using_webpacker if defined?(@using_webpacker)
 
@@ -20,7 +18,18 @@ module ReactOnRails
     def self.shakapacker_version
       return nil unless ReactOnRails::Utils.gem_available?("shakapacker")
 
-      Gem.loaded_specs["shakapacker"].version.to_s
+      @shakapacker_version ||= Gem.loaded_specs["shakapacker"].version.to_s
+    end
+
+    def self.shakapacker_version_as_array
+      match = shakapacker_version.match(ReactOnRails::VersionChecker::MAJOR_MINOR_PATCH_VERSION_REGEX)
+
+      @shakapacker_version_as_array = [match[1].to_i, match[2].to_i, match[3].to_i]
+    end
+
+    def self.shackapacker_version_requirement_met?(ary)
+      ary[0] >= shakapacker_version_as_array[0] && ary[1] >= shakapacker_version_as_array[1] &&
+        ary[2] >= shakapacker_version_as_array[2]
     end
 
     # This returns either a URL for the webpack-dev-server, non-server bundle or
@@ -84,6 +93,48 @@ module ReactOnRails
       MSG
       puts wrap_message(msg)
       exit!
+    end
+
+    def self.webpack_assets_status_checker
+      source_path = ReactOnRails::Utils.source_path
+      generated_assets_full_path = ReactOnRails::Utils.generated_assets_full_path
+      webpack_generated_files = ReactOnRails.configuration.webpack_generated_files
+
+      @webpack_assets_status_checker ||= ReactOnRails::TestHelper::WebpackAssetsStatusChecker.new(
+        source_path: source_path,
+        generated_assets_full_path: generated_assets_full_path,
+        webpack_generated_files: webpack_generated_files
+      )
+    end
+
+    def self.raise_nested_entries_disabled
+      msg = <<~MSG
+        **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
+        webpacker.yml to enable nested entries. for more information read
+        https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
+      MSG
+
+      raise ReactOnRails::Error, msg
+    end
+
+    def self.raise_shakapacker_version_incompatible_for_autobundling
+      msg = <<~MSG
+        **ERROR** ReactOnRails: Please upgrade Shakapacker to version #{ReactOnRails::WebpackerUtils.semver_to_string(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)} or \
+        above to use the automated bundle generation feature. The currently installed version is \
+        #{ReactOnRails::WebpackerUtils.semver_to_string(ReactOnRails::WebpackerUtils.shakapacker_version_as_array)}.
+      MSG
+
+      raise ReactOnRails::Error, msg
+    end
+
+    def self.raise_shakapacker_not_installed
+      msg = <<~MSG
+        **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker \
+        #{ReactOnRails::WebpackerUtils.semver_to_string(minimum_required_shakapacker_version)} or above to use the \
+        automated bundle generation feature.
+      MSG
+
+      raise ReactOnRails::Error, msg
     end
   end
 end
