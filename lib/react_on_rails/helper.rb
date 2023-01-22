@@ -11,12 +11,10 @@ require "addressable/uri"
 require "react_on_rails/utils"
 require "react_on_rails/json_output"
 require "active_support/concern"
-require "webpacker"
 
 module ReactOnRails
   module Helper
     include ReactOnRails::Utils::Required
-    include Webpacker::Helper
 
     COMPONENT_HTML_KEY = "componentHtml"
 
@@ -335,9 +333,7 @@ module ReactOnRails
     end
 
     def generated_components_pack_path(component_name)
-      extension = PacksGenerator::GENERATED_PACK_EXTENSION
-
-      "#{ReactOnRails::WebpackerUtils.webpacker_source_entry_path}/generated/#{component_name}.#{extension}"
+      "#{ReactOnRails::WebpackerUtils.webpacker_source_entry_path}/generated/#{component_name}.js"
     end
 
     def build_react_component_result_for_server_rendered_string(

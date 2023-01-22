@@ -213,12 +213,12 @@ module ReactOnRails
       expect(ReactOnRails.configuration.auto_load_bundle).to eq(false)
     end
 
-    it "changes the configuration of the gem, such as setting the auto_load_bundle option to true" do
+    it "changes the configuration of the gem, such as setting the components_subdirectory option to 'something" do
       ReactOnRails.configure do |config|
-        config.auto_load_bundle = true
+        config.components_subdirectory = "something"
       end
 
-      expect(ReactOnRails.configuration.auto_load_bundle).to eq(true)
+      expect(ReactOnRails.configuration.components_subdirectory).to eq("something")
     end
 
     it "has a default configuration of the gem" do
