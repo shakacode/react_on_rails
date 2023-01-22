@@ -15,6 +15,8 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since last non-beta release.
 
+- Added file-system-based automatic bundle generation feature. [PR 1455](https://github.com/shakacode/react_on_rails/pull/1455) by [pulkitkkr](https://github.com/pulkitkkr), [PR 1503](https://github.com/shakacode/react_on_rails/pull/1503) by [pulkitkkr](https://github.com/pulkitkkr), & [PR 1509](https://github.com/shakacode/react_on_rails/pull/1509) by [judahmeek](https://github.com/judahmeek).
+
 *Please add entries here for your pull requests that are not yet released.*
 - Added `./bin/dev` and `./bin/dev-static` executables to ease and standardize running the dev server. [PR 1491](https://github.com/shakacode/react_on_rails/pull/1491) by [ahangarha](https://github.com/ahangarha)
 
@@ -37,8 +39,6 @@ Changes since last non-beta release.
   To migrate this change, remove `mini_racer` gem from your `Gemfile` and test your app for correct behaviour. You can continue using `mini_racer` and it will be still picked as the default `ExecJS` runtime, if present in your app `Gemfile`.
 
 - Upgraded the example test app in `spec/dummy` to React 18. [PR 1463](https://github.com/shakacode/react_on_rails/pull/1463) by [alexeyr](https://github.com/alexeyr).
-
-- Added file-system-based automatic bundle generation feature. [PR 1455](https://github.com/shakacode/react_on_rails/pull/1455) by [pulkitkkr](https://github.com/pulkitkkr).
 
 #### Fixed
 - Correctly unmount roots under React 18. [PR 1466](https://github.com/shakacode/react_on_rails/pull/1466) by [alexeyr](https://github.com/alexeyr).

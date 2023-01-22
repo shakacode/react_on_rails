@@ -36,6 +36,13 @@ You can change the value in `config/initializers/react_on_rails` by updating it 
 config.auto_load_bundle = true
 ```
 
+### Update `ApplicationHelper`
+Due to being dependent on `shakapacker`, pack generation logic is stored in a separate module, which must be included in your `ApplicationHelper`:
+
+```rb
+  include ReactOnRails::WebpackerHelper
+```
+
 ### Update `.gitignore` file
 React on Rails automatically generates pack files for components to be registered in the `packs/generated` directory. To avoid committing generated files into the version control system, please update `.gitignore` to have
 
