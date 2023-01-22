@@ -11,12 +11,10 @@ require "addressable/uri"
 require "react_on_rails/utils"
 require "react_on_rails/json_output"
 require "active_support/concern"
-require "webpacker"
 
 module ReactOnRails
   module Helper
     include ReactOnRails::Utils::Required
-    include Webpacker::Helper
 
     COMPONENT_HTML_KEY = "componentHtml"
 
@@ -91,26 +89,6 @@ module ReactOnRails
         MSG
         raise ReactOnRails::Error, msg
       end
-    end
-
-    def load_pack_for_component(component_name)
-      component_pack_file = generated_components_pack(component_name)
-      is_component_pack_present = File.exist?("#{component_pack_file}.jsx")
-      is_development = ENV["RAILS_ENV"] == "development"
-
-      if is_development && !is_component_pack_present
-        ReactOnRails::PacksGenerator.generate
-        raise_generated_missing_pack_warning(component_name)
-      end
-
-      ReactOnRails::PacksGenerator.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
-
-      append_javascript_pack_tag "generated/#{component_name}"
-      append_stylesheet_pack_tag "generated/#{component_name}"
-    end
-
-    def generated_components_pack(component_name)
-      "#{ReactOnRails::WebpackerUtils.webpacker_source_entry_path}/generated/#{component_name}"
     end
 
     # react_component_hash is used to return multiple HTML strings for server rendering, such as for
@@ -449,7 +427,7 @@ module ReactOnRails
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
 
-      load_pack_for_component react_component_name if render_options.auto_load_bundle
+      ApplicationController.helpers.load_pack_for_component react_component_name if render_options.auto_load_bundle
 
       {
         render_options: render_options,
@@ -552,17 +530,6 @@ module ReactOnRails
         JS
       end
       result
-    end
-
-    def raise_generated_missing_pack_warning(component_name)
-      msg = <<~MSG
-        **ERROR** ReactOnRails: Generated missing pack for Component: #{component_name}. Please refresh the webpage \
-        once webpack has finished generating the bundles. If the problem persists
-        1. Verify `components_subdirectory` is configured in `config/initializers/react_on_rails`.
-        2. Component: #{component_name} is placed inside the configured `components_subdirectory`.
-      MSG
-
-      raise ReactOnRails::Error, msg
     end
 
     def replay_console_option(val)
