@@ -29,10 +29,6 @@ module ReactOnRails
         stale_generated_files(client_files)
       end
 
-      def stale_generated_component_packs
-        stale_generated_files(component_pack_files)
-      end
-
       def stale_generated_files(files)
         manifest_needed = ReactOnRails::WebpackerUtils.using_webpacker? &&
                           !ReactOnRails::WebpackerUtils.manifest_exists?
@@ -87,14 +83,6 @@ module ReactOnRails
 
       def client_files
         @client_files ||= make_file_list(make_globs(source_path)).to_ary
-      end
-
-      def component_pack_files
-        make_file_list(make_globs(components_search_path)).to_ary
-      end
-
-      def components_search_path
-        "#{source_path}/**/#{ReactOnRails.configuration.components_subdirectory}"
       end
 
       def make_globs(dirs)
