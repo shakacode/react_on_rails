@@ -557,8 +557,7 @@ module ReactOnRails
 
     def raise_generated_missing_pack_warning(component_name)
       msg = <<~MSG
-        **ERROR** ReactOnRails: Generated missing pack for Component: #{component_name}. Please refresh the webpage \
-        once webpack has finished generating the bundles. If the problem persists
+        **ERROR** ReactOnRails: Generated missing pack for Component: #{component_name}. Please restart the webpack dev server to ensure webpack generates the chunks corresponding to #{component_name} component. If the problem persists
         1. Verify `components_subdirectory` is configured in `config/initializers/react_on_rails`.
         2. Component: #{component_name} is placed inside the configured `components_subdirectory`.
       MSG
