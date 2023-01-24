@@ -26,9 +26,8 @@ module ReactOnRails
       verify_configuration
 
       is_generated_directory_present = Dir.exist?(generated_packs_directory_path)
-      stale_packs = webpack_assets_status_checker.stale_generated_component_packs
 
-      return if is_generated_directory_present && stale_packs.empty? && missing_packs.empty?
+      return if is_generated_directory_present && stale_or_missing_packs.empty?
 
       clean_generated_packs_directory
       generate_packs
@@ -296,13 +295,14 @@ module ReactOnRails
       puts "Prepended\n#{text_to_prepend}to #{file}."
     end
 
-    def missing_packs
-      required_files = common_component_to_path.values + client_component_to_path.values
+    def stale_or_missing_packs
+      component_files = common_component_to_path.values + client_component_to_path.values
+      most_recent_mtime = WebpackAssetsStatusChecker.find_most_recent_mtime(component_files)
 
-      required_files.each_with_object([]) do |file, missing_list|
-        is_generated_pack_present = File.exist?(generated_pack_path(file))
+      component_files.each_with_object([]) do |file, missing_or_stale_list|
+        path = generated_pack_path(file)
 
-        missing_list << file unless  is_generated_pack_present
+        missing_or_stale_list << file if !File.exist?(path) || File.mtime(path) < most_recent_mtime
       end
     end
 
