@@ -298,12 +298,13 @@ module ReactOnRails
 
     def stale_or_missing_packs
       component_files = common_component_to_path.values + client_component_to_path.values
-      most_recent_mtime = WebpackAssetsStatusChecker.find_most_recent_mtime(component_files)
+      most_recent_mtime = Utils.find_most_recent_mtime(component_files)
 
       component_files.each_with_object([]) do |file, missing_or_stale_list|
         path = generated_pack_path(file)
 
         missing_or_stale_list << file if !File.exist?(path) || File.mtime(path) < most_recent_mtime
+        missing_or_stale_list
       end
     end
 
