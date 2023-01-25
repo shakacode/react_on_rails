@@ -35,7 +35,7 @@ module ReactOnRails
 
         return ["manifest.json"] if manifest_needed
 
-        most_recent_mtime = find_most_recent_mtime(files)
+        most_recent_mtime = Utils.find_most_recent_mtime(files)
         all_compiled_assets.each_with_object([]) do |webpack_generated_file, stale_gen_list|
           if !File.exist?(webpack_generated_file) ||
              File.mtime(webpack_generated_file) < most_recent_mtime
@@ -46,13 +46,6 @@ module ReactOnRails
       end
 
       private
-
-      def find_most_recent_mtime(files)
-        files.reduce(1.year.ago) do |newest_time, file|
-          mt = File.mtime(file)
-          mt > newest_time ? mt : newest_time
-        end
-      end
 
       def all_compiled_assets
         @all_compiled_assets ||= begin

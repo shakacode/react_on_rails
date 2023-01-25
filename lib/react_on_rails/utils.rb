@@ -197,5 +197,12 @@ module ReactOnRails
       rstrip = to_remove - lstrip
       str[0..(midpoint - lstrip - 1)] + TRUNCATION_FILLER + str[(midpoint + rstrip)..-1]
     end
+
+    def self.find_most_recent_mtime(files)
+      files.reduce(1.year.ago) do |newest_time, file|
+        mt = File.mtime(file)
+        mt > newest_time ? mt : newest_time
+      end
+    end
   end
 end
