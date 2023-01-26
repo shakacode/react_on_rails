@@ -9,6 +9,7 @@ module ReactOnRails
     MINIMUM_SHAKAPACKER_MAJOR_VERSION = 6
     MINIMUM_SHAKAPACKER_MINOR_VERSION = 5
     MINIMUM_SHAKAPACKER_PATCH_VERSION = 1
+    GENERATED_PACK_EXTENSION = "js".freeze
 
     def self.generate
       packs_generator = PacksGenerator.new
@@ -18,6 +19,10 @@ module ReactOnRails
     def self.raise_nested_entries_disabled
       packs_generator = PacksGenerator.new
       packs_generator.raise_nested_entries_disabled
+    end
+
+    def self.generated_pack_extension
+      GENERATED_PACK_EXTENSION
     end
 
     def verify_setup_and_generate_packs
@@ -152,7 +157,7 @@ module ReactOnRails
     end
 
     def generated_pack_path(file_path)
-      "#{generated_packs_directory_path}/#{component_name(file_path)}.js"
+      "#{generated_packs_directory_path}/#{component_name(file_path)}.#{generated_pack_extension}"
     end
 
     def component_name(file_path)

@@ -94,8 +94,8 @@ module ReactOnRails
     end
 
     def load_pack_for_component(component_name)
-      component_pack_file = generated_components_pack(component_name)
-      is_component_pack_present = File.exist?("#{component_pack_file}.jsx")
+      component_pack_file_path = "#{generated_components_pack(component_name)}.#{PacksGenerator.generated_pack_extension}"
+      is_component_pack_present = File.exist?(component_pack_file_path)
       is_development = ENV["RAILS_ENV"] == "development"
 
       if is_development && !is_component_pack_present
