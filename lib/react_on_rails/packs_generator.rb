@@ -5,11 +5,12 @@ require "fileutils"
 module ReactOnRails
   # rubocop:disable Metrics/ClassLength
   class PacksGenerator
+    mattr_reader :generated_pack_extension, default: "js"
+
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/.freeze
     MINIMUM_SHAKAPACKER_MAJOR_VERSION = 6
     MINIMUM_SHAKAPACKER_MINOR_VERSION = 5
     MINIMUM_SHAKAPACKER_PATCH_VERSION = 1
-    GENERATED_PACK_EXTENSION = "js".freeze
 
     def self.generate
       packs_generator = PacksGenerator.new
@@ -19,10 +20,6 @@ module ReactOnRails
     def self.raise_nested_entries_disabled
       packs_generator = PacksGenerator.new
       packs_generator.raise_nested_entries_disabled
-    end
-
-    def self.generated_pack_extension
-      GENERATED_PACK_EXTENSION
     end
 
     def verify_setup_and_generate_packs
