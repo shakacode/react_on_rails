@@ -116,7 +116,8 @@ module ReactOnRails
         expect(File.exist?(generated_server_bundle_file_path)).to eq(true)
       end
 
-      it "creates pack for ComponentWithCommonOnly" do
+      it "creates pack for ComponentWithCommonOnly with correct extension" do
+        expect(File.extname(component_pack)).to eq(PacksGenerator::GENERATED_PACK_EXTENSION)
         expect(File.exist?(component_pack)).to eq(true)
       end
 
@@ -229,7 +230,8 @@ module ReactOnRails
         expect(File.exist?(generated_server_bundle_file_path)).to eq(true)
       end
 
-      it "creates pack for ComponentWithClientOnly" do
+      it "creates pack for ComponentWithClientOnly with correct extension" do
+        expect(File.extname(component_pack)).to eq(PacksGenerator::GENERATED_PACK_EXTENSION)
         expect(File.exist?(component_pack)).to eq(true)
       end
 
