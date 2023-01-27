@@ -109,7 +109,7 @@ module ReactOnRails
     end
 
     def generated_components_pack_path(component_name)
-      extension = PacksGenerator.generated_pack_extension
+      extension = PacksGenerator::GENERATED_PACK_EXTENSION
 
       "#{ReactOnRails::WebpackerUtils.webpacker_source_entry_path}/generated/#{component_name}.#{extension}"
     end

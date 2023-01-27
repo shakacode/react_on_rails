@@ -5,12 +5,11 @@ require "fileutils"
 module ReactOnRails
   # rubocop:disable Metrics/ClassLength
   class PacksGenerator
-    mattr_reader :generated_pack_extension, default: "js"
-
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/.freeze
     MINIMUM_SHAKAPACKER_MAJOR_VERSION = 6
     MINIMUM_SHAKAPACKER_MINOR_VERSION = 5
     MINIMUM_SHAKAPACKER_PATCH_VERSION = 1
+    GENERATED_PACK_EXTENSION = "js"
 
     def self.generate
       packs_generator = PacksGenerator.new
@@ -154,7 +153,7 @@ module ReactOnRails
     end
 
     def generated_pack_path(file_path)
-      "#{generated_packs_directory_path}/#{component_name(file_path)}.#{generated_pack_extension}"
+      "#{generated_packs_directory_path}/#{component_name(file_path)}.#{GENERATED_PACK_EXTENSION}"
     end
 
     def component_name(file_path)
