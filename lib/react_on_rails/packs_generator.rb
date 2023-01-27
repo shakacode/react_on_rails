@@ -27,7 +27,7 @@ module ReactOnRails
 
       is_generated_directory_present = Dir.exist?(generated_packs_directory_path)
 
-      return if is_generated_directory_present && stale_or_missing_packs.empty?
+      return if is_generated_directory_present && !stale_or_missing_packs?
 
       clean_generated_packs_directory
       generate_packs
@@ -295,15 +295,14 @@ module ReactOnRails
       puts "Prepended\n#{text_to_prepend}to #{file}."
     end
 
-    def stale_or_missing_packs
+    def stale_or_missing_packs?
       component_files = common_component_to_path.values + client_component_to_path.values
       most_recent_mtime = Utils.find_most_recent_mtime(component_files)
 
-      component_files.each_with_object([]) do |file, missing_or_stale_list|
+      component_files.each_with_object([]).any? do |file|
         path = generated_pack_path(file)
 
-        missing_or_stale_list << file if !File.exist?(path) || File.mtime(path) < most_recent_mtime
-        missing_or_stale_list
+        !File.exist?(path) || File.mtime(path) < most_recent_mtime
       end
     end
 
