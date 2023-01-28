@@ -4,6 +4,8 @@ require_relative "rails_helper"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRails
+  GENERATED_PACKS_CONSOLE_OUTPUT_TEXT = "Generated Packs:"
+
   # rubocop:disable Metrics/BlockLength
   describe PacksGenerator do
     let(:webpacker_source_path) { File.expand_path("fixtures/automated_packs_generation", __dir__) }
@@ -249,6 +251,45 @@ module ReactOnRails
         expect(generated_server_bundle_content).not_to include("#{component_name}.jsx")
         expect(generated_server_bundle_content).not_to include("#{component_name}.client.jsx")
         expect(generated_server_bundle_content).not_to include("#{component_name}.server.jsx")
+      end
+    end
+
+    context "when pack generator is called" do
+      let(:component_name) { "ComponentWithCommonOnly" }
+      let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
+
+      before do
+        stub_webpacker_source_path(component_name: component_name,
+                                   webpacker_source_path: webpacker_source_path)
+      end
+
+      it "does not generate packs if there are no new components or stale files" do
+        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
+
+        expect { described_class.generate }.not_to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
+      end
+
+      it "generate packs if a new component is added" do
+        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
+
+        create_new_component("NewComponent")
+
+        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
+      end
+
+      it "generate packs if an old component is updated" do
+        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
+
+        create_new_component(component_name)
+
+        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
+      end
+
+      def create_new_component(name)
+        components_subdirectory = ReactOnRails.configuration.components_subdirectory
+        path = "#{webpacker_source_path}/components/#{component_name}/#{components_subdirectory}/#{name}.jsx"
+
+        File.write(path, "// Empty Test Component\n")
       end
     end
 

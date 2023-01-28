@@ -24,13 +24,11 @@ module ReactOnRails
     def verify_setup_and_generate_packs
       return unless components_subdirectory.present?
 
-      raise_webpacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
-      raise_shakapacker_version_incompatible unless shackapacker_version_requirement_met?
-      raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
+      verify_configuration
 
       is_generated_directory_present = Dir.exist?(generated_packs_directory_path)
 
-      return if is_generated_directory_present && webpack_assets_status_checker.stale_generated_component_packs.empty?
+      return if is_generated_directory_present && !stale_or_missing_packs?
 
       clean_generated_packs_directory
       generate_packs
@@ -296,6 +294,23 @@ module ReactOnRails
       content_with_prepended_text = text_to_prepend + file_content
       File.write(file, content_with_prepended_text)
       puts "Prepended\n#{text_to_prepend}to #{file}."
+    end
+
+    def stale_or_missing_packs?
+      component_files = common_component_to_path.values + client_component_to_path.values
+      most_recent_mtime = Utils.find_most_recent_mtime(component_files)
+
+      component_files.each_with_object([]).any? do |file|
+        path = generated_pack_path(file)
+
+        !File.exist?(path) || File.mtime(path) < most_recent_mtime
+      end
+    end
+
+    def verify_configuration
+      raise_webpacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
+      raise_shakapacker_version_incompatible unless shackapacker_version_requirement_met?
+      raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
     end
   end
   # rubocop:enable Metrics/ClassLength

@@ -29,17 +29,13 @@ module ReactOnRails
         stale_generated_files(client_files)
       end
 
-      def stale_generated_component_packs
-        stale_generated_files(component_pack_files)
-      end
-
       def stale_generated_files(files)
         manifest_needed = ReactOnRails::WebpackerUtils.using_webpacker? &&
                           !ReactOnRails::WebpackerUtils.manifest_exists?
 
         return ["manifest.json"] if manifest_needed
 
-        most_recent_mtime = find_most_recent_mtime(files)
+        most_recent_mtime = Utils.find_most_recent_mtime(files)
         all_compiled_assets.each_with_object([]) do |webpack_generated_file, stale_gen_list|
           if !File.exist?(webpack_generated_file) ||
              File.mtime(webpack_generated_file) < most_recent_mtime
@@ -50,13 +46,6 @@ module ReactOnRails
       end
 
       private
-
-      def find_most_recent_mtime(files)
-        files.reduce(1.year.ago) do |newest_time, file|
-          mt = File.mtime(file)
-          mt > newest_time ? mt : newest_time
-        end
-      end
 
       def all_compiled_assets
         @all_compiled_assets ||= begin
@@ -87,14 +76,6 @@ module ReactOnRails
 
       def client_files
         @client_files ||= make_file_list(make_globs(source_path)).to_ary
-      end
-
-      def component_pack_files
-        make_file_list(make_globs(components_search_path)).to_ary
-      end
-
-      def components_search_path
-        "#{source_path}/**/#{ReactOnRails.configuration.components_subdirectory}"
       end
 
       def make_globs(dirs)
