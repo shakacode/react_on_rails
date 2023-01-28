@@ -99,7 +99,7 @@ module ReactOnRails
 
       if is_development && !is_component_pack_present
         ReactOnRails::PacksGenerator.generate
-        raise_generated_missing_pack_warning(component_name)
+        raise_missing_pack_error(component_name)
       end
 
       ReactOnRails::PacksGenerator.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
@@ -555,7 +555,7 @@ module ReactOnRails
       result
     end
 
-    def raise_generated_missing_pack_warning(component_name)
+    def raise_missing_pack_error(component_name)
       msg = <<~MSG
         **ERROR** ReactOnRails: Generated missing pack for Component: #{component_name}. Please restart the webpack dev server or webpack in watch mode, to ensure webpack generates the chunks corresponding to #{component_name} component. If the problem persists
         1. Verify `components_subdirectory` is configured in `config/initializers/react_on_rails`.
