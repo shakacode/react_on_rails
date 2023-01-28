@@ -54,6 +54,9 @@
     "react": ">= 16",
     "react-dom": ">= 16"
   },
+  "resolutions": {
+    "ansi-regex": "^3.0.1"
+  },
   "files": [
     "node_package/lib",
     "webpackConfigLoader.js"
