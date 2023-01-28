@@ -8,7 +8,7 @@ jobs:
       matrix:
         ruby: [2.7]
         node: [14]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v2
     - name: Setup Ruby
@@ -32,12 +32,12 @@ jobs:
       uses: actions/cache@v2
       with:
         path: node_modules
-        key: v4-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+        key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
     - name: Save root ruby gems to cache
       uses: actions/cache@v2
       with:
         path: vendor/bundle
-        key: v4-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
+        key: v5-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji

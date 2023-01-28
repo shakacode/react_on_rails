@@ -9,36 +9,35 @@ module ReactOnRails
     MINIMUM_SHAKAPACKER_MAJOR_VERSION = 6
     MINIMUM_SHAKAPACKER_MINOR_VERSION = 5
     MINIMUM_SHAKAPACKER_PATCH_VERSION = 1
+    GENERATED_PACK_EXTENSION = "js"
 
     def self.generate
       packs_generator = PacksGenerator.new
       packs_generator.verify_setup_and_generate_packs
     end
 
-    def self.raise_nested_enteries_disabled
+    def self.raise_nested_entries_disabled
       packs_generator = PacksGenerator.new
-      packs_generator.raise_nested_enteries_disabled
+      packs_generator.raise_nested_entries_disabled
     end
 
     def verify_setup_and_generate_packs
       return unless components_subdirectory.present?
 
-      raise_webpacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
-      raise_shakapacker_version_incompatible unless shackapacker_version_requirement_met?
-      raise_nested_enteries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
+      verify_configuration
 
       is_generated_directory_present = Dir.exist?(generated_packs_directory_path)
 
-      return if is_generated_directory_present && webpack_assets_status_checker.stale_generated_component_packs.empty?
+      return if is_generated_directory_present && !stale_or_missing_packs?
 
       clean_generated_packs_directory
       generate_packs
     end
 
-    def raise_nested_enteries_disabled
+    def raise_nested_entries_disabled
       msg = <<~MSG
         **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
-        webpacker.yml to enable nested enteries. for more information read
+        webpacker.yml to enable nested entries. for more information read
         https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
       MSG
 
@@ -103,7 +102,8 @@ module ReactOnRails
       relative_path_to_generated_server_bundle = relative_path(defined_server_bundle_file_path,
                                                                generated_server_bundle_file_path)
       content = <<~FILE_CONTENT
-        import "./#{relative_path_to_generated_server_bundle}"\n
+        // import statement added by react_on_rails:generate_packs rake task
+        import "./#{relative_path_to_generated_server_bundle}"
       FILE_CONTENT
 
       prepend_to_file_if_not_present(defined_server_bundle_file_path, content)
@@ -124,7 +124,8 @@ module ReactOnRails
     end
 
     def defined_server_bundle_file_path
-      ReactOnRails::Utils.server_bundle_js_file_path
+      Rails.root.join(ReactOnRails::WebpackerUtils.webpacker_source_entry_path,
+                      ReactOnRails.configuration.server_bundle_js_file)
     end
 
     def generated_packs_directory_path
@@ -150,7 +151,7 @@ module ReactOnRails
     end
 
     def generated_pack_path(file_path)
-      "#{generated_packs_directory_path}/#{component_name(file_path)}.jsx"
+      "#{generated_packs_directory_path}/#{component_name(file_path)}.#{GENERATED_PACK_EXTENSION}"
     end
 
     def component_name(file_path)
@@ -292,6 +293,24 @@ module ReactOnRails
 
       content_with_prepended_text = text_to_prepend + file_content
       File.write(file, content_with_prepended_text)
+      puts "Prepended\n#{text_to_prepend}to #{file}."
+    end
+
+    def stale_or_missing_packs?
+      component_files = common_component_to_path.values + client_component_to_path.values
+      most_recent_mtime = Utils.find_most_recent_mtime(component_files)
+
+      component_files.each_with_object([]).any? do |file|
+        path = generated_pack_path(file)
+
+        !File.exist?(path) || File.mtime(path) < most_recent_mtime
+      end
+    end
+
+    def verify_configuration
+      raise_webpacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
+      raise_shakapacker_version_incompatible unless shackapacker_version_requirement_met?
+      raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
     end
   end
   # rubocop:enable Metrics/ClassLength

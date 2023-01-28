@@ -8,7 +8,7 @@ jobs:
       matrix:
         ruby: [2.7]
         node: [14]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v2
     - name: Setup Ruby
@@ -28,7 +28,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: vendor/bundle
-        key: v4-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
+        key: v5-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
     - name: Install Ruby Gems for package
       run: bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
     - name: Run rspec tests

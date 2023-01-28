@@ -2,6 +2,7 @@ module.exports = function (api) {
   const defaultConfigFunc = require('shakapacker/package/babel/preset.js');
   const resultConfig = defaultConfigFunc(api);
   const isProductionEnv = api.env('production');
+  const isDevelopmentEnv = api.env('development');
 
   const changesOnDefault = {
     presets: [
@@ -15,7 +16,7 @@ module.exports = function (api) {
     ].filter(Boolean),
     plugins: [
       process.env.WEBPACK_SERVE && 'react-refresh/babel',
-      isProductionEnv && [
+      !isDevelopmentEnv && [
         'babel-plugin-transform-react-remove-prop-types',
         {
           removeImport: true,

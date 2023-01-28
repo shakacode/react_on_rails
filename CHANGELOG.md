@@ -17,8 +17,22 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [13.3.0] - 2022-01-28
+### Fixed
+- Fixed pack not found warning while using `react_component` and `react_component_hash` helpers, even when corresponding chunks are present. [PR 1511](https://github.com/shakacode/react_on_rails/pull/1511) by [pulkitkkr](https://github.com/pulkitkkr)
+- Fixed FS-based packs generation functionality to trigger pack generation  on the creation of a new react component inside `components_subdirectory`. [PR 1506](https://github.com/shakacode/react_on_rails/pull/1506) by [pulkitkkr](https://github.com/pulkitkkr)
+
 ### Added
-- Exposed `reactHydrateOrRender` utility via [PR 1481](https://github.com/shakacode/react_on_rails/pull/1481)
+- Added `./bin/dev` and `./bin/dev-static` executables to ease and standardize running the dev server. [PR 1491](https://github.com/shakacode/react_on_rails/pull/1491) by [ahangarha](https://github.com/ahangarha)
+
+### [13.2.0] - 2022-12-23
+                                           
+### Fixed
+- Fix reactOnRailsPageUnloaded when there is no component on the page. Important for apps using both hotwire and react_on_rails. [PR 1498](https://github.com/shakacode/react_on_rails/pull/1498) by [NhanHo](https://github.com/NhanHo).
+- Fixing wrong type. The throwIfMissing param of getStore should be optional as it defaults to true. [PR 1480](https://github.com/shakacode/react_on_rails/pull/1480) by [wouldntsavezion](https://github.com/wouldntsavezion).
+
+### Added
+- Exposed `reactHydrateOrRender` utility via [PR 1481](https://github.com/shakacode/react_on_rails/pull/1481) by [vaukalak](https://github.com/vaukalak).
 - Optimized `ReactOnRails::TestHelper`'s RSpec integration using
   `when_first_matching_example_defined` via [PR 1496](https://github.com/shakacode/react_on_rails/pull/1496)
 
@@ -1047,7 +1061,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.0.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.2.0...master
+[13.2.0]: https://github.com/shakacode/react_on_rails/compare/13.1.0...13.2.0
 [13.1.0]: https://github.com/shakacode/react_on_rails/compare/13.0.2...13.1.0
 [13.0.2]: https://github.com/shakacode/react_on_rails/compare/13.0.1...13.0.2
 [13.0.1]: https://github.com/shakacode/react_on_rails/compare/13.0.0...13.0.1

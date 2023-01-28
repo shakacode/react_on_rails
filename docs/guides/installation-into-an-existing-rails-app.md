@@ -7,48 +7,46 @@
 1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `package.json` file.
 
    ```ruby
-   gem "react_on_rails", "12.0.0" # Update to the current version
-   gem "webpacker", "~> 5"
+   gem "react_on_rails", "13.1.0" # Use the latest and the exact version
+   gem "shakapacker", "6.5.4"
    ```
 
-1. Add the webpacker and react_on_rails gems
-_Use the latest version for react_on_rails._
+   Or use `bundle add`:
 
-```
-bundle add webpacker                 
-bundle add react_on_rails --version=12.0.4 --strict
-```
+   ```bash
+   bundle add react_on_rails --version=13.1.0 --strict
+   bundle add shakapacker --strict
+   ```
 
 2. Run the following 2 commands to install Webpacker with React. Note, if you are using an older version of Rails than 5.1, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
 
    ```bash
-   bundle exec rails webpacker:install
-   bundle exec rails webpacker:install:react
+   rails webpacker:install
    ```
 
 3. Commit this to git (or else you cannot run the generator unless you pass the option `--ignore-warnings`).
 
-4. See help for the generator:
+4. Run the generator with a simple "Hello World" example (more options below):
 
    ```bash
-   $ rails generate react_on_rails:install --help
+   rails generate react_on_rails:install
    ```
 
-5. Run the generator with a simple "Hello World" example (more options below):
+   For more information about this generator use `--help` option:
 
    ```bash
-   $ rails generate react_on_rails:install
+   rails generate react_on_rails:install --help
    ```
+5. Ensure that you have `overmind` or `foreman` installed
 
-6. Ensure that you have `foreman` installed: `gem install foreman`.
-
-7. Start your Rails server:
+6. Start your Rails server:
 
    ```bash
-   $ foreman start -f Procfile.dev
+   ./bin/dev
    ```
+   Note: `foreman` defaults to PORT 5000 unless you set the value of PORT in your environment. For example, you can `export PORT=3000` to use the Rails default port of 3000. For the hello_world example this is already set.
 
-8. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world). Note: `foreman` defaults to PORT 5000 unless you set the value of PORT in your environment. For example, you can `export PORT=3000` to use the Rails default port of 3000. For the hello_world example this is already set.
+7. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world).
 
 ## Installation
 
@@ -60,7 +58,7 @@ See the [Installation Overview](https://www.shakacode.com/react-on-rails/docs/ad
 All JavaScript in React On Rails is loaded from npm: [react-on-rails](https://www.npmjs.com/package/react-on-rails). To manually install this (you did not use the generator), assuming you have a standard configuration, run this command (assuming you are in the directory where you have your `node_modules`):
 
 ```bash
-$ yarn add react-on-rails --exact
+yarn add react-on-rails --exact
 ```
 
 That will install the latest version and update your package.json. **NOTE:** the `--exact` flag will ensure that you do not have a "~" or "^" for your react-on-rails version in your package.json.

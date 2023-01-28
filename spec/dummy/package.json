@@ -7,15 +7,16 @@
   },
   "private": true,
   "dependencies": {
-    "@babel/core": "7",
-    "@babel/plugin-transform-runtime": "7",
+    "@babel/core": "7.17.9",
+    "@babel/plugin-transform-runtime": "7.17.0",
     "@babel/preset-env": "7",
     "@babel/preset-react": "^7.10.4",
-    "@babel/runtime": "7",
+    "@babel/runtime": "7.17.9",
     "@rescript/react": "^0.10.3",
-    "babel-loader": "8",
+    "babel-loader": "8.2.4",
     "babel-plugin-macros": "^3.1.0",
     "babel-plugin-module-resolver": "^4.0.0",
+    "babel-plugin-transform-react-remove-prop-types": "^0.4.24",
     "compression-webpack-plugin": "9",
     "core-js": "3",
     "create-react-class": "^15.6.3",
@@ -49,11 +50,11 @@
     "sass": "^1.43.4",
     "sass-loader": "^12.3.0",
     "sass-resources-loader": "^2.1.0",
-    "shakapacker": "^6.4.1",
+    "shakapacker": "6.5.1",
     "style-loader": "^3.3.1",
-    "terser-webpack-plugin": "5",
+    "terser-webpack-plugin": "5.3.1",
     "url-loader": "^4.0.0",
-    "webpack": "5",
+    "webpack": "5.72.0",
     "webpack-assets-manifest": "5",
     "webpack-cli": "4",
     "webpack-merge": "5"
@@ -64,7 +65,7 @@
     "@types/react-dom": "^18.0.5",
     "@types/react-helmet": "^6.1.5",
     "react-refresh": "^0.11.0",
-    "webpack-dev-server": "^4.7.3"
+    "webpack-dev-server": "^4.9.0"
   },
   "browser": {
     "fs": false

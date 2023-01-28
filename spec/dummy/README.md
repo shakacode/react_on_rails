@@ -24,7 +24,7 @@ yalc link react-on-rails
 cd react_on_rails
 yarn run dummy:install 
 cd spec/dummy
-yarn rescript:build
+yarn build:rescript
 ```
 
 # Starting the Sample App

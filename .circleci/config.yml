@@ -206,6 +206,9 @@ jobs:
       - run: *install-dummy-app-node-modules
       - run: *install-dummy-app-ruby-gems
       - run:
+          name: generate file system-based packs
+          command: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+      - run:
           name: Build test bundles for dummy app
           command: cd spec/dummy && yarn run build:test
       - save_cache:
@@ -269,12 +272,12 @@ jobs:
           name: Prep for CI
           # TODO -- need to leverage Circle CI containers
           command: |
-            bundle exec rake prepare_for_ci
+            bundle exec rails prepare_for_ci
       - run:
           name: Main CI
           # TODO -- need to leverage Circle CI containers
           command: |
-            bundle exec rake run_rspec:all_dummy
+            bundle exec rails run_rspec:all_dummy
       # The following step will run only if the main job is finished successfully.
       # Build hook is triggered by curl command described here https://docs.netlify.com/configure-builds/build-hooks/
       # NETLIFY_HOOK is an environment variable on CircleCI to keep sensitive data outside the repo

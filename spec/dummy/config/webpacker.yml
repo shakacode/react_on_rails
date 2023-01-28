@@ -7,6 +7,7 @@ default: &default
 
   cache_path: tmp/cache/webpacker
   webpack_compile_output: false
+  ensure_consistent_versioning: true
 
   # Additional paths webpack should lookup modules
   # ['app/assets', 'engine/foo/app/assets']
@@ -14,6 +15,7 @@ default: &default
 
   # Reload manifest.json on all requests so we reload latest compiled packs
   cache_manifest: false
+  nested_entries: true
 
 development:
   <<: *default
