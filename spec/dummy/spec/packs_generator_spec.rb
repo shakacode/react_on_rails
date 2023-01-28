@@ -4,7 +4,7 @@ require_relative "rails_helper"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRails
-  GENERATED_PACKS_CONSOLE_OUTPUT_TEXT= "Generated Packs:"
+  GENERATED_PACKS_CONSOLE_OUTPUT_TEXT = "Generated Packs:"
 
   # rubocop:disable Metrics/BlockLength
   describe PacksGenerator do
