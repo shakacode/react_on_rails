@@ -4,7 +4,7 @@ require_relative "rails_helper"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRails
-  GENERATED_PACKS_OUTPUT_REGEX = /Generated Packs:/.freeze
+  GENERATED_PACKS_CONSOLE_OUTPUT_TEXT= "Generated Packs:"
 
   # rubocop:disable Metrics/BlockLength
   describe PacksGenerator do
@@ -264,25 +264,25 @@ module ReactOnRails
       end
 
       it "does not generate packs if there are no new components or stale files" do
-        expect { described_class.generate }.to output(GENERATED_PACKS_OUTPUT_REGEX).to_stdout
+        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
 
-        expect { described_class.generate }.not_to output(GENERATED_PACKS_OUTPUT_REGEX).to_stdout
+        expect { described_class.generate }.not_to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
       end
 
       it "generate packs if a new component is added" do
-        expect { described_class.generate }.to output(GENERATED_PACKS_OUTPUT_REGEX).to_stdout
+        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
 
         create_new_component("NewComponent")
 
-        expect { described_class.generate }.to output(GENERATED_PACKS_OUTPUT_REGEX).to_stdout
+        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
       end
 
       it "generate packs if an old component is updated" do
-        expect { described_class.generate }.to output(GENERATED_PACKS_OUTPUT_REGEX).to_stdout
+        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
 
         create_new_component(component_name)
 
-        expect { described_class.generate }.to output(GENERATED_PACKS_OUTPUT_REGEX).to_stdout
+        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
       end
 
       def create_new_component(name)
