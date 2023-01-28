@@ -10,6 +10,9 @@ describe ReactOnRails::TestHelper::EnsureAssetsCompiled do
 
     before do
       allow(ReactOnRails::WebpackerUtils).to receive(:check_manifest_not_cached).and_return(nil)
+      double_packs = instance_double(ReactOnRails::PacksGenerator)
+      allow(ReactOnRails::PacksGenerator).to receive(:instance).and_return(double_packs)
+      allow(double_packs).to receive(:verify_setup_and_generate_packs)
     end
 
     context "when assets are not up to date" do
