@@ -9,6 +9,7 @@ module ReactOnRails
     MINIMUM_SHAKAPACKER_MAJOR_VERSION = 6
     MINIMUM_SHAKAPACKER_MINOR_VERSION = 5
     MINIMUM_SHAKAPACKER_PATCH_VERSION = 1
+    GENERATED_PACK_EXTENSION = "js"
 
     def self.generate
       packs_generator = PacksGenerator.new
@@ -152,7 +153,7 @@ module ReactOnRails
     end
 
     def generated_pack_path(file_path)
-      "#{generated_packs_directory_path}/#{component_name(file_path)}.js"
+      "#{generated_packs_directory_path}/#{component_name(file_path)}.#{GENERATED_PACK_EXTENSION}"
     end
 
     def component_name(file_path)

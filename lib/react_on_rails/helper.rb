@@ -94,8 +94,7 @@ module ReactOnRails
     end
 
     def load_pack_for_component(component_name)
-      component_pack_file = generated_components_pack(component_name)
-      is_component_pack_present = File.exist?("#{component_pack_file}.jsx")
+      is_component_pack_present = File.exist?(generated_components_pack_path(component_name))
       is_development = ENV["RAILS_ENV"] == "development"
 
       if is_development && !is_component_pack_present
@@ -109,8 +108,10 @@ module ReactOnRails
       append_stylesheet_pack_tag "generated/#{component_name}"
     end
 
-    def generated_components_pack(component_name)
-      "#{ReactOnRails::WebpackerUtils.webpacker_source_entry_path}/generated/#{component_name}"
+    def generated_components_pack_path(component_name)
+      extension = PacksGenerator::GENERATED_PACK_EXTENSION
+
+      "#{ReactOnRails::WebpackerUtils.webpacker_source_entry_path}/generated/#{component_name}.#{extension}"
     end
 
     # react_component_hash is used to return multiple HTML strings for server rendering, such as for
