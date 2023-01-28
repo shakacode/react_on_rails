@@ -7,7 +7,6 @@ PATH
       execjs (~> 2.5)
       rails (>= 5.2)
       rainbow (~> 3.0)
-      shakapacker (~> 6.5)
 
 GEM
   remote: https://rubygems.org/

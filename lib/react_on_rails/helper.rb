@@ -11,12 +11,10 @@ require "addressable/uri"
 require "react_on_rails/utils"
 require "react_on_rails/json_output"
 require "active_support/concern"
-require "webpacker"
 
 module ReactOnRails
   module Helper
     include ReactOnRails::Utils::Required
-    include Webpacker::Helper
 
     COMPONENT_HTML_KEY = "componentHtml"
 
@@ -99,14 +97,12 @@ module ReactOnRails
       is_development = ENV["RAILS_ENV"] == "development"
 
       if is_development && !is_component_pack_present
-        ReactOnRails::PacksGenerator.generate
+        ReactOnRails::PacksGenerator.instance.verify_setup_and_generate_packs
         raise_generated_missing_pack_warning(component_name)
       end
 
-      ReactOnRails::PacksGenerator.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
-
-      append_javascript_pack_tag "generated/#{component_name}"
-      append_stylesheet_pack_tag "generated/#{component_name}"
+      ApplicationController.helpers.append_javascript_pack_tag "generated/#{component_name}"
+      ApplicationController.helpers.append_stylesheet_pack_tag "generated/#{component_name}"
     end
 
     def generated_components_pack(component_name)

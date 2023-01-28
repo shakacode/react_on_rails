@@ -197,5 +197,24 @@ module ReactOnRails
       rstrip = to_remove - lstrip
       str[0..(midpoint - lstrip - 1)] + TRUNCATION_FILLER + str[(midpoint + rstrip)..-1]
     end
+
+    def self.prepend_to_file_if_text_not_present(file, text_to_prepend)
+      if File.exist?(file)
+        file_content = File.read(file)
+
+        return if file_content.include?(text_to_prepend)
+
+        content_with_prepended_text = text_to_prepend + file_content
+        File.write(file, content_with_prepended_text, mode: "w")
+      else
+        File.write(file, text_to_prepend, mode: "w+")
+      end
+
+      puts "Prepended\n#{text_to_prepend}to #{file}."
+    end
+
+    def self.semver_to_string(ary)
+      "#{ary[0]}.#{ary[1]}.#{ary[2]}"
+    end
   end
 end

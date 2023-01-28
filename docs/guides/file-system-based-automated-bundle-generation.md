@@ -180,6 +180,8 @@ The default value of the `auto_load_bundle` parameter can be specified by settin
 
 If server rendering is enabled, the component will be registered for usage both in server and client rendering. In order to have separate definitions for client and server rendering, name the component files as `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file.
 
+Once generated, all server entrypoints will be imported into a file named `[ReactOnRails.configuration.server_bundle_js_file]-generated.js`, which in turn will be imported into a source file named the same as `ReactOnRails.configuration.server_bundle_js_file`. If your server bundling logic is such that your server bundle source entrypoint is not named the same as your `ReactOnRails.configuration.server_bundle_js_file` & changing it would be difficult, please let us know.
+
 *Note: If specifying separate definitions for client and server rendering, please make sure to delete the generalized `ComponentName.jsx` file.*
 
 ### Using Automated Bundle Generation Feature with already defined packs
