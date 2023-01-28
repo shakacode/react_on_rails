@@ -47,6 +47,11 @@ for all client files, including your sources and node_modules.
 # NOTE: you typically will leave the commented out configurations set to their defaults.
 # Thus, you only need to pay careful attention to the non-commented settings in this file.
 ReactOnRails.configure do |config|
+  # You can optionally add values to your rails_context. This object is passed
+  # every time a component renders.
+  # See below for an example definition of RenderingExtension
+  config.rendering_extension = RenderingExtension
+  
   # `trace`: General debugging flag.
   # The default is true for development, off otherwise.
   # With true, you get detailed logs of rendering and stack traces if you call setTimout,
@@ -99,6 +104,11 @@ ReactOnRails.configure do |config|
   # If you are hashing this file (supposing you are using the same file for client rendering), then
   # you should include a name that matches your bundle name in your webpack config.
   config.server_bundle_js_file = "server-bundle.js"
+  
+  # `prerender` means server-side rendering
+  # default is false. This is an option for view helpers `render_component` and `render_component_hash`.
+  # Set to true to change the default value to true. 
+  config.prerender = false
 
   # THE BELOW OPTIONS FOR SERVER-SIDE RENDERING RARELY NEED CHANGING
   #
@@ -158,14 +168,19 @@ ReactOnRails.configure do |config|
   ################################################################################
   ################################################################################
   # FILE SYSTEM BASED COMPONENT REGISTRY
+  # `render_component` and `render_component_hash` view helper methods can
+  # auto-load the bundle for the generated component, to avoid having to specify the
+  # bundle manually for each view with the component.
   ################################################################################
   # components_subdirectory is the name of the subdirectory matched to detect and register components automatically
   # The default is nil. You can enable the feature by updating it in the next line.
-  config.components_subdirectory = "ror_components"
+  config.components_subdirectory = nil
+  # Change to a value like this example to enable this feature 
+  # config.components_subdirectory = "ror_components"
 
-  # For automated component registry, `render_component` view helper method tries to load bundle for component from
-  # generated directory. default is false, you can pass option at the time of individual usage or update the default
-  # in the following line
+  # Default configuration to auto loading bundles for components.
+  # default is false. The default can be overrident as an option in calls to view helpers
+  # `render_component` and `render_component_hash`. You may set to true to change the default to auto loading.
   config.auto_load_bundle = false
 
   ################################################################################
@@ -187,20 +202,6 @@ ReactOnRails.configure do |config|
   # Possible output formats are js and json
   # The default format is json
   config.i18n_output_format = 'json'
-
-  ################################################################################
-  ################################################################################
-  # CLIENT RENDERING OPTIONS
-  # Below options can be overridden by passing options to the react_on_rails
-  # `render_component` view helper method.
-  ################################################################################
-  # default is false
-  config.prerender = false
-
-  # You can optionally add values to your rails_context. This object is passed
-  # every time a component renders.
-  # See below for an example definition of RenderingExtension
-  config.rendering_extension = RenderingExtension
 
   ################################################################################
   ################################################################################
