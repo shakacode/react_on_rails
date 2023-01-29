@@ -17,13 +17,11 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
-### Fixed
-- Upgrade several JS dependencies to fix security issues. [PR 1514](https://github.com/shakacode/react_on_rails/pull/1514) by [ahangarha](https://github.com/ahangarha)
-
-### [13.3.0] - 2022-01-28
+### [13.3.0] - 2022-01-29
 ### Fixed
 - Fixed pack not found warning while using `react_component` and `react_component_hash` helpers, even when corresponding chunks are present. [PR 1511](https://github.com/shakacode/react_on_rails/pull/1511) by [pulkitkkr](https://github.com/pulkitkkr)
 - Fixed FS-based packs generation functionality to trigger pack generation  on the creation of a new react component inside `components_subdirectory`. [PR 1506](https://github.com/shakacode/react_on_rails/pull/1506) by [pulkitkkr](https://github.com/pulkitkkr)
+- Upgrade several JS dependencies to fix security issues. [PR 1514](https://github.com/shakacode/react_on_rails/pull/1514) by [ahangarha](https://github.com/ahangarha)
 
 ### Added
 - Added `./bin/dev` and `./bin/dev-static` executables to ease and standardize running the dev server. [PR 1491](https://github.com/shakacode/react_on_rails/pull/1491) by [ahangarha](https://github.com/ahangarha)
@@ -1062,7 +1060,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.2.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.3.0...master
+[13.3.0]: https://github.com/shakacode/react_on_rails/compare/13.2.0...13.3.0
 [13.2.0]: https://github.com/shakacode/react_on_rails/compare/13.1.0...13.2.0
 [13.1.0]: https://github.com/shakacode/react_on_rails/compare/13.0.2...13.1.0
 [13.0.2]: https://github.com/shakacode/react_on_rails/compare/13.0.1...13.0.2
