@@ -205,20 +205,27 @@ module ReactOnRails
       expect(ReactOnRails.configuration.random_dom_id).to eq(false)
     end
 
-    it "changes the configuration of the gem, such as setting the auto_load_bundle option to false" do
-      ReactOnRails.configure do |config|
-        config.auto_load_bundle = false
-      end
-
-      expect(ReactOnRails.configuration.auto_load_bundle).to eq(false)
+    it "calls raise_missing_components_subdirectory if auto_load_bundle = true & components_subdirectory is not set" do
+      expect do
+        ReactOnRails.configure do |config|
+          config.auto_load_bundle = true
+        end
+      end.to raise_error(ReactOnRails::Error, /components_subdirectory is unconfigured/)
     end
 
-    it "changes the configuration of the gem, such as setting the auto_load_bundle option to true" do
+    it "checks that autobundling requirements are met if configuration options for autobundling are set" do
+      allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
+      allow(ReactOnRails::WebpackerUtils).to receive(:shackapacker_version_requirement_met?).and_return(true)
+      allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(true)
+
       ReactOnRails.configure do |config|
         config.auto_load_bundle = true
+        config.components_subdirectory = "something"
       end
 
-      expect(ReactOnRails.configuration.auto_load_bundle).to eq(true)
+      expect(ReactOnRails::WebpackerUtils).to have_received(:using_webpacker?).thrice
+      expect(ReactOnRails::WebpackerUtils).to have_received(:shackapacker_version_requirement_met?)
+      expect(ReactOnRails::WebpackerUtils).to have_received(:nested_entries?)
     end
 
     it "has a default configuration of the gem" do

@@ -111,6 +111,7 @@ module ReactOnRails
 
     # on ReactOnRails
     def setup_config_values
+      check_autobundling_requirements_if_configured
       ensure_webpack_generated_files_exists
       configure_generated_assets_dirs_deprecation
       configure_skip_display_none_deprecation
@@ -122,6 +123,18 @@ module ReactOnRails
     end
 
     private
+
+    def check_autobundling_requirements_if_configured
+      raise_missing_components_subdirectory if auto_load_bundle && !components_subdirectory.present?
+      return unless components_subdirectory.present?
+
+      ReactOnRails::WebpackerUtils.raise_shakapacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
+      ReactOnRails::WebpackerUtils.raise_shakapacker_version_incompatible_for_autobundling unless
+        ReactOnRails::WebpackerUtils.shackapacker_version_requirement_met?(
+          ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION
+        )
+      ReactOnRails::WebpackerUtils.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
+    end
 
     def adjust_precompile_task
       skip_react_on_rails_precompile = %w[no false n f].include?(ENV["REACT_ON_RAILS_PRECOMPILE"])
@@ -242,6 +255,16 @@ module ReactOnRails
       return if skip_display_none.nil?
 
       Rails.logger.warn "[DEPRECATION] ReactOnRails: remove skip_display_none from configuration."
+    end
+
+    def raise_missing_components_subdirectory
+      msg = <<~MSG
+        **ERROR** ReactOnRails: auto_load_bundle is set to true, yet components_subdirectory is unconfigured.\
+        Please set components_subdirectory to the desired directory.  For more information, please see \
+        https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+      MSG
+
+      raise ReactOnRails::Error, msg
     end
   end
 end

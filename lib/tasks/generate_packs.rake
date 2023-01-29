@@ -6,6 +6,6 @@ namespace :react_on_rails do
   DESC
 
   task generate_packs: :environment do
-    ReactOnRails::PacksGenerator.generate
+    ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
   end
 end

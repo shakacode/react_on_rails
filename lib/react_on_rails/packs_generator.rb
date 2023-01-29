@@ -6,42 +6,21 @@ module ReactOnRails
   # rubocop:disable Metrics/ClassLength
   class PacksGenerator
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/.freeze
-    MINIMUM_SHAKAPACKER_MAJOR_VERSION = 6
-    MINIMUM_SHAKAPACKER_MINOR_VERSION = 5
-    MINIMUM_SHAKAPACKER_PATCH_VERSION = 1
-    GENERATED_PACK_EXTENSION = "js"
+    MINIMUM_SHAKAPACKER_VERSION = [6, 5, 1].freeze
 
-    def self.generate
-      packs_generator = PacksGenerator.new
-      packs_generator.verify_setup_and_generate_packs
+    def self.instance
+      @instance ||= PacksGenerator.new
     end
 
-    def self.raise_nested_entries_disabled
-      packs_generator = PacksGenerator.new
-      packs_generator.raise_nested_entries_disabled
-    end
+    def generate_packs_if_stale
+      are_generated_files_present_and_up_to_date = Dir.exist?(generated_packs_directory_path) &&
+                                                   File.exist?(generated_server_bundle_file_path) &&
+                                                   !stale_or_missing_packs?
 
-    def verify_setup_and_generate_packs
-      return unless components_subdirectory.present?
-
-      verify_configuration
-
-      is_generated_directory_present = Dir.exist?(generated_packs_directory_path)
-
-      return if is_generated_directory_present && !stale_or_missing_packs?
+      return if are_generated_files_present_and_up_to_date
 
       clean_generated_packs_directory
       generate_packs
-    end
-
-    def raise_nested_entries_disabled
-      msg = <<~MSG
-        **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
-        webpacker.yml to enable nested entries. for more information read
-        https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
-      MSG
-
-      raise ReactOnRails::Error, msg
     end
 
     private
@@ -99,23 +78,26 @@ module ReactOnRails
     end
 
     def add_generated_pack_to_server_bundle
-      relative_path_to_generated_server_bundle = relative_path(defined_server_bundle_file_path,
+      relative_path_to_generated_server_bundle = relative_path(server_bundle_entrypoint,
                                                                generated_server_bundle_file_path)
       content = <<~FILE_CONTENT
         // import statement added by react_on_rails:generate_packs rake task
         import "./#{relative_path_to_generated_server_bundle}"
       FILE_CONTENT
 
-      prepend_to_file_if_not_present(defined_server_bundle_file_path, content)
+      ReactOnRails::Utils.prepend_to_file_if_text_not_present(
+        file: server_bundle_entrypoint,
+        text_to_prepend: content,
+        regex: %r{import ['"]\./#{relative_path_to_generated_server_bundle}['"]}
+      )
     end
 
     def generated_server_bundle_file_path
-      file_ext = File.extname(defined_server_bundle_file_path)
-      generated_server_bundle_file_path = defined_server_bundle_file_path.sub(file_ext, "-generated#{file_ext}")
+      generated_server_bundle_file_path = server_bundle_entrypoint.sub(".js", "-generated.js")
       generated_server_bundle_file_name = component_name(generated_server_bundle_file_path)
       source_entry_path = ReactOnRails::WebpackerUtils.webpacker_source_entry_path
 
-      "#{source_entry_path}/#{generated_server_bundle_file_name}#{file_ext}"
+      "#{source_entry_path}/#{generated_server_bundle_file_name}.js"
     end
 
     def clean_generated_packs_directory
@@ -123,7 +105,7 @@ module ReactOnRails
       FileUtils.mkdir_p(generated_packs_directory_path)
     end
 
-    def defined_server_bundle_file_path
+    def server_bundle_entrypoint
       Rails.root.join(ReactOnRails::WebpackerUtils.webpacker_source_entry_path,
                       ReactOnRails.configuration.server_bundle_js_file)
     end
@@ -151,7 +133,7 @@ module ReactOnRails
     end
 
     def generated_pack_path(file_path)
-      "#{generated_packs_directory_path}/#{component_name(file_path)}.#{GENERATED_PACK_EXTENSION}"
+      "#{generated_packs_directory_path}/#{component_name(file_path)}.js"
     end
 
     def component_name(file_path)
@@ -198,23 +180,7 @@ module ReactOnRails
     def components_search_path
       source_path = ReactOnRails::WebpackerUtils.webpacker_source_path
 
-      "#{source_path}/**/#{components_subdirectory}"
-    end
-
-    def components_subdirectory
-      ReactOnRails.configuration.components_subdirectory
-    end
-
-    def webpack_assets_status_checker
-      source_path = ReactOnRails::Utils.source_path
-      generated_assets_full_path = ReactOnRails::Utils.generated_assets_full_path
-      webpack_generated_files = ReactOnRails.configuration.webpack_generated_files
-
-      @webpack_assets_status_checker ||= ReactOnRails::TestHelper::WebpackAssetsStatusChecker.new(
-        source_path: source_path,
-        generated_assets_full_path: generated_assets_full_path,
-        webpack_generated_files: webpack_generated_files
-      )
+      "#{source_path}/**/#{ReactOnRails.configuration.components_subdirectory}"
     end
 
     def raise_client_component_overrides_common(component_name)
@@ -246,56 +212,6 @@ module ReactOnRails
       raise ReactOnRails::Error, msg
     end
 
-    def raise_shakapacker_version_incompatible
-      msg = <<~MSG
-        **ERROR** ReactOnRails: Please upgrade Shakapacker to version #{minimum_required_shakapacker_version} or \
-        above to use the automated bundle generation feature. The currently installed version is \
-        #{ReactOnRails::WebpackerUtils.shakapacker_version}.
-      MSG
-
-      raise ReactOnRails::Error, msg
-    end
-
-    def raise_webpacker_not_installed
-      msg = <<~MSG
-        **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker \
-        #{minimum_required_shakapacker_version} or above to use the \
-        automated bundle generation feature.
-      MSG
-
-      raise ReactOnRails::Error, msg
-    end
-
-    def shakapacker_major_minor_version
-      shakapacker_version = ReactOnRails::WebpackerUtils.shakapacker_version
-      match = shakapacker_version.match(ReactOnRails::VersionChecker::MAJOR_MINOR_PATCH_VERSION_REGEX)
-
-      [match[1].to_i, match[2].to_i, match[3].to_i]
-    end
-
-    def shackapacker_version_requirement_met?
-      major = shakapacker_major_minor_version[0]
-      minor = shakapacker_major_minor_version[1]
-      patch = shakapacker_major_minor_version[2]
-
-      major >= MINIMUM_SHAKAPACKER_MAJOR_VERSION && minor >= MINIMUM_SHAKAPACKER_MINOR_VERSION &&
-        patch >= MINIMUM_SHAKAPACKER_PATCH_VERSION
-    end
-
-    def minimum_required_shakapacker_version
-      "#{MINIMUM_SHAKAPACKER_MAJOR_VERSION}.#{MINIMUM_SHAKAPACKER_MINOR_VERSION}.#{MINIMUM_SHAKAPACKER_PATCH_VERSION}"
-    end
-
-    def prepend_to_file_if_not_present(file, text_to_prepend)
-      file_content = File.read(file)
-
-      return if file_content.include?(text_to_prepend)
-
-      content_with_prepended_text = text_to_prepend + file_content
-      File.write(file, content_with_prepended_text)
-      puts "Prepended\n#{text_to_prepend}to #{file}."
-    end
-
     def stale_or_missing_packs?
       component_files = common_component_to_path.values + client_component_to_path.values
       most_recent_mtime = Utils.find_most_recent_mtime(component_files)
@@ -305,12 +221,6 @@ module ReactOnRails
 
         !File.exist?(path) || File.mtime(path) < most_recent_mtime
       end
-    end
-
-    def verify_configuration
-      raise_webpacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
-      raise_shakapacker_version_incompatible unless shackapacker_version_requirement_met?
-      raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
     end
   end
   # rubocop:enable Metrics/ClassLength
