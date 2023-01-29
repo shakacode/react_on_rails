@@ -12,14 +12,7 @@ module ReactOnRails
       @instance ||= PacksGenerator.new
     end
 
-    def verify_setup_and_generate_packs
-      ReactOnRails::WebpackerUtils.raise_shakapacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
-      ReactOnRails::WebpackerUtils.raise_shakapacker_version_incompatible_for_autobundling unless
-        ReactOnRails::WebpackerUtils.shackapacker_version_requirement_met?(
-          MINIMUM_SHAKAPACKER_VERSION
-        )
-      ReactOnRails::WebpackerUtils.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
-
+    def generate_packs_if_stale
       are_generated_files_present_and_up_to_date = Dir.exist?(generated_packs_directory_path) &&
                                                    File.exist?(generated_server_bundle_file_path) &&
                                                    !stale_or_missing_packs?
@@ -100,12 +93,11 @@ module ReactOnRails
     end
 
     def generated_server_bundle_file_path
-      file_ext = File.extname(server_bundle_entrypoint)
-      generated_server_bundle_file_path = server_bundle_entrypoint.sub(file_ext, "-generated#{file_ext}")
+      generated_server_bundle_file_path = server_bundle_entrypoint.sub(".js", "-generated.js")
       generated_server_bundle_file_name = component_name(generated_server_bundle_file_path)
       source_entry_path = ReactOnRails::WebpackerUtils.webpacker_source_entry_path
 
-      "#{source_entry_path}/#{generated_server_bundle_file_name}#{file_ext}"
+      "#{source_entry_path}/#{generated_server_bundle_file_name}.js"
     end
 
     def clean_generated_packs_directory

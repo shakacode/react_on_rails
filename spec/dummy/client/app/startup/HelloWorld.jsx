@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import React from 'react';
 import RailsContext from '../components/RailsContext';
 
-// Example of CSS modules.
+// Example of CSS modules...
 import css from '../components/HelloWorld.module.scss';
 
 // Super simple example of the simplest possible React component

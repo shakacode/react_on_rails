@@ -37,7 +37,7 @@ module ReactOnRails
         # All done if no stale files!
         return if stale_gen_files.empty?
 
-        ReactOnRails::PacksGenerator.instance.verify_setup_and_generate_packs
+        ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
 
         # Inform the developer that we're ensuring gen assets are ready.
         puts_start_compile_check_message(stale_gen_files)
