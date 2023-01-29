@@ -17,6 +17,9 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+## Added 
+- Optimized `ReactOnRails::TestHelper`'s RSpec integration using `when_first_matching_example_defined`. [PR 1496](https://github.com/shakacode/react_on_rails/pull/1496) by [mcls](https://github.com/mcls).
+
 ### [13.3.0] - 2022-01-29
 ### Fixed
 - Fixed pack not found warning while using `react_component` and `react_component_hash` helpers, even when corresponding chunks are present. [PR 1511](https://github.com/shakacode/react_on_rails/pull/1511) by [pulkitkkr](https://github.com/pulkitkkr)
@@ -34,8 +37,6 @@ Changes since last non-beta release.
 
 ### Added
 - Exposed `reactHydrateOrRender` utility via [PR 1481](https://github.com/shakacode/react_on_rails/pull/1481) by [vaukalak](https://github.com/vaukalak).
-- Optimized `ReactOnRails::TestHelper`'s RSpec integration using
-  `when_first_matching_example_defined` via [PR 1496](https://github.com/shakacode/react_on_rails/pull/1496)
 
 ### [13.1.0] - 2022-08-20
 
