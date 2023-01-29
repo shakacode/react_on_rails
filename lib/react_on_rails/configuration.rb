@@ -111,7 +111,7 @@ module ReactOnRails
 
     # on ReactOnRails
     def setup_config_values
-      check_auto_load_requirements_if_auto_load
+      check_autobundling_requirements_if_configured
       ensure_webpack_generated_files_exists
       configure_generated_assets_dirs_deprecation
       configure_skip_display_none_deprecation
@@ -124,10 +124,10 @@ module ReactOnRails
 
     private
 
-    def check_auto_load_requirements_if_auto_load
-      return if auto_load_bundle != true
+    def check_autobundling_requirements_if_configured
+      raise_missing_components_subdirectory if auto_load_bundle && !components_subdirectory.present?
+      return unless components_subdirectory.present?
 
-      raise_missing_components_subdirectory unless components_subdirectory.present?
       ReactOnRails::WebpackerUtils.raise_shakapacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
       ReactOnRails::WebpackerUtils.raise_shakapacker_version_incompatible_for_autobundling unless
         ReactOnRails::WebpackerUtils.shackapacker_version_requirement_met?(

@@ -322,14 +322,14 @@ module ReactOnRails
       is_development = ENV["RAILS_ENV"] == "development"
 
       if is_development && !is_component_pack_present
-        ReactOnRails::PacksGenerator.generate
+        ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
         raise_missing_pack_error(component_name)
       end
 
-      ReactOnRails::PacksGenerator.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
+      ReactOnRails::WebpackerUtils.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
 
-      append_javascript_pack_tag "generated/#{component_name}"
-      append_stylesheet_pack_tag "generated/#{component_name}"
+      ApplicationController.helpers.append_javascript_pack_tag "generated/#{component_name}"
+      ApplicationController.helpers.append_stylesheet_pack_tag "generated/#{component_name}"
     end
 
     def generated_components_pack_path(component_name)
