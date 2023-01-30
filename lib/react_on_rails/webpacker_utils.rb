@@ -27,9 +27,10 @@ module ReactOnRails
       @shakapacker_version_as_array = [match[1].to_i, match[2].to_i, match[3].to_i]
     end
 
-    def self.shackapacker_version_requirement_met?(ary)
-      ary[0] >= shakapacker_version_as_array[0] && ary[1] >= shakapacker_version_as_array[1] &&
-        ary[2] >= shakapacker_version_as_array[2]
+    def self.shackapacker_version_requirement_met?(required_version)
+      req_ver = semver_to_string(required_version)
+
+      Gem::Version.new(shakapacker_version) >= Gem::Version.new(req_ver)
     end
 
     # This returns either a URL for the webpack-dev-server, non-server bundle or
@@ -135,6 +136,10 @@ module ReactOnRails
       MSG
 
       raise ReactOnRails::Error, msg
+    end
+
+    def self.semver_to_string(ary)
+      "#{ary[0]}.#{ary[1]}.#{ary[2]}"
     end
   end
 end
