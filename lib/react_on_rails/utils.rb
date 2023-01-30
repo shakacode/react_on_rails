@@ -219,9 +219,5 @@ module ReactOnRails
 
       puts "Prepended\n#{text_to_prepend}to #{file}."
     end
-
-    def self.semver_to_string(ary)
-      "#{ary[0]}.#{ary[1]}.#{ary[2]}"
-    end
   end
 end
