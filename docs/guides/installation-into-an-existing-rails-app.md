@@ -37,7 +37,9 @@
    ```bash
    rails generate react_on_rails:install --help
    ```
-5. Ensure that you have `overmind` or `foreman` installed
+5. Ensure that you have `overmind` or `foreman` installed.
+
+   Note: `foreman` should be installed on the system not on your project. [Read more](https://github.com/ddollar/foreman/wiki/Don't-Bundle-Foreman)
 
 6. Start your Rails server:
 
