@@ -251,8 +251,6 @@ heroku open
 
 and you will see your live app and you can share this URL with your friends. Congrats!
 
-A deployed version of the project `spec/dummy` which demonstrates several uses of `react_on_rails` is available on heroku [through this link](https://ror-spec-dummy.herokuapp.com/)
-
 ## Turning on Server Rendering
 
 You can turn on server rendering by simply changing the `prerender` option to `true`:
