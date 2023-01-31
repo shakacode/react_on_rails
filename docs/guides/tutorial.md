@@ -37,7 +37,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 - [Other features](#other-features)
   - [Turning on Server Rendering](#turning-on-server-rendering)
   - [Moving from the Rails default `/app/javascript` to the recommended `/client` structure](#moving-from-the-rails-default-appjavascript-to-the-recommended-client-structure)
-  - [Using HMR with the rails/webpacker setup](#using-hmr-with-the-railswebpacker-setup)
+  - [Using HMR with the shakapacker setup](#using-hmr-with-the-railswebpacker-setup)
   - [Custom IP & PORT setup (Cloud9 example)](#custom-ip--port-setup-cloud9-example)
   - [RubyMine performance tip](#rubymine-performance-tip)
 - [Conclusion](#conclusion)
@@ -330,7 +330,7 @@ mv app/javascript client
 source_path: client
 ```
 
-## Using HMR with the rails/webpacker setup
+## Using HMR with the shakapacker setup
 
 Start the app using `overmind start -f Procfile.dev` or `foreman start -f Procfile.dev`.
 
@@ -342,7 +342,7 @@ So you get some basics from HMR with no code changes. If you want to go further,
 * [DevServer](https://webpack.js.org/configuration/dev-server/)
 * [Hot Module Replacement](https://webpack.js.org/concepts/hot-module-replacement/)
 
-React on Rails will automatically handle disabling server rendering if there is only one bundle file created by the Webpack development server by `rails/webpacker`.
+React on Rails will automatically handle disabling server rendering if there is only one bundle file created by the Webpack development server by `shakapcker`.
 
 
 ## Custom IP & PORT setup (Cloud9 example)
