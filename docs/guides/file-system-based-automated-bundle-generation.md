@@ -64,6 +64,7 @@ default: &default
 ```
 
 the directory structure will look like this
+
 ```
 app/javascript:
   └── packs:               # sets up webpack entries
@@ -100,15 +101,15 @@ Your layout would contain:
   <%= stylesheet_pack_tag 'application' %>
 ```
 
-
 Suppose, you want to use bundle splitting to minimize unnecessary javascript loaded on each page, you would put each of your components in the `packs` directory.
+
 ```
 app/javascript:
-  └── packs:               # sets up webpack entries
-  │   └── FooComponentOne.jsx # Internally uses ReactOnRails.register
-  │   └── BarComponentOne.jsx # Internally uses ReactOnRails.register
-  │   └── BarComponentTwo.jsx # Internally uses ReactOnRails.register
-  └── src:                 # any directory name is fine. Referenced files need to be under source_path
+  └── packs:                   # sets up webpack entries
+  │   └── FooComponentOne.jsx  # Internally uses ReactOnRails.register
+  │   └── BarComponentOne.jsx  # Internally uses ReactOnRails.register
+  │   └── BarComponentTwo.jsx  # Internally uses ReactOnRails.register
+  └── src:                     # any directory name is fine. Referenced files need to be under source_path
   │   └── Foo
   │   │   └── ...
   │   └── Bar

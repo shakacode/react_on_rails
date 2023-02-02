@@ -7,18 +7,18 @@
 1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `package.json` file.
 
    ```ruby
-   gem "react_on_rails", "13.1.0" # Use the latest and the exact version
-   gem "shakapacker", "6.5.4"
+   gem "react_on_rails", "13.3.1" # Use the latest and the exact version
+   gem "shakapacker", "6.5.5"
    ```
 
    Or use `bundle add`:
 
    ```bash
-   bundle add react_on_rails --version=13.1.0 --strict
-   bundle add shakapacker --strict
+   bundle add react_on_rails --version=13.3.1 --strict
+   bundle add shakapacker --version=6.5.5 --strict
    ```
 
-2. Run the following 2 commands to install Webpacker with React. Note, if you are using an older version of Rails than 5.1, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
+2. Run the following 2 commands to install Shakapakcer (Webpacker) with React. Note, if you are using an older version of Rails than 5.1, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
 
    ```bash
    rails webpacker:install
@@ -37,14 +37,16 @@
    ```bash
    rails generate react_on_rails:install --help
    ```
-5. Ensure that you have `overmind` or `foreman` installed
+5. Ensure that you have `overmind` or `foreman` installed.
+
+   Note: `foreman` should be installed on the system not on your project. [Read more](https://github.com/ddollar/foreman/wiki/Don't-Bundle-Foreman)
 
 6. Start your Rails server:
 
    ```bash
    ./bin/dev
    ```
-   Note: `foreman` defaults to PORT 5000 unless you set the value of PORT in your environment. For example, you can `export PORT=3000` to use the Rails default port of 3000. For the hello_world example this is already set.
+   Note: `foreman` defaults to PORT 5000 unless you set the value of PORT in your environment. For example, you can `export PORT=3000` to use the Rails default port of 3000. For the hello_world example, this is already set.
 
 7. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world).
 
