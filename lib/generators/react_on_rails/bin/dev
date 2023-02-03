@@ -8,10 +8,7 @@ rescue Errno::ENOENT
 end
 
 def run(process)
-  args = [*ARGV]
-  args.shift
-  puts "Using #{process}"
-  exec "#{process} start -f Procfile.dev", args.join(" ")
+  system "#{process} start -f Procfile.dev"
 rescue Errno::ENOENT
   warn <<~MSG
     ERROR:
