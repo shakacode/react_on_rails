@@ -79,6 +79,15 @@ module ReactOnRails
 
       def add_bin_scripts
         directory "#{__dir__}/bin", "bin"
+
+        # Make these and only these files executable
+        files_to_copy = []
+        Dir.chdir("#{__dir__}/bin") do
+          files_to_copy.concat(Dir.glob("*"))
+        end
+        files_to_become_excutable = files_to_copy.map { |filename| "bin/#{filename}" }
+
+        File.chmod(0o755, *files_to_become_excutable)
       end
     end
   end
