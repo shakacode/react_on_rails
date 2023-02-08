@@ -28,7 +28,9 @@ Gem::Specification.new do |s|
   s.add_dependency "addressable"
   s.add_dependency "connection_pool"
   s.add_dependency "execjs", "~> 2.5"
-  s.add_dependency "rails", ">= 5.2"
+  s.add_dependency "railties", ">= 5.2"
+  s.add_dependency "activesupport", ">= 5.2"
+  s.add_dependency "actionpack", ">= 5.2"
   s.add_dependency "rainbow", "~> 3.0"
 
   s.add_development_dependency "bundler", "~> 2"
