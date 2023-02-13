@@ -324,8 +324,8 @@ module ReactOnRails
 
       ReactOnRails::WebpackerUtils.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
 
-      ApplicationController.helpers.append_javascript_pack_tag "generated/#{component_name}"
-      ApplicationController.helpers.append_stylesheet_pack_tag "generated/#{component_name}"
+      ApplicationController.helpers.append_javascript_pack_tag("generated/#{component_name}")
+      ApplicationController.helpers.append_stylesheet_pack_tag("generated/#{component_name}")
     end
 
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
