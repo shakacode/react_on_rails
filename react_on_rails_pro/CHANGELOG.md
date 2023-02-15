@@ -14,11 +14,13 @@ You can find the **package** version numbers from this repo's tags and below in 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [3.1.1] - 2022-08-03
 ## Doc and Spec Only Updates
 React 18 is now supported! Check the [React on Rails CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details and the updates to the [loadable-components instructions](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/code-splitting-loadable-components.md).
 
 ### Improved
 - Updated `Rubocop` version from `1.18.3` to `1.36.0`. Fixed Rubocop warnings. [PR 296](https://github.com/shakacode/react_on_rails_pro/pull/296) by [alkesh26](https://github.com/alkesh26).
+- Updated dependencies to address known security vulnerabilities
 
 ## [3.1.0] - 2022-08-03
 ### Fixed
@@ -283,7 +285,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.0...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.1...HEAD
+[3.1.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.0...3.1.1
 [3.1.0]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.1...3.1.0
 [3.0.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0...3.0.1
 [3.0.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.3.0...3.0.0
