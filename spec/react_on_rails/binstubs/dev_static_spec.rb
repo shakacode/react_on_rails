@@ -19,7 +19,7 @@ RSpec.describe "bin/dev-static script" do
   it "with Overmind installed, uses Overmind" do
     allow(IO).to receive(:popen).with("overmind -v").and_return("Some truthy result")
 
-    expect_any_instance_of(Kernel).to receive(:exec).with("overmind start -f Procfile.dev-static", "")
+    expect_any_instance_of(Kernel).to receive(:system).with("overmind start -f Procfile.dev-static")
 
     load script_path
   end
@@ -28,7 +28,7 @@ RSpec.describe "bin/dev-static script" do
     allow(IO).to receive(:popen).with("overmind -v").and_raise(Errno::ENOENT)
     allow(IO).to receive(:popen).with("foreman -v").and_return("Some truthy result")
 
-    expect_any_instance_of(Kernel).to receive(:exec).with("foreman start -f Procfile.dev-static", "")
+    expect_any_instance_of(Kernel).to receive(:system).with("foreman start -f Procfile.dev-static")
 
     load script_path
   end
@@ -50,8 +50,8 @@ RSpec.describe "bin/dev-static script" do
     allow(IO).to receive(:popen).with("overmind -v").and_return("Some truthy result")
 
     allow_any_instance_of(Kernel)
-      .to receive(:exec)
-      .with("overmind start -f Procfile.dev-static", "")
+      .to receive(:system)
+      .with("overmind start -f Procfile.dev-static")
       .and_raise(Errno::ENOENT)
     allow_any_instance_of(Kernel).to receive(:exit!)
 
