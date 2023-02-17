@@ -21,7 +21,7 @@ Here are the options available for the JavaScript renderer configuration object,
 1. **sentryDsn**: - (default: `env.SENTRY_DSN || null`) - Enables server rendering errors catching with Sentry if the options is set. Add package `@sentry/node`.
 1. **sentryTracing** - (default: `env.SENTRY_TRACING || null`) - Should be set to `true` to enable adding trace context to the error. Requires **sentryDsn** to be set.
 1. **sentryTracesSampleRate** - (default: `env.SENTRY_TRACES_SAMPLE_RATE || 0.1`) - With this option set, every transaction created will have that percentage chance of being sent to Sentry. So, for example, if you set sentryTracesSampleRate to 0.2, approximately 20% of your transactions will get recorded and sent. See below for more details on Sentry Tracing. See [additional docs](./error-reporting-and-tracing.md).
-1. ** includeTimerPolyfills** - (default: `env.INCLUDE_TIMER_POLYFILLS || false`) - With this option set, use of `setTimeout`, `setInterval`, & `clearTimeout` functions will throw errors during server-rendering. Only use this option if you want to transition to using another javascript renderer such as mini_racer.
+1. **includeTimerPolyfills** - (default: `env.INCLUDE_TIMER_POLYFILLS || false`) - With this option set, use of `setTimeout`, `setInterval`, & `clearTimeout` functions will throw errors during server-rendering. Only use this option if you want to transition to using another javascript renderer such as mini_racer.
 
 ## Example Launch Files
 
