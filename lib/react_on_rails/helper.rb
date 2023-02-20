@@ -313,10 +313,6 @@ module ReactOnRails
       @rails_context.merge(serverSide: server_side)
     end
 
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
-
-    private
-
     def load_pack_for_component(component_name)
       is_component_pack_present = File.exist?(generated_components_pack_path(component_name))
       is_development = ENV["RAILS_ENV"] == "development"
@@ -328,9 +324,13 @@ module ReactOnRails
 
       ReactOnRails::WebpackerUtils.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
 
-      append_javascript_pack_tag "generated/#{component_name}"
-      append_stylesheet_pack_tag "generated/#{component_name}"
+      ApplicationController.helpers.append_javascript_pack_tag("generated/#{component_name}")
+      ApplicationController.helpers.append_stylesheet_pack_tag("generated/#{component_name}")
     end
+
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
+
+    private
 
     def generated_components_pack_path(component_name)
       "#{ReactOnRails::WebpackerUtils.webpacker_source_entry_path}/generated/#{component_name}.js"
