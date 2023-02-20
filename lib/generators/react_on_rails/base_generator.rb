@@ -150,7 +150,7 @@ module ReactOnRails
 
               or
 
-                ./bin/dev # Running with statically created bundles, without HMR
+                ./bin/dev-static # Running with statically created bundles, without HMR
 
             - To server render, change this line app/views/hello_world/index.html.erb to
               `prerender: true` to see server rendering (right click on page and select "view source").
