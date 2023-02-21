@@ -16,6 +16,8 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+### Fixed
+- Fixed the bug in `bin/dev` and `bin/dev-static` scripts by using `system` instead of `exec` and remove option to pass arguments [PR 1519](https://github.com/shakacode/react_on_rails/pull/1519) by [ahangarha](https://github.com/ahangarha).
 
 ### [13.3.1] - 2022-01-30
 ## Added 
