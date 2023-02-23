@@ -33,12 +33,6 @@ exports.getVmBundleFilePath = function getVmBundleFilePath() {
   return vmBundleFilePath;
 };
 
-function undefinedForExecLogging(functionName) {
-  return `
-    console.error('[ReactOnRails Renderer]: ${functionName} is not defined for VM. No-op for server rendering.');
-    console.error(getStackTrace().join('\\n'));`;
-}
-
 function replayVmConsole() {
   if (log.level !== 'debug') return;
   const consoleHistoryFromVM = vm.runInContext('console.history', context);
@@ -115,9 +109,10 @@ exports.buildVM = async function buildVM(filePath) {
 
     if (includeTimerPolyfills) {
       // Define timer polyfills:
-      vm.runInContext(`function setInterval() { ${undefinedForExecLogging('setInterval')} }`, context);
-      vm.runInContext(`function setTimeout() { ${undefinedForExecLogging('setTimeout')} }`, context);
-      vm.runInContext(`function clearTimeout() { ${undefinedForExecLogging('clearTimeout')} }`, context);
+      vm.runInContext(`function setInterval() {}`, context);
+      vm.runInContext(`function setTimeout() {}`, context);
+      vm.runInContext(`function clearTimeout() {}`, context);
+      vm.runInContext(`function clearInterval() {}`, context);
     }
 
     // Run bundle code in created context:
