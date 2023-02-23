@@ -13,6 +13,8 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+### Fixed
+- Removed console errors when `setTimeout` is used server-size. The call is silently ignored for seamless integration of https://github.com/petyosi/react-virtuoso
 
 ## [3.1.1] - 2022-08-03
 ## Doc and Spec Only Updates
