@@ -16,6 +16,9 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
+
+### [13.3.2] - 2022-02-24
+
 ### Fixed
 - Fixed the bug in `bin/dev` and `bin/dev-static` scripts by using `system` instead of `exec` and remove option to pass arguments [PR 1519](https://github.com/shakacode/react_on_rails/pull/1519) by [ahangarha](https://github.com/ahangarha).
 
@@ -1069,7 +1072,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.3.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.3.2...master
+[13.3.2]: https://github.com/shakacode/react_on_rails/compare/13.3.1...13.3.2
 [13.3.1]: https://github.com/shakacode/react_on_rails/compare/13.3.0...13.3.1
 [13.3.0]: https://github.com/shakacode/react_on_rails/compare/13.2.0...13.3.0
 [13.2.0]: https://github.com/shakacode/react_on_rails/compare/13.1.0...13.2.0
