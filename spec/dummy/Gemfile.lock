@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (13.3.1)
+    react_on_rails (13.3.2)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -234,10 +234,10 @@ GEM
       unicode-display_width (>= 1.4.0, < 3.0)
     rubocop-ast (1.5.0)
       parser (>= 3.0.1.1)
-    rubocop-performance (1.10.1)
-      rubocop (>= 0.90.0, < 2.0)
+    rubocop-performance (1.16.0)
+      rubocop (>= 1.7.0, < 2.0)
       rubocop-ast (>= 0.4.0)
-    rubocop-rspec (2.2.0)
+    rubocop-rspec (2.4.0)
       rubocop (~> 1.0)
       rubocop-ast (>= 1.1.0)
     ruby-progressbar (1.11.0)
@@ -338,8 +338,8 @@ DEPENDENCIES
   rspec-retry
   rspec_junit_formatter
   rubocop (= 1.14.0)
-  rubocop-performance
-  rubocop-rspec
+  rubocop-performance (= 1.16.0)
+  rubocop-rspec (= 2.4.0)
   sass-rails (~> 6.0)
   scss_lint
   sdoc
