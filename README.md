@@ -1,4 +1,4 @@
-[![CircleCI](https://circleci.com/gh/shakacode/react_on_rails_pro.svg?style=svg&circle-token=faed0841684a8e88fcf06945ef2b62ded3b124a8)](https://circleci.com/gh/shakacode/react_on_rails_pro)
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/shakacode/react_on_rails_pro/tree/master.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/shakacode/react_on_rails_pro/tree/master)
 
 _See the [CHANGELOG](./CHANGELOG.md) for release updates and **upgrade** details._
 

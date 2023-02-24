@@ -13,8 +13,12 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
+
+## [3.1.2] - 2023-02-24
+
 ### Fixed
 - Removed console errors when `setTimeout` is used server-size. The call is silently ignored for seamless integration of https://github.com/petyosi/react-virtuoso
+- Numerous Dependabot alerts
 
 ## [3.1.1] - 2022-08-03
 ## Doc and Spec Only Updates
@@ -287,7 +291,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.1...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.2...HEAD
+[3.1.2]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.1...3.1.2
 [3.1.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.0...3.1.1
 [3.1.0]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.1...3.1.0
 [3.0.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0...3.0.1
