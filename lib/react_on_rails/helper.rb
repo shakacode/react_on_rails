@@ -327,7 +327,8 @@ module ReactOnRails
       end
 
       ReactOnRails::WebpackerUtils.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
-
+      puts "ZYXXYZ" if @self.nil?
+      @self ||= (puts self.inspect) || true
       append_javascript_pack_tag "generated/#{component_name}"
       append_stylesheet_pack_tag "generated/#{component_name}"
     end
