@@ -15,4 +15,5 @@ _Remove this line after checking all the items here. If the item is not applicab
 
 ### Other Information
 
-_Remove this parapraph and mention any other important and relevant information such as benchmarks._
+_Remove this paragraph and mention any other important and relevant information such as benchmarks._
+
