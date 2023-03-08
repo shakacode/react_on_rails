@@ -65,7 +65,7 @@ Changes since last non-beta release.
 
 - Fixed the `You are importing hydrateRoot from "react-dom" [...] You should instead import it from "react-dom/client"` warning under React 18 ([#1441](https://github.com/shakacode/react_on_rails/issues/1441)). [PR 1460](https://github.com/shakacode/react_on_rails/pull/1460) by [alexeyr](https://github.com/alexeyr).
 
-  In exchange, you may see a warning like this when building a Webpack bundle under React 16:
+  In exchange, you may see a warning like this when building using any version of React below 18:
   ```
   WARNING in ./node_modules/react-on-rails/node_package/lib/reactHydrateOrRender.js19:25-52
   Module not found: Error: Can't resolve 'react-dom/client' in '/home/runner/work/react_on_rails/react_on_rails/spec/dummy/node_modules/react-on-rails/node_package/lib'
