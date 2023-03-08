@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 ## Suppress warning related to Can't resolve 'react-dom/client' in React < 18
 
-You may see a warning like this when building using any version of React below 18:
+You may see a warning like this when building a Webpack bundle using any version of React below 18:
 
 ```
 Module not found: Error: Can't resolve 'react-dom/client' in ....
