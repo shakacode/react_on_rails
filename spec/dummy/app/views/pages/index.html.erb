@@ -1,7 +1,7 @@
-
-<h1>react_on_rails gem testing</h1>
-<hr/>
-This page demonstrates a few things the other pages do not show:
+<h2 class="page-header">react_on_rails gem testing</h2>
+<h2 class="section-header">
+  This page demonstrates a few things the other pages do not show:
+</h2>
 <ul>
   <li>
     Multiple instance of same component on the page. The ID value of the top level DIVs increments.
@@ -12,7 +12,7 @@ This page demonstrates a few things the other pages do not show:
 </ul>
 
 <hr/>
-<h1>Server Rendered/Cached React/Redux Component</h1>
+<h2 class="section-header">Server Rendered/Cached React/Redux Component</h2>
 <p>
   Server Caching (Rails.application.config.perform_caching) is <%= $rails_perform_caching %>
   <% if $rails_perform_caching %>
@@ -30,7 +30,7 @@ This page demonstrates a few things the other pages do not show:
 <%= react_component("ReduxApp", props: @app_props_server_render.merge(prerender: true), trace: true, prerender: true, id: "ReduxApp-react-component-0") %>
 <hr/>
 
-<h1>Server Rendered React Component Without Redux</h1>
+<h2 class="section-header">Server Rendered React Component Without Redux</h2>
 <pre>
     <%%= react_component("HelloWorld", props: @app_props_server_render, trace: true, id: "HelloWorld-react-component-1") %><br/>
   </pre>
@@ -42,21 +42,21 @@ This page demonstrates a few things the other pages do not show:
 <%= react_component("HelloWorld", props: @app_props_server_render, trace: true, id: "HelloWorld-react-component-1") %>
 <hr/>
 
-<h1>React Rails Server Rendering with Hooks</h1>
+<h2 class="section-header">React Rails Server Rendering with Hooks</h2>
 <pre>
     <%%= react_component("HelloWorldHooks", props: @app_props_server_render, prerender: true, trace: true, id: "HelloWorld-react-component-6") %><br/>
 </pre>
 <%= react_component("HelloWorldHooks", props: @app_props_server_render, prerender: true, trace: true, id: "HelloWorld-react-component-6") %>
 <hr/>
 
-<h1>React Rails Server Rendering with Hooks with rails_context</h1>
+<h2 class="section-header">React Rails Server Rendering with Hooks with rails_context</h2>
 <pre>
     <%%= react_component("HelloWorldHooksContext", props: @app_props_server_render, prerender: true, trace: true, id: "HelloWorld-react-component-7") %><br/>
 </pre>
 <%= react_component("HelloWorldHooksContext", props: @app_props_server_render, prerender: true, trace: true, id: "HelloWorld-react-component-7") %>
 <hr/>
 
-<h1>Simple Client Rendered Component</h1>
+<h2 class="section-header">Simple Client Rendered Component</h2>
 <!-- Passing prerender: true to not render on server -->
 <pre>
   <%%= react_component("HelloWorldApp", props: @app_props_hello, prerender: true, trace: true, id: "HelloWorldApp-react-component-2") %>
@@ -64,14 +64,14 @@ This page demonstrates a few things the other pages do not show:
 <%= react_component("HelloWorldApp", props: @app_props_hello, prerender: true, trace: true, id: "HelloWorldApp-react-component-2") %>
 <hr/>
 
-<h1>Showing you can put the same component twice on a page with different props</h1>
+<h2 class="section-header">Showing you can put the same component twice on a page with different props</h2>
 <pre>
   <%%= react_component("HelloWorldApp", props: @app_props_hello_again, prerender: true, trace: true, id: "HelloWorldApp-react-component-3") %>
 </pre>
 <%= react_component("HelloWorldApp", props: @app_props_hello_again, prerender: true, trace: true, id: "HelloWorldApp-react-component-3") %>
 <hr/>
 
-<h1>Component that returns string html on server</h1>
+<h2 class="section-header">Component that returns string html on server</h2>
 <pre>
   <%%= react_component("HelloWorld", props: @app_props_hello, prerender: true, trace: true, id: "HelloWorld-react-component-4") %>
   <%%= react_component("HelloES5", props: @app_props_hello, prerender: true, trace: true, id: "HelloES5-react-component-5") %>
@@ -79,7 +79,7 @@ This page demonstrates a few things the other pages do not show:
 <%= react_component("RenderedHtml", prerender: true, trace: true, id: "HelloWorld-react-component-4") %>
 <hr/>
 
-<h1>Simple Component Without Redux</h1>
+<h2 class="section-header">Simple Component Without Redux</h2>
 <pre>
   <%%= react_component("HelloWorld", props: @app_props_hello, prerender: true, trace: true, id: "HelloWorld-react-component-5") %>
   <%%= react_component("HelloES5", props: @app_props_hello, prerender: true, trace: true, id: "HelloES5-react-component-5") %>
@@ -88,7 +88,7 @@ This page demonstrates a few things the other pages do not show:
 <%= react_component("HelloWorldES5", props: @app_props_hello, prerender: true, trace: true, id: "HelloWorldES5-react-component-5") %>
 <hr/>
 
-<h1>Non-React Component</h1>
+<h2 class="section-header">Non-React Component</h2>
 <p>For example, Suppose you have some JavaScript that generates a string of HTML:</p>
 <pre>
   this.HelloString.world()

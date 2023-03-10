@@ -1,45 +1,41 @@
+h1 class="page-header">Server Rendered/Cached React/Redux Component</h1>
+<br/>
+This example demonstrates server side rendering with the <code>cached_react_component</code> helper.
+<br/>
+<h2 class="section-header">Result</h2>
 <!-- print statements to show when server rendering is happening -->
 <%= cached_react_component("ReduxApp", cache_key: "A", prerender: true,
                            trace: true, id: "ReduxApp-react-component-0") do
-   calc_slow_app_props_server_render
+  calc_slow_app_props_server_render
 end %>
-
 <hr/>
-
-<h1>Server Rendered/Cached React/Redux Component</h1>
-<p>
-  This example demonstrates server side rendering with the `cached_react_component` helper.
-</p>
-
-<hr/>
-<h2>Setup</h2>
+<h2 class="section-header">Setup</h2>
 Place the component on the view: spec/dummy/app/views/pages/server_side_redux_app_cached.html.erb.
 Note the cache block.
 <br/>
-<pre>
+<pre><code class="language-ruby">
 <%% cached_react_component("ReduxApp", cache_key: "A", prerender: true, trace: true, id: "ReduxApp-react-component-0") do %>
 <%%  @app_props_server_render %>
 <%% end %>
-</pre>
+</code></pre>
 
 <hr/>
 
-<h2>
+<h2 class="section-header">
   Notes on Fragment Caching
 </h2>
 <ol>
   <li>
-    Toggle caching in development mode: `rails dev:cache`
+    Toggle caching in development mode: <code>rails dev:cache</code>
   </li>
   <li>
     Refresh this page and you will NOT see this print again in your console for your server.
     This confirms that the fragment of HTML was cached and your calculation of props was not done again.
     This can be a big performance boost!
 
-    <pre>
-      XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-      calling slow calc_app_props_server_render
-      XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-    </pre>
+    <pre class="log-section">
+  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+  calling slow calc_app_props_server_render
+  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</pre>
   </li>
 </ol>
