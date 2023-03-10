@@ -120,6 +120,8 @@ GEM
     crack (0.4.5)
       rexml
     crass (1.0.6)
+    csso-rails (1.0.0)
+      execjs (>= 1)
     diff-lcs (1.5.0)
     docile (1.4.0)
     equivalent-xml (0.6.0)
@@ -189,6 +191,8 @@ GEM
     persistent_http (2.0.3)
       gene_pool (>= 1.3)
     pg (1.4.5)
+    prism-rails (1.5.0)
+      railties
     pry (0.14.1)
       coderay (~> 1.1)
       method_source (~> 1.0)
@@ -334,6 +338,8 @@ GEM
     sqlite3 (1.5.3)
       mini_portile2 (~> 2.8.0)
     sync (0.5.0)
+    tailwindcss-rails (2.0.21)
+      railties (>= 6.0.0)
     term-ansicolor (1.7.1)
       tins (~> 1.0)
     thor (1.2.1)
@@ -383,6 +389,7 @@ DEPENDENCIES
   capybara
   capybara-screenshot
   coveralls
+  csso-rails (~> 1.0)
   equivalent-xml
   faker
   generator_spec
@@ -396,6 +403,7 @@ DEPENDENCIES
   net-imap
   net-smtp
   pg
+  prism-rails
   pry (>= 0.14.1)
   pry-byebug!
   pry-doc
@@ -419,6 +427,7 @@ DEPENDENCIES
   spring-watcher-listen
   sprockets
   sqlite3
+  tailwindcss-rails (~> 2.0)
   turbolinks
   uglifier
   uri (= 0.10.0)

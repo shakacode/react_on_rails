@@ -7,10 +7,11 @@ export default (props, _railsContext, domNodeId) => {
   const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
   // fulfill the store with the server data
   const initialState = window.__APOLLO_STATE__;
+
   const client = new ApolloClient({
     cache: new InMemoryCache().restore(initialState),
     link: createHttpLink({
-      uri: 'http://localhost:3000/graphql',
+      uri: `${window.location.origin}/graphql`,
       credentials: 'same-origin',
       headers: {
         'X-CSRF-Token': csrfToken,
