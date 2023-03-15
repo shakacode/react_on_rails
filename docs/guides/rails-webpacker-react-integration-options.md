@@ -56,6 +56,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
 ----
 
+## Suppress warning related to Can't resolve 'react-dom/client' in React < 18
+
+You may see a warning like this when building a Webpack bundle using any version of React below 18:
+
+```
+Module not found: Error: Can't resolve 'react-dom/client' in ....
+```
+
+It can be safely [suppressed](https://webpack.js.org/configuration/other-options/#ignorewarnings) in your Webpack configuration. The following is an example of this suppression in `config/webpack/commonWebpackConfig.js`:
+
+```js
+const { webpackConfig: baseClientWebpackConfig, merge } = require('shakapacker');
+
+const commonOptions = {
+  resolve: {
+    extensions: ['.css', '.ts', '.tsx'],
+  },
+};
+
+const ignoreWarningsConfig = {
+  ignoreWarnings: [/Module not found: Error: Can't resolve 'react-dom\/client'/],
+};
+
+const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptions, ignoreWarningsConfig);
+
+module.exports = commonWebpackConfig;
+```
+
+----
+
 ## HMR and React Hot Reloading
 
 Before turning HMR on, consider upgrading to the latest stable gems and packages:
