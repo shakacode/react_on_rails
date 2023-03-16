@@ -57,7 +57,7 @@ RSpec.describe "bin/dev-static script" do
 
     expected_message = <<~MSG
       ERROR:
-      Please ensure `Procfile.dev-static` exist in your project!
+      Please ensure `Procfile.dev-static` exists in your project!
     MSG
 
     expect { load script_path }.to output(expected_message).to_stderr_from_any_process
