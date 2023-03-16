@@ -46,7 +46,7 @@ const configureServer = () => {
     filename: 'server-bundle.js',
     globalObject: 'this',
     // If using the React on Rails Pro node server renderer, uncomment the next line
-    // libraryTarget: 'commonjs2',
+    libraryTarget: 'commonjs2',
     path: config.outputPath,
     publicPath: config.publicPath,
     // https://webpack.js.org/configuration/output/#outputglobalobject
