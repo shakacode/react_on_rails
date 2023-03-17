@@ -12,7 +12,7 @@ def run(process)
 rescue Errno::ENOENT
   warn <<~MSG
     ERROR:
-    Please ensure `Procfile.dev` exist in your project!
+    Please ensure `Procfile.dev` exists in your project!
   MSG
   exit!
 end
