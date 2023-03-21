@@ -17,6 +17,11 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [13.3.3] - 2022-03-21
+
+### Fixed
+- Fixed bug regarding loading FS-based packs. [PR 1527](https://github.com/shakacode/react_on_rails/pull/1527) by [judahmeek](https://github.com/judahmeek)
+
 ### [13.3.2] - 2022-02-24
 
 ### Fixed
