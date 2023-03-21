@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (13.3.2)
+    react_on_rails (13.3.3)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -338,8 +338,8 @@ DEPENDENCIES
   rspec-retry
   rspec_junit_formatter
   rubocop (= 1.14.0)
-  rubocop-performance (= 1.16.0)
-  rubocop-rspec (= 2.4.0)
+  rubocop-performance
+  rubocop-rspec
   sass-rails (~> 6.0)
   scss_lint
   sdoc
