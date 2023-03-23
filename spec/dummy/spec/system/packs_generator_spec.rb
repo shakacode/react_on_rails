@@ -1,22 +1,19 @@
 # frozen_string_literal: true
 
-require_relative "rails_helper"
+require "rails_helper"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRails
-  GENERATED_PACKS_CONSOLE_OUTPUT_TEXT = "Generated Packs:"
+  GENERATED_PACKS_CONSOLE_OUTPUT_REGEX = /Generated Packs:/.freeze
 
   # rubocop:disable Metrics/BlockLength
   describe PacksGenerator do
-    let(:webpacker_source_path) { File.expand_path("fixtures/automated_packs_generation", __dir__) }
-    let(:webpacker_source_entry_path) { File.expand_path("fixtures/automated_packs_generation/packs", __dir__) }
-    let(:generated_directory) { File.expand_path("fixtures/automated_packs_generation/packs/generated", __dir__) }
+    let(:webpacker_source_path) { File.expand_path("../fixtures/automated_packs_generation", __dir__) }
+    let(:webpacker_source_entry_path) { File.expand_path("../fixtures/automated_packs_generation/packs", __dir__) }
+    let(:generated_directory) { File.expand_path("../fixtures/automated_packs_generation/packs/generated", __dir__) }
     let(:server_bundle_js_file) { "server-bundle.js" }
     let(:server_bundle_js_file_path) do
-      File.expand_path("fixtures/automated_packs_generation/packs/#{server_bundle_js_file}", __dir__)
-    end
-    let(:generated_assets_full_path) do
-      File.expand_path("fixtures/automated_packs_generation/packs", __dir__)
+      File.expand_path("../fixtures/automated_packs_generation/packs/#{server_bundle_js_file}", __dir__)
     end
     let(:webpack_generated_files) { %w[manifest.json] }
 
@@ -31,7 +28,7 @@ module ReactOnRails
       allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_entry_path)
         .and_return(webpacker_source_entry_path)
       allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.1")
-      allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(generated_assets_full_path)
+      allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(webpacker_source_entry_path)
       allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle_js_file_path)
     end
 
@@ -44,59 +41,20 @@ module ReactOnRails
       File.truncate("#{webpacker_source_entry_path}/#{server_bundle_js_file}", 0)
     end
 
-    context "when webpacker is not installed" do
-      before do
-        allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(false)
-      end
-
-      it "raises an error" do
-        msg = <<~MSG
-          **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker \
-          6.5.1 or above to use the \
-          automated bundle generation feature.
-        MSG
-
-        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
-      end
-    end
-
-    context "when shakapacker version requirements not met" do
-      before do
-        allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.0")
-      end
-
+    context "when the generated server bundle is configured as ReactOnRails.configuration.server_bundle_js_file" do
       after do
-        allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.1")
+        FileUtils.rm_rf server_bundle_js_file
+        FileUtils.mv("#{webpacker_source_entry_path}/temp", server_bundle_js_file_path)
+        ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = false
       end
 
-      it "raises an error" do
-        msg = <<~MSG
-          **ERROR** ReactOnRails: Please upgrade Shakapacker to version 6.5.1 or \
-          above to use the automated bundle generation feature. The currently installed version is \
-          6.5.0.
-        MSG
-
-        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
-      end
-    end
-
-    context "when nested_entries not enabled" do
-      before do
-        allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(false)
-      end
-
-      after do
-        allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(true)
-      end
-
-      it "raises an error" do
-        msg = <<~MSG
-          **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
-          webpacker.yml to enable nested entries. for more information read
-          https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
-        MSG
-
-        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
+      it "generates the server bundle within the source_entry_point" do
+        FileUtils.mv(server_bundle_js_file_path, "#{webpacker_source_entry_path}/temp")
+        FileUtils.rm_rf server_bundle_js_file_path
+        ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = true
+        described_class.instance.generate_packs_if_stale
+        expect(File.exist?(server_bundle_js_file_path)).to equal(true)
+        expect(File.exist?(generated_server_bundle_file_path)).to equal(false)
       end
     end
 
@@ -107,7 +65,7 @@ module ReactOnRails
       before do
         stub_webpacker_source_path(component_name: component_name,
                                    webpacker_source_path: webpacker_source_path)
-        described_class.generate
+        described_class.instance.generate_packs_if_stale
       end
 
       it "creates generated pack directory" do
@@ -115,11 +73,10 @@ module ReactOnRails
       end
 
       it "creates generated server bundle file" do
-        expect(File.exist?(generated_server_bundle_file_path)).to eq(true)
+        expect(File.exist?(generated_server_bundle_file_path)).to equal(true)
       end
 
-      it "creates pack for ComponentWithCommonOnly with correct extension" do
-        expect(File.extname(component_pack)).to eq(PacksGenerator::GENERATED_PACK_EXTENSION)
+      it "creates pack for ComponentWithCommonOnly" do
         expect(File.exist?(component_pack)).to eq(true)
       end
 
@@ -156,7 +113,7 @@ module ReactOnRails
           information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
         MSG
 
-        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
+        expect { described_class.instance.generate_packs_if_stale }.to raise_error(ReactOnRails::Error, msg)
       end
     end
 
@@ -176,7 +133,7 @@ module ReactOnRails
           information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
         MSG
 
-        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
+        expect { described_class.instance.generate_packs_if_stale }.to raise_error(ReactOnRails::Error, msg)
       end
     end
 
@@ -191,7 +148,7 @@ module ReactOnRails
 
       it "raises an error for definition override" do
         msg =  /Please delete the common definition and have separate server and client files/
-        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
+        expect { described_class.instance.generate_packs_if_stale }.to raise_error(ReactOnRails::Error, msg)
       end
     end
 
@@ -210,7 +167,7 @@ module ReactOnRails
           information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
         MSG
 
-        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
+        expect { described_class.instance.generate_packs_if_stale }.to raise_error(ReactOnRails::Error, msg)
       end
     end
 
@@ -221,7 +178,7 @@ module ReactOnRails
       before do
         stub_webpacker_source_path(component_name: component_name,
                                    webpacker_source_path: webpacker_source_path)
-        described_class.generate
+        described_class.instance.generate_packs_if_stale
       end
 
       it "creates generated pack directory" do
@@ -232,8 +189,7 @@ module ReactOnRails
         expect(File.exist?(generated_server_bundle_file_path)).to eq(true)
       end
 
-      it "creates pack for ComponentWithClientOnly with correct extension" do
-        expect(File.extname(component_pack)).to eq(PacksGenerator::GENERATED_PACK_EXTENSION)
+      it "creates pack for ComponentWithClientOnly" do
         expect(File.exist?(component_pack)).to eq(true)
       end
 
@@ -264,25 +220,37 @@ module ReactOnRails
       end
 
       it "does not generate packs if there are no new components or stale files" do
-        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
+        expect do
+          described_class.instance.generate_packs_if_stale
+        end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
 
-        expect { described_class.generate }.not_to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
+        expect do
+          described_class.instance.generate_packs_if_stale
+        end.not_to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
       end
 
       it "generate packs if a new component is added" do
-        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
+        expect do
+          described_class.instance.generate_packs_if_stale
+        end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
 
         create_new_component("NewComponent")
 
-        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
+        expect do
+          described_class.instance.generate_packs_if_stale
+        end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
       end
 
       it "generate packs if an old component is updated" do
-        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
+        expect do
+          described_class.instance.generate_packs_if_stale
+        end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
 
         create_new_component(component_name)
 
-        expect { described_class.generate }.to output(GENERATED_PACKS_CONSOLE_OUTPUT_TEXT).to_stdout
+        expect do
+          described_class.instance.generate_packs_if_stale
+        end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
       end
 
       def create_new_component(name)
@@ -294,7 +262,7 @@ module ReactOnRails
     end
 
     def generated_server_bundle_file_path
-      "#{webpacker_source_entry_path}/server-bundle-generated.js"
+      "#{Pathname(webpacker_source_entry_path).parent}/server-bundle-generated.js"
     end
 
     def stub_webpacker_source_path(webpacker_source_path:, component_name:)

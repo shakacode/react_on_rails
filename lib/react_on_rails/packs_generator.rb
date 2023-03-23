@@ -78,6 +78,8 @@ module ReactOnRails
     end
 
     def add_generated_pack_to_server_bundle
+      return if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
+
       relative_path_to_generated_server_bundle = relative_path(server_bundle_entrypoint,
                                                                generated_server_bundle_file_path)
       content = <<~FILE_CONTENT
@@ -93,9 +95,11 @@ module ReactOnRails
     end
 
     def generated_server_bundle_file_path
+      return server_bundle_entrypoint if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
+
       generated_server_bundle_file_path = server_bundle_entrypoint.sub(".js", "-generated.js")
       generated_server_bundle_file_name = component_name(generated_server_bundle_file_path)
-      source_entry_path = ReactOnRails::WebpackerUtils.webpacker_source_entry_path
+      source_entry_path = Pathname(ReactOnRails::WebpackerUtils.webpacker_source_entry_path).parent
 
       "#{source_entry_path}/#{generated_server_bundle_file_name}.js"
     end

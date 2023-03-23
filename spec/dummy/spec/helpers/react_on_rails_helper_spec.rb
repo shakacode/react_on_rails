@@ -9,6 +9,7 @@ end
 
 # rubocop:disable Metrics/BlockLength
 describe ReactOnRailsHelper, type: :helper do
+  include Webpacker::Helper
   before do
     allow(self).to receive(:request) {
       Struct.new("Request", :original_url, :env)
@@ -34,6 +35,41 @@ describe ReactOnRailsHelper, type: :helper do
 
   let(:json_string_unsanitized) do
     "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"</script><script>alert('foo')</script>\"}"
+  end
+
+  describe "#load_pack_for_component" do
+    context "when the entrypoint doesn't exist" do
+      before do
+        allow(File).to receive(:exist?).and_return(false)
+        stub = instance_double(ReactOnRails::PacksGenerator)
+        allow(ReactOnRails::PacksGenerator).to receive(:instance).and_return(stub)
+        allow(stub).to receive(:generate_packs_if_stale)
+      end
+
+      it "throws an error in development" do
+        ENV["RAILS_ENV"] = "development"
+        expect { helper.load_pack_for_component("component_name") }.to raise_error(ReactOnRails::Error)
+        ENV["RAILS_ENV"] = "test"
+      end
+
+      it "generates prefixed js/css pack tags in production" do
+        allow(helper).to receive(:append_javascript_pack_tag)
+        expect { helper.load_pack_for_component("component_name") }.not_to raise_error
+        expect(helper).to have_received(:append_javascript_pack_tag).with("component_name")
+      end
+    end
+
+    context "when the entrypoint does exist" do
+      before do
+        allow(File).to receive(:exist?).and_return(true)
+      end
+
+      it "does not add a prefix for components outside the components_subdirectory" do
+        allow(helper).to receive(:append_javascript_pack_tag)
+        expect { helper.load_pack_for_component("component_name") }.not_to raise_error
+        expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name")
+      end
+    end
   end
 
   describe "#json_safe_and_pretty(hash_or_string)" do
