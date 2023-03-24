@@ -46,6 +46,7 @@ group :test do
   gem "rspec_junit_formatter"
   gem "rspec-rails"
   gem "rspec-retry"
-  gem "selenium-webdriver"
-  gem "webdrivers", "3.9.4"
+  # https://github.com/SeleniumHQ/selenium/issues/11815#issuecomment-1484208148
+  gem "selenium-webdriver", "4.8.1"
+  gem "webdrivers"
 end
