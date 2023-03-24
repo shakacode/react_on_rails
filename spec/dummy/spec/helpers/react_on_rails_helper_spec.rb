@@ -9,6 +9,8 @@ end
 
 # rubocop:disable Metrics/BlockLength
 describe ReactOnRailsHelper, type: :helper do
+  include Webpacker::Helper
+
   before do
     allow(self).to receive(:request) {
       Struct.new("Request", :original_url, :env)
