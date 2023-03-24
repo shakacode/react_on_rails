@@ -20,15 +20,11 @@ namespace :run_rspec do
 
   desc "Runs dummy rspec with turbolinks"
   task dummy: ["dummy_apps:dummy_app"] do
-    clean_gen_assets(spec_dummy_dir)
-    bundle_install_in(dummy_app_dir)
     run_tests_in(spec_dummy_dir)
   end
 
   desc "Runs dummy rspec without turbolinks"
   task dummy_no_turbolinks: ["dummy_apps:dummy_app"] do
-    clean_gen_assets(spec_dummy_dir)
-    bundle_install_in(dummy_app_dir)
     run_tests_in(spec_dummy_dir,
                  env_vars: "DISABLE_TURBOLINKS=TRUE",
                  command_name: "dummy_no_turbolinks")
@@ -109,9 +105,4 @@ def run_tests_in(dir, options = {})
   env_vars = +"#{options.fetch(:env_vars, '')} TEST_ENV_COMMAND_NAME=\"#{command_name}\""
   env_vars << "COVERAGE=true" if ENV["USE_COVERALLS"]
   sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
-end
-
-def clean_gen_assets(dir)
-  path = calc_path(dir)
-  sh_in_dir(path.realpath, "yarn run build:clean")
 end
