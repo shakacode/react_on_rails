@@ -15,6 +15,7 @@ jobs:
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby }}
+        bundler: 2.4.9
     - name: Print system information
       run: |
         echo "Linux release: "; cat /etc/issue
