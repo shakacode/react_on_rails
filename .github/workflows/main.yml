@@ -15,6 +15,7 @@ jobs:
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby }}
+        bundler: 2.4.9
     # libyaml-dev is needed for psych v5
     # this gem depends on sdoc which depends on rdoc which depends on psych
     - name: Fix dependency for libyaml-dev
@@ -60,6 +61,8 @@ jobs:
         key: v5-dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
     - name: Install Ruby Gems for dummy app
       run: cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+    - name: clear generated file system-based packs
+      run: rm -rf spec/dummy/client/app/generated
     - name: generate file system-based packs
       run: cd spec/dummy && RAILS_ENV=test bundle exec rake react_on_rails:generate_packs
     - name: Build test bundles for dummy app
@@ -126,7 +129,6 @@ jobs:
       with:
         path: spec/dummy/public/webpack
         key: v5-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
-
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji
@@ -152,16 +154,12 @@ jobs:
           sudo apt-get install google-chrome-stable
           echo -e "\nInstalled $(google-chrome --version)"
         fi
-    - name: Touch webpack bundles
-      run: touch spec/dummy/public/webpack/test/*
     - name: Install yalc globally
       run: sudo yarn global add yalc
     - name: Increase the amount of inotify watchers
       run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
-    - name: Prep for CI
-      run: bundle exec rails prepare_for_ci
     - name: Main CI
-      run: bundle exec rails ${{ matrix.rake_task }}
+      run: bundle exec rake ${{ matrix.rake_task }}
     - name: Store test results
       uses: actions/upload-artifact@v2
       with:
