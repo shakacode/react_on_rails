@@ -317,6 +317,7 @@ PLATFORMS
 DEPENDENCIES
   amazing_print
   bootsnap
+  bundler (= 2.4.9)
   capybara
   capybara-screenshot
   coveralls
@@ -353,4 +354,4 @@ DEPENDENCIES
   webdrivers (= 3.9.4)
 
 BUNDLED WITH
-   2.3.5
+   2.4.9
