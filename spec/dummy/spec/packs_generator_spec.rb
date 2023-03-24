@@ -44,59 +44,17 @@ module ReactOnRails
       File.truncate(server_bundle_js_file_path, 0)
     end
 
-    context "when webpacker is not installed" do
-      before do
-        allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(false)
-      end
-
-      it "raises an error" do
-        msg = <<~MSG
-          **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker \
-          6.5.1 or above to use the \
-          automated bundle generation feature.
-        MSG
-
-        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
-      end
-    end
-
-    context "when shakapacker version requirements not met" do
-      before do
-        allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.0")
-      end
-
-      after do
-        allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.1")
-      end
-
-      it "raises an error" do
-        msg = <<~MSG
-          **ERROR** ReactOnRails: Please upgrade Shakapacker to version 6.5.1 or \
-          above to use the automated bundle generation feature. The currently installed version is \
-          6.5.0.
-        MSG
-
-        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
-      end
-    end
-
-    context "when nested_entries not enabled" do
-      before do
-        allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(false)
-      end
-
-      after do
-        allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(true)
-      end
-
-      it "raises an error" do
-        msg = <<~MSG
-          **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
-          webpacker.yml to enable nested entries. for more information read
-          https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
-        MSG
-
-        expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
+    context "when the generated server bundle is configured as ReactOnRails.configuration.server_bundle_js_file" do
+      it "generates the server bundle within the source_entry_point" do
+        FileUtils.mv(server_bundle_js_file_path, "./temp")
+        FileUtils.rm_rf server_bundle_js_file_path
+        ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = true
+        described_class.instance.generate_packs_if_stale
+        expect(File.exist?(server_bundle_js_file_path)).to equal(true)
+        expect(File.exist?("#{Pathname(webpacker_source_entry_path).parent}/server-bundle-generated.js"))
+          .to equal(false)
+        FileUtils.mv("./temp", server_bundle_js_file_path)
+        ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = false
       end
     end
 

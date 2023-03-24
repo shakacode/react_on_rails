@@ -313,15 +313,7 @@ module ReactOnRails
       @rails_context.merge(serverSide: server_side)
     end
 
-    def load_pack_for_component(component_name)
-      is_component_pack_present = File.exist?(generated_components_pack_path(component_name))
-      is_development = ENV["RAILS_ENV"] == "development"
-
-      if is_development && !is_component_pack_present
-        ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
-        raise_missing_pack_error(component_name)
-      end
-
+    def load_pack_for_generated_components(component_name)
       ReactOnRails::WebpackerUtils.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
 
       append_javascript_pack_tag "generated/#{component_name}"
@@ -446,7 +438,11 @@ module ReactOnRails
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
 
-      load_pack_for_component react_component_name if render_options.auto_load_bundle
+      if render_options.auto_load_bundle
+        is_component_pack_present = File.exist?(generated_components_pack_path(react_component_name))
+
+        load_pack_for_generated_components(react_component_name) if is_component_pack_present
+      end
 
       {
         render_options: render_options,
@@ -549,16 +545,6 @@ module ReactOnRails
         JS
       end
       result
-    end
-
-    def raise_missing_pack_error(component_name)
-      msg = <<~MSG
-        **ERROR** ReactOnRails: Generated missing pack for Component: #{component_name}. Please restart the webpack dev server or webpack in watch mode, to ensure webpack generates the chunks corresponding to #{component_name} component. If the problem persists
-        1. Verify `components_subdirectory` is configured in `config/initializers/react_on_rails`.
-        2. Component: #{component_name} is placed inside the configured `components_subdirectory`.
-      MSG
-
-      raise ReactOnRails::Error, msg
     end
 
     def replay_console_option(val)
