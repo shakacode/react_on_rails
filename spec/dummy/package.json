@@ -75,7 +75,7 @@
     "lint": "cd ../.. && yarn run lint",
     "format": "cd ../.. && yarn start format",
     "test": "yarn run build:test && yarn run lint && rspec",
-    "build:test": "rm -rf public/webpack/test && yarn build:rescript && RAILS_ENV=test NODE_ENV=test bin/webpacker",
+    "build:test": "rm -rf public/webpack/test && yarn build:rescript && RAILS_ENV=test NODE_ENV=production bin/webpacker",
     "build:dev": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/webpacker --watch",
     "build:dev:server": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/webpacker --watch",
     "build:dev:watch": "rescript build -w && RAILS_ENV=development NODE_ENV=development bin/webpacker --watch",
