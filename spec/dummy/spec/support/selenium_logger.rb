@@ -11,7 +11,7 @@ RSpec.configure do |config|
 
     errors = []
 
-    page.driver.browser.manage.logs.get(:browser).each do |entry|
+    page.driver.browser.logs.get(:browser).each do |entry|
       # can't use match? on Ruby 2.2. Uncomment when Ruby 2.4 is used for all test platforms
       # next if entry.message.match?(/Download the React DevTools for a better development experience/)
       next if entry.message.include?("Download the React DevTools for a better development experience")
@@ -19,7 +19,7 @@ RSpec.configure do |config|
       log_only_list.include?(entry.level) ? puts(entry.message) : errors << entry.message
     end
 
-    page.driver.browser.manage.logs.get(:driver).each do |entry|
+    page.driver.browser.logs.get(:driver).each do |entry|
       log_only_list.include?(entry.level) ? puts(entry.message) : errors << entry.message
     end
 
