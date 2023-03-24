@@ -1,3 +1,4 @@
+# CircleCI is not longer in use by this repository & this file is now for reference only.
 version: 2
 
 aliases:
@@ -53,7 +54,7 @@ aliases:
   - &install-dummy-app-ruby-gems
     name: Install Ruby Gems for dummy app
     command: |
-      gem install bundler
+      gem install bundler:2.4.9
       echo "Bundler version: "; bundle --version
       cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
 
@@ -61,7 +62,7 @@ aliases:
   - &install-package-ruby-gems
     name: Install Ruby Gems for package
     command: |
-      gem install bundler
+      gem install bundler:2.4.9
       echo "Bundler version: "; bundle --version
       bundle lock --add-platform 'x86_64-linux'
       bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
@@ -272,12 +273,12 @@ jobs:
           name: Prep for CI
           # TODO -- need to leverage Circle CI containers
           command: |
-            bundle exec rails prepare_for_ci
+            bundle exec rake prepare_for_ci
       - run:
           name: Main CI
           # TODO -- need to leverage Circle CI containers
           command: |
-            bundle exec rails run_rspec:all_dummy
+            bundle exec rake run_rspec:all_dummy
       # The following step will run only if the main job is finished successfully.
       # Build hook is triggered by curl command described here https://docs.netlify.com/configure-builds/build-hooks/
       # NETLIFY_HOOK is an environment variable on CircleCI to keep sensitive data outside the repo
