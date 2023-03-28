@@ -36,4 +36,6 @@ ReactOnRails.configure do |config|
   config.rendering_props_extension = RenderingPropsExtension
   config.components_subdirectory = "startup"
   config.auto_load_bundle = true
+  config.make_generated_server_bundle_the_entrypoint = true
+  config.defer_generated_component_packs = false
 end
