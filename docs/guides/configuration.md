@@ -183,6 +183,12 @@ ReactOnRails.configure do |config|
   # `render_component` and `render_component_hash`. You may set to true to change the default to auto loading.
   config.auto_load_bundle = false
 
+  # default is false
+  # Set this to true & instead of trying to import the generated server components into your existing
+  # server bundle entrypoint, the PacksGenerator will create a server bundle entrypoint using
+  # config.server_bundle_js_file for the filename.
+  config.make_generated_server_bundle_the_entrypoint = false
+
   ################################################################################
   # I18N OPTIONS
   ################################################################################
