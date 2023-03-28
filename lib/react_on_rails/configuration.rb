@@ -38,7 +38,8 @@ module ReactOnRails
       same_bundle_for_client_and_server: false,
       i18n_output_format: nil,
       components_subdirectory: nil,
-      make_generated_server_bundle_the_entrypoint: false
+      make_generated_server_bundle_the_entrypoint: false,
+      defer_generated_component_packs: true
     )
   end
 
@@ -51,7 +52,8 @@ module ReactOnRails
                   :build_production_command, :i18n_dir, :i18n_yml_dir, :i18n_output_format,
                   :server_render_method, :random_dom_id, :auto_load_bundle,
                   :same_bundle_for_client_and_server, :rendering_props_extension,
-                  :make_generated_server_bundle_the_entrypoint
+                  :make_generated_server_bundle_the_entrypoint,
+                  :defer_generated_component_packs
 
     # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
@@ -62,7 +64,7 @@ module ReactOnRails
                    skip_display_none: nil, generated_assets_dirs: nil,
                    generated_assets_dir: nil, webpack_generated_files: nil,
                    rendering_extension: nil, build_test_command: nil,
-                   build_production_command: nil,
+                   build_production_command: nil, defer_generated_component_packs: nil,
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
@@ -103,6 +105,7 @@ module ReactOnRails
       self.components_subdirectory = components_subdirectory
       self.auto_load_bundle = auto_load_bundle
       self.make_generated_server_bundle_the_entrypoint = make_generated_server_bundle_the_entrypoint
+      self.defer_generated_component_packs = defer_generated_component_packs
     end
     # rubocop:enable Metrics/AbcSize
 
