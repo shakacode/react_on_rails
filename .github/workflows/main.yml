@@ -89,6 +89,7 @@ jobs:
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby }}
+        bundler: 2.4.9
     - name: Setup Node
       uses: actions/setup-node@v2-beta
       with:
