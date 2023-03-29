@@ -23,6 +23,12 @@ RSpec.configure do |config|
       non_error_levels.include?(entry.level) ? puts(entry.message) : errors << entry.message
     end
 
-    raise("Java Script Error(s) on the page:\n\n#{errors.join('\n')}") if errors.present?
+    clean_errors = errors.reject do |err_msg|
+      err_msg.include?("Timed out receiving message from renderer: 0.100") ||
+        err_msg.include?("SharedArrayBuffer will require cross-origin isolation") ||
+        err_msg.include?("You are currently using minified code outside of NODE_ENV === \\\"production\\\"")
+    end
+
+    raise("Java Script Error(s) on the page:\n\n#{errors.join('\n')}") if clean_errors.present?
   end
 end
