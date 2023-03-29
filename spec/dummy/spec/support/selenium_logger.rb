@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.configure do |config|
-  config.after(:each, :js) do |example|
+  config.after(:each, :js) do |_example|
     next unless %i[selenium_chrome selenium_chrome_headless].include?(Capybara.current_driver)
 
     errors = []
@@ -9,7 +9,6 @@ RSpec.configure do |config|
     non_error_levels = %w[DEBUG INFO WARNING]
 
     page.driver.browser.logs.get(:browser).each do |entry|
-
       pretty_message = if entry.message.match?(%r{http://(127.0.0.1|app.lvh.me)[^ ]+ [\d:]+ })
                          entry.message[/[^ ]+ [^ ]+ (.*)$/, 1]&.gsub(/\A"|"\Z/, "")&.gsub(/\\n/, "\n")
                        else

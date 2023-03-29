@@ -107,7 +107,7 @@ describe "Pages/client_side_log_throw", :js, :ignore_js_errors do
   end
 end
 
-describe "Pages/Pure Component", :focus, :js do
+describe "Pages/Pure Component", :js do
   subject { page }
 
   before { visit "/pure_component" }
