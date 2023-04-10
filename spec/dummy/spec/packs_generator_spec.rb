@@ -93,7 +93,7 @@ module ReactOnRails
         msg = <<~MSG
           **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
           webpacker.yml to enable nested entries. for more information read
-          https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
+          https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation/#enable-nested_entries-for-shakapacker
         MSG
 
         expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
@@ -153,7 +153,7 @@ module ReactOnRails
         msg = <<~MSG
           **ERROR** ReactOnRails: client specific definition for Component '#{component_name}' overrides the \
           common definition. Please delete the common definition and have separate server and client files. For more \
-          information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+          information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation/
         MSG
 
         expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
@@ -173,7 +173,7 @@ module ReactOnRails
         msg = <<~MSG
           **ERROR** ReactOnRails: server specific definition for Component '#{component_name}' overrides the \
           common definition. Please delete the common definition and have separate server and client files. For more \
-          information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+          information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation/
         MSG
 
         expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
@@ -207,7 +207,7 @@ module ReactOnRails
       it "raises missing client file error" do
         msg = <<~MSG
           **ERROR** ReactOnRails: Component '#{component_name}' is missing a client specific file. For more \
-          information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+          information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation/
         MSG
 
         expect { described_class.generate }.to raise_error(ReactOnRails::Error, msg)
