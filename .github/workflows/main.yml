@@ -1,6 +1,6 @@
 name: Main test
 
-on: [push, pull_request]
+on: [push]
 
 jobs:
   build-dummy-app-webpack-test-bundles:
@@ -34,7 +34,7 @@ jobs:
         echo "Yarn version: "; yarn --version
         echo "Bundler version: "; bundle --version
     - name: Save root node_modules to cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: node_modules
         key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
@@ -46,7 +46,7 @@ jobs:
     - name: yalc publish for react-on-rails
       run: yalc publish
     - name: Save spec/dummy/node_modules to cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: spec/dummy/node_modules
         key: v5-dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/yarn.lock') }}
@@ -55,7 +55,7 @@ jobs:
     - name: Install Node modules with Yarn for dummy app
       run: cd spec/dummy && yarn install --no-progress --no-emoji
     - name: Save dummy app ruby gems to cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: spec/dummy/vendor/bundle
         key: v5-dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
@@ -70,7 +70,7 @@ jobs:
     - id: get-sha
       run: echo "::set-output name=sha::$(git rev-parse HEAD)"
     - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
-      uses: actions/cache@v2
+      uses: actions/cache/save@v3
       with:
         path: spec/dummy/public/webpack
         key: v5-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
@@ -104,29 +104,29 @@ jobs:
         echo "Yarn version: "; yarn --version
         echo "Bundler version: "; bundle --version
     - name: Save root node_modules to cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: node_modules
         key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
     - name: Save root ruby gems to cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: vendor/bundle
         key: v5-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
     - name: Save dummy app ruby gems to cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: spec/dummy/vendor/bundle
         key: v5-dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
     - name: Save spec/dummy/node_modules to cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: spec/dummy/node_modules
         key: v5-dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/yarn.lock') }}
     - id: get-sha
       run: echo "::set-output name=sha::$(git rev-parse HEAD)"
     - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: spec/dummy/public/webpack
         key: v5-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
