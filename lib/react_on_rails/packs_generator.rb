@@ -220,12 +220,11 @@ module ReactOnRails
 
     def stale_or_missing_packs?
       component_files = common_component_to_path.values + client_component_to_path.values
-      most_recent_mtime = Utils.find_most_recent_mtime(component_files)
+      most_recent_mtime = Utils.find_most_recent_mtime(component_files).to_i
 
       component_files.each_with_object([]).any? do |file|
         path = generated_pack_path(file)
-
-        !File.exist?(path) || File.mtime(path) < most_recent_mtime
+        !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
       end
     end
   end

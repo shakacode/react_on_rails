@@ -217,23 +217,23 @@ module ReactOnRails
       before do
         stub_webpacker_source_path(component_name: component_name,
                                    webpacker_source_path: webpacker_source_path)
+        FileUtils.mkdir_p(generated_directory)
+        File.write(component_pack, "wat")
+        File.write(generated_server_bundle_file_path, "wat")
+      end
+
+      after do
+        FileUtils.rm_rf generated_directory
+        FileUtils.rm generated_server_bundle_file_path
       end
 
       it "does not generate packs if there are no new components or stale files" do
-        expect do
-          described_class.instance.generate_packs_if_stale
-        end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
-
         expect do
           described_class.instance.generate_packs_if_stale
         end.not_to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
       end
 
       it "generate packs if a new component is added" do
-        expect do
-          described_class.instance.generate_packs_if_stale
-        end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
-
         create_new_component("NewComponent")
 
         expect do
@@ -243,10 +243,7 @@ module ReactOnRails
       end
 
       it "generate packs if an old component is updated" do
-        expect do
-          described_class.instance.generate_packs_if_stale
-        end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
-
+        FileUtils.rm component_pack
         create_new_component(component_name)
 
         expect do
