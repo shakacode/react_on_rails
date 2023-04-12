@@ -42,7 +42,7 @@ describe ReactOnRailsHelper, type: :helper do
       allow(helper).to receive(:append_javascript_pack_tag)
       allow(helper).to receive(:append_stylesheet_pack_tag)
       expect { helper.load_pack_for_generated_components("component_name") }.not_to raise_error
-      expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name")
+      expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", {:defer=>false})
       expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
     end
   end
