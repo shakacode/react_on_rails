@@ -79,7 +79,7 @@ jobs:
       matrix:
         ruby: [2.7]
         node: [14]
-        rake_task: ['run_rspec:all_dummy', 'run_rspec:all_but_examples', 'run_rspec:examples']
+        rake_task: ['run_rspec:all_but_examples', 'run_rspec:examples']
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v2
