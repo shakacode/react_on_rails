@@ -185,6 +185,14 @@ Once generated, all server entrypoints will be imported into a file named `[Reac
 
 *Note: If specifying separate definitions for client and server rendering, please make sure to delete the generalized `ComponentName.jsx` file.*
 
+### Integrating auto-bundling into CI workflows
+
+Currently, ReactOnRails contains conditional logic that checks for the existence of generated entrypoint files whenever `react_component` or one of its derivative methods are called. This conditional logic is used to determine the relative file path to provide `append_javascript_pack` as an argument.
+
+This means that `rake react_on_rails:generate_packs` or its programmatic equivalent must be run as a prerequisite to any sort of test or spec that would result in `react_component` or one of its derivative methods being called, even if the generated entrypoint files have already been bundled in a previous workflow/job.
+
+Caching of the generated entrypoints would likely also resolve this issue.
+
 ### Using Automated Bundle Generation Feature with already defined packs
 
 To use the Automated Bundle Generation feature with already defined packs, `config/initializers/react_on_rails` should explicitly be configured with `config.auto_load_bundle = false` and you can explicitly pass `auto_load_bundle` option in [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and  [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) for the components using this feature.
