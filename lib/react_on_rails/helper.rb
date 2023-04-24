@@ -313,7 +313,7 @@ module ReactOnRails
       @rails_context.merge(serverSide: server_side)
     end
 
-    def load_pack_for_generated_components(component_name)
+    def load_pack_for_generated_component(component_name)
       ReactOnRails::WebpackerUtils.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
 
       append_javascript_pack_tag("generated/#{component_name}",
@@ -442,7 +442,7 @@ module ReactOnRails
       if render_options.auto_load_bundle
         is_component_pack_present = File.exist?(generated_components_pack_path(react_component_name))
 
-        load_pack_for_generated_components(react_component_name) if is_component_pack_present
+        load_pack_for_generated_component(react_component_name) if is_component_pack_present
       end
 
       {

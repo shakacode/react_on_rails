@@ -189,9 +189,9 @@ ReactOnRails.configure do |config|
   # config.server_bundle_js_file for the filename.
   config.make_generated_server_bundle_the_entrypoint = false
 
-  # Default is false
-  # Set this to true to have `defer: false` added to your `append_javascript_pack` calls for generated entrypoints.
-  config.defer_generated_component_packs = false
+  # Default is true, which matches Webpacker/Shakapacker's defer default for `append_javascript_pack`
+  # Set this to false to have `defer: false` added to your `append_javascript_pack` calls for generated entrypoints.
+  config.defer_generated_component_packs = true
 
   ################################################################################
   # I18N OPTIONS

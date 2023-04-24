@@ -37,11 +37,11 @@ describe ReactOnRailsHelper, type: :helper do
     "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"</script><script>alert('foo')</script>\"}"
   end
 
-  describe "#load_pack_for_generated_components" do
+  describe "#load_pack_for_generated_component" do
     it "appends js/css pack tag" do
       allow(helper).to receive(:append_javascript_pack_tag)
       allow(helper).to receive(:append_stylesheet_pack_tag)
-      expect { helper.load_pack_for_generated_components("component_name") }.not_to raise_error
+      expect { helper.load_pack_for_generated_component("component_name") }.not_to raise_error
       expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: false })
       expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
     end
