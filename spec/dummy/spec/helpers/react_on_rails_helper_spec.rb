@@ -9,6 +9,7 @@ end
 
 # rubocop:disable Metrics/BlockLength
 describe ReactOnRailsHelper, type: :helper do
+  include Webpacker::Helper
   before do
     allow(self).to receive(:request) {
       Struct.new("Request", :original_url, :env)
@@ -34,6 +35,16 @@ describe ReactOnRailsHelper, type: :helper do
 
   let(:json_string_unsanitized) do
     "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"</script><script>alert('foo')</script>\"}"
+  end
+
+  describe "#load_pack_for_generated_component" do
+    it "appends js/css pack tag" do
+      allow(helper).to receive(:append_javascript_pack_tag)
+      allow(helper).to receive(:append_stylesheet_pack_tag)
+      expect { helper.load_pack_for_generated_component("component_name") }.not_to raise_error
+      expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: false })
+      expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
+    end
   end
 
   describe "#json_safe_and_pretty(hash_or_string)" do

@@ -1,14 +1,11 @@
 import React from 'react';
+import css from '../components/ImageExample/ImageExample.module.scss';
 
-// Note the global alias for image
-// eslint-disable-next-line import/no-unresolved
+// Note the global alias for images
+import bowerLogo from '../components/ImageExample/bower.png';
+import blueprintIcon from '../components/ImageExample/blueprint_icon.svg';
 import logo from 'Assets/images/256egghead.png';
-// eslint-disable-next-line import/no-unresolved
 import legoIcon from 'Assets/images/lego_icon.svg';
-
-import css from './ImageExample.module.scss';
-import bowerLogo from './bower.png';
-import blueprintIcon from './blueprint_icon.svg';
 
 const TestComponent = (_props) => (
   <div>

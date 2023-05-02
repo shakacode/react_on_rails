@@ -9,10 +9,6 @@ module ReactOnRails
   end
 
   DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
-  DEFAULT_COMPONENTS_SUBDIRECTORY = nil
-  DEFAULT_SERVER_RENDER_TIMEOUT = 20
-  DEFAULT_POOL_SIZE = 1
-  DEFAULT_RANDOM_DOM_ID = true # for backwards compatability
 
   def self.configuration
     @configuration ||= Configuration.new(
@@ -28,8 +24,8 @@ module ReactOnRails
       raise_on_prerender_error: Rails.env.development?,
       trace: Rails.env.development?,
       development_mode: Rails.env.development?,
-      server_renderer_pool_size: DEFAULT_POOL_SIZE,
-      server_renderer_timeout: DEFAULT_SERVER_RENDER_TIMEOUT,
+      server_renderer_pool_size: 1,
+      server_renderer_timeout: 20,
       skip_display_none: nil,
       # skip_display_none is deprecated
       webpack_generated_files: %w[manifest.json],
@@ -38,35 +34,37 @@ module ReactOnRails
       server_render_method: nil,
       build_test_command: "",
       build_production_command: "",
-      random_dom_id: DEFAULT_RANDOM_DOM_ID,
+      random_dom_id: true,
       same_bundle_for_client_and_server: false,
       i18n_output_format: nil,
-      components_subdirectory: DEFAULT_COMPONENTS_SUBDIRECTORY
+      components_subdirectory: nil,
+      make_generated_server_bundle_the_entrypoint: false,
+      defer_generated_component_packs: true
     )
   end
 
   class Configuration
     attr_accessor :node_modules_location, :server_bundle_js_file, :prerender, :replay_console,
-                  :trace, :development_mode,
-                  :logging_on_server, :server_renderer_pool_size,
+                  :trace, :development_mode, :logging_on_server, :server_renderer_pool_size,
                   :server_renderer_timeout, :skip_display_none, :raise_on_prerender_error,
-                  :generated_assets_dirs, :generated_assets_dir,
+                  :generated_assets_dirs, :generated_assets_dir, :components_subdirectory,
                   :webpack_generated_files, :rendering_extension, :build_test_command,
-                  :build_production_command,
-                  :i18n_dir, :i18n_yml_dir, :i18n_output_format,
+                  :build_production_command, :i18n_dir, :i18n_yml_dir, :i18n_output_format,
                   :server_render_method, :random_dom_id, :auto_load_bundle,
-                  :same_bundle_for_client_and_server, :rendering_props_extension, :components_subdirectory
+                  :same_bundle_for_client_and_server, :rendering_props_extension,
+                  :make_generated_server_bundle_the_entrypoint,
+                  :defer_generated_component_packs
 
     # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
-                   replay_console: nil,
+                   replay_console: nil, make_generated_server_bundle_the_entrypoint: nil,
                    trace: nil, development_mode: nil,
                    logging_on_server: nil, server_renderer_pool_size: nil,
                    server_renderer_timeout: nil, raise_on_prerender_error: true,
                    skip_display_none: nil, generated_assets_dirs: nil,
                    generated_assets_dir: nil, webpack_generated_files: nil,
                    rendering_extension: nil, build_test_command: nil,
-                   build_production_command: nil,
+                   build_production_command: nil, defer_generated_component_packs: nil,
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
@@ -106,6 +104,8 @@ module ReactOnRails
       self.server_render_method = server_render_method
       self.components_subdirectory = components_subdirectory
       self.auto_load_bundle = auto_load_bundle
+      self.make_generated_server_bundle_the_entrypoint = make_generated_server_bundle_the_entrypoint
+      self.defer_generated_component_packs = defer_generated_component_packs
     end
     # rubocop:enable Metrics/AbcSize
 

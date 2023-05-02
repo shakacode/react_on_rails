@@ -78,6 +78,8 @@ module ReactOnRails
     end
 
     def add_generated_pack_to_server_bundle
+      return if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
+
       relative_path_to_generated_server_bundle = relative_path(server_bundle_entrypoint,
                                                                generated_server_bundle_file_path)
       content = <<~FILE_CONTENT
@@ -93,11 +95,15 @@ module ReactOnRails
     end
 
     def generated_server_bundle_file_path
+      return server_bundle_entrypoint if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
+
       generated_server_bundle_file_path = server_bundle_entrypoint.sub(".js", "-generated.js")
       generated_server_bundle_file_name = component_name(generated_server_bundle_file_path)
-      source_entry_path = ReactOnRails::WebpackerUtils.webpacker_source_entry_path
+      source_entrypoint_parent = Pathname(ReactOnRails::WebpackerUtils.webpacker_source_entry_path).parent
+      generated_nonentrypoints_path = "#{source_entrypoint_parent}/generated"
 
-      "#{source_entry_path}/#{generated_server_bundle_file_name}.js"
+      FileUtils.mkdir_p(generated_nonentrypoints_path)
+      "#{generated_nonentrypoints_path}/#{generated_server_bundle_file_name}.js"
     end
 
     def clean_generated_packs_directory
@@ -214,12 +220,11 @@ module ReactOnRails
 
     def stale_or_missing_packs?
       component_files = common_component_to_path.values + client_component_to_path.values
-      most_recent_mtime = Utils.find_most_recent_mtime(component_files)
+      most_recent_mtime = Utils.find_most_recent_mtime(component_files).to_i
 
       component_files.each_with_object([]).any? do |file|
         path = generated_pack_path(file)
-
-        !File.exist?(path) || File.mtime(path) < most_recent_mtime
+        !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
       end
     end
   end

@@ -8,6 +8,7 @@ gem "sass-rails", "~> 6.0"
 gem "uglifier"
 gem "jquery-rails"
 gem "puma", "~> 5.0"
+gem "bundler", "2.4.9"
 
 # Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
 gem "turbolinks" if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
@@ -46,5 +47,5 @@ group :test do
   gem "rspec-rails"
   gem "rspec-retry"
   gem "selenium-webdriver"
-  gem "webdrivers", "3.9.4"
+  gem "webdrivers"
 end

@@ -17,6 +17,9 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### Added
+- Improved functionality of Filesystem-based pack generation & auto-bundling. Added `make_generated_server_bundle_the_entrypoint` configuration key. [PR 1531](https://github.com/shakacode/react_on_rails/pull/1531) by [judahmeek](https://github.com/judahmeek)
+
 ### [13.3.3] - 2022-03-21
 
 ### Fixed

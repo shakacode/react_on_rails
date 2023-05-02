@@ -178,10 +178,20 @@ ReactOnRails.configure do |config|
   # Change to a value like this example to enable this feature 
   # config.components_subdirectory = "ror_components"
 
-  # Default configuration to auto loading bundles for components.
-  # default is false. The default can be overrident as an option in calls to view helpers
+  # Default is false.
+  # The default can be overidden as an option in calls to view helpers
   # `render_component` and `render_component_hash`. You may set to true to change the default to auto loading.
   config.auto_load_bundle = false
+
+  # Default is false
+  # Set this to true & instead of trying to import the generated server components into your existing
+  # server bundle entrypoint, the PacksGenerator will create a server bundle entrypoint using
+  # config.server_bundle_js_file for the filename.
+  config.make_generated_server_bundle_the_entrypoint = false
+
+  # Default is true, which matches Webpacker/Shakapacker's defer default for `append_javascript_pack`
+  # Set this to false to have `defer: false` added to your `append_javascript_pack` calls for generated entrypoints.
+  config.defer_generated_component_packs = true
 
   ################################################################################
   # I18N OPTIONS

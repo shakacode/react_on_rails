@@ -101,7 +101,7 @@ Your layout would contain:
   <%= stylesheet_pack_tag 'application' %>
 ```
 
-Suppose, you want to use bundle splitting to minimize unnecessary javascript loaded on each page, you would put each of your components in the `packs` directory.
+Now suppose you want to use bundle splitting to minimize unnecessary javascript loaded on each page, you would put each of your components in the `packs` directory.
 
 ```
 app/javascript:
@@ -124,23 +124,26 @@ The tricky part is to figure out which bundles to load on any Rails view. [Shaka
 
 #### Solution
 
-File-system-based automated pack generation simplifies this process with a new option for the view helpers. The steps to use it in this example are:
+File-system-based automated pack generation simplifies this process with a new option for the view helpers.
 
-1. Remove parameters passed directly to `javascript_pack_tag` and `stylesheet_pack_tag`.
-2. Remove parameters passed directly to `append_javascript_pack_tag` and `append_stylesheet_pack_tag`.
+For example, if you wanted to utilize our file-system based entrypoint generation for `FooComponentOne` & `BarComponentOne`, but not `BarComponentTwo` (for whatever reason), then...
+
+1. Remove generated entrypoints from parameters passed directly to `javascript_pack_tag` and `stylesheet_pack_tag`.
+2. Remove generated entrypoints from parameters passed directly to `append_javascript_pack_tag` and `append_stylesheet_pack_tag`.
 
 Your layout would now contain:
 
 ```erb
-  <%= javascript_pack_tag %>
-  <%= stylesheet_pack_tag %>
+  <%= javascript_pack_tag('BarComponentTwo') %>
+  <%= stylesheet_pack_tag('BarComponentTwo') %>
 ```
 
-3. Create a directory structure as mentioned below:
+3. Create a directory structure where the components that you want to be auto-generated are within `ReactOnRails.configuration.components_subdirectory`, which should be a subdirectory of `Shakapacker.config.source_path`:
 
 ```
 app/javascript:
-  └── packs
+  └── packs:
+  │   └── BarComponentTwo.jsx  # Internally uses ReactOnRails.register
   └── src:
   │   └── Foo
   │   │ └── ...
@@ -150,18 +153,20 @@ app/javascript:
   │   │ └── ...
   │   │ └── ror_components          # configured as `components_subdirectory`
   │   │   │ └── BarComponentOne.jsx
+  │   │ └── something_else
   │   │   │ └── BarComponentTwo.jsx
 ```
 
-4. You no longer need to register these React components nor directly add their bundles. For example you can have a Rails view using three components:
+4. You no longer need to register the React components within the `ReactOnRails.configuration.components_subdirectory` nor directly add their bundles. For example you can have a Rails view using three components:
 
 ```erb
+    <% append_javascript_pack('BarComponentTwo'))>
     <%= react_component("FooComponentOne", {}, auto_load_bundle: true) %>
     <%= react_component("BarComponentOne", {}, auto_load_bundle: true) %>
-    <%= react_component("BarComponentTwo", {}, auto_load_bundle: true) %>
+    <%= react_component("BarComponentTwo", {}) %>
 ```
 
-If `FooComponentOne` uses multiple HTML strings for server rendering, the [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper can be used on the Rails view, as illustrated below.
+If a component uses multiple HTML strings for server rendering, the [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper can be used on the Rails view, as illustrated below.
 
 ```erb
 <% foo_component_one_data = react_component_hash("FooComponentOne",
@@ -184,6 +189,14 @@ If server rendering is enabled, the component will be registered for usage both 
 Once generated, all server entrypoints will be imported into a file named `[ReactOnRails.configuration.server_bundle_js_file]-generated.js`, which in turn will be imported into a source file named the same as `ReactOnRails.configuration.server_bundle_js_file`. If your server bundling logic is such that your server bundle source entrypoint is not named the same as your `ReactOnRails.configuration.server_bundle_js_file` & changing it would be difficult, please let us know.
 
 *Note: If specifying separate definitions for client and server rendering, please make sure to delete the generalized `ComponentName.jsx` file.*
+
+### Integrating auto-bundling into CI workflows
+
+Currently, ReactOnRails contains conditional logic that checks for the existence of generated entrypoint files whenever `react_component` or one of its derivative methods are called. If a generated entrypoint of the same name as provided to `react_component` or `react_component_hash` exists, then an `append_javascript_pack` call is made automatically.
+
+This means that `rake react_on_rails:generate_packs` or its programmatic equivalent must be run as a prerequisite to any sort of test or spec that would result in `react_component` or `react_component_hash` being called, even if the generated entrypoint files have already been bundled in a previous workflow/job.
+
+Caching of the generated entrypoints between workflow/jobs should also resolve this issue.
 
 ### Using Automated Bundle Generation Feature with already defined packs
 
