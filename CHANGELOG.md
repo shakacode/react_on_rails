@@ -20,6 +20,9 @@ Changes since last non-beta release.
 ### Added
 - Improved functionality of Filesystem-based pack generation & auto-bundling. Added `make_generated_server_bundle_the_entrypoint` configuration key. [PR 1531](https://github.com/shakacode/react_on_rails/pull/1531) by [judahmeek](https://github.com/judahmeek)
 
+### Removed
+- Removed unneeded `HMR=true` from `Procfile.dev` in install template [PR 1537](https://github.com/shakacode/react_on_rails/pull/1537) by [ahangarha](https://github.com/ahangarha).
+
 ### [13.3.3] - 2022-03-21
 
 ### Fixed
