@@ -17,6 +17,8 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+### [13.3.4] - 2022-05-23
+
 ### Added
 - Improved functionality of Filesystem-based pack generation & auto-bundling. Added `make_generated_server_bundle_the_entrypoint` configuration key. [PR 1531](https://github.com/shakacode/react_on_rails/pull/1531) by [judahmeek](https://github.com/judahmeek)
 
@@ -1083,7 +1085,9 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.3.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.3.4...master
+[13.3.4]: https://github.com/shakacode/react_on_rails/compare/13.3.3...13.3.4
+[13.3.3]: https://github.com/shakacode/react_on_rails/compare/13.3.2...13.3.3
 [13.3.2]: https://github.com/shakacode/react_on_rails/compare/13.3.1...13.3.2
 [13.3.1]: https://github.com/shakacode/react_on_rails/compare/13.3.0...13.3.1
 [13.3.0]: https://github.com/shakacode/react_on_rails/compare/13.2.0...13.3.0
