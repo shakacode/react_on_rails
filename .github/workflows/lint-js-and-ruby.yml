@@ -1,6 +1,6 @@
 name: Lint JS and Ruby
 
-on: [push, pull_request]
+on: [push]
 
 jobs:
   build:
