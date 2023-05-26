@@ -218,6 +218,7 @@ describe "Manual client hydration", :js, :focus, type: :system do
     within("#HelloWorldRehydratable-react-component-1") do
       find("input").set "Should update"
       within("h3") do
+        p page.driver.browser.logs.get(:browser)
         expect(page).to have_content "Should update"
       end
     end
