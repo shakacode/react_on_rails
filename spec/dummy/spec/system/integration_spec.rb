@@ -210,7 +210,7 @@ end
 describe "Manual client hydration", :js, type: :system do
   before { visit "/xhr_refresh" }
 
-  it "HelloWorldRehydratable onChange should trigger" do
+  it "HelloWorldRehydratable should register" do
     within("form") do
       click_button "refresh"
     end
