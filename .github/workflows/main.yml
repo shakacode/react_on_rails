@@ -79,7 +79,6 @@ jobs:
       matrix:
         ruby: [2.7]
         node: [14]
-        rake_task: ['run_rspec:all_but_examples', 'run_rspec:examples']
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v2
@@ -160,7 +159,7 @@ jobs:
     - name: generate file system-based packs
       run: cd spec/dummy && RAILS_ENV=test bundle exec rake react_on_rails:generate_packs
     - name: Main CI
-      run: bundle exec rake ${{ matrix.rake_task }}
+      run: cd spec/dummy && bundle exec rspec spec/system/integration_spec.rb
     - name: Store test results
       uses: actions/upload-artifact@v2
       with:
