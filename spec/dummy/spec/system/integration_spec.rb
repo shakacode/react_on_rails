@@ -207,7 +207,7 @@ describe "renderedHtml from generator function", :js do
   end
 end
 
-describe "Manual client hydration", :js, type: :system do
+describe "Manual client hydration", :js, :focus, type: :system do
   before { visit "/xhr_refresh" }
 
   it "HelloWorldRehydratable should register" do
