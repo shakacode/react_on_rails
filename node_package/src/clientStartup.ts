@@ -311,10 +311,10 @@ export function clientStartup(context: Context): void {
   // If lazy asynch loading is used, such as with loadable-components, then the init
   // function will install some handler that will properly know when to do hyrdation.
   if (document.readyState !== 'loading') {
-    console.log("renderInit used with setTimeout")
+    console.warn("renderInit used with setTimeout")
     window.setTimeout(renderInit);
   } else {
-    console.log("renderInit used with eventListener")
+    console.warn("renderInit used with eventListener")
     document.addEventListener('DOMContentLoaded', renderInit);
   }
 }

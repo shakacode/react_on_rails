@@ -33,7 +33,6 @@ export default {
         isRenderer,
       });
 
-      console.warn("Registered components: ");
       registeredComponents.forEach(logRegisteredComponents)
     });
   },
