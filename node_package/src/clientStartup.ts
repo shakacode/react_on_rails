@@ -213,6 +213,7 @@ export function reactOnRailsPageLoaded(): void {
     context.roots = [];
   }
   forEachStore(context, railsContext);
+  console.warn("RoR components are now being rendered.");
   forEachReactOnRailsComponentRender(context, railsContext);
 }
 
@@ -310,8 +311,10 @@ export function clientStartup(context: Context): void {
   // If lazy asynch loading is used, such as with loadable-components, then the init
   // function will install some handler that will properly know when to do hyrdation.
   if (document.readyState !== 'loading') {
+    console.log("renderInit used with setTimeout")
     window.setTimeout(renderInit);
   } else {
+    console.log("renderInit used with eventListener")
     document.addEventListener('DOMContentLoaded', renderInit);
   }
 }
