@@ -2,7 +2,7 @@ import type { RegisteredComponent, ReactComponentOrRenderFunction, RenderFunctio
 import isRenderFunction from './isRenderFunction';
 
 function logRegisteredComponents(value: string, key: string) {
-  console.info(key);
+  console.warn(key);
 }
 
 const registeredComponents = new Map();
@@ -21,7 +21,7 @@ export default {
       if (!component) {
         throw new Error(`Called register with null component named ${name}`);
       }
-      console.info("registering ".concat(name, " component"));
+      console.warn("registering ".concat(name, " component"));
 
       const renderFunction = isRenderFunction(component);
       const isRenderer = renderFunction && (component as RenderFunction).length === 3;
@@ -33,7 +33,7 @@ export default {
         isRenderer,
       });
 
-      console.info("Registered components: ");
+      console.warn("Registered components: ");
       registeredComponents.forEach(logRegisteredComponents)
     });
   },
