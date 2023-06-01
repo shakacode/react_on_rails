@@ -286,6 +286,17 @@ function isWindow(context: Context): context is Window {
   return (context as Window).document !== undefined;
 }
 
+function onPageReady(callback: () => void) {
+  if (document.readyState === "complete") {
+    callback();
+  } else {
+    document.addEventListener("readystatechange", function onReadyStateChange() {
+        onPageReady(callback);
+        document.removeEventListener("readystatechange", onReadyStateChange);
+    });
+  }
+}
+
 export function clientStartup(context: Context): void {
   // Check if server rendering
   if (!isWindow(context)) {
@@ -302,16 +313,5 @@ export function clientStartup(context: Context): void {
   // eslint-disable-next-line no-underscore-dangle, no-param-reassign
   context.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
 
-  debugTurbolinks('Adding DOMContentLoaded event to install event listeners.');
-
-  // So  long as the document is not loading, we can assume:
-  // The document has finished loading and the document has been parsed
-  // but sub-resources such as images, stylesheets and frames are still loading.
-  // If lazy asynch loading is used, such as with loadable-components, then the init
-  // function will install some handler that will properly know when to do hyrdation.
-  if (document.readyState !== 'loading') {
-    window.setTimeout(renderInit);
-  } else {
-    document.addEventListener('DOMContentLoaded', renderInit);
-  }
+  onPageReady(renderInit);
 }

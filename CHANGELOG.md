@@ -17,6 +17,8 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+- Fixed race condition where a react component could attempt to initialize before it had been registered. [PR 1540](https://github.com/shakacode/react_on_rails/pull/1540) by [judahmeek](https://github.com/judahmeek)
+
 ### [13.3.4] - 2022-05-23
 
 ### Added
