@@ -43,7 +43,7 @@ module ReactOnRailsPro
     DEFAULT_EXCLUDED_DEPENDENCY_GLOBS = [].freeze
     DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER = nil
     DEFAULT_RENDERER_REQUEST_RETRY_LIMIT = 5
-    DEFAULT_THROW_JS_ERRORS = false
+    DEFAULT_THROW_JS_ERRORS = true
     DEFAULT_RENDERING_RETURNS_PROMISES = false
 
     attr_accessor :renderer_url, :renderer_password, :tracing,
