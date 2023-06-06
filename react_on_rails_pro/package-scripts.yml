@@ -21,7 +21,7 @@ scripts:
       script: rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node -r source-map-support/register packages/node-renderer/src/default-node-renderer.js
   lint:
     description: Run all linters
-    script: concurrently --prefix "[{name}]" --names "ESLINT, RUBOCOP, PRETTIER" -c "blue,yellow,magenta,orange" "nps eslint" "rubocop" "nps format.listDifferent"
+    script: concurrently --prefix "[{name}]" --names "ESLINT, RUBOCOP, PRETTIER" -c "blue,yellow,magenta,orange" "nps eslint" "bundle exec rubocop" "nps format.listDifferent"
 
   eslint:
     default:
