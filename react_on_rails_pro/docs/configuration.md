@@ -54,13 +54,14 @@ ReactOnRailsPro.configure do |config|
 
   # React on Rails Node Renderer now support render functions returning promises! To enable this optional functionality,
   # toggle the following option.
-  # Default is false
+  # Default is false.
   config.rendering_returns_promises = false
 
   # If you're using the NodeRenderer, a value of true allows errors to be thrown from the bundle
   # code for SSR so that an error tracking system on the NodeRender can use the exceptions.
-  # This value defaults to false. It should only be set to true when using the NodeRender.
-  config.throw_js_errors = false
+  # If you are using ExecJS as your rendering method, set this to false.
+  # Default is true.
+  config.throw_js_errors = true
 
   # You may provide a password and/or a port that will be sent to renderer for simple authentication.
   # `https://:<password>@url:<port>`. For example: https://:myPassword1@renderer:3800. Don't forget
