@@ -72,13 +72,13 @@ aliases:
   - &restore-dummy-app-gem-cache
     name: Restore cached Ruby Gems for dummy app
     keys:
-      - v5-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
+      - v4-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
 
   # Restore vendor/bundle dir from cache using react_on_rails_pro.gemspec checksum as a key.
   - &restore-package-gem-cache
     name: Restore cached Ruby Gems for package
     keys:
-      - v5-package-app-gem-cache-{{ checksum "react_on_rails_pro.gemspec" }}
+      - v4-package-app-gem-cache-{{ checksum "react_on_rails_pro.gemspec" }}
 
     # NOTE: Sometimes CI generated docker images are not updated in time to keep up with the minimum required
     # by chromedriver versions of Chrome. Just bump here Chrome version if chromedriver raises errors
@@ -141,7 +141,6 @@ jobs:
           key: v4-dummy-app-node-modules-cache-{{ checksum "spec/dummy/yarn.lock" }}
           paths:
             - spec/dummy/node_modules
-            - spec/dummy/node_modules
 
   # Install Ruby gems for package with Bundler and save them to cache.
   install-package-ruby-gems:
@@ -187,13 +186,17 @@ jobs:
       - run: *install-dummy-app-node-modules
       - run: *install-dummy-app-ruby-gems
       - run:
+          name: Generate file-system based entrypoints
+          command: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+      - run:
           name: Build test bundles for dummy app
           command: cd spec/dummy && yarn run build:test
       - save_cache:
           name: Save test webpack bundles to cache (for build number checksum used by rspec job)
           key: v4-dummy-app-webpack-bundle-{{ .Revision }}
           paths:
-            - spec/dummy/public/webpack
+            - spec/dummy/public/webpack/test
+
   # Run JS unit tests for Renderer package.
   package-js-tests:
     docker:
@@ -237,6 +240,7 @@ jobs:
       - run: *print-system-info
       - restore_cache: *restore-package-gem-cache
       - restore_cache: *restore-dummy-app-gem-cache
+      - run: rm -rf spec/dummy/public/webpack
       - restore_cache:
           name: Restore cached webpack bundles for dummy app
           key: v4-dummy-app-webpack-bundle-{{ .Revision }}
@@ -245,18 +249,19 @@ jobs:
       - run: *install-latest-chrome
       - run: *install-dummy-app-node-modules
       - run:
+          name: Generate file-system based entrypoints
+          command: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+      - run:
           name: Run Node renderer in a background
           command: cd spec/dummy && yarn run node-renderer
           background: true
       - run:
-          name: Touch webpack bundles
-          command:  touch spec/dummy/public/webpack/test/*
-      - run:
           name: Run rspec tests
           command: |
-            cd spec/dummy && bundle exec rspec --format RspecJunitFormatter \
-                                               --out ~/rspec/rspec.xml \
-                                               --format documentation
+            cd spec/dummy && RAILS_ENV=test bundle exec rspec \
+                                              --format RspecJunitFormatter \
+                                              --out ~/rspec/rspec.xml \
+                                              --format documentation
       - store_test_results:
           path: ~/rspec
       - store_artifacts:
