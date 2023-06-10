@@ -3,7 +3,7 @@ import { ChunkExtractor } from '@loadable/server';
 import { renderToString } from 'react-dom/server';
 import { Helmet } from 'react-helmet';
 
-import App from './LoadableApp';
+import App from '../loadable/LoadableApp';
 
 const loadableApp = (props, _railsContext) => {
   const path = require('path');

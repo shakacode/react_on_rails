@@ -2,40 +2,40 @@ import '../assets/styles/application.css';
 
 import ReactOnRails from 'react-on-rails';
 
-import HelloWorld from '../components/HelloWorld';
+import HelloWorld from '../ror-auto-load-components/HelloWorld';
 
-import HelloWorldWithLogAndThrow from '../components/HelloWorldWithLogAndThrow';
-import HelloWorldES5 from '../components/HelloWorldES5';
-import HelloWorldRehydratable from '../components/HelloWorldRehydratable';
-import HelloWorldApp from '../startup/HelloWorldApp';
-import HelloWorldHooks from '../components/HelloWorldHooks';
-import HelloWorldHooksContext from '../components/HelloWorldHooksContext';
-import BrokenApp from '../startup/BrokenApp';
+import HelloWorldWithLogAndThrow from '../ror-auto-load-components/HelloWorldWithLogAndThrow';
+import HelloWorldES5 from '../ror-auto-load-components/HelloWorldES5';
+import HelloWorldRehydratable from '../ror-auto-load-components/HelloWorldRehydratable';
+import HelloWorldApp from '../ror-auto-load-components/HelloWorldApp';
+import HelloWorldHooks from '../ror-auto-load-components/HelloWorldHooks';
+import HelloWorldHooksContext from '../ror-auto-load-components/HelloWorldHooksContext';
+import BrokenApp from '../ror-auto-load-components/BrokenApp';
 
-import ReduxApp from '../startup/ClientReduxApp';
-import ReduxSharedStoreApp from '../startup/ClientReduxSharedStoreApp';
-import RouterApp from '../startup/ClientRouterApp';
-import PureComponent from '../components/PureComponent';
-import CacheDisabled from '../components/CacheDisabled';
-import CssModulesImagesFontsExample from '../components/CssModulesImagesFontsExample';
-import ManualRenderApp from '../startup/ManualRenderAppRenderer';
+import ReduxApp from '../ror-auto-load-components/ReduxApp.client';
+import ReduxSharedStoreApp from '../ror-auto-load-components/ReduxSharedStoreApp.client';
+import RouterApp from '../ror-auto-load-components/RouterApp.client';
+import PureComponent from '../ror-auto-load-components/PureComponent';
+import CacheDisabled from '../ror-auto-load-components/CacheDisabled';
+import CssModulesImagesFontsExample from '../ror-auto-load-components/CssModulesImagesFontsExample';
+import ManualRenderApp from '../ror-auto-load-components/ManualRenderApp';
 
 import SharedReduxStore from '../stores/SharedReduxStore';
 
 // Deferred render on the client side w/ server render
-import RenderedHtml from '../startup/ClientRenderedHtml';
+import RenderedHtml from '../ror-auto-load-components/RenderedHtml.client';
 
 // Deferred render on the client side w/ server render with additional HTML strings:
-import ReactHelmetApp from '../startup/ReactHelmetClientApp';
+import ReactHelmetApp from '../ror-auto-load-components/ReactHelmetApp.client';
 
 // Demonstrate using Images
-import ImageExample from '../components/ImageExample';
+import ImageExample from '../ror-auto-load-components/ImageExample';
 
-import SetTimeoutLoggingApp from '../startup/SetTimeoutClientApp';
+import SetTimeoutLoggingApp from '../ror-auto-load-components/SetTimeoutLoggingApp.client';
 
-import Loadable from '../startup/loadable-client.imports-loadable';
+import Loadable from '../ror-auto-load-components/Loadable.client';
 
-import ApolloGraphQLApp from '../startup/ApolloGraphQLAppClient';
+import ApolloGraphQLApp from '../ror-auto-load-components/ApolloGraphQLApp.client';
 
 ReactOnRails.setOptions({
   traceTurbolinks: true,
