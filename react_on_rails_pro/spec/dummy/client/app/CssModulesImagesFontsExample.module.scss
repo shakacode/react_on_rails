@@ -4,7 +4,7 @@
 
 // TODO: Figure out how to get this in a global spot
 $font-family-sans-serif: 'OpenSans-Light';  // apply custom font
-$fonts-url-path: '../assets/fonts';
+$fonts-url-path: './assets/fonts';
 @font-face {
   font-family: 'OpenSans-Light';
   src: url('#{$fonts-url-path}/OpenSans-Light.ttf') format('truetype');
@@ -14,7 +14,7 @@ $fonts-url-path: '../assets/fonts';
 }
 
 // Small image is url encode
-$check-svg: url("../assets/images/guest-list-accepted.png");
+$check-svg: url("./assets/images/guest-list-accepted.png");
 $check-size: 132px;
 .check {
   display: inline-block;
@@ -25,7 +25,7 @@ $check-size: 132px;
 }
 
 // Relative path of larger image
-$last-call-svg: url("../assets/images/last-call.png");
+$last-call-svg: url("./assets/images/last-call.png");
 $last-call-width: 1440px;
 $last-call-height: 373px;
 
@@ -38,7 +38,7 @@ $last-call-height: 373px;
 }
 
 // This is an absolute path to the image, defined in app-variables.scss
-$images-url-path: '../assets/images';
+$images-url-path: './assets/images';
 
 $rails-on-maui-width: 140px;
 $rails-on-maui-height: 40px;

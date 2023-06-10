@@ -1,11 +1,11 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import css from './ImageExample.module.scss';
+import css from '../components/ImageExample/ImageExample.module.scss';
 
 // Note the global alias for images
 import logo from 'Assets/images/256egghead.png';
-import bowerLogo from './bower.png';
-import blueprintIcon from './blueprint_icon.svg';
+import bowerLogo from '../components/ImageExample/bower.png';
+import blueprintIcon from '../components/ImageExample/blueprint_icon.svg';
 import legoIcon from 'Assets/images/lego_icon.svg';
 const TestComponent = (props) => (
   <div>

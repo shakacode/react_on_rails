@@ -1,6 +1,6 @@
 // Top level component for simple client side only rendering
 import React from 'react';
-import HelloWorld from '../components/HelloWorld';
+import HelloWorld from './HelloWorld';
 
 /*
  *  Export a function that takes the props and returns a ReactComponent.
