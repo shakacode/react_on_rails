@@ -14,6 +14,7 @@ module.exports = function (api) {
       ],
     ].filter(Boolean),
     plugins: [
+      '@babel/plugin-proposal-export-default-from',
       process.env.WEBPACK_SERVE && 'react-refresh/babel',
       '@loadable/babel-plugin',
       isProductionEnv && [

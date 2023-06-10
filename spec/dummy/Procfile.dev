@@ -10,4 +10,3 @@ rails-server-assets: HMR=true SERVER_BUNDLE_ONLY=yes bin/webpacker --watch
 
 # Start Node server for server rendering.
 node-renderer: RENDERER_LOG_LEVEL=debug yarn run node-renderer
-spec/dummy/Procfile.dev
