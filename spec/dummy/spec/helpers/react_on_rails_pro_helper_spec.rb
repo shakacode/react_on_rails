@@ -9,6 +9,7 @@ describe ReactOnRailsProHelper, type: :helper do
   # In order to test the pro helper, we need to load the methods from the regular helper.
   # I couldn't see any easier way to do this.
   include ReactOnRails::Helper
+  include Webpacker::Helper
   before do
     allow(self).to receive(:request) {
       RequestDetails.new("http://foobar.com/development", { "HTTP_ACCEPT_LANGUAGE" => "en" })
@@ -50,7 +51,7 @@ describe ReactOnRailsProHelper, type: :helper do
     end
 
     describe "caching" do
-      describe "ReactOnRailsProHeler.cached_react_component" do
+      describe "ReactOnRailsProHelper.cached_react_component" do
         it "caches the content" do
           props = { a: 1, b: 2 }
 

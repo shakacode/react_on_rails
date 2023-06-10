@@ -7,6 +7,28 @@
 require "react_on_rails/helper"
 
 module ReactOnRailsProHelper
+  def fetch_react_component(component_name, options)
+    if ReactOnRailsPro::Cache.use_cache?(options)
+      cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
+      Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
+      cache_options = options[:cache_options]
+      cache_hit = true
+      result = Rails.cache.fetch(cache_key, cache_options) do
+        cache_hit = false
+        yield
+      end
+      load_pack_for_generated_component(component_name) if ReactOnRails.configuration.auto_load_bundle && cache_hit
+      # Pass back the cache key in the results only if the result is a Hash
+      if result.is_a?(Hash)
+        result[:RORP_CACHE_KEY] = cache_key
+        result[:RORP_CACHE_HIT] = cache_hit
+      end
+      result
+    else
+      yield
+    end
+  end
+
   # Provide caching support for react_component in a manner akin to Rails fragment caching.
   # All the same options as react_component apply with the following difference:
   #
@@ -23,10 +45,12 @@ module ReactOnRailsProHelper
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
 
-      ReactOnRailsPro::Cache.fetch_react_component(component_name, raw_options) do
+      fetch_react_component(component_name, raw_options) do
         sanitized_options = raw_options
         sanitized_options[:props] = yield
         sanitized_options[:skip_prerender_cache] = true
+        sanitized_options[:auto_load_bundle] =
+          ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
         react_component(component_name, sanitized_options)
       end
     end
@@ -50,10 +74,12 @@ module ReactOnRailsProHelper
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
 
-      ReactOnRailsPro::Cache.fetch_react_component(component_name, raw_options) do
+      fetch_react_component(component_name, raw_options) do
         sanitized_options = raw_options
         sanitized_options[:props] = yield
         sanitized_options[:skip_prerender_cache] = true
+        sanitized_options[:auto_load_bundle] =
+          ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
         react_component_hash(component_name, sanitized_options)
       end
     end
