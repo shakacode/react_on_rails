@@ -113,9 +113,7 @@ module ReactOnRails
 
         def eval_js(js_code, _render_options)
           @js_context_pool.with do |js_context|
-            result = js_context.eval(js_code)
-            js_context.eval("console.history = []")
-            result
+            js_context.eval(js_code)
           end
         end
 
