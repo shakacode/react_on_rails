@@ -40,13 +40,17 @@ module ReactOnRails
           var railsContext = #{rails_context};
         #{redux_stores}
           var props = #{props_string};
-          return ReactOnRails.serverRenderReactComponent({
-            name: '#{react_component_name}',
-            domNodeId: '#{render_options.dom_id}',
-            props: props,
-            trace: #{render_options.trace},
-            railsContext: railsContext
-          });
+          try {
+            return ReactOnRails.serverRenderReactComponent({
+              name: '#{react_component_name}',
+              domNodeId: '#{render_options.dom_id}',
+              props: props,
+              trace: #{render_options.trace},
+              railsContext: railsContext
+            });
+          } finally {
+            console.history = [];
+          }
         })()
         JS
       end
