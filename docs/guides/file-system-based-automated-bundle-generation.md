@@ -1,5 +1,3 @@
-Attention! If you are visiting this doc because you are encountering new failures on CI while implementing this feature, be sure to read [our section specifically for CI integration](#integrating-auto-bundling-into-ci-workflows)!
-
 # File-System-Based Automated Bundle Generation
 
 To use the automated bundle generation feature introduced in React on Rails v13.1.0, please upgrade to use [Shakapacker v6.5.1](https://github.com/shakacode/shakapacker/tree/v6.5.1) at least. If you are currently using webpacker, please follow the migration steps available [here](https://github.com/shakacode/shakapacker/blob/master/docs/v6_upgrade.md).
@@ -195,13 +193,5 @@ Once generated, all server entrypoints will be imported into a file named `[Reac
 ### Using Automated Bundle Generation Feature with already defined packs
 
 As of version 13.3.4, bundles inside of directories that match `config.components_subdirectory` will be automatically added as entrypoints, while bundles outside of those directories will have to be manually added to the Shakapacker.config.source_entry_path or Webpack's `entry` rules.
-
-### Integrating auto-bundling into CI workflows
-
-Currently, ReactOnRails contains conditional logic that checks for the existence of generated entrypoint files whenever `react_component` or one of its derivative methods are called. If a generated entrypoint of the same name as provided to `react_component` or `react_component_hash` exists, then an `append_javascript_pack` call is made automatically.
-
-This means that `rake react_on_rails:generate_packs` or its programmatic equivalent must be run as a prerequisite to any sort of test or spec that would result in `react_component` or `react_component_hash` being called, even if the generated entrypoint files have already been bundled in a previous workflow/job.
-
-Caching of the generated entrypoints between workflow/jobs should also resolve this issue.
 
 

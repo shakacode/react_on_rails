@@ -313,20 +313,25 @@ module ReactOnRails
       @rails_context.merge(serverSide: server_side)
     end
 
-    def load_pack_for_generated_component(component_name)
-      ReactOnRails::WebpackerUtils.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
+    def load_pack_for_generated_component(react_component_name, render_options)
+      return unless render_options.auto_load_bundle
 
-      append_javascript_pack_tag("generated/#{component_name}",
+      ReactOnRails::WebpackerUtils.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
+      if Rails.env.development?
+        is_component_pack_present = File.exist?(generated_components_pack_path(react_component_name))
+        raise_missing_autoloaded_bundle(react_component_name) unless is_component_pack_present
+      end
+      append_javascript_pack_tag("generated/#{react_component_name}",
                                  defer: ReactOnRails.configuration.defer_generated_component_packs)
-      append_stylesheet_pack_tag("generated/#{component_name}")
+      append_stylesheet_pack_tag("generated/#{react_component_name}")
     end
 
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
     private
 
-    def generated_components_pack_path(component_name)
-      "#{ReactOnRails::WebpackerUtils.webpacker_source_entry_path}/generated/#{component_name}.js"
+    def generated_components_pack_path(react_component_name)
+      "#{ReactOnRails::WebpackerUtils.webpacker_source_entry_path}/generated/#{react_component_name}.js"
     end
 
     def build_react_component_result_for_server_rendered_string(
@@ -439,11 +444,7 @@ module ReactOnRails
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
 
-      if render_options.auto_load_bundle
-        is_component_pack_present = File.exist?(generated_components_pack_path(react_component_name))
-
-        load_pack_for_generated_component(react_component_name) if is_component_pack_present
-      end
+      load_pack_for_generated_component(react_component_name, render_options)
 
       {
         render_options: render_options,
@@ -563,6 +564,17 @@ module ReactOnRails
       include ScoutApm::Tracer
       instrument_method :react_component, type: "ReactOnRails", name: "react_component"
       instrument_method :react_component_hash, type: "ReactOnRails", name: "react_component_hash"
+    end
+
+    def raise_missing_autoloaded_bundle(react_component_name)
+      msg = <<~MSG
+        **ERROR** ReactOnRails: Component "#{react_component_name}" is configured as "auto_load_bundle: true"
+        but the generated component entrypoint, which should have been at #{generated_components_pack_path(react_component_name)},
+        is missing. You might want to check that this component is in a directory named "#{ReactOnRails.configuration.components_subdirectory}"
+        & that "bundle exec rake react_on_rails:generate_packs" has been run.
+      MSG
+
+      raise ReactOnRails::Error, msg
     end
   end
 end
