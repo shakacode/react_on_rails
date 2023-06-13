@@ -80,7 +80,7 @@ module ReactOnRails
           .and_return(true)
         expect do
           ReactOnRails.configure do |config|
-            config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
+            config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
           end
         end.to raise_error(ReactOnRails::Error, /webpacker_precompile: false/)
       end
@@ -90,7 +90,7 @@ module ReactOnRails
           .and_return(false)
         expect do
           ReactOnRails.configure do |config|
-            config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
+            config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
           end
         end.not_to raise_error
       end
