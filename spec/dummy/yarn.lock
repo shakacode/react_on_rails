@@ -6482,7 +6482,7 @@ react-is@^18.0.0:
   integrity sha512-xWGDIW6x921xtzPkhiULtthJHoJvBbF3q26fzloPCK0hsvxtPVelvftw3zjbHWSkR2km9Z+4uxbDDK/6Zw9B8w==
 
 "react-on-rails@file:.yalc/react-on-rails":
-  version "12.0.5-beta.0"
+  version "13.3.4"
   dependencies:
     "@babel/runtime-corejs3" "^7.12.5"
     concurrently "^5.1.0"
@@ -7094,10 +7094,10 @@ sha.js@^2.4.0, sha.js@^2.4.8:
     inherits "^2.0.1"
     safe-buffer "^5.0.1"
 
-shakapacker@6.5.1:
-  version "6.5.1"
-  resolved "https://registry.yarnpkg.com/shakapacker/-/shakapacker-6.5.1.tgz#3c1554771c0498ea757cb86dfc06811875f4c2bd"
-  integrity sha512-yOVvek0fxAU3FUjWcT7GxpJ/zAbhKbGEw78HHYfMAHE95cDhxTAQjBwvChP/PlceiteXUryRI0Mrdy7jqXvmnw==
+shakapacker@7.0.0-rc.1:
+  version "7.0.0-rc.1"
+  resolved "https://registry.yarnpkg.com/shakapacker/-/shakapacker-7.0.0-rc.1.tgz#375770f82c48dff8ea13225603d91230f8a3c0b9"
+  integrity sha512-zrDctdf4/ByYfZKEftoGXzInnvpHgpMUie+HEkODhyQ8VBmXQhdj/kuWk+8txTAfrQScpzG7UT/UKqMrbuXapw==
   dependencies:
     glob "^7.2.0"
     js-yaml "^4.1.0"
