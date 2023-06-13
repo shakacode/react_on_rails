@@ -6,7 +6,7 @@ module ReactOnRails
   class VersionChecker
     attr_reader :node_package_version
 
-    MAJOR_MINOR_PATCH_VERSION_REGEX = /(\d+)\.(\d+)\.(\d+)/.freeze
+    MAJOR_MINOR_PATCH_VERSION_REGEX = /(\d+)\.(\d+)\.(\d+)\.?(.+)?/.freeze
 
     def self.build
       new(NodePackageVersion.build)

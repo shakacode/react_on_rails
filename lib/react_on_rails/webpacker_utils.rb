@@ -25,6 +25,9 @@ module ReactOnRails
       match = shakapacker_version.match(ReactOnRails::VersionChecker::MAJOR_MINOR_PATCH_VERSION_REGEX)
 
       @shakapacker_version_as_array = [match[1].to_i, match[2].to_i, match[3].to_i]
+
+      beta = match[4]
+      @shakapacker_version_as_array << beta unless beta.empty?
     end
 
     def self.shackapacker_version_requirement_met?(required_version)
@@ -139,7 +142,10 @@ module ReactOnRails
     end
 
     def self.semver_to_string(ary)
-      "#{ary[0]}.#{ary[1]}.#{ary[2]}"
+      major_minor_patch = "#{ary[0]}.#{ary[1]}.#{ary[2]}"
+      beta = ary[3]
+
+      beta ? "#{major_minor_patch}.#{beta}" : major_minor_patch
     end
   end
 end
