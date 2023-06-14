@@ -9,7 +9,7 @@ describe ReactOnRails::TestHelper::EnsureAssetsCompiled do
     after { described_class.has_been_run = false }
 
     before do
-      allow(ReactOnRails::ShakapackerUtils).to receive(:check_manifest_not_cached).and_return(nil)
+      allow(ReactOnRails::PackerUtils).to receive(:check_manifest_not_cached).and_return(nil)
       double_packs = instance_double(ReactOnRails::PacksGenerator)
       allow(ReactOnRails::PacksGenerator).to receive(:instance).and_return(double_packs)
       allow(double_packs).to receive(:generate_packs_if_stale)

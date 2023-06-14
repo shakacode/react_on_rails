@@ -8,10 +8,10 @@ module ReactOnRails
   RSpec.describe Configuration do
     let(:existing_path) { Pathname.new(Dir.mktmpdir) }
     let(:not_existing_path) { "/path/to/#{SecureRandom.hex(4)}" }
-    let(:using_shakapacker) { false }
+    let(:using_packer) { false }
 
     before do
-      allow(ReactOnRails::ShakapackerUtils).to receive(:using_shakapacker?).and_return(using_shakapacker)
+      allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(using_packer)
       ReactOnRails.instance_variable_set(:@configuration, nil)
     end
 
@@ -20,15 +20,15 @@ module ReactOnRails
     end
 
     describe "generated_assets_dir" do
-      let(:using_shakapacker) { true }
-      let(:shakapacker_public_output_path) do
+      let(:using_packer) { true }
+      let(:packer_public_output_path) do
         File.expand_path(File.join(Rails.root, "public/webpack/dev"))
       end
 
       before do
         allow(Rails).to receive(:root).and_return(File.expand_path("."))
         allow(Shakapacker).to receive_message_chain("config.public_output_path")
-          .and_return(shakapacker_public_output_path)
+          .and_return(packer_public_output_path)
       end
 
       it "does not throw if the generated assets dir is blank with webpacker" do
@@ -39,7 +39,7 @@ module ReactOnRails
         end.not_to raise_error
       end
 
-      it "does not throw if the shakapacker_public_output_path does match the generated assets dir" do
+      it "does not throw if the packer_public_output_path does match the generated assets dir" do
         expect do
           ReactOnRails.configure do |config|
             config.generated_assets_dir = "public/webpack/dev"
@@ -47,7 +47,7 @@ module ReactOnRails
         end.not_to raise_error
       end
 
-      it "does throw if the shakapacker_public_output_path does not match the generated assets dir" do
+      it "does throw if the packer_public_output_path does not match the generated assets dir" do
         expect do
           ReactOnRails.configure do |config|
             config.generated_assets_dir = "public/webpack/other"
@@ -266,7 +266,7 @@ module ReactOnRails
     end
 
     it "checks that autobundling requirements are met if configuration options for autobundling are set" do
-      allow(ReactOnRails::ShakapackerUtils).to receive_messages(using_shakapacker?: true,
+      allow(ReactOnRails::PackerUtils).to receive_messages(using_packer?: true,
                                                                 shackapacker_version_requirement_met?: true,
                                                                 nested_entries?: true)
 
@@ -275,9 +275,9 @@ module ReactOnRails
         config.components_subdirectory = "something"
       end
 
-      expect(ReactOnRails::ShakapackerUtils).to have_received(:using_shakapacker?).thrice
-      expect(ReactOnRails::ShakapackerUtils).to have_received(:shackapacker_version_requirement_met?)
-      expect(ReactOnRails::ShakapackerUtils).to have_received(:nested_entries?)
+      expect(ReactOnRails::PackerUtils).to have_received(:using_packer?).thrice
+      expect(ReactOnRails::PackerUtils).to have_received(:shakapacker_version_requirement_met?)
+      expect(ReactOnRails::PackerUtils).to have_received(:nested_entries?)
     end
 
     it "has a default configuration of the gem" do
