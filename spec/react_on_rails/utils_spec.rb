@@ -21,7 +21,7 @@ module ReactOnRails
         end
 
         context "with Shakapacker enabled", :shakapacker do
-          let(:shakapacker_public_output_path) do
+          let(:packer_public_output_path) do
             File.expand_path(File.join(Rails.root, "public/webpack/dev"))
           end
 
@@ -31,14 +31,14 @@ module ReactOnRails
             allow(Shakapacker).to receive_message_chain("dev_server.running?")
               .and_return(false)
             allow(Shakapacker).to receive_message_chain("config.public_output_path")
-              .and_return(shakapacker_public_output_path)
-            allow(ReactOnRails::ShakapackerUtils).to receive(:using_shakapacker?).and_return(true)
+              .and_return(packer_public_output_path)
+            allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
           end
 
           context "when file in manifest", :shakapacker do
             before do
               # Note Shakapacker manifest lookup is inside of the public_output_path
-              # [2] (pry) ReactOnRails::ShakapackerUtils: 0> Shakapacker.manifest.lookup("app-bundle.js")
+              # [2] (pry) ReactOnRails::PackerUtils: 0> Shakapacker.manifest.lookup("app-bundle.js")
               # "/webpack/development/app-bundle-c1d2b6ab73dffa7d9c0e.js"
               allow(Shakapacker).to receive_message_chain("manifest.lookup!")
                 .with("webpack-bundle.js")
@@ -47,7 +47,7 @@ module ReactOnRails
                 .and_return("server-bundle.js")
             end
 
-            it { is_expected.to eq("#{shakapacker_public_output_path}/webpack-bundle-0123456789abcdef.js") }
+            it { is_expected.to eq("#{packer_public_output_path}/webpack-bundle-0123456789abcdef.js") }
           end
 
           context "with manifest.json" do
@@ -55,15 +55,15 @@ module ReactOnRails
               described_class.bundle_js_file_path("manifest.json")
             end
 
-            it { is_expected.to eq("#{shakapacker_public_output_path}/manifest.json") }
+            it { is_expected.to eq("#{packer_public_output_path}/manifest.json") }
           end
         end
 
-        context "without Shakapacker enabled" do
+        context "without a packer enabled" do
           before do
             allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
               .and_return("public/webpack/dev")
-            allow(ReactOnRails::ShakapackerUtils).to receive(:using_shakapacker?).and_return(false)
+            allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(false)
           end
 
           it { is_expected.to eq(File.expand_path(File.join(Rails.root, "public/webpack/dev/webpack-bundle.js"))) }
@@ -77,7 +77,7 @@ module ReactOnRails
           allow(Shakapacker).to receive_message_chain("config.send").with(:data)
                                                                     .and_return({})
 
-          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to be(false)
+          expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to eq(false)
         end
 
         it "returns false if source_path is defined in the config/webpacker.yml and node_modules defined" do
@@ -86,7 +86,7 @@ module ReactOnRails
           allow(Shakapacker).to receive_message_chain("config.send").with(:data)
                                                                     .and_return(source_path: "client/app")
 
-          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to be(false)
+          expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to eq(false)
         end
 
         it "returns true if node_modules is not blank and the source_path is not defined in config/webpacker.yml" do
@@ -95,14 +95,14 @@ module ReactOnRails
           allow(Shakapacker).to receive_message_chain("config.send").with(:data)
                                                                     .and_return({})
 
-          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to be(true)
+          expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to eq(true)
         end
       end
 
       describe ".server_bundle_js_file_path with Shakapacker enabled" do
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
-          allow(ReactOnRails::ShakapackerUtils).to receive(:using_shakapacker?).and_return(true)
+          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
           allow(Shakapacker).to receive_message_chain("config.public_output_path")
             .and_return(Pathname.new("public/webpack/development"))
         end
@@ -341,6 +341,13 @@ module ReactOnRails
         subject { described_class.react_on_rails_pro_version }
 
         it { is_expected.to eq("") }
+      end
+
+      describe ".gem_available?" do
+        it "calls Gem.loaded_specs" do
+          expect(Gem).to receive(:loaded_specs)
+          described_class.gem_available?("nonexistent_gem")
+        end
       end
     end
   end

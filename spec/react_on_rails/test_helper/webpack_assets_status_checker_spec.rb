@@ -20,13 +20,13 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     end
 
     before do
-      allow(ReactOnRails::ShakapackerUtils).to receive(:check_manifest_not_cached).and_return(nil)
+      allow(ReactOnRails::PackerUtils).to receive(:check_manifest_not_cached).and_return(nil)
       allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(generated_assets_full_path)
     end
 
     context "with Webpacker" do
       before do
-        allow(ReactOnRails::ShakapackerUtils).to receive(:using_shakapacker?).and_return(true)
+        allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
       end
 
       context "when compiled assets with manifest exist and are up-to-date" do
@@ -34,7 +34,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
 
         before do
           require "shakapacker"
-          allow(ReactOnRails::ShakapackerUtils).to receive(:manifest_exists?).and_return(true)
+          allow(ReactOnRails::PackerUtils).to receive(:manifest_exists?).and_return(true)
           allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
             .with("manifest.json")
             .and_return(File.join(generated_assets_full_path, "manifest.json"))
@@ -52,7 +52,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
 
         before do
           require "shakapacker"
-          allow(ReactOnRails::ShakapackerUtils).to receive(:manifest_exists?).and_return(false)
+          allow(ReactOnRails::PackerUtils).to receive(:manifest_exists?).and_return(false)
         end
 
         specify { expect(checker.stale_generated_webpack_files).to eq(["manifest.json"]) }
@@ -64,7 +64,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
 
         before do
           require "shakapacker"
-          allow(ReactOnRails::ShakapackerUtils).to receive_messages(
+          allow(ReactOnRails::PackerUtils).to receive_messages(
             manifest_exists?: true,
             shakapacker_public_output_path: generated_assets_full_path
           )
@@ -89,7 +89,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
       let(:webpack_generated_files) { %w[client-bundle.js server-bundle.js] }
 
       before do
-        allow(ReactOnRails::ShakapackerUtils).to receive(:using_shakapacker?).and_return(false)
+        allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(false)
       end
 
       context "when compiled assets exist and are up-to-date" do
