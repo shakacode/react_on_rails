@@ -2,7 +2,6 @@
 
 require "rails"
 
-require "react_on_rails/packer_adapter"
 require "react_on_rails/error"
 require "react_on_rails/prerender_error"
 require "react_on_rails/json_parse_error"
