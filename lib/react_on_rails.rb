@@ -2,6 +2,7 @@
 
 require "rails"
 
+require "react_on_rails/packer_adapter"
 require "react_on_rails/error"
 require "react_on_rails/prerender_error"
 require "react_on_rails/json_parse_error"
@@ -18,7 +19,7 @@ require "react_on_rails/version_syntax_converter"
 require "react_on_rails/test_helper"
 require "react_on_rails/git_utils"
 require "react_on_rails/utils"
-require "react_on_rails/webpacker_utils"
+require "react_on_rails/packer_utils"
 require "react_on_rails/packs_generator"
 require "react_on_rails/test_helper/webpack_assets_compiler"
 require "react_on_rails/test_helper/webpack_assets_status_checker"

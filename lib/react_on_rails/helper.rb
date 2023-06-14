@@ -314,7 +314,7 @@ module ReactOnRails
     end
 
     def load_pack_for_generated_component(component_name)
-      ReactOnRails::WebpackerUtils.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
+      ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
 
       append_javascript_pack_tag("generated/#{component_name}",
                                  defer: ReactOnRails.configuration.defer_generated_component_packs)
@@ -326,7 +326,7 @@ module ReactOnRails
     private
 
     def generated_components_pack_path(component_name)
-      "#{ReactOnRails::WebpackerUtils.webpacker_source_entry_path}/generated/#{component_name}.js"
+      "#{ReactOnRails::PackerUtils.packer_source_entry_path}/generated/#{component_name}.js"
     end
 
     def build_react_component_result_for_server_rendered_string(
