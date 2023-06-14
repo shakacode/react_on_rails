@@ -3,7 +3,7 @@
 require "rails/generators"
 require_relative "generator_messages"
 require_relative "generator_helper"
-
+# rubocop:disable Metrics/ClassLength
 module ReactOnRails
   module Generators
     class BaseGenerator < Rails::Generators::Base
@@ -30,11 +30,14 @@ module ReactOnRails
       def copy_base_files
         base_path = "base/base/"
         base_files = %w[app/controllers/hello_world_controller.rb
-                        app/views/layouts/hello_world.html.erb
-                        config/initializers/react_on_rails.rb
-                        Procfile.dev
-                        Procfile.dev-static]
+                        app/views/layouts/hello_world.html.erb]
+        base_templates = %w[config/initializers/react_on_rails.rb
+                            Procfile.dev
+                            Procfile.dev-static]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
+        base_templates.each do |file|
+          template("#{base_path}/#{file}.tt", file, { packer_type: ReactOnRails::PackerUtils.packer_type })
+        end
       end
 
       def copy_js_bundle_files
@@ -60,16 +63,14 @@ module ReactOnRails
         config = {
           message: "// The source code including full typescript support is available at:"
         }
-        base_files.each do |file|
-          template("#{base_path}/#{file}.tt", file, config)
-        end
+        base_files.each { |file| template("#{base_path}/#{file}.tt", file, config) }
       end
 
-      def copy_shakapacker_config
-        puts "Adding Shakapacker v7 config file"
+      def copy_packer_config
+        puts "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
         base_path = "base/base/"
-        base_files = %w[config/shakapacker.yml]
-        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
+        config = "config/#{ReactOnRails::PackerUtils.packer_type}.yml"
+        copy_file("#{base_path}#{config}", config)
       end
 
       def add_base_gems_to_gemfile
@@ -167,3 +168,4 @@ module ReactOnRails
     end
   end
 end
+# rubocop:enable Metrics/ClassLength
