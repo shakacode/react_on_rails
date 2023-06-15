@@ -130,7 +130,7 @@ module ReactOnRails
 
       ReactOnRails::PackerUtils.raise_shakapacker_not_installed unless ReactOnRails::PackerUtils.using_packer?
       ReactOnRails::PackerUtils.raise_shakapacker_version_incompatible_for_autobundling unless
-        ReactOnRails::PackerUtils.packer_version_requirement_met?(
+        ReactOnRails::PackerUtils.shakapacker_version_requirement_met?(
           ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION
         )
       ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?

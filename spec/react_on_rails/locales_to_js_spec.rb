@@ -10,7 +10,7 @@ module ReactOnRails
     let(:default_path) { "#{i18n_dir}/default.js" }
 
     before do
-      allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(false)
+      allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(false)
     end
 
     shared_examples "locale to js" do

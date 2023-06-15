@@ -25,12 +25,12 @@ module ReactOnRails
       ReactOnRails.configuration.components_subdirectory = "ror_components"
       ReactOnRails.configuration.webpack_generated_files = webpack_generated_files
 
-      allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(true)
-      allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
-      allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(true)
-      allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_entry_path)
+      allow(ReactOnRails::PackerUtils).to receive(:manifest_exists?).and_return(true)
+      allow(ReactOnRails::PackerUtils).to receive(:using_webpacker?).and_return(true)
+      allow(ReactOnRails::PackerUtils).to receive(:nested_entries?).and_return(true)
+      allow(ReactOnRails::PackerUtils).to receive(:webpacker_source_entry_path)
         .and_return(webpacker_source_entry_path)
-      allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.1")
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version).and_return("6.5.1")
       allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(webpacker_source_entry_path)
       allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle_js_file_path)
     end
@@ -122,7 +122,7 @@ module ReactOnRails
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
-        allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_path)
+        allow(ReactOnRails::PackerUtils).to receive(:webpacker_source_path)
           .and_return("#{webpacker_source_path}/components/#{component_name}")
       end
 
@@ -264,7 +264,7 @@ module ReactOnRails
     end
 
     def stub_webpacker_source_path(webpacker_source_path:, component_name:)
-      allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_path)
+      allow(ReactOnRails::PackerUtils).to receive(:webpacker_source_path)
         .and_return("#{webpacker_source_path}/components/#{component_name}")
     end
   end

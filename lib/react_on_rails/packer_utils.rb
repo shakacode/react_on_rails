@@ -28,11 +28,11 @@ module ReactOnRails
     def self.adapter
       if @using_webpacker
         require "webpacker"
-        return Webpacker
+        return ::Webpacker
       end
       if @using_shakapacker
         require "shakapacker"
-        return Shakapacker
+        return ::Shakapacker
       end
       nil
     end
@@ -55,7 +55,7 @@ module ReactOnRails
       @shakapacker_version_as_array = [match[1].to_i, match[2].to_i, match[3].to_i]
     end
 
-    def self.packer_version_requirement_met?(required_version)
+    def self.shakapacker_version_requirement_met?(required_version)
       req_ver = semver_to_string(required_version)
 
       Gem::Version.new(shakapacker_version) >= Gem::Version.new(req_ver)
