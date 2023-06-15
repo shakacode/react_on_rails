@@ -64,7 +64,7 @@ module ReactOnRails
 
       before do
         stub_packer_source_path(component_name: component_name,
-                                   packer_source_path: packer_source_path)
+                                packer_source_path: packer_source_path)
         described_class.instance.generate_packs_if_stale
       end
 
@@ -103,7 +103,7 @@ module ReactOnRails
 
       before do
         stub_packer_source_path(component_name: component_name,
-                                   packer_source_path: packer_source_path)
+                                packer_source_path: packer_source_path)
       end
 
       it "raises an error for definition override" do
@@ -143,7 +143,7 @@ module ReactOnRails
 
       before do
         stub_packer_source_path(component_name: component_name,
-                                   packer_source_path: packer_source_path)
+                                packer_source_path: packer_source_path)
       end
 
       it "raises an error for definition override" do
@@ -158,7 +158,7 @@ module ReactOnRails
 
       before do
         stub_packer_source_path(component_name: component_name,
-                                   packer_source_path: packer_source_path)
+                                packer_source_path: packer_source_path)
       end
 
       it "raises missing client file error" do
@@ -177,7 +177,7 @@ module ReactOnRails
 
       before do
         stub_packer_source_path(component_name: component_name,
-                                   packer_source_path: packer_source_path)
+                                packer_source_path: packer_source_path)
         described_class.instance.generate_packs_if_stale
       end
 
@@ -216,7 +216,7 @@ module ReactOnRails
 
       before do
         stub_packer_source_path(component_name: component_name,
-                                   packer_source_path: packer_source_path)
+                                packer_source_path: packer_source_path)
         FileUtils.mkdir_p(generated_directory)
         File.write(component_pack, "wat")
         File.write(generated_server_bundle_file_path, "wat")
