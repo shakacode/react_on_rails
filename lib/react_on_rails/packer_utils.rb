@@ -19,8 +19,8 @@ module ReactOnRails
     end
 
     def self.packer_type
-      return "shakapacker" if using_shakapacker
-      return "webpacker" if using_webpacker
+      return "shakapacker" if using_shakapacker?
+      return "webpacker" if using_webpacker?
 
       nil
     end

@@ -162,7 +162,11 @@ module ReactOnRails
     rescue Gem::LoadError
       false
     rescue StandardError
-      Gem.available?(name).present?
+      begin
+        Gem.available?(name).present?
+      rescue NoMethodError
+        false
+      end
     end
 
     # Todo -- remove this for v13, as we don't need both boolean and number

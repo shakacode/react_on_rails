@@ -361,6 +361,13 @@ module ReactOnRails
 
         it { is_expected.to eq("") }
       end
+
+      describe ".gem_available?" do
+        it "calls Gem.loaded_specs" do
+          expect(Gem).to receive(:loaded_specs)
+          described_class.gem_available?("nonexistent_gem")
+        end
+      end
     end
   end
 end
