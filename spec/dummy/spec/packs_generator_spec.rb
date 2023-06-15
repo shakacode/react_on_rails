@@ -8,8 +8,8 @@ module ReactOnRails
 
   # rubocop:disable Metrics/BlockLength
   describe PacksGenerator do
-    let(:webpacker_source_path) { File.expand_path("./fixtures/automated_packs_generation", __dir__) }
-    let(:webpacker_source_entry_path) { File.expand_path("./fixtures/automated_packs_generation/packs", __dir__) }
+    let(:packer_source_path) { File.expand_path("./fixtures/automated_packs_generation", __dir__) }
+    let(:packer_source_entry_path) { File.expand_path("./fixtures/automated_packs_generation/packs", __dir__) }
     let(:generated_directory) { File.expand_path("./fixtures/automated_packs_generation/packs/generated", __dir__) }
     let(:server_bundle_js_file) { "server-bundle.js" }
     let(:server_bundle_js_file_path) do
@@ -26,12 +26,12 @@ module ReactOnRails
       ReactOnRails.configuration.webpack_generated_files = webpack_generated_files
 
       allow(ReactOnRails::PackerUtils).to receive(:manifest_exists?).and_return(true)
-      allow(ReactOnRails::PackerUtils).to receive(:using_webpacker?).and_return(true)
+      allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
       allow(ReactOnRails::PackerUtils).to receive(:nested_entries?).and_return(true)
-      allow(ReactOnRails::PackerUtils).to receive(:webpacker_source_entry_path)
-        .and_return(webpacker_source_entry_path)
+      allow(ReactOnRails::PackerUtils).to receive(:packer_source_entry_path)
+        .and_return(packer_source_entry_path)
       allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version).and_return("6.5.1")
-      allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(webpacker_source_entry_path)
+      allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(packer_source_entry_path)
       allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle_js_file_path)
     end
 
@@ -39,7 +39,7 @@ module ReactOnRails
       ReactOnRails.configuration.server_bundle_js_file = old_server_bundle
       ReactOnRails.configuration.components_subdirectory = old_subdirectory
 
-      FileUtils.rm_rf "#{webpacker_source_entry_path}/generated"
+      FileUtils.rm_rf "#{packer_source_entry_path}/generated"
       FileUtils.rm_rf generated_server_bundle_file_path
       File.truncate(server_bundle_js_file_path, 0)
     end
@@ -51,7 +51,7 @@ module ReactOnRails
         ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = true
         described_class.instance.generate_packs_if_stale
         expect(File.exist?(server_bundle_js_file_path)).to equal(true)
-        expect(File.exist?("#{Pathname(webpacker_source_entry_path).parent}/server-bundle-generated.js"))
+        expect(File.exist?("#{Pathname(packer_source_entry_path).parent}/server-bundle-generated.js"))
           .to equal(false)
         FileUtils.mv("./temp", server_bundle_js_file_path)
         ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = false
@@ -63,8 +63,8 @@ module ReactOnRails
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
-        stub_webpacker_source_path(component_name: component_name,
-                                   webpacker_source_path: webpacker_source_path)
+        stub_packer_source_path(component_name: component_name,
+                                   packer_source_path: packer_source_path)
         described_class.instance.generate_packs_if_stale
       end
 
@@ -102,8 +102,8 @@ module ReactOnRails
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
-        stub_webpacker_source_path(component_name: component_name,
-                                   webpacker_source_path: webpacker_source_path)
+        stub_packer_source_path(component_name: component_name,
+                                   packer_source_path: packer_source_path)
       end
 
       it "raises an error for definition override" do
@@ -122,8 +122,8 @@ module ReactOnRails
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
-        allow(ReactOnRails::PackerUtils).to receive(:webpacker_source_path)
-          .and_return("#{webpacker_source_path}/components/#{component_name}")
+        allow(ReactOnRails::PackerUtils).to receive(:packer_source_path)
+          .and_return("#{packer_source_path}/components/#{component_name}")
       end
 
       it "raises an error for definition override" do
@@ -142,8 +142,8 @@ module ReactOnRails
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
-        stub_webpacker_source_path(component_name: component_name,
-                                   webpacker_source_path: webpacker_source_path)
+        stub_packer_source_path(component_name: component_name,
+                                   packer_source_path: packer_source_path)
       end
 
       it "raises an error for definition override" do
@@ -157,8 +157,8 @@ module ReactOnRails
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
-        stub_webpacker_source_path(component_name: component_name,
-                                   webpacker_source_path: webpacker_source_path)
+        stub_packer_source_path(component_name: component_name,
+                                   packer_source_path: packer_source_path)
       end
 
       it "raises missing client file error" do
@@ -176,8 +176,8 @@ module ReactOnRails
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
-        stub_webpacker_source_path(component_name: component_name,
-                                   webpacker_source_path: webpacker_source_path)
+        stub_packer_source_path(component_name: component_name,
+                                   packer_source_path: packer_source_path)
         described_class.instance.generate_packs_if_stale
       end
 
@@ -215,8 +215,8 @@ module ReactOnRails
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
-        stub_webpacker_source_path(component_name: component_name,
-                                   webpacker_source_path: webpacker_source_path)
+        stub_packer_source_path(component_name: component_name,
+                                   packer_source_path: packer_source_path)
         FileUtils.mkdir_p(generated_directory)
         File.write(component_pack, "wat")
         File.write(generated_server_bundle_file_path, "wat")
@@ -239,7 +239,7 @@ module ReactOnRails
         expect do
           described_class.instance.generate_packs_if_stale
         end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
-        FileUtils.rm "#{webpacker_source_path}/components/ComponentWithCommonOnly/ror_components/NewComponent.jsx"
+        FileUtils.rm "#{packer_source_path}/components/ComponentWithCommonOnly/ror_components/NewComponent.jsx"
       end
 
       it "generate packs if an old component is updated" do
@@ -253,7 +253,7 @@ module ReactOnRails
 
       def create_new_component(name)
         components_subdirectory = ReactOnRails.configuration.components_subdirectory
-        path = "#{webpacker_source_path}/components/#{component_name}/#{components_subdirectory}/#{name}.jsx"
+        path = "#{packer_source_path}/components/#{component_name}/#{components_subdirectory}/#{name}.jsx"
 
         File.write(path, "// Empty Test Component\n")
       end
@@ -263,9 +263,9 @@ module ReactOnRails
       described_class.instance.send(:generated_server_bundle_file_path)
     end
 
-    def stub_webpacker_source_path(webpacker_source_path:, component_name:)
-      allow(ReactOnRails::PackerUtils).to receive(:webpacker_source_path)
-        .and_return("#{webpacker_source_path}/components/#{component_name}")
+    def stub_packer_source_path(packer_source_path:, component_name:)
+      allow(ReactOnRails::PackerUtils).to receive(:packer_source_path)
+        .and_return("#{packer_source_path}/components/#{component_name}")
     end
   end
   # rubocop:enable Metrics/BlockLength
