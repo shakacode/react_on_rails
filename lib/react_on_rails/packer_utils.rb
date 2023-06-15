@@ -26,15 +26,13 @@ module ReactOnRails
     end
 
     def self.adapter
-      if @using_webpacker
-        require "webpacker"
-        return ::Webpacker
-      end
-      if @using_shakapacker
+      return nil unless using_packer?
+      if shakapacker_version_requirement_met?([7,0,0])
         require "shakapacker"
         return ::Shakapacker
       end
-      nil
+      require "webpacker"
+      return ::Webpacker
     end
 
     def self.dev_server_running?
@@ -148,9 +146,9 @@ module ReactOnRails
 
     def self.raise_shakapacker_version_incompatible_for_autobundling
       msg = <<~MSG
-        **ERROR** ReactOnRails: Please upgrade Shakapacker to version #{ReactOnRails::PackerUtils.semver_to_string(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)} or \
+        **ERROR** ReactOnRails: Please upgrade Shakapacker to version #{semver_to_string(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)} or \
         above to use the automated bundle generation feature. The currently installed version is \
-        #{ReactOnRails::PackerUtils.semver_to_string(ReactOnRails::PackerUtils.shakapacker_version_as_array)}.
+        #{semver_to_string(ReactOnRails::PackerUtils.shakapacker_version_as_array)}.
       MSG
 
       raise ReactOnRails::Error, msg
@@ -159,7 +157,7 @@ module ReactOnRails
     def self.raise_shakapacker_not_installed
       msg = <<~MSG
         **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker \
-        #{ReactOnRails::PackerUtils.semver_to_string(minimum_required_shakapacker_version)} or above to use the \
+        #{semver_to_string(minimum_required_shakapacker_version)} or above to use the \
         automated bundle generation feature.
       MSG
 
