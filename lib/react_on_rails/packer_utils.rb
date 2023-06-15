@@ -9,13 +9,16 @@ module ReactOnRails
     def self.using_shakapacker?
       return @using_shakapacker if defined?(@using_shakapacker)
 
-      @using_shakapacker = ReactOnRails::Utils.gem_available?("shakapacker")
+      @using_shakapacker = ReactOnRails::Utils.gem_available?("shakapacker") &&
+                           shakapacker_version_requirement_met?([7, 0, 0])
     end
 
     def self.using_webpacker?
       return @using_webpacker if defined?(@using_webpacker)
 
-      @using_webpacker = ReactOnRails::Utils.gem_available?("webpacker")
+      @using_webpacker = (ReactOnRails::Utils.gem_available?("shakapacker") &&
+                          shakapacker_version_as_array[0] <= 6) ||
+                         ReactOnRails::Utils.gem_available?("webpacker")
     end
 
     def self.packer_type
@@ -27,12 +30,13 @@ module ReactOnRails
 
     def self.adapter
       return nil unless using_packer?
-      if shakapacker_version_requirement_met?([7,0,0])
+
+      if using_shakapacker?
         require "shakapacker"
         return ::Shakapacker
       end
       require "webpacker"
-      return ::Webpacker
+      ::Webpacker
     end
 
     def self.dev_server_running?
@@ -80,8 +84,8 @@ module ReactOnRails
     end
 
     def self.precompile?
-      return Webpacker.config.webpacker_precompile? if using_webpacker?
-      return Shakapacker.config.shakapacker_precompile? if using_shakapacker?
+      return ::Webpacker.config.webpacker_precompile? if using_webpacker?
+      return ::Shakapacker.config.shakapacker_precompile? if using_shakapacker?
 
       false
     end
