@@ -215,7 +215,7 @@ module ReactOnRails
     end
 
     def ensure_generated_assets_dir_present
-      return if generated_assets_dir.present? || ReactOnRails::PackerUtils.using_webpacker?
+      return if generated_assets_dir.present? || ReactOnRails::PackerUtils.using_packer?
 
       self.generated_assets_dir = DEFAULT_GENERATED_ASSETS_DIR
       Rails.logger.warn "ReactOnRails: Set generated_assets_dir to default: #{DEFAULT_GENERATED_ASSETS_DIR}"
@@ -224,7 +224,7 @@ module ReactOnRails
     def configure_generated_assets_dirs_deprecation
       return if generated_assets_dirs.blank?
 
-      if ReactOnRails::PackerUtils.using_webpacker?
+      if ReactOnRails::PackerUtils.using_packer?
         packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
         # rubocop:disable Layout/LineLength
         Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the generated_assets_dirs nor "\

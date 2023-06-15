@@ -215,7 +215,7 @@ module ReactOnRails
 
     it "checks that autobundling requirements are met if configuration options for autobundling are set" do
       allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
-      allow(ReactOnRails::PackerUtils).to receive(:shackapacker_version_requirement_met?).and_return(true)
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?).and_return(true)
       allow(ReactOnRails::PackerUtils).to receive(:nested_entries?).and_return(true)
 
       ReactOnRails.configure do |config|
@@ -224,7 +224,7 @@ module ReactOnRails
       end
 
       expect(ReactOnRails::PackerUtils).to have_received(:using_packer?).thrice
-      expect(ReactOnRails::PackerUtils).to have_received(:shackapacker_version_requirement_met?)
+      expect(ReactOnRails::PackerUtils).to have_received(:shakapacker_version_requirement_met?)
       expect(ReactOnRails::PackerUtils).to have_received(:nested_entries?)
     end
 
