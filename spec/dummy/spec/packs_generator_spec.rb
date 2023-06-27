@@ -26,7 +26,7 @@ module ReactOnRails
       ReactOnRails.configuration.webpack_generated_files = webpack_generated_files
 
       allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(true)
-      allow(ReactOnRails::WebpackerUtils).to receive(:using_shakapacker?).and_return(true)
+      allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
       allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(true)
       allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_source_entry_path)
         .and_return(shakapacker_source_entry_path)
