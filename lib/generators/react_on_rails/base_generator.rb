@@ -157,20 +157,20 @@ module ReactOnRails
 
             - Run `rails s` to start the Rails server.
 
-            - Run bin/webpacker-dev-server to start the Webpack dev server for compilation of Webpack
+            - Run bin/shakapacker-dev-server to start the Webpack dev server for compilation of Webpack
               assets as soon as you save. This default setup with the dev server does not work
               for server rendering
 
             - Visit http://localhost:3000/hello_world and see your React On Rails app running!
 
-            - To turn on HMR, edit config/webpacker.yml and set HMR to true. Restart the rails server
-              and bin/webpacker-dev-server. Or use Procfile.dev.
+            - To turn on HMR, edit config/shakapacker.yml and set HMR to true. Restart the rails server
+              and bin/shakapacker-dev-server. Or use Procfile.dev.
         MSG
       end
 
       def print_helpful_message
         message = self.class.helpful_message
-        message = message.gsub("webpacker", "shakapacker") if using_shakapacker_7?
+        message = message.gsub("shakapacker", "webpacker") unless using_shakapacker_7?
         GeneratorMessages.add_info(message)
       end
 
