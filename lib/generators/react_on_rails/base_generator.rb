@@ -28,26 +28,23 @@ module ReactOnRails
       end
 
       def copy_base_files
-        base_path = "base/base/"
         base_files = %w[app/controllers/hello_world_controller.rb
                         app/views/layouts/hello_world.html.erb
                         config/initializers/react_on_rails.rb
                         Procfile.dev
                         Procfile.dev-static]
-        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
+        base_files.each { |file| copy_file("#{base_path}/#{file}", file) }
       end
 
       def copy_js_bundle_files
-        base_path = "base/base/"
         base_files = %w[app/javascript/packs/server-bundle.js
                         app/javascript/bundles/HelloWorld/components/HelloWorldServer.js
                         app/javascript/bundles/HelloWorld/components/HelloWorld.module.css]
-        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
+        base_files.each { |file| copy_file("#{base_path}/#{file}", file) }
       end
 
       def copy_webpack_config
         puts "Adding Webpack config"
-        base_path = "base/base"
         base_files = %w[babel.config.js
                         config/webpack/clientWebpackConfig.js
                         config/webpack/commonWebpackConfig.js
@@ -67,9 +64,8 @@ module ReactOnRails
 
       def copy_webpacker_config
         puts "Adding Webpacker v6 config"
-        base_path = "base/base/"
-        base_files = %w[config/webpacker.yml]
-        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
+        base_files = using_shakapacker_7? ? %w[config/shakapacker.yml] : %w[config/webpacker.yml]
+        base_files.each { |file| copy_file("#{base_path}/#{file}", file) }
       end
 
       def add_base_gems_to_gemfile
@@ -173,7 +169,9 @@ module ReactOnRails
       end
 
       def print_helpful_message
-        GeneratorMessages.add_info(self.class.helpful_message)
+        message = self.class.helpful_message
+        message = message.gsub("webpacker", "shakapacker") if using_shakapacker_7?
+        GeneratorMessages.add_info(message)
       end
 
       private
@@ -206,6 +204,18 @@ module ReactOnRails
       def add_configure_rspec_to_compile_assets(helper_file)
         search_str = "RSpec.configure do |config|"
         gsub_file(helper_file, search_str, CONFIGURE_RSPEC_TO_COMPILE_ASSETS)
+      end
+
+      def base_path
+        @base_path ||= using_shakapacker_7? ? "base/shakapacker7_base" : "base/webpacker_base"
+      end
+
+      def using_shakapacker_7?
+        shakapacker_gem = Gem::Specification.find_by_name("shakapacker")
+        shakapacker_gem.version.segments.first == 7
+      rescue Gem::MissingSpecError
+        # In case using Webpacker
+        false
       end
     end
   end
