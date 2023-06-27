@@ -33,7 +33,7 @@ module ReactOnRails
       end
 
       def create_appropriate_templates
-        base_js_path = "#{base_path}app/javascript"
+        base_js_path = "#{base_path}/app/javascript"
         config = {
           component_name: "HelloWorldApp",
           app_relative_path: "../bundles/HelloWorld/startup/HelloWorldApp"
@@ -50,7 +50,7 @@ module ReactOnRails
       private
 
       def base_path
-        @base_path ||= using_shakapacker_7? ? "base/shakapacker7_base/" : "base/webpacker_base/"
+        @base_path ||= using_shakapacker_7? ? "base/shakapacker7_base" : "base/webpacker_base"
       end
 
       def using_shakapacker_7?
