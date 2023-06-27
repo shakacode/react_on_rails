@@ -13,7 +13,7 @@ A bug is a crash or incorrect behavior. If you have a debugging or troubleshooti
 
 1. Ruby version:
 2. Rails version:
-3. Webpacker version:
+3. Shakapacker/Webpacker version:
 4. React on Rails version:
 
 ## Expected behavior
