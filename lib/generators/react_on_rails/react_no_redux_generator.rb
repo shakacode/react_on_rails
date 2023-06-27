@@ -30,7 +30,7 @@ module ReactOnRails
       private
 
       def base_path
-        @base_path ||= using_shakapacker_7? ? "base/shakapacker7_base/" : "base/webpacker_base/"
+        @base_path ||= using_shakapacker_7? ? "base/shakapacker7_base" : "base/webpacker_base"
       end
 
       def using_shakapacker_7?
