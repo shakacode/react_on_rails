@@ -14,9 +14,9 @@
 2. [Upgrading React on Rails](https://www.shakacode.com/react-on-rails/docs/guides/upgrading-react-on-rails/#upgrading-to-v12).
 
 ## Example Apps
-1. [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) example repo for a simple configuration of webpack via the rails/webpacker gem
+1. [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) example repo for a simple configuration of webpack via the `shakacode/shakapacker` gem
 that supports SSR.
-2. Example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_demo_ssr_hmr) for a new way to setup the creation of your SSR bundle with `rails/webpacker`.
+2. Example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_demo_ssr_hmr) for a new way to setup the creation of your SSR bundle with `shakacode/shakapacker`.
 3. Live, [open source](https://github.com/shakacode/react-webpack-rails-tutorial), example of this gem, see [reactrails.com](http://reactrails.com).
 
 # Other Resources
