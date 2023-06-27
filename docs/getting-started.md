@@ -21,9 +21,13 @@ application is not yet set up to use webpacker, please see
    bundle add react_on_rails --strict
    ```
 
-2. Run installation command for webpacker:
+2. Run installation command for shakapacker:
 
    ```bash
+   # for Shakapacker v7
+   rails shakapacker:install
+
+   # for Shakapacker v6 or Webpacker
    rails webpacker:install
    ```
 
@@ -60,7 +64,7 @@ Below is the line where you turn server rendering on by setting `prerender` to t
 ```
 
 Note, if you got an error in your console regarding "ReferenceError: window is not defined",
-then you need to edit `config/webpacker.yml` and set `hmr: false` and `inline: false`.
+then you need to edit `config/shakapacker.yml` and set `hmr: false` and `inline: false`.
 See [rails/webpacker PR 2644](https://github.com/rails/webpacker/pull/2644) for a fix for this
 issue.
 
@@ -69,7 +73,7 @@ issue.
 ### Configuration
 
 * Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](https://www.shakacode.com/react-on-rails/docs/guides/configuration/) for documentation of all configuration options.
-* Configure `config/webpacker.yml`. If you used the generator and the default webpacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/webpacker.yml](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/webpacker.yml) example or the official default [webpacker.yml](https://github.com/rails/webpacker/blob/master/lib/install/config/webpacker.yml).
+* Configure `config/shakapacker.yml` (or `config/webpacker.yml` for Shakapacker v6). If you used the generator and the default shakapacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/shakapacker.yml](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/shakapacker.yml) example or the official default [shakapacker.yml](https://github.com/shakacode/shakapacker/blob/master/lib/install/config/shakapacker.yml).
 * Most apps should rely on the rails/webpacker setup for Webpack. v6 of rails/webpacker includes support for v5 of webpack.
 
 ## Including your React Component on your Rails Views
