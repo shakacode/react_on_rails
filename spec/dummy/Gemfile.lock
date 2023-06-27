@@ -163,7 +163,7 @@ GEM
       nio4r (~> 2.0)
     racc (1.6.2)
     rack (2.2.3)
-    rack-proxy (0.7.4)
+    rack-proxy (0.7.6)
       rack
     rack-test (1.1.0)
       rack (>= 1.0, < 3)
@@ -265,7 +265,7 @@ GEM
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
     semantic_range (3.0.0)
-    shakapacker (6.5.1)
+    shakapacker (7.0.0)
       activesupport (>= 5.2)
       rack-proxy (>= 0.6.1)
       railties (>= 5.2)
@@ -346,7 +346,7 @@ DEPENDENCIES
   scss_lint
   sdoc
   selenium-webdriver
-  shakapacker (= 6.5.1)
+  shakapacker (= 7.0.0)
   spring (~> 4.0)
   sprockets (~> 4.0)
   sqlite3
