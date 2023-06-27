@@ -3,7 +3,7 @@
 # https://github.com/rails/webpacker/pull/2018
 
 To debug:
-bin/webpacker --debug
+bin/shakapacker --debug
 
 And put a debugger statement in the file you're editing.
 
