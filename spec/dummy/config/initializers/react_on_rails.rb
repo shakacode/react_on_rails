@@ -29,7 +29,7 @@ ReactOnRails.configure do |config|
 
   # Uncomment to test these
   # config.build_test_command = "yarn run build:test"
-  # config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
+  # config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
   # config.webpack_generated_files = %w[server-bundle.js manifest.json]
   config.rendering_extension = RenderingExtension
 
