@@ -20,6 +20,9 @@ Changes since last non-beta release.
 ### Improved
 - Improved performance by removing an unnecessary JS eval from Ruby. [PR 1544](https://github.com/shakacode/react_on_rails/pull/1544) by [wyattades](https://github.com/wyattades).
 
+### Added
+- Added support for Shakapacker 7 in install generator [PR 1548](https://github.com/shakacode/react_on_rails/pull/1548) by [ahangarha](https://github.com/ahangarha).
+
 ### Removed
 - Removed a requirement for autoloaded pack files to be generated as part of CI or deployment separate from initial Shakapacker bundling. [PR 1545](https://github.com/shakacode/react_on_rails/pull/1545) by [judahmeek](https://github.com/judahmeek).
 
