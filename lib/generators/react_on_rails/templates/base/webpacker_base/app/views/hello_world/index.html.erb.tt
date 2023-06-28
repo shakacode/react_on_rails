@@ -1,2 +1,0 @@
-<h1>Hello World</h1>
-<%%= react_component("<%= config[:component_name] %>", props: @hello_world_props, prerender: false) %>
