@@ -60,11 +60,11 @@ describe InstallGenerator, type: :generator do
       expect(GeneratorMessages.output).to include(expected)
     end
 
-    # specify "react with redux generator contains a helpful message" do
-    #   run_generator_test_with_args(%w[--redux], package_json: true)
-    #   # GeneratorMessages.output is an array with the git error being the first one
-    #   expect(GeneratorMessages.output).to include(expected)
-    # end
+    specify "react with redux generator contains a helpful message" do
+      run_generator_test_with_args(%w[--redux], package_json: true)
+      # GeneratorMessages.output is an array with the git error being the first one
+      expect(GeneratorMessages.output).to include(expected)
+    end
   end
 
   context "when detecting existing bin-files on *nix" do
