@@ -130,50 +130,6 @@ module ReactOnRails
           ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
       STR
 
-      def self.helpful_message
-        <<-MSG.strip_heredoc
-
-          What to do next:
-
-            - See the documentation on https://github.com/shakacode/shakapacker#webpack-configuration
-              for how to customize the default webpack configuration.
-
-            - Include your webpack assets to your application layout.
-
-                <%= javascript_pack_tag 'hello-world-bundle' %>
-
-            - To start Rails server run:
-
-                ./bin/dev # Running with HMR
-
-              or
-
-                ./bin/dev-static # Running with statically created bundles, without HMR
-
-            - To server render, change this line app/views/hello_world/index.html.erb to
-              `prerender: true` to see server rendering (right click on page and select "view source").
-
-                <%= react_component("HelloWorldApp", props: @hello_world_props, prerender: true) %>
-
-          Alternative steps to run the app:
-
-            - Run `rails s` to start the Rails server.
-
-            - Run bin/shakapacker-dev-server to start the Webpack dev server for compilation of Webpack
-              assets as soon as you save. This default setup with the dev server does not work
-              for server rendering
-
-            - Visit http://localhost:3000/hello_world and see your React On Rails app running!
-
-            - To turn on HMR, edit config/shakapacker.yml and set HMR to true. Restart the rails server
-              and bin/shakapacker-dev-server. Or use Procfile.dev.
-        MSG
-      end
-
-      def print_helpful_message
-        GeneratorMessages.add_info(self.class.helpful_message)
-      end
-
       private
 
       # From https://github.com/rails/rails/blob/4c940b2dbfb457f67c6250b720f63501d74a45fd/railties/lib/rails/generators/rails/app/app_generator.rb
