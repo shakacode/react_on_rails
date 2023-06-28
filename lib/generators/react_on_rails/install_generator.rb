@@ -52,6 +52,8 @@ module ReactOnRails
         else
           invoke "react_on_rails:react_no_redux"
         end
+
+        invoke "react_on_rails:adapt_for_older_shakapacker" unless using_shakapacker_7?
       end
 
       # NOTE: other requirements for existing files such as .gitignore or application.
@@ -88,6 +90,14 @@ module ReactOnRails
         files_to_become_excutable = files_to_copy.map { |filename| "bin/#{filename}" }
 
         File.chmod(0o755, *files_to_become_excutable)
+      end
+
+      def using_shakapacker_7?
+        shakapacker_gem = Gem::Specification.find_by_name("shakapacker")
+        shakapacker_gem.version.segments.first == 7
+      rescue Gem::MissingSpecError
+        # In case using Webpacker
+        false
       end
     end
   end
