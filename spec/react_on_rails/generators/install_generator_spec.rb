@@ -51,7 +51,7 @@ describe InstallGenerator, type: :generator do
 
   context "with helpful message" do
     let(:expected) do
-      GeneratorMessages.format_info(ReactOnRails::Generators::BaseGenerator.helpful_message)
+      GeneratorMessages.format_info(ReactOnRails::Generators::GeneratorMessages.helpful_message_after_installation)
     end
 
     specify "base generator contains a helpful message" do

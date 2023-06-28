@@ -29,6 +29,7 @@ module ReactOnRails
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
           add_bin_scripts
+          add_post_install_message
         else
           error = "react_on_rails generator prerequisites not met!"
           GeneratorMessages.add_error(error)
@@ -90,6 +91,13 @@ module ReactOnRails
         files_to_become_excutable = files_to_copy.map { |filename| "bin/#{filename}" }
 
         File.chmod(0o755, *files_to_become_excutable)
+      end
+
+      def add_post_install_message
+        message = GeneratorMessages.helpful_message_after_installation
+        message = message.gsub("shakapacker", "webpacker") unless using_shakapacker_7?
+
+        GeneratorMessages.add_info(message)
       end
 
       def using_shakapacker_7?
