@@ -33,6 +33,7 @@ module ReactOnRails
       end
 
       def create_appropriate_templates
+        base_path = "base/base"
         base_js_path = "#{base_path}/app/javascript"
         config = {
           component_name: "HelloWorldApp",
@@ -45,20 +46,6 @@ module ReactOnRails
 
       def add_redux_yarn_dependencies
         run "yarn add redux react-redux"
-      end
-
-      private
-
-      def base_path
-        @base_path ||= using_shakapacker_7? ? "base/shakapacker7_base" : "base/webpacker_base"
-      end
-
-      def using_shakapacker_7?
-        shakapacker_gem = Gem::Specification.find_by_name("shakapacker")
-        shakapacker_gem.version.segments.first == 7
-      rescue Gem::MissingSpecError
-        # In case using Webpacker
-        false
       end
     end
   end
