@@ -95,7 +95,10 @@ module ReactOnRails
 
       def add_post_install_message
         message = GeneratorMessages.helpful_message_after_installation
-        message = message.gsub("shakapacker", "webpacker") unless using_shakapacker_7?
+        unless using_shakapacker_7?
+          message = message.gsub("config/shakapacker", "config/webpacker")
+          message = message.gsub("bin/shakapacker", "bin/webpacker")
+        end
 
         GeneratorMessages.add_info(message)
       end
