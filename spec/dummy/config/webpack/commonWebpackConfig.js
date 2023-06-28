@@ -4,7 +4,7 @@ const webpack = require('webpack');
 
 const aliasConfig = require('./alias.js');
 
-const baseClientWebpackConfig = generateWebpackConfig()
+const baseClientWebpackConfig = generateWebpackConfig();
 
 const commonOptions = {
   resolve: {
