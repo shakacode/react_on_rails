@@ -26,7 +26,7 @@ module ReactOnRails
 
       def modify_requiring_webpack_config_in_js
         file = "config/webpack/commonWebpackConfig.js"
-        gsub_file(file, "const baseClientWebpackConfig = generateWebpackConfig()\n", "")
+        gsub_file(file, "const baseClientWebpackConfig = generateWebpackConfig();\n", "")
         gsub_file(
           file,
           "const { generateWebpackConfig, merge } = require('shakapacker');",
