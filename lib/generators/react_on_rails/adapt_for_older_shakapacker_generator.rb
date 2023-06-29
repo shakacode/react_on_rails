@@ -21,6 +21,7 @@ module ReactOnRails
       end
 
       def rename_config_file
+        puts "Renaming shakapacker.yml into webpacker.yml"
         FileUtils.mv("config/shakapacker.yml", "config/webpacker.yml")
       end
 
