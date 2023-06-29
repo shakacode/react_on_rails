@@ -11,8 +11,6 @@ module ReactOnRails
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
 
-      BASE_PATH = "base/base"
-
       # --redux
       class_option :redux,
                    type: :boolean,
@@ -30,23 +28,26 @@ module ReactOnRails
       end
 
       def copy_base_files
+        base_path = "base/base/"
         base_files = %w[app/controllers/hello_world_controller.rb
                         app/views/layouts/hello_world.html.erb
                         config/initializers/react_on_rails.rb
                         Procfile.dev
                         Procfile.dev-static]
-        base_files.each { |file| copy_file("#{BASE_PATH}/#{file}", file) }
+        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
       def copy_js_bundle_files
+        base_path = "base/base/"
         base_files = %w[app/javascript/packs/server-bundle.js
                         app/javascript/bundles/HelloWorld/components/HelloWorldServer.js
                         app/javascript/bundles/HelloWorld/components/HelloWorld.module.css]
-        base_files.each { |file| copy_file("#{BASE_PATH}/#{file}", file) }
+        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
       def copy_webpack_config
         puts "Adding Webpack config"
+        base_path = "base/base"
         base_files = %w[babel.config.js
                         config/webpack/clientWebpackConfig.js
                         config/webpack/commonWebpackConfig.js
@@ -60,14 +61,15 @@ module ReactOnRails
           message: "// The source code including full typescript support is available at:"
         }
         base_files.each do |file|
-          template("#{BASE_PATH}/#{file}.tt", file, config)
+          template("#{base_path}/#{file}.tt", file, config)
         end
       end
 
       def copy_webpacker_config
         puts "Adding Webpacker v6 config"
+        base_path = "base/base/"
         base_files = %w[config/shakapacker.yml]
-        base_files.each { |file| copy_file("#{BASE_PATH}/#{file}", file) }
+        base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
       def add_base_gems_to_gemfile
