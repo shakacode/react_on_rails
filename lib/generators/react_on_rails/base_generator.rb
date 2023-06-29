@@ -65,8 +65,8 @@ module ReactOnRails
         end
       end
 
-      def copy_webpacker_config
-        puts "Adding Webpacker v6 config"
+      def copy_shakapacker_config
+        puts "Adding Shakapacker v7 config file"
         base_path = "base/base/"
         base_files = %w[config/shakapacker.yml]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
