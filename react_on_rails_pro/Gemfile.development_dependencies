@@ -58,6 +58,7 @@ group :development, :test do
   gem 'rubocop-performance', "1.15.0", require: false
   gem 'rubocop-rspec', "2.13.2", require: false
   gem "scss_lint", require: false
+  gem 'bundler', "2.3.3"
 end
 
 group :test do
