@@ -181,7 +181,9 @@ jobs:
     steps:
       - checkout
       - run: *print-system-info
+      - restore_cache: *restore-package-node-modules-cache
       - restore_cache: *restore-dummy-app-node-modules-cache
+      - restore_cache: *restore-dummy-app-gem-cache
       - run: *install-package-node-modules
       - run: *install-dummy-app-node-modules
       - run: *install-dummy-app-ruby-gems
@@ -239,6 +241,8 @@ jobs:
       - checkout
       - run: *print-system-info
       - restore_cache: *restore-package-gem-cache
+      - restore_cache: *restore-package-node-modules-cache
+      - restore_cache: *restore-dummy-app-node-modules-cache
       - restore_cache: *restore-dummy-app-gem-cache
       - run: rm -rf spec/dummy/public/webpack
       - restore_cache:
