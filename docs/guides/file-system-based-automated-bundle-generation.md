@@ -1,11 +1,11 @@
 # File-System-Based Automated Bundle Generation
 
-To use the automated bundle generation feature introduced in React on Rails v13.1.0, please upgrade to use [Shakapacker v6.5.1](https://github.com/shakacode/shakapacker/tree/v6.5.1) at least. If you are currently using webpacker, please follow the migration steps available [here](https://github.com/shakacode/shakapacker/blob/master/docs/v6_upgrade.md).
+To use the automated bundle generation feature introduced in React on Rails v13.1.0, please upgrade to use [Shakapacker v6.5.1](https://github.com/shakacode/shakapacker/tree/v6.5.1) at least. If you are currently using Webpacker, please follow the migration steps available [v6 upgrade](https://github.com/shakacode/shakapacker/blob/master/docs/v6_upgrade.md). Then upgrade to Shakapacker 7 using [v7 upgrade](https://github.com/shakacode/shakapacker/blob/master/docs/v7_upgrade.md) guide.
 
 ## Configuration
 
 ### Enable nested_entries for Shakapacker
-To use the automated bundle generation feature, set `nested_entries: true` in the `webpacker.yml` file like this.
+To use the automated bundle generation feature, set `nested_entries: true` in the `shakapacker.yml` file like this.
 The generated files will go in a nested directory.
 
 ```yml
@@ -44,14 +44,14 @@ React on Rails automatically generates pack files for components to be registere
 app/javascript/packs/generated
 ```
 
-*Note: the directory might be different depending on the `source_entry_path` in `config/webpacker.yml`.*
+*Note: the directory might be different depending on the `source_entry_path` in `config/shakapacker.yml`.*
 
 ## Usage
 
 ### Basic usage
 
 #### Background
-If the `webpacker.yml` file is configured as instructed [here](https://github.com/shakacode/shakapacker#configuration-and-code), with the following configurations
+If the `shakapacker.yml` file is configured as instructed [here](https://github.com/shakacode/shakapacker#configuration-and-code), with the following configurations
 
 ```yml
 default: &default

@@ -12,13 +12,13 @@ Previously, the gem `webpacker` was a Gem dependency.
 
 v13 has changed slightly to switch to `shakapacker`.
 
-For details, see see the [Shakapacker guide to upgrading](https://github.com/shakacode/shakapacker/blob/master/docs/v6_upgrade.md)
+For details, see the Shakapacker guide to upgrading to [version 6](https://github.com/shakacode/shakapacker/blob/master/docs/v6_upgrade.md) and [version 7](https://github.com/shakacode/shakapacker/blob/master/docs/v7_upgrade.md)
 
 In summary:
 
 1. Change the gem reference from 'webpacker' to 'shakapacker'
 2. Change the npm reference from '@rails/webpacker' to 'shakapacker'
-3. Other updates, depending on what version of rails/webpacker that you had.
+3. Other updates, depending on what version of `rails/webpacker` that you had.
 
 ## Upgrading to v12
 ### Recent versions

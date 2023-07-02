@@ -25,8 +25,8 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 - [Installation](#installation)
   - [Setting up your environment](#setting-up-your-environment)
   - [Create a new Ruby on Rails App](#create-a-new-ruby-on-rails-app)
-  - [Add the shakapacker and react_on_rails gems](#add-the-shakapacker-and-react_on_rails-gems)
-  - [Run the shakapacker generator](#run-the-shakapacker-generator)
+  - [Add the Shakapacker and react_on_rails gems](#add-the-shakapacker-and-react_on_rails-gems)
+  - [Run the Shakapacker generator](#run-the-shakapacker-generator)
   - [Run the React on Rails Generator](#run-the-react-on-rails-generator)
   - [Setting up your environment variables](#setting-up-your-environment-variables)
   - [Running the app](#running-the-app)
@@ -68,7 +68,7 @@ cd test-react-on-rails
 ```
 Note: You can use `--database=postgresql` option to use Postgresql for the database.
 
-## Add the shakapacker and react_on_rails gems
+## Add the Shakapacker and react_on_rails gems
 We recommend using the latest version of these gems. Otherwise, specify the
 exact versions of both the gem and npm packages. In other words, don't use
 the `^` or `~` in the version specifications.
@@ -81,7 +81,7 @@ bundle add shakapacker --strict
 Note: The latest released React On Rails version is considered stable. Please use the latest
 version to ensure you get all the security patches and the best support.
 
-## Run the shakapacker generator
+## Run the Shakapacker generator
 
 ```bash
 bundle exec rails shakapacker:install
@@ -294,7 +294,7 @@ If you want to test this out with HMR, then you also need to add this line to yo
 ```
 
 More likely, you will create a different build file for server rendering. However, if you want to
-use the same file from the webpack-dev-server, you'll need to add that line.
+use the same file from the shakapack-dev-server, you'll need to add that line.
 
 When you look at the source code for the page (right click, view source in Chrome), you can see the difference between non-server rendering, where your DIV containing your React looks like this:
 
