@@ -1,8 +1,8 @@
 Here is the full set of config options. This file is `/config/initializers/react_on_rails.rb`
 
-First, you should have a `/config/webpacker.yml` setup.
+First, you should have a `/config/shakapacker.yml` setup.
 
-Here is the setup when using the recommended `/client` directory for your node_modules and source files:
+Here is the setup when using the recommended `/client` directory for your `node_modules` and source files:
 
 ```yaml
 # Note: Base output directory of /public is assumed for static files
@@ -23,7 +23,7 @@ development:
 
 test:
   <<: *default
-  # Ensure that webpacker invokes webpack to build files for tests if not using the
+  # Ensure that shakapacker invokes webpack to build files for tests if not using the
   #   ReactOnRails rspec helper.
   compile: true
 
@@ -69,19 +69,19 @@ ReactOnRails.configure do |config|
   config.random_dom_id = true # default
 
   # defaults to "" (top level)
-  config.node_modules_location = "client" # If using webpacker you should use "".
+  config.node_modules_location = "client" # If using Shakapacker you should use "".
 
-  # If you're using the standard rails/webpacker configuration of webpack, then rails/webpacker
+  # If you're using the standard Shakapacker configuration of webpack, then Shakapacker
   # will automatically modify or create an assets:precompile task to build your assets. If so,
   # set this value to nil.  Alternatively, you can specify `config.build_production_command`
   # to have react_on_rails invoke a command for you during assets:precompile.
   # The command is either a script or a module containing a class method `call`
   # In this example, the module BuildProductionCommand would have a class method `call`.
-  config.build_production_command = "RAILS_ENV=production bin/webpacker"
+  config.build_production_command = "RAILS_ENV=production bin/shakapacker"
 
   # NOTE:
-  # When specifying `build_production_command`, you need to disable `rails/webpacker` 
-  # configuration by setting `webpacker_precompile: false` in your `config/webpacker.yml` file.
+  # When specifying `build_production_command`, you need to disable `rails/shakapacker` 
+  # configuration by setting `shakapacker_precompile: false` in your `config/shakapacker.yml` file.
 
   # See bottom for an example of the BuildProductionCommand module.
   # config.build_production_command = BuildProductionCommand
@@ -118,8 +118,8 @@ ReactOnRails.configure do |config|
   # Normally, you have different bundles for client and server, thus, the default is false.
   # Furthermore, if you are not hashing the server bundle (not in the manifest.json), then React on Rails
   # will only look for the server bundle to be created in the typical file location, typically by
-  # a `webpack --watch` process.
-  # If true, ensure that in config/webpacker.yml that you have both dev_server.hmr and
+  # a `shakapacker --watch` process.
+  # If true, ensure that in config/shakapacker.yml that you have both dev_server.hmr and
   # dev_server.inline set to false.
   config.same_bundle_for_client_and_server = false
 
@@ -220,9 +220,9 @@ ReactOnRails.configure do |config|
   # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
   #
   # NOTE:
-  # Instead of using this test helper, you may ensure fresh test files using rails/webpacker via:
-  # 1. Have `config/webpacker/test.js` exporting an array of objects to configure both client and server bundles.
-  # 2. Set the compile option to true in config/webpacker.yml for env test
+  # Instead of using this test helper, you may ensure fresh test files using Shakapacker via:
+  # 1. Have `config/webpack/test.js` exporting an array of objects to configure both client and server bundles.
+  # 2. Set the compile option to true in config/shakapacker.yml for env test
   ################################################################################
 
   # If you are using this in your spec_helper.rb (or rails_helper.rb):
@@ -232,15 +232,15 @@ ReactOnRails.configure do |config|
   # with rspec then this controls what yarn command is run
   # to automatically refresh your webpack assets on every test run.
   #
-  config.build_test_command = "RAILS_ENV=test bin/webpacker"
+  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 
   # CONFIGURE YOUR SOURCE FILES
   # The test helper needs to know where your JavaScript files exist. The value is configured
-  # by your config/webpacker.yml source_path:
+  # by your config/shakapacker.yml source_path:
   # source_path: client/app # if using recommended /client directory
   #
   # Define the files we need to check for webpack compilation when running tests.
-  # The default is `%w( manifest.json )` as will be sufficient for most webpacker builds.
+  # The default is `%w( manifest.json )` as will be sufficient for most shakapacker builds.
   # However, if you are generating a server bundle that is NOT hashed (present in manifest.json),
   # then include the file in this list like this:
   config.webpack_generated_files = %w( server-bundle.js manifest.json )
@@ -267,7 +267,7 @@ module BuildProductionCommand
   include FileUtils
   # The call method will be called during assets:precompile
   def self.call
-    sh "bin/webpacker"
+    sh "bin/shakapacker"
   end
 end
 ```
