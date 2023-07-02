@@ -3,7 +3,7 @@
 Support React on Rails development [by becoming a Github sponsor](https://github.com/sponsors/shakacode) and get these benefits:
 
 1. 1-hour per month of support via Slack, PR reviews, and Zoom for React on Rails,
-   React-Rails, rails/webpacker, ReScript (ReasonML), TypeScript, Rust, etc.
+   React-Rails, Shakapacker, rails/webpacker, ReScript (ReasonML), TypeScript, Rust, etc.
 2. React on Rails Pro Software that extends React on Rails with Node server rendering,
    fragment caching, code-splitting, and other performance enhancements for React on Rails.
 

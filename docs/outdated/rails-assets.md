@@ -1,6 +1,6 @@
 # Rails assets and the Extract Text Plugin
 
-*This doc needs updating for the use of rails/webpacker with React on Rails*
+*This doc needs updating for the use of  Shakapacker or rails/webpacker with React on Rails*
 
 The [Webpack file loader](https://github.com/webpack/file-loader) copies referenced files to
 the destination output directory, with an MD5 hash. The other term for this is a "digest".

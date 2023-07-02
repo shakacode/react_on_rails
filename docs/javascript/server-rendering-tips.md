@@ -17,7 +17,7 @@ For the best performance with Server Rendering, consider using [React on Rails P
 ## Troubleshooting Server Rendering
 
 1. First be sure your code works with server rendering disabled (`prerender: false`)
-2. Be sure that `config.trace` is true. You will get the server invocation code that renders your component. If you're not using Webpacker, you will also get the whole file used to setup the JavaScript context.
+2. Be sure that `config.trace` is true. You will get the server invocation code that renders your component. If you're not using Shakapacker, you will also get the whole file used to setup the JavaScript context.
 
 ## CSS
 Server bundles must always have CSS Extracted

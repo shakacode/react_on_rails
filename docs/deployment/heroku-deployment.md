@@ -14,22 +14,26 @@ For more information, see [Using Multiple Buildpacks for an App](https://devcent
 
 ## assets:precompile
 
-### rails/webpacker webpack configuration
-If you're using the standard rails/webpacker configuration of webpack, then rails/webpacker
-will automatically modify or create an assets:precompile task to build your assets. 
+### Shakapacker webpack configuration
+
+Shakapacker hooks up a new `shakapacker:compile` task to `assets:precompile`, which gets run whenever you run `assets:precompile`.
+If you are not using Sprockets `shakapacker:compile` is automatically aliased to `assets:precompile`.
+
+If you're using the standard `shakacode/shakapacker` configuration of webpack, then `shakacode/shakapacker`
+will automatically modify or create an `assets:precompile` task to build your assets.
 
 Alternatively, you can specify `config.build_production_command` to have
-react_on_rails invoke a command for you during assets:precompile.
+`react_on_rails` invoke a command for you during `assets:precompile`.
 
 ```
-config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
+config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
 ```
 
-### Consider Removing Webpacker's clean task
+### Consider Removing Shakapacker's clean task
 
-If you are deploying on Heroku, then you don't need Webpacker's clean task which
+If you are deploying on Heroku, then you don't need Shakapacker's clean task which
 might delete files that you need.
 
 ```
-Rake::Task['webpacker:clean'].clear
+Rake::Task['shakapacker:clean'].clear
 ```
