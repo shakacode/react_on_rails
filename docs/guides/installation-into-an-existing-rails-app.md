@@ -7,21 +7,21 @@
 1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `package.json` file.
 
    ```ruby
+   gem "shakapacker", "7.0.1"     # Use the latest and the exact version
    gem "react_on_rails", "13.3.1" # Use the latest and the exact version
-   gem "shakapacker", "6.5.5"
    ```
 
    Or use `bundle add`:
 
    ```bash
+   bundle add shakapacker --version=7.0.1 --strict
    bundle add react_on_rails --version=13.3.1 --strict
-   bundle add shakapacker --version=6.5.5 --strict
    ```
 
-2. Run the following 2 commands to install Shakapakcer (Webpacker) with React. Note, if you are using an older version of Rails than 5.1, you'll need to install webpacker with React per the instructions [here](https://github.com/rails/webpacker).
+2. Run the following 2 commands to install Shakapacker with React. Note, if you are using an older version of Rails than 5.1, you'll need to install Webpacker with React per the instructions [here](https://github.com/rails/webpacker).
 
    ```bash
-   rails webpacker:install
+   rails shakapacker:install
    ```
 
 3. Commit this to git (or else you cannot run the generator unless you pass the option `--ignore-warnings`).
