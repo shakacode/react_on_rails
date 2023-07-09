@@ -4,7 +4,7 @@ _Also see the example repo of [React on Rails Tutorial With SSR, HMR fast refres
 
 -----
 
-*Updated for Ruby 2.7, Rails 7, React on Rails v13, and Shakapacker v6*
+*Updated for Ruby 2.7, Rails 7, React on Rails v13, and Shakapacker v7*
 
 This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
@@ -26,7 +26,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
   - [Setting up your environment](#setting-up-your-environment)
   - [Create a new Ruby on Rails App](#create-a-new-ruby-on-rails-app)
   - [Add the shakapacker and react_on_rails gems](#add-the-shakapacker-and-react_on_rails-gems)
-  - [Run the shakapacker (webpacker) generator](#run-the-shakapacker-webpacker-generator)
+  - [Run the shakapacker generator](#run-the-shakapacker-generator)
   - [Run the React on Rails Generator](#run-the-react-on-rails-generator)
   - [Setting up your environment variables](#setting-up-your-environment-variables)
   - [Running the app](#running-the-app)
@@ -37,7 +37,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 - [Other features](#other-features)
   - [Turning on Server Rendering](#turning-on-server-rendering)
   - [Moving from the Rails default `/app/javascript` to the recommended `/client` structure](#moving-from-the-rails-default-appjavascript-to-the-recommended-client-structure)
-  - [Using HMR with the shakapacker setup](#using-hmr-with-the-railswebpacker-setup)
+  - [Using HMR with the shakapacker setup](#using-hmr-with-the-shakapacker-setup)
   - [Custom IP & PORT setup (Cloud9 example)](#custom-ip--port-setup-cloud9-example)
   - [RubyMine performance tip](#rubymine-performance-tip)
 - [Conclusion](#conclusion)
@@ -81,10 +81,10 @@ bundle add shakapacker --strict
 Note: The latest released React On Rails version is considered stable. Please use the latest
 version to ensure you get all the security patches and the best support.
 
-## Run the shakapacker (webpacker) generator
+## Run the shakapacker generator
 
 ```bash
-bundle exec rails webpacker:install
+bundle exec rails shakapacker:install
 ```
 
 Commit all the changes so far to avoid getting errors in the next step.
@@ -134,7 +134,7 @@ Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) and
 
 # HMR vs. React Hot Reloading
 
-First, check that the `hmr` and the `inline` options are `true` in your `config/webpacker.yml` file.
+First, check that the `hmr` and the `inline` options are `true` in your `config/shakapacker.yml` file.
 
 The basic setup will have HMR working with the default Shakapacker setup. The basic
 [HMR](https://webpack.js.org/concepts/hot-module-replacement/), without a special
@@ -324,7 +324,7 @@ ShakaCode recommends that you use `/client` for your client side app. This way a
 mv app/javascript client
 ```
 
-2. Edit your `/config/webpacker.yml` file. Change the `default/source_path`:
+2. Edit your `/config/shakapacker.yml` file. Change the `default/source_path`:
 
 ```yml
 source_path: client
@@ -359,11 +359,8 @@ Then visit https://your-shared-addr.c9users.io:8080/hello_world
 
 It's super important to exclude certain directories from RubyMine or else it will slow to a crawl as it tries to parse all the npm files.
 
-* Generated files, per the settings in your `config/webpacker.yml`, which default to `public/packs` and `public/packs-test`
+* Generated files, per the settings in your `config/shakapacker.yml`, which default to `public/packs` and `public/packs-test`
 * `node_modules`
-
-
-
 
 # Conclusion
 
