@@ -24,11 +24,7 @@ application is not yet set up to use webpacker, please see
 2. Run installation command for shakapacker:
 
    ```bash
-   # for Shakapacker v7
    rails shakapacker:install
-
-   # for Shakapacker v6 or Webpacker
-   rails webpacker:install
    ```
 
 3. Commit this to git (or else you cannot run the generator unless you pass the option `--ignore-warnings`).
@@ -73,8 +69,8 @@ issue.
 ### Configuration
 
 * Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](https://www.shakacode.com/react-on-rails/docs/guides/configuration/) for documentation of all configuration options.
-* Configure `config/shakapacker.yml` (or `config/webpacker.yml` for Shakapacker v6). If you used the generator and the default shakapacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/shakapacker.yml](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/shakapacker.yml) example or the official default [shakapacker.yml](https://github.com/shakacode/shakapacker/blob/master/lib/install/config/shakapacker.yml).
-* Most apps should rely on the rails/webpacker setup for Webpack. v6 of rails/webpacker includes support for v5 of webpack.
+* Configure `config/shakapacker.yml`. If you used the generator and the default shakapacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/shakapacker.yml](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/shakapacker.yml) example or the official default [shakapacker.yml](https://github.com/shakacode/shakapacker/blob/master/lib/install/config/shakapacker.yml).
+* Most apps should rely on the Shakapacker setup for Webpack. Starting from v6, Shakapacker includes support for v5 of webpack.
 
 ## Including your React Component on your Rails Views
 
