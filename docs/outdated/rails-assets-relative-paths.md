@@ -1,4 +1,4 @@
-*Note: this doc reflects using Sprockets for assets and has not been updated for rails/webpacker*
+*Note: this doc reflects using Sprockets for assets and has not been updated for Shakapacker or rails/webpacker*
 
 # Using Webpack bundled assets with the Rails Asset Pipeline
 
