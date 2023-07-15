@@ -3,13 +3,14 @@ import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
 import createReactOutput from './createReactOutput';
-import {isServerRenderHash, isPromise} from
-    './isServerRenderResult';
+import { isServerRenderHash, isPromise } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import type { RenderParams, RenderResult, RenderingError } from './types/index';
 
-export default function serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult> {
+export default function serverRenderReactComponentInternal(
+  options: RenderParams,
+): null | string | Promise<RenderResult> {
   const { name, domNodeId, trace, props, railsContext, renderingReturnsPromises, throwJsErrors } = options;
 
   let renderResult: null | string | Promise<string> = null;
@@ -33,37 +34,42 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
     });
 
     const processServerRenderHash = () => {
-        // We let the client side handle any redirect
-        // Set hasErrors in case we want to throw a Rails exception
-        hasErrors = !!(reactRenderingResult as {routeError: Error}).routeError;
+      // We let the client side handle any redirect
+      // Set hasErrors in case we want to throw a Rails exception
+      hasErrors = !!(reactRenderingResult as { routeError: Error }).routeError;
 
-        if (hasErrors) {
-          console.error(
-            `React Router ERROR: ${JSON.stringify((reactRenderingResult as {routeError: Error}).routeError)}`,
-          );
-        }
+      if (hasErrors) {
+        console.error(
+          `React Router ERROR: ${JSON.stringify((reactRenderingResult as { routeError: Error }).routeError)}`,
+        );
+      }
 
-        if ((reactRenderingResult as {redirectLocation: {pathname: string; search: string}}).redirectLocation) {
-          if (trace) {
-            const { redirectLocation } = (reactRenderingResult as {redirectLocation: {pathname: string; search: string}});
-            const redirectPath = redirectLocation.pathname + redirectLocation.search;
-            console.log(`\
-  ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redirectPath}`,
-            );
-          }
-          // For redirects on server rendering, we can't stop Rails from returning the same result.
-          // Possibly, someday, we could have the rails server redirect.
-          return '';
+      if (
+        (reactRenderingResult as { redirectLocation: { pathname: string; search: string } }).redirectLocation
+      ) {
+        if (trace) {
+          const { redirectLocation } = reactRenderingResult as {
+            redirectLocation: { pathname: string; search: string };
+          };
+          const redirectPath = redirectLocation.pathname + redirectLocation.search;
+          console.log(`\
+  ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redirectPath}`);
         }
-        return (reactRenderingResult as { renderedHtml: string }).renderedHtml;
+        // For redirects on server rendering, we can't stop Rails from returning the same result.
+        // Possibly, someday, we could have the rails server redirect.
+        return '';
+      }
+      return (reactRenderingResult as { renderedHtml: string }).renderedHtml;
     };
 
     const processPromise = () => {
       if (!renderingReturnsPromises) {
-        console.error('Your render function returned a Promise, which is only supported by a node renderer, not ExecJS.')
+        console.error(
+          'Your render function returned a Promise, which is only supported by a node renderer, not ExecJS.',
+        );
       }
       return reactRenderingResult;
-    }
+    };
 
     const processReactElement = () => {
       try {
@@ -99,13 +105,14 @@ as a renderFunction and not a simple React Function Component.`);
 
   const consoleReplayScript = buildConsoleReplay();
   const addRenderingErrors = (resultObject: RenderResult, renderError: RenderingError) => {
-    resultObject.renderingError = { // eslint-disable-line no-param-reassign
+    // eslint-disable-next-line no-param-reassign
+    resultObject.renderingError = {
       message: renderError.message,
       stack: renderError.stack,
     };
-  }
+  };
 
-  if(renderingReturnsPromises) {
+  if (renderingReturnsPromises) {
     const resolveRenderResult = async () => {
       let promiseResult;
 
@@ -127,7 +134,7 @@ as a renderFunction and not a simple React Function Component.`);
           }),
           consoleReplayScript,
           hasErrors: true,
-        }
+        };
         renderingError = e;
       }
 
