@@ -38,12 +38,23 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   describe "#load_pack_for_generated_component" do
+    let(:render_options) do
+      ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: "component_name",
+                                                      options: {})
+    end
+
     it "appends js/css pack tag" do
       allow(helper).to receive(:append_javascript_pack_tag)
       allow(helper).to receive(:append_stylesheet_pack_tag)
-      expect { helper.load_pack_for_generated_component("component_name") }.not_to raise_error
+      expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
       expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: true })
       expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
+    end
+
+    it "throws an error in development if generated component isn't found" do
+      allow(Rails.env).to receive(:development?).and_return(true)
+      expect { helper.load_pack_for_generated_component("nonexisting_component", render_options) }
+        .to raise_error(ReactOnRails::Error, /the generated component entrypoint/)
     end
   end
 
