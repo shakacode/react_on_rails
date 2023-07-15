@@ -11,7 +11,7 @@ This documentation assumes the usage of ReactOnRails with Shakapacker 7. For ins
 
 ## Basic Installation
 
-You need a Rails application with Shakapacker installed and configured on it. Check [Shakapacker documentation]() for more details but typically you need the following steps:
+You need a Rails application with Shakapacker installed and configured on it. Check [Shakapacker documentation](https://github.com/shakacode/shakapacker) for more details but typically you need the following steps:
 
 ```bash
 rails new PROJECT_NAME --skip-javascript
