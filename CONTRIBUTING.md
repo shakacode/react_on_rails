@@ -244,6 +244,16 @@ Run `docker-compose build ci` to build the CI container. Run `docker-compose run
 
 Run `docker-compose build tests` to build the tests container. Run `docker-compose run tests` to start all RSpec tests.
 
+### Server-side-rendering performance benchmarking
+
+See a simple example of benchmarking different ExecJS runtimes (NodeJS, [MiniRacer](https://github.com/rubyjs/mini_racer), [Alaska](https://github.com/mavenlink/alaska)) in `spec/dummy/bin/benchmark`.
+
+After setting up the dummy app (`spec/dummy`), run:
+```bash
+cd spec/dummy
+bin/benchmark
+```
+
 # Advice for Project Maintainers and Contributors
 
 What do project maintainers do? What sort of work is involved? [sstephenson](https://github.com/sstephenson) wrote in the [turbolinks](https://github.com/turbolinks/turbolinks) repo:

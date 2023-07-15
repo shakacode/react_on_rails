@@ -1,4 +1,5 @@
 const { merge, config } = require('shakapacker');
+const path = require('path');
 const commonWebpackConfig = require('./commonWebpackConfig');
 
 const webpack = require('webpack');
@@ -8,6 +9,7 @@ const configureServer = () => {
   // toWebpackConfig() is a mutable GLOBAL. Thus any changes, like modifying the
   // entry value will result in changing the client config!
   // Using webpack-merge into an empty object avoids this issue.
+  /** @type {webpack.Configuration} */
   const serverWebpackConfig = commonWebpackConfig();
 
   // We just want the single server bundle entry
@@ -108,6 +110,31 @@ const configureServer = () => {
   // break with SSR. The fix is to use a node renderer and change the target.
   // If using the React on Rails Pro node server renderer, uncomment the next line
   // serverWebpackConfig.target = 'node'
+
+  // MiniRacer specific config
+  if (process.env.EXECJS_RUNTIME === 'MiniRacer') {
+    // disable nodejs target
+    serverWebpackConfig.target = false;
+
+    serverWebpackConfig.output.chunkFormat = 'commonjs';
+
+    // add `process` polyfill
+    serverWebpackConfig.plugins.push(
+      new webpack.ProvidePlugin({
+        process: 'process/browser',
+      }),
+    );
+
+    // add `stream` polyfill
+    serverWebpackConfig.resolve.fallback ||= {};
+    serverWebpackConfig.resolve.fallback.stream = require.resolve('stream-browserify');
+
+    // add polyfills: TextEncoder/TextDecoder, URLSearchParams, global
+    serverWebpackConfig.entry['server-bundle'] = [
+      path.resolve(process.cwd(), 'client/app/miniracerPolyfills.js'),
+      serverWebpackConfig.entry['server-bundle'],
+    ];
+  }
 
   return serverWebpackConfig;
 };

@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+#
+# A simple example of how to benchmark the dummy app.
+#
+
+set -euo pipefail
+
+shutdown_server() {
+  if [ -f tmp/pids/server.pid ]; then
+    kill $(cat tmp/pids/server.pid)
+    rm -f tmp/pids/server.pid
+  fi
+}
+
+hit_backend() {
+  local pathname="$1"
+  curl "http://localhost:3000$pathname" \
+    --max-time 3 \
+    --silent \
+    --no-progress-meter \
+    --fail \
+    -w %{time_total} \
+    -o /dev/null
+}
+
+run_benchmarks() {
+  local runtime="$1"
+  local pathname="$2"
+
+  echo "Benchmarking with $runtime..."
+
+  # start dummy app server in background
+  MANUAL_EXECJS_RUNTIME="$runtime" \
+    RAILS_ENV=production \
+    bundle exec rails s -p 3000 &
+
+  sleep 3 # wait for server to start
+
+  echo "Warmup: $(hit_backend $pathname)"
+
+  durations=()
+  for i in {1..10}; do
+    dur=$(hit_backend $pathname)
+    durations+=("$dur")
+    echo "Request $i: ${dur}s"
+  done
+
+  echo "$runtime average: $(echo "${durations[*]}" | awk '{ total += $1 } END { print total/NR }')s"
+
+  shutdown_server
+}
+
+# If you modified `node_package` files, first follow the
+# instructions in CONTRIBUTING.md to setup `yalc`.
+
+# Build server-rendering assets:
+# yarn build:rescript # if needed
+rm -rf public/webpack
+RAILS_ENV=production NODE_ENV=production bin/webpacker
+
+# kill server on exit
+trap shutdown_server EXIT
+
+# kill any existing server
+shutdown_server
+
+# remove any existing logs
+rm -f log/*.log
+
+echo "Benchmarking server-side rendering..."
+
+# run_benchmarks Node /render_js # FIXME: Node runtime is broken with this setup, it stalls infinitely.
+run_benchmarks MiniRacer /render_js
+run_benchmarks Alaska /render_js
+
+# FIXME: all others SSR endpoints are broken with this setup
+#   e.g. Hitting /server_side_hello_world gives error: "ActionView::Template::Error (Shakapacker can't find generated/HelloWorld.js in manifest.json"
+
+echo "Benchmarking complete!"

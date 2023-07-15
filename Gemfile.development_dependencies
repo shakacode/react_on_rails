@@ -2,7 +2,7 @@
 
 gem "shakapacker", "6.5.1"
 gem "bootsnap", require: false
-gem "rails", "~> 7.0"
+gem "rails", "~> 7.0", ">= 7.0.1"
 gem "sqlite3"
 gem "sass-rails", "~> 6.0"
 gem "uglifier"
@@ -24,7 +24,7 @@ gem "amazing_print"
 
 group :development, :test do
   gem "listen"
-  gem "pry"
+  gem "pry", ">= 0.14.2"
   gem "pry-byebug"
   gem "pry-doc"
   gem "pry-rails"
@@ -34,6 +34,10 @@ group :development, :test do
   gem "rubocop-rspec", require: false
   gem "scss_lint", require: false
   gem "spring", "~> 4.0"
+
+  # Example ExecJS runtimes
+  gem "mini_racer", require: false
+  gem "alaska", require: false
 end
 
 group :test do
