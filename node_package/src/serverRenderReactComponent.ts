@@ -9,7 +9,7 @@ import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import type { RenderParams, RenderResult, RenderingError } from './types/index';
 
-export default function serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult> {
+function serverRenderReactComponentInternal(options: RenderParams): null | string | Promise<RenderResult> {
   const { name, domNodeId, trace, props, railsContext, renderingReturnsPromises, throwJsErrors } = options;
 
   let renderResult: null | string | Promise<string> = null;
@@ -153,3 +153,14 @@ as a renderFunction and not a simple React Function Component.`);
 
   return JSON.stringify(result);
 }
+
+const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (options) => {
+  try {
+    return serverRenderReactComponentInternal(options);
+  } finally {
+    // Reset console history after each render.
+    // See `RubyEmbeddedJavaScript.console_polyfill` for initialization.
+    console.history = [];
+  }
+};
+export default serverRenderReactComponent;
