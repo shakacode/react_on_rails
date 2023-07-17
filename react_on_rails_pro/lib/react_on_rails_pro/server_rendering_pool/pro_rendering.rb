@@ -18,13 +18,9 @@ module ReactOnRailsPro
 
         def exec_server_render_js(js_code, render_options)
           ::ReactOnRailsPro::Utils.with_trace(render_options.react_component_name) do
-            # See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
-            # the digest is on the render options.
-            # TODO: the request digest should be removed unless prerender caching is used
-            set_request_digest_on_render_options(js_code, render_options)
             if ReactOnRailsPro.configuration.prerender_caching &&
                render_options.internal_option(:skip_prerender_cache).nil?
-              prerender_cache_key = cache_key(js_code, render_options)
+              prerender_cache_key = cache_key(render_options)
               prerender_cache_hit = true
               result = Rails.cache.fetch(prerender_cache_key) do
                 prerender_cache_hit = false
@@ -42,24 +38,6 @@ module ReactOnRailsPro
           end
         end
 
-        # See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
-        # the digest is on the render options.
-        def set_request_digest_on_render_options(js_code, render_options)
-          return unless render_options.request_digest.blank?
-
-          digest = if render_options.random_dom_id?
-                     Rails.logger.info do
-                       "[ReactOnRailsPro] Rendering #{render_options.react_component_name}. " \
-                         "Suggest setting `id` on react_component or setting react_on_rails.rb initializer " \
-                         "config.random_dom_id to false for BETTER performance."
-                     end
-                     Digest::MD5.hexdigest(without_random_values(js_code))
-                   else
-                     Digest::MD5.hexdigest(js_code)
-                   end
-          render_options.request_digest = digest
-        end
-
         private
 
         def without_random_values(js_code)
@@ -68,9 +46,7 @@ module ReactOnRailsPro
           js_code.gsub(/domNodeId: '[\w-]*',/, "")
         end
 
-        def cache_key(js_code, render_options)
-          set_request_digest_on_render_options(js_code, render_options)
-
+        def cache_key(render_options)
           [
             *ReactOnRailsPro::Cache.base_cache_key("ror_pro_rendered_html",
                                                    prerender: render_options.prerender),
