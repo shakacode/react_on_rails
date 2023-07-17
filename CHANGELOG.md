@@ -14,6 +14,9 @@ You can find the **package** version numbers from this repo's tags and below in 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+### Improved
+- Remove unused bundle request digest for a minor performance improvement. [PR 331](https://github.com/shakacode/react_on_rails_pro/pull/331) by [judahmeek](https://github.com/judahmeek).
+
 ## [3.1.2] - 2023-02-24
 
 ### Fixed

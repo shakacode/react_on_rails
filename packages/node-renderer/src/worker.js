@@ -111,24 +111,11 @@ module.exports = function run(config) {
     return true;
   };
 
-  // See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
-  // the digest is part of the request URL. Yes, it's not used here, but the
-  // server logs might show it to distinguish different requests.
-  app.route('/bundles/:bundleTimestamp/render/:renderRequestDigest').post(
+  app.route('/bundles/:bundleTimestamp').post(
     asyncHandler(async (req, res, _next) => {
       if (!requestPrechecks(req, res)) {
         return;
       }
-
-      // if(TESTING_TIMEOUTS && getRandomInt(2) === 1) {
-      //   console.log(
-      //     'ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ');
-      //   console.log(`Sleeping, to test timeouts`);
-      //   console.log(
-      //     'ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ');
-      //
-      //   await sleep(100000);
-      // }
 
       const { renderingRequest } = req.body;
       const { bundleTimestamp } = req.params;
