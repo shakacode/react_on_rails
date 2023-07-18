@@ -17,13 +17,13 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
-### Improved
+#### Improved
 - Improved performance by removing an unnecessary JS eval from Ruby. [PR 1544](https://github.com/shakacode/react_on_rails/pull/1544) by [wyattades](https://github.com/wyattades).
 
-### Removed
+#### Removed
 - Removed a requirement for autoloaded pack files to be generated as part of CI or deployment separate from initial Shakapacker bundling. [PR 1545](https://github.com/shakacode/react_on_rails/pull/1545) by [judahmeek](https://github.com/judahmeek).
 
-### Changed
+#### Changed
 - Throw error when attempting to redefine ReactOnRails. [PR 1562](https://github.com/shakacode/react_on_rails/pull/1562) by [rubenochiavone](https://github.com/rubenochiavone).
 
 ### [13.3.5] - 2023-05-31
@@ -32,45 +32,45 @@ Changes since last non-beta release.
 
 ### [13.3.4] - 2023-05-23
 
-### Added
+#### Added
 - Improved functionality of Filesystem-based pack generation & auto-bundling. Added `make_generated_server_bundle_the_entrypoint` configuration key. [PR 1531](https://github.com/shakacode/react_on_rails/pull/1531) by [judahmeek](https://github.com/judahmeek).
 
-### Removed
+#### Removed
 - Removed unneeded `HMR=true` from `Procfile.dev` in install template [PR 1537](https://github.com/shakacode/react_on_rails/pull/1537) by [ahangarha](https://github.com/ahangarha).
 
 ### [13.3.3] - 2023-03-21
 
-### Fixed
+#### Fixed
 - Fixed bug regarding loading FS-based packs. [PR 1527](https://github.com/shakacode/react_on_rails/pull/1527) by [judahmeek](https://github.com/judahmeek).
 
 ### [13.3.2] - 2023-02-24
 
-### Fixed
+#### Fixed
 - Fixed the bug in `bin/dev` and `bin/dev-static` scripts by using `system` instead of `exec` and remove option to pass arguments [PR 1519](https://github.com/shakacode/react_on_rails/pull/1519) by [ahangarha](https://github.com/ahangarha).
 
 ### [13.3.1] - 2023-01-30
-## Added 
+#### Added
 - Optimized `ReactOnRails::TestHelper`'s RSpec integration using `when_first_matching_example_defined`. [PR 1496](https://github.com/shakacode/react_on_rails/pull/1496) by [mcls](https://github.com/mcls).
  
-### Fixed
+#### Fixed
 - Fixed bug regarding FS-based packs generation. [PR 1515](https://github.com/shakacode/react_on_rails/pull/1515) by [pulkitkkr](https://github.com/pulkitkkr).
 
 ### [13.3.0] - 2023-01-29
-### Fixed
+#### Fixed
 - Fixed pack not found warning while using `react_component` and `react_component_hash` helpers, even when corresponding chunks are present. [PR 1511](https://github.com/shakacode/react_on_rails/pull/1511) by [pulkitkkr](https://github.com/pulkitkkr).
 - Fixed FS-based packs generation functionality to trigger pack generation  on the creation of a new react component inside `components_subdirectory`. [PR 1506](https://github.com/shakacode/react_on_rails/pull/1506) by [pulkitkkr](https://github.com/pulkitkkr).
 - Upgrade several JS dependencies to fix security issues. [PR 1514](https://github.com/shakacode/react_on_rails/pull/1514) by [ahangarha](https://github.com/ahangarha).
 
-### Added
+#### Added
 - Added `./bin/dev` and `./bin/dev-static` executables to ease and standardize running the dev server. [PR 1491](https://github.com/shakacode/react_on_rails/pull/1491) by [ahangarha](https://github.com/ahangarha).
 
 ### [13.2.0] - 2022-12-23
                                            
-### Fixed
+#### Fixed
 - Fix reactOnRailsPageUnloaded when there is no component on the page. Important for apps using both hotwire and react_on_rails. [PR 1498](https://github.com/shakacode/react_on_rails/pull/1498) by [NhanHo](https://github.com/NhanHo).
 - Fixing wrong type. The throwIfMissing param of getStore should be optional as it defaults to true. [PR 1480](https://github.com/shakacode/react_on_rails/pull/1480) by [wouldntsavezion](https://github.com/wouldntsavezion).
 
-### Added
+#### Added
 - Exposed `reactHydrateOrRender` utility via [PR 1481](https://github.com/shakacode/react_on_rails/pull/1481) by [vaukalak](https://github.com/vaukalak).
 
 ### [13.1.0] - 2022-08-20
@@ -118,16 +118,16 @@ Changes since last non-beta release.
 
 ### [12.6.0] - 2022-01-22
 
-### Added
+#### Added
 - A `rendering_props_extension` configuration which takes a module with an `adjust_props_for_client_side_hydration` method, which is used to process props differently for server/client if `prerender` is set to `true`. [PR 1413](https://github.com/shakacode/react_on_rails/pull/1413) by [gscarv13](https://github.com/gscarv13) & [judahmeek](https://github.com/judahmeek).
 
 ### [12.5.2] - 2021-12-29
-### Fixed
+#### Fixed
 - Usage of config.build_production_command for custom command for production builds fixed. [PR 1415](https://github.com/shakacode/react_on_rails/pull/1415) by [judahmeek](https://github.com/judahmeek).
 
 ### [12.5.1] - 2021-12-27
 
-### Fixed
+#### Fixed
 - A fatal server rendering error if running an ReactOnRails >=12.4.0 with ReactOnRails Pro <2.4.0. [PR 1412](https://github.com/shakacode/react_on_rails/pull/1412) by [judahmeek](https://github.com/judahmeek).
 
 ### [12.5.0] - 2021-12-26
@@ -487,7 +487,7 @@ Moved to [our documentation](https://www.shakacode.com/react-on-rails/docs/guide
 - Fixes GitUtils.uncommitted_changes? throwing an error when called in an environment without Git, and allows install generator to be run successfully with `--ignore-warnings` [#878](https://github.com/shakacode/react_on_rails/pull/878) by [jasonblalock](https://github.com/jasonblalock).
 
 ## [8.0.5] - 2017-07-04
-### fixed
+#### Fixed
  - Corrects `devBuild` value for webpack production build from webpackConfigLoader. [#877](https://github.com/shakacode/react_on_rails/pull/877) by [chenqingspring](https://github.com/chenqingspring).
  - Remove contentBase deprecation warning message. [#878](https://github.com/shakacode/react_on_rails/pull/878) by [ened ](https://github.com/ened).
  - Removes invalid reference to _railsContext in the generated files. [#886](https://github.com/shakacode/react_on_rails/pull/886) by [justin808](https://github.com/justin808).
@@ -496,11 +496,11 @@ Moved to [our documentation](https://www.shakacode.com/react-on-rails/docs/guide
 *Note: 8.0.4 skipped.*
 
 ## [8.0.3] - 2017-06-19
-### Fixed
+#### Fixed
 - Ruby 2.1 issue due to `<<~` as reported in [issue #870](https://github.com/shakacode/react_on_rails/issues/870). [#867](https://github.com/shakacode/react_on_rails/pull/867) by [justin808](https://github.com/justin808)
 
 ## [8.0.2] - 2017-06-04
-### Fixed
+#### Fixed
 - Any failure in webpack to build test files quits tests.
 - Fixed a Ruby 2.4 potential crash which could cause a crash due to pathname change in Ruby 2.4.
 - CI Improvements:
@@ -511,7 +511,7 @@ Moved to [our documentation](https://www.shakacode.com/react-on-rails/docs/guide
 - [#862](https://github.com/shakacode/react_on_rails/pull/862) by [justin808](https://github.com/justin808)
 
 ## [8.0.1] - 2017-05-30
-### Fixed
+#### Fixed
 - Generator no longer modifies `assets.rb`. [#859](https://github.com/shakacode/react_on_rails/pull/859) by [justin808](https://github.com/justin808)
 
 ## [8.0.0] - 2017-05-29
@@ -524,21 +524,21 @@ Moved to [our documentation](https://www.shakacode.com/react-on-rails/docs/guide
 - For a simple example of the webpacker_lite setup, run the basic generator.
 
 ## [8.0.0-beta.3] - 2017-05-27
-### Changed
+#### Changed
 - Major updates for WebpackerLite 2.0.2. [#844](https://github.com/shakacode/react_on_rails/pull/845) by [justin808](https://github.com/justin808) with help from ](https://github.com/robwise)
 - Logging no longer occurs when trace is turned to false. [#845](https://github.com/shakacode/react_on_rails/pull/845) by [conturbo](https://github.com/Conturbo)
 
 ## [8.0.0-beta.2] - 2017-05-08
 
-### Changed
+#### Changed
 Removed unnecessary values in default paths.yml files for generators. [#834](https://github.com/shakacode/react_on_rails/pull/834) by [justin808](https://github.com/justin808).
 
 ## [8.0.0-beta.1] - 2017-05-03
 
-### Added
+#### Added
 Support for WebpackerLite in the generators. [#822](https://github.com/shakacode/react_on_rails/pull/822) by [kaizencodes](https://github.com/kaizencodes) and [justin808](https://github.com/justin808).
 
-### Changed
+#### Changed
 Breaking change is that the default value of symlink_non_digested_assets_regex has changed from this
 old value to nil. This is a breaking change if you didn't have this value set in your
 config/initializers/react_on_rails.rb file and you need this because you're using webpack's CSS
@@ -558,65 +558,65 @@ Same as 7.0.1.
 *Accidental release of beta gem here*
 
 ## [7.0.1] - 2017-04-27
-### Fixed
+#### Fixed
 - Fix to handle nil values in json_safe_and_pretty [#823](https://github.com/shakacode/react_on_rails/pull/823) by [dzirtusss](https://github.com/dzirtusss)
 
 ## [7.0.0] - 2017-04-25
-### Changed
+#### Changed
 - Any version differences in gem and node package for React on Rails throw an error [#821](https://github.com/shakacode/react_on_rails/pull/821) by [justin808](https://github.com/justin808)
 
-### Fixed
+#### Fixed
 - Fixes serious performance regression when using String props for rendering. [#821](https://github.com/shakacode/react_on_rails/pull/821) by [justin808](https://github.com/justin808)
 
 ## [6.10.1] - 2017-04-23
-### Fixed
+#### Fixed
 - Improve json conversion with tests and support for older Rails 3.x. [#787](https://github.com/shakacode/react_on_rails/pull/787) by [cheremukhin23](https://github.com/cheremukhin23) and [Ynote](https://github.com/Ynote).
 
 ## [6.10.0] - 2017-04-13
 
-### Added
+#### Added
 - Add an ability to return multiple HTML strings in a `Hash` as a result of `react_component` method call. Allows to build `<head>` contents with [React Helmet](https://github.com/nfl/react-helmet). [#800](https://github.com/shakacode/react_on_rails/pull/800) by [udovenko](https://github.com/udovenko).
 
-### Fixed
+#### Fixed
 - Fix PropTypes, createClass deprecation warnings for React 15.5.x. [#804](https://github.com/shakacode/react_on_rails/pull/804) by [udovenko ](https://github.com/udovenko).
 
 ## [6.9.3] - 2017-04-03
 
-### Fixed
+#### Fixed
 - Removed call of to_json on strings when formatting props. [#791](https://github.com/shakacode/react_on_rails/pull/791) by [justin808](https://github.com/justin808).
 
 ## [6.9.2] - 2017-04-02
 
-### Changed
+#### Changed
 - Update version_checker.rb to `logger.error` rather than `logger.warn` for gem/npm version mismatch. [#788](https://github.com/shakacode/react_on_rails/issues/788) by [justin808](https://github.com/justin808).
 
-### Fixed
+#### Fixed
 - Remove pretty formatting of JSON in development. [#789](https://github.com/shakacode/react_on_rails/pull/789) by [justin808](https://github.com/justin808)
 - Clear hydrated stores with each server rendered block. [#785](https://github.com/shakacode/react_on_rails/pull/785) by [udovenko](https://github.com/udovenko)
 
 ## [6.9.1] - 2017-03-30
 
-### Fixed
+#### Fixed
 - Fixes Crash in Development for String Props. [#784](https://github.com/shakacode/react_on_rails/issues/784) by [justin808](https://github.com/justin808).
 
 ## [6.9.0] - 2017-03-29
 
-### Fixed
+#### Fixed
 - Fixed error in the release script. [#767](https://github.com/shakacode/react_on_rails/issues/767) by [isolo](https://github.com/isolo).
 
-### Changed
+#### Changed
 - Use <script type="application/json"> for props and store instead of hidden div. [#775] (https://github.com/shakacode/react_on_rails/pull/775) by [cheremukhin23](https://github.com/cheremukhin23).
 
-### Added
+#### Added
 - Add option to specify i18n_yml_dir in order to include only subset of locale files when generating translations.js & default.js for react-intl.
 [#777](https://github.com/shakacode/react_on_rails/pull/777) by [danijel](https://github.com/danijel).
 
 ## [6.8.2] - 2017-03-24
-### Fixed
+#### Fixed
 - Change webpack output path to absolute and update webpack to version ^2.3.1. [#771](https://github.com/shakacode/react_on_rails/pull/771) by [cheremukhin23](https://github.com/cheremukhin23).
 
 ## [6.8.1] - 2017-03-21
-### Fixed
+#### Fixed
 - Fixed error "The node you're attempting to unmount was rendered by another copy of React." [#706](https://github.com/shakacode/react_on_rails/issues/706) when navigating to cached page using Turbolinks  [#763](https://github.com/shakacode/react_on_rails/pull/763) by [szyablitsky](https://github.com/szyablitsky).
 
 ## [6.8.0] - 2017-03-06
@@ -624,7 +624,7 @@ Same as 7.0.1.
 - Converted to Webpack v2 for generators, tests, and all example code. [#742](https://github.com/shakacode/react_on_rails/pull/742) by [justin808](https://github.com/justin808).
 
 ## [6.7.2] - 2017-03-05
-### Improved
+#### Improved
 - Improve i18n Integration with a better error message if the value of the i18n directory is invalid. [#748](https://github.com/shakacode/react_on_rails/pull/748) by [justin808](https://github.com/justin808).
 
 ## [6.7.1] - 2017-02-28
@@ -632,7 +632,7 @@ No changes other than a test fix.
 
 ## [6.7.0] - 2017-02-28
 
-### IMPORTANT
+#### IMPORTANT
 - If you installed 6.6.0, you will need to comment out the line matching i18n_dir unless you are using this feature. 6.7.1 will give you an error like:
 
 ```
@@ -645,32 +645,32 @@ Commenting out this line addresses the issue:
 config.i18n_dir = Rails.root.join("client", "app", "libs", "i18n")
 ```
 
-### Added
+#### Added
 - Allow using rake task to generate javascript locale files. The test helper automatically creates the localization files when needed. [#717](https://github.com/shakacode/react_on_rails/pull/717) by [JasonYCHuang](https://github.com/JasonYCHuang).
 
-### Fixed
+#### Fixed
 - Upgrade Rails to 4.2.8 to fix security vulnerabilities in 4.2.5. [#735](https://github.com/shakacode/react_on_rails/pull/735) by [hrishimittal](https://github.com/hrishimittal).
 - Fix spec failing due to duplicate component. [#734](https://github.com/shakacode/react_on_rails/pull/734) by [hrishimittal](https://github.com/hrishimittal).
 
 ## [6.6.0] - 2017-02-18
-### Added
+#### Added
 - Switched to yarn! [#715](https://github.com/shakacode/react_on_rails/pull/715) by [squadette](https://github.com/squadette).
 
 ## [6.5.1] - 2017-02-11
-### Fixed
+#### Fixed
 - Allow using gem without sprockets. [#671](https://github.com/shakacode/react_on_rails/pull/671) by [fc-arny](https://github.com/fc-arny).
 - Fixed issue [#706](https://github.com/shakacode/react_on_rails/issues/706) with "flickering" components when they are unmounted too early [#709](https://github.com/shakacode/react_on_rails/pull/709) by [szyablitsky](https://github.com/szyablitsky).
 - Small formatting fix for errors [#703](https://github.com/shakacode/react_on_rails/pull/703) by [justin808](https://github.com/justin808).
 
 ## [6.5.0] - 2017-01-31
-### Added
+#### Added
 - Allow generator function to return Object with property `renderedHtml` (already could return Object with props `redirectLocation, error`) rather than a React component or a function that returns a React component. One reason to use a generator function is that sometimes in server rendering, specifically with React Router v4, you need to return the result of calling ReactDOMServer.renderToString(element). [#689](https://github.com/shakacode/react_on_rails/issues/689) by [justin808](https://github.com/justin808).
 
-### Fixed
+#### Fixed
 - Fix incorrect "this" references of Node.js SSR [#690](https://github.com/shakacode/react_on_rails/issues/689) by [nostophilia](https://github.com/nostophilia).
 
 ## [6.4.2] - 2017-01-17
-### Fixed
+#### Fixed
 - Added OS detection for install generator, system call for Windows and unit-tests for it. [#666](https://github.com/shakacode/react_on_rails/pull/666) by [GeorgeGorbanev](https://github.com/GeorgeGorbanev).
 
 ## [6.4.1] - 2017-1-17
@@ -678,17 +678,17 @@ No changes.
 
 ## [6.4.0] - 2017-1-12
 
-### Possible Breaking Change
+#### Possible Breaking Change
 - Since foreman is no longer a dependency of the React on Rails gem, please run `gem install foreman`. If you are using rvm, you may wish to run `rvm @global do gem install foreman` to install foreman for all your gemsets.
 
-### Fixed
+#### Fixed
 - Removed foreman as a dependency. [#678](https://github.com/shakacode/react_on_rails/pull/678) by [x2es](https://github.com/x2es).
 
-### Added
+#### Added
 - Automatically generate __i18n__ javascript files for `react-intl` when the serve starts up. [#642](https://github.com/shakacode/react_on_rails/pull/642) by [JasonYCHuang](https://github.com/JasonYCHuang).
 
 ## [6.3.5] - 2017-1-6
-### Fixed
+#### Fixed
 - The redux generator now creates a HelloWorld component that uses redux rather than local state. [#669](https://github.com/shakacode/react_on_rails/issues/669) by [justin808](https://github.com/justin808).
 
 ## [6.3.4] - 2016-12-25
