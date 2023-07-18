@@ -26,11 +26,11 @@ Changes since last non-beta release.
 ### Changed
 - Throw error when attempting to redefine ReactOnRails. [PR 1562](https://github.com/shakacode/react_on_rails/pull/1562) by [rubenochiavone](https://github.com/rubenochiavone).
 
-### [13.3.5] - 2022-05-31
+### [13.3.5] - 2023-05-31
 #### Fixed
 - Fixed race condition where a react component could attempt to initialize before it had been registered. [PR 1540](https://github.com/shakacode/react_on_rails/pull/1540) by [judahmeek](https://github.com/judahmeek).
 
-### [13.3.4] - 2022-05-23
+### [13.3.4] - 2023-05-23
 
 ### Added
 - Improved functionality of Filesystem-based pack generation & auto-bundling. Added `make_generated_server_bundle_the_entrypoint` configuration key. [PR 1531](https://github.com/shakacode/react_on_rails/pull/1531) by [judahmeek](https://github.com/judahmeek).
@@ -38,24 +38,24 @@ Changes since last non-beta release.
 ### Removed
 - Removed unneeded `HMR=true` from `Procfile.dev` in install template [PR 1537](https://github.com/shakacode/react_on_rails/pull/1537) by [ahangarha](https://github.com/ahangarha).
 
-### [13.3.3] - 2022-03-21
+### [13.3.3] - 2023-03-21
 
 ### Fixed
 - Fixed bug regarding loading FS-based packs. [PR 1527](https://github.com/shakacode/react_on_rails/pull/1527) by [judahmeek](https://github.com/judahmeek).
 
-### [13.3.2] - 2022-02-24
+### [13.3.2] - 2023-02-24
 
 ### Fixed
 - Fixed the bug in `bin/dev` and `bin/dev-static` scripts by using `system` instead of `exec` and remove option to pass arguments [PR 1519](https://github.com/shakacode/react_on_rails/pull/1519) by [ahangarha](https://github.com/ahangarha).
 
-### [13.3.1] - 2022-01-30
+### [13.3.1] - 2023-01-30
 ## Added 
 - Optimized `ReactOnRails::TestHelper`'s RSpec integration using `when_first_matching_example_defined`. [PR 1496](https://github.com/shakacode/react_on_rails/pull/1496) by [mcls](https://github.com/mcls).
  
 ### Fixed
 - Fixed bug regarding FS-based packs generation. [PR 1515](https://github.com/shakacode/react_on_rails/pull/1515) by [pulkitkkr](https://github.com/pulkitkkr).
 
-### [13.3.0] - 2022-01-29
+### [13.3.0] - 2023-01-29
 ### Fixed
 - Fixed pack not found warning while using `react_component` and `react_component_hash` helpers, even when corresponding chunks are present. [PR 1511](https://github.com/shakacode/react_on_rails/pull/1511) by [pulkitkkr](https://github.com/pulkitkkr).
 - Fixed FS-based packs generation functionality to trigger pack generation  on the creation of a new react component inside `components_subdirectory`. [PR 1506](https://github.com/shakacode/react_on_rails/pull/1506) by [pulkitkkr](https://github.com/pulkitkkr).
