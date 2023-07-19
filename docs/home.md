@@ -20,4 +20,4 @@ that supports SSR.
 3. Live, [open source](https://github.com/shakacode/react-webpack-rails-tutorial), example of this gem, see [reactrails.com](http://reactrails.com).
 
 # Other Resources
-1. RailsConf 2020 talk: [Webpacker, It-Just-Works, But How?](http://railsconf.com/2020/video/justin-gordon-webpacker-it-just-works-but-how)
+1. RailsConf 2020 talk: [Webpacker, It-Just-Works, But How?](https://www.shakacode.com/blog/railsconf-2020-webpacker-it-just-works-but-how/)
