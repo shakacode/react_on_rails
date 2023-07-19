@@ -7,24 +7,24 @@ react_on_rails: upgraded from 6.6.0 to 9.0.3
 
 Rspec failing with
 ```
-Failure/Error: raise Shakapacker::Manifest::MissingEntryError, missing_file_from_manifest_error(name)
+Failure/Error: raise Webpacker::Manifest::MissingEntryError, missing_file_from_manifest_error(name)
      
-     Shakapacker::Manifest::MissingEntryError:
-       Shakapacker can't find webpack-bundle.js in /home/user/ws/pp/code/pp-core-checkout_spa_update_npm/public/webpack-test/manifest.json. Possible causes:
-       1. You want to set Shakapacker.yml value of compile to true for your environment
+     Webpacker::Manifest::MissingEntryError:
+       Webpacker can't find webpack-bundle.js in /home/user/ws/pp/code/pp-core-checkout_spa_update_npm/public/webpack-test/manifest.json. Possible causes:
+       1. You want to set webpacker.yml value of compile to true for your environment
           unless you are using the `webpack -w` or the webpack-dev-server.
        2. Webpack has not yet re-run to reflect updates.
-       3. You have misconfigured Shakapacker's config/shakapacker.yml file.
+       3. You have misconfigured Webpacker's config/webpacker.yml file.
        4. Your Webpack configuration is not creating a manifest.
        Your manifest contains:
        {
          "main.css": "/webpack-test/main-bundle.css",
          "main.js": "/webpack-test/main-dde0e05a2817931424c3.js"
        }
-     # /home/user/.rbenv/versions/2.3.1/lib/ruby/gems/2.3.0/gems/shakapacker-3.0.1/lib/shakapacker/manifest.rb:44:in `handle_missing_entry'
-     # /home/user/.rbenv/versions/2.3.1/lib/ruby/gems/2.3.0/gems/shakapacker-3.0.1/lib/shakapacker/manifest.rb:40:in `find'
-     # /home/user/.rbenv/versions/2.3.1/lib/ruby/gems/2.3.0/gems/shakapacker-3.0.1/lib/shakapacker/manifest.rb:27:in `lookup'
-     # /home/user/.rbenv/versions/2.3.1/lib/ruby/gems/2.3.0/gems/react_on_rails-9.0.3/lib/react_on_rails/utils.rb:145:in `bundle_js_file_path_from_shakapacker'
+     # /home/user/.rbenv/versions/2.3.1/lib/ruby/gems/2.3.0/gems/webpacker-3.0.1/lib/webpacker/manifest.rb:44:in `handle_missing_entry'
+     # /home/user/.rbenv/versions/2.3.1/lib/ruby/gems/2.3.0/gems/webpacker-3.0.1/lib/webpacker/manifest.rb:40:in `find'
+     # /home/user/.rbenv/versions/2.3.1/lib/ruby/gems/2.3.0/gems/webpacker-3.0.1/lib/webpacker/manifest.rb:27:in `lookup'
+     # /home/user/.rbenv/versions/2.3.1/lib/ruby/gems/2.3.0/gems/react_on_rails-9.0.3/lib/react_on_rails/utils.rb:145:in `bundle_js_file_path_from_webpacker'
      # /home/user/.rbenv/versions/2.3.1/lib/ruby/gems/2.3.0/gems/react_on_rails-9.0.3/lib/react_on_rails/utils.rb:90:in `bundle_js_file_path'
      # /home/user/.rbenv/versions/2.3.1/lib/ruby/gems/2.3.0/gems/react_on_rails-9.0.3/lib/react_on_rails/test_helper/webpack_assets_status_checker.rb:56:in `block in all_compiled_assets'
      # /home/user/.rbenv/versions/2.3.1/lib/ruby/gems/2.3.0/gems/react_on_rails-9.0.3/lib/react_on_rails/test_helper/webpack_assets_status_checker.rb:55:in `map'
@@ -68,7 +68,7 @@ const { output } = webpackConfigLoader(configPath);
 ...
 ```
 
-### config/shakapacker.yml
+### config/webpacker.yml
 
 is default from sample appliction v9.x
 
