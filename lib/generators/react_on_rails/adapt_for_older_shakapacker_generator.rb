@@ -8,9 +8,9 @@ module ReactOnRails
     class AdaptForOlderShakapackerGenerator < Rails::Generators::Base
       include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
-      # source_root(File.expand_path("templates", __dir__))
 
       def change_spelling_to_webpacker
+        puts "Change spelling to webpacker v7"
         files = %w[
           Procfile.dev
           Procfile.dev-static
@@ -21,11 +21,13 @@ module ReactOnRails
       end
 
       def rename_config_file
+        puts "Rename to config/webpacker.yml"
         puts "Renaming shakapacker.yml into webpacker.yml"
         FileUtils.mv("config/shakapacker.yml", "config/webpacker.yml")
       end
 
       def modify_requiring_webpack_config_in_js
+        puts "Update commonWebpackConfig.js to follow the Shakapacker v6 interface"
         file = "config/webpack/commonWebpackConfig.js"
         gsub_file(file, "const baseClientWebpackConfig = generateWebpackConfig();\n\n", "")
         gsub_file(
