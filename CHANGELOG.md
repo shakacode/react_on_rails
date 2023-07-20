@@ -23,6 +23,9 @@ Changes since last non-beta release.
 ### Removed
 - Removed a requirement for autoloaded pack files to be generated as part of CI or deployment separate from initial Shakapacker bundling. [PR 1545](https://github.com/shakacode/react_on_rails/pull/1545) by [judahmeek](https://github.com/judahmeek).
 
+### Changed
+- Throw error when attempting to redefine ReactOnRails. [PR 1562](https://github.com/shakacode/react_on_rails/pull/1562) by [rubenochiavone](https://github.com/rubenochiavone).
+
 ### [13.3.5] - 2022-05-31
 #### Fixed
 - Fixed race condition where a react component could attempt to initialize before it had been registered. [PR 1540](https://github.com/shakacode/react_on_rails/pull/1540) by [judahmeek](https://github.com/judahmeek).

@@ -30,6 +30,16 @@ if (ctx === undefined) {
   throw new Error("The context (usually Window or NodeJS's Global) is undefined.");
 }
 
+if (ctx.ReactOnRails !== undefined) {
+  throw new Error(`
+    The ReactOnRails value exists in the ${ctx} scope, it may not be safe to overwrite it.
+    
+    This could be caused by setting Webpack's optimization.runtimeChunk to "true" or "multiple" - please check your Webpack configuration.
+    
+    Read more at https://github.com/shakacode/react_on_rails/issues/1558.
+  `);
+}
+
 const DEFAULT_OPTIONS = {
   traceTurbolinks: false,
   turbo: false,
