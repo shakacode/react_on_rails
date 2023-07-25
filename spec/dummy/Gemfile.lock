@@ -314,7 +314,7 @@ PLATFORMS
 DEPENDENCIES
   amazing_print
   bootsnap
-  bundler (= 2.4.9)
+  bundler (= 2.4.17)
   capybara
   capybara-screenshot
   coveralls
@@ -350,4 +350,4 @@ DEPENDENCIES
   uglifier
 
 BUNDLED WITH
-   2.4.9
+   2.4.17
