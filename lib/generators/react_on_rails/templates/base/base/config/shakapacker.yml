@@ -1,11 +1,11 @@
-# Note: You must restart bin/webpacker-dev-server for changes to take effect
+# Note: You must restart bin/shakapacker-dev-server for changes to take effect
 
 default: &default
   source_path: app/javascript
   source_entry_path: packs
   public_root_path: public
   public_output_path: packs
-  cache_path: tmp/webpacker
+  cache_path: tmp/shakapacker
   webpack_compile_output: true
 
   # Additional paths webpack should lookup modules
@@ -17,7 +17,7 @@ default: &default
 
 development:
   <<: *default
-  # This is false since we're running `bin/webpacker -w` in Procfile.dev-setic
+  # This is false since we're running `bin/shakapacker -w` in Procfile.dev-setic
   compile: false
 
   # Reference: https://webpack.js.org/configuration/dev-server/

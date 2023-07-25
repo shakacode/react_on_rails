@@ -30,7 +30,7 @@ module ReactOnRails
       allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(true)
       allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_entry_path)
         .and_return(webpacker_source_entry_path)
-      allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("6.5.1")
+      allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("7.0.0")
       allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(webpacker_source_entry_path)
       allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle_js_file_path)
     end

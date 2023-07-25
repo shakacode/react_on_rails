@@ -1,11 +1,11 @@
-# Note: You must restart bin/webpacker-dev-server for changes to take effect
+# Note: You must restart bin/shakapacker-dev-server for changes to take effect
 
 default: &default
   source_path: client/app
   source_entry_path: packs
   public_root_path: public
 
-  cache_path: tmp/cache/webpacker
+  cache_path: tmp/cache/shakapacker
   webpack_compile_output: false
   ensure_consistent_versioning: true
 
@@ -19,7 +19,7 @@ default: &default
 
 development:
   <<: *default
-  # Turn this to true if you want to use the rails/webpacker check that the test
+  # Turn this to true if you want to use the rails/shakapacker check that the test
   # bundles need building. Also, remove the customization to spec/rails_helper.rb.
   compile: false
 

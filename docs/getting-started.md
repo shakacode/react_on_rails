@@ -2,6 +2,8 @@
 
 Note, the best way to understand how to use ReactOnRails is to study a few simple examples. You can do a quick demo setup, either on your existing app or on a new Rails app.
 
+This documentation assumes the usage of ReactOnRails with Shakapacker 7. For installation on Shakapacker 6, check [tips for usage with Shakapacker 6](https://www.shakacode.com/react-on-rails/docs/aditional-details/tips-for-usage-with-sp6) first.
+
 1. Do the quick [tutorial](https://www.shakacode.com/react-on-rails/docs/guides/tutorial/).
 2. Add React on Rails to an existing Rails app per [the instructions](https://www.shakacode.com/react-on-rails/docs/guides/installation-into-an-existing-rails-app/).
 3. Look at [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy), a simple, no DB example.
@@ -9,38 +11,37 @@ Note, the best way to understand how to use ReactOnRails is to study a few simpl
 
 ## Basic Installation
 
-These steps assume that you've got a rails application with webpacker (e.g. one
-generated using `rails new my_app --javascript=webpack`). If your
-application is not yet set up to use webpacker, please see 
-[the instructions for installing into an existing Rails app](https://www.shakacode.com/react-on-rails/docs/guides/installation-into-an-existing-rails-app/).*
+You need a Rails application with Shakapacker installed and configured on it. Check [Shakapacker documentation](https://github.com/shakacode/shakapacker) for more details but typically you need the following steps:
 
-1. Add the `shakapacker` and `react_on_rails` gem to Gemfile:
+```bash
+rails new PROJECT_NAME --skip-javascript
+cd PROJECT_NAME
+bundle add shakapacker --strict
+rails shakapacker:install
+```
+
+You may need to check [the instructions for installing into an existing Rails app](https://www.shakacode.com/react-on-rails/docs/guides/installation-into-an-existing-rails-app/) if you have an already working Rails application.
+
+1. Add the `react_on_rails` gem to Gemfile:
 
    ```bash
-   bundle add shakapacker --strict
    bundle add react_on_rails --strict
    ```
 
-2. Run installation command for webpacker:
+   Commit this to git (or else you cannot run the generator in the next step unless you pass the option `--ignore-warnings`).
 
-   ```bash
-   rails webpacker:install
-   ```
-
-3. Commit this to git (or else you cannot run the generator unless you pass the option `--ignore-warnings`).
-
-3. Run the generator:
+2. Run the install generator:
 
    ```bash
    rails generate react_on_rails:install
    ```
 
-4. Start the app:
+3. Start the app:
 
    - Run `./bin/dev` for HMR
    - Run `./bin/dev-static` for statically created bundles (no HMR)
 
-5. Visit http://localhost:3000/hello_world.
+4. Visit http://localhost:3000/hello_world.
 
 
 ### Turning on server rendering
@@ -60,7 +61,7 @@ Below is the line where you turn server rendering on by setting `prerender` to t
 ```
 
 Note, if you got an error in your console regarding "ReferenceError: window is not defined",
-then you need to edit `config/webpacker.yml` and set `hmr: false` and `inline: false`.
+then you need to edit `config/shakapacker.yml` and set `hmr: false` and `inline: false`.
 See [rails/webpacker PR 2644](https://github.com/rails/webpacker/pull/2644) for a fix for this
 issue.
 
@@ -69,18 +70,18 @@ issue.
 ### Configuration
 
 * Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](https://www.shakacode.com/react-on-rails/docs/guides/configuration/) for documentation of all configuration options.
-* Configure `config/webpacker.yml`. If you used the generator and the default webpacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/webpacker.yml](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/webpacker.yml) example or the official default [webpacker.yml](https://github.com/rails/webpacker/blob/master/lib/install/config/webpacker.yml).
-* Most apps should rely on the rails/webpacker setup for Webpack. v6 of rails/webpacker includes support for v5 of webpack.
+* Configure `config/shakapacker.yml`. If you used the generator and the default Shakapacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/shakapacker.yml](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/shakapacker.yml) example or the official default [shakapacker.yml](https://github.com/shakacode/shakapacker/blob/master/lib/install/config/shakapacker.yml).
+* Most apps should rely on the Shakapacker setup for Webpack. Shakapacker v6+ includes support for webpack version 5.
 
 ## Including your React Component on your Rails Views
 
-- React component are rendered via your Rails Views. Here's an ERB sample:
+- React components are rendered via your Rails Views. Here's an ERB sample:
 
   ```erb
   <%= react_component("HelloWorld", props: @some_props) %>
   ```
 
-- **Server-Side Rendering**: Your react component is first rendered into HTML on the server. Use the **prerender** option:
+- **Server-Side Rendering**: Your React component is first rendered into HTML on the server. Use the **prerender** option:
 
   ```erb
   <%= react_component("HelloWorld", props: @some_props, prerender: true) %>
@@ -146,13 +147,13 @@ For details on techniques to use different code for client and server rendering,
 
 ## Specifying Your React Components: Register directly or use render-functions
 
-You have two ways to specify your React components. You can either register the React component (either function or class component) directly, or you can create a function that returns a React component, which we using the name of a "render-function". Creating a render-function allows:
+You have two ways to specify your React components. You can either register the React component (either function or class component) directly, or you can create a function that returns a React component, which we using the name of a "render-function". Creating a render-function allows you to:
 
-1. You to have access to the `railsContext`. See [documentation for the railsContext](https://www.shakacode.com/react-on-rails/docs/guides/render-functions-and-railscontext/) in terms of why you might need it. You **need** a Render-Function to access the `railsContext`.
-2. You can use the passed-in props to initialize a redux store or set up react-router.
-3. You can return different components depending on what's in the props.
+1. Access to the `railsContext`. See the [documentation for the railsContext](https://www.shakacode.com/react-on-rails/docs/guides/render-functions-and-railscontext/) in terms of why you might need it. You **need** a Render-Function to access the `railsContext`.
+2. Use the passed-in props to initialize a redux store or set up `react-router`.
+3. Return different components depending on what's in the props.
 
-Note, the return value of a **Render-Function** should be either a React Function or Class Component, or an object representing server rendering results.
+Note, the return value of a **Render-Function** should be either a React Function or Class Component or an object representing server rendering results.
 
 **Do not return a React Element (JSX).**
 
@@ -174,9 +175,9 @@ Thus, there is no difference between registering a React Function Component or c
 
 ## react_component_hash for Render-Functions
 
-Another reason to use a Render-Function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: { renderedHtml, redirectLocation, error }. Make sure you use this function with `react_component_hash`.
+Another reason to use a Render-Function is that sometimes in server rendering, specifically with React Router, you need to return the result of calling ReactDOMServer.renderToString(element). You can do this by returning an object with the following shape: `{ renderedHtml, redirectLocation, error }`. Make sure you use this function with `react_component_hash`.
 
-For server rendering, if you wish to return multiple HTML strings from a Render-Function, you may return an Object from your Render-Function with a single top-level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys componentHtml and any other custom keys that you added:
+For server rendering, if you wish to return multiple HTML strings from a Render-Function, you may return an Object from your Render-Function with a single top-level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys `componentHtml` and any other custom keys that you added:
 
 ```js
 { renderedHtml: { componentHtml, customKey1, customKey2} }

@@ -5,7 +5,7 @@ have your app make a second round trip to the Rails server to get initialization
 
 **Server-Side Rendering (SSR)** results in Rails rendering HTML for your React components. The main reasons to use SSR are better SEO and pages display more quickly.
 
-These gems provide advanced integration of React with [rails/webpacker](https://github.com/rails/webpacker):
+These gems provide advanced integration of React with [shakacode/shakapacker](https://github.com/shakacode/shakapacker):
 
 | Gem | Props Hydration | Server-Side-Rendering (SSR) | SSR with HMR | SSR with React-Router | SSR with Code Splitting | Node SSR |
 | --- | --------------- | --- | --------------------- | ----------------------| ------------------------|----|
@@ -89,9 +89,9 @@ module.exports = commonWebpackConfig;
 ## HMR and React Hot Reloading
 
 Before turning HMR on, consider upgrading to the latest stable gems and packages:
-https://github.com/rails/webpacker#upgrading
+https://github.com/shakacode/shakapacker#upgrading
 
-Configure `config/webpacker.yml` file:
+Configure `config/shakapacker.yml` file:
 
 ```yaml
 development:
@@ -101,7 +101,7 @@ development:
     inline: true
 ```
 
-This basic configuration alone will have HMR working with the default webpacker setup. However, a code save will trigger a full page refresh each time you save a file.
+This basic configuration alone will have HMR working with the default Shakapacker setup. However, a code save will trigger a full page refresh each time you save a file.
 
 Webpack's HMR allows the replacement of modules for React in-place without reloading the browser. To do this, you have two options:
 
