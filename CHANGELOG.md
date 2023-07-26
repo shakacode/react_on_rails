@@ -28,6 +28,7 @@ Changes since last non-beta release.
 
 #### Changed
 - Throw error when attempting to redefine ReactOnRails. [PR 1562](https://github.com/shakacode/react_on_rails/pull/1562) by [rubenochiavone](https://github.com/rubenochiavone).
+- Prevent generating FS-based packs when `component_subdirectory` configuration is not present. [PR 1567](https://github.com/shakacode/react_on_rails/pull/1567) by [blackjack26](https://github.com/blackjack26).
 
 ### [13.3.5] - 2023-05-31
 #### Fixed
