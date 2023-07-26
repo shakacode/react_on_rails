@@ -259,6 +259,18 @@ module ReactOnRails
       end
     end
 
+    context "when components subdirectory is not set" do
+      before do
+        ReactOnRails.configuration.components_subdirectory = nil
+      end
+
+      it "does not generate packs" do
+        expect do
+          described_class.instance.generate_packs_if_stale
+        end.not_to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
+      end
+    end
+
     def generated_server_bundle_file_path
       described_class.instance.send(:generated_server_bundle_file_path)
     end
