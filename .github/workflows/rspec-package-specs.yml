@@ -6,8 +6,8 @@ jobs:
   build:
     strategy:
       matrix:
-        ruby: [2.7]
-        node: [14]
+        ruby: [2.7, 3.2]
+        node: [16, 18]
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v2
