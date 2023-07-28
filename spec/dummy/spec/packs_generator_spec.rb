@@ -262,17 +262,13 @@ module ReactOnRails
 
     context "when components subdirectory is not set" do
       before do
-        ReactOnRails.configure do |config|
-          config.components_subdirectory = nil
-          config.auto_load_bundle = false
-        end
+          ReactOnRails.configuration.components_subdirectory = nil
+          ReactOnRails.configuration.auto_load_bundle = false
       end
 
       after do
-        ReactOnRails.configure do |config|
-          config.components_subdirectory = old_subdirectory
-          config.auto_load_bundle = old_auto_load_bundle
-        end
+        ReactOnRails.configuration.components_subdirectory = old_subdirectory
+        ReactOnRails.configuration.auto_load_bundle = old_auto_load_bundle
       end
 
       it "does not generate packs" do
