@@ -76,10 +76,13 @@ describe "Pages/Index", :js do
   end
 end
 
-context "when Server Rendering with Options", :js do
+context "when Server Rendering with Options", :js, :focus do
   subject { page }
 
   before do
+    puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    puts "ReactOnRails.configuration.components_subdirectory: #{ReactOnRails.configuration.components_subdirectory}"
+    puts "ReactOnRails.configuration.auto_load_bundle: #{ReactOnRails.configuration.auto_load_bundle}"
     visit server_side_hello_world_with_options_path
   end
 
