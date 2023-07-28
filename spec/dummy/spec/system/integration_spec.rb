@@ -31,7 +31,7 @@ shared_examples "React Component" do |dom_selector|
   end
 end
 
-describe "Pages/Index", :js do
+describe "Pages/Index", :js, :focus do
   subject { page }
 
   context "when rendering All in one page" do
