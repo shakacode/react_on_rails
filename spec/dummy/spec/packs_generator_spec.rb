@@ -262,6 +262,11 @@ module ReactOnRails
 
     context "when components subdirectory is not set & auto_load_bundle is false", :focus do
       it "does not generate packs" do
+        puts "YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY"
+        puts "ReactOnRails.configuration.components_subdirectory: #{ReactOnRails.configuration.components_subdirectory}"
+        puts "ReactOnRails.configuration.auto_load_bundle: #{ReactOnRails.configuration.auto_load_bundle}"
+        puts "old_subdirectory: #{old_subdirectory}"
+        puts "old_auto_load_bundle: #{old_auto_load_bundle}"
         ReactOnRails.configuration.components_subdirectory = nil
         ReactOnRails.configuration.auto_load_bundle = false
         expect do
@@ -269,6 +274,11 @@ module ReactOnRails
         end.not_to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
         ReactOnRails.configuration.components_subdirectory = old_subdirectory
         ReactOnRails.configuration.auto_load_bundle = old_auto_load_bundle
+        puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+        puts "ReactOnRails.configuration.components_subdirectory: #{ReactOnRails.configuration.components_subdirectory}"
+        puts "ReactOnRails.configuration.auto_load_bundle: #{ReactOnRails.configuration.auto_load_bundle}"
+        puts "old_subdirectory: #{old_subdirectory}"
+        puts "old_auto_load_bundle: #{old_auto_load_bundle}"
       end
     end
 
