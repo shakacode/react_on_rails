@@ -260,7 +260,7 @@ module ReactOnRails
       end
     end
 
-    context "when components subdirectory is not set & auto_load_bundle is false", :focus do
+    context "when components subdirectory is not set & auto_load_bundle is false" do
       it "does not generate packs" do
         puts "YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY"
         puts "ReactOnRails.configuration.components_subdirectory: #{ReactOnRails.configuration.components_subdirectory}"

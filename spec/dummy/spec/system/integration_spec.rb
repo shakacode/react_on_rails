@@ -76,7 +76,7 @@ describe "Pages/Index", :js do
   end
 end
 
-context "when Server Rendering with Options", :js, :focus do
+context "when Server Rendering with Options", :js do
   subject { page }
 
   before do
