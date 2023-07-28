@@ -262,7 +262,8 @@ module ReactOnRails
 
     context "when components subdirectory is not set & auto_load_bundle is false" do
       it "does not generate packs" do
-        old_sub, old_auto = old_subdirectory, old_auto_load_bundle
+        old_sub = old_subdirectory
+        old_auto = old_auto_load_bundle
         ReactOnRails.configuration.components_subdirectory = nil
         ReactOnRails.configuration.auto_load_bundle = false
         expect do
