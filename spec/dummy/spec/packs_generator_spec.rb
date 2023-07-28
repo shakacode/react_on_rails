@@ -260,7 +260,7 @@ module ReactOnRails
       end
     end
 
-    context "when components subdirectory is not set" do
+    context "when components subdirectory is not set", :focus do
       before do
           ReactOnRails.configuration.components_subdirectory = nil
           ReactOnRails.configuration.auto_load_bundle = false
