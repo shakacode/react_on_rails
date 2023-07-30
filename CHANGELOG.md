@@ -17,6 +17,9 @@ Changes since last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
 
+#### Fixed
+- Fixed Pack Generation logic during `assets:precompile` if `auto_load_bundle` is `false` & `components_subdirectory` is not set. [PR 1567](https://github.com/shakacode/react_on_rails/pull/1545) by [blackjack26](https://github.com/blackjack26) & [judahmeek](https://github.com/judahmeek).
+
 #### Improved
 - Improved performance by removing an unnecessary JS eval from Ruby. [PR 1544](https://github.com/shakacode/react_on_rails/pull/1544) by [wyattades](https://github.com/wyattades).
 
