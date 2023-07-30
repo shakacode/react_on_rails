@@ -131,56 +131,56 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
 1. Remove generated entrypoints from parameters passed directly to `javascript_pack_tag` and `stylesheet_pack_tag`.
 2. Remove generated entrypoints from parameters passed directly to `append_javascript_pack_tag` and `append_stylesheet_pack_tag`.
 
-Your layout would now contain:
+    Your layout would now contain:
 
-```erb
-  <%= javascript_pack_tag('BarComponentTwo') %>
-  <%= stylesheet_pack_tag('BarComponentTwo') %>
-```
+    ```erb
+    <%= javascript_pack_tag('BarComponentTwo') %>
+    <%= stylesheet_pack_tag('BarComponentTwo') %>
+    ```
 
 3. Create a directory structure where the components that you want to be auto-generated are within `ReactOnRails.configuration.components_subdirectory`, which should be a subdirectory of `Shakapacker.config.source_path`:
 
-```
-app/javascript:
-  └── packs:
-  │   └── BarComponentTwo.jsx  # Internally uses ReactOnRails.register
-  └── src:
-  │   └── Foo
-  │   │ └── ...
-  │   │ └── ror_components          # configured as `components_subdirectory`
-  │   │   └── FooComponentOne.jsx
-  │   └── Bar
-  │   │ └── ...
-  │   │ └── ror_components          # configured as `components_subdirectory`
-  │   │   │ └── BarComponentOne.jsx
-  │   │ └── something_else
-  │   │   │ └── BarComponentTwo.jsx
-```
+    ```
+    app/javascript:
+      └── packs:
+      │   └── BarComponentTwo.jsx  # Internally uses ReactOnRails.register
+      └── src:
+      │   └── Foo
+      │   │ └── ...
+      │   │ └── ror_components          # configured as `components_subdirectory`
+      │   │   └── FooComponentOne.jsx
+      │   └── Bar
+      │   │ └── ...
+      │   │ └── ror_components          # configured as `components_subdirectory`
+      │   │   │ └── BarComponentOne.jsx
+      │   │ └── something_else
+      │   │   │ └── BarComponentTwo.jsx
+    ```
 
 4. You no longer need to register the React components within the `ReactOnRails.configuration.components_subdirectory` nor directly add their bundles. For example you can have a Rails view using three components:
 
-```erb
-    <% append_javascript_pack('BarComponentTwo'))>
+    ```erb
+    <% append_javascript_pack('BarComponentTwo') %>
     <%= react_component("FooComponentOne", {}, auto_load_bundle: true) %>
     <%= react_component("BarComponentOne", {}, auto_load_bundle: true) %>
     <%= react_component("BarComponentTwo", {}) %>
-```
+    ```
 
-If a component uses multiple HTML strings for server rendering, the [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper can be used on the Rails view, as illustrated below.
+    If a component uses multiple HTML strings for server rendering, the [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper can be used on the Rails view, as illustrated below.
 
-```erb
-<% foo_component_one_data = react_component_hash("FooComponentOne",
-                                             prerender: true,
-                                             auto_load_bundle: true
-                                             props: {}
-                                          ) %>
-<% content_for :title do %>
-   <%= foo_component_one_data['title'] %>
-<% end %>
-<%= foo_component_one_data["componentHtml"] %>
-```
+    ```erb
+    <% foo_component_one_data = react_component_hash("FooComponentOne",
+                                                prerender: true,
+                                                auto_load_bundle: true
+                                                props: {}
+                                              ) %>
+    <% content_for :title do %>
+      <%= foo_component_one_data['title'] %>
+    <% end %>
+    <%= foo_component_one_data["componentHtml"] %>
+    ```
 
-The default value of the `auto_load_bundle` parameter can be specified by setting `config.auto_load_bundle` in `config/initializers/react_on_rails.rb` and thus removed from each call to `react_component`.
+    The default value of the `auto_load_bundle` parameter can be specified by setting `config.auto_load_bundle` in `config/initializers/react_on_rails.rb` and thus removed from each call to `react_component`.
 
 ### Server Rendering and Client Rendering Components
 
