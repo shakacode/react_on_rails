@@ -2,7 +2,7 @@
 import React from 'react';
 import ReactHelmet from '../components/ReactHelmet';
 
-const stubbedResponse = { name: 'ReactOnRails', country: [] };
+const stubbedResponse = { name: 'ReactOnRails', country: [], count: 0 };
 
 export default (props, _railsContext) => () => (
   <ReactHelmet {...props} apiRequestResponse={stubbedResponse} />
