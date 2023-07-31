@@ -1,22 +1,22 @@
 # Change Log
-All notable changes to this project's source code will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next version. NOTE: major versions of the npm module and the gem must be kept in sync.
+All notable changes to this project's source code will be documented in this file. Items under `Unreleased` is upcoming features that will be out in the next version. 
 
 Migration instructions for the major updates can be found [here](https://www.shakacode.com/react-on-rails/docs/guides/upgrading-react-on-rails#upgrading-to-version-9.md). Some smaller migration information can be found here.
 
-## Need Help Migrating?
+## Want to Save Time Updating?
 If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for information about our [React on Rails Pro Support Options](https://www.shakacode.com/react-on-rails-pro).
 
-We specialize in helping companies to quickly and efficiently move from versions before 9 to current. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4 for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
+We specialize in helping companies quickly and efficiently update client-side dependencies, allowing developers to focus on features and bug fixes rather than addressing tech-debt from old dependencies. ShakaCode also maintains Shakapacker, the successor to Webpacker.
 
 ## Contributors
 Please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## Versions
 ### [Unreleased]
-Changes since last non-beta release.
+Changes since the last non-beta release.
 
 *Please add entries here for your pull requests that are not yet released.*
-
+### [13.4.0] - 2023-07-30
 #### Fixed
 - Fixed Pack Generation logic during `assets:precompile` if `auto_load_bundle` is `false` & `components_subdirectory` is not set. [PR 1567](https://github.com/shakacode/react_on_rails/pull/1545) by [blackjack26](https://github.com/blackjack26) & [judahmeek](https://github.com/judahmeek).
 
@@ -26,12 +26,11 @@ Changes since last non-beta release.
 #### Added
 - Added support for Shakapacker 7 in install generator [PR 1548](https://github.com/shakacode/react_on_rails/pull/1548) by [ahangarha](https://github.com/ahangarha).
 
-#### Removed
-- Removed a requirement for autoloaded pack files to be generated as part of CI or deployment separate from initial Shakapacker bundling. [PR 1545](https://github.com/shakacode/react_on_rails/pull/1545) by [judahmeek](https://github.com/judahmeek).
-
 #### Changed
 - Throw error when attempting to redefine ReactOnRails. [PR 1562](https://github.com/shakacode/react_on_rails/pull/1562) by [rubenochiavone](https://github.com/rubenochiavone).
 - Prevent generating FS-based packs when `component_subdirectory` configuration is not present. [PR 1567](https://github.com/shakacode/react_on_rails/pull/1567) by [blackjack26](https://github.com/blackjack26).
+- Removed a requirement for autoloaded pack files to be generated as part of CI or deployment separate from initial Shakapacker bundling. [PR 1545](https://github.com/shakacode/react_on_rails/pull/1545) by [judahmeek](https://github.com/judahmeek).
+
 
 ### [13.3.5] - 2023-05-31
 #### Fixed
@@ -1103,9 +1102,10 @@ Best done with Object destructing:
 - Turbolinks support.
 
 ##### Fixed
-- Fix several generator related issues.
+- Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.3.5...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.4.0...master
+[13.4.0]: https://github.com/shakacode/react_on_rails/compare/13.3.5...13.4.0
 [13.3.5]: https://github.com/shakacode/react_on_rails/compare/13.3.4...13.3.5
 [13.3.4]: https://github.com/shakacode/react_on_rails/compare/13.3.3...13.3.4
 [13.3.3]: https://github.com/shakacode/react_on_rails/compare/13.3.2...13.3.3
