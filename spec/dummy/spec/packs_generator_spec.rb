@@ -19,6 +19,7 @@ module ReactOnRails
 
     let(:old_server_bundle) { ReactOnRails.configuration.server_bundle_js_file }
     let(:old_subdirectory) { ReactOnRails.configuration.components_subdirectory }
+    let(:old_auto_load_bundle) { ReactOnRails.configuration.auto_load_bundle }
 
     before do
       ReactOnRails.configuration.server_bundle_js_file = server_bundle_js_file
@@ -256,6 +257,20 @@ module ReactOnRails
         path = "#{webpacker_source_path}/components/#{component_name}/#{components_subdirectory}/#{name}.jsx"
 
         File.write(path, "// Empty Test Component\n")
+      end
+    end
+
+    context "when components subdirectory is not set & auto_load_bundle is false" do
+      it "does not generate packs" do
+        old_sub = old_subdirectory
+        old_auto = old_auto_load_bundle
+        ReactOnRails.configuration.components_subdirectory = nil
+        ReactOnRails.configuration.auto_load_bundle = false
+        expect do
+          described_class.instance.generate_packs_if_stale
+        end.not_to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
+        ReactOnRails.configuration.components_subdirectory = old_sub
+        ReactOnRails.configuration.auto_load_bundle = old_auto
       end
     end
 

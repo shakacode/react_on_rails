@@ -13,6 +13,8 @@ module ReactOnRails
     end
 
     def generate_packs_if_stale
+      return unless ReactOnRails.configuration.auto_load_bundle
+
       are_generated_files_present_and_up_to_date = Dir.exist?(generated_packs_directory_path) &&
                                                    File.exist?(generated_server_bundle_file_path) &&
                                                    !stale_or_missing_packs?
