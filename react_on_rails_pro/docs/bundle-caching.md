@@ -71,6 +71,22 @@ config.remote_bundle_cache_adapter = S3BundleCacheAdapter
 This module needs four class methods: `cache_keys` (optional), `build`, `fetch`, `upload`. See two
 examples of this below.
 
+Also, add whatever file the remote_bundle_cache_adapter module is defined in to `config.dependency_globs`.
+
+If there are any other files for which changes should bust the fragment cache for
+cached_react_component and cached_react_component_hash, add those as well to `config.dependency_globs`. This should include any files used to generate the JSON props, webpack and/or Shakapacker configuration files, and package lockfiles.
+
+To simplify your configuration, entire directories can be added to `config.dependency_globs` & then any irrelevant files or subdirectories can be added to `config.excluded_dependency_globs`
+
+For example:
+```ruby
+  config.dependency_globs = [ File.join(Rails.root, "app", "views", "**", "*.jbuilder") ]
+  config.excluded_dependency_globs = [ File.join(Rails.root, "app", "views", "**", "dont_hash_this.jbuilder") ]
+```
+will hash all files in `app/views` that have the `jbuilder` extension except for any file named `dont_hash_this.jbuilder`.
+
+The goal is that Ruby only changes that don't affect your webpack bundles don't change the cache keys, and anything that could affect the bundles MUST change the cache keys!
+
 ### 3. Remove any call to rake task `react_on_rails_pro:pre_stage_bundle_for_node_renderer`
 This task is called automaticaly if you're using bundle caching.
 ```ruby
