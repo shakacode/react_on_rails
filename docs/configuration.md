@@ -20,9 +20,11 @@ ReactOnRailsPro.configure do |config|
   # Array of globs to find any files for which changes should bust the fragment cache for
   # cached_react_component and cached_react_component_hash. This should include any files used to
   # generate the JSON props, webpack and/or webpacker configuration files, and npm package lockfiles.
+  # Default for `dependency_globs` is an empty array
   config.dependency_globs = [ File.join(Rails.root, "app", "views", "**", "*.jbuilder") ]
 
   # Array of globs to exclude from config.dependency_globs for ReactOnRailsPro cache key hashing
+  # Default for `excluded_dependency_globs` is an empty array
   config.excluded_dependency_globs = [ File.join(Rails.root, "app", "views", "**", "dont_hash_this.jbuilder") ]
 
   # Remote bundle caching saves deployment time by caching bundles.
