@@ -1,4 +1,5 @@
 import type { ReactElement, ReactNode, Component, FunctionComponent, ComponentClass } from 'react';
+import type { RouteProps, ExtractRouteParams } from 'react-router';
 
 // Don't import redux just for the type definitions
 // See https://github.com/shakacode/react_on_rails/issues/1321
@@ -28,13 +29,13 @@ export interface RailsContext {
   httpAcceptLanguage: string;
 }
 
-type AuthenticityHeaders = {[id: string]: string} & {'X-CSRF-Token': string | null; 'X-Requested-With': string};
+type AuthenticityHeaders = { [id: string]: string } & { 'X-CSRF-Token': string | null; 'X-Requested-With': string };
 
 type StoreGenerator = (props: Record<string, unknown>, railsContext: RailsContext) => Store
 
 interface ServerRenderResult {
   renderedHtml?: string;
-  redirectLocation?: {pathname: string; search: string};
+  redirectLocation?: { pathname: string; search: string };
   routeError?: Error;
   error?: Error;
 }
@@ -120,11 +121,19 @@ export interface Root {
 
 export type RenderReturnType = void | Element | Component | Root;
 
+export interface RSCRouteProps<
+  Path extends string = string,
+  Params extends { [K: string]: string | undefined } = ExtractRouteParams<Path, string>,
+> extends RouteProps<Path, Params> {
+  componentName: string;
+  props: Record<string, unknown> | undefined;
+}
+
 export interface ReactOnRails {
   register(components: { [id: string]: ReactComponentOrRenderFunction }): void;
   registerStore(stores: { [id: string]: Store }): void;
   getStore(name: string, throwIfMissing?: boolean): Store | undefined;
-  setOptions(newOptions: {traceTurbolinks: boolean}): void;
+  setOptions(newOptions: { traceTurbolinks: boolean }): void;
   reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType;
   reactOnRailsPageLoaded(): void;
   authenticityToken(): string | null;
@@ -138,11 +147,14 @@ export interface ReactOnRails {
   ): RenderReturnType;
   getComponent(name: string): RegisteredComponent;
   serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;
+  renderReactServerComponent(options: RenderParams): null | string | Promise<RenderResult>;
   handleError(options: ErrorOptions): string | undefined;
   buildConsoleReplay(): string;
   registeredComponents(): Map<string, RegisteredComponent>;
   storeGenerators(): Map<string, StoreGenerator>;
   stores(): Map<string, Store>;
   resetOptions(): void;
+  useRSC(componentName: string, props: Record<string, unknown> | undefined): string | null;
+  RSCRoute(props: RSCRouteProps): JSX.Element;
   options: Record<string, string | number | boolean>;
 }

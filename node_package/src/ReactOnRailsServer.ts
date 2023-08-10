@@ -5,6 +5,7 @@ import handleError from './handleError';
 import ComponentRegistry from './ComponentRegistry';
 import StoreRegistry from './StoreRegistry';
 import serverRenderReactComponent from './serverRenderReactComponent';
+import renderReactServerComponent from './renderReactServerComponent';
 import buildConsoleReplay from './buildConsoleReplay';
 import createReactOutput from './createReactOutput';
 import Authenticity from './Authenticity';
@@ -21,8 +22,6 @@ import type {
   RSCRouteProps,
 } from './types';
 import reactHydrateOrRender from './reactHydrateOrRender';
-import useRSC from './useRSC';
-import RSCRoute from './RSCRoute';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Store = any;
@@ -249,9 +248,7 @@ ctx.ReactOnRails = {
    * @param options
    */
   renderReactServerComponent(options: RenderParams): null | string | Promise<RenderResult> {
-    throw new Error(
-      'renderReactServerComponent() can only be called on the server side.',
-    );
+    return renderReactServerComponent(options);
   },
 
   /**
@@ -297,12 +294,16 @@ ctx.ReactOnRails = {
     this.options = Object.assign({}, DEFAULT_OPTIONS);
   },
 
-  useRSC(componentName: string, props?: Record<string, unknown>): string | null {
-    return useRSC(componentName, props);
+  useRSC(_componentName: string, _props?: Record<string, unknown>): string | null {
+    throw new Error(
+      'useRSC() can only be called on the client side.',
+    );
   },
 
   RSCRoute(props: RSCRouteProps): JSX.Element {
-    return RSCRoute(props);
+    throw new Error(
+      'RSCRoute() can only be called on the client side.',
+    );
   },
 };
 
