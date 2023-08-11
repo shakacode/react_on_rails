@@ -201,7 +201,7 @@ module ReactOnRails
     def self.find_most_recent_mtime(files)
       files.reduce(1.year.ago) do |newest_time, file|
         mt = File.mtime(file)
-        mt > newest_time ? mt : newest_time
+        [mt, newest_time].max
       end
     end
 

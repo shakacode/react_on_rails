@@ -155,9 +155,7 @@ module ReactOnRails
     end
 
     def common_component_to_path
-      common_components_paths = Dir.glob("#{components_search_path}/*").reject do |f|
-        CONTAINS_CLIENT_OR_SERVER_REGEX.match?(f)
-      end
+      common_components_paths = Dir.glob("#{components_search_path}/*").grep_v(CONTAINS_CLIENT_OR_SERVER_REGEX)
       component_name_to_path(common_components_paths)
     end
 
