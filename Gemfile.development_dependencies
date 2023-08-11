@@ -2,7 +2,7 @@
 
 gem "shakapacker", "7.0.1"
 gem "bootsnap", require: false
-gem "rails", "~> 7.0"
+gem "rails", "~> 7.0", ">= 7.0.1"
 gem "sqlite3"
 gem "sass-rails", "~> 6.0"
 gem "uglifier"
