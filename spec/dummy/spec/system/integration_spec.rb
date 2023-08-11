@@ -184,7 +184,7 @@ describe "React Router", :js do
   end
 end
 
-describe "Manual Rendering", :js, type: :system do
+describe "Manual Rendering", :js do
   subject { page }
 
   before { visit "/client_side_manual_render" }
@@ -207,7 +207,7 @@ describe "renderedHtml from generator function", :js do
   end
 end
 
-describe "Manual client hydration", :js, type: :system do
+describe "Manual client hydration", :js do
   before { visit "/xhr_refresh" }
 
   it "HelloWorldRehydratable onChange should trigger" do

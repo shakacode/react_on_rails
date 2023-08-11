@@ -77,7 +77,7 @@ module ReactOnRails
           allow(Webpacker).to receive_message_chain("config.send").with(:data)
                                                                   .and_return({})
 
-          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to eq(false)
+          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to be(false)
         end
 
         it "returns false if source_path is defined in the config/webpacker.yml and node_modules defined" do
@@ -86,7 +86,7 @@ module ReactOnRails
           allow(Webpacker).to receive_message_chain("config.send").with(:data)
                                                                   .and_return(source_path: "client/app")
 
-          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to eq(false)
+          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to be(false)
         end
 
         it "returns true if node_modules is not blank and the source_path is not defined in config/webpacker.yml" do
@@ -95,7 +95,7 @@ module ReactOnRails
           allow(Webpacker).to receive_message_chain("config.send").with(:data)
                                                                   .and_return({})
 
-          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to eq(true)
+          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to be(true)
         end
       end
 
@@ -227,7 +227,7 @@ module ReactOnRails
             expect(described_class.truthy_presence(nil)).to eq(nil.presence)
 
             # Blank strings are nil for presence
-            expect(described_class.truthy_presence(nil)).to eq(nil)
+            expect(described_class.truthy_presence(nil)).to be_nil
           end
         end
 
@@ -263,31 +263,31 @@ module ReactOnRails
           context "with Rails 3" do
             before { allow(Rails).to receive(:version).and_return("3") }
 
-            it { is_expected.to eq(true) }
+            it { is_expected.to be(true) }
           end
 
           context "with Rails 3.2" do
             before { allow(Rails).to receive(:version).and_return("3.2") }
 
-            it { is_expected.to eq(true) }
+            it { is_expected.to be(true) }
           end
 
           context "with Rails 4" do
             before { allow(Rails).to receive(:version).and_return("4") }
 
-            it { is_expected.to eq(false) }
+            it { is_expected.to be(false) }
           end
 
           context "with Rails 4.2" do
             before { allow(Rails).to receive(:version).and_return("4.2") }
 
-            it { is_expected.to eq(false) }
+            it { is_expected.to be(false) }
           end
 
           context "with Rails 10.0" do
             before { allow(Rails).to receive(:version).and_return("10.0") }
 
-            it { is_expected.to eq(false) }
+            it { is_expected.to be(false) }
           end
 
           context "when called twice" do
@@ -311,13 +311,13 @@ module ReactOnRails
           context "with Rails 4.1.0" do
             before { allow(Rails).to receive(:version).and_return("4.1.0") }
 
-            it { is_expected.to eq(true) }
+            it { is_expected.to be(true) }
           end
 
           context "with Rails 4.1.1" do
             before { allow(Rails).to receive(:version).and_return("4.1.1") }
 
-            it { is_expected.to eq(false) }
+            it { is_expected.to be(false) }
           end
         end
       end
@@ -353,7 +353,7 @@ module ReactOnRails
       describe ".react_on_rails_pro?" do
         subject { described_class.react_on_rails_pro? }
 
-        it { is_expected.to(eq(false)) }
+        it { is_expected.to(be(false)) }
       end
 
       describe ".react_on_rails_pro_version?" do

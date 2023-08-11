@@ -190,7 +190,7 @@ module ReactOnRails
       end
 
       expect(ReactOnRails.configuration.server_bundle_js_file).to eq("server.js")
-      expect(ReactOnRails.configuration.prerender).to eq(false)
+      expect(ReactOnRails.configuration.prerender).to be(false)
     end
 
     it "changes the configuration of the gem, such as setting the prerender option to true" do
@@ -201,8 +201,8 @@ module ReactOnRails
       end
 
       expect(ReactOnRails.configuration.server_bundle_js_file).to eq("something.js")
-      expect(ReactOnRails.configuration.prerender).to eq(true)
-      expect(ReactOnRails.configuration.random_dom_id).to eq(false)
+      expect(ReactOnRails.configuration.prerender).to be(true)
+      expect(ReactOnRails.configuration.random_dom_id).to be(false)
     end
 
     it "calls raise_missing_components_subdirectory if auto_load_bundle = true & components_subdirectory is not set" do
@@ -214,9 +214,8 @@ module ReactOnRails
     end
 
     it "checks that autobundling requirements are met if configuration options for autobundling are set" do
-      allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
-      allow(ReactOnRails::WebpackerUtils).to receive(:shackapacker_version_requirement_met?).and_return(true)
-      allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(true)
+      allow(ReactOnRails::WebpackerUtils).to receive_messages(using_webpacker?: true,
+                                                              shackapacker_version_requirement_met?: true, nested_entries?: true)
 
       ReactOnRails.configure do |config|
         config.auto_load_bundle = true
@@ -234,7 +233,7 @@ module ReactOnRails
       end
       # rubocop:enable Lint/EmptyBlock
 
-      expect(ReactOnRails.configuration.random_dom_id).to eq(true)
+      expect(ReactOnRails.configuration.random_dom_id).to be(true)
     end
   end
 end

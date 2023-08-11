@@ -8,7 +8,7 @@ class PlainReactOnRailsHelper
 end
 
 # rubocop:disable Metrics/BlockLength
-describe ReactOnRailsHelper, type: :helper do
+describe ReactOnRailsHelper do
   include Webpacker::Helper
   before do
     allow(self).to receive(:request) {

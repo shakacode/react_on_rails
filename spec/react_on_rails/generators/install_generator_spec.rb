@@ -73,13 +73,13 @@ describe InstallGenerator, type: :generator do
     specify "when node is exist" do
       stub_const("RUBY_PLATFORM", "linux")
       allow(install_generator).to receive(:`).with("which node").and_return("/path/to/bin")
-      expect(install_generator.send(:missing_node?)).to eq false
+      expect(install_generator.send(:missing_node?)).to be false
     end
 
     specify "when npm is exist" do
       stub_const("RUBY_PLATFORM", "linux")
       allow(install_generator).to receive(:`).with("which yarn").and_return("/path/to/bin")
-      expect(install_generator.send(:missing_yarn?)).to eq false
+      expect(install_generator.send(:missing_yarn?)).to be false
     end
   end
 
@@ -89,13 +89,13 @@ describe InstallGenerator, type: :generator do
     specify "when node is missing" do
       stub_const("RUBY_PLATFORM", "linux")
       allow(install_generator).to receive(:`).with("which node").and_return("")
-      expect(install_generator.send(:missing_node?)).to eq true
+      expect(install_generator.send(:missing_node?)).to be true
     end
 
     specify "when npm is missing" do
       stub_const("RUBY_PLATFORM", "linux")
       allow(install_generator).to receive(:`).with("which yarn").and_return("")
-      expect(install_generator.send(:missing_yarn?)).to eq true
+      expect(install_generator.send(:missing_yarn?)).to be true
     end
   end
 
@@ -105,13 +105,13 @@ describe InstallGenerator, type: :generator do
     specify "when node is exist" do
       stub_const("RUBY_PLATFORM", "mswin")
       allow(install_generator).to receive(:`).with("where node").and_return("/path/to/bin")
-      expect(install_generator.send(:missing_node?)).to eq false
+      expect(install_generator.send(:missing_node?)).to be false
     end
 
     specify "when npm is exist" do
       stub_const("RUBY_PLATFORM", "mswin")
       allow(install_generator).to receive(:`).with("where yarn").and_return("/path/to/bin")
-      expect(install_generator.send(:missing_yarn?)).to eq false
+      expect(install_generator.send(:missing_yarn?)).to be false
     end
   end
 
@@ -121,13 +121,13 @@ describe InstallGenerator, type: :generator do
     specify "when node is missing" do
       stub_const("RUBY_PLATFORM", "mswin")
       allow(install_generator).to receive(:`).with("where node").and_return("")
-      expect(install_generator.send(:missing_node?)).to eq true
+      expect(install_generator.send(:missing_node?)).to be true
     end
 
     specify "when yarn is missing" do
       stub_const("RUBY_PLATFORM", "mswin")
       allow(install_generator).to receive(:`).with("where yarn").and_return("")
-      expect(install_generator.send(:missing_yarn?)).to eq true
+      expect(install_generator.send(:missing_yarn?)).to be true
     end
   end
 end
