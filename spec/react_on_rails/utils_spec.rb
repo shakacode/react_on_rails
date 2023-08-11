@@ -99,7 +99,7 @@ module ReactOnRails
         end
       end
 
-      describe ".server_bundle_js_file_path" do
+      describe ".server_bundle_js_file_path with Webpacker enabled" do
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
           allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
@@ -107,7 +107,7 @@ module ReactOnRails
             .and_return(Pathname.new("public/webpack/development"))
         end
 
-        context "with Webpacker enabled and server file not in manifest", :webpacker do
+        context "with server file not in manifest", :webpacker do
           it "returns the unhashed server path" do
             server_bundle_name = "server-bundle.js"
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
@@ -122,7 +122,7 @@ module ReactOnRails
           end
         end
 
-        context "with Webpacker enabled and server file in the manifest, used for client", :webpacker do
+        context "with server file in the manifest, used for client", :webpacker do
           it "returns the correct path hashed server path" do
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
               .and_return("webpack-bundle.js")
@@ -136,32 +136,31 @@ module ReactOnRails
             expect(path).to end_with("public/webpack/development/webpack-bundle-123456.js")
             expect(path).to start_with("/")
           end
-        end
 
-        context "with Webpacker enabled and server file in the manifest, used for client, and webpack-dev-server running, and same file used for server and client",
-                :webpacker do
-          it "returns the correct path hashed server path" do
-            allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-              .and_return("webpack-bundle.js")
-            allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
-              .and_return(true)
-            allow(Webpacker).to receive_message_chain("dev_server.running?")
-              .and_return(true)
-            allow(Webpacker).to receive_message_chain("dev_server.protocol")
-              .and_return("http")
-            allow(Webpacker).to receive_message_chain("dev_server.host_with_port")
-              .and_return("localhost:3035")
-            allow(Webpacker).to receive_message_chain("manifest.lookup!")
-              .with("webpack-bundle.js")
-              .and_return("/webpack/development/webpack-bundle-123456.js")
+          context "with webpack-dev-server running, and same file used for server and client" do
+            it "returns the correct path hashed server path" do
+              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+                .and_return("webpack-bundle.js")
+              allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
+                .and_return(true)
+              allow(Webpacker).to receive_message_chain("dev_server.running?")
+                .and_return(true)
+              allow(Webpacker).to receive_message_chain("dev_server.protocol")
+                .and_return("http")
+              allow(Webpacker).to receive_message_chain("dev_server.host_with_port")
+                .and_return("localhost:3035")
+              allow(Webpacker).to receive_message_chain("manifest.lookup!")
+                .with("webpack-bundle.js")
+                .and_return("/webpack/development/webpack-bundle-123456.js")
 
-            path = described_class.server_bundle_js_file_path
+              path = described_class.server_bundle_js_file_path
 
-            expect(path).to eq("http://localhost:3035/webpack/development/webpack-bundle-123456.js")
+              expect(path).to eq("http://localhost:3035/webpack/development/webpack-bundle-123456.js")
+            end
           end
         end
 
-        context "with Webpacker enabled, dev-server running, and server file in the manifest, and separate client/server files",
+        context "with dev-server running, and server file in the manifest, and separate client/server files",
                 :webpacker do
           it "returns the correct path hashed server path" do
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")

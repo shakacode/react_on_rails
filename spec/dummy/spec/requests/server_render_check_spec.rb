@@ -108,7 +108,7 @@ describe "Server Rendering", :server_rendering do
   describe "server rendering railsContext" do
     let(:http_accept_language) { "en-US,en;q=0.8" }
 
-    def check_match(pathname, id_base)
+    def expect_match(pathname, id_base)
       html_nodes = Nokogiri::HTML(response.body)
       top_id = "##{id_base}-react-component-0"
       keys_to_vals = {
@@ -144,14 +144,14 @@ describe "Server Rendering", :server_rendering do
     context "with shared redux store" do
       it "matches expected values" do
         do_request(server_side_hello_world_shared_store_path)
-        check_match("server_side_hello_world_shared_store", "ReduxSharedStoreApp")
+        expect_match("server_side_hello_world_shared_store", "ReduxSharedStoreApp")
       end
     end
 
     context "when using Render-Function" do
       it "matches expected values" do
         do_request(server_side_redux_app_path)
-        check_match("server_side_redux_app", "ReduxApp")
+        expect_match("server_side_redux_app", "ReduxApp")
       end
     end
   end

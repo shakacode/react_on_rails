@@ -18,7 +18,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     }
   end
 
-  it "works" do
+  it "works without raising error" do
     attrs = the_attrs
 
     expect do

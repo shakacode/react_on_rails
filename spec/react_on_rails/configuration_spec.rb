@@ -215,7 +215,8 @@ module ReactOnRails
 
     it "checks that autobundling requirements are met if configuration options for autobundling are set" do
       allow(ReactOnRails::WebpackerUtils).to receive_messages(using_webpacker?: true,
-                                                              shackapacker_version_requirement_met?: true, nested_entries?: true)
+                                                              shackapacker_version_requirement_met?: true,
+                                                              nested_entries?: true)
 
       ReactOnRails.configure do |config|
         config.auto_load_bundle = true

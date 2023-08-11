@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-def change_text_expect_dom_selector(dom_selector)
+def expect_change_text_in_dom_selector(dom_selector)
   new_text = "John Doe"
 
   within(dom_selector) do
@@ -27,7 +27,7 @@ shared_examples "React Component" do |dom_selector|
   it { is_expected.to have_css dom_selector }
 
   it "changes name in message according to input" do
-    change_text_expect_dom_selector(dom_selector)
+    expect_change_text_in_dom_selector(dom_selector)
   end
 end
 
@@ -91,9 +91,9 @@ describe "Turbolinks across pages", :js do
 
   it "changes name in message according to input" do
     visit "/client_side_hello_world"
-    change_text_expect_dom_selector("#HelloWorld-react-component-0")
+    expect_change_text_in_dom_selector("#HelloWorld-react-component-0")
     click_link "Hello World Component Server Rendered, with extra options"
-    change_text_expect_dom_selector("#my-hello-world-id")
+    expect_change_text_in_dom_selector("#my-hello-world-id")
   end
 end
 
@@ -120,7 +120,7 @@ describe "Pages/Hello World ReScript Component", :js do
 
   before { visit "/client_side_rescript_hello_world" }
 
-  it { change_text_expect_dom_selector("#HelloWorld-rescript-react-component-0") }
+  it { expect_change_text_in_dom_selector("#HelloWorld-rescript-react-component-0") }
 end
 
 describe "Pages/server_side_log_throw", :ignore_js_errors, :js do
@@ -259,7 +259,7 @@ describe "generator function returns renderedHtml as an object with additional H
   describe "with enabled JS", :js do
     include_examples "renderedHtmls should not have any errors and set correct page title"
     it "renders the name change" do
-      change_text_expect_dom_selector("div#react-helmet-0")
+      expect_change_text_in_dom_selector("div#react-helmet-0")
     end
   end
 end
