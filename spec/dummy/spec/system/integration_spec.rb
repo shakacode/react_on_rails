@@ -141,8 +141,8 @@ describe "Pages/server_side_log_throw_raise", :js do
 
   it "redirects to /client_side_hello_world and flashes an error" do
     flash_message = page.find(:css, ".flash").text
-    expect(flash_message).to eq("Error prerendering in react_on_rails. Redirected back to"\
-                                " '/server_side_log_throw_raise_invoker'. See server logs for output.")
+    expect(flash_message).to eq("Error prerendering in react_on_rails. Redirected back to " \
+                                "'/server_side_log_throw_raise_invoker'. See server logs for output.")
     expect(page).to have_current_path("/server_side_log_throw_raise_invoker")
   end
 end

@@ -52,7 +52,7 @@ module ReactOnRails
     end
 
     def raise_node_semver_version_warning
-      msg = "**ERROR** ReactOnRails: Your node package version for react-on-rails contains a "\
+      msg = "**ERROR** ReactOnRails: Your node package version for react-on-rails contains a " \
             "^ or ~\n#{common_error_msg}"
       raise ReactOnRails::Error, msg
     end

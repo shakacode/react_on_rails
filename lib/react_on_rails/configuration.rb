@@ -137,7 +137,7 @@ module ReactOnRails
     end
 
     def adjust_precompile_task
-      skip_react_on_rails_precompile = %w[no false n f].include?(ENV["REACT_ON_RAILS_PRECOMPILE"])
+      skip_react_on_rails_precompile = %w[no false n f].include?(ENV.fetch("REACT_ON_RAILS_PRECOMPILE", nil))
 
       return if skip_react_on_rails_precompile || build_production_command.blank?
 
@@ -187,7 +187,7 @@ module ReactOnRails
       webpacker_public_output_path = ReactOnRails::WebpackerUtils.webpacker_public_output_path
 
       if File.expand_path(generated_assets_dir) == webpacker_public_output_path.to_s
-        Rails.logger.warn("You specified generated_assets_dir in `config/initializers/react_on_rails.rb` "\
+        Rails.logger.warn("You specified generated_assets_dir in `config/initializers/react_on_rails.rb` " \
                           "with Webpacker. Remove this line from your configuration file.")
       else
         msg = <<~MSG
@@ -225,20 +225,20 @@ module ReactOnRails
 
       if ReactOnRails::WebpackerUtils.using_webpacker?
         webpacker_public_output_path = ReactOnRails::WebpackerUtils.webpacker_public_output_path
-        Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the "\
-                          "generated_assets_dirs no the generated_assets_dir when using Webpacker. This is defined by "\
-                          "public_output_path specified in webpacker.yml = #{webpacker_public_output_path}."
+        Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the " \
+                          "generated_assets_dirs no the generated_assets_dir when using Webpacker. This is defined " \
+                          "by public_output_path specified in webpacker.yml = #{webpacker_public_output_path}."
         return
       end
 
-      Rails.logger.warn "[DEPRECATION] ReactOnRails: Use config.generated_assets_dir rather than "\
+      Rails.logger.warn "[DEPRECATION] ReactOnRails: Use config.generated_assets_dir rather than " \
                         "generated_assets_dirs"
       if generated_assets_dir.blank?
         self.generated_assets_dir = generated_assets_dirs
       else
-        Rails.logger.warn "[DEPRECATION] ReactOnRails. You have both generated_assets_dirs and "\
-                          "generated_assets_dir defined. Define ONLY generated_assets_dir if NOT using Webpacker"\
-                          " and define neither if using Webpacker"
+        Rails.logger.warn "[DEPRECATION] ReactOnRails. You have both generated_assets_dirs and " \
+                          "generated_assets_dir defined. Define ONLY generated_assets_dir if NOT using Webpacker " \
+                          "and define neither if using Webpacker"
       end
     end
 

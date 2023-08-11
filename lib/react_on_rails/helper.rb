@@ -155,7 +155,7 @@ module ReactOnRails
       if defer
         @registered_stores_defer_render ||= []
         @registered_stores_defer_render << redux_store_data
-        "YOU SHOULD NOT SEE THIS ON YOUR VIEW -- Uses as a code block, like <% redux_store %> "\
+        "YOU SHOULD NOT SEE THIS ON YOUR VIEW -- Uses as a code block, like <% redux_store %> " \
           "and not <%= redux store %>"
       else
         @registered_stores ||= []
@@ -245,7 +245,7 @@ module ReactOnRails
       return "{}" if hash_or_string.nil?
 
       unless hash_or_string.is_a?(String) || hash_or_string.is_a?(Hash)
-        raise ReactOnRails::Error, "#{__method__} only accepts String or Hash as argument "\
+        raise ReactOnRails::Error, "#{__method__} only accepts String or Hash as argument " \
                                    "(#{hash_or_string.class} given)."
       end
 

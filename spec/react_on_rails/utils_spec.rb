@@ -138,8 +138,8 @@ module ReactOnRails
           end
         end
 
-        context "with Webpacker enabled and server file in the manifest, used for client, "\
-                " and webpack-dev-server running, and same file used for server and client", :webpacker do
+        context "with Webpacker enabled and server file in the manifest, used for client,  " \
+                "and webpack-dev-server running, and same file used for server and client", :webpacker do
           it "returns the correct path hashed server path" do
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
               .and_return("webpack-bundle.js")
@@ -161,8 +161,8 @@ module ReactOnRails
           end
         end
 
-        context "with Webpacker enabled, dev-server running, and server file in the manifest, and "\
-                " separate client/server files", :webpacker do
+        context "with Webpacker enabled, dev-server running, and server file in the manifest, and  " \
+                "separate client/server files", :webpacker do
           it "returns the correct path hashed server path" do
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
               .and_return("server-bundle.js")
