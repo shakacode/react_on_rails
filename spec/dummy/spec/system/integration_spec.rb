@@ -24,9 +24,9 @@ def finished_all_ajax_requests?
 end
 
 shared_examples "React Component" do |dom_selector|
-  scenario { is_expected.to have_css dom_selector }
+  it { is_expected.to have_css dom_selector }
 
-  scenario "changes name in message according to input" do
+  it "changes name in message according to input" do
     change_text_expect_dom_selector(dom_selector)
   end
 end
@@ -97,7 +97,7 @@ describe "Turbolinks across pages", :js do
   end
 end
 
-describe "Pages/client_side_log_throw", :js, :ignore_js_errors do
+describe "Pages/client_side_log_throw", :ignore_js_errors, :js do
   subject { page }
 
   before { visit "/client_side_log_throw" }
@@ -123,7 +123,7 @@ describe "Pages/Hello World ReScript Component", :js do
   it { change_text_expect_dom_selector("#HelloWorld-rescript-react-component-0") }
 end
 
-describe "Pages/server_side_log_throw", :js, :ignore_js_errors do
+describe "Pages/server_side_log_throw", :ignore_js_errors, :js do
   subject { page }
 
   before { visit "/server_side_log_throw" }
@@ -224,7 +224,7 @@ describe "Manual client hydration", :js, type: :system do
   end
 end
 
-describe "returns hash if hash_result == true even with prerendering error", :js, :ignore_js_errors do
+describe "returns hash if hash_result == true even with prerendering error", :ignore_js_errors, :js do
   subject { page }
 
   before do
@@ -292,7 +292,7 @@ shared_examples "React Component Shared Store" do |url|
   before { visit url }
 
   context url do
-    scenario "Type in one component changes the other component" do
+    it "Type in one component changes the other component" do
       expect(page).to have_current_path(url, ignore_query: true)
       new_text = "John Doe"
       new_text2 = "Jane Smith"

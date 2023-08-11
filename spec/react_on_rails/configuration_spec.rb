@@ -5,7 +5,7 @@ require_relative "spec_helper"
 # rubocop:disable Metrics/ModuleLength
 
 module ReactOnRails
-  RSpec.describe Configuration do # rubocop:disable Metrics/BlockLength
+  RSpec.describe Configuration do
     let(:existing_path) { Pathname.new(Dir.mktmpdir) }
     let(:not_existing_path) { "/path/to/#{SecureRandom.hex(4)}" }
     let(:using_webpacker) { false }
