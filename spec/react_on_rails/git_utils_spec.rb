@@ -10,11 +10,10 @@ module ReactOnRails
 
         it "returns true" do
           allow(described_class).to receive(:`).with("git status --porcelain").and_return("M file/path")
-          allow_any_instance_of(Process::Status).to receive(:success?).and_return(true)
           expect(message_handler).to receive(:add_error)
             .with("You have uncommitted code. Please commit or stash your changes before continuing")
 
-          expect(described_class.uncommitted_changes?(message_handler)).to be(true)
+          expect(described_class.uncommitted_changes?(message_handler, true)).to be(true)
         end
       end
 
@@ -23,10 +22,9 @@ module ReactOnRails
 
         it "returns false" do
           allow(described_class).to receive(:`).with("git status --porcelain").and_return("")
-          allow_any_instance_of(Process::Status).to receive(:success?).and_return(true)
           expect(message_handler).not_to receive(:add_error)
 
-          expect(described_class.uncommitted_changes?(message_handler)).to be(false)
+          expect(described_class.uncommitted_changes?(message_handler, true)).to be(false)
         end
       end
 
@@ -35,11 +33,10 @@ module ReactOnRails
 
         it "returns true" do
           allow(described_class).to receive(:`).with("git status --porcelain").and_return(nil)
-          allow_any_instance_of(Process::Status).to receive(:success?).and_return(false)
           expect(message_handler).to receive(:add_error)
             .with("You do not have Git installed. Please install Git, and commit your changes before continuing")
 
-          expect(described_class.uncommitted_changes?(message_handler)).to be(true)
+          expect(described_class.uncommitted_changes?(message_handler, false)).to be(true)
         end
       end
     end
