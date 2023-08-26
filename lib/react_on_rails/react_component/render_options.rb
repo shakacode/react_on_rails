@@ -35,7 +35,7 @@ module ReactOnRails
                                                                           props.clone)
           end
 
-          raise ReactOnRails::Error, "ReactOnRails: your rendering_props_extension module is missing the "\
+          raise ReactOnRails::Error, "ReactOnRails: your rendering_props_extension module is missing the " \
                                      "required adjust_props_for_client_side_hydration method & can not be used"
         end
         props

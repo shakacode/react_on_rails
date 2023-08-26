@@ -77,7 +77,7 @@ module ReactOnRails
           allow(Webpacker).to receive_message_chain("config.send").with(:data)
                                                                   .and_return({})
 
-          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to eq(false)
+          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to be(false)
         end
 
         it "returns false if source_path is defined in the config/webpacker.yml and node_modules defined" do
@@ -86,7 +86,7 @@ module ReactOnRails
           allow(Webpacker).to receive_message_chain("config.send").with(:data)
                                                                   .and_return(source_path: "client/app")
 
-          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to eq(false)
+          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to be(false)
         end
 
         it "returns true if node_modules is not blank and the source_path is not defined in config/webpacker.yml" do
@@ -95,11 +95,11 @@ module ReactOnRails
           allow(Webpacker).to receive_message_chain("config.send").with(:data)
                                                                   .and_return({})
 
-          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to eq(true)
+          expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to be(true)
         end
       end
 
-      describe ".server_bundle_js_file_path" do
+      describe ".server_bundle_js_file_path with Webpacker enabled" do
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
           allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
@@ -107,7 +107,7 @@ module ReactOnRails
             .and_return(Pathname.new("public/webpack/development"))
         end
 
-        context "with Webpacker enabled and server file not in manifest", :webpacker do
+        context "with server file not in manifest", :webpacker do
           it "returns the unhashed server path" do
             server_bundle_name = "server-bundle.js"
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
@@ -122,7 +122,7 @@ module ReactOnRails
           end
         end
 
-        context "with Webpacker enabled and server file in the manifest, used for client", :webpacker do
+        context "with server file in the manifest, used for client", :webpacker do
           it "returns the correct path hashed server path" do
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
               .and_return("webpack-bundle.js")
@@ -136,33 +136,32 @@ module ReactOnRails
             expect(path).to end_with("public/webpack/development/webpack-bundle-123456.js")
             expect(path).to start_with("/")
           end
-        end
 
-        context "with Webpacker enabled and server file in the manifest, used for client, "\
-                " and webpack-dev-server running, and same file used for server and client", :webpacker do
-          it "returns the correct path hashed server path" do
-            allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-              .and_return("webpack-bundle.js")
-            allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
-              .and_return(true)
-            allow(Webpacker).to receive_message_chain("dev_server.running?")
-              .and_return(true)
-            allow(Webpacker).to receive_message_chain("dev_server.protocol")
-              .and_return("http")
-            allow(Webpacker).to receive_message_chain("dev_server.host_with_port")
-              .and_return("localhost:3035")
-            allow(Webpacker).to receive_message_chain("manifest.lookup!")
-              .with("webpack-bundle.js")
-              .and_return("/webpack/development/webpack-bundle-123456.js")
+          context "with webpack-dev-server running, and same file used for server and client" do
+            it "returns the correct path hashed server path" do
+              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+                .and_return("webpack-bundle.js")
+              allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
+                .and_return(true)
+              allow(Webpacker).to receive_message_chain("dev_server.running?")
+                .and_return(true)
+              allow(Webpacker).to receive_message_chain("dev_server.protocol")
+                .and_return("http")
+              allow(Webpacker).to receive_message_chain("dev_server.host_with_port")
+                .and_return("localhost:3035")
+              allow(Webpacker).to receive_message_chain("manifest.lookup!")
+                .with("webpack-bundle.js")
+                .and_return("/webpack/development/webpack-bundle-123456.js")
 
-            path = described_class.server_bundle_js_file_path
+              path = described_class.server_bundle_js_file_path
 
-            expect(path).to eq("http://localhost:3035/webpack/development/webpack-bundle-123456.js")
+              expect(path).to eq("http://localhost:3035/webpack/development/webpack-bundle-123456.js")
+            end
           end
         end
 
-        context "with Webpacker enabled, dev-server running, and server file in the manifest, and "\
-                " separate client/server files", :webpacker do
+        context "with dev-server running, and server file in the manifest, and separate client/server files",
+                :webpacker do
           it "returns the correct path hashed server path" do
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
               .and_return("server-bundle.js")
@@ -227,7 +226,7 @@ module ReactOnRails
             expect(described_class.truthy_presence(nil)).to eq(nil.presence)
 
             # Blank strings are nil for presence
-            expect(described_class.truthy_presence(nil)).to eq(nil)
+            expect(described_class.truthy_presence(nil)).to be_nil
           end
         end
 
@@ -263,31 +262,31 @@ module ReactOnRails
           context "with Rails 3" do
             before { allow(Rails).to receive(:version).and_return("3") }
 
-            it { is_expected.to eq(true) }
+            it { is_expected.to be(true) }
           end
 
           context "with Rails 3.2" do
             before { allow(Rails).to receive(:version).and_return("3.2") }
 
-            it { is_expected.to eq(true) }
+            it { is_expected.to be(true) }
           end
 
           context "with Rails 4" do
             before { allow(Rails).to receive(:version).and_return("4") }
 
-            it { is_expected.to eq(false) }
+            it { is_expected.to be(false) }
           end
 
           context "with Rails 4.2" do
             before { allow(Rails).to receive(:version).and_return("4.2") }
 
-            it { is_expected.to eq(false) }
+            it { is_expected.to be(false) }
           end
 
           context "with Rails 10.0" do
             before { allow(Rails).to receive(:version).and_return("10.0") }
 
-            it { is_expected.to eq(false) }
+            it { is_expected.to be(false) }
           end
 
           context "when called twice" do
@@ -311,13 +310,13 @@ module ReactOnRails
           context "with Rails 4.1.0" do
             before { allow(Rails).to receive(:version).and_return("4.1.0") }
 
-            it { is_expected.to eq(true) }
+            it { is_expected.to be(true) }
           end
 
           context "with Rails 4.1.1" do
             before { allow(Rails).to receive(:version).and_return("4.1.1") }
 
-            it { is_expected.to eq(false) }
+            it { is_expected.to be(false) }
           end
         end
       end
@@ -353,7 +352,7 @@ module ReactOnRails
       describe ".react_on_rails_pro?" do
         subject { described_class.react_on_rails_pro? }
 
-        it { is_expected.to(eq(false)) }
+        it { is_expected.to(be(false)) }
       end
 
       describe ".react_on_rails_pro_version?" do

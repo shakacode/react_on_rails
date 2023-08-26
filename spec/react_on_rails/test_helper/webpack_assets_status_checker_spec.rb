@@ -64,9 +64,10 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
 
         before do
           require "shakapacker"
-          allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(true)
-          allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_public_output_path)
-            .and_return(generated_assets_full_path)
+          allow(ReactOnRails::WebpackerUtils).to receive_messages(
+            manifest_exists?: true,
+            webpacker_public_output_path: generated_assets_full_path
+          )
           allow(ReactOnRails.configuration).to receive(:server_bundle_js_file).and_return("server-bundle.js")
           allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
             .with("manifest.json")

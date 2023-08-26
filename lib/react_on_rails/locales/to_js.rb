@@ -21,7 +21,7 @@ module ReactOnRails
         <<-JS.strip_heredoc
           import { defineMessages } from 'react-intl';
 
-          const defaultLocale = \'#{default_locale}\';
+          const defaultLocale = '#{default_locale}';
 
           const defaultMessages = defineMessages(#{@defaults});
 

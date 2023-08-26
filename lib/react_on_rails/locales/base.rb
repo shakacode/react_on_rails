@@ -107,7 +107,7 @@ module ReactOnRails
       end
 
       def generate_file(template, path)
-        result = ERB.new(template).result()
+        result = ERB.new(template).result
         File.write(path, result)
       end
 
@@ -157,7 +157,7 @@ module ReactOnRails
         <<-JS.strip_heredoc
           import { defineMessages } from 'react-intl';
 
-          const defaultLocale = \'#{default_locale}\';
+          const defaultLocale = '#{default_locale}';
 
           const defaultMessages = defineMessages(#{@defaults});
 

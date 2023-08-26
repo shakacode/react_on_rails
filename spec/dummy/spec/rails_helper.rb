@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 ENV["RAILS_ENV"] ||= "test"
-SERVER_BUNDLE_PATH = File.expand_path("../../public/webpack/#{ENV['RAILS_ENV']}/server-bundle.js", __FILE__)
+SERVER_BUNDLE_PATH = File.expand_path("../../public/webpack/#{ENV.fetch('RAILS_ENV', nil)}/server-bundle.js", __FILE__)
 
 require_relative "simplecov_helper"
 require_relative "spec_helper"
@@ -50,7 +50,7 @@ RSpec.configure do |config|
 
   # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
   # For React on Rails Pro, using loadable-stats.json
-  config.fixture_path = "#{::Rails.root}/spec/fixtures"
+  config.fixture_path = "#{Rails.root}/spec/fixtures"
 
   # If you're not using ActiveRecord, or you'd prefer not to run each of your
   # examples within a transaction, remove the following line or assign false
@@ -91,11 +91,11 @@ RSpec.configure do |config|
     Rack::Handler::Puma.run(app, Port: port)
   end
 
-  config.before(:each, type: :system, js: true) do
+  config.before(:each, js: true, type: :system) do
     driven_by driver
   end
 
-  config.before(:each, type: :system, rack_test: true) do
+  config.before(:each, rack_test: true, type: :system) do
     driven_by :rack_test
   end
 

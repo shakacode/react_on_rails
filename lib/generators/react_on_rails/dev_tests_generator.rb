@@ -39,7 +39,7 @@ module ReactOnRails
 
         hello_world_index = File.join(destination_root, "app", "views", "hello_world", "index.html.erb")
         hello_world_contents = File.read(hello_world_index)
-        new_hello_world_contents = hello_world_contents.gsub(/prerender: false/,
+        new_hello_world_contents = hello_world_contents.gsub("prerender: false",
                                                              "prerender: true")
 
         File.open(hello_world_index, "w+") { |f| f.puts new_hello_world_contents }

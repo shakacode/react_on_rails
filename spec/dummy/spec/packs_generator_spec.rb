@@ -26,14 +26,14 @@ module ReactOnRails
       ReactOnRails.configuration.components_subdirectory = "ror_components"
       ReactOnRails.configuration.webpack_generated_files = webpack_generated_files
 
-      allow(ReactOnRails::WebpackerUtils).to receive(:manifest_exists?).and_return(true)
-      allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
-      allow(ReactOnRails::WebpackerUtils).to receive(:nested_entries?).and_return(true)
-      allow(ReactOnRails::WebpackerUtils).to receive(:webpacker_source_entry_path)
-        .and_return(webpacker_source_entry_path)
-      allow(ReactOnRails::WebpackerUtils).to receive(:shakapacker_version).and_return("7.0.0")
-      allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(webpacker_source_entry_path)
-      allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle_js_file_path)
+      allow(ReactOnRails::WebpackerUtils).to receive_messages(
+        manifest_exists?: true,
+        using_webpacker?: true,
+        nested_entries?: true,
+        webpacker_source_entry_path: webpacker_source_entry_path, shakapacker_version: "7.0.0"
+      )
+      allow(ReactOnRails::Utils).to receive_messages(generated_assets_full_path: webpacker_source_entry_path,
+                                                     server_bundle_js_file_path: server_bundle_js_file_path)
     end
 
     after do
@@ -78,7 +78,7 @@ module ReactOnRails
       end
 
       it "creates pack for ComponentWithCommonOnly" do
-        expect(File.exist?(component_pack)).to eq(true)
+        expect(File.exist?(component_pack)).to be(true)
       end
 
       it "generated pack for ComponentWithCommonOnly uses common file for pack" do
@@ -187,11 +187,11 @@ module ReactOnRails
       end
 
       it "creates generated server bundle file" do
-        expect(File.exist?(generated_server_bundle_file_path)).to eq(true)
+        expect(File.exist?(generated_server_bundle_file_path)).to be(true)
       end
 
       it "creates pack for ComponentWithClientOnly" do
-        expect(File.exist?(component_pack)).to eq(true)
+        expect(File.exist?(component_pack)).to be(true)
       end
 
       it "generated pack for ComponentWithClientOnly uses client file for pack" do

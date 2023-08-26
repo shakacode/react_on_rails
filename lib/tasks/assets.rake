@@ -18,7 +18,7 @@ namespace :react_on_rails do
         elsif build_production_command.methods.include?(:call)
           build_production_command.call
         else
-          msg = "ReactonRails.configuration.build_production_command is improperly configured. "\
+          msg = "ReactonRails.configuration.build_production_command is improperly configured. " \
                 "Value = #{build_production_command} with class #{build_production_command.class}"
           puts Rainbow(msg).red
           exit!(1)

@@ -5,9 +5,8 @@ require "execjs"
 
 module ReactOnRails
   module ServerRenderingPool
-    # rubocop:disable Metrics/ClassLength
     class RubyEmbeddedJavaScript
-      # rubocop:enable Metrics/ClassLength
+      # rubocop:disable Metrics/ClassLength
       class << self
         def reset_pool
           options = {
@@ -125,8 +124,8 @@ module ReactOnRails
             File.read(server_js_file)
           end
         rescue StandardError => e
-          msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be "\
-                "read. You may set the server_bundle_js_file in your configuration to be \"\" to "\
+          msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be " \
+                "read. You may set the server_bundle_js_file in your configuration to be \"\" to " \
                 "avoid this warning.\nError is: #{e}"
           raise ReactOnRails::Error, msg
         end
@@ -145,15 +144,15 @@ module ReactOnRails
           begin
             if ReactOnRails.configuration.trace
               Rails.logger.info do
-                "[react_on_rails] Created JavaScript context with file "\
+                "[react_on_rails] Created JavaScript context with file " \
                   "#{ReactOnRails::Utils.server_bundle_js_file_path}"
               end
             end
             ExecJS.compile(base_js_code)
           rescue StandardError => e
-            msg = "ERROR when compiling base_js_code! "\
-                  "See file #{file_name} to "\
-                  "correlate line numbers of error. Error is\n\n#{e.message}"\
+            msg = "ERROR when compiling base_js_code! " \
+                  "See file #{file_name} to " \
+                  "correlate line numbers of error. Error is\n\n#{e.message}" \
                   "\n\n#{e.backtrace.join("\n")}"
             Rails.logger.error(msg)
             trace_js_code_used("Error when compiling JavaScript code for the context.", base_js_code,
@@ -192,8 +191,8 @@ module ReactOnRails
 
         def undefined_for_exec_js_logging(function_name)
           if ReactOnRails.configuration.trace
-            "console.error('[React on Rails Rendering] #{function_name} is not defined for server rendering.');\n"\
-              "  console.error(getStackTrace().join('\\n'));"
+            "console.error('[React on Rails Rendering] #{function_name} is not defined for server rendering.');\n  " \
+              "console.error(getStackTrace().join('\\n'));"
           else
             ""
           end
@@ -235,6 +234,7 @@ module ReactOnRails
           raise ReactOnRails::Error, msg
         end
       end
+      # rubocop:enable Metrics/ClassLength
     end
   end
 end

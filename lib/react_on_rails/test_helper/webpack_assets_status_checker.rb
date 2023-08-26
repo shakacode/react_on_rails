@@ -62,10 +62,10 @@ module ReactOnRails
           else
             file_list = make_file_list(make_globs(generated_assets_full_path)).to_ary
             puts "V" * 80
-            puts "Please define config.webpack_generated_files (array) so the test helper knows "\
-                 "which files are required. If you are using webpacker, you typically need to only "\
+            puts "Please define config.webpack_generated_files (array) so the test helper knows " \
+                 "which files are required. If you are using webpacker, you typically need to only " \
                  "include 'manifest.json'."
-            puts "Detected the possible following files to check for webpack compilation in "\
+            puts "Detected the possible following files to check for webpack compilation in " \
                  "#{generated_assets_full_path}"
             puts file_list.join("\n")
             puts "^" * 80

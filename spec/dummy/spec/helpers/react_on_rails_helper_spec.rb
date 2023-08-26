@@ -8,7 +8,7 @@ class PlainReactOnRailsHelper
 end
 
 # rubocop:disable Metrics/BlockLength
-describe ReactOnRailsHelper, type: :helper do
+describe ReactOnRailsHelper do
   include Webpacker::Helper
   before do
     allow(self).to receive(:request) {
@@ -29,7 +29,7 @@ describe ReactOnRailsHelper, type: :helper do
   end
 
   let(:json_string_sanitized) do
-    '{"hello":"world","free":"of charge","x":"\\u003c/script\\u003e\\u003cscrip'\
+    '{"hello":"world","free":"of charge","x":"\\u003c/script\\u003e\\u003cscrip' \
       "t\\u003ealert('foo')\\u003c/script\\u003e\"}"
   end
 
@@ -166,7 +166,7 @@ describe ReactOnRailsHelper, type: :helper do
       end
 
       let(:json_props_sanitized) do
-        '{"hello":"world","free":"of charge","x":"\\u003c/script\\u003e\\u003cscrip'\
+        '{"hello":"world","free":"of charge","x":"\\u003c/script\\u003e\\u003cscrip' \
           "t\\u003ealert('foo')\\u003c/script\\u003e\"}"
       end
 
@@ -298,8 +298,8 @@ describe ReactOnRailsHelper, type: :helper do
     end
 
     let(:react_store_script) do
-      '<script type="application/json" data-js-react-on-rails-store="reduxStore">'\
-        '{"name":"My Test Name"}'\
+      '<script type="application/json" data-js-react-on-rails-store="reduxStore">' \
+        '{"name":"My Test Name"}' \
         "</script>"
     end
 

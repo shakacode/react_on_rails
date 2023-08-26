@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-def change_text_expect_dom_selector(dom_selector)
+def expect_change_text_in_dom_selector(dom_selector)
   new_text = "John Doe"
 
   within(dom_selector) do
@@ -24,10 +24,10 @@ def finished_all_ajax_requests?
 end
 
 shared_examples "React Component" do |dom_selector|
-  scenario { is_expected.to have_css dom_selector }
+  it { is_expected.to have_css dom_selector }
 
-  scenario "changes name in message according to input" do
-    change_text_expect_dom_selector(dom_selector)
+  it "changes name in message according to input" do
+    expect_change_text_in_dom_selector(dom_selector)
   end
 end
 
@@ -91,13 +91,13 @@ describe "Turbolinks across pages", :js do
 
   it "changes name in message according to input" do
     visit "/client_side_hello_world"
-    change_text_expect_dom_selector("#HelloWorld-react-component-0")
+    expect_change_text_in_dom_selector("#HelloWorld-react-component-0")
     click_link "Hello World Component Server Rendered, with extra options"
-    change_text_expect_dom_selector("#my-hello-world-id")
+    expect_change_text_in_dom_selector("#my-hello-world-id")
   end
 end
 
-describe "Pages/client_side_log_throw", :js, :ignore_js_errors do
+describe "Pages/client_side_log_throw", :ignore_js_errors, :js do
   subject { page }
 
   before { visit "/client_side_log_throw" }
@@ -120,10 +120,10 @@ describe "Pages/Hello World ReScript Component", :js do
 
   before { visit "/client_side_rescript_hello_world" }
 
-  it { change_text_expect_dom_selector("#HelloWorld-rescript-react-component-0") }
+  it { expect_change_text_in_dom_selector("#HelloWorld-rescript-react-component-0") }
 end
 
-describe "Pages/server_side_log_throw", :js, :ignore_js_errors do
+describe "Pages/server_side_log_throw", :ignore_js_errors, :js do
   subject { page }
 
   before { visit "/server_side_log_throw" }
@@ -141,8 +141,8 @@ describe "Pages/server_side_log_throw_raise", :js do
 
   it "redirects to /client_side_hello_world and flashes an error" do
     flash_message = page.find(:css, ".flash").text
-    expect(flash_message).to eq("Error prerendering in react_on_rails. Redirected back to"\
-                                " '/server_side_log_throw_raise_invoker'. See server logs for output.")
+    expect(flash_message).to eq("Error prerendering in react_on_rails. Redirected back to " \
+                                "'/server_side_log_throw_raise_invoker'. See server logs for output.")
     expect(page).to have_current_path("/server_side_log_throw_raise_invoker")
   end
 end
@@ -184,7 +184,7 @@ describe "React Router", :js do
   end
 end
 
-describe "Manual Rendering", :js, type: :system do
+describe "Manual Rendering", :js do
   subject { page }
 
   before { visit "/client_side_manual_render" }
@@ -207,7 +207,7 @@ describe "renderedHtml from generator function", :js do
   end
 end
 
-describe "Manual client hydration", :js, type: :system do
+describe "Manual client hydration", :js do
   before { visit "/xhr_refresh" }
 
   it "HelloWorldRehydratable onChange should trigger" do
@@ -224,7 +224,7 @@ describe "Manual client hydration", :js, type: :system do
   end
 end
 
-describe "returns hash if hash_result == true even with prerendering error", :js, :ignore_js_errors do
+describe "returns hash if hash_result == true even with prerendering error", :ignore_js_errors, :js do
   subject { page }
 
   before do
@@ -259,7 +259,7 @@ describe "generator function returns renderedHtml as an object with additional H
   describe "with enabled JS", :js do
     include_examples "renderedHtmls should not have any errors and set correct page title"
     it "renders the name change" do
-      change_text_expect_dom_selector("div#react-helmet-0")
+      expect_change_text_in_dom_selector("div#react-helmet-0")
     end
   end
 end
@@ -292,7 +292,7 @@ shared_examples "React Component Shared Store" do |url|
   before { visit url }
 
   context url do
-    scenario "Type in one component changes the other component" do
+    it "Type in one component changes the other component" do
       expect(page).to have_current_path(url, ignore_query: true)
       new_text = "John Doe"
       new_text2 = "Jane Smith"
