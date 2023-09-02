@@ -21,7 +21,7 @@ jobs:
     - name: Fix dependency for libyaml-dev
       run: sudo apt install libyaml-dev
     - name: Setup Node
-      uses: actions/setup-node@v2-beta
+      uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node }}
     - name: Print system information
@@ -89,7 +89,7 @@ jobs:
         ruby-version: ${{ matrix.ruby }}
         bundler: 2.4.17
     - name: Setup Node
-      uses: actions/setup-node@v2-beta
+      uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node }}
     - name: Print system information
