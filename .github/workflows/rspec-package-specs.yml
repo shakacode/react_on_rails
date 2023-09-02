@@ -35,12 +35,12 @@ jobs:
     - name: Run rspec tests
       run: bundle exec rspec spec/react_on_rails
     - name: Store test results
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: main-rspec
         path: ~/rspec
     - name: Store artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: main-test-log
         path: log/test.log

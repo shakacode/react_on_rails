@@ -162,22 +162,22 @@ jobs:
     - name: Main CI
       run: bundle exec rake ${{ matrix.rake_task }}
     - name: Store test results
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: main-rspec
         path: ~/rspec
     - name: Store artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: dummy-app-capybara
         path: spec/dummy/tmp/capybara
     - name: Store artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: dummy-app-test-log
         path: spec/dummy/log/test.log
     - name: Store artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: dummy-app-yarn-log
         path: spec/dummy/yarn-error.log
