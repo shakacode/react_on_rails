@@ -22,7 +22,7 @@ jobs:
         echo "Node version: "; node -v
         echo "Yarn version: "; yarn --version
     - name: Save root node_modules to cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: node_modules
         key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}

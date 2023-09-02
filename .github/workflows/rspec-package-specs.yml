@@ -26,7 +26,7 @@ jobs:
         echo "Yarn version: "; yarn --version
         echo "Bundler version: "; bundle --version
     - name: Save root ruby gems to cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: vendor/bundle
         key: v5-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
