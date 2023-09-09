@@ -3,6 +3,24 @@
 require "rainbow"
 
 module GeneratorHelper
+  def require_package_json_gem
+    require "bundler/inline"
+
+    gemfile { gem "package_json", github: "G-Rath/package_json" }
+
+    puts "using package_json v#{PackageJson::VERSION}"
+  end
+
+  def package_json
+    if @package_json.nil?
+      require_package_json_gem
+
+      @package_json = PackageJson.read(@app_path)
+    end
+
+    @package_json
+  end
+
   # Takes a relative path from the destination root, such as `.gitignore` or `app/assets/javascripts/application.js`
   def dest_file_exists?(file)
     dest_file = File.join(destination_root, file)
