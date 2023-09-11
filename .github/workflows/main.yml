@@ -10,7 +10,9 @@ jobs:
         node: [16, 18]
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1
       with:
@@ -21,7 +23,7 @@ jobs:
     - name: Fix dependency for libyaml-dev
       run: sudo apt install libyaml-dev
     - name: Setup Node
-      uses: actions/setup-node@v2-beta
+      uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node }}
     - name: Print system information
@@ -82,14 +84,16 @@ jobs:
         rake_task: ['run_rspec:all_but_examples', 'run_rspec:examples']
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby }}
         bundler: 2.4.17
     - name: Setup Node
-      uses: actions/setup-node@v2-beta
+      uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node }}
     - name: Print system information
@@ -162,22 +166,22 @@ jobs:
     - name: Main CI
       run: bundle exec rake ${{ matrix.rake_task }}
     - name: Store test results
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: main-rspec
         path: ~/rspec
     - name: Store artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: dummy-app-capybara
         path: spec/dummy/tmp/capybara
     - name: Store artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: dummy-app-test-log
         path: spec/dummy/log/test.log
     - name: Store artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: dummy-app-yarn-log
         path: spec/dummy/yarn-error.log

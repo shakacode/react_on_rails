@@ -10,7 +10,9 @@ jobs:
         node: [16, 18]
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1
       with:
@@ -26,7 +28,7 @@ jobs:
         echo "Yarn version: "; yarn --version
         echo "Bundler version: "; bundle --version
     - name: Save root ruby gems to cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: vendor/bundle
         key: v5-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
@@ -35,12 +37,12 @@ jobs:
     - name: Run rspec tests
       run: bundle exec rspec spec/react_on_rails
     - name: Store test results
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: main-rspec
         path: ~/rspec
     - name: Store artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: main-test-log
         path: log/test.log

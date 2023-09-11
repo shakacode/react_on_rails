@@ -9,9 +9,11 @@ jobs:
         node: [16, 18]
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
     - name: Setup Node
-      uses: actions/setup-node@v2-beta
+      uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node }}
     - name: Print system information
@@ -22,7 +24,7 @@ jobs:
         echo "Node version: "; node -v
         echo "Yarn version: "; yarn --version
     - name: Save root node_modules to cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: node_modules
         key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
