@@ -33,7 +33,7 @@
     "es5-shim": "^4.5.9",
     "expose-loader": "1.0.3",
     "file-loader": "^6.2.0",
-    "graphql": "^16.6.0",
+    "graphql": "^16.8.1",
     "history": "^4.6.3",
     "imports-loader": "^1.2.0",
     "lodash": "^4.17.4",
