@@ -42,11 +42,17 @@ module ReactOnRailsPro
         end
 
         def eval_js(js_code, render_options, send_bundle: false)
+          ReactOnRailsPro::ServerRenderingPool::ProRendering
+            .set_request_digest_on_render_options(js_code, render_options)
+
           # In case this method is called with simple, raw JS, not depending on the bundle, next line
           # is needed.
           @bundle_hash ||= ReactOnRailsPro::Utils.bundle_hash
 
-          path = "/bundles/#{@bundle_hash}"
+          # TODO: Remove the request_digest. See https://github.com/shakacode/react_on_rails_pro/issues/119
+          # From the request path
+          # path = "/bundles/#{@bundle_hash}/render"
+          path = "/bundles/#{@bundle_hash}/render/#{render_options.request_digest}"
 
           response = ReactOnRailsPro::Request.render_code(path, js_code, send_bundle)
 

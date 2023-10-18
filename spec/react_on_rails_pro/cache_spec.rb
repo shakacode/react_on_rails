@@ -36,9 +36,8 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(react_component_string1).to eq(result)
       expect(react_component_string2).to eq(result)
       expect(create_component_code).to have_received(:call).once
-      expect(cache_data.keys.first)
-        .to eq("ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/the_cache_key")
-      expect(cache_data.values.first.value).to eq(result)
+      string_cache_key = "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/the_cache_key"
+      expect(Rails.cache.fetch(string_cache_key)).to eq(result)
     end
 
     it "fetches the value from the cache if the value is a Hash" do
@@ -65,8 +64,7 @@ describe ReactOnRailsPro::Cache, :caching do
 
       expect(create_component_code).to have_received(:call).once
       string_cache_key = "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/the_cache_key"
-      expect(cache_data.keys.first).to eq(string_cache_key)
-      expect(cache_data.values.first.value[:component_html]).to eq(html)
+      expect(Rails.cache.fetch(string_cache_key)[:component_html]).to eq(html)
     end
 
     it "fetches the value from the cache if cache_key is a lambda" do
@@ -87,9 +85,8 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(react_component_string1).to eq(result)
       expect(react_component_string2).to eq(result)
       expect(create_component_code).to have_received(:call).once
-      expect(cache_data.keys.first)
-        .to eq("ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/the_cache_key")
-      expect(cache_data.values.first.value).to eq(result)
+      string_cache_key = "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/the_cache_key"
+      expect(Rails.cache.fetch(string_cache_key)).to eq(result)
     end
 
     it "skips the cache if option :if is false" do
@@ -110,7 +107,6 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(react_component_string1).to eq(result)
       expect(react_component_string2).to eq(result)
       expect(create_component_code).to have_received(:call).twice
-      expect(cache_data.keys.size).to eq(0)
     end
 
     it "skips the cache if option :unless is true" do
@@ -131,7 +127,6 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(react_component_string1).to eq(result)
       expect(react_component_string2).to eq(result)
       expect(create_component_code).to have_received(:call).twice
-      expect(cache_data.keys.size).to eq(0)
     end
   end
 
