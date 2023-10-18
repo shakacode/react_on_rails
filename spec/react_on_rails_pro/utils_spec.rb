@@ -131,7 +131,7 @@ module ReactOnRailsPro
         before do
           allow(ReactOnRailsPro.configuration)
             .to receive(:tracing).and_return(false)
-          Rails.stub(:logger).and_return(logger_mock)
+          allow(Rails).to receive(:logger).and_return(logger_mock)
         end
 
         it "does not log the time for the method execution" do
