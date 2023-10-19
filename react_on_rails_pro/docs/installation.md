@@ -166,6 +166,9 @@ or edit package.json directly
 ### Configuration
 See [NodeRenderer JavaScript Configuration](./node-renderer/js-configuration.md).
 
+#### Webpack Configuration
+Set your server bundle webpack configuration to use a target of `node` per the [Webpack docs](https://webpack.js.org/concepts/targets/#usage).
+
 ## Authentication when using Github packages
 [Auth for the npm package](https://docs.github.com/en/packages/using-github-packages-with-your-projects-ecosystem/configuring-npm-for-use-with-github-packages#authenticating-to-github-packages)
 

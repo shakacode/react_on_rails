@@ -49,11 +49,6 @@ ReactOnRailsPro.configure do |config|
   # Default for `server_renderer` is "ExecJS"
   config.server_renderer = "NodeRenderer"
 
-  # If you are using the NodeRenderer, then you stop React on Rails from stubbing setTimeout, setInterval, & clearTimeout
-  # by this option to false. Also, if server_renderer is not set to "NodeRenderer", this option will be ignored.
-  # Default is true.
-  config.include_execjs_polyfills = true
-
   # React on Rails Node Renderer now support render functions returning promises! To enable this optional functionality,
   # toggle the following option.
   # Default is false.
