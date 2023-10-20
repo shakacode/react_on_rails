@@ -17,7 +17,13 @@ module ReactOnRailsProHelper
         cache_hit = false
         yield
       end
-      load_pack_for_generated_component(component_name) if ReactOnRails.configuration.auto_load_bundle && cache_hit
+      if cache_hit
+        render_options = ReactOnRails::ReactComponent::RenderOptions.new(
+          react_component_name: component_name,
+          options: options
+        )
+        load_pack_for_generated_component(component_name, render_options)
+      end
       # Pass back the cache key in the results only if the result is a Hash
       if result.is_a?(Hash)
         result[:RORP_CACHE_KEY] = cache_key
