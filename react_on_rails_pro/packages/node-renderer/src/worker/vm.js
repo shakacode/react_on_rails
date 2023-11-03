@@ -64,13 +64,23 @@ exports.buildVM = async function buildVM(filePath) {
   }
 
   try {
-    const { supportModules, includeTimerPolyfills } = getConfig();
+    const { supportModules, includeTimerPolyfills, additionalContext } = getConfig();
+    const additionalContextIsObject = additionalContext !== null && additionalContext.constructor === Object;
     vmBundleFilePath = undefined;
+    const contextObject = {};
     if (supportModules) {
-      context = vm.createContext({ Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval });
-    } else {
-      context = vm.createContext();
+      log.debug(
+        'Adding Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval to context object.',
+      );
+      Object.assign(contextObject, { Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval });
     }
+    if (additionalContextIsObject) {
+      const keysString = Object.keys(additionalContext).join(', ');
+      log.debug(`Adding ${keysString} to context object.`);
+      Object.assign(contextObject, additionalContext);
+    }
+    context = vm.createContext(contextObject);
+
     // Create explicit reference to global context, just in case (some libs can use it):
     vm.runInContext('global = this', context);
 
@@ -120,7 +130,7 @@ exports.buildVM = async function buildVM(filePath) {
 
     // If node-specific code is provided then it must be wrapped into a module wrapper. The bundle
     // may need the `require` function, which is not available when running in vm unless passed in.
-    if (supportModules) {
+    if (additionalContextIsObject || supportModules) {
       vm.runInContext(m.wrap(bundleContents), context)(
         exports,
         require,

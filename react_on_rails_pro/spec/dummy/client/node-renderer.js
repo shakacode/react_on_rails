@@ -38,9 +38,10 @@ const config = {
 
   sentryTracesSampleRate: 1,
 
-  // supportModules should be set to true to allow the server-bundle code to see require, exports, etc.
-  // false is like the ExecJS behavior
-  // this option is required to equal `true` if you want to use loadable components
+  // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS modules
+  // that get added to the VM context: { Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval }.
+  // This option is required to equal `true` if you want to use loadable components.
+  // Setting this value to false causes the NodeRenderer to behave like ExecJS
   supportModules: true,
 
   // Required to use setTimeout, setInterval, & clearTimeout during server rendering

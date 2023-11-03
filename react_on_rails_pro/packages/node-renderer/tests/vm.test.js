@@ -38,7 +38,7 @@ describe('buildVM and runInVM', () => {
       expect(result).toBeTruthy();
     });
 
-    test('available if supportModules disabled', async () => {
+    test('available if supportModules enabled', async () => {
       const config = getConfig();
       config.supportModules = true;
 
@@ -49,6 +49,27 @@ describe('buildVM and runInVM', () => {
       expect(result).toBeTruthy();
 
       result = await runInVM('typeof process !== "undefined"');
+      expect(result).toBeTruthy();
+    });
+  });
+
+  describe('additionalContext', () => {
+    test('not available if additionalContext not set', async () => {
+      await createUploadedBundleForTest();
+      await buildVM(uploadedBundlePathForTest());
+
+      const result = await runInVM('typeof testString === "undefined"');
+      expect(result).toBeTruthy();
+    });
+
+    test('available if additionalContext set', async () => {
+      const config = getConfig();
+      config.additionalContext = { testString: 'a string' };
+
+      await createUploadedBundleForTest();
+      await buildVM(uploadedBundlePathForTest());
+
+      const result = await runInVM('typeof testString !== "undefined"');
       expect(result).toBeTruthy();
     });
   });
