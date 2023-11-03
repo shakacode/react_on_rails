@@ -50,9 +50,17 @@ const defaultConfig = {
   // Use directory DEFAULT_TMP_DIR if none provided
   bundlePath: env.RENDERER_BUNDLE_PATH || DEFAULT_TMP_DIR,
 
-  // supportModules should be set to true to allow the server-bundle code to see require, exports, etc.
-  // false is like the ExecJS behavior
+  // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS modules
+  // that get added to the VM context: { Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval }.
+  // This option is required to equal `true` if you want to use loadable components.
+  // Setting this value to false causes the NodeRenderer to behave like ExecJS
   supportModules: env.RENDERER_SUPPORT_MODULES || null,
+
+  // additionalContext enables you to specify additional NodeJS modules to add to the VM context in
+  // addition to our supportModules defaults.
+  // Object shorthand notation may be used, but is not required.
+  // Example: { URL, URLSearchParams, Crypto }
+  additionalContext: null,
 
   // Workers count defaults to number of CPUs minus 1
   workersCount:
