@@ -1,5 +1,6 @@
 import React from 'react';
-import { BrowserRouter, StaticRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
+import { StaticRouter } from 'react-router-dom/server';
 
 import Header from '../components/Loadable/Header';
 import Routes from '../components/Loadable/routes/Routes';
