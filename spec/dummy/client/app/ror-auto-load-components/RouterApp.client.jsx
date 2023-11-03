@@ -1,5 +1,12 @@
 import React from 'react';
-import { BrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+
 import routes from '../routes/routes';
 
-export default (props) => <BrowserRouter {...props}>{routes}</BrowserRouter>;
+const dataClientRouter = () => {
+  const router = createBrowserRouter(routes);
+
+  return <RouterProvider router={router} />;
+};
+
+export default dataClientRouter;

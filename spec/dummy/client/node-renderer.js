@@ -44,6 +44,10 @@ const config = {
   // Setting this value to false causes the NodeRenderer to behave like ExecJS
   supportModules: true,
 
+  // additionalContext enables you to specify additional NodeJS modules to add to the VM context in
+  // addition to our supportModules defaults.
+  additionalContext: { URL, AbortController },
+
   // Required to use setTimeout, setInterval, & clearTimeout during server rendering
   includeTimerPolyfills: false,
 };

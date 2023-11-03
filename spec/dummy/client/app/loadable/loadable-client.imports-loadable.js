@@ -5,10 +5,10 @@ import { loadableReady } from '@loadable/component';
 
 import ClientApp from './LoadableApp';
 
-const App = (props, _railsContext, domNodeId) => {
+const App = (props, railsContext, domNodeId) => {
   loadableReady(() => {
     const el = document.getElementById(domNodeId);
-    hydrateRoot(el, React.createElement(ClientApp, { ...props }));
+    hydrateRoot(el, React.createElement(ClientApp, { ...props, path: railsContext.pathname }));
   });
 };
 

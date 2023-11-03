@@ -6,7 +6,7 @@ import App from './LoadableApp';
 
 // Version of the consumer app to use without loadable components to enable HMR
 const hmrApp = (props, railsContext) => {
-  const componentHtml = renderToString(React.createElement(App, { ...props, railsContext }));
+  const componentHtml = renderToString(React.createElement(App, { ...props, path: railsContext.pathname }));
   const helmet = Helmet.renderStatic();
 
   return {

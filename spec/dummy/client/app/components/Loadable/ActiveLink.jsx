@@ -1,8 +1,8 @@
 import React from 'react';
-import { Link, useRouteMatch } from 'react-router-dom';
+import { Link, useMatch } from 'react-router-dom';
 
 function ActiveLink({ text, to }) {
-  const match = useRouteMatch({
+  const match = useMatch({
     path: to,
   });
 

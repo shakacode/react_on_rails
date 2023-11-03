@@ -1,21 +1,17 @@
 import React from 'react';
-import { withRouter, Route, Switch } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 
 import { PageA, PageB } from './Routes.imports-loadable';
 
-class Routes extends React.PureComponent {
+class LoadableRoutes extends React.PureComponent {
   render() {
     return (
-      <Switch>
-        <Route path="/A">
-          <PageA />
-        </Route>
-        <Route path="/B">
-          <PageB />
-        </Route>
-      </Switch>
+      <Routes>
+        <Route path="A" Component={PageA} />
+        <Route path="B" Component={PageB} />
+      </Routes>
     );
   }
 }
 
-export default withRouter(Routes);
+export default LoadableRoutes;
