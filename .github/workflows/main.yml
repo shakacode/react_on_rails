@@ -5,15 +5,13 @@ on:
     branches:
       - 'master'
   pull_request:
-    paths:
-      - '**.*'
 
 jobs:
   build-dummy-app-webpack-test-bundles:
     strategy:
       matrix:
         ruby: [2.7, 3.2]
-        node: [16, 18]
+        node: [14, 16, 18]
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
@@ -85,8 +83,8 @@ jobs:
     needs: build-dummy-app-webpack-test-bundles
     strategy:
       matrix:
-        ruby: [2.7]
-        node: [14]
+        ruby: [2.7, 3.2]
+        node: [14, 16, 18]
         rake_task: ['run_rspec:all_but_examples', 'run_rspec:examples']
     runs-on: ubuntu-22.04
     steps:

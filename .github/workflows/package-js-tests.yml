@@ -6,14 +6,12 @@ on:
     branches:
       - 'master'
   pull_request:
-    paths:
-      - '**.*'
 
 jobs:
   build:
     strategy:
       matrix:
-        node: [16, 18]
+        node: [14, 16, 18]
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
