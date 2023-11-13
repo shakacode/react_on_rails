@@ -27,11 +27,5 @@ module ReactOnRails
 
       it_behaves_like "escaped json"
     end
-
-    describe ".escaped_without_erb_utils" do
-      subject { described_class.escape_without_erb_util(hash_value.to_json) }
-
-      it_behaves_like "escaped json"
-    end
   end
 end
