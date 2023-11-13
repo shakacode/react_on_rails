@@ -4,7 +4,9 @@ on:
   push:
     branches:
       - 'master'
-  pull_request
+  pull_request:
+    paths:
+      - '**.*'
 
 jobs:
   build-dummy-app-webpack-test-bundles:

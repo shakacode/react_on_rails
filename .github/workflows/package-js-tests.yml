@@ -1,6 +1,13 @@
 name: JS unit tests for Renderer package
 
-on: [push, pull_request]
+
+on:
+  push:
+    branches:
+      - 'master'
+  pull_request:
+    paths:
+      - '**.*'
 
 jobs:
   build:
