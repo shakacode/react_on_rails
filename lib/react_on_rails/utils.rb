@@ -118,12 +118,6 @@ module ReactOnRails
       end
     end
 
-    # rubocop:disable Naming/VariableNumber
-    def self.rails_version_less_than_4_1_1
-      rails_version_less_than("4.1.1")
-    end
-    # rubocop:enable Naming/VariableNumber
-
     module Required
       def required(arg_name)
         raise ReactOnRails::Error, "#{arg_name} is required"

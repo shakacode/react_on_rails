@@ -301,24 +301,6 @@ module ReactOnRails
             end
           end
         end
-
-        describe ".rails_version_less_than_4_1_1" do
-          subject { described_class.rails_version_less_than_4_1_1 }
-
-          before { described_class.instance_variable_set :@rails_version_less_than, nil }
-
-          context "with Rails 4.1.0" do
-            before { allow(Rails).to receive(:version).and_return("4.1.0") }
-
-            it { is_expected.to be(true) }
-          end
-
-          context "with Rails 4.1.1" do
-            before { allow(Rails).to receive(:version).and_return("4.1.1") }
-
-            it { is_expected.to be(false) }
-          end
-        end
       end
 
       describe ".smart_trim" do
