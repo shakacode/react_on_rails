@@ -5,8 +5,8 @@ require "execjs"
 
 module ReactOnRails
   module ServerRenderingPool
+    # rubocop:disable Metrics/ClassLength
     class RubyEmbeddedJavaScript
-      # rubocop:disable Metrics/ClassLength
       class << self
         def reset_pool
           options = {

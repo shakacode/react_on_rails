@@ -1,13 +1,17 @@
 name: Rspec test for gem
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - 'master'
+  pull_request:
 
 jobs:
   build:
     strategy:
       matrix:
         ruby: [2.7, 3.2]
-        node: [16, 18]
+        node: [14, 20]
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4

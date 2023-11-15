@@ -7,7 +7,7 @@ gem "sqlite3"
 gem "sass-rails", "~> 6.0"
 gem "uglifier"
 gem "jquery-rails"
-gem "puma", "~> 5.0"
+gem "puma", "~> 6.0"
 gem "bundler", "2.4.17"
 
 # Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
@@ -46,5 +46,6 @@ group :test do
   gem "rspec_junit_formatter"
   gem "rspec-rails"
   gem "rspec-retry"
-  gem "selenium-webdriver"
+  gem "selenium-webdriver", "4.9.0"
+  gem "webdrivers", "5.3.0"
 end

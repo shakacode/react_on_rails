@@ -1,12 +1,17 @@
 name: JS unit tests for Renderer package
 
-on: [push, pull_request]
+
+on:
+  push:
+    branches:
+      - 'master'
+  pull_request:
 
 jobs:
   build:
     strategy:
       matrix:
-        node: [16, 18]
+        node: [14, 20]
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
