@@ -1,11 +1,11 @@
-import type { ReactElement, ReactNode, Component, FunctionComponent, ComponentClass } from 'react';
+import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
 
 // Don't import redux just for the type definitions
 // See https://github.com/shakacode/react_on_rails/issues/1321
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Store = any;
 
-type ReactComponent = FunctionComponent | ComponentClass | string;
+type ReactComponent = ComponentType<any> | string;
 
 // Keep these in sync with method lib/react_on_rails/helper.rb#rails_context
 export interface RailsContext {
@@ -33,7 +33,7 @@ type AuthenticityHeaders = {[id: string]: string} & {'X-CSRF-Token': string | nu
 type StoreGenerator = (props: Record<string, unknown>, railsContext: RailsContext) => Store
 
 interface ServerRenderResult {
-  renderedHtml?: string;
+  renderedHtml?: string | { componentHtml: string; [key: string]: string };
   redirectLocation?: {pathname: string; search: string};
   routeError?: Error;
   error?: Error;
@@ -44,7 +44,7 @@ type CreateReactOutputResult = ServerRenderResult | ReactElement | Promise<strin
 type RenderFunctionResult = ReactComponent | ServerRenderResult | Promise<string>;
 
 interface RenderFunction {
-  (props?: Record<string, unknown>, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
+  (props?: any, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
   // We allow specifying that the function is RenderFunction and not a React Function Component
   // by setting this property
   renderFunction?: boolean;
