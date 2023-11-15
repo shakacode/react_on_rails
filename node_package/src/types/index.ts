@@ -33,7 +33,7 @@ type AuthenticityHeaders = {[id: string]: string} & {'X-CSRF-Token': string | nu
 type StoreGenerator = (props: Record<string, unknown>, railsContext: RailsContext) => Store
 
 interface ServerRenderResult {
-  renderedHtml?: string;
+  renderedHtml?: string | { componentHtml: string; [key: string]: string };
   redirectLocation?: {pathname: string; search: string};
   routeError?: Error;
   error?: Error;
