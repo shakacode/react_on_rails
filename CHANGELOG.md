@@ -15,6 +15,10 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+### [13.4.1]
+#### Fixed
+- Fixed Typescript types for ServerRenderResult, ReactComponent, and RenderFunction interfaces. [PR 1582](https://github.com/shakacode/react_on_rails/pull/1582) by [kotarella1110](https://github.com/kotarella1110)
+
 - Removed a workaround in `JsonOutput#escape` for an no-longer supported Rails version. Additionally, removed `Utils.rails_version_less_than_4_1_1`
 which was only used in the workaround. [PR 1580](https://github.com/shakacode/react_on_rails/pull/1580) by [wwahammy](https://github.com/wwahammy)
 
@@ -1106,7 +1110,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.4.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.4.1...master
+[13.4.1]: https://github.com/shakacode/react_on_rails/compare/13.4.0...13.4.1
 [13.4.0]: https://github.com/shakacode/react_on_rails/compare/13.3.5...13.4.0
 [13.3.5]: https://github.com/shakacode/react_on_rails/compare/13.3.4...13.3.5
 [13.3.4]: https://github.com/shakacode/react_on_rails/compare/13.3.3...13.3.4
