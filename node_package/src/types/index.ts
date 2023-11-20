@@ -17,14 +17,13 @@ export interface RailsContext {
   rorPro: boolean;
   rorProVersion?: string;
   serverSide: boolean;
-  originalUrl: string;
   href: string;
   location: string;
   scheme: string;
   host: string;
-  port: string;
+  port: number | null;
   pathname: string;
-  search: string;
+  search: string | null;
   httpAcceptLanguage: string;
 }
 
