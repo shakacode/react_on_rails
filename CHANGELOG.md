@@ -23,6 +23,10 @@ Changes since the last non-beta release.
 - Removed a workaround in `JsonOutput#escape` for an no-longer supported Rails version. Additionally, removed `Utils.rails_version_less_than_4_1_1`
 which was only used in the workaround. [PR 1580](https://github.com/shakacode/react_on_rails/pull/1580) by [wwahammy](https://github.com/wwahammy)
 
+#### Added
+
+- Exposed TypeScript all types [PR 1586](https://github.com/shakacode/react_on_rails/pull/1586) by [kotarella1110](https://github.com/kotarella1110)
+
 ### [13.4.0] - 2023-07-30
 #### Fixed
 - Fixed Pack Generation logic during `assets:precompile` if `auto_load_bundle` is `false` & `components_subdirectory` is not set. [PR 1567](https://github.com/shakacode/react_on_rails/pull/1545) by [blackjack26](https://github.com/blackjack26) & [judahmeek](https://github.com/judahmeek).
