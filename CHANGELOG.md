@@ -17,14 +17,12 @@ Changes since the last non-beta release.
 
 ### [13.4.1]
 #### Fixed
-- Fixed Typescript types for ServerRenderResult, ReactComponent, and RenderFunction interfaces. [PR 1582](https://github.com/shakacode/react_on_rails/pull/1582) by [kotarella1110](https://github.com/kotarella1110)
-- Fixed Typescript types for RailsContext interfaces. [PR 1585](https://github.com/shakacode/react_on_rails/pull/1585) by [kotarella1110](https://github.com/kotarella1110)
+- Fixed Typescript types for ServerRenderResult, ReactComponent, RenderFunction, and RailsContext interfaces. [PR 1582](https://github.com/shakacode/react_on_rails/pull/1582) & [PR 1585](https://github.com/shakacode/react_on_rails/pull/1585) by [kotarella1110](https://github.com/kotarella1110)
 
 - Removed a workaround in `JsonOutput#escape` for an no-longer supported Rails version. Additionally, removed `Utils.rails_version_less_than_4_1_1`
 which was only used in the workaround. [PR 1580](https://github.com/shakacode/react_on_rails/pull/1580) by [wwahammy](https://github.com/wwahammy)
 
 #### Added
-
 - Exposed TypeScript all types [PR 1586](https://github.com/shakacode/react_on_rails/pull/1586) by [kotarella1110](https://github.com/kotarella1110)
 
 ### [13.4.0] - 2023-07-30
