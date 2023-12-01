@@ -4,7 +4,7 @@ name: JS unit tests for Renderer package
 on:
   push:
     branches:
-      - 'master'
+      - 'main'
   pull_request:
 
 jobs:
