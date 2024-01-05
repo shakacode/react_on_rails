@@ -141,7 +141,7 @@ module ReactOnRails
 
       return if skip_react_on_rails_precompile || build_production_command.blank?
 
-      if Webpacker.config.webpacker_precompile?
+      if shakapacker_precompile?
         msg = <<~MSG
 
           React on Rails and Shakapacker error in configuration!
@@ -265,6 +265,14 @@ module ReactOnRails
       MSG
 
       raise ReactOnRails::Error, msg
+    end
+
+    def shakapacker_precompile?
+      config = Webpacker.config
+
+      return config.webpacker_precompile? unless config.respond_to?(:shakapacker_precompile?)
+
+      config.shakapacker_precompile?
     end
   end
 end
