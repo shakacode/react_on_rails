@@ -15,6 +15,9 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+#### Fixed
+- Prevent displaying the deprecation message for using `webpacker_precompile?` when using Shakapacker v7+ [PR 1592](https://github.com/shakacode/react_on_rails/pull/1592) by [ahangarha](https://github.com/ahangarha).
+
 ### [13.4.1]
 #### Fixed
 - Fixed Typescript types for ServerRenderResult, ReactComponent, RenderFunction, and RailsContext interfaces. [PR 1582](https://github.com/shakacode/react_on_rails/pull/1582) & [PR 1585](https://github.com/shakacode/react_on_rails/pull/1585) by [kotarella1110](https://github.com/kotarella1110)
