@@ -24,6 +24,9 @@ Changes since the last non-beta release.
 - Dropped Ruby 2.7 support [PR 1595](https://github.com/shakacode/react_on_rails/pull/1595) by [ahangarha](https://github.com/ahangarha).
 - Dropped support for Node 14 and 17 [PR 1596](https://github.com/shakacode/react_on_rails/pull/1596) by [ahangarha](https://github.com/ahangarha).
 
+#### Fixed
+- Prevent displaying the deprecation message for using `webpacker_precompile?` when using Shakapacker v7+ [PR 1592](https://github.com/shakacode/react_on_rails/pull/1592) by [ahangarha](https://github.com/ahangarha).
+
 ### [13.4.1]
 #### Fixed
 - Fixed Typescript types for ServerRenderResult, ReactComponent, RenderFunction, and RailsContext interfaces. [PR 1582](https://github.com/shakacode/react_on_rails/pull/1582) & [PR 1585](https://github.com/shakacode/react_on_rails/pull/1585) by [kotarella1110](https://github.com/kotarella1110)
