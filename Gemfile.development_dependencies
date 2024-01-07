@@ -3,7 +3,9 @@
 gem "shakapacker", "7.0.1"
 gem "bootsnap", require: false
 gem "rails", "~> 7.0", ">= 7.0.1"
-gem "sqlite3"
+
+# sqlite3 1.7.0 ends native gem support for Ruby 2.7
+gem "sqlite3", "~> 1.0", "< 1.7.0"
 gem "sass-rails", "~> 6.0"
 gem "uglifier"
 gem "jquery-rails"

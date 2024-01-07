@@ -92,7 +92,7 @@ describe "Turbolinks across pages", :js do
   it "changes name in message according to input" do
     visit "/client_side_hello_world"
     expect_change_text_in_dom_selector("#HelloWorld-react-component-0")
-    click_link "Hello World Component Server Rendered, with extra options"
+    click_on "Hello World Component Server Rendered, with extra options"
     expect_change_text_in_dom_selector("#my-hello-world-id")
   end
 end
@@ -164,19 +164,19 @@ describe "React Router", :js do
 
   before do
     visit "/"
-    click_link "React Router"
+    click_on "React Router"
   end
 
   context "when rendering /react_router" do
     it { is_expected.to have_text("Woohoo, we can use react-router here!") }
 
     it "clicking links correctly renders other pages" do
-      click_link "Router First Page"
+      click_on "Router First Page"
       expect(page).to have_current_path("/react_router/first_page")
       first_page_header_text = page.find(:css, "h2#first-page").text
       expect(first_page_header_text).to eq("React Router First Page")
 
-      click_link "Router Second Page"
+      click_on "Router Second Page"
       expect(page).to have_current_path("/react_router/second_page")
       second_page_header_text = page.find(:css, "h2#second-page").text
       expect(second_page_header_text).to eq("React Router Second Page")
@@ -212,7 +212,7 @@ describe "Manual client hydration", :js do
 
   it "HelloWorldRehydratable onChange should trigger" do
     within("form") do
-      click_button "refresh"
+      click_on "refresh"
     end
     wait_for_ajax
     within("#HelloWorldRehydratable-react-component-1") do
