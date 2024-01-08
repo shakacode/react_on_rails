@@ -77,7 +77,7 @@ module ReactOnRails
       end
 
       def add_yarn_dependencies
-        major_minor_patch_only = /\A\d+\.\d+\.\d+\z/.freeze
+        major_minor_patch_only = /\A\d+\.\d+\.\d+\z/
         if ReactOnRails::VERSION.match?(major_minor_patch_only)
           run "yarn add react-on-rails@#{ReactOnRails::VERSION} --exact"
         else

@@ -4,7 +4,7 @@ require "rails_helper"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRails
-  GENERATED_PACKS_CONSOLE_OUTPUT_REGEX = /Generated Packs:/.freeze
+  GENERATED_PACKS_CONSOLE_OUTPUT_REGEX = /Generated Packs:/
 
   # rubocop:disable Metrics/BlockLength
   describe PacksGenerator do

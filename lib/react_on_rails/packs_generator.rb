@@ -5,7 +5,7 @@ require "fileutils"
 module ReactOnRails
   # rubocop:disable Metrics/ClassLength
   class PacksGenerator
-    CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/.freeze
+    CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/
     MINIMUM_SHAKAPACKER_VERSION = [6, 5, 1].freeze
 
     def self.instance
