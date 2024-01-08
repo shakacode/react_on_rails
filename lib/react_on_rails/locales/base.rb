@@ -100,7 +100,7 @@ module ReactOnRails
 
       def convert
         file_names.each do |name|
-          template = send("template_#{name}")
+          template = send(:"template_#{name}")
           path = file(name)
           generate_file(template, path)
         end

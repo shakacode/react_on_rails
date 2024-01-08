@@ -100,11 +100,11 @@ RSpec.configure do |config|
     Rack::Handler::Puma.run(app, Port: port)
   end
 
-  config.before(:each, js: true, type: :system) do
+  config.before(:each, :js, type: :system) do
     driven_by driver
   end
 
-  config.before(:each, rack_test: true, type: :system) do
+  config.before(:each, :rack_test, type: :system) do
     driven_by :rack_test
   end
 

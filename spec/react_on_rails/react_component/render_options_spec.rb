@@ -148,7 +148,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
 
       context "without #{option} option" do
         it "returns #{option} from config" do
-          ReactOnRails.configuration.public_send("#{option}=", true)
+          ReactOnRails.configuration.public_send(:"#{option}=", true)
           attrs = the_attrs
 
           opts = described_class.new(**attrs)

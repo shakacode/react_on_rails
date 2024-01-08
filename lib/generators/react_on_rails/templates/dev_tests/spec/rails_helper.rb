@@ -40,7 +40,7 @@ end
 # ActiveRecord::Migration.maintain_test_schema!
 
 RSpec.configure do |config|
-  config.before(:each, js: true, type: :system) do
+  config.before(:each, :js, type: :system) do
     driven_by :selenium_chrome
   end
 
