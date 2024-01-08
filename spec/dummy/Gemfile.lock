@@ -390,7 +390,7 @@ DEPENDENCIES
   shakapacker (= 7.0.1)
   spring (~> 4.0)
   sprockets (~> 4.0)
-  sqlite3 (~> 1.0, < 1.7.0)
+  sqlite3
   turbolinks
   uglifier
   webdrivers (= 5.3.0)

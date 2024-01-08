@@ -4,7 +4,4 @@ source "https://rubygems.org"
 
 eval_gemfile File.expand_path("../../Gemfile.development_dependencies", __dir__)
 
-# sqlite3 1.7.0 ends native gem support for Ruby 2.7
-gem "sqlite3", "~> 1.0", "< 1.7.0"
-
 gem "react_on_rails", path: "../.."
