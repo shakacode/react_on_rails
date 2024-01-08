@@ -31,9 +31,9 @@ group :development, :test do
   gem "pry-doc"
   gem "pry-rails"
   gem "pry-rescue"
-  gem "rubocop", "~>1.56", require: false
-  gem "rubocop-performance", "~>1.18.0", require: false
-  gem "rubocop-rspec", "~>2.23.2", require: false
+  gem "rubocop", "~>1.59", require: false
+  gem "rubocop-performance", "~>1.20.0", require: false
+  gem "rubocop-rspec", "~>2.26", require: false
   gem "scss_lint", require: false
   gem "spring", "~> 4.0"
 end
