@@ -23,7 +23,7 @@ Gem::Specification.new do |s|
   s.executables   = s.files.grep(%r{^exe/}) { |f| File.basename(f) }
   s.require_paths = ["lib"]
 
-  s.required_ruby_version = ">= 2.7.0"
+  s.required_ruby_version = ">= 3.0.0"
 
   s.add_dependency "addressable"
   s.add_dependency "connection_pool"
@@ -31,7 +31,6 @@ Gem::Specification.new do |s|
   s.add_dependency "rails", ">= 5.2"
   s.add_dependency "rainbow", "~> 3.0"
 
-  s.add_development_dependency "bundler", "~> 2"
   s.add_development_dependency "gem-release"
   s.post_install_message = '
 --------------------------------------------------------------------------------
