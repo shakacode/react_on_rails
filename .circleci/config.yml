@@ -3,7 +3,7 @@ version: 2
 
 aliases:
   - &docker-image
-    - image: circleci/ruby:2.7-node-browsers
+    - image: circleci/ruby:3.0-node-browsers
 
   # Print critical data and executables versions.
   - &print-system-info
@@ -54,7 +54,7 @@ aliases:
   - &install-dummy-app-ruby-gems
     name: Install Ruby Gems for dummy app
     command: |
-      gem install bundler:2.4.17
+      gem install bundler:2.5.3
       echo "Bundler version: "; bundle --version
       cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
 
@@ -62,7 +62,7 @@ aliases:
   - &install-package-ruby-gems
     name: Install Ruby Gems for package
     command: |
-      gem install bundler:2.4.17
+      gem install bundler:2.5.3
       echo "Bundler version: "; bundle --version
       bundle lock --add-platform 'x86_64-linux'
       bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
