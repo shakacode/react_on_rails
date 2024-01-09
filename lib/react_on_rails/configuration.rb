@@ -141,20 +141,7 @@ module ReactOnRails
 
       return if skip_react_on_rails_precompile || build_production_command.blank?
 
-      if shakapacker_precompile?
-        msg = <<~MSG
-
-          React on Rails and Shakapacker error in configuration!
-          In order to use config/react_on_rails.rb config.build_production_command,
-          you must edit config/webpacker.yml to include this value in the default configuration:
-          'webpacker_precompile: false'
-
-          Alternatively, remove the config/react_on_rails.rb config.build_production_command and the
-          default bin/webpacker script will be used for assets:precompile.
-
-        MSG
-        raise ReactOnRails::Error, msg
-      end
+      raise(ReactOnRails::Error, shakapacker_precompile_true_message) if shakapacker_precompile?
 
       precompile_tasks = lambda {
         Rake::Task["react_on_rails:generate_packs"].invoke
@@ -267,12 +254,32 @@ module ReactOnRails
       raise ReactOnRails::Error, msg
     end
 
+    def using_shakapacker_6?
+      shakapacker_major_version = ReactOnRails::WebpackerUtils.shakapacker_version_as_array[0]
+
+      shakapacker_major_version == 6
+    end
+
     def shakapacker_precompile?
-      config = Webpacker.config
+      return Webpacker.config.webpacker_precompile? if using_shakapacker_6?
 
-      return config.webpacker_precompile? unless config.respond_to?(:shakapacker_precompile?)
+      Webpacker.config.shakapacker_precompile?
+    end
 
-      config.shakapacker_precompile?
+    def shakapacker_precompile_true_message
+      packer = using_shakapacker_6? ? "webpacker" : "shakapacker"
+
+      <<~MSG
+
+        React on Rails and Shakapacker error in configuration!
+        In order to use config/react_on_rails.rb config.build_production_command,
+        you must edit config/#{packer}.yml to include this value in the default configuration:
+        '#{packer}_precompile: false'
+
+        Alternatively, remove the config/react_on_rails.rb config.build_production_command and the
+        default bin/#{packer} script will be used for assets:precompile.
+
+      MSG
     end
   end
 end
