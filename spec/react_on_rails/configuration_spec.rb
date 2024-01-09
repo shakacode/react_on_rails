@@ -126,6 +126,17 @@ module ReactOnRails
             .and_return("7.0.0")
         end
 
+        it "doesn't show deprecation message for webpacker_precompile?" do
+          allow(Webpacker).to receive_message_chain("config.shakapacker_precompile?")
+            .and_return(false)
+
+          expect do
+            ReactOnRails.configure do |config|
+              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
+            end
+          end.not_to output(/Consider using `shakapacker_precompile?`/).to_stdout
+        end
+
         it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
           allow(Webpacker).to receive_message_chain("config.shakapacker_precompile?")
             .and_return(true)
