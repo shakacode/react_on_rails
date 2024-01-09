@@ -146,13 +146,16 @@ module ReactOnRails
       precompile_tasks = lambda {
         Rake::Task["react_on_rails:generate_packs"].invoke
         Rake::Task["react_on_rails:assets:webpack"].invoke
-        puts "Invoking task webpacker:clean from React on Rails"
 
         # VERSIONS is per the shakacode/shakapacker clean method definition.
         # We set it very big so that it is not used, and then clean just
         # removes files older than 1 hour.
         versions = 100_000
-        Rake::Task["webpacker:clean"].invoke(versions)
+
+        clean_task = using_shakapacker_6? ? "webpacker:clean" : "shakapacker:clean"
+
+        puts "Invoking task #{clean_task} from React on Rails"
+        Rake::Task[clean_task].invoke(versions)
       }
 
       if Rake::Task.task_defined?("assets:precompile")
