@@ -19,8 +19,8 @@
     "@types/react-dom": "^16.9.17",
     "@types/turbolinks": "^5.2.0",
     "@types/webpack-env": "^1.18.0",
-    "@typescript-eslint/eslint-plugin": "^4.33.0",
-    "@typescript-eslint/parser": "^4.33.0",
+    "@typescript-eslint/eslint-plugin": "^6.18.1",
+    "@typescript-eslint/parser": "^6.18.1",
     "babelify": "^10.0.0",
     "blue-tape": "^1.0.0",
     "concurrently": "^8.2.0",
@@ -44,7 +44,7 @@
     "react-transform-hmr": "^1.0.4",
     "redux": "^4.2.0",
     "ts-jest": "^29.1.0",
-    "typescript": "^4.9.4"
+    "typescript": "^5.3.3"
   },
   "dependencies": {
     "@babel/runtime-corejs3": "^7.12.5"
