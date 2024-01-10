@@ -22,7 +22,7 @@ jobs:
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby }}
-        bundler: 2.4.17
+        bundler: 2.5.3
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
@@ -52,7 +52,7 @@ jobs:
         yarn run eslint -v
         sudo yarn global add yalc
     - name: Install Ruby Gems for package
-      run: bundle check --path=vendor/bundle || bundle _2.4.17_ install --path=vendor/bundle --jobs=4 --retry=3
+      run: bundle check --path=vendor/bundle || bundle _2.5.3_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Linting of Ruby
       run: bundle exec rubocop
     - name: Linting of JS

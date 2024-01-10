@@ -1,16 +1,15 @@
 # frozen_string_literal: true
 
-gem "shakapacker", "7.0.1"
+gem "shakapacker", "7.2.1"
 gem "bootsnap", require: false
-gem "rails", "~> 7.0", ">= 7.0.1"
+gem "rails", "~> 7.1"
 
-# sqlite3 1.7.0 ends native gem support for Ruby 2.7
-gem "sqlite3", "~> 1.0", "< 1.7.0"
+gem "sqlite3"
 gem "sass-rails", "~> 6.0"
 gem "uglifier"
 gem "jquery-rails"
 gem "puma", "~> 6.0"
-gem "bundler", "2.4.17"
+gem "bundler", "2.5.3"
 
 # Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
 gem "turbolinks" if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
@@ -31,9 +30,9 @@ group :development, :test do
   gem "pry-doc"
   gem "pry-rails"
   gem "pry-rescue"
-  gem "rubocop", "~>1.56", require: false
-  gem "rubocop-performance", "~>1.18.0", require: false
-  gem "rubocop-rspec", "~>2.23.2", require: false
+  gem "rubocop", "~>1.59", require: false
+  gem "rubocop-performance", "~>1.20.0", require: false
+  gem "rubocop-rspec", "~>2.26", require: false
   gem "scss_lint", require: false
   gem "spring", "~> 4.0"
 end

@@ -189,7 +189,7 @@ module ReactOnRails
       to_remove = str.length - max_length
       lstrip = (to_remove / 2.0).ceil
       rstrip = to_remove - lstrip
-      str[0..(midpoint - lstrip - 1)] + TRUNCATION_FILLER + str[(midpoint + rstrip)..-1]
+      str[0..(midpoint - lstrip - 1)] + TRUNCATION_FILLER + str[(midpoint + rstrip)..]
     end
 
     def self.find_most_recent_mtime(files)

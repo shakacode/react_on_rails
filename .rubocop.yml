@@ -7,7 +7,7 @@ require:
 AllCops:
   NewCops: enable
   DisplayCopNames: true
-  TargetRubyVersion: 2.5
+  TargetRubyVersion: 3.0.0
 
   Include:
     - '**/Rakefile'
