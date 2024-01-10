@@ -13,6 +13,8 @@ import { isServerRenderHash } from './isServerRenderResult';
 import reactHydrateOrRender from './reactHydrateOrRender';
 import { supportsRootApi } from './reactApis';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 declare global {
   interface Window {
     ReactOnRails: ReactOnRailsType;
@@ -302,7 +304,6 @@ export function clientStartup(context: Context): void {
   if (!isWindow(context)) {
     return;
   }
-  const { document } = context;
 
   // Tried with a file local variable, but the install handler gets called twice.
   // eslint-disable-next-line no-underscore-dangle

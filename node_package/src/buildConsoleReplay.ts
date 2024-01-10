@@ -1,6 +1,8 @@
 import RenderUtils from './RenderUtils';
 import scriptSanitizedVal from './scriptSanitizedVal';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 declare global {
   interface Console {
     history?: {
