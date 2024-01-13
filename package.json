@@ -50,7 +50,7 @@
     "@babel/runtime-corejs3": "^7.12.5"
   },
   "peerDependencies": {
-    "js-yaml": ">= 3.0.0",
+    "js-yaml": ">= 4.1.0",
     "react": ">= 16",
     "react-dom": ">= 16"
   },
