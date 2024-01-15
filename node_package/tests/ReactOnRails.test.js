@@ -21,7 +21,7 @@ describe('ReactOnRails', () => {
 
     document.body.innerHTML = '<div id="root"></div>';
     // eslint-disable-next-line no-underscore-dangle
-    const actual = ReactOnRails.render('R1', {}, 'root')._reactInternalFiber.type;
+    const actual = ReactOnRails.render('R1', {}, 'root')._reactInternals.type;
     expect(actual).toEqual(R1);
   });
 

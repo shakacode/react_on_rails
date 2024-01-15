@@ -9,6 +9,8 @@ import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import type { RenderParams, RenderResult, RenderingError } from './types/index';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 function serverRenderReactComponentInternal(options: RenderParams): null | string | Promise<RenderResult> {
   const { name, domNodeId, trace, props, railsContext, renderingReturnsPromises, throwJsErrors } = options;
 
