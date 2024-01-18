@@ -1,4 +1,4 @@
-FROM ruby:2.7.5
+FROM ruby:3.3.0
 
 RUN apt-get update
 
