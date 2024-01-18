@@ -40,21 +40,21 @@ aliases:
   - &install-dummy-app-ruby-gems
     name: Install Ruby Gems for dummy app
     command: |
-      gem install bundler -v "2.3.3"
+      gem install bundler -v "2.5.4"
       echo "Bundler version: "; bundle --version
       bundle config set --local path 'vendor/bundle'
       bundle config set --local disable_checksum_validation true
-      cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle _2.3.3_ check || bundle _2.3.3_ install --jobs=4 --retry=3
+      cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
   # Install ruby gems unless existing set of gems is satisfying bundler.
   - &install-package-ruby-gems
     name: Install Ruby Gems for package
     command: |
-      gem install bundler -v "2.3.3"
+      gem install bundler -v "2.5.4"
       echo "Bundler version: "; bundle --version
       bundle config set --local path 'vendor/bundle'
       bundle config set --local disable_checksum_validation true
-      bundle _2.3.3_ check || bundle _2.3.3_ install --jobs=4 --retry=3
+      bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
   # Restore node_modules dir from cache using yarn.lock checksum as a key.
   - &restore-package-node-modules-cache
@@ -100,7 +100,7 @@ jobs:
   # Lint all
   lint-js-and-ruby:
     docker:
-      - image: &docker_image circleci/ruby:2.7-node-browsers
+      - image: &docker_image cimg/ruby:3.3.0-browsers
     steps:
       - checkout
       - run: *print-system-info
