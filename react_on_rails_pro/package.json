@@ -91,8 +91,7 @@
     "start": "nps",
     "developing": "rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node -r source-map-support/register packages/node-renderer/src/default-node-renderer.js",
     "eslint": "eslint .",
-    "check": "nps lint && nps format && nps test",
-    "local": "echo 'Be sure to run yarn run dummy:install' && yarn run build && cd spec/dummy && foreman start"
+    "check": "nps lint && nps format && nps test"
   },
   "repository": {
     "type": "git",
