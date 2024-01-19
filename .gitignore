@@ -44,7 +44,7 @@ spec/dummy/client/npm-debug.log*
 yalc.lock
 
 **/.node-renderer-bundles/**
-**/db/*.sqlite3
+**/db/*.sqlite3*
 **/log/*.log
 **/public/webpack/**
 
