@@ -31,3 +31,5 @@ npm-debug.*
 
 .yalc
 yalc.lock
+
+.byebug_history
