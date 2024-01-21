@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "rake"
-require "fileutils"
 
 require "rails_helper"
 
@@ -16,7 +15,10 @@ describe "rake assets:precompile task" do
     end
 
     expect do
+      system "bundle install && yarn install && yarn run build:test"
       Rake::Task["assets:precompile"].execute
     end.not_to output(/Consider using `rake shakapacker:clean`/).to_stdout
+
+    Rake::Task.clear
   end
 end
