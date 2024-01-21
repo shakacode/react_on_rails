@@ -3,7 +3,7 @@
 require "rake"
 require "fileutils"
 
-require_relative "../rails_helper"
+require "rails_helper"
 
 describe "rake assets:precompile task" do
   it "doesn't show deprecation message for using webpacker:clean task" do
