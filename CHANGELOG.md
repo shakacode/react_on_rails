@@ -20,7 +20,7 @@ Changes since the last non-beta release.
 - Removed deprecated `webpackConfigLoader.js` [PR 1600](https://github.com/shakacode/react_on_rails/pull/1600) by [ahangarha](https://github.com/ahangarha).
 
 #### Fixed
-- Prevent displaying the deprecation message for using `webpacker_precompile?` when using Shakapacker v7+ [PR 1592](https://github.com/shakacode/react_on_rails/pull/1592) by [ahangarha](https://github.com/ahangarha).
+- Prevent displaying the deprecation message for using `webpacker_precompile?` method and `webpacker:clean` rake task when using Shakapacker v7+ [PR 1592](https://github.com/shakacode/react_on_rails/pull/1592) by [ahangarha](https://github.com/ahangarha).
 
 ### [13.4.1]
 #### Fixed
