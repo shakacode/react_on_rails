@@ -141,7 +141,7 @@ module ReactOnRails
 
       return if skip_react_on_rails_precompile || build_production_command.blank?
 
-      raise(ReactOnRails::Error, shakapacker_precompile_true_message) if shakapacker_precompile?
+      raise(ReactOnRails::Error, compile_command_conflict_message) if shakapacker_precompile?
 
       precompile_tasks = lambda {
         Rake::Task["react_on_rails:generate_packs"].invoke
@@ -152,10 +152,8 @@ module ReactOnRails
         # removes files older than 1 hour.
         versions = 100_000
 
-        clean_task = using_shakapacker_6? ? "webpacker:clean" : "shakapacker:clean"
-
-        puts "Invoking task #{clean_task} from React on Rails"
-        Rake::Task[clean_task].invoke(versions)
+        puts "Invoking task #{shakapacker_clean_task} from React on Rails"
+        Rake::Task[shakapacker_clean_task].invoke(versions)
       }
 
       if Rake::Task.task_defined?("assets:precompile")
@@ -257,20 +255,18 @@ module ReactOnRails
       raise ReactOnRails::Error, msg
     end
 
-    def using_shakapacker_6?
-      shakapacker_major_version = ReactOnRails::WebpackerUtils.shakapacker_version_as_array[0]
-
-      shakapacker_major_version == 6
-    end
-
     def shakapacker_precompile?
-      return Webpacker.config.webpacker_precompile? if using_shakapacker_6?
+      return Webpacker.config.webpacker_precompile? if ReactOnRails::WebpackerUtils.using_shakapacker_6?
 
       Webpacker.config.shakapacker_precompile?
     end
 
-    def shakapacker_precompile_true_message
-      packer = using_shakapacker_6? ? "webpacker" : "shakapacker"
+    def shakapacker_clean_task
+      ReactOnRails::WebpackerUtils.using_shakapacker_6? ? "webpacker:clean" : "shakapacker:clean"
+    end
+
+    def compile_command_conflict_message
+      packer = ReactOnRails::WebpackerUtils.using_shakapacker_6? ? "webpacker" : "shakapacker"
 
       <<~MSG
 
