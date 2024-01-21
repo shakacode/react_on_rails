@@ -141,5 +141,11 @@ module ReactOnRails
     def self.semver_to_string(ary)
       "#{ary[0]}.#{ary[1]}.#{ary[2]}"
     end
+
+    def self.using_shakapacker_6?
+      shakapacker_major_version = shakapacker_version_as_array[0]
+
+      shakapacker_major_version == 6
+    end
   end
 end
