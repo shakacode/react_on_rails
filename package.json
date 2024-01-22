@@ -55,8 +55,7 @@
     "react-dom": ">= 16"
   },
   "files": [
-    "node_package/lib",
-    "webpackConfigLoader.js"
+    "node_package/lib"
   ],
   "scripts": {
     "test": "jest node_package/tests",
