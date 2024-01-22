@@ -10,7 +10,7 @@
 
 const { join, resolve } = require('path');
 const { env } = require('process');
-const { load } = require('js-yaml');
+const { safeLoad } = require('js-yaml');
 const { readFileSync } = require('fs');
 
 function removeOuterSlashes(string) {
@@ -51,7 +51,7 @@ const configLoader = (configPath) => {
   // Some test environments might not have the NODE_ENV set, so we'll have fallbacks.
   const configEnv = env.NODE_ENV || env.RAILS_ENV || 'development';
   const ymlConfigPath = join(configPath, 'webpacker.yml');
-  const settings = load(readFileSync(ymlConfigPath, 'utf8'))[configEnv];
+  const settings = safeLoad(readFileSync(ymlConfigPath, 'utf8'))[configEnv];
 
   // NOTE: Rails path is hard coded to `/public`
   const output = {
