@@ -3,7 +3,7 @@ version: 2
 
 aliases:
   - &docker-image
-    - image: circleci/ruby:3.0-node-browsers
+    - image: cimg/ruby:3.0-browsers
 
   # Print critical data and executables versions.
   - &print-system-info
