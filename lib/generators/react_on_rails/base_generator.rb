@@ -91,8 +91,7 @@ module ReactOnRails
             babel-plugin-macros"
 
         puts "Adding CSS handlers"
-        # css-minimizer-webpack-plugin v6.0.0 requires Node 18+
-        run "yarn add css-loader 'css-minimizer-webpack-plugin@<6.0.0' mini-css-extract-plugin style-loader"
+        run "yarn add css-loader css-minimizer-webpack-plugin mini-css-extract-plugin style-loader"
 
         puts "Adding dev dependencies"
         run "yarn add -D @pmmmwh/react-refresh-webpack-plugin react-refresh"
