@@ -15,9 +15,6 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
-#### Fixed
-- Limit `css-minimizer-webpack-plugin` version below v6.0.0, allowing the react_on_rails generator to work in environments with Nodejs < 18 [PR 1598](https://github.com/shakacode/react_on_rails/pull/1598) by [ahangarha](https://github.com/ahangarha).
-
 #### Changed
 - Bump minimum version of peer dependencies as following [PR 1596](https://github.com/shakacode/react_on_rails/pull/1596) by [ahangarha](https://github.com/ahangarha).
   - `js-yaml` to `4.1.0`
