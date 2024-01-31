@@ -43,30 +43,7 @@ At the same time dev/prod environments works fine (with extra webpack calling st
 
 ### webpack.config.js
 
-```js
-...
-const ManifestPlugin = require('webpack-manifest-plugin');
-...
-const { output } = webpackConfigLoader(configPath);
-...
-  output: {
-    filename: '[name]-[hash].js',
-
-    // Leading and trailing slashes ARE necessary.
-    publicPath: output.publicPath,
-    path: output.path,
-  },
-...
-  plugins: [
-    ...
-    new ManifestPlugin({
-      publicPath: output.publicPath,
-      writeToFileEmit: true
-    }),
-   ...
-  ]
-...
-```
+See [Shakapcker Webpack Configuration](https://github.com/shakacode/shakapacker/blob/master/README.md#webpack-configuration).
 
 ### config/webpacker.yml
 

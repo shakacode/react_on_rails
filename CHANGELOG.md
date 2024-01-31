@@ -15,14 +15,9 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
-#### Changed
-- Bump minimum version of peer dependencies as following [PR 1596](https://github.com/shakacode/react_on_rails/pull/1596) by [ahangarha](https://github.com/ahangarha).
-  - `js-yaml` to `4.1.0`
-  - `react` and `react-dom` to `17.0.0`
-
 #### Removed
 - Dropped Ruby 2.7 support [PR 1595](https://github.com/shakacode/react_on_rails/pull/1595) by [ahangarha](https://github.com/ahangarha).
-- Dropped support for Node 14 and 17 [PR 1596](https://github.com/shakacode/react_on_rails/pull/1596) by [ahangarha](https://github.com/ahangarha).
+- Removed deprecated `webpackConfigLoader.js` [PR 1600](https://github.com/shakacode/react_on_rails/pull/1600) by [ahangarha](https://github.com/ahangarha).
 
 ### [13.4.1]
 #### Fixed
