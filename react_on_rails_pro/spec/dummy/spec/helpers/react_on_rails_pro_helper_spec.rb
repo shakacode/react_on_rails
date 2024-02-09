@@ -137,7 +137,7 @@ describe ReactOnRailsProHelper, type: :helper do
           end
 
           expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
-          expect(cache_data.values[0].value["componentHtml"]).to match(/div id="ReactHelmetApp-react-component"/)
+          expect(cache_data.values[0].value).to match(/div id="ReactHelmetApp-react-component"/)
         end
 
         context "with prerender_caching off" do
@@ -153,7 +153,7 @@ describe ReactOnRailsProHelper, type: :helper do
             end
 
             expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
-            expect(cache_data.values[0].value["componentHtml"]).to match(/div id="ReactHelmetApp-react-component"/)
+            expect(cache_data.values[0].value).to match(/div id="ReactHelmetApp-react-component"/)
           end
         end
 
