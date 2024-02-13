@@ -26,7 +26,7 @@ scripts:
   eslint:
     default:
       description: Run eslint.
-      script: eslint . --ext ".js,.jsx"
+      script: eslint . --ext ".js,.jsx,.ts,.tsx"
     fix:
       description: Run eslint and auto-fix.
       script: nps "eslint --fix"
@@ -37,15 +37,16 @@ scripts:
   format:
     default:
       description: Format files using prettier.
-      script: concurrently --prefix "[{name}]" --names "js,json" -c "yellow,magenta,green" "nps format.js" "nps format.json"
+      script: concurrently --prefix "[{name}]" --names "js,ts,json" -c "yellow,magenta,green" "nps format.js" "nps format.ts" "nps format.json"
     listDifferent:
       description: Check that all files were formatted using prettier.
       script: |
         concurrently \
           --prefix "[{name}]" \
-          --names "js,json" \
+          --names "js,ts,json" \
           -c "yellow,magenta,green" \
           "nps format.js.listDifferent" \
+          "nps format.ts.listDifferent" \
           "nps format.json.listDifferent"
     js:
       default:
@@ -54,6 +55,13 @@ scripts:
       listDifferent:
         description: Check if any JS files would change by running prettier-eslint.
         script: prettier "**/*.@(js|jsx)" --list-different
+    ts:
+      default:
+        description: Run prettier-eslint on TS.
+        script: prettier "**/*.@(ts|tsx)" --write
+      listDifferent:
+        description: Check if any TS files would change by running prettier-eslint.
+        script: prettier "**/*.@(ts|tsx)" --list-different
     json:
       default:
         description: Run prettier on JSON files.

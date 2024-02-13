@@ -40,6 +40,10 @@ class PagesController < ApplicationController
     render "/pages/pro/apollo_graphql"
   end
 
+  def lazy_apollo_graphql
+    render "/pages/pro/lazy_apollo_graphql"
+  end
+
   # See files in spec/dummy/app/views/pages
 
   helper_method :calc_slow_app_props_server_render

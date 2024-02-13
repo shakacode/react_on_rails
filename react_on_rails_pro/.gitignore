@@ -18,6 +18,11 @@ tmp
 /spec/dummy/public/assets
 /spec/dummy/public/stylesheets
 
+# IDEs
+.idea/
+.vscode/
+.pryrc
+
 # RVM
 .ruby-version
 .ruby-gemset
