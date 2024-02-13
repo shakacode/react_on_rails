@@ -1,0 +1,119 @@
+<h2 class="page-header">
+  This page demonstrates the use of <a href="https://github.com/shakacode/use-ssr-computation.macro">useSSRComputation</a> babel macro to <b>Lazy Load Apollo Client</b> package.
+</h2>
+<br />
+<p>Please have a look at the <a href="https://github.com/shakacode/use-ssr-computation.macro">macro docs</a> before proceeding to this example.</p>
+<p>Watch the <b>Network</b> tab in browser to ensure that the <b>Apollo GraphQL</b> bundle is downloaded only when user is changed or updated.</p>
+
+<div class="section-header">
+  Result
+</div>
+
+<% result = react_component_hash(
+  "LazyApolloGraphQLApp",
+  prerender: true,
+  trace: true,
+  props: {
+    # since _dummy_session is a http only cookie, it shouldn't be passed to the FE javascript code
+    ssrOnlyProps: {
+      csrf: form_authenticity_token,
+      sessionCookie: cookies["_dummy_session"]
+    }
+  }) %>
+<%= result["componentHtml"] %>
+
+<% content_for :head do %>
+  <%= result["apolloStateTag"] %>
+<% end %>
+
+<br />
+<div style="position: relative; padding-bottom: 56.25%; height: 0;">
+  <iframe
+    src="https://www.loom.com/embed/75ea975dc7ca49639c32e30c180503a2?sid=b37d3342-881a-4e56-ad80-e1f566ec0673"
+    frameborder="0"
+    webkitallowfullscreen
+    mozallowfullscreen
+    allowfullscreen
+    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+  </iframe>
+</div>
+
+<div class="section-header">
+  Query SSR Computation file
+</div>
+<h2 class="section-subheader">Consists of:</h2>
+<ul class="list">
+  <li><code>preloadQuery</code> method: should be called on server-side before using the <i>ssr-computation</i> file. Because the ssr compute function must be sync, it will read the query directly from cache.</li>
+  <li><code>compute</code> method: called on server side to get the current result of the query. Also, will be called on client side if there is a cache miss or when subscriptions are resumed.</li>
+  <li><code>subscribe</code> method: called on client-side when subscriptions are resumed. Responsible for watching changes happen to the query and pass them to the ssr-computation macro.</li>
+</ul>
+
+<h2 class="section-subheader">Notes</h2>
+<p>The <code>preloadQuery</code> is called in <code>LazyApolloGraphQLApp.server.tsx</code> before rendering the tree.</p>
+
+<pre><code class="language-ts">
+<%= File.read(Rails.root.join "client/app/ssr-computations/userQuery.ssr-computation.ts") %>
+</code></pre>
+
+<div class="section-header">
+  Lazy load Apollo mutations
+</div>
+<ul class="list">
+  <li>The <code>useLazyMutation</code> custom hook is used to execute the mutations.</li>
+  <li>The hook accepts a function that lazy load the mutation module when needed. It will avoid adding the mutation module to the main bundle.</li>
+  <li>When the mutation is executed, it calls <code>fetchSubscriptions</code> function to make all queries listen to changes that may happen in Apollo cache.</li>
+  <li>Hence, any change that will happen to the <code>User</code> object will be pushed to the components that are listening to it.</li>
+  <li>It dynamically loads mutation module and the function that creates and initialize Apollo client.</li>
+  <li>Finally, the mutation is executed.</li>
+  <li>We can test this behavior by updating user name in one component and we will see that it changes in the other component as well.</li>
+</ul>
+
+<pre><code class="language-ts">
+<%= File.read(Rails.root.join "client/app/utils/useLazyMutation.ts") %>
+</code></pre>
+
+<div class="section-header">
+  Server render function
+</div>
+<p><b>Don't forget to call <code>preloadQuery()</code> before rendering. Also, pass the ssr computation cache to the client-side by getting it from <code>getSSRCache</code> function</b></p>
+
+<pre><code class="language-tsx">
+<%= File.read(Rails.root.join "client/app/ror-auto-load-components/LazyApolloGraphQLApp.server.tsx") %>
+</code></pre>
+
+<div class="section-header">
+  Client render-function
+</div>
+<p>It hydrates the ssr cache by calling <code>setSSRCache</code> method and pass to it the cache object embedded from server-side before hydrating the App.</p>
+<pre><code class="language-tsx">
+<%= File.read(Rails.root.join "client/app/ror-auto-load-components/LazyApolloGraphQLApp.client.tsx") %>
+</code></pre>
+
+<div class="section-header">
+  Helper method call in the view:
+</div>
+
+<pre><code class="language-ruby">
+<%%=
+result = react_component_hash(
+  "LazyApolloGraphQLApp",
+  prerender: true,
+  trace: true,
+  # since _dummy_session is a http only cookie, it shouldn't be passed to the FE javascript code
+  ssrOnlyProps: {
+    csrf: form_authenticity_token,
+    sessionCookie: cookies["_dummy_session"]
+  }
+)
+%>
+</code></pre>
+
+
+Don't forget to insert the <b>apolloStateTag</b> field in the document <b>head</b> to enable hydration
+
+<pre><code class="language-ruby">
+<%%= content_for :head do %>
+  <%%= result["apolloStateTag"] %>
+<%% end %>
+</code></pre>
+

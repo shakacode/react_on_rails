@@ -3,6 +3,20 @@ const commonWebpackConfig = require('./commonWebpackConfig');
 
 const webpack = require('webpack');
 
+function extractLoader(rule, loaderName) {
+  return rule.use.find((item) => {
+    let testValue;
+
+    if (typeof item === 'string') {
+      testValue = item;
+    } else if (typeof item.loader === 'string') {
+      testValue = item.loader;
+    }
+
+    return testValue.includes(loaderName);
+  });
+}
+
 const configureServer = () => {
   // We need to use "merge" because the clientConfigObject, EVEN after running
   // toWebpackConfig() is a mutable GLOBAL. Thus any changes, like modifying the
@@ -78,21 +92,15 @@ const configureServer = () => {
         }
         return !(testValue.match(/mini-css-extract-plugin/) || testValue === 'style-loader');
       });
-      const cssLoader = rule.use.find((item) => {
-        let testValue;
-
-        if (typeof item === 'string') {
-          testValue = item;
-        } else if (typeof item.loader === 'string') {
-          testValue = item.loader;
-        }
-
-        return testValue.includes('css-loader');
-      });
+      const cssLoader = extractLoader(rule, 'css-loader');
       if (cssLoader && cssLoader.options) {
         cssLoader.options.modules = { exportOnlyLocals: true };
       }
 
+      const babelLoader = extractLoader(rule, 'babel-loader');
+      if (babelLoader) {
+        babelLoader.options.caller = { ssr: true };
+      }
       // Skip writing image files during SSR by setting emitFile to false
     } else if (rule.use && (rule.use.loader === 'url-loader' || rule.use.loader === 'file-loader')) {
       rule.use.options.emitFile = false;
