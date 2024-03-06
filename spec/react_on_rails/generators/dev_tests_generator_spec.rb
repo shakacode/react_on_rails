@@ -25,16 +25,16 @@ describe DevTestsGenerator, type: :generator do
 
     it "changes package.json to use local react-on-rails version of module" do
       assert_file("package.json") do |contents|
-        assert_match('"react-on-rails"', contents)
-        assert_match('"postinstall"', contents)
+        expect(contents).to match('"react-on-rails"')
+        expect(contents).to match('"postinstall"')
       end
     end
 
     it "adds test-related gems to Gemfile" do
       assert_file("Gemfile") do |contents|
-        assert_match("gem \"rspec-rails\", group: :test", contents)
-        assert_match("gem \"coveralls\", require: false", contents)
-        assert_match("gem \"chromedriver-helper\", group: :test", contents)
+        expect(contents).to match("gem \"rspec-rails\", group: :test")
+        expect(contents).to match("gem \"coveralls\", require: false")
+        expect(contents).to match("gem \"chromedriver-helper\", group: :test")
       end
     end
   end
@@ -49,7 +49,7 @@ describe DevTestsGenerator, type: :generator do
 
     it "adds prerender for examples with example-server-rendering" do
       assert_file("app/views/hello_world/index.html.erb") do |contents|
-        assert_match("prerender: true", contents)
+        expect(contents).to match("prerender: true")
       end
     end
   end

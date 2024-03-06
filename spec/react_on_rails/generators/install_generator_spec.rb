@@ -45,7 +45,7 @@ describe InstallGenerator, type: :generator do
 
     it "adds ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)" do
       expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_RSPEC_TO_COMPILE_ASSETS
-      assert_file("spec/rails_helper.rb") { |contents| assert_match(expected, contents) }
+      assert_file("spec/rails_helper.rb") { |contents| expect(contents).to match(expected) }
     end
   end
 

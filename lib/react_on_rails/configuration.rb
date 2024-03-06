@@ -141,31 +141,19 @@ module ReactOnRails
 
       return if skip_react_on_rails_precompile || build_production_command.blank?
 
-      if Webpacker.config.webpacker_precompile?
-        msg = <<~MSG
-
-          React on Rails and Shakapacker error in configuration!
-          In order to use config/react_on_rails.rb config.build_production_command,
-          you must edit config/webpacker.yml to include this value in the default configuration:
-          'webpacker_precompile: false'
-
-          Alternatively, remove the config/react_on_rails.rb config.build_production_command and the
-          default bin/webpacker script will be used for assets:precompile.
-
-        MSG
-        raise ReactOnRails::Error, msg
-      end
+      raise(ReactOnRails::Error, compile_command_conflict_message) if shakapacker_precompile?
 
       precompile_tasks = lambda {
         Rake::Task["react_on_rails:generate_packs"].invoke
         Rake::Task["react_on_rails:assets:webpack"].invoke
-        puts "Invoking task webpacker:clean from React on Rails"
 
         # VERSIONS is per the shakacode/shakapacker clean method definition.
         # We set it very big so that it is not used, and then clean just
         # removes files older than 1 hour.
         versions = 100_000
-        Rake::Task["webpacker:clean"].invoke(versions)
+
+        puts "Invoking task #{shakapacker_clean_task} from React on Rails"
+        Rake::Task[shakapacker_clean_task].invoke(versions)
       }
 
       if Rake::Task.task_defined?("assets:precompile")
@@ -265,6 +253,32 @@ module ReactOnRails
       MSG
 
       raise ReactOnRails::Error, msg
+    end
+
+    def shakapacker_precompile?
+      return Webpacker.config.webpacker_precompile? if ReactOnRails::WebpackerUtils.using_shakapacker_6?
+
+      Webpacker.config.shakapacker_precompile?
+    end
+
+    def shakapacker_clean_task
+      ReactOnRails::WebpackerUtils.using_shakapacker_6? ? "webpacker:clean" : "shakapacker:clean"
+    end
+
+    def compile_command_conflict_message
+      packer = ReactOnRails::WebpackerUtils.using_shakapacker_6? ? "webpacker" : "shakapacker"
+
+      <<~MSG
+
+        React on Rails and Shakapacker error in configuration!
+        In order to use config/react_on_rails.rb config.build_production_command,
+        you must edit config/#{packer}.yml to include this value in the default configuration:
+        '#{packer}_precompile: false'
+
+        Alternatively, remove the config/react_on_rails.rb config.build_production_command and the
+        default bin/#{packer} script will be used for assets:precompile.
+
+      MSG
     end
   end
 end

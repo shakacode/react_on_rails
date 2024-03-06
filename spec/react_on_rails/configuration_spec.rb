@@ -75,40 +75,103 @@ module ReactOnRails
     end
 
     describe ".build_production_command" do
-      it "fails when \"webpacker_precompile\" is truly and \"build_production_command\" is truly" do
-        allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
-          .and_return(true)
-        expect do
-          ReactOnRails.configure do |config|
-            config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
-          end
-        end.to raise_error(ReactOnRails::Error, /webpacker_precompile: false/)
+      context "when using Shakapacker 6" do
+        before do
+          allow(ReactOnRails::WebpackerUtils)
+            .to receive("shakapacker_version")
+            .and_return("6.0.0")
+        end
+
+        it "fails when \"webpacker_precompile\" is truly and \"build_production_command\" is truly" do
+          allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
+            .and_return(true)
+          expect do
+            ReactOnRails.configure do |config|
+              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
+            end
+          end.to raise_error(ReactOnRails::Error, /webpacker_precompile: false/)
+        end
+
+        it "doesn't fail when \"webpacker_precompile\" is falsy and \"build_production_command\" is truly" do
+          allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
+            .and_return(false)
+          expect do
+            ReactOnRails.configure do |config|
+              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
+            end
+          end.not_to raise_error
+        end
+
+        it "doesn't fail when \"webpacker_precompile\" is truly and \"build_production_command\" is falsy" do
+          allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
+            .and_return(true)
+          expect do
+            ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
+          end.not_to raise_error
+        end
+
+        it "doesn't fail when \"webpacker_precompile\" is falsy and \"build_production_command\" is falsy" do
+          allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
+            .and_return(false)
+          expect do
+            ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
+          end.not_to raise_error
+        end
       end
 
-      it "doesn't fail when \"webpacker_precompile\" is falsy and \"build_production_command\" is truly" do
-        allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
-          .and_return(false)
-        expect do
-          ReactOnRails.configure do |config|
-            config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
-          end
-        end.not_to raise_error
-      end
+      context "when using Shakapacker 7" do
+        before do
+          allow(ReactOnRails::WebpackerUtils)
+            .to receive("shakapacker_version")
+            .and_return("7.0.0")
+        end
 
-      it "doesn't fail when \"webpacker_precompile\" is truly and \"build_production_command\" is falsy" do
-        allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
-          .and_return(true)
-        expect do
-          ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
-        end.not_to raise_error
-      end
+        it "doesn't show deprecation message for webpacker_precompile?" do
+          allow(Webpacker).to receive_message_chain("config.shakapacker_precompile?")
+            .and_return(false)
 
-      it "doesn't fail when \"webpacker_precompile\" is falsy and \"build_production_command\" is falsy" do
-        allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
-          .and_return(false)
-        expect do
-          ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
-        end.not_to raise_error
+          expect do
+            ReactOnRails.configure do |config|
+              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
+            end
+          end.not_to output(/Consider using `shakapacker_precompile?`/).to_stdout
+        end
+
+        it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
+          allow(Webpacker).to receive_message_chain("config.shakapacker_precompile?")
+            .and_return(true)
+          expect do
+            ReactOnRails.configure do |config|
+              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
+            end
+          end.to raise_error(ReactOnRails::Error, /shakapacker_precompile: false/)
+        end
+
+        it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is truly" do
+          allow(Webpacker).to receive_message_chain("config.shakapacker_precompile?")
+            .and_return(false)
+          expect do
+            ReactOnRails.configure do |config|
+              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
+            end
+          end.not_to raise_error
+        end
+
+        it "doesn't fail when \"shakapacker_precompile\" is truly and \"build_production_command\" is falsy" do
+          allow(Webpacker).to receive_message_chain("config.shakapacker_precompile?")
+            .and_return(true)
+          expect do
+            ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
+          end.not_to raise_error
+        end
+
+        it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is falsy" do
+          allow(Webpacker).to receive_message_chain("config.shakapacker_precompile?")
+            .and_return(false)
+          expect do
+            ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
+          end.not_to raise_error
+        end
       end
     end
 
