@@ -111,19 +111,16 @@ Set `config.server_renderer = "NodeRenderer"` in your  `ReactOnRailsPro.configur
 Note that you will need to bundle install after making this change, but also that **you will need to restart your Rails application if you make any changes to the gem**.
 
 ## Testing the Node package for react_on_rails_pro
-In addition to testing the Ruby parts out, you can also test the node package parts of the gem with an external application. Install the local package by using a relative path in your test/client app's `package.json`, like this:
-```sh
-cd test/client
-rm -rf node_modules/react-on-rails && npm i 'file:../path-to-react-on-rails-top-package.json'
-```
-_Note: You must use npm here till yarn stops preferring cached packages over local. see [issue #2649](https://github.com/yarnpkg/yarn/issues/2649).
+In addition to testing the Ruby parts out, you can also test the node package parts of the gem with an external application.
 
-When you use a relative path, be sure to run the above `yarn` command whenever you change the node package for react-on-rails.
+To do this, follow the instructions in the
+[Local Node Package](#local-node-package).
 
 #### Example: Testing NPM changes with the dummy app
+
 1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails_pro/blob/more_test_and_docs/packages/node-renderer/src/ReactOnRailsProNodeRenderer.js#L6) in `react_on_rails/packages/node-renderer/src/ReactOnRailsProNodeRenderer.js` to confirm we're getting an update to the node package.
-2. The "postinstall" script of "spec/dummy" sets up yalc to use react-on-rails-pro for renderer.
-3. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console.
+2. The `preinstall` script of `spec/dummy` sets up `yalc` to use `react-on-rails-pro` for the renderer.
+3. Refresh the browser if the server is already running or start the server using `foreman start -f Procfile.dev` from `react_on_rails/spec/dummy` and navigate to `http://localhost:3000/`. You will now see the `Hello!` message printed in the browser's console.
 
 _Note: you don't have to build the NPM package since it is used only with node runtime and its source code is exactly what is executed when you run it._
 
@@ -160,12 +157,18 @@ Notice the 2 "debug" settings of LOCKFILE and ROR.
 See https://nodejs.org/api/util.html#util_util_debuglog_section for details on `debuglog`.
 
 ### Local Node Package
-Because the example and dummy apps rely on the `react_on_rails_pro` node package, they should link directly to your local version to pick up any changes you may have made to that package. To achieve this, switch to the dummy app's root directory and run this command below which runs something like [this script](spec/dummy/package.json#L14)
+Because the example and dummy apps rely on the `react_on_rails_pro` node package, they should link directly to your local version to pick up any changes you may have made to that package.
+To achieve this, you can use `yalc`.
+The easy way to do this is to run the command below in the dummy app root directory.
+For more information check the script section of the
+[package.json](spec/dummy/package.json)
+in `spec/dummy` app directory.
 
 ```sh
-cd react_on_rails/spec/dummy
-yarn run install-pro-package
+cd spec/dummy
+yarn run preinstall
 ```
+
 _Note: this runs npm under the hood as explained in **Test NPM for react_on_rails_pro** section above_
 
 From now on, the example and dummy apps will use your local packages/node-renderer folder as the `react_on_rails_pro` node package.
@@ -234,18 +237,65 @@ yarn run check
 ```
 
 ### Starting the Dummy App
-To run the dummy app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start`. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the webpack configs, then you need to restart foreman.
+Before running the dummy app,
+you need to generate JavaScript packs in the dummy app project.
+To do this,
+go to `spec/dummy` directory and run the following rake task:
+
+```sh
+bundle exec rake react_on_rails:generate_packs
+```
+
+Since the dummy app requires several process to run in the background, don't run `rails s` directly.
+Instead, run `foreman start -f Procfile.dev`.
+This requires `foreman` gem to be already installed (`gem install foreman`).
+Alternatively, you can use `overmind`.
+
+Doing this, ensures the asset generation by webpack
+and node renderer run in the background,
+which is essential for the dummy app to work.
+
+If you change the webpack configs, then you need to restart `foreman`.
 
 ### RSpec Testing
-Run `rspec` command for testing within the sample apps, like `spec/dummy`.
+
+Before running ruby tests ensure you have done the following steps in `spec/dummy` directory:
+
+```sh
+# in the root directory
+bundle install
+yarn install
+
+cd spec/dummy
+
+bundle exec rake react_on_rails:generate_packs
+
+yarn run preinstall
+yarn install
+
+RAILS_ENV=test bin/webpacker # to generate assets for test environment
+```
+
+Then in a separate terminal, run the following to get node rendered run in background:
+
+```sh
+# in spec/dummy directory
+yarn run node-renderer
+```
+
+Get back to your main terminal and run:
+
+```sh
+bundle exec rspec`
+```
 
 If you run `rspec` at the top level, you'll see this message: `require': cannot load such file -- rails_helper (LoadError)`
 
-After running a test, you can view the coverage results SimpleCov reports by opening `coverage/index.html`.
+After running a test, you can view the coverage results in SimpleCov reports by opening `coverage/index.html`.
 
 ### Debugging
 Start the sample app like this for some debug printing:
 
 ```sh
-TRACE_REACT_ON_RAILS=true && foreman start
+TRACE_REACT_ON_RAILS=true && foreman start -f Procfile.dev
 ```
