@@ -15,6 +15,9 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+### [14.0.0]
+_Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigLoader.js`._
+
 #### Removed
 - Dropped Ruby 2.7 support [PR 1595](https://github.com/shakacode/react_on_rails/pull/1595) by [ahangarha](https://github.com/ahangarha).
 - Removed deprecated `webpackConfigLoader.js` [PR 1600](https://github.com/shakacode/react_on_rails/pull/1600) by [ahangarha](https://github.com/ahangarha).
