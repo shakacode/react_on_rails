@@ -7,10 +7,10 @@ shared_examples "react_with_redux_generator" do
 
   it "creates appropriate templates" do
     assert_file("app/javascript/packs/hello-world-bundle.js") do |contents|
-      assert_match("import HelloWorldApp from '../bundles/HelloWorld/startup/HelloWorldApp';", contents)
+      expect(contents).to match("import HelloWorldApp from '../bundles/HelloWorld/startup/HelloWorldApp';")
     end
     assert_file("app/views/hello_world/index.html.erb") do |contents|
-      assert_match(/"HelloWorldApp"/, contents)
+      expect(contents).to match(/"HelloWorldApp"/)
     end
   end
 
