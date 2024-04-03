@@ -15,7 +15,7 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
-### [14.0.0]
+### [14.0.0] - 2024-04-03
 _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigLoader.js`._
 
 #### Removed
@@ -23,6 +23,7 @@ _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigL
 - Removed deprecated `webpackConfigLoader.js` [PR 1600](https://github.com/shakacode/react_on_rails/pull/1600) by [ahangarha](https://github.com/ahangarha).
 
 #### Fixed
+- Trimmed the Gem to remove package.json which could cause superflous security warnings. [PR 1605](https://github.com/shakacode/react_on_rails/pull/1605) by [justin808](https://github.com/justin808).
 - Prevent displaying the deprecation message for using `webpacker_precompile?` method and `webpacker:clean` rake task when using Shakapacker v7+ [PR 1592](https://github.com/shakacode/react_on_rails/pull/1592) by [ahangarha](https://github.com/ahangarha).
 
 ### [13.4.1]
@@ -1123,7 +1124,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/13.4.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.0.0...master
+[14.0.0]: https://github.com/shakacode/react_on_rails/compare/13.4.1...14.0.0
 [13.4.1]: https://github.com/shakacode/react_on_rails/compare/13.4.0...13.4.1
 [13.4.0]: https://github.com/shakacode/react_on_rails/compare/13.3.5...13.4.0
 [13.3.5]: https://github.com/shakacode/react_on_rails/compare/13.3.4...13.3.5
