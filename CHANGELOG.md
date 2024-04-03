@@ -25,11 +25,7 @@ _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigL
 #### Fixed
 - Trimmed the Gem to remove package.json which could cause superflous security warnings. [PR 1605](https://github.com/shakacode/react_on_rails/pull/1605) by [justin808](https://github.com/justin808).
 - Prevent displaying the deprecation message for using `webpacker_precompile?` method and `webpacker:clean` rake task when using Shakapacker v7+ [PR 1592](https://github.com/shakacode/react_on_rails/pull/1592) by [ahangarha](https://github.com/ahangarha).
-
-### [13.4.1]
-#### Fixed
 - Fixed Typescript types for ServerRenderResult, ReactComponent, RenderFunction, and RailsContext interfaces. [PR 1582](https://github.com/shakacode/react_on_rails/pull/1582) & [PR 1585](https://github.com/shakacode/react_on_rails/pull/1585) by [kotarella1110](https://github.com/kotarella1110)
-
 - Removed a workaround in `JsonOutput#escape` for an no-longer supported Rails version. Additionally, removed `Utils.rails_version_less_than_4_1_1`
 which was only used in the workaround. [PR 1580](https://github.com/shakacode/react_on_rails/pull/1580) by [wwahammy](https://github.com/wwahammy)
 
@@ -1125,8 +1121,7 @@ Best done with Object destructing:
 - Fix several generator-related issues.
 
 [Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.0.0...master
-[14.0.0]: https://github.com/shakacode/react_on_rails/compare/13.4.1...14.0.0
-[13.4.1]: https://github.com/shakacode/react_on_rails/compare/13.4.0...13.4.1
+[14.0.0]: https://github.com/shakacode/react_on_rails/compare/13.4.0...14.0.0
 [13.4.0]: https://github.com/shakacode/react_on_rails/compare/13.3.5...13.4.0
 [13.3.5]: https://github.com/shakacode/react_on_rails/compare/13.3.4...13.3.5
 [13.3.4]: https://github.com/shakacode/react_on_rails/compare/13.3.3...13.3.4
