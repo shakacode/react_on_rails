@@ -3,7 +3,7 @@ import React from 'react';
 import RailsContext from '../components/RailsContext';
 
 // Example of CSS modules...
-import * as css from '../components/HelloWorld.module.scss';
+import css from '../components/HelloWorld.module.scss';
 
 // Super simple example of the simplest possible React component
 class HelloWorld extends React.Component {
