@@ -4,7 +4,7 @@ require "English"
 
 module ReactOnRails
   module GitUtils
-    def self.uncommitted_changes?(message_handler, git_installed = true)
+    def self.uncommitted_changes?(message_handler, git_installed: true)
       return false if ENV["COVERAGE"] == "true"
 
       status = `git status --porcelain`

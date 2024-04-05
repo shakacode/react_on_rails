@@ -30,7 +30,7 @@ group :development, :test do
   gem "pry-doc"
   gem "pry-rails"
   gem "pry-rescue"
-  gem "rubocop", "~>1.59", require: false
+  gem "rubocop", "1.61.0", require: false
   gem "rubocop-performance", "~>1.20.0", require: false
   gem "rubocop-rspec", "~>2.26", require: false
   gem "scss_lint", require: false
