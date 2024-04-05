@@ -14,7 +14,7 @@ rake release[1.5.6.beta.2]
 ```
 
 ## Testing the Gem before Release from a Rails App
-See [Contributing](../../CONTRIBUTING.md)
+See [Contributing](https://github.com/shakacode/react_on_rails_pro/blob/master/CONTRIBUTING.md)
 
 ### Prerequisites
 Before this command can be run, a bit of setup is required:

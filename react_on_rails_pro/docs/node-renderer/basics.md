@@ -1,15 +1,15 @@
 # Requirements
-* You must React on Rails v11.0.7 or higher.
+* You must use React on Rails v11.0.7 or higher.
 
 # Install the Gem and the Node Module
-See [docs/installation.md](../installation.md).
+See [Installation](https://www.shakacode.com/react-on-rails-pro/docs/installation/).
 
 # Setup Node Renderer Server
 **node-renderer** is a standalone Node application to serve React SSR requests from a **Rails** client. You don't need any **Ruby** code to setup and launch it. You can configure with the command line or with a launch file.
 
 ## Simple Command Line for node-renderer
 
-1. ENV values for the default config are (See [JS Configuration](./js-configuration.md) for more details):
+1. ENV values for the default config are (See [JS Configuration](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/js-configuration/) for more details):
     * `RENDERER_PORT`
     * `RENDERER_LOG_LEVEL`
     * `RENDERER_BUNDLE_PATH`
@@ -38,7 +38,7 @@ For the most control over the setup, create a JavaScript file to start the NodeR
    yarn init
    yarn add https://[your-github-token]:x-oauth-basic@github.com/shakacode/react_on_rails_pro.git\#master
    ```
-3. Configure a JavaScript file that will launch the rendering server per the docs in [Node Renderer JavaScript Configuration](./js-configuration.md). For example, create a file `node-renderer.js`. Here is a simple example that uses all the defaults except for bundlePath:
+4. Configure a JavaScript file that will launch the rendering server per the docs in [Node Renderer JavaScript Configuration](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/js-configuration/). For example, create a file `node-renderer.js`. Here is a simple example that uses all the defaults except for bundlePath:
 
    ```javascript
    import path from 'path';
@@ -54,13 +54,13 @@ For the most control over the setup, create a JavaScript file to start the NodeR
 6. You can use a command line argument of `-p SOME_PORT` to override any configured or ENV value for the port.
 
 # Setup Rails Application
-Create `config/initializers/react_on_rails_pro.rb` and configure the **renderer server**. See configuration values in [docs/configuration.md](../configuration.md). Pay attention to:
+Create `config/initializers/react_on_rails_pro.rb` and configure the **renderer server**. See configuration values in [Configuration](https://www.shakacode.com/react-on-rails-pro/docs/configuration/). Pay attention to:
 
 1. Set `config.server_renderer = "NodeRenderer"`
-1. Leave the default of `config.prerender_caching = true` and ensure your Rails cache is properly configured to handle the additional cache load.
-1. Configure values beginning with `renderer_`
-1. Use ENV values for values like `renderer_url` so that your deployed server is properly configured. If the ENV value is unset, the default for the renderer_url is `localhost:3800`.
-1. Here's a tiny example using mostly defaults:
+2. Leave the default of `config.prerender_caching = true` and ensure your Rails cache is properly configured to handle the additional cache load.
+3. Configure values beginning with `renderer_`
+4. Use ENV values for values like `renderer_url` so that your deployed server is properly configured. If the ENV value is unset, the default for the renderer_url is `localhost:3800`.
+5. Here's a tiny example using mostly defaults:
 ```ruby
 ReactOnRailsPro.configure do |config|
  config.server_renderer = "NodeRenderer"
@@ -72,13 +72,14 @@ end
 
 ## Troublshooting
 
-* See [JS Memory Leaks](../js-memory-leaks.md).
+* See [JS Memory Leaks](https://www.shakacode.com/react-on-rails-pro/docs/js-memory-leaks/).
   
 ## Upgrading
 
 The NodeRenderer has a protocol version on both the Rails and Node sides. If the Rails server sends a protocol version that does not match the Node side, an error is returned. Ideally, you want to keep both the Rails and Node sides at the same version.
 
-# References
-* [Installation](../installation.md).
-* [Rails Options for node-renderer](../configuration.md)
-* [JS Options for node-renderer](./js-configuration.md)
+## References
+
+* [Installation](https://www.shakacode.com/react-on-rails-pro/docs/installation/).
+* [Rails Options for node-renderer](https://www.shakacode.com/react-on-rails-pro/docs/configuration/)
+* [JS Options for node-renderer](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/js-configuration/)

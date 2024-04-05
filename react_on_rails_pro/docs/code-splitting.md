@@ -4,7 +4,8 @@ by ShakaCode
 *Last updated June 13, 2019*
 
 # Deprecated
-**Please, see [our new documentation on how to setup code splitting with loadable components](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/code-splitting-loadable-components.md).**
+
+**Please, see [our new documentation on how to setup code splitting with loadable components](https://www.shakacode.com/react-on-rails-pro/docs/code-splitting-loadable-components/).**
 
 # Introduction
 
