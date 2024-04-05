@@ -17,6 +17,9 @@ You can find the **package** version numbers from this repo's tags and below in 
 ### Removed
 - Drop support for EOL'd Ruby 2.7 [PR 365](https://github.com/shakacode/react_on_rails_pro/pull/365) by [ahangarha](https://github.com/ahangarha).
 
+### Fixed
+- Updated multiple JS dependencies for bug fixes.
+
 ## [3.1.2] - 2023-02-24
 
 ### Fixed
