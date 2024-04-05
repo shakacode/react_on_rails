@@ -42,11 +42,11 @@ Any task in client/package.json that starts the node-renderer
 
 ### Modifying Precompile Task
 
-_Not necessary if you are using [bundle caching](../bundle-caching.md) as doing so will result in the below being done automatically._
+_Not necessary if you are using [bundle caching](https://www.shakacode.com/react-on-rails-pro/docs/bundle-caching/) as doing so will result in the below being done automatically._
 
 To avoid the initial round trip to get a bundle on the renderer, you can do something like this to copy the file during precompile.
 
-See [lib/tasks/assets.rake](../../lib/tasks/assets.rake) for a couple tasks that you can use.
+See [lib/tasks/assets.rake](https://github.com/shakacode/react_on_rails_pro/blob/master/lib/tasks/assets.rake) for a couple tasks that you can use.
 
 If you're using the default tmp/bundles subdirectory for the node-renderer, you don't need to set the
 ENV value for `RENDERER_BUNDLE_PATH`. Otherwise, please set this ENV value so the files get copied
