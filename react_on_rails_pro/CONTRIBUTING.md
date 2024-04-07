@@ -299,3 +299,15 @@ Start the sample app like this for some debug printing:
 ```sh
 TRACE_REACT_ON_RAILS=true && foreman start -f Procfile.dev
 ```
+
+# Releasing
+Contact Justin Gordon, justin@shakacode.com
+
+Notes, these 2 files need auth tokens to [publish to Github Packages](https://docs.github.com/en/enterprise-server%403.10/packages/working-with-a-github-packages-registry/working-with-the-rubygems-registry):
+1. `~/.npmrc`
+2. `~/.gem/credentials`
+
+Then run a command like:
+```bash
+bundle exec rake release\[4.0.0.rc.1\]
+```
