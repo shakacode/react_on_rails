@@ -4,7 +4,9 @@
   "protocolVersion": "1.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
   "main": "packages/node-renderer/src/ReactOnRailsProNodeRenderer.js",
-  "bin": "./packages/node-renderer/src/default-node-renderer.js",
+  "bin": {
+    "react-on-rails-pro-node-renderer": "packages/node-renderer/src/default-node-renderer.js"
+  },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
@@ -71,7 +73,7 @@
     "prettier-eslint-cli": "^5.0.0",
     "release-it": "^15.5.0",
     "supertest": "^4.0.2",
-    "tap-diff": "https://github.com/vaguilera/tap-diff",
+    "tap-diff": "git+https://github.com/vaguilera/tap-diff.git",
     "tap-spec": "^5.0.0",
     "tape-async": "^2.3.0",
     "touch": "^3.1.0",
