@@ -234,6 +234,16 @@ module ReactOnRails
         end.not_to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
       end
 
+      it "adds a single import statement to the server bundle" do
+        test_string = "// import statement added by react_on_rails:generate_packs"
+        same_instance = described_class.instance
+        File.truncate(server_bundle_js_file_path, 0)
+        same_instance.generate_packs_if_stale
+        expect(File.read(server_bundle_js_file_path).scan(/(?=#{test_string})/).count).to equal(1)
+        same_instance.generate_packs_if_stale
+        expect(File.read(server_bundle_js_file_path).scan(/(?=#{test_string})/).count).to equal(1)
+      end
+
       it "generate packs if a new component is added" do
         create_new_component("NewComponent")
 

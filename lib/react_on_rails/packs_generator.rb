@@ -15,6 +15,7 @@ module ReactOnRails
     def generate_packs_if_stale
       return unless ReactOnRails.configuration.auto_load_bundle
 
+      add_generated_pack_to_server_bundle
       are_generated_files_present_and_up_to_date = Dir.exist?(generated_packs_directory_path) &&
                                                    File.exist?(generated_server_bundle_file_path) &&
                                                    !stale_or_missing_packs?
@@ -99,8 +100,8 @@ module ReactOnRails
     def generated_server_bundle_file_path
       return server_bundle_entrypoint if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
 
-      generated_server_bundle_file_path = server_bundle_entrypoint.sub(".js", "-generated.js")
-      generated_server_bundle_file_name = component_name(generated_server_bundle_file_path)
+      generated_interim_server_bundle_path = server_bundle_entrypoint.sub(".js", "-generated.js")
+      generated_server_bundle_file_name = component_name(generated_interim_server_bundle_path)
       source_entrypoint_parent = Pathname(ReactOnRails::WebpackerUtils.webpacker_source_entry_path).parent
       generated_nonentrypoints_path = "#{source_entrypoint_parent}/generated"
 

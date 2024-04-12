@@ -36,15 +36,26 @@ You can change the value in `config/initializers/react_on_rails` by updating it 
 config.auto_load_bundle = true
 ```
 
+### Location of generated files
+Generated files will go to the following two directories:
+* Pack files for entrypoint components will be generated in the `{Webpacker.config.source_entry_path}/generated` directory.
+* The interim server bundle file, which is only generated if you already have a server bundle entrypoint & have not set `make_generated_server_bundle_the_entrypoint` to `true`, will be generated in the `{Pathname(Webpacker.config.source_entry_path).parent}/generated` directory.
+
 ### Update `.gitignore` file
-React on Rails automatically generates pack files for components to be registered in the `packs/generated` directory. To avoid committing generated files into the version control system, please update `.gitignore` to have
+To avoid committing generated files to your version control system, please update `.gitignore` to include:
 
 ```gitignore
 # Generated React on Rails packs
-app/javascript/packs/generated
+**/generated/**
 ```
 
-*Note: the directory might be different depending on the `source_entry_path` in `config/shakapacker.yml`.*
+### Commit changes to server bundle entrypoint
+If you already have an existing server bundle entrypoint & have not set `make_generated_server_bundle_the_entrypoint` to `true`, then pack generation will add an import statement to your existing server bundle entrypoint similar to:
+```javascript
+// import statement added by react_on_rails:generate_packs rake task
+import "./../generated/server-bundle-generated.js"
+```
+We recommend committing this import statement to your version control system.
 
 ## Usage
 
