@@ -14,6 +14,8 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ## Versions
 ### [Unreleased]
 Changes since the last non-beta release.
+#### Added
+- Pack Generation: Added functionality that will add an import statement, if missing, to the server bundle entrypoint even if the autobundle generated files still exist [PR 1610](https://github.com/shakacode/react_on_rails/pull/1610) by [judahmeek](https://github.com/judahmeek).
 
 ### [14.0.0] - 2024-04-03
 _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigLoader.js`._
