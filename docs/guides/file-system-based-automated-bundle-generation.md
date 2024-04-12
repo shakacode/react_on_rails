@@ -36,15 +36,26 @@ You can change the value in `config/initializers/react_on_rails` by updating it 
 config.auto_load_bundle = true
 ```
 
+### Location of generated files
+Generated files will go to the following two directories:
+* Pack files for entrypoint components will be generated in the `{Shakapacker.config.source_entry_path}/generated` directory.
+* The interim server bundle file, which is only generated if you already have a server bundle entrypoint and have not set `make_generated_server_bundle_the_entrypoint` to `true`, will be generated in the `{Pathname(Shakapacker.config.source_entry_path).parent}/generated` directory.
+
 ### Update `.gitignore` file
-React on Rails automatically generates pack files for components to be registered in the `packs/generated` directory. To avoid committing generated files into the version control system, please update `.gitignore` to have
+To avoid committing generated files to your version control system, please update `.gitignore` to include:
 
 ```gitignore
 # Generated React on Rails packs
-app/javascript/packs/generated
+**/generated/**
 ```
 
-*Note: the directory might be different depending on the `source_entry_path` in `config/shakapacker.yml`.*
+### Commit changes to server bundle entrypoint
+If you already have an existing server bundle entrypoint and have not set `make_generated_server_bundle_the_entrypoint` to `true`, then pack generation will add an import statement to your existing server bundle entrypoint similar to:
+```javascript
+// import statement added by react_on_rails:generate_packs rake task
+import "./../generated/server-bundle-generated.js"
+```
+We recommend committing this import statement to your version control system.
 
 ## Usage
 
@@ -126,7 +137,7 @@ The tricky part is to figure out which bundles to load on any Rails view. [Shaka
 
 File-system-based automated pack generation simplifies this process with a new option for the view helpers.
 
-For example, if you wanted to utilize our file-system based entrypoint generation for `FooComponentOne` & `BarComponentOne`, but not `BarComponentTwo` (for whatever reason), then...
+For example, if you wanted to utilize our file-system based entrypoint generation for `FooComponentOne` and `BarComponentOne`, but not `BarComponentTwo` (for whatever reason), then...
 
 1. Remove generated entrypoints from parameters passed directly to `javascript_pack_tag` and `stylesheet_pack_tag`.
 2. Remove generated entrypoints from parameters passed directly to `append_javascript_pack_tag` and `append_stylesheet_pack_tag`.
@@ -186,7 +197,7 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
 
 If server rendering is enabled, the component will be registered for usage both in server and client rendering. In order to have separate definitions for client and server rendering, name the component files as `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file.
 
-Once generated, all server entrypoints will be imported into a file named `[ReactOnRails.configuration.server_bundle_js_file]-generated.js`, which in turn will be imported into a source file named the same as `ReactOnRails.configuration.server_bundle_js_file`. If your server bundling logic is such that your server bundle source entrypoint is not named the same as your `ReactOnRails.configuration.server_bundle_js_file` & changing it would be difficult, please let us know.
+Once generated, all server entrypoints will be imported into a file named `[ReactOnRails.configuration.server_bundle_js_file]-generated.js`, which in turn will be imported into a source file named the same as `ReactOnRails.configuration.server_bundle_js_file`. If your server bundling logic is such that your server bundle source entrypoint is not named the same as your `ReactOnRails.configuration.server_bundle_js_file` and changing it would be difficult, please let us know.
 
 *Note: If specifying separate definitions for client and server rendering, please make sure to delete the generalized `ComponentName.jsx` file.*
 
