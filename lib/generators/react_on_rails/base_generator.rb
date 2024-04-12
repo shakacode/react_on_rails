@@ -99,7 +99,7 @@ module ReactOnRails
         css_minimizer_webpack_plugin_version = node_major_version >= 18 ? "" : "@<6.0.0"
         css_minimizer_webpack_plugin = "css-minimizer-webpack-plugin#{css_minimizer_webpack_plugin_version}"
 
-        run "yarn add 'css-loader@<7.0.0' '#{css_minimizer_webpack_plugin}' mini-css-extract-plugin 'style-loader<4.0.0'"
+        run "yarn add 'css-loader@<7.0.0' '#{css_minimizer_webpack_plugin}' mini-css-extract-plugin 'style-loader@<4.0.0'" # rubocop:disable Layout/LineLength
 
         puts "Adding dev dependencies"
         run "yarn add -D @pmmmwh/react-refresh-webpack-plugin react-refresh"
