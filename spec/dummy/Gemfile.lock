@@ -278,11 +278,11 @@ GEM
     rspec-support (3.12.1)
     rspec_junit_formatter (0.6.0)
       rspec-core (>= 2, < 4, != 2.12.0)
-    rubocop (1.59.0)
+    rubocop (1.61.0)
       json (~> 2.3)
       language_server-protocol (>= 3.17.0)
       parallel (~> 1.10)
-      parser (>= 3.2.2.4)
+      parser (>= 3.3.0.2)
       rainbow (>= 2.2.2, < 4.0)
       regexp_parser (>= 1.8, < 3.0)
       rexml (>= 3.2.5, < 4.0)
@@ -408,7 +408,7 @@ DEPENDENCIES
   rspec-rails
   rspec-retry
   rspec_junit_formatter
-  rubocop (~> 1.59)
+  rubocop (= 1.61.0)
   rubocop-performance (~> 1.20.0)
   rubocop-rspec (~> 2.26)
   sass-rails (~> 6.0)
