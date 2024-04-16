@@ -441,10 +441,9 @@ module ReactOnRails
                                                 "data-trace" => (render_options.trace ? true : nil),
                                                 "data-dom-id" => render_options.dom_id)
 
+      load_pack_for_generated_component(react_component_name, render_options)
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
-
-      load_pack_for_generated_component(react_component_name, render_options)
 
       {
         render_options: render_options,
