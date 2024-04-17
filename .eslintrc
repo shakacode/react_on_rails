@@ -1,12 +1,19 @@
 ---
+root: true
+
 extends:
+  - eslint:recommended
+  - plugin:import/typescript
   - eslint-config-shakacode
   - prettier
-  - prettier/react
 
 globals:
   __DEBUG_SERVER_ERRORS__: true
   __SERVER_ERRORS__: true
+
+parserOptions:
+  # We have @babel/eslint-parser from eslint-config-shakacode, but don't use Babel in the main project
+  requireConfigFile: false
 
 plugins:
   - jest
@@ -14,10 +21,22 @@ plugins:
 env:
   browser: true
   node: true
-  jest/globals: true
+  jest: true
+
+settings:
+  import/extensions: [".js", ".ts"]
+  import/parsers:
+    "@typescript-eslint/parser": [".ts"]
+  import/resolver:
+    node: true
+    typescript: true
 
 rules:
   no-console: 0
+  no-void:
+    - error
+    # Allow using void to suppress errors about misused promises
+    - { allowAsStatement: true }
 
   # https://github.com/benmosher/eslint-plugin-import/issues/340
   import/no-extraneous-dependencies: 0
@@ -27,7 +46,38 @@ rules:
   jest/no-identical-title: "error"
   jest/prefer-to-have-length: "warn"
   jest/valid-expect: "error"
+  import/extensions: "off"
   import/prefer-default-export: "off"
 
   # incompatible with prettier
+  lines-between-class-members: off
   no-mixed-operators: 0
+
+overrides:
+  - files: "**/*.ts{x,}"
+    parser: "@typescript-eslint/parser"
+    parserOptions:
+      project: true
+    plugins:
+      - "@typescript-eslint"
+    extends:
+      - plugin:@typescript-eslint/strict-type-checked
+    rules:
+      "@typescript-eslint/restrict-template-expressions": off
+      "@typescript-eslint/no-non-null-assertion": off
+      "@typescript-eslint/no-unused-vars":
+        - error
+        - { argsIgnorePattern: "^_" }
+      # Remove all below in the follow-up PR
+      "@typescript-eslint/no-explicit-any": off
+      "@typescript-eslint/no-unsafe-argument": off
+      "@typescript-eslint/no-unsafe-assignment": off
+      "@typescript-eslint/no-unsafe-call": off
+      "@typescript-eslint/no-unsafe-member-access": off
+      "@typescript-eslint/no-unsafe-return": off
+      "@typescript-eslint/no-var-requires": off
+      "@typescript-eslint/require-await": off
+  - files: "packages/node-renderer/tests/**"
+    rules:
+      # Allows Jest mocks before import
+      import/first: off

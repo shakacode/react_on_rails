@@ -2,16 +2,18 @@
  * Logic for checking protocol version.
  * @module worker/checkProtocVersionHandler
  */
-const packageJson = require('../shared/packageJson');
+import type { Request } from 'express';
+import packageJson from '../shared/packageJson';
 
-module.exports = function checkProtocolVersion(req) {
-  if (req.body.protocolVersion !== packageJson.protocolVersion) {
+export = function checkProtocolVersion(req: Request) {
+  const reqProtocolVersion = (req.body as { protocolVersion?: string }).protocolVersion;
+  if (reqProtocolVersion !== packageJson.protocolVersion) {
     return {
       headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
       status: 412,
       data: `Unsupported renderer protocol version ${
-        req.body.protocolVersion
-          ? `request protocol ${req.body.protocolVersion}`
+        reqProtocolVersion
+          ? `request protocol ${reqProtocolVersion}`
           : `MISSING with body ${JSON.stringify(req.body)}`
       } does not
 match installed renderer protocol ${packageJson.protocolVersion} for version ${packageJson.version}.

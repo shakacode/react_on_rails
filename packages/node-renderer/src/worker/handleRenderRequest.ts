@@ -5,29 +5,30 @@
  * @module worker/handleRenderRequest
  */
 
-const cluster = require('cluster');
-const path = require('path');
-const fsExtra = require('fs-extra');
+import cluster from 'cluster';
+import path from 'path';
+import fsExtra from 'fs-extra';
 
-const { lock, unlock } = require('../shared/locks');
-const fileExistsAsync = require('../shared/fileExistsAsync');
-const log = require('../shared/log');
-const {
+import { lock, unlock } from '../shared/locks';
+import fileExistsAsync from '../shared/fileExistsAsync';
+import log from '../shared/log';
+import {
   formatExceptionMessage,
   errorResponseResult,
   workerIdLabel,
   moveUploadedAssets,
-} = require('../shared/utils');
-const { getConfig } = require('../shared/configBuilder');
-const errorReporter = require('../shared/errorReporter');
-const { buildVM, getVmBundleFilePath, runInVM } = require('./vm');
+  Asset,
+} from '../shared/utils';
+import { getConfig } from '../shared/configBuilder';
+import errorReporter from '../shared/errorReporter';
+import { buildVM, getVmBundleFilePath, runInVM } from './vm';
 
 /**
  *
  * @param renderingRequest
  * @returns {Promise<*>}
  */
-async function prepareResult(renderingRequest) {
+async function prepareResult(renderingRequest: string) {
   try {
     const result = await runInVM(renderingRequest, cluster);
 
@@ -35,7 +36,7 @@ async function prepareResult(renderingRequest) {
     if (!result) {
       const error = new Error('INVALID NIL or NULL result for rendering');
       exceptionMessage = formatExceptionMessage(renderingRequest, error, 'INVALID result for prepareResult');
-    } else if (result.exceptionMessage) {
+    } else if (typeof result === 'object' && result.exceptionMessage) {
       ({ exceptionMessage } = result);
     }
 
@@ -54,10 +55,12 @@ async function prepareResult(renderingRequest) {
   }
 }
 
-function getRequestBundleFilePath(bundleTimestamp) {
+function getRequestBundleFilePath(bundleTimestamp: string | number) {
   const { bundlePath } = getConfig();
   return path.join(bundlePath, `${bundleTimestamp}.js`);
 }
+
+type Bundle = Pick<Asset, 'file'>;
 
 /**
  *
@@ -68,21 +71,21 @@ function getRequestBundleFilePath(bundleTimestamp) {
  * @returns {Promise<{headers: {"Cache-Control": string}, data: any, status: number}>}
  */
 async function handleNewBundleProvided(
-  bundleFilePathPerTimestamp,
-  providedNewBundle,
-  renderingRequest,
-  assetsToCopy,
+  bundleFilePathPerTimestamp: string,
+  providedNewBundle: Bundle,
+  renderingRequest: string,
+  assetsToCopy: Asset[] | null | undefined,
 ) {
   log.info('Worker received new bundle: %s', bundleFilePathPerTimestamp);
 
-  let lockAcquired;
-  let lockfileName;
+  let lockAcquired = false;
+  let lockfileName: string | undefined;
   try {
     const { lockfileName: name, wasLockAcquired, errorMessage } = await lock(bundleFilePathPerTimestamp);
     lockfileName = name;
     lockAcquired = wasLockAcquired;
 
-    if (!lockAcquired) {
+    if (!wasLockAcquired) {
       const msg = formatExceptionMessage(
         renderingRequest,
         errorMessage,
@@ -135,7 +138,9 @@ to ${bundleFilePathPerTimestamp})`,
     if (lockAcquired) {
       log.info('About to unlock %s from worker %i', lockfileName, workerIdLabel());
       try {
-        await unlock(lockfileName);
+        if (lockfileName) {
+          await unlock(lockfileName);
+        }
       } catch (error) {
         const msg = formatExceptionMessage(
           renderingRequest,
@@ -153,11 +158,16 @@ to ${bundleFilePathPerTimestamp})`,
  * @returns Promise where the result contains { status, data, headers } for to
  * send back to the browser.
  */
-module.exports = async function handleRenderRequest({
+export = async function handleRenderRequest({
   renderingRequest,
   bundleTimestamp,
   providedNewBundle,
   assetsToCopy,
+}: {
+  renderingRequest: string;
+  bundleTimestamp: string | number;
+  providedNewBundle?: Bundle | null;
+  assetsToCopy?: Asset[] | null;
 }) {
   try {
     const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
@@ -209,6 +219,6 @@ module.exports = async function handleRenderRequest({
       'Caught top level error in handleRenderRequest',
     );
     errorReporter.notify(msg);
-    return Promise.reject(error);
+    return Promise.reject(error as Error);
   }
 };

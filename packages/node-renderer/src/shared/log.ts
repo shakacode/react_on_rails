@@ -1,10 +1,10 @@
-const winston = require('winston');
+import winston = require('winston');
 
 const { format } = winston;
 
 const { combine, splat, colorize, label, printf } = format;
 
-const myFormat = printf((info) => `[${info.label}] ${info.level}: ${info.message}`);
+const myFormat = printf((info) => `[${info.label as string}] ${info.level}: ${info.message}`);
 
 const transports = [
   new winston.transports.Console({
@@ -12,19 +12,17 @@ const transports = [
   }),
 ];
 
-// https://stackoverflow.com/questions/54047173/mixed-default-and-named-exports-in-node-with-es5-syntax
-/* eslint-disable-next-line no-multi-assign */
-const logger = (module.exports = winston.createLogger({
+export default winston.createLogger({
   transports,
   format: combine(label({ label: 'RORP' }), splat(), colorize(), myFormat),
   exitOnError: false,
-}));
+});
 
-logger.configureLogger = function configureLogger(theLogger, logLevel) {
+export function configureLogger(theLogger: winston.Logger, logLevel: string | undefined) {
   theLogger.configure({
     level: logLevel,
     transports,
     format: combine(label({ label: 'RORP' }), splat(), colorize(), myFormat),
     exitOnError: false,
   });
-};
+}

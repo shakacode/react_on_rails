@@ -1,14 +1,13 @@
-const sleep = require('sleep-promise');
-const lockfile = require('lockfile');
-const { promisify } = require('util');
+import sleep from 'sleep-promise';
+import lockfile, { Options } from 'lockfile';
+import { promisify } from 'util';
 
-const debug = require('../shared/debug');
-const log = require('../shared/log');
+import debug from './debug';
+import log from './log';
+import { workerIdLabel } from './utils';
 
-const lockfileLockAsync = promisify(lockfile.lock);
+const lockfileLockAsync = promisify<string, Options>(lockfile.lock);
 const lockfileUnlockAsync = promisify(lockfile.unlock);
-
-const { workerIdLabel } = require('../shared/utils');
 
 const TEST_LOCKFILE_THREADING = false;
 
@@ -49,32 +48,36 @@ const lockfileOptions = {
   pollPeriod: LOCKFILE_POLL_PERIOD,
 };
 
-/**
- *
- * @param lockfileName
- * @returns {Promise<void>}
- */
-exports.unlock = async function unlock(lockfileName) {
+export async function unlock(lockfileName: string) {
   debug('Worker %s: About to unlock %s', workerIdLabel(), lockfileName);
   log.info('Worker %s: About to unlock %s', workerIdLabel(), lockfileName);
 
   await lockfileUnlockAsync(lockfileName);
-};
+}
 
-/**
- * @returns { lockfileName, wasLockAcquired, errorMessage }
- */
-exports.lock = async function lock(filename) {
+type LockResult = {
+  lockfileName: string;
+} & (
+  | {
+      wasLockAcquired: true;
+      errorMessage: null;
+    }
+  | {
+      wasLockAcquired: false;
+      errorMessage: Error;
+    }
+);
+
+export async function lock(filename: string): Promise<LockResult> {
   const lockfileName = `${filename}.lock`;
   const workerId = workerIdLabel();
-  let wasLockAcquired = false;
 
   try {
     debug('Worker %s: About to request lock %s', workerId, lockfileName);
     log.info('Worker %s: About to request lock %s', workerId, lockfileName);
     await lockfileLockAsync(lockfileName, lockfileOptions);
-    wasLockAcquired = true;
 
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (TEST_LOCKFILE_THREADING) {
       debug('Worker %i: handleNewBundleProvided sleeping 5s', workerId);
       await sleep(5000);
@@ -83,7 +86,7 @@ exports.lock = async function lock(filename) {
     debug('After acquired lock in pid', lockfileName);
   } catch (error) {
     log.info('Worker %s: Failed to acquire lock %s, error %s', workerId, lockfileName, error);
-    return { lockfileName, wasLockAcquired, errorMessage: error };
+    return { lockfileName, wasLockAcquired: false, errorMessage: error as Error };
   }
-  return { lockfileName, wasLockAcquired, errorMessage: null };
-};
+  return { lockfileName, wasLockAcquired: true, errorMessage: null };
+}

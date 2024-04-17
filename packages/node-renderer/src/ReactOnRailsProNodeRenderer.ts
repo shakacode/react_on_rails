@@ -2,10 +2,10 @@ const cluster = require('cluster');
 const master = require('./master');
 const worker = require('./worker');
 
-exports.reactOnRailsProNodeRenderer = function reactOnRailsProNodeRenderer(config = {}) {
+export function reactOnRailsProNodeRenderer(config = {}) {
   if (cluster.isMaster) {
     master(config);
   } else {
     worker(config);
   }
-};
+}

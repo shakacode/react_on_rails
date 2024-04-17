@@ -25,8 +25,8 @@ aliases:
     command: yarn start format.listDifferent
 
   - &typescript-check
-    name: Check TypeScript of the dummy app
-    command: cd spec/dummy && yarn run tsc -p client/tsconfig.json  --noEmit
+    name: Check TypeScript
+    command: yarn run nps check-typescript
 
   # Install/update Node modules for renderer package unless existing set of modules is satisfying Yarn.
   - &install-package-node-modules

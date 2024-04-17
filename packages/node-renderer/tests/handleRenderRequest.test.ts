@@ -1,7 +1,9 @@
-const path = require('path');
-const touch = require('touch');
-const lockfile = require('lockfile');
-const sleep = require('sleep-promise');
+import path from 'path';
+import touch from 'touch';
+import lockfile from 'lockfile';
+import sleep from 'sleep-promise';
+import { getVmBundleFilePath } from '../src/worker/vm';
+import handleRenderRequest from '../src/worker/handleRenderRequest';
 
 const {
   createVmBundle,
@@ -17,10 +19,6 @@ const uploadedBundlePathForTest = () => uploadedBundlePath(testName);
 const createUploadedBundleForTest = () => createUploadedBundle(testName);
 const lockfilePathForTest = () => lockfilePath(testName);
 const createVmBundleForTest = () => createVmBundle(testName);
-
-const { getVmBundleFilePath } = require('../src/worker/vm');
-const handleRenderRequest = require('../src/worker/handleRenderRequest');
-
 const renderResult = {
   status: 200,
   headers: { 'Cache-Control': 'public, max-age=31536000' },
@@ -81,6 +79,7 @@ describe(testName, () => {
     // We're using a lockfile with an artificially old date,
     // so make it use that instead of ctime.
     // Probably you should never do this in production!
+    // @ts-expect-error Not allowed by the types
     lockfile.filetime = 'mtime';
 
     expect.assertions(2);
@@ -104,14 +103,12 @@ describe(testName, () => {
     const lockfileOptions = { pollPeriod: 100, stale: 10000 };
     lockfile.lockSync(lockfilePathForTest(), lockfileOptions);
 
-    sleep(5).then(() => {
-      console.log('TEST building VM from sleep');
-      createVmBundleForTest().then(() => {
-        console.log('TEST DONE building VM from sleep');
-        lockfile.unlock(lockfilePathForTest(), (err) => {
-          console.log('TEST unlocked lockfile', err);
-        });
-      });
+    await sleep(5);
+    console.log('TEST building VM from sleep');
+    await createVmBundleForTest();
+    console.log('TEST DONE building VM from sleep');
+    lockfile.unlock(lockfilePathForTest(), (err) => {
+      console.log('TEST unlocked lockfile', err);
     });
 
     const result = await handleRenderRequest({

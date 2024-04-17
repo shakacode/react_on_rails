@@ -1,8 +1,13 @@
-const requireOptional = require('./requireOptional');
-const log = require('./log');
+import type { Transaction } from '@sentry/types';
+import requireOptional from './requireOptional';
+import log from './log';
 
+type SentryModule = typeof import('@sentry/node');
 const sentryTracing = requireOptional('@sentry/tracing');
+
 class Tracing {
+  Sentry: null | SentryModule;
+
   constructor() {
     this.Sentry = null;
   }
@@ -15,7 +20,7 @@ class Tracing {
     return null;
   }
 
-  setSentry(Sentry) {
+  setSentry(Sentry: SentryModule) {
     if (sentryTracing === null) {
       log.error(
         '@sentry/tracing package is not installed. Either install it in order to use tracing with Sentry or set sentryTracing to false in your config.',
@@ -25,7 +30,7 @@ class Tracing {
     }
   }
 
-  async withinTransaction(fn, op, name) {
+  async withinTransaction<T>(fn: (transaction?: Transaction) => Promise<T>, op: string, name: string) {
     if (this.Sentry === null) {
       return fn();
     }
@@ -43,4 +48,4 @@ class Tracing {
 
 const tracing = new Tracing();
 
-module.exports = tracing;
+export = tracing;

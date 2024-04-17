@@ -6,15 +6,16 @@
  */
 // TODO: Replace with express-basic-auth per https://github.com/shakacode/react_on_rails_pro/issues/110
 
-const { getConfig } = require('../shared/configBuilder');
+import type { Request } from 'express';
+import { getConfig } from '../shared/configBuilder';
 
 /**
  *
  */
-module.exports = function authenticate(req) {
+export = function authenticate(req: Request) {
   const { password } = getConfig();
 
-  if (password && password !== req.body.password) {
+  if (password && password !== (req.body as { password?: string }).password) {
     return {
       headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
       status: 401,

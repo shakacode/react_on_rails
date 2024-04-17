@@ -1,4 +1,7 @@
-const path = require('path');
+import path from 'path';
+import { buildVM, getVmBundleFilePath, resetVM, runInVM } from '../src/worker/vm';
+import { getConfig } from '../src/shared/configBuilder';
+
 const {
   uploadedBundlePath,
   createUploadedBundle,
@@ -6,8 +9,6 @@ const {
   createVmBundle,
   resetForTest,
 } = require('./helper');
-const { buildVM, runInVM, getVmBundleFilePath, resetVM } = require('../src/worker/vm');
-const { getConfig } = require('../src/shared/configBuilder');
 
 const testName = 'vm';
 const uploadedBundlePathForTest = () => uploadedBundlePath(testName);
@@ -102,9 +103,10 @@ describe('buildVM and runInVM', () => {
     expect(result).toBeTruthy();
 
     result = await runInVM('console');
+    // @ts-expect-error Intentional comparison
     expect(result !== console).toBeTruthy();
 
-    expect(console.history === undefined).toBeTruthy();
+    expect((console as { history?: unknown }).history === undefined).toBeTruthy();
 
     result = await runInVM('console.history !== undefined');
     expect(result).toBeTruthy();
@@ -128,7 +130,9 @@ describe('buildVM and runInVM', () => {
     await buildVM(uploadedBundlePathForTest());
     // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
     const result = await runInVM('process.exit()');
-    expect(result.exceptionMessage.match(/process is not defined/)).toBeTruthy();
+    expect(
+      typeof result === 'object' && result.exceptionMessage.match(/process is not defined/),
+    ).toBeTruthy();
   });
 
   test('Captured exceptions for a long message', async () => {
@@ -139,7 +143,8 @@ describe('buildVM and runInVM', () => {
     const code = `process.exit()${'\n// 1234567890123456789012345678901234567890'.repeat(
       50,
     )}\n// Finishing Comment`;
-    const { exceptionMessage } = await runInVM(code);
+    const result = await runInVM(code);
+    const exceptionMessage = typeof result === 'object' ? result.exceptionMessage : '';
     expect(exceptionMessage.match(/process is not defined/)).toBeTruthy();
     expect(exceptionMessage.match(/process.exit/)).toBeTruthy();
     expect(exceptionMessage.match(/Finishing Comment/)).toBeTruthy();
@@ -197,7 +202,9 @@ describe('buildVM and runInVM', () => {
       'welcomePageRenderingRequest.js',
     );
     const welcomePageRenderingResult = await runInVM(welcomePageComponentRenderingRequest);
-    expect(welcomePageRenderingResult.includes('data-react-checksum=\\"800299790\\"')).toBeTruthy();
+    expect(
+      (welcomePageRenderingResult as string).includes('data-react-checksum=\\"800299790\\"'),
+    ).toBeTruthy();
 
     // LayoutNavbar component:
     const layoutNavbarComponentRenderingRequest = readRenderingRequest(
@@ -206,7 +213,9 @@ describe('buildVM and runInVM', () => {
       'layoutNavbarRenderingRequest.js',
     );
     const layoutNavbarRenderingResult = await runInVM(layoutNavbarComponentRenderingRequest);
-    expect(layoutNavbarRenderingResult.includes('data-react-checksum=\\"-667058792\\"')).toBeTruthy();
+    expect(
+      (layoutNavbarRenderingResult as string).includes('data-react-checksum=\\"-667058792\\"'),
+    ).toBeTruthy();
 
     // ListingIndex component:
     const listingIndexComponentRenderingRequest = readRenderingRequest(
@@ -215,7 +224,9 @@ describe('buildVM and runInVM', () => {
       'listingIndexRenderingRequest.js',
     );
     const listingIndexRenderingResult = await runInVM(listingIndexComponentRenderingRequest);
-    expect(listingIndexRenderingResult.includes('data-react-checksum=\\"452252439\\"')).toBeTruthy();
+    expect(
+      (listingIndexRenderingResult as string).includes('data-react-checksum=\\"452252439\\"'),
+    ).toBeTruthy();
 
     // ListingShow component:
     const listingShowComponentRenderingRequest = readRenderingRequest(
@@ -224,7 +235,9 @@ describe('buildVM and runInVM', () => {
       'listingsShowRenderingRequest.js',
     );
     const listingShowRenderingResult = await runInVM(listingShowComponentRenderingRequest);
-    expect(listingShowRenderingResult.includes('data-react-checksum=\\"-324043796\\"')).toBeTruthy();
+    expect(
+      (listingShowRenderingResult as string).includes('data-react-checksum=\\"-324043796\\"'),
+    ).toBeTruthy();
 
     // UserShow component:
     const userShowComponentRenderingRequest = readRenderingRequest(
@@ -233,7 +246,9 @@ describe('buildVM and runInVM', () => {
       'userShowRenderingRequest.js',
     );
     const userShowRenderingResult = await runInVM(userShowComponentRenderingRequest);
-    expect(userShowRenderingResult.includes('data-react-checksum=\\"-1039690194\\"')).toBeTruthy();
+    expect(
+      (userShowRenderingResult as string).includes('data-react-checksum=\\"-1039690194\\"'),
+    ).toBeTruthy();
   });
 
   test('ReactWebpackRailsTutorial bundle for commit ec974491', async () => {
@@ -253,7 +268,9 @@ describe('buildVM and runInVM', () => {
       'navigationBarAppRenderingRequest.js',
     );
     const navigationBarRenderingResult = await runInVM(navigationBarComponentRenderingRequest);
-    expect(navigationBarRenderingResult.includes('data-react-checksum=\\"-472831860\\"')).toBeTruthy();
+    expect(
+      (navigationBarRenderingResult as string).includes('data-react-checksum=\\"-472831860\\"'),
+    ).toBeTruthy();
 
     // RouterApp component:
     const routerAppComponentRenderingRequest = readRenderingRequest(
@@ -262,12 +279,14 @@ describe('buildVM and runInVM', () => {
       'routerAppRenderingRequest.js',
     );
     const routerAppRenderingResult = await runInVM(routerAppComponentRenderingRequest);
-    expect(routerAppRenderingResult.includes('data-react-checksum=\\"-1777286250\\"')).toBeTruthy();
+    expect(
+      (routerAppRenderingResult as string).includes('data-react-checksum=\\"-1777286250\\"'),
+    ).toBeTruthy();
 
     // App component:
     const appComponentRenderingRequest = readRenderingRequest(project, commit, 'appRenderingRequest.js');
     const appRenderingResult = await runInVM(appComponentRenderingRequest);
-    expect(appRenderingResult.includes('data-react-checksum=\\"-490396040\\"')).toBeTruthy();
+    expect((appRenderingResult as string).includes('data-react-checksum=\\"-490396040\\"')).toBeTruthy();
   });
 
   test('BionicWorkshop bundle for commit fa6ccf6b', async () => {
@@ -287,7 +306,7 @@ describe('buildVM and runInVM', () => {
     const signInPageWithFlashRenderingResult = await runInVM(signInPageWithFlashRenderingRequest);
 
     // We don't put checksum here since it changes for every request with Rails auth token:
-    expect(signInPageWithFlashRenderingResult.includes('data-react-checksum=')).toBeTruthy();
+    expect((signInPageWithFlashRenderingResult as string).includes('data-react-checksum=')).toBeTruthy();
 
     // Landing page component:
     const landingPageRenderingRequest = readRenderingRequest(
@@ -296,12 +315,16 @@ describe('buildVM and runInVM', () => {
       'landingPageRenderingRequest.js',
     );
     const landingPageRenderingResult = await runInVM(landingPageRenderingRequest);
-    expect(landingPageRenderingResult.includes('data-react-checksum=\\"-1899958456\\"')).toBeTruthy();
+    expect(
+      (landingPageRenderingResult as string).includes('data-react-checksum=\\"-1899958456\\"'),
+    ).toBeTruthy();
 
     // Post page component:
     const postPageRenderingRequest = readRenderingRequest(project, commit, 'postPageRenderingRequest.js');
     const postPageRenderingResult = await runInVM(postPageRenderingRequest);
-    expect(postPageRenderingResult.includes('data-react-checksum=\\"-1296077150\\"')).toBeTruthy();
+    expect(
+      (postPageRenderingResult as string).includes('data-react-checksum=\\"-1296077150\\"'),
+    ).toBeTruthy();
 
     // Authors page component:
     const authorsPageRenderingRequest = readRenderingRequest(
@@ -310,7 +333,9 @@ describe('buildVM and runInVM', () => {
       'authorsPageRenderingRequest.js',
     );
     const authorsPageRenderingResult = await runInVM(authorsPageRenderingRequest);
-    expect(authorsPageRenderingResult.includes('data-react-checksum=\\"-1066737665\\"')).toBeTruthy();
+    expect(
+      (authorsPageRenderingResult as string).includes('data-react-checksum=\\"-1066737665\\"'),
+    ).toBeTruthy();
   });
 
   // Testing using a bundle that used a web target for the server bundle
@@ -333,7 +358,9 @@ describe('buildVM and runInVM', () => {
     const reduxAppRenderingResult = await runInVM(reduxAppComponentRenderingRequest);
 
     expect(
-      reduxAppRenderingResult.includes('<h3>Redux Hello, <!-- -->Mr. Server Side Rendering<!-- -->!</h3>'),
+      (reduxAppRenderingResult as string).includes(
+        '<h3>Redux Hello, <!-- -->Mr. Server Side Rendering<!-- -->!</h3>',
+      ),
     ).toBeTruthy();
   });
 });

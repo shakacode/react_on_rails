@@ -3,32 +3,29 @@
  * @module worker
  */
 
-// Set next value to true to test timeouts
-// const TESTING_TIMEOUTS = false
-
-const path = require('path');
-const cluster = require('cluster');
-const express = require('express');
-const busBoy = require('express-busboy');
-
-const log = require('./shared/log');
-const packageJson = require('./shared/packageJson');
-const { buildConfig, getConfig } = require('./shared/configBuilder');
-const asyncHandler = require('./shared/expressAsyncHandler');
-const fileExistsAsync = require('./shared/fileExistsAsync');
-
-const checkProtocolVersion = require('./worker/checkProtocolVersionHandler');
-const authenticate = require('./worker/authHandler');
-const handleRenderRequest = require('./worker/handleRenderRequest');
-const {
+import path from 'path';
+import cluster from 'cluster';
+import express, { NextFunction, Request, Response } from 'express';
+import busBoy from 'express-busboy';
+import log from './shared/log';
+import packageJson from './shared/packageJson';
+import { buildConfig, Config, getConfig } from './shared/configBuilder';
+import asyncHandler from './shared/expressAsyncHandler';
+import fileExistsAsync from './shared/fileExistsAsync';
+import checkProtocolVersion from './worker/checkProtocolVersionHandler';
+import authenticate from './worker/authHandler';
+import handleRenderRequest from './worker/handleRenderRequest';
+import {
+  Asset,
   errorResponseResult,
   formatExceptionMessage,
-  workerIdLabel,
   moveUploadedAssets,
-} = require('./shared/utils');
-const errorReporter = require('./shared/errorReporter');
-const tracing = require('./shared/tracing');
-const { lock, unlock } = require('./shared/locks');
+  ResponseResult,
+  workerIdLabel,
+} from './shared/utils';
+import errorReporter from './shared/errorReporter';
+import tracing from './shared/tracing';
+import { lock, unlock } from './shared/locks';
 
 // Uncomment next 2 functions for testing timeouts
 // function sleep(ms) {
@@ -41,21 +38,31 @@ const { lock, unlock } = require('./shared/locks');
 //   return Math.floor(Math.random() * Math.floor(max));
 // }
 
-function setHeaders(headers, res) {
-  Object.keys(headers).forEach((key) => res.set(key, headers[key]));
+function setHeaders(headers: ResponseResult['headers'], res: Response) {
+  Object.entries(headers).forEach(([key, header]) => res.set(key, header));
 }
 
-const setResponse = (result, res) => {
+const setResponse = (result: ResponseResult, res: Response) => {
   const { status, data, headers } = result;
   if (status !== 200 && status !== 410) {
-    log.info(`Sending non-200, non-410 data back: ${data}`);
+    log.info(`Sending non-200, non-410 data back: ${typeof data === 'string' ? data : JSON.stringify(data)}`);
   }
   setHeaders(headers, res);
   res.status(status);
   res.send(data);
 };
 
-module.exports = function run(config) {
+declare module 'express' {
+  // eslint-disable-next-line no-shadow -- augmentation
+  interface Request {
+    body: {
+      renderingRequest: string;
+    };
+    files?: Record<string, Asset>;
+  }
+}
+
+export = function run(config: Partial<Config>) {
   // Store config in app state. From now it can be loaded by any module using
   // getConfig():
   buildConfig(config);
@@ -75,7 +82,7 @@ module.exports = function run(config) {
     },
   });
 
-  const isProtocolVersionMatch = (req, res) => {
+  const isProtocolVersionMatch = (req: Request, res: Response) => {
     // Check protocol version
     const protocolVersionCheckingResult = checkProtocolVersion(req);
 
@@ -87,7 +94,7 @@ module.exports = function run(config) {
     return true;
   };
 
-  const isAuthenticated = (req, res) => {
+  const isAuthenticated = (req: Request, res: Response) => {
     // Authenticate Ruby client
     const authResult = authenticate(req);
 
@@ -99,7 +106,7 @@ module.exports = function run(config) {
     return true;
   };
 
-  const requestPrechecks = (req, res) => {
+  const requestPrechecks = (req: Request, res: Response) => {
     if (!isProtocolVersionMatch(req, res)) {
       return false;
     }
@@ -115,7 +122,8 @@ module.exports = function run(config) {
   // the digest is part of the request URL. Yes, it's not used here, but the
   // server logs might show it to distinguish different requests.
   app.route('/bundles/:bundleTimestamp/render/:renderRequestDigest').post(
-    asyncHandler(async (req, res, _next) => {
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises,@typescript-eslint/require-await -- Express types don't expect async handler
+    asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
       if (!requestPrechecks(req, res)) {
         return;
       }
@@ -133,16 +141,16 @@ module.exports = function run(config) {
 
       const { renderingRequest } = req.body;
       const { bundleTimestamp } = req.params;
-      const { bundle: providedNewBundle, ...assetsToCopyObj } = req.files;
+      const { bundle: providedNewBundle, ...assetsToCopyObj } = req.files ?? {};
 
       try {
         const assetsToCopy = Object.values(assetsToCopyObj);
-        tracing.withinTransaction(
+        void tracing.withinTransaction(
           async (transaction) => {
             try {
               const result = await handleRenderRequest({
                 renderingRequest,
-                bundleTimestamp,
+                bundleTimestamp: bundleTimestamp!,
                 providedNewBundle,
                 assetsToCopy,
               });
@@ -158,6 +166,7 @@ module.exports = function run(config) {
                 if (transaction) {
                   scope.setSpan(transaction);
                 }
+                return scope;
               });
               setResponse(errorResponseResult(exceptionMessage), res);
             }
@@ -178,13 +187,14 @@ module.exports = function run(config) {
   // in the runtime. Since remote renderer doesn't contain
   // any assets, they must be uploaded manually.
   app.route('/upload-assets').post(
-    asyncHandler(async (req, res, _next) => {
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Express types don't expect async handler
+    asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
       if (!requestPrechecks(req, res)) {
         return;
       }
-      let lockAcquired;
-      let lockfileName;
-      const assets = Object.values(req.files);
+      let lockAcquired = false;
+      let lockfileName: string | undefined;
+      const assets = Object.values(req.files ?? {});
       const assetsDescription = JSON.stringify(assets.map((asset) => asset.filename));
       const taskDescription = `Uploading files ${assetsDescription} to ${bundlePath}`;
       try {
@@ -192,7 +202,7 @@ module.exports = function run(config) {
         lockfileName = name;
         lockAcquired = wasLockAcquired;
 
-        if (!lockAcquired) {
+        if (!wasLockAcquired) {
           const msg = formatExceptionMessage(
             taskDescription,
             errorMessage,
@@ -219,7 +229,9 @@ module.exports = function run(config) {
       } finally {
         if (lockAcquired) {
           try {
-            await unlock(lockfileName);
+            if (lockfileName) {
+              await unlock(lockfileName);
+            }
           } catch (error) {
             const msg = formatExceptionMessage(
               taskDescription,
@@ -235,7 +247,8 @@ module.exports = function run(config) {
 
   // Checks if file exist
   app.route('/asset-exists').post(
-    asyncHandler(async (req, res, _next) => {
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Express types don't expect async handler
+    asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
       if (!isAuthenticated(req, res)) {
         return;
       }
@@ -249,7 +262,7 @@ module.exports = function run(config) {
         return;
       }
 
-      const assetPath = path.join(bundlePath, filename);
+      const assetPath = path.join(bundlePath, filename as string);
 
       const fileExists = await fileExistsAsync(assetPath);
 

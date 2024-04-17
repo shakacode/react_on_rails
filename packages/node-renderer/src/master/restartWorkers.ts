@@ -3,19 +3,26 @@
  * @module master/restartWorkers
  */
 
-const cluster = require('cluster');
-const log = require('../shared/log');
+import cluster from 'cluster';
+import log from '../shared/log';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 
-module.exports = function restartWorkers(delayBetweenIndividualWorkerRestarts) {
+declare module 'cluster' {
+  interface Worker {
+    isScheduledRestart?: boolean;
+  }
+}
+
+export = function restartWorkers(delayBetweenIndividualWorkerRestarts: number) {
   log.info('Started scheduled restart of workers');
 
   let delay = 0;
-  Object.keys(cluster.workers).forEach((id) => {
-    const worker = cluster.workers[id];
+  Object.values(cluster.workers).forEach((worker) => {
     const killWorker = () => {
+      if (!worker) return;
       log.debug('Kill worker #%d', worker.id);
+      // eslint-disable-next-line no-param-reassign
       worker.isScheduledRestart = true;
       worker.destroy();
     };

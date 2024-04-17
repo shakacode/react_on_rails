@@ -28,66 +28,66 @@ exports.getOtherFixtureAsset = function getOtherFixtureAsset() {
   return path.resolve(__dirname, `./fixtures/${exports.ASSET_UPLOAD_OTHER_FILE}`);
 };
 
-exports.bundlePath = function bundlePath(testName) {
+exports.bundlePath = function bundlePath(testName: string) {
   return path.resolve(__dirname, 'tmp', testName);
 };
 
-exports.setConfig = function setConfig(testName) {
+exports.setConfig = function setConfig(testName: string) {
   buildConfig({
     bundlePath: exports.bundlePath(testName),
   });
 };
 
-/**
- *
- * @returns {Promise<void>}
- */
-exports.createVmBundle = async function createVmBundle(testName) {
+exports.vmBundlePath = function vmBundlePath(testName: string) {
+  return path.resolve(exports.bundlePath(testName), `${exports.BUNDLE_TIMESTAMP}.js`);
+};
+
+exports.createVmBundle = async function createVmBundle(testName: string) {
   await fsCopyFileAsync(exports.getFixtureBundle(), exports.vmBundlePath(testName));
   return buildVM(exports.vmBundlePath(testName));
 };
 
-exports.lockfilePath = function lockfilePath(testName) {
+exports.lockfilePath = function lockfilePath(testName: string) {
   return `${exports.vmBundlePath(testName)}.lock`;
 };
 
-exports.uploadedBundleDir = function uploadedBundleDir(testName) {
+function uploadedBundleDir(testName: string) {
   return path.resolve(exports.bundlePath(testName), 'uploads');
+}
+
+exports.uploadedBundlePath = function uploadedBundlePath(testName: string) {
+  return path.resolve(uploadedBundleDir(testName), `${exports.BUNDLE_TIMESTAMP}.js`);
 };
 
-exports.uploadedBundlePath = function uploadedBundlePath(testName) {
-  return path.resolve(exports.uploadedBundleDir(testName), `${exports.BUNDLE_TIMESTAMP}.js`);
-};
-
-exports.vmBundlePath = function vmBundlePath(testName) {
-  return path.resolve(exports.bundlePath(testName), `${exports.BUNDLE_TIMESTAMP}.js`);
-};
-
-exports.assetPath = function assetPath(testName) {
+exports.assetPath = function assetPath(testName: string) {
   return path.resolve(exports.bundlePath(testName), exports.ASSET_UPLOAD_FILE);
 };
 
-exports.assetPathOther = function assetPathOther(testName) {
+exports.assetPathOther = function assetPathOther(testName: string) {
   return path.resolve(exports.bundlePath(testName), exports.ASSET_UPLOAD_OTHER_FILE);
 };
 
-exports.createUploadedBundle = async function createUploadedBundle(testName) {
+exports.createUploadedBundle = async function createUploadedBundle(testName: string) {
   const mkdirAsync = promisify(fs.mkdir);
-  await mkdirAsync(exports.uploadedBundleDir(testName), { recursive: true });
+  await mkdirAsync(uploadedBundleDir(testName), { recursive: true });
   return fsCopyFileAsync(exports.getFixtureBundle(), exports.uploadedBundlePath(testName));
 };
 
-exports.createAsset = async function createAsset(testName) {
+exports.createAsset = async function createAsset(testName: string) {
   return fsCopyFileAsync(exports.getFixtureAsset(), exports.assetPath(testName));
 };
 
-exports.resetForTest = async function resetForTest(testName) {
+exports.resetForTest = async function resetForTest(testName: string) {
   await fsExtra.emptyDir(exports.bundlePath(testName));
   resetVM();
   exports.setConfig(testName);
 };
 
-exports.readRenderingRequest = function readRenderingRequest(projectName, commit, requestDumpFileName) {
+exports.readRenderingRequest = function readRenderingRequest(
+  projectName: string,
+  commit: string,
+  requestDumpFileName: string,
+) {
   const renderingRequestRelativePath = path.join(
     './fixtures/projects/',
     projectName,
@@ -95,27 +95,6 @@ exports.readRenderingRequest = function readRenderingRequest(projectName, commit
     requestDumpFileName,
   );
   return fs.readFileSync(path.resolve(__dirname, renderingRequestRelativePath), 'utf8');
-};
-
-exports.createResponse = function createResponse(validate) {
-  const result = {
-    headers: {},
-    data: '',
-    status: null,
-  };
-
-  return {
-    set: (key, value) => {
-      result.headers[key] = value;
-    },
-    status: (value) => {
-      result.status = value;
-    },
-    send: (data) => {
-      result.data = data;
-      validate(result);
-    },
-  };
 };
 
 exports.setConfig('helper');

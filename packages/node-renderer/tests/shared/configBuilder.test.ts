@@ -1,21 +1,21 @@
-const Sentry = require('@sentry/node');
-const tracing = require('../../src/shared/tracing');
-const errorReporter = require('../../src/shared/errorReporter');
-const { buildConfig } = require('../../src/shared/configBuilder');
+import { getCurrentHub } from '@sentry/node';
+import tracing from '../../src/shared/tracing';
+import errorReporter from '../../src/shared/errorReporter';
+import { buildConfig } from '../../src/shared/configBuilder';
 
 // https://github.com/getsentry/sentry-javascript/blob/master/packages/node/test/index.test.ts#L17
 const testDsn = 'https://53039209a22b4ec1bcc296a3c9fdecd6@sentry.io/4291';
 
 // https://github.com/getsentry/sentry-go/issues/9#issuecomment-619615289
-const isSentryInitialized = () => Sentry.getCurrentHub().getClient() !== undefined;
+const isSentryInitialized = () => getCurrentHub().getClient() !== undefined;
 
 describe('configBuilder', () => {
   beforeEach(() => {
-    Sentry.getCurrentHub().pushScope();
+    getCurrentHub().pushScope();
   });
 
   afterEach(() => {
-    Sentry.getCurrentHub().popScope();
+    getCurrentHub().popScope();
   });
 
   test('should enable error catching with sentry', () => {
