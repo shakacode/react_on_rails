@@ -1,9 +1,10 @@
-const request = require('supertest');
-const fs = require('fs');
-const path = require('path');
-const querystring = require('querystring');
+/* eslint-disable @typescript-eslint/no-floating-promises, @typescript-eslint/require-await -- update supertest use later */
+import request from 'supertest';
+import fs from 'fs';
+import querystring from 'querystring';
+import worker from '../src/worker';
+import packageJson from '../../../package.json';
 
-const worker = require('../src/worker');
 const {
   BUNDLE_TIMESTAMP,
   createVmBundle,
@@ -21,9 +22,6 @@ const {
 const testName = 'worker';
 const createVmBundleForTest = () => createVmBundle(testName);
 const bundlePathForTest = () => bundlePath(testName);
-
-// eslint-disable-next-line import/no-dynamic-require
-const packageJson = require(path.join(__dirname, '/../../../package.json'));
 
 const gemVersion = packageJson.version;
 const { protocolVersion } = packageJson;
@@ -86,8 +84,12 @@ describe('express worker', () => {
           protocolVersion,
         })
         .end((_err, res) => {
-          expect(res.error.status).toBe(401);
-          expect(res.error.text).toBe('Wrong password');
+          if (res.error) {
+            expect(res.error.status).toBe(401);
+            expect(res.error.text).toBe('Wrong password');
+          } else {
+            fail('Expected error');
+          }
           done();
         });
     },
@@ -117,8 +119,12 @@ describe('express worker', () => {
         })
         .end((_err, res) => {
           console.log('res', JSON.stringify(res));
-          expect(res.error.status).toBe(401);
-          expect(res.error.text).toBe('Wrong password');
+          if (res.error) {
+            expect(res.error.status).toBe(401);
+            expect(res.error.text).toBe('Wrong password');
+          } else {
+            fail('Expected error');
+          }
           done();
         });
     },
@@ -135,8 +141,6 @@ describe('express worker', () => {
       const app = worker({
         bundlePath: bundlePathForTest(),
         password: 'my_password',
-        gemVersion,
-        protocolVersion,
       });
 
       request(app)

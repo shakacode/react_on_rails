@@ -3,39 +3,38 @@
  * @module worker/vm
  */
 
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
-const m = require('module');
-const cluster = require('cluster');
-const { promisify } = require('util');
-
-const log = require('../shared/log');
-const { getConfig } = require('../shared/configBuilder');
-const { formatExceptionMessage, smartTrim } = require('../shared/utils');
-const errorReporter = require('../shared/errorReporter');
+import fs from 'fs';
+import path from 'path';
+import vm from 'vm';
+import m from 'module';
+import cluster from 'cluster';
+import { promisify } from 'util';
+import log from '../shared/log';
+import { getConfig } from '../shared/configBuilder';
+import { formatExceptionMessage, smartTrim } from '../shared/utils';
+import errorReporter from '../shared/errorReporter';
 
 const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
 
 // Both context and vmBundleFilePath are set when the VM is ready.
-let context;
+let context: vm.Context | undefined;
 
 // vmBundleFilePath is cleared at the beginning of creating the context and set only when the
 // context is properly created.
-let vmBundleFilePath;
+let vmBundleFilePath: string | undefined;
 
 /**
- * Value is set after VM created from the bundleFilePath. This value is null if the context is
+ * Value is set after VM created from the bundleFilePath. This value is undefined if the context is
  * not ready.
  */
-exports.getVmBundleFilePath = function getVmBundleFilePath() {
+export function getVmBundleFilePath() {
   return vmBundleFilePath;
-};
+}
 
 function replayVmConsole() {
   if (log.level !== 'debug') return;
-  const consoleHistoryFromVM = vm.runInContext('console.history', context);
+  const consoleHistoryFromVM = vm.runInContext('console.history', context!) as { arguments: unknown[] }[];
 
   consoleHistoryFromVM.forEach((msg) => {
     const stringifiedList = msg.arguments.map((arg) => {
@@ -43,7 +42,7 @@ function replayVmConsole() {
       try {
         val = typeof arg === 'string' || arg instanceof String ? arg : JSON.stringify(arg);
       } catch (e) {
-        val = `${e.message}: ${arg}`;
+        val = `${(e as Error).message}: ${arg}`;
       }
 
       return val;
@@ -53,12 +52,16 @@ function replayVmConsole() {
   });
 }
 
-/**
- *
- * @param filePath
- * @returns {Promise<boolean>}
- */
-exports.buildVM = async function buildVM(filePath) {
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace NodeJS {
+    interface Global {
+      ReactOnRails?: unknown;
+    }
+  }
+}
+
+export async function buildVM(filePath: string) {
   if (filePath === vmBundleFilePath && context) {
     return Promise.resolve(true);
   }
@@ -131,6 +134,7 @@ exports.buildVM = async function buildVM(filePath) {
     // If node-specific code is provided then it must be wrapped into a module wrapper. The bundle
     // may need the `require` function, which is not available when running in vm unless passed in.
     if (additionalContextIsObject || supportModules) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       vm.runInContext(m.wrap(bundleContents), context)(
         exports,
         require,
@@ -163,10 +167,10 @@ exports.buildVM = async function buildVM(filePath) {
     return Promise.resolve(true);
   } catch (error) {
     log.error('Caught Error when creating context in buildVM, %O', error);
-    errorReporter.notify(error);
-    return Promise.reject(error);
+    errorReporter.notify(error as Error);
+    return Promise.reject(error as Error);
   }
-};
+}
 
 /**
  *
@@ -174,12 +178,20 @@ exports.buildVM = async function buildVM(filePath) {
  * @param vmCluster
  * @returns {{exceptionMessage: string}}
  */
-exports.runInVM = async function runInVM(renderingRequest, vmCluster) {
+export async function runInVM(
+  renderingRequest: string,
+  vmCluster?: typeof cluster,
+): Promise<string | { exceptionMessage: string }> {
   const { bundlePath } = getConfig();
 
   try {
+    if (context == null) {
+      throw new Error('runInVM called before buildVM');
+    }
+
     if (log.level === 'debug') {
-      const clusterWorkerId = vmCluster && vmCluster.worker ? `worker ${vmCluster.worker.id} ` : '';
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      const clusterWorkerId = vmCluster?.worker?.id ? `worker ${vmCluster.worker.id} ` : '';
       log.debug(`worker ${clusterWorkerId}received render request with code
 ${smartTrim(renderingRequest)}`);
       const debugOutputPathCode = path.join(bundlePath, 'code.js');
@@ -189,7 +201,7 @@ ${smartTrim(renderingRequest)}`);
 
     vm.runInContext('console.history = []', context);
 
-    let result = vm.runInContext(renderingRequest, context);
+    let result = vm.runInContext(renderingRequest, context) as string | Promise<string>;
     if (typeof result !== 'string') {
       const objectResult = await result;
       result = JSON.stringify(objectResult);
@@ -209,12 +221,9 @@ ${smartTrim(result)}`);
     log.debug('Caught exception in rendering request', exceptionMessage);
     return Promise.resolve({ exceptionMessage });
   }
-};
+}
 
-/**
- *
- */
-exports.resetVM = function resetVM() {
+export function resetVM() {
   context = undefined;
   vmBundleFilePath = undefined;
-};
+}

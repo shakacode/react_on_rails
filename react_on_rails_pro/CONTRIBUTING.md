@@ -202,7 +202,7 @@ yarn test
 
 Example of using ndb to debug a test
 ```bash
-ndb $(yarn bin)/jest --runInBand  packages/node-renderer/tests/**/*.test.js -t 'FriendsAndGuests bundle for commit 1a7fe417'
+ndb $(yarn bin)/jest --runInBand  packages/node-renderer/tests/**/*.test.[jt]s -t 'FriendsAndGuests bundle for commit 1a7fe417'
 ```
 Hit F8 and then a debugger statement within the test will get hit.
 

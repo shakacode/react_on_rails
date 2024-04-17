@@ -29,6 +29,15 @@ tmp
 
 # NVM
 .nvmrc
+# nodenv
+.node-version
+
+# Direnv
+.envrc
+
+# TypeScript
+dist/
+*.tsbuildinfo
 
 node_modules
 

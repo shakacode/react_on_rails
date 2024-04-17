@@ -17,3 +17,5 @@ packages/node-renderer/webpack.config.js
 **/public/**
 **/tmp/**
 vendor
+# TypeScript generated files
+**/dist

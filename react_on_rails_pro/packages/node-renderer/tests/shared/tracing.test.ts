@@ -1,14 +1,15 @@
-const { jest } = require('@jest/globals');
+import { Transaction } from '@sentry/types';
+import { jest } from '@jest/globals';
 
 jest.mock('@sentry/node');
 
-const Sentry = require('@sentry/node');
-const tracing = require('../../src/shared/tracing');
+import Sentry = require('@sentry/node');
+import tracing = require('../../src/shared/tracing');
 
 test('should run function and finish transaction', async () => {
   const finishMock = jest.fn();
-  const fn = jest.fn();
-  Sentry.startTransaction.mockReturnValue({ finish: finishMock });
+  const fn = jest.fn<Promise<unknown>, [Transaction | undefined]>();
+  (Sentry.startTransaction as jest.Mock).mockReturnValue({ finish: finishMock });
   tracing.setSentry(Sentry);
   await tracing.withinTransaction(fn, 'sample', 'Sample');
   expect(finishMock.mock.calls).toHaveLength(1);
@@ -17,7 +18,7 @@ test('should run function and finish transaction', async () => {
 
 test('should throw if inner function throws', async () => {
   const finishMock = jest.fn();
-  Sentry.startTransaction.mockReturnValue({ finish: finishMock });
+  (Sentry.startTransaction as jest.Mock).mockReturnValue({ finish: finishMock });
   tracing.setSentry(Sentry);
   await expect(async () => {
     await tracing.withinTransaction(

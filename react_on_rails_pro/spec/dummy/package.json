@@ -95,7 +95,7 @@
     "test": "yarn run build:test && yarn run lint && rspec",
     "lint": "cd ../.. && nps lint",
     "preinstall": "yarn run link-source && yalc add --link @shakacode-tools/react-on-rails-pro-node-renderer",
-    "link-source": "cd ../.. && yalc publish",
+    "link-source": "cd ../.. && yarn run nps build && yalc publish",
     "build:test": "rm -rf public/webpack/test && RAILS_ENV=test NODE_ENV=test bin/webpacker",
     "build:dev": "rm -rf public/webpack/development && RAILS_ENV=development NODE_ENV=development bin/webpacker",
     "build:dev:watch": "RAILS_ENV=development NODE_ENV=development bin/webpacker --watch",
