@@ -2,17 +2,16 @@ import path from 'path';
 import touch from 'touch';
 import lockfile from 'lockfile';
 import sleep from 'sleep-promise';
-import { getVmBundleFilePath } from '../src/worker/vm';
-import handleRenderRequest from '../src/worker/handleRenderRequest';
-
-const {
+import {
   createVmBundle,
   uploadedBundlePath,
   createUploadedBundle,
   resetForTest,
   BUNDLE_TIMESTAMP,
   lockfilePath,
-} = require('./helper');
+} from './helper';
+import { getVmBundleFilePath } from '../src/worker/vm';
+import handleRenderRequest from '../src/worker/handleRenderRequest';
 
 const testName = 'handleRenderRequest';
 const uploadedBundlePathForTest = () => uploadedBundlePath(testName);

@@ -22,7 +22,7 @@ export = function restartWorkers(delayBetweenIndividualWorkerRestarts: number) {
     const killWorker = () => {
       if (!worker) return;
       log.debug('Kill worker #%d', worker.id);
-      // eslint-disable-next-line no-param-reassign
+      // eslint-disable-next-line no-param-reassign -- necessary change
       worker.isScheduledRestart = true;
       worker.destroy();
     };

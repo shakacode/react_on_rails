@@ -1,14 +1,13 @@
 import path from 'path';
-import { buildVM, getVmBundleFilePath, resetVM, runInVM } from '../src/worker/vm';
-import { getConfig } from '../src/shared/configBuilder';
-
-const {
+import {
   uploadedBundlePath,
   createUploadedBundle,
   readRenderingRequest,
   createVmBundle,
   resetForTest,
-} = require('./helper');
+} from './helper';
+import { buildVM, getVmBundleFilePath, resetVM, runInVM } from '../src/worker/vm';
+import { getConfig } from '../src/shared/configBuilder';
 
 const testName = 'vm';
 const uploadedBundlePathForTest = () => uploadedBundlePath(testName);

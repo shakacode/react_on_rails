@@ -1,8 +1,6 @@
 import winston = require('winston');
 
-const { format } = winston;
-
-const { combine, splat, colorize, label, printf } = format;
+const { combine, splat, colorize, label, printf } = winston.format;
 
 const myFormat = printf((info) => `[${info.label as string}] ${info.level}: ${info.message}`);
 

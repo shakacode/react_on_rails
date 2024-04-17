@@ -1,5 +1,5 @@
 /**
- * Holds virtual machine for rendering code in isolated context.
+ * Manages the virtual machine for rendering code in isolated context.
  * @module worker/vm
  */
 
@@ -33,8 +33,8 @@ export function getVmBundleFilePath() {
 }
 
 function replayVmConsole() {
-  if (log.level !== 'debug') return;
-  const consoleHistoryFromVM = vm.runInContext('console.history', context!) as { arguments: unknown[] }[];
+  if (log.level !== 'debug' || !context) return;
+  const consoleHistoryFromVM = vm.runInContext('console.history', context) as { arguments: unknown[] }[];
 
   consoleHistoryFromVM.forEach((msg) => {
     const stringifiedList = msg.arguments.map((arg) => {
@@ -53,7 +53,7 @@ function replayVmConsole() {
 }
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- needed to augment
   namespace NodeJS {
     interface Global {
       ReactOnRails?: unknown;
@@ -176,7 +176,6 @@ export async function buildVM(filePath: string) {
  *
  * @param renderingRequest JS Code to execute for SSR
  * @param vmCluster
- * @returns {{exceptionMessage: string}}
  */
 export async function runInVM(
   renderingRequest: string,
@@ -190,9 +189,9 @@ export async function runInVM(
     }
 
     if (log.level === 'debug') {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      const clusterWorkerId = vmCluster?.worker?.id ? `worker ${vmCluster.worker.id} ` : '';
-      log.debug(`worker ${clusterWorkerId}received render request with code
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- worker is nullable in the primary process
+      const workerId = vmCluster?.worker?.id;
+      log.debug(`worker ${workerId ? `${workerId} ` : ''}received render request with code
 ${smartTrim(renderingRequest)}`);
       const debugOutputPathCode = path.join(bundlePath, 'code.js');
       log.debug(`Full code executed written to: ${debugOutputPathCode}`);

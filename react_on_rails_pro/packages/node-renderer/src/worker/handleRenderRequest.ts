@@ -18,17 +18,13 @@ import {
   workerIdLabel,
   moveUploadedAssets,
   Asset,
+  ResponseResult,
 } from '../shared/utils';
 import { getConfig } from '../shared/configBuilder';
 import errorReporter from '../shared/errorReporter';
 import { buildVM, getVmBundleFilePath, runInVM } from './vm';
 
-/**
- *
- * @param renderingRequest
- * @returns {Promise<*>}
- */
-async function prepareResult(renderingRequest: string) {
+async function prepareResult(renderingRequest: string): Promise<ResponseResult> {
   try {
     const result = await runInVM(renderingRequest, cluster);
 
@@ -63,19 +59,17 @@ function getRequestBundleFilePath(bundleTimestamp: string | number) {
 type Bundle = Pick<Asset, 'file'>;
 
 /**
- *
  * @param bundleFilePathPerTimestamp
  * @param providedNewBundle
  * @param renderingRequest
  * @param assetsToCopy might be null
- * @returns {Promise<{headers: {"Cache-Control": string}, data: any, status: number}>}
  */
 async function handleNewBundleProvided(
   bundleFilePathPerTimestamp: string,
   providedNewBundle: Bundle,
   renderingRequest: string,
   assetsToCopy: Asset[] | null | undefined,
-) {
+): Promise<ResponseResult> {
   log.info('Worker received new bundle: %s', bundleFilePathPerTimestamp);
 
   let lockAcquired = false;
@@ -155,7 +149,7 @@ to ${bundleFilePathPerTimestamp})`,
 
 /**
  * Creates the result for the express server to use.
- * @returns Promise where the result contains { status, data, headers } for to
+ * @returns Promise where the result contains { status, data, headers } to
  * send back to the browser.
  */
 export = async function handleRenderRequest({
@@ -168,7 +162,7 @@ export = async function handleRenderRequest({
   bundleTimestamp: string | number;
   providedNewBundle?: Bundle | null;
   assetsToCopy?: Asset[] | null;
-}) {
+}): Promise<ResponseResult> {
   try {
     const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
 

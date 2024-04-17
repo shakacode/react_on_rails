@@ -4,8 +4,7 @@ import fs from 'fs';
 import querystring from 'querystring';
 import worker from '../src/worker';
 import packageJson from '../../../package.json';
-
-const {
+import {
   BUNDLE_TIMESTAMP,
   createVmBundle,
   resetForTest,
@@ -17,7 +16,7 @@ const {
   bundlePath,
   assetPath,
   assetPathOther,
-} = require('./helper');
+} from './helper';
 
 const testName = 'worker';
 const createVmBundleForTest = () => createVmBundle(testName);
