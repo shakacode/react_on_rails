@@ -20,6 +20,5 @@ spec
 node_modules
 tmp
 gen-examples
+packages/node-renderer/src
 packages/node-renderer/tests
-packages/node-renderer/.eslintrc
-packages/node-renderer/.flowconfig

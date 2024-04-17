@@ -8,9 +8,8 @@ import log from './log';
 export const TRUNCATION_FILLER = '\n... TRUNCATED ...\n';
 
 export function workerIdLabel() {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  const workerId = cluster?.worker?.id || 'NO WORKER ID';
-  return workerId;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- worker is nullable in the primary process
+  return cluster?.worker?.id || 'NO WORKER ID';
 }
 
 // From https://stackoverflow.com/a/831583/1009332
@@ -53,21 +52,20 @@ export function errorResponseResult(msg: string): ResponseResult {
 }
 
 /**
- *
- * @param renderingRequest JavaScript code to execute
- * @param error
- * @returns {string}
+ * @param renderingRequest The JavaScript code which threw an error
+ * @param error The error that was thrown (typed as `unknown` to minimize casts in `catch`)
+ * @param context Optional context to include in the error message
  */
-export function formatExceptionMessage(renderingRequest: string, error: any, context?: string) {
+export function formatExceptionMessage(renderingRequest: string, error: unknown, context?: string) {
   return `${context ? `\nContext:\n${context}\n` : ''}
 JS code for rendering request was:
 ${smartTrim(renderingRequest)}
     
 EXCEPTION MESSAGE:
-${error.message || error}
+${(error as Error).message || error}
 
 STACK:
-${error.stack}`;
+${(error as Error).stack}`;
 }
 
 export interface Asset {
@@ -76,9 +74,7 @@ export interface Asset {
 }
 
 /**
- *
  * @param uploadedAssets array of objects with values { file, filename }
- * @returns {Promise<void>}
  */
 export async function moveUploadedAssets(uploadedAssets: Asset[]): Promise<void> {
   const { bundlePath } = getConfig();

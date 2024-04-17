@@ -52,11 +52,10 @@ export interface Config {
   includeTimerPolyfills: boolean;
 }
 
-let config: Config;
-let userConfig: Partial<Config>;
+let config: Config | undefined;
+let userConfig: Partial<Config> = {};
 
 export function getConfig() {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (!config) {
     throw Error('Call buildConfig before calling getConfig');
   }
@@ -127,13 +126,15 @@ function envValuesUsed() {
   };
 }
 
-function sanitizedSettings(aConfig: Config, defaultValue?: string) {
-  return {
-    ...aConfig,
-    password: aConfig.password != null ? '<MASKED>' : defaultValue,
-    allWorkersRestartInterval: aConfig.allWorkersRestartInterval || defaultValue,
-    delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts || defaultValue,
-  };
+function sanitizedSettings(aConfig: Partial<Config> | undefined, defaultValue?: string) {
+  return aConfig && Object.keys(aConfig).length > 0
+    ? {
+        ...aConfig,
+        password: aConfig.password != null ? '<MASKED>' : defaultValue,
+        allWorkersRestartInterval: aConfig.allWorkersRestartInterval || defaultValue,
+        delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts || defaultValue,
+      }
+    : {};
 }
 
 export function logSanitizedConfig() {
@@ -143,7 +144,7 @@ export function logSanitizedConfig() {
   log.info('ENV values used for settings (use "RENDERER_" prefix):\n%O', envValuesUsed());
   log.info(
     'Customized values for settings from config object (overides ENV):\n%O',
-    sanitizedSettings(getConfig()),
+    sanitizedSettings(userConfig),
   );
   log.info('Final renderer settings used:\n%O', sanitizedSettings(config, '<NOT PROVIDED>'));
 }
@@ -167,7 +168,8 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     }
 
     if (currentArg === 'p') {
-      config.port = parseInt(val, 10);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- config is still guaranteed to be defined here
+      config!.port = parseInt(val, 10);
     }
   });
 

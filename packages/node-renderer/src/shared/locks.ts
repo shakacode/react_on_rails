@@ -77,7 +77,7 @@ export async function lock(filename: string): Promise<LockResult> {
     log.info('Worker %s: About to request lock %s', workerId, lockfileName);
     await lockfileLockAsync(lockfileName, lockfileOptions);
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the const may be changed to test threading
     if (TEST_LOCKFILE_THREADING) {
       debug('Worker %i: handleNewBundleProvided sleeping 5s', workerId);
       await sleep(5000);

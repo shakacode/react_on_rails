@@ -5,7 +5,7 @@
 
 import path from 'path';
 import cluster from 'cluster';
-import express, { NextFunction, Request, Response } from 'express';
+import express, { Request, Response } from 'express';
 import busBoy from 'express-busboy';
 import log from './shared/log';
 import packageJson from './shared/packageJson';
@@ -121,9 +121,10 @@ export = function run(config: Partial<Config>) {
   // See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
   // the digest is part of the request URL. Yes, it's not used here, but the
   // server logs might show it to distinguish different requests.
-  app.route('/bundles/:bundleTimestamp/render/:renderRequestDigest').post(
+  const bundleRoute = '/bundles/:bundleTimestamp/render/:renderRequestDigest';
+  app.route(bundleRoute).post(
     // eslint-disable-next-line @typescript-eslint/no-misused-promises,@typescript-eslint/require-await -- Express types don't expect async handler
-    asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
+    asyncHandler<typeof bundleRoute>(async (req, res, _next) => {
       if (!requestPrechecks(req, res)) {
         return;
       }
@@ -150,7 +151,7 @@ export = function run(config: Partial<Config>) {
             try {
               const result = await handleRenderRequest({
                 renderingRequest,
-                bundleTimestamp: bundleTimestamp!,
+                bundleTimestamp,
                 providedNewBundle,
                 assetsToCopy,
               });
@@ -188,7 +189,7 @@ export = function run(config: Partial<Config>) {
   // any assets, they must be uploaded manually.
   app.route('/upload-assets').post(
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Express types don't expect async handler
-    asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
+    asyncHandler(async (req, res, _next) => {
       if (!requestPrechecks(req, res)) {
         return;
       }
@@ -248,7 +249,7 @@ export = function run(config: Partial<Config>) {
   // Checks if file exist
   app.route('/asset-exists').post(
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Express types don't expect async handler
-    asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
+    asyncHandler(async (req, res, _next) => {
       if (!isAuthenticated(req, res)) {
         return;
       }
