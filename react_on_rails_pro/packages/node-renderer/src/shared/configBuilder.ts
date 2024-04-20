@@ -64,6 +64,7 @@ export function getConfig() {
 }
 
 function defaultWorkersCount() {
+  // Create a worker for each CPU except one that is used for master process
   return os.cpus().length - 1 || 1;
 }
 

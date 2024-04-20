@@ -37,7 +37,7 @@ scripts:
   eslint:
     default:
       description: Run eslint.
-      script: eslint . --ext ".js,.jsx,.ts,.tsx"
+      script: eslint . --ext ".js,.jsx,.ts,.tsx" --report-unused-disable-directives
     fix:
       description: Run eslint and auto-fix.
       script: nps "eslint --fix"
