@@ -1,4 +1,3 @@
-import { Transaction } from '@sentry/types';
 import { jest } from '@jest/globals';
 
 jest.mock('@sentry/node');
@@ -8,7 +7,7 @@ import tracing = require('../../src/shared/tracing');
 
 test('should run function and finish transaction', async () => {
   const finishMock = jest.fn();
-  const fn = jest.fn<Promise<unknown>, [Transaction | undefined]>();
+  const fn = jest.fn<Parameters<typeof tracing.withinTransaction>[0]>();
   (Sentry.startTransaction as jest.Mock).mockReturnValue({ finish: finishMock });
   tracing.setSentry(Sentry);
   await tracing.withinTransaction(fn, 'sample', 'Sample');
