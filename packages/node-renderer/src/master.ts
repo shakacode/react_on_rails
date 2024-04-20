@@ -17,11 +17,7 @@ export = function masterRun(runningConfig?: Partial<Config>) {
 
   logSanitizedConfig();
 
-  // Count available CPUs for worker processes:
-  const workerCpuCount = workersCount;
-
-  // Create a worker for each CPU except one that used for master process:
-  for (let i = 0; i < workerCpuCount; i += 1) {
+  for (let i = 0; i < workersCount; i += 1) {
     cluster.fork();
   }
 

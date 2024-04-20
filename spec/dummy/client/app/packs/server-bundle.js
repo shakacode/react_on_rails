@@ -1,3 +1,5 @@
+// import statement added by react_on_rails:generate_packs rake task
+import './../generated/server-bundle-generated.js';
 // Shows the mapping from the exported object to the name used by the server rendering.
 import ReactOnRails from 'react-on-rails';
 

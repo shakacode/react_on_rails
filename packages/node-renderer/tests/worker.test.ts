@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-floating-promises, @typescript-eslint/require-await -- update supertest use later */
 import request from 'supertest';
 import fs from 'fs';
 import querystring from 'querystring';
