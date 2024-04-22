@@ -29,11 +29,11 @@ Gem::Specification.new do |s|
   s.add_dependency "addressable"
   s.add_dependency "connection_pool"
   s.add_dependency "execjs", "~> 2.5"
-  s.add_dependency "sqlite3", "~> 1.6"
   s.add_dependency "rails", ">= 5.2"
   s.add_dependency "rainbow", "~> 3.0"
 
   s.add_development_dependency "gem-release"
+  s.add_development_dependency "sqlite3", "~> 1.6"
   s.post_install_message = '
 --------------------------------------------------------------------------------
 Checkout https://www.shakacode.com/react-on-rails-pro for information about
