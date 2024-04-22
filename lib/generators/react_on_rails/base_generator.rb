@@ -92,14 +92,7 @@ module ReactOnRails
 
         puts "Adding CSS handlers"
 
-        # css_minimizer_webpack_plugin version 6 only supports Nodejs v18+
-        # When we bump our minimum Nodejs version to 18, we can remove this logic
-        # and install css_minimizer_webpack_plugin directly.
-        node_major_version = `node -v`.match(/^v(\d{,2})\./)[1]&.to_i
-        css_minimizer_webpack_plugin_version = node_major_version >= 18 ? "" : "@<6.0.0"
-        css_minimizer_webpack_plugin = "css-minimizer-webpack-plugin#{css_minimizer_webpack_plugin_version}"
-
-        run "yarn add 'css-loader@<7.0.0' '#{css_minimizer_webpack_plugin}' mini-css-extract-plugin style-loader"
+        run "yarn add css-loader css-minimizer-webpack-plugin mini-css-extract-plugin style-loader@"
 
         puts "Adding dev dependencies"
         run "yarn add -D @pmmmwh/react-refresh-webpack-plugin react-refresh"
