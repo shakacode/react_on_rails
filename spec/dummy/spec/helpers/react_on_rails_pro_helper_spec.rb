@@ -5,10 +5,6 @@ require "support/script_tag_utils"
 
 RequestDetails = Struct.new(:original_url, :env)
 
-def cache_data
-  Rails.cache.instance_variable_get(:@data)
-end
-
 describe ReactOnRailsProHelper, type: :helper do
   # In order to test the pro helper, we need to load the methods from the regular helper.
   # I couldn't see any easier way to do this.
