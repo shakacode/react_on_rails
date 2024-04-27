@@ -166,7 +166,7 @@ export = async function handleRenderRequest({
   try {
     const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
 
-    // If current vm is correct and ready
+    // If the current VM has the correct bundle and is ready
     if (getVmBundleFilePath() === bundleFilePathPerTimestamp) {
       return prepareResult(renderingRequest);
     }
@@ -181,16 +181,7 @@ export = async function handleRenderRequest({
       );
     }
 
-    // If no vm yet or bundle name does not match
-    const workerId = workerIdLabel();
-
-    if (getVmBundleFilePath()) {
-      log.info('Bundle per timestamp %s needed. Worker: %s', bundleFilePathPerTimestamp, workerId);
-    } else {
-      log.info('Bundle %s needed, but none saved yet. Worker: %s', bundleFilePathPerTimestamp, workerId);
-    }
-
-    // Check if bundle was uploaded:
+    // Check if the bundle exists:
     const fileExists = await fileExistsAsync(bundleFilePathPerTimestamp);
     if (!fileExists) {
       log.info(`No saved bundle ${bundleFilePathPerTimestamp}. Requesting a new bundle.`);
@@ -201,8 +192,9 @@ export = async function handleRenderRequest({
       });
     }
 
-    // The bundle exists and the vm was not yet created. Another worker must
-    // have written it or it was saved during deployment.
+    // The bundle exists, but the VM has not yet been created.
+    // Another worker must have written it or it was saved during deployment.
+    log.info('Bundle %s exists. Building VM for worker %s.', bundleFilePathPerTimestamp, workerIdLabel());
     await buildVM(bundleFilePathPerTimestamp);
 
     return prepareResult(renderingRequest);
