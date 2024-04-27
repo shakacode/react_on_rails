@@ -4,6 +4,8 @@
  * @module worker/configBuilder
  */
 import os from 'os';
+import path from 'path';
+import fs from 'fs';
 import requireOptional from './requireOptional';
 import log, { configureLogger } from './log';
 import errorReporter from './errorReporter';
@@ -13,7 +15,6 @@ import truthy from './truthy';
 
 const Sentry = requireOptional('@sentry/node') as typeof import('@sentry/node') | null;
 
-const DEFAULT_TMP_DIR = '/tmp/react-on-rails-pro-node-renderer-bundles';
 // usually remote renderers are on staging or production, so, use production folder always
 const DEFAULT_PORT = 3800;
 const DEFAULT_LOG_LEVEL = 'info';
@@ -68,6 +69,25 @@ function defaultWorkersCount() {
   return os.cpus().length - 1 || 1;
 }
 
+// Find the .node-renderer-bundles folder if it exists, otherwise use /tmp
+function defaultBundlePath() {
+  let currentDir = process.cwd();
+  const maxDepth = 10;
+  for (let i = 0; i < maxDepth; i += 1) {
+    const nodeRendererBundlesPath = path.resolve(currentDir, '.node-renderer-bundles');
+    if (fs.existsSync(nodeRendererBundlesPath)) {
+      return nodeRendererBundlesPath;
+    }
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      // We're at the root and didn't find the folder
+      break;
+    }
+    currentDir = parentDir;
+  }
+  return '/tmp/react-on-rails-pro-node-renderer-bundles';
+}
+
 const defaultConfig: Config = {
   // Use env port if we run on Heroku
   port: Number(env.RENDERER_PORT) || DEFAULT_PORT,
@@ -75,8 +95,7 @@ const defaultConfig: Config = {
   // Show only important messages by default
   logLevel: env.RENDERER_LOG_LEVEL || DEFAULT_LOG_LEVEL,
 
-  // Use directory DEFAULT_TMP_DIR if none provided
-  bundlePath: env.RENDERER_BUNDLE_PATH || DEFAULT_TMP_DIR,
+  bundlePath: env.RENDERER_BUNDLE_PATH || defaultBundlePath(),
 
   supportModules: truthy(env.RENDERER_SUPPORT_MODULES),
 

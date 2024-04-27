@@ -20,6 +20,7 @@ You can find the **package** version numbers from this repo's tags and below in 
 ### Fixed
 - Updated multiple JS dependencies for bug fixes.
 - Added execute permission for `spec/dummy/bin/dev` [PR 387](https://github.com/shakacode/react_on_rails_pro/pull/387) by [alexeyr](https://github.com/alexeyr).
+- Made default bundle paths in node-renderer and Rails consistent [PR 399](https://github.com/shakacode/react_on_rails_pro/pull/399) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
 ### Changed
 - Converted JS code to TS [PR 386](https://github.com/shakacode/react_on_rails_pro/pull/386) and [PR 389](https://github.com/shakacode/react_on_rails_pro/pull/389) by [alexeyr-ci](https://github.com/alexeyr-ci).

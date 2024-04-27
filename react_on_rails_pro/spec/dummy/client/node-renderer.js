@@ -6,8 +6,8 @@ const env = process.env;
 const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
 
 const config = {
-  bundlePath: path.resolve(__dirname, '../.node-renderer-bundles'), // Save bundle to "tmp/bundles" dir of our dummy app
-  // This is the default
+  // This is the default but avoids searching for the Rails root
+  bundlePath: path.resolve(__dirname, '../.node-renderer-bundles'),
   port: env.RENDERER_PORT || 3800, // Listen at RENDERER_PORT env value or default port 3800
   logLevel: env.RENDERER_LOG_LEVEL || 'info',
 
@@ -20,12 +20,12 @@ const config = {
   // be set if you wish to have automatic worker restarting, say to clear memory leaks.
 
   // time in minutes between restarting all workers
-  allWorkersRestartInterval: (env.CI && 2) || env.RENDERER_ALL_WORKERS_RESTART_INTERVAL || 10,
+  allWorkersRestartInterval: (env.CI ? 2 : env.RENDERER_ALL_WORKERS_RESTART_INTERVAL) || 10,
 
   // time in minutes between each worker restarting when restarting all workers
-  delayBetweenIndividualWorkerRestarts: (env.CI && 0.01) || 1,
+  delayBetweenIndividualWorkerRestarts: env.CI ? 0.01 : 1,
 
-  // Uncomment and change value for testing the honeybadger API integration
+  // This is a test account for React on Rails Pro. Substitute your own.
   honeybadgerApiKey: 'a602365c',
 
   // This is a test account for React on Rails Pro.
