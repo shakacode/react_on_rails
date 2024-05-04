@@ -39,7 +39,8 @@ module ReactOnRails
       i18n_output_format: nil,
       components_subdirectory: nil,
       make_generated_server_bundle_the_entrypoint: false,
-      defer_generated_component_packs: true
+      defer_generated_component_packs: true,
+      force_load: false
     )
   end
 
@@ -53,7 +54,8 @@ module ReactOnRails
                   :server_render_method, :random_dom_id, :auto_load_bundle,
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
-                  :defer_generated_component_packs
+                  :defer_generated_component_packs,
+                  :force_load
 
     # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
@@ -68,7 +70,7 @@ module ReactOnRails
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
-                   components_subdirectory: nil, auto_load_bundle: nil)
+                   components_subdirectory: nil, auto_load_bundle: nil, force_load: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir

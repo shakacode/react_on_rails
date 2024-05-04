@@ -23,6 +23,8 @@ gem "sprockets", "~> 4.0"
 
 gem "amazing_print"
 
+gem "turbo-rails"
+
 group :development, :test do
   gem "listen"
   gem "pry"
