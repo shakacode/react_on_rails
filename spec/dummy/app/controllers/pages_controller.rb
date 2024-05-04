@@ -36,6 +36,12 @@ class PagesController < ApplicationController
       }.merge(xss_payload)
     }
 
+    @app_props_hello_from_turbo_stream = {
+      helloTurboStreamData: {
+        name: "Mrs. Client Side Rendering From Turbo Stream"
+      }.merge(xss_payload)
+    }
+
     @app_props_hello_again = {
       helloWorldData: {
         name: "Mrs. Client Side Hello Again"
