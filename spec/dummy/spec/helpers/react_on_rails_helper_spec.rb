@@ -288,6 +288,26 @@ describe ReactOnRailsHelper do
       it { is_expected.not_to include '<span id="App-react-component-0"></span>' }
       it { is_expected.to include '<div id="App-react-component-0"></div>' }
     end
+
+    describe "'force_load' tag option" do
+      let(:force_load_script) do
+        %(
+ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');
+        ).html_safe
+      end
+
+      context "with 'force_load' == true" do
+        subject { react_component("App", force_load: true) }
+
+        it { is_expected.to include force_load_script }
+      end
+
+      context "without 'force_load' tag option" do
+        subject { react_component("App") }
+
+        it { is_expected.not_to include force_load_script }
+      end
+    end
   end
 
   describe "#redux_store" do
