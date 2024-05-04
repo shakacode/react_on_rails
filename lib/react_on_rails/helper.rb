@@ -441,6 +441,14 @@ module ReactOnRails
                                                 "data-trace" => (render_options.trace ? true : nil),
                                                 "data-dom-id" => render_options.dom_id)
 
+      if render_options.force_load
+        component_specification_tag.concat(
+          content_tag(:script, %(
+ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
+          ).html_safe)
+        )
+      end
+                    
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
 
