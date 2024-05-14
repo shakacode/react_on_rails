@@ -113,7 +113,7 @@ The following companies support our open source projects, and ShakaCode uses the
     <img alt="ScoutAPM" src="https://user-images.githubusercontent.com/4244251/184881152-9f2d8fba-88ac-4ba6-873b-22387f8711c5.png" height="120px">
   </picture>
 </a>
-<a href="https://controlplane.com">
+<a href="https://shakacode.controlplane.com">
   <picture>
     <img alt="Control Plane" src="https://github.com/shakacode/.github/assets/20628911/90babd87-62c4-4de3-baa4-3d78ef4bec25" height="120px">
   </picture>
