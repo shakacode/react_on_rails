@@ -29,7 +29,6 @@ Gem::Specification.new do |s|
   s.add_dependency "addressable"
   s.add_dependency "connection_pool"
   s.add_dependency "execjs", "~> 2.5"
-  s.add_dependency "sqlite3", "~> 1.6"
   s.add_dependency "rails", ">= 5.2"
   s.add_dependency "rainbow", "~> 3.0"
 
