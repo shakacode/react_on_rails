@@ -37,7 +37,7 @@ jobs:
         path: vendor/bundle
         key: v5-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
     - name: Install Ruby Gems for package
-      run: bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+      run: bundle check --path=vendor/bundle || bundle  _2.5.3_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Run rspec tests
       run: bundle exec rspec spec/react_on_rails
     - name: Store test results
