@@ -387,7 +387,6 @@ PLATFORMS
 DEPENDENCIES
   amazing_print
   bootsnap
-  bundler (= 2.5.3)
   capybara
   capybara-screenshot
   coveralls
@@ -418,10 +417,10 @@ DEPENDENCIES
   shakapacker (= 7.2.1)
   spring (~> 4.0)
   sprockets (~> 4.0)
-  sqlite3
+  sqlite3 (~> 1.6)
   turbolinks
   uglifier
   webdrivers (= 5.3.0)
 
 BUNDLED WITH
-   2.5.3
+   2.5.9

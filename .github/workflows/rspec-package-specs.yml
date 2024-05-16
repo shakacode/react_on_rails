@@ -21,7 +21,7 @@ jobs:
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby }}
-        bundler: 2.5.3
+        bundler: 2.5.9
     - name: Print system information
       run: |
         echo "Linux release: "; cat /etc/issue
@@ -37,7 +37,7 @@ jobs:
         path: vendor/bundle
         key: v5-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
     - name: Install Ruby Gems for package
-      run: bundle check --path=vendor/bundle || bundle  _2.5.3_ install --path=vendor/bundle --jobs=4 --retry=3
+      run: bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Run rspec tests
       run: bundle exec rspec spec/react_on_rails
     - name: Store test results
