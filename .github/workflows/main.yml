@@ -21,7 +21,7 @@ jobs:
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby }}
-        bundler: 2.5.3
+        bundler: 2.5.9
     # libyaml-dev is needed for psych v5
     # this gem depends on sdoc which depends on rdoc which depends on psych
     - name: Fix dependency for libyaml-dev
@@ -66,7 +66,7 @@ jobs:
         path: spec/dummy/vendor/bundle
         key: v5-dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
     - name: Install Ruby Gems for dummy app
-      run: cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle _2.5.3_ install --path=vendor/bundle --jobs=4 --retry=3
+      run: cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: generate file system-based packs
       run: cd spec/dummy && RAILS_ENV=test bundle exec rake react_on_rails:generate_packs
     - name: Build test bundles for dummy app
@@ -94,7 +94,7 @@ jobs:
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby }}
-        bundler: 2.5.3
+        bundler: 2.5.9
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
@@ -145,9 +145,9 @@ jobs:
     - name: yalc add react-on-rails
       run: cd spec/dummy && yalc add react-on-rails
     - name: Install Ruby Gems for package
-      run:  bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle  _2.5.3_ install --path=vendor/bundle --jobs=4 --retry=3
+      run:  bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Install Ruby Gems for dummy app
-      run: cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle _2.5.3_ install --path=vendor/bundle --jobs=4 --retry=3
+      run: cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Ensure minimum required Chrome version
       run: |
         echo -e "Already installed $(google-chrome --version)\n"
