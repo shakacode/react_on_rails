@@ -4,9 +4,12 @@ All notable changes to this project's source code will be documented in this fil
 Migration instructions for the major updates can be found [here](https://www.shakacode.com/react-on-rails/docs/guides/upgrading-react-on-rails#upgrading-to-version-9.md). Some smaller migration information can be found here.
 
 ## Want to Save Time Updating?
-If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for information about our [React on Rails Pro Support Options](https://www.shakacode.com/react-on-rails-pro).
 
-We specialize in helping companies quickly and efficiently update client-side dependencies, allowing developers to focus on features and bug fixes rather than addressing tech-debt from old dependencies. ShakaCode also maintains Shakapacker, the successor to Webpacker.
+If you need help upgrading `react_on_rails`, `webpacker` to `shakapacker`, or JS packages, contact justin@shakacode.com. We can upgrade your project and improve your development and customer experiences, allowing you to focus on building new features or fixing bugs instead. 
+
+For an overview of working with us, see our [Client Engagement Model](https://www.shakacode.com/blog/client-engagement-model/) article and [how we bill for time](https://www.shakacode.com/blog/shortcut-jira-trello-github-toggl-time-and-task-tracking/).
+
+If you think ShakaCode can help your project, [click here](https://meetings.hubspot.com/justingordon/30-minute-consultation) to book a call with [Justin Gordon](mailto:justin@shakacode.com), the creator of React on Rails and Shakapacker.
 
 ## Contributors
 Please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
@@ -14,8 +17,11 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ## Versions
 ### [Unreleased]
 Changes since the last non-beta release.
-#### Added
-- Pack Generation: Added functionality that will add an import statement, if missing, to the server bundle entrypoint even if the autobundle generated files still exist [PR 1610](https://github.com/shakacode/react_on_rails/pull/1610) by [judahmeek](https://github.com/judahmeek).
+
+### [14.0.1] - 2024-05-16
+
+#### Fixed
+- Pack Generation: Added functionality that will add an import statement, if missing, to the server bundle entry point even if the auto-bundle generated files still exist [PR 1610](https://github.com/shakacode/react_on_rails/pull/1610) by [judahmeek](https://github.com/judahmeek).
 
 ### [14.0.0] - 2024-04-03
 _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigLoader.js`._
@@ -1122,7 +1128,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.0.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.0.1...master
+[14.0.1]: https://github.com/shakacode/react_on_rails/compare/14.0.0...14.0.1
 [14.0.0]: https://github.com/shakacode/react_on_rails/compare/13.4.0...14.0.0
 [13.4.0]: https://github.com/shakacode/react_on_rails/compare/13.3.5...13.4.0
 [13.3.5]: https://github.com/shakacode/react_on_rails/compare/13.3.4...13.3.5
