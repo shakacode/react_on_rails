@@ -24,17 +24,25 @@
 
 *These are the docs for React on Rails 13. To see the older docs: [v12](https://github.com/shakacode/react_on_rails/tree/12.6.0) and [v11](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
 
-#### About
-React on Rails integrates Rails with (server rendering of) Facebook's [React](https://github.com/facebook/react) front-end framework.
+# About
+React on Rails integrates Rails with (server rendering of) [React](https://github.com/facebook/react).
 
-This project is maintained by the software consulting firm [ShakaCode](https://www.shakacode.com). We focus on Ruby on Rails applications with React front-ends, often using TypeScript or ReScript (ReasonML). We also build React Native apps and Gatsby sites. See [our recent work](https://www.shakacode.com/recent-work) for examples of what we do. ShakaCode.com (HiChee.com) is [hiring developers that like working on open-source](https://www.shakacode.com/career/).
+This project is maintained by [ShakaCode](https://www.shakacode.com). 
 
-Are you interested in optimizing your webpack setup for React on Rails including code
-splitting with [react-router](https://github.com/ReactTraining/react-router#readme) and
- [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers?
-We did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://www.shakacode.com/recent-work/popmenu/). Several years later, Popmenu is serving millions of SSR requests per day with React on Rails.
+## ShakaCode Upgrade Support
+ShakaCode focuses on helping Ruby on Rails teams better use React and Webpack. We can upgrade your project and improve your development and customer experiences, allowing you to focus on building new features or fixing bugs instead. 
 
-Check out [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/). For more information, feel free to contact Justin Gordon, [justin@shakacode.com](mailto:justin@shakacode.com), maintainer of React on Rails.
+For an overview of working with us, see our [Client Engagement Model](https://www.shakacode.com/blog/client-engagement-model/) article and [how we bill for time](https://www.shakacode.com/blog/shortcut-jira-trello-github-toggl-time-and-task-tracking/).
+
+We also specialize in helping development teams lower infrastructure and CI costs. Check out our project [Control Plane Flow](https://github.com/shakacode/control-plane-flow/), which can allow you to get the ease of Heroku with the power of Kubernetes and big cost savings.
+
+If you think ShakaCode can help your project, [click here](https://meetings.hubspot.com/justingordon/30-minute-consultation) to book a call with [Justin Gordon](mailto:justin@shakacode.com), the creator of React on Rails.
+
+## React on Rails Pro
+Are you interested in optimizing your webpack setup for React on Rails, including code splitting with [react-router](https://github.com/ReactTraining/react-router#readme) and  [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers?
+We did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://www.shakacode.com/recent-work/popmenu/). Several years later, Popmenu serves tens of millions of SSR requests daily with React on Rails Pro.
+
+If you're interested, read more about [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) and [book a call](https://meetings.hubspot.com/justingordon/30-minute-consultation).
 
 # Documentation
 
@@ -42,16 +50,16 @@ See the documentation at **[shakacode.com/react-on-rails/docs](https://www.shaka
 
 ## Project Objective
 
-To provide a high performance framework for integrating Ruby on Rails with React via the [**Webpacker**](https://github.com/rails/webpacker) gem, especially regarding React Server-Side Rendering for better SEO and improved performance.
+To provide a high-performance framework for integrating Ruby on Rails with React, especially regarding React Server-Side Rendering for better SEO and improved performance.
 
 ## Features and Why React on Rails?
 
-Given that `rails/webpacker` gem already provides basic React integration, why would you use "React on Rails"?
+Given that `shakacode/shakapacker` gem already provides basic React integration, why would you use "React on Rails"?
 
 1. Automatic configuration of what bundles are added to the page based on what React components are on the page. This results in faster browser loading time via smaller bundle sizes.
-1. Keep up with the latest changes of different versions of React. React 18 is supported.
+1. Keep up with the latest changes in different versions of React. React 18 is supported.
 1. Easy passing of props directly from your Rails view to your React components rather than having your Rails view load and then make a separate request to your API.
-Tight integration with [shakapacker](https://github.com/shakacode/shakapacker) (or it's predecessor [rails/webpacker](https://github.com/rails/webpacker)).
+Tight integration with [shakapacker](https://github.com/shakacode/shakapacker) (or its predecessor [rails/webpacker](https://github.com/rails/webpacker)).
 1. Server-Side Rendering (SSR), often used for SEO crawler indexing and UX performance.
 1. [Automated optimized entry-point creation and bundle inclusion when placing a component on a page. With this feature, you no longer need to configure `javascript_pack_tags` and `stylesheet_pack_tags` on your layouts based on what’s shown. “It just works!”](https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation/)
 1. [Redux](https://github.com/reactjs/redux) and [React Router](https://github.com/ReactTraining/react-router#readme) integration with server-side-rendering.
@@ -87,7 +95,7 @@ Ruby on Rails >=5, rails/webpacker >= 4.2 or shakapacker > 6, Ruby >= 3.0.0
 
 ## Contributing
 
-Bug reports and pull requests are welcome. See [Contributing](https://github.com/shakacode/react_on_rails/tree/master/CONTRIBUTING.md) to get started, and the [list of help wanted issues](https://github.com/shakacode/react_on_rails/labels/contributions%3A%20up%20for%20grabs%21).
+Bug reports and pull requests are welcome. To get started, see [Contributing](https://github.com/shakacode/react_on_rails/tree/master/CONTRIBUTING.md) and the [list of help wanted issues](https://github.com/shakacode/react_on_rails/labels/contributions%3A%20up%20for%20grabs%21).
 
 # Work with Us
 ShakaCode is **[hiring passionate software engineers](http://www.shakacode.com/career)** to work on our projects, including [HiChee](https://hichee.com)!
@@ -98,7 +106,7 @@ The gem is available as open source under the terms of the [MIT License](https:/
 
 # Supporters
 
-The following companies support our open source projects, and ShakaCode uses their products!
+The following companies support our open-source projects, and ShakaCode uses their products!
 
 <br />
 <br />
