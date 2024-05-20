@@ -258,7 +258,7 @@ module ReactOnRails
     def shakapacker_precompile?
       return Webpacker.config.webpacker_precompile? if ReactOnRails::WebpackerUtils.using_shakapacker_6?
 
-      Webpacker.config.shakapacker_precompile?
+      Shakapacker.config.shakapacker_precompile?
     end
 
     def shakapacker_clean_task
