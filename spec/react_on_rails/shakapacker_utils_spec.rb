@@ -3,10 +3,10 @@
 require_relative "spec_helper"
 
 module ReactOnRails
-  describe WebpackerUtils do
-    describe ".using_webpacker?" do
+  describe ShakapackerUtils do
+    describe ".using_shakapacker?" do
       subject do
-        described_class.using_webpacker?
+        described_class.using_shakapacker?
       end
 
       it { is_expected.to be(true) }
