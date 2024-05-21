@@ -18,7 +18,7 @@ jobs:
       with:
         persist-credentials: false
     - name: Setup Node
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
     - name: Print system information
