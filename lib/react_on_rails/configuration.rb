@@ -256,27 +256,23 @@ module ReactOnRails
     end
 
     def shakapacker_precompile?
-      return Webpacker.config.webpacker_precompile? if ReactOnRails::WebpackerUtils.using_shakapacker_6?
-
       Shakapacker.config.shakapacker_precompile?
     end
 
     def shakapacker_clean_task
-      ReactOnRails::WebpackerUtils.using_shakapacker_6? ? "webpacker:clean" : "shakapacker:clean"
+      "shakapacker:clean"
     end
 
     def compile_command_conflict_message
-      packer = ReactOnRails::WebpackerUtils.using_shakapacker_6? ? "webpacker" : "shakapacker"
-
       <<~MSG
 
         React on Rails and Shakapacker error in configuration!
         In order to use config/react_on_rails.rb config.build_production_command,
-        you must edit config/#{packer}.yml to include this value in the default configuration:
-        '#{packer}_precompile: false'
+        you must edit config/shakapacker.yml to include this value in the default configuration:
+        'shakapacker_precompile: false'
 
         Alternatively, remove the config/react_on_rails.rb config.build_production_command and the
-        default bin/#{packer} script will be used for assets:precompile.
+        default bin/shakapacker script will be used for assets:precompile.
 
       MSG
     end
