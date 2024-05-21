@@ -42,7 +42,7 @@ jobs:
       if: matrix.versions == 'oldest'
       run: script/convert
     - name: Save root node_modules to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: node_modules
         key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
@@ -53,7 +53,7 @@ jobs:
     - name: yalc publish for react-on-rails
       run: yalc publish
     - name: Save spec/dummy/node_modules to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: spec/dummy/node_modules
         key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-${{ matrix.versions }}
@@ -62,7 +62,7 @@ jobs:
     - name: Install Node modules with Yarn for dummy app
       run: cd spec/dummy && yarn install --no-progress --no-emoji
     - name: Save dummy app ruby gems to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: spec/dummy/vendor/bundle
         key: dummy-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
@@ -113,29 +113,29 @@ jobs:
       if: matrix.versions == 'oldest'
       run: script/convert
     - name: Save root node_modules to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: node_modules
         key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
     - name: Save root ruby gems to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: vendor/bundle
         key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
     - name: Save dummy app ruby gems to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: spec/dummy/vendor/bundle
         key: dummy-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
     - name: Save spec/dummy/node_modules to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: spec/dummy/node_modules
         key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-${{ matrix.versions }}
     - id: get-sha
       run: echo "::set-output name=sha::$(git rev-parse HEAD)"
     - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: spec/dummy/public/webpack
         key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
