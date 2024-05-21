@@ -4,7 +4,7 @@ require_relative "spec_helper"
 
 module ReactOnRails
   describe ShakapackerUtils do
-    describe ".using_webapcker?" do
+    describe ".using_shakapacker?" do
       subject do
         described_class.using_shakapacker?
       end
