@@ -9,7 +9,7 @@ end
 
 # rubocop:disable Metrics/BlockLength
 describe ReactOnRailsHelper do
-  include Webpacker::Helper
+  include Shakapacker::Helper
   before do
     allow(self).to receive(:request) {
       Struct.new("Request", :original_url, :env)
