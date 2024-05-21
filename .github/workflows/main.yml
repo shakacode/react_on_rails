@@ -179,22 +179,22 @@ jobs:
     - name: Main CI
       run: bundle exec rake run_rspec:all_dummy
     - name: Store test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: main-rspec
         path: ~/rspec
     - name: Store artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: dummy-app-capybara
         path: spec/dummy/tmp/capybara
     - name: Store artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: dummy-app-test-log
         path: spec/dummy/log/test.log
     - name: Store artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: dummy-app-yarn-log
         path: spec/dummy/yarn-error.log
