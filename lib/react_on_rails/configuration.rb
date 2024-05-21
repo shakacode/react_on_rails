@@ -128,7 +128,8 @@ module ReactOnRails
       raise_missing_components_subdirectory if auto_load_bundle && !components_subdirectory.present?
       return unless components_subdirectory.present?
 
-      ReactOnRails::ShakapackerUtils.raise_shakapacker_not_installed unless ReactOnRails::ShakapackerUtils.using_shakapacker?
+      ReactOnRails::ShakapackerUtils.raise_shakapacker_not_installed unless
+        ReactOnRails::ShakapackerUtils.using_shakapacker?
       ReactOnRails::ShakapackerUtils.raise_shakapacker_version_incompatible_for_autobundling unless
         ReactOnRails::ShakapackerUtils.shackapacker_version_requirement_met?(
           ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION
