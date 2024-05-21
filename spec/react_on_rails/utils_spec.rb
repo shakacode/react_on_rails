@@ -35,7 +35,7 @@ module ReactOnRails
             allow(ReactOnRails::ShakapackerUtils).to receive(:using_shakapacker?).and_return(true)
           end
 
-          context "when file in manifest", :webpacker do
+          context "when file in manifest", :shakapacker do
             before do
               # Note Shakapacker manifest lookup is inside of the public_output_path
               # [2] (pry) ReactOnRails::ShakapackerUtils: 0> Shakapacker.manifest.lookup("app-bundle.js")
@@ -107,7 +107,7 @@ module ReactOnRails
             .and_return(Pathname.new("public/webpack/development"))
         end
 
-        context "with server file not in manifest", :webpacker do
+        context "with server file not in manifest", :shakapacker do
           it "returns the unhashed server path" do
             server_bundle_name = "server-bundle.js"
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
@@ -122,7 +122,7 @@ module ReactOnRails
           end
         end
 
-        context "with server file in the manifest, used for client", :webpacker do
+        context "with server file in the manifest, used for client", :shakapacker do
           it "returns the correct path hashed server path" do
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
               .and_return("webpack-bundle.js")
@@ -161,7 +161,7 @@ module ReactOnRails
         end
 
         context "with dev-server running, and server file in the manifest, and separate client/server files",
-                :webpacker do
+                :shakapacker do
           it "returns the correct path hashed server path" do
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
               .and_return("server-bundle.js")
