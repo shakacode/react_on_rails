@@ -20,6 +20,9 @@ Changes since the last non-beta release.
 
 ### [14.0.2] - 2024-05-20
 
+#### Removed
+- Dropped Shakapacker v6 support [PR 1622](https://github.com/shakacode/react_on_rails/pull/1622) by [adriangohjw](https://github.com/adriangohjw)
+
 #### Fixed
 - Resolves possible thrown error for precompile checks with Shakapacker. [PR 1622](https://github.com/shakacode/react_on_rails/pull/1622) by [adriangohjw](https://github.com/adriangohjw)
 
