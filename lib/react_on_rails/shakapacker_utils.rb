@@ -1,15 +1,15 @@
 # frozen_string_literal: true
 
 module ReactOnRails
-  module WebpackerUtils
-    def self.using_webpacker?
-      return @using_webpacker if defined?(@using_webpacker)
+  module ShakapackerUtils
+    def self.using_shakapacker?
+      return @using_shakapacker if defined?(@using_shakapacker)
 
-      @using_webpacker = ReactOnRails::Utils.gem_available?("shakapacker")
+      @using_shakapacker = ReactOnRails::Utils.gem_available?("shakapacker")
     end
 
     def self.dev_server_running?
-      return false unless using_webpacker?
+      return false unless using_shakapacker?
 
       Shakapacker.dev_server.running?
     end
@@ -35,9 +35,9 @@ module ReactOnRails
     # This returns either a URL for the webpack-dev-server, non-server bundle or
     # the hashed server bundle if using the same bundle for the client.
     # Otherwise returns a file path.
-    def self.bundle_js_uri_from_webpacker(bundle_name)
+    def self.bundle_js_uri_from_shakapacker(bundle_name)
       # Note Webpacker 3.4.3 manifest lookup is inside of the public_output_path
-      # [2] (pry) ReactOnRails::WebpackerUtils: 0> Webpacker.manifest.lookup("app-bundle.js")
+      # [2] (pry) ReactOnRails::ShakapackerUtils: 0> Webpacker.manifest.lookup("app-bundle.js")
       # "/webpack/development/app-bundle-c1d2b6ab73dffa7d9c0e.js"
       # Next line will throw if the file or manifest does not exist
       hashed_bundle_name = Shakapacker.manifest.lookup!(bundle_name)
@@ -56,11 +56,11 @@ module ReactOnRails
       end
     end
 
-    def self.webpacker_source_path
+    def self.shakapacker_source_path
       Shakapacker.config.source_path
     end
 
-    def self.webpacker_source_entry_path
+    def self.shakapacker_source_entry_path
       Shakapacker.config.source_entry_path
     end
 
@@ -68,8 +68,8 @@ module ReactOnRails
       Shakapacker.config.nested_entries?
     end
 
-    def self.webpacker_public_output_path
-      # Shakapacker has the full absolute path of webpacker output files in a Pathname
+    def self.shakapacker_public_output_path
+      # Shakapacker has the full absolute path of shakapacker output files in a Pathname
       Shakapacker.config.public_output_path.to_s
     end
 
@@ -77,19 +77,19 @@ module ReactOnRails
       Shakapacker.config.public_manifest_path.exist?
     end
 
-    def self.webpacker_source_path_explicit?
-      # WARNING: Calling private method `data` on Shakapacker::Configuration, lib/webpacker/configuration.rb
-      config_webpacker_yml = Shakapacker.config.send(:data)
-      config_webpacker_yml[:source_path].present?
+    def self.shakapacker_source_path_explicit?
+      # WARNING: Calling private method `data` on Shakapacker::Configuration, lib/shakapacker/configuration.rb
+      config_shakapacker_yml = Shakapacker.config.send(:data)
+      config_shakapacker_yml[:source_path].present?
     end
 
     def self.check_manifest_not_cached
-      return unless using_webpacker? && Shakapacker.config.cache_manifest?
+      return unless using_shakapacker? && Shakapacker.config.cache_manifest?
 
       msg = <<-MSG.strip_heredoc
           ERROR: you have enabled cache_manifest in the #{Rails.env} env when using the
           ReactOnRails::TestHelper.configure_rspec_to_compile_assets helper
-          To fix this: edit your config/webpacker.yml file and set cache_manifest to false for test.
+          To fix this: edit your config/shakapacker.yml file and set cache_manifest to false for test.
       MSG
       puts wrap_message(msg)
       exit!
@@ -119,9 +119,9 @@ module ReactOnRails
 
     def self.raise_shakapacker_version_incompatible_for_autobundling
       msg = <<~MSG
-        **ERROR** ReactOnRails: Please upgrade Shakapacker to version #{ReactOnRails::WebpackerUtils.semver_to_string(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)} or \
+        **ERROR** ReactOnRails: Please upgrade Shakapacker to version #{ReactOnRails::ShakapackerUtils.semver_to_string(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)} or \
         above to use the automated bundle generation feature. The currently installed version is \
-        #{ReactOnRails::WebpackerUtils.semver_to_string(ReactOnRails::WebpackerUtils.shakapacker_version_as_array)}.
+        #{ReactOnRails::ShakapackerUtils.semver_to_string(ReactOnRails::ShakapackerUtils.shakapacker_version_as_array)}.
       MSG
 
       raise ReactOnRails::Error, msg
@@ -130,7 +130,7 @@ module ReactOnRails
     def self.raise_shakapacker_not_installed
       msg = <<~MSG
         **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker \
-        #{ReactOnRails::WebpackerUtils.semver_to_string(minimum_required_shakapacker_version)} or above to use the \
+        #{ReactOnRails::ShakapackerUtils.semver_to_string(minimum_required_shakapacker_version)} or above to use the \
         automated bundle generation feature.
       MSG
 

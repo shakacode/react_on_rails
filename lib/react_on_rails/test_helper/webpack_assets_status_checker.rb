@@ -30,8 +30,8 @@ module ReactOnRails
       end
 
       def stale_generated_files(files)
-        manifest_needed = ReactOnRails::WebpackerUtils.using_webpacker? &&
-                          !ReactOnRails::WebpackerUtils.manifest_exists?
+        manifest_needed = ReactOnRails::ShakapackerUtils.using_shakapacker? &&
+                          !ReactOnRails::ShakapackerUtils.manifest_exists?
 
         return ["manifest.json"] if manifest_needed
 

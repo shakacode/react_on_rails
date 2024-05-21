@@ -67,7 +67,7 @@ module ReactOnRails
                                     source_path: nil,
                                     generated_assets_full_path: nil,
                                     webpack_generated_files: nil)
-      ReactOnRails::WebpackerUtils.check_manifest_not_cached
+      ReactOnRails::ShakapackerUtils.check_manifest_not_cached
       if webpack_assets_status_checker.nil?
         source_path ||= ReactOnRails::Utils.source_path
         generated_assets_full_path ||= ReactOnRails::Utils.generated_assets_full_path
@@ -86,7 +86,7 @@ module ReactOnRails
           puts
           @printed_once = true
 
-          if ReactOnRails::WebpackerUtils.using_webpacker? &&
+          if ReactOnRails::ShakapackerUtils.using_shakapacker? &&
              ReactOnRails::Utils.using_webpacker_source_path_is_not_defined_and_custom_node_modules?
             msg = <<-MSG.strip_heredoc
               WARNING: Define config.webpacker.yml to include sourcePath to configure

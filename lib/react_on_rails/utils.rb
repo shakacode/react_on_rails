@@ -79,12 +79,12 @@ module ReactOnRails
       return @server_bundle_path if @server_bundle_path && !Rails.env.development?
 
       bundle_name = ReactOnRails.configuration.server_bundle_js_file
-      @server_bundle_path = if ReactOnRails::WebpackerUtils.using_webpacker?
+      @server_bundle_path = if ReactOnRails::ShakapackerUtils.using_shakapacker?
                               begin
                                 bundle_js_file_path(bundle_name)
                               rescue Shakapacker::Manifest::MissingEntryError
                                 File.expand_path(
-                                  File.join(ReactOnRails::WebpackerUtils.webpacker_public_output_path,
+                                  File.join(ReactOnRails::ShakapackerUtils.shakapacker_public_output_path,
                                             bundle_name)
                                 )
                               end
@@ -94,8 +94,8 @@ module ReactOnRails
     end
 
     def self.bundle_js_file_path(bundle_name)
-      if ReactOnRails::WebpackerUtils.using_webpacker? && bundle_name != "manifest.json"
-        ReactOnRails::WebpackerUtils.bundle_js_uri_from_webpacker(bundle_name)
+      if ReactOnRails::ShakapackerUtils.using_shakapacker? && bundle_name != "manifest.json"
+        ReactOnRails::ShakapackerUtils.bundle_js_uri_from_shakapacker(bundle_name)
       else
         # Default to the non-hashed name in the specified output directory, which, for legacy
         # React on Rails, this is the output directory picked up by the asset pipeline.
@@ -129,23 +129,23 @@ module ReactOnRails
     end
 
     def self.source_path
-      if ReactOnRails::WebpackerUtils.using_webpacker?
-        ReactOnRails::WebpackerUtils.webpacker_source_path
+      if ReactOnRails::ShakapackerUtils.using_shakapacker?
+        ReactOnRails::ShakapackerUtils.shakapacker_source_path
       else
         ReactOnRails.configuration.node_modules_location
       end
     end
 
     def self.using_webpacker_source_path_is_not_defined_and_custom_node_modules?
-      return false unless ReactOnRails::WebpackerUtils.using_webpacker?
+      return false unless ReactOnRails::ShakapackerUtils.using_shakapacker?
 
-      !ReactOnRails::WebpackerUtils.webpacker_source_path_explicit? &&
+      !ReactOnRails::ShakapackerUtils.shakapacker_source_path_explicit? &&
         ReactOnRails.configuration.node_modules_location.present?
     end
 
     def self.generated_assets_full_path
-      if ReactOnRails::WebpackerUtils.using_webpacker?
-        ReactOnRails::WebpackerUtils.webpacker_public_output_path
+      if ReactOnRails::ShakapackerUtils.using_shakapacker?
+        ReactOnRails::ShakapackerUtils.shakapacker_public_output_path
       else
         File.expand_path(ReactOnRails.configuration.generated_assets_dir)
       end
