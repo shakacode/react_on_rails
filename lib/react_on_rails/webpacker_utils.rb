@@ -5,14 +5,13 @@ module ReactOnRails
     def self.using_webpacker?
       return @using_webpacker if defined?(@using_webpacker)
 
-      @using_webpacker = ReactOnRails::Utils.gem_available?("webpacker") ||
-                         ReactOnRails::Utils.gem_available?("shakapacker")
+      @using_webpacker = ReactOnRails::Utils.gem_available?("shakapacker")
     end
 
     def self.dev_server_running?
       return false unless using_webpacker?
 
-      Webpacker.dev_server.running?
+      Shakapacker.dev_server.running?
     end
 
     def self.shakapacker_version
@@ -41,7 +40,7 @@ module ReactOnRails
       # [2] (pry) ReactOnRails::WebpackerUtils: 0> Webpacker.manifest.lookup("app-bundle.js")
       # "/webpack/development/app-bundle-c1d2b6ab73dffa7d9c0e.js"
       # Next line will throw if the file or manifest does not exist
-      hashed_bundle_name = Webpacker.manifest.lookup!(bundle_name)
+      hashed_bundle_name = Shakapacker.manifest.lookup!(bundle_name)
 
       # Support for hashing the server-bundle and having that built
       # the webpack-dev-server is provided by the config value
@@ -49,43 +48,43 @@ module ReactOnRails
       # would mean that the bundle is created by the webpack-dev-server
       is_server_bundle = bundle_name == ReactOnRails.configuration.server_bundle_js_file
 
-      if Webpacker.dev_server.running? && (!is_server_bundle ||
+      if Shakapacker.dev_server.running? && (!is_server_bundle ||
         ReactOnRails.configuration.same_bundle_for_client_and_server)
-        "#{Webpacker.dev_server.protocol}://#{Webpacker.dev_server.host_with_port}#{hashed_bundle_name}"
+        "#{Shakapacker.dev_server.protocol}://#{Shakapacker.dev_server.host_with_port}#{hashed_bundle_name}"
       else
         File.expand_path(File.join("public", hashed_bundle_name)).to_s
       end
     end
 
     def self.webpacker_source_path
-      Webpacker.config.source_path
+      Shakapacker.config.source_path
     end
 
     def self.webpacker_source_entry_path
-      Webpacker.config.source_entry_path
+      Shakapacker.config.source_entry_path
     end
 
     def self.nested_entries?
-      Webpacker.config.nested_entries?
+      Shakapacker.config.nested_entries?
     end
 
     def self.webpacker_public_output_path
-      # Webpacker has the full absolute path of webpacker output files in a Pathname
-      Webpacker.config.public_output_path.to_s
+      # Shakapacker has the full absolute path of webpacker output files in a Pathname
+      Shakapacker.config.public_output_path.to_s
     end
 
     def self.manifest_exists?
-      Webpacker.config.public_manifest_path.exist?
+      Shakapacker.config.public_manifest_path.exist?
     end
 
     def self.webpacker_source_path_explicit?
-      # WARNING: Calling private method `data` on Webpacker::Configuration, lib/webpacker/configuration.rb
-      config_webpacker_yml = Webpacker.config.send(:data)
+      # WARNING: Calling private method `data` on Shakapacker::Configuration, lib/webpacker/configuration.rb
+      config_webpacker_yml = Shakapacker.config.send(:data)
       config_webpacker_yml[:source_path].present?
     end
 
     def self.check_manifest_not_cached
-      return unless using_webpacker? && Webpacker.config.cache_manifest?
+      return unless using_webpacker? && Shakapacker.config.cache_manifest?
 
       msg = <<-MSG.strip_heredoc
           ERROR: you have enabled cache_manifest in the #{Rails.env} env when using the
@@ -140,12 +139,6 @@ module ReactOnRails
 
     def self.semver_to_string(ary)
       "#{ary[0]}.#{ary[1]}.#{ary[2]}"
-    end
-
-    def self.using_shakapacker_6?
-      shakapacker_major_version = shakapacker_version_as_array[0]
-
-      shakapacker_major_version == 6
     end
   end
 end

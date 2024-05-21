@@ -20,34 +20,34 @@ module ReactOnRails
           described_class.bundle_js_file_path("webpack-bundle.js")
         end
 
-        context "with Webpacker enabled", :webpacker do
-          let(:webpacker_public_output_path) do
+        context "with Shakapacker enabled", :shakapacker do
+          let(:shakapacker_public_output_path) do
             File.expand_path(File.join(Rails.root, "public/webpack/dev"))
           end
 
           before do
             allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
               .and_return("")
-            allow(Webpacker).to receive_message_chain("dev_server.running?")
+            allow(Shakapacker).to receive_message_chain("dev_server.running?")
               .and_return(false)
-            allow(Webpacker).to receive_message_chain("config.public_output_path")
-              .and_return(webpacker_public_output_path)
+            allow(Shakapacker).to receive_message_chain("config.public_output_path")
+              .and_return(shakapacker_public_output_path)
             allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
           end
 
           context "when file in manifest", :webpacker do
             before do
-              # Note Webpacker manifest lookup is inside of the public_output_path
-              # [2] (pry) ReactOnRails::WebpackerUtils: 0> Webpacker.manifest.lookup("app-bundle.js")
+              # Note Shakapacker manifest lookup is inside of the public_output_path
+              # [2] (pry) ReactOnRails::WebpackerUtils: 0> Shakapacker.manifest.lookup("app-bundle.js")
               # "/webpack/development/app-bundle-c1d2b6ab73dffa7d9c0e.js"
-              allow(Webpacker).to receive_message_chain("manifest.lookup!")
+              allow(Shakapacker).to receive_message_chain("manifest.lookup!")
                 .with("webpack-bundle.js")
                 .and_return("/webpack/dev/webpack-bundle-0123456789abcdef.js")
               allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
                 .and_return("server-bundle.js")
             end
 
-            it { is_expected.to eq("#{webpacker_public_output_path}/webpack-bundle-0123456789abcdef.js") }
+            it { is_expected.to eq("#{shakapacker_public_output_path}/webpack-bundle-0123456789abcdef.js") }
           end
 
           context "with manifest.json" do
@@ -55,11 +55,11 @@ module ReactOnRails
               described_class.bundle_js_file_path("manifest.json")
             end
 
-            it { is_expected.to eq("#{webpacker_public_output_path}/manifest.json") }
+            it { is_expected.to eq("#{shakapacker_public_output_path}/manifest.json") }
           end
         end
 
-        context "without Webpacker enabled" do
+        context "without Shakapacker enabled" do
           before do
             allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
               .and_return("public/webpack/dev")
@@ -74,8 +74,8 @@ module ReactOnRails
         it "returns false if node_modules is blank" do
           allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
             .and_return("")
-          allow(Webpacker).to receive_message_chain("config.send").with(:data)
-                                                                  .and_return({})
+          allow(Shakapacker).to receive_message_chain("config.send").with(:data)
+                                                                    .and_return({})
 
           expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to be(false)
         end
@@ -83,8 +83,8 @@ module ReactOnRails
         it "returns false if source_path is defined in the config/webpacker.yml and node_modules defined" do
           allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
             .and_return("client")
-          allow(Webpacker).to receive_message_chain("config.send").with(:data)
-                                                                  .and_return(source_path: "client/app")
+          allow(Shakapacker).to receive_message_chain("config.send").with(:data)
+                                                                    .and_return(source_path: "client/app")
 
           expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to be(false)
         end
@@ -92,18 +92,18 @@ module ReactOnRails
         it "returns true if node_modules is not blank and the source_path is not defined in config/webpacker.yml" do
           allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
             .and_return("node_modules")
-          allow(Webpacker).to receive_message_chain("config.send").with(:data)
-                                                                  .and_return({})
+          allow(Shakapacker).to receive_message_chain("config.send").with(:data)
+                                                                    .and_return({})
 
           expect(described_class.using_webpacker_source_path_is_not_defined_and_custom_node_modules?).to be(true)
         end
       end
 
-      describe ".server_bundle_js_file_path with Webpacker enabled" do
+      describe ".server_bundle_js_file_path with Shakapacker enabled" do
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
           allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
-          allow(Webpacker).to receive_message_chain("config.public_output_path")
+          allow(Shakapacker).to receive_message_chain("config.public_output_path")
             .and_return(Pathname.new("public/webpack/development"))
         end
 
@@ -112,9 +112,9 @@ module ReactOnRails
             server_bundle_name = "server-bundle.js"
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
               .and_return(server_bundle_name)
-            allow(Webpacker).to receive_message_chain("manifest.lookup!")
+            allow(Shakapacker).to receive_message_chain("manifest.lookup!")
               .with(server_bundle_name)
-              .and_raise(Webpacker::Manifest::MissingEntryError)
+              .and_raise(Shakapacker::Manifest::MissingEntryError)
 
             path = described_class.server_bundle_js_file_path
 
@@ -128,7 +128,7 @@ module ReactOnRails
               .and_return("webpack-bundle.js")
             allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
               .and_return(true)
-            allow(Webpacker).to receive_message_chain("manifest.lookup!")
+            allow(Shakapacker).to receive_message_chain("manifest.lookup!")
               .with("webpack-bundle.js")
               .and_return("webpack/development/webpack-bundle-123456.js")
 
@@ -143,13 +143,13 @@ module ReactOnRails
                 .and_return("webpack-bundle.js")
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(true)
-              allow(Webpacker).to receive_message_chain("dev_server.running?")
+              allow(Shakapacker).to receive_message_chain("dev_server.running?")
                 .and_return(true)
-              allow(Webpacker).to receive_message_chain("dev_server.protocol")
+              allow(Shakapacker).to receive_message_chain("dev_server.protocol")
                 .and_return("http")
-              allow(Webpacker).to receive_message_chain("dev_server.host_with_port")
+              allow(Shakapacker).to receive_message_chain("dev_server.host_with_port")
                 .and_return("localhost:3035")
-              allow(Webpacker).to receive_message_chain("manifest.lookup!")
+              allow(Shakapacker).to receive_message_chain("manifest.lookup!")
                 .with("webpack-bundle.js")
                 .and_return("/webpack/development/webpack-bundle-123456.js")
 
@@ -167,10 +167,10 @@ module ReactOnRails
               .and_return("server-bundle.js")
             allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
               .and_return(false)
-            allow(Webpacker).to receive_message_chain("manifest.lookup!")
+            allow(Shakapacker).to receive_message_chain("manifest.lookup!")
               .with("server-bundle.js")
               .and_return("webpack/development/server-bundle-123456.js")
-            allow(Webpacker).to receive_message_chain("dev_server.running?")
+            allow(Shakapacker).to receive_message_chain("dev_server.running?")
               .and_return(true)
 
             path = described_class.server_bundle_js_file_path
