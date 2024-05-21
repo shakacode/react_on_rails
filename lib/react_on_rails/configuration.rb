@@ -128,12 +128,12 @@ module ReactOnRails
       raise_missing_components_subdirectory if auto_load_bundle && !components_subdirectory.present?
       return unless components_subdirectory.present?
 
-      ReactOnRails::WebpackerUtils.raise_shakapacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
-      ReactOnRails::WebpackerUtils.raise_shakapacker_version_incompatible_for_autobundling unless
-        ReactOnRails::WebpackerUtils.shackapacker_version_requirement_met?(
+      ReactOnRails::ShakapackerUtils.raise_shakapacker_not_installed unless ReactOnRails::ShakapackerUtils.using_shakapacker?
+      ReactOnRails::ShakapackerUtils.raise_shakapacker_version_incompatible_for_autobundling unless
+        ReactOnRails::ShakapackerUtils.shackapacker_version_requirement_met?(
           ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION
         )
-      ReactOnRails::WebpackerUtils.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
+      ReactOnRails::ShakapackerUtils.raise_nested_entries_disabled unless ReactOnRails::ShakapackerUtils.nested_entries?
     end
 
     def adjust_precompile_task
@@ -168,21 +168,21 @@ module ReactOnRails
     end
 
     def error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
-      return unless ReactOnRails::WebpackerUtils.using_webpacker?
+      return unless ReactOnRails::ShakapackerUtils.using_shakapacker?
 
       return if generated_assets_dir.blank?
 
-      webpacker_public_output_path = ReactOnRails::WebpackerUtils.webpacker_public_output_path
+      shakapacker_public_output_path = ReactOnRails::ShakapackerUtils.shakapacker_public_output_path
 
-      if File.expand_path(generated_assets_dir) == webpacker_public_output_path.to_s
+      if File.expand_path(generated_assets_dir) == shakapacker_public_output_path.to_s
         Rails.logger.warn("You specified generated_assets_dir in `config/initializers/react_on_rails.rb` " \
                           "with Webpacker. Remove this line from your configuration file.")
       else
         msg = <<~MSG
-          Error configuring /config/initializers/react_on_rails.rb: You are using webpacker
+          Error configuring /config/initializers/react_on_rails.rb: You are using shakapacker
           and your specified value for generated_assets_dir = #{generated_assets_dir}
           that does not match the value for public_output_path specified in
-          webpacker.yml = #{webpacker_public_output_path}. You should remove the configuration
+          shakapacker.yml = #{shakapacker_public_output_path}. You should remove the configuration
           value for "generated_assets_dir" from your config/initializers/react_on_rails.rb file.
         MSG
         raise ReactOnRails::Error, msg
@@ -202,7 +202,7 @@ module ReactOnRails
     end
 
     def ensure_generated_assets_dir_present
-      return if generated_assets_dir.present? || ReactOnRails::WebpackerUtils.using_webpacker?
+      return if generated_assets_dir.present? || ReactOnRails::ShakapackerUtils.using_shakapacker?
 
       self.generated_assets_dir = DEFAULT_GENERATED_ASSETS_DIR
       Rails.logger.warn "ReactOnRails: Set generated_assets_dir to default: #{DEFAULT_GENERATED_ASSETS_DIR}"
@@ -211,11 +211,11 @@ module ReactOnRails
     def configure_generated_assets_dirs_deprecation
       return if generated_assets_dirs.blank?
 
-      if ReactOnRails::WebpackerUtils.using_webpacker?
-        webpacker_public_output_path = ReactOnRails::WebpackerUtils.webpacker_public_output_path
+      if ReactOnRails::ShakapackerUtils.using_shakapacker?
+        shakapacker_public_output_path = ReactOnRails::ShakapackerUtils.shakapacker_public_output_path
         Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the " \
-                          "generated_assets_dirs no the generated_assets_dir when using Webpacker. This is defined " \
-                          "by public_output_path specified in webpacker.yml = #{webpacker_public_output_path}."
+                          "generated_assets_dirs no the generated_assets_dir when using Shakapacker. This is defined " \
+                          "by public_output_path specified in webpacker.yml = #{shakapacker_public_output_path}."
         return
       end
 
@@ -225,7 +225,7 @@ module ReactOnRails
         self.generated_assets_dir = generated_assets_dirs
       else
         Rails.logger.warn "[DEPRECATION] ReactOnRails. You have both generated_assets_dirs and " \
-                          "generated_assets_dir defined. Define ONLY generated_assets_dir if NOT using Webpacker " \
+                          "generated_assets_dir defined. Define ONLY generated_assets_dir if NOT using Shakapacker " \
                           "and define neither if using Webpacker"
       end
     end

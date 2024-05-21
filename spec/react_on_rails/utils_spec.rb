@@ -32,13 +32,13 @@ module ReactOnRails
               .and_return(false)
             allow(Shakapacker).to receive_message_chain("config.public_output_path")
               .and_return(shakapacker_public_output_path)
-            allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
+            allow(ReactOnRails::ShakapackerUtils).to receive(:using_shakapacker?).and_return(true)
           end
 
           context "when file in manifest", :webpacker do
             before do
               # Note Shakapacker manifest lookup is inside of the public_output_path
-              # [2] (pry) ReactOnRails::WebpackerUtils: 0> Shakapacker.manifest.lookup("app-bundle.js")
+              # [2] (pry) ReactOnRails::ShakapackerUtils: 0> Shakapacker.manifest.lookup("app-bundle.js")
               # "/webpack/development/app-bundle-c1d2b6ab73dffa7d9c0e.js"
               allow(Shakapacker).to receive_message_chain("manifest.lookup!")
                 .with("webpack-bundle.js")
@@ -63,7 +63,7 @@ module ReactOnRails
           before do
             allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
               .and_return("public/webpack/dev")
-            allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(false)
+            allow(ReactOnRails::ShakapackerUtils).to receive(:using_shakapacker?).and_return(false)
           end
 
           it { is_expected.to eq(File.expand_path(File.join(Rails.root, "public/webpack/dev/webpack-bundle.js"))) }
@@ -102,7 +102,7 @@ module ReactOnRails
       describe ".server_bundle_js_file_path with Shakapacker enabled" do
         before do
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
-          allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
+          allow(ReactOnRails::ShakapackerUtils).to receive(:using_shakapacker?).and_return(true)
           allow(Shakapacker).to receive_message_chain("config.public_output_path")
             .and_return(Pathname.new("public/webpack/development"))
         end
