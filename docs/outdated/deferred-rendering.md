@@ -18,7 +18,6 @@ Let's say you're requesting a page that needs to fetch a code chunk from the ser
 > (client) `<!-- react-empty: 1 -`
 
 > (server) `<div data-reactroot="`
-<!--This comment is here because the comment beginning on line 13 messes up Sublime's markdown parsing-->
 
 Different markup is generated on the client than on the server. Why does this happen? When you register a component or Render-Function with `ReactOnRails.register`, React on Rails will by default render the component as soon as the page loads. However, code splitting requires that components render at a later time when the JavaScript chunks have loaded.
 

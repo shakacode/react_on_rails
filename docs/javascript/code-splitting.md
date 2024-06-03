@@ -16,7 +16,7 @@ Let's say you're requesting a page that needs to fetch a code chunk from the ser
 
 > Warning: React attempted to reuse markup in a container but the checksum was invalid. This generally means that you are using server rendering and the markup generated on the server was not what the client was expecting. React injected new markup to compensate which works but you have lost many of the benefits of server rendering. Instead, figure out why the markup being generated is different on the client or server:
 
-> (client) `react-empty: 1 -`
+> (client) `<!-- react-empty: 1 -`
 
 > (server) `<div data-reactroot="`
 
