@@ -25,13 +25,12 @@ You can find the **package** version numbers from this repo's tags and below in 
 ### Changed
 - Converted JS code to TS [PR 386](https://github.com/shakacode/react_on_rails_pro/pull/386) and [PR 389](https://github.com/shakacode/react_on_rails_pro/pull/389) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
-## [3.1.2] - 2023-02-24
+## [3.1.2] - 2024-06-06
 
 ### Fixed
 - Removed console errors when `setTimeout` is used server-size. The call is silently ignored for seamless integration of https://github.com/petyosi/react-virtuoso
 - Numerous Dependabot alerts
 
-## [3.1.1] - 2022-08-03
 ## Doc and Spec Only Updates
 React 18 is now supported! Check the [React on Rails CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details and the updates to the [loadable-components instructions](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/code-splitting-loadable-components.md).
 
@@ -303,8 +302,7 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - advanced error handling
 
 [Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.2...HEAD
-[3.1.2]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.1...3.1.2
-[3.1.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.0...3.1.1
+[3.1.2]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.0...3.1.2
 [3.1.0]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.1...3.1.0
 [3.0.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0...3.0.1
 [3.0.0]: https://github.com/shakacode/react_on_rails_pro/compare/2.3.0...3.0.0
