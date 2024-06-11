@@ -17,7 +17,8 @@ You need a Rails application with Shakapacker installed and configured on it. Ch
 rails new PROJECT_NAME --skip-javascript
 cd PROJECT_NAME
 bundle add shakapacker --strict
-rails shakapacker:install
+# currently react_on_rails uses yarn classic by default
+PACKAGE_JSON_FALLBACK_MANAGER=yarn_classic rails shakapacker:install
 ```
 
 You may need to check [the instructions for installing into an existing Rails app](https://www.shakacode.com/react-on-rails/docs/guides/installation-into-an-existing-rails-app/) if you have an already working Rails application.

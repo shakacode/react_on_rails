@@ -40,8 +40,7 @@ module ReactOnRails
       def copy_js_bundle_files
         base_path = "base/base/"
         base_files = %w[app/javascript/packs/server-bundle.js
-                        app/javascript/bundles/HelloWorld/components/HelloWorldServer.js
-                        app/javascript/bundles/HelloWorld/components/HelloWorld.module.css]
+                        app/javascript/bundles/HelloWorld/components/HelloWorldServer.js]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
