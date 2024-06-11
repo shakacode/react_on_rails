@@ -16,10 +16,9 @@ Let's say you're requesting a page that needs to fetch a code chunk from the ser
 
 > Warning: React attempted to reuse markup in a container but the checksum was invalid. This generally means that you are using server rendering and the markup generated on the server was not what the client was expecting. React injected new markup to compensate which works but you have lost many of the benefits of server rendering. Instead, figure out why the markup being generated is different on the client or server:
 
-> (client) <!-- react-empty: 1 -
+> (client) `<!-- react-empty: 1 -`
 
-> (server) <div data-reactroot="
-<!--This comment is here because the comment beginning on line 13 messes up Sublime's markdown parsing-->
+> (server) `<div data-reactroot="`
 
 Different markup is generated on the client than on the server. Why does this happen? When you register a component or Render-Function with `ReactOnRails.register`, react on rails will render the component as soon as the page loads. However, react-router renders a comment while waiting for the code chunk to be fetched from the server. This means that react will tear all of the server rendered code out of the DOM, and then rerender it a moment later once the code chunk arrives from the server, defeating most of the purpose of server rendering.
 
@@ -119,7 +118,7 @@ See:
 
 - [spec/dummy/client/app/startup/client-bundle.js](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/client-bundle.js)
 - [spec/dummy/client/app/packs/server-bundle.js](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/packs/server-bundle.js)
-- [spec/dummy/client/app/startup/DeferredRenderAppClient](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/DeferredRenderAppClient.jsx)<-- Code splitting implemented here
+- [spec/dummy/client/app/startup/DeferredRenderAppClient](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/DeferredRenderAppClient.jsx) # Code splitting implemented here
 - [spec/dummy/client/app/startup/DeferredRenderAppServer.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/DeferredRenderAppServer.jsx)
 - [spec/dummy/client/app/components/DeferredRender.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/components/DeferredRender.jsx)
 - [spec/dummy/client/app/components/DeferredRenderAsyncPage.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/components/DeferredRenderAsyncPage.jsx)
