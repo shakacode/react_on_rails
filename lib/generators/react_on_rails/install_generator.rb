@@ -54,7 +54,7 @@ module ReactOnRails
           invoke "react_on_rails:react_no_redux"
         end
 
-        invoke "react_on_rails:adapt_for_older_shakapacker" unless using_shakapacker_7?
+        invoke "react_on_rails:adapt_for_older_shakapacker" unless using_shakapacker_7_or_above?
       end
 
       # NOTE: other requirements for existing files such as .gitignore or application.
@@ -95,7 +95,7 @@ module ReactOnRails
 
       def add_post_install_message
         message = GeneratorMessages.helpful_message_after_installation
-        unless using_shakapacker_7?
+        unless using_shakapacker_7_or_above?
           message = message.gsub("config/shakapacker", "config/webpacker")
           message = message.gsub("bin/shakapacker", "bin/webpacker")
         end
@@ -103,9 +103,9 @@ module ReactOnRails
         GeneratorMessages.add_info(message)
       end
 
-      def using_shakapacker_7?
+      def using_shakapacker_7_or_above?
         shakapacker_gem = Gem::Specification.find_by_name("shakapacker")
-        shakapacker_gem.version.segments.first == 7
+        shakapacker_gem.version.segments.first >= 7
       rescue Gem::MissingSpecError
         # In case using Webpacker
         false
