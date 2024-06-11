@@ -1,4 +1,6 @@
-import ReactDOMServer from 'react-dom/server';
+import React from 'react';
+import ReactDOMServer, { PipeableStream } from 'react-dom/server';
+import { PassThrough } from 'stream';
 import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
@@ -194,6 +196,55 @@ const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (o
     }
   }
   return result;
+};
+
+const stringToStream = (str: string) => {
+  const stream = new PassThrough();
+  stream.push(str);
+  stream.push(null);
+  return stream;
+};
+
+export const streamServerRenderedReactComponent = (options: RenderParams) => {
+  const { name, domNodeId, trace, props, railsContext, renderingReturnsPromises, throwJsErrors } = options;
+
+  let renderResult: null | PassThrough = null;
+
+  try {
+    const componentObj = ComponentRegistry.get(name);
+    if (componentObj.isRenderer) {
+      throw new Error(`\
+Detected a renderer while server rendering component '${name}'. \
+See https://github.com/shakacode/react_on_rails#renderer-functions`);
+    }
+
+    const reactRenderingResult = createReactOutput({
+      componentObj,
+      domNodeId,
+      trace,
+      props,
+      railsContext,
+    });
+
+    if (isServerRenderHash(reactRenderingResult) || isPromise(reactRenderingResult)) {
+      throw new Error('Server rendering of streams is not supported for server render hashes or promises.');
+    }
+
+    renderResult = new PassThrough();
+    ReactDOMServer.renderToPipeableStream(reactRenderingResult as ReactElement).pipe(renderResult);
+  } catch (e: any) {
+    if (throwJsErrors) {
+      throw e;
+    }
+
+    renderResult = stringToStream(handleError({
+      e,
+      name,
+      serverSide: true,
+    }));
+  }
+
+  return renderResult;
 };
 
 export default serverRenderReactComponent;
