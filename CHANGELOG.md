@@ -18,6 +18,11 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+### [14.0.2] - 2024-06-11
+
+#### Fixed
+- Project initialization with Shakapacker v8+ fixed [PR 1629](https://github.com/shakacode/react_on_rails/pull/1629) by [vaukalak](https://github.com/vaukalak)
+
 ### [14.0.1] - 2024-05-16
 
 #### Fixed
@@ -1128,7 +1133,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.0.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.0.2...master
+[14.0.2]: https://github.com/shakacode/react_on_rails/compare/14.0.1...14.0.2
 [14.0.1]: https://github.com/shakacode/react_on_rails/compare/14.0.0...14.0.1
 [14.0.0]: https://github.com/shakacode/react_on_rails/compare/13.4.0...14.0.0
 [13.4.0]: https://github.com/shakacode/react_on_rails/compare/13.3.5...13.4.0
