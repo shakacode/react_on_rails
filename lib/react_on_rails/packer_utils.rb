@@ -28,7 +28,7 @@ module ReactOnRails
       nil
     end
 
-    def self.adapter
+    def self.packer
       return nil unless using_packer?
 
       if using_shakapacker?
@@ -42,7 +42,7 @@ module ReactOnRails
     def self.dev_server_running?
       return false unless using_packer?
 
-      adapter.dev_server.running?
+      packer.dev_server.running?
     end
 
     def self.shakapacker_version
@@ -68,7 +68,7 @@ module ReactOnRails
     # the hashed server bundle if using the same bundle for the client.
     # Otherwise returns a file path.
     def self.bundle_js_uri_from_packer(bundle_name)
-      hashed_bundle_name = adapter.manifest.lookup!(bundle_name)
+      hashed_bundle_name = packer.manifest.lookup!(bundle_name)
 
       # Support for hashing the server-bundle and having that built
       # the webpack-dev-server is provided by the config value
@@ -76,9 +76,9 @@ module ReactOnRails
       # would mean that the bundle is created by the webpack-dev-server
       is_server_bundle = bundle_name == ReactOnRails.configuration.server_bundle_js_file
 
-      if adapter.dev_server.running? && (!is_server_bundle ||
+      if packer.dev_server.running? && (!is_server_bundle ||
         ReactOnRails.configuration.same_bundle_for_client_and_server)
-        "#{adapter.dev_server.protocol}://#{adapter.dev_server.host_with_port}#{hashed_bundle_name}"
+        "#{packer.dev_server.protocol}://#{packer.dev_server.host_with_port}#{hashed_bundle_name}"
       else
         File.expand_path(File.join("public", hashed_bundle_name)).to_s
       end
@@ -92,31 +92,31 @@ module ReactOnRails
     end
 
     def self.packer_source_path
-      adapter.config.source_path
+      packer.config.source_path
     end
 
     def self.packer_source_entry_path
-      adapter.config.source_entry_path
+      packer.config.source_entry_path
     end
 
     def self.nested_entries?
-      adapter.config.nested_entries?
+      packer.config.nested_entries?
     end
 
     def self.packer_public_output_path
-      adapter.config.public_output_path.to_s
+      packer.config.public_output_path.to_s
     end
 
     def self.manifest_exists?
-      adapter.config.public_manifest_path.exist?
+      packer.config.public_manifest_path.exist?
     end
 
     def self.packer_source_path_explicit?
-      adapter.config.send(:data)[:source_path].present?
+      packer.config.send(:data)[:source_path].present?
     end
 
     def self.check_manifest_not_cached
-      return unless using_packer? && adapter.config.cache_manifest?
+      return unless using_packer? && packer.config.cache_manifest?
 
       msg = <<-MSG.strip_heredoc
           ERROR: you have enabled cache_manifest in the #{Rails.env} env when using the

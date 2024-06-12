@@ -215,7 +215,7 @@ module ReactOnRails
         packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
         # rubocop:disable Layout/LineLength
         Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the generated_assets_dirs nor " \
-                          "the generated_assets_dir when using Shakapacker. This is defined by " \
+                          "the generated_assets_dir when using #{ReactOnRails::PackerUtils.packer_type.upcase_first}. This is defined by " \
                           "public_output_path specified in #{ReactOnRails::PackerUtils.packer_type}.yml = #{packer_public_output_path}."
         # rubocop:enable Layout/LineLength
         return
@@ -257,18 +257,10 @@ module ReactOnRails
       raise ReactOnRails::Error, msg
     end
 
-    def shakapacker_precompile?
-      Shakapacker.config.shakapacker_precompile?
-    end
-
-    def shakapacker_clean_task
-      "shakapacker:clean"
-    end
-
     def compile_command_conflict_message
       <<~MSG
 
-        React on Rails and Shakapacker error in configuration!
+        React on Rails and #{ReactOnRails::PackerUtils.packer_type.upcase_first} error in configuration!
         In order to use config/react_on_rails.rb config.build_production_command,
         you must edit config/#{ReactOnRails::PackerUtils.packer_type}.yml to include this value in the default configuration:
         '#{ReactOnRails::PackerUtils.packer_type}_precompile: false'
