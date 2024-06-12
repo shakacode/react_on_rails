@@ -3,7 +3,6 @@
 require "rails/generators"
 require_relative "generator_messages"
 require_relative "generator_helper"
-# rubocop:disable Metrics/ClassLength
 module ReactOnRails
   module Generators
     class BaseGenerator < Rails::Generators::Base
@@ -167,4 +166,3 @@ module ReactOnRails
     end
   end
 end
-# rubocop:enable Metrics/ClassLength

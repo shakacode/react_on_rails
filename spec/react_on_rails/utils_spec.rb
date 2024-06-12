@@ -77,7 +77,7 @@ module ReactOnRails
           allow(Shakapacker).to receive_message_chain("config.send").with(:data)
                                                                     .and_return({})
 
-          expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to eq(false)
+          expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to be(false)
         end
 
         it "returns false if source_path is defined in the config/webpacker.yml and node_modules defined" do
@@ -86,7 +86,7 @@ module ReactOnRails
           allow(Shakapacker).to receive_message_chain("config.send").with(:data)
                                                                     .and_return(source_path: "client/app")
 
-          expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to eq(false)
+          expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to be(false)
         end
 
         it "returns true if node_modules is not blank and the source_path is not defined in config/webpacker.yml" do
@@ -95,7 +95,7 @@ module ReactOnRails
           allow(Shakapacker).to receive_message_chain("config.send").with(:data)
                                                                     .and_return({})
 
-          expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to eq(true)
+          expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to be(true)
         end
       end
 

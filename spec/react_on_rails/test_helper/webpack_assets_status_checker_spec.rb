@@ -66,7 +66,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
           require "shakapacker"
           allow(ReactOnRails::PackerUtils).to receive_messages(
             manifest_exists?: true,
-            shakapacker_public_output_path: generated_assets_full_path
+            packer_public_output_path: generated_assets_full_path
           )
           allow(ReactOnRails.configuration).to receive(:server_bundle_js_file).and_return("server-bundle.js")
           allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
