@@ -24,6 +24,7 @@ gem "amazing_print"
 
 group :development, :test do
   gem "listen"
+  gem "debug"
   gem "pry"
   gem "pry-byebug"
   gem "pry-doc"
