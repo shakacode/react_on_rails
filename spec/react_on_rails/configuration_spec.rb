@@ -77,7 +77,7 @@ module ReactOnRails
     describe ".build_production_command" do
       context "when using Shakapacker 7" do
         before do
-          allow(ReactOnRails::ShakapackerUtils)
+          allow(ReactOnRails::PackerUtils)
             .to receive("shakapacker_version")
             .and_return("7.0.0")
         end
@@ -121,7 +121,7 @@ module ReactOnRails
 
       context "when using Shakapacker 8" do
         before do
-          allow(ReactOnRails::ShakapackerUtils)
+          allow(ReactOnRails::PackerUtils)
             .to receive("shakapacker_version")
             .and_return("8.0.0")
         end
@@ -267,8 +267,8 @@ module ReactOnRails
 
     it "checks that autobundling requirements are met if configuration options for autobundling are set" do
       allow(ReactOnRails::PackerUtils).to receive_messages(using_packer?: true,
-                                                                shackapacker_version_requirement_met?: true,
-                                                                nested_entries?: true)
+                                                           shakapacker_version_requirement_met?: true,
+                                                           nested_entries?: true)
 
       ReactOnRails.configure do |config|
         config.auto_load_bundle = true

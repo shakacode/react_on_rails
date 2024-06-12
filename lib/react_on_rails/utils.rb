@@ -82,7 +82,7 @@ module ReactOnRails
       @server_bundle_path = if ReactOnRails::PackerUtils.using_packer?
                               begin
                                 bundle_js_file_path(bundle_name)
-                              rescue Webpacker::Manifest::MissingEntryError, Shakapacker::Manifest::MissingEntryError
+                              rescue ReactOnRails::PackerUtils.adapter::Manifest::MissingEntryError
                                 File.expand_path(
                                   File.join(ReactOnRails::PackerUtils.packer_public_output_path,
                                             bundle_name)
