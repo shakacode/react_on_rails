@@ -179,7 +179,7 @@ ReactOnRails.configure do |config|
   # config.components_subdirectory = "ror_components"
 
   # Default is false.
-  # The default can be overidden as an option in calls to view helpers
+  # The default can be overridden as an option in calls to view helpers
   # `render_component` and `render_component_hash`. You may set to true to change the default to auto loading.
   config.auto_load_bundle = false
 

@@ -11,7 +11,7 @@ Here's a [decent article to introduce you to server rendering](https://medium.fr
 
 During the Rails rendering of HTML per a browser request, the Rails server will execute some JavaScript to create a string of HTML used for React server rendering. This resulting HTML is placed with in your Rails view's output.
 
-The default JavaScript interpretter is [ExecJS](https://github.com/rails/execjs). If you want to maximize the perfomance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
+The default JavaScript interpreter is [ExecJS](https://github.com/rails/execjs). If you want to maximize the performance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
 
 See [this note](https://www.shakacode.com/react-on-rails/docs/guides/client-vs-server-rendering/).
 

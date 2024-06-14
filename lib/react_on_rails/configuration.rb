@@ -247,7 +247,7 @@ module ReactOnRails
 
     def raise_missing_components_subdirectory
       msg = <<~MSG
-        **ERROR** ReactOnRails: auto_load_bundle is set to true, yet components_subdirectory is unconfigured.\
+        **ERROR** ReactOnRails: auto_load_bundle is set to true, yet components_subdirectory is not configured.\
         Please set components_subdirectory to the desired directory.  For more information, please see \
         https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
       MSG

@@ -18,7 +18,7 @@ or to autofix
     yarn run lint -- --fix
     
     
-Updating Node Dependenencies
+Updating Node Dependencies
 ===========================
 
 ```
