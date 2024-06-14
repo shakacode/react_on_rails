@@ -10,7 +10,7 @@ jobs:
   rspec-package-tests:
     strategy:
       matrix:
-        versions: ['shakapacker_v6', 'shakapacker_v8']
+        versions: ['oldest', 'newest']
     runs-on: ubuntu-22.04
     env:
       # $BUNDLE_GEMFILE must be set at the job level, so it is set for all steps
@@ -22,7 +22,7 @@ jobs:
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1
       with:
-        ruby-version: ${{ matrix.versions == 'shakapacker_v6' && '3.0' || '3.3' }}
+        ruby-version: ${{ matrix.versions == 'oldest' && '3.0' || '3.3' }}
         bundler: 2.5.9
     - name: Print system information
       run: |
@@ -37,7 +37,9 @@ jobs:
       uses: actions/cache@v3
       with:
         path: vendor/bundle
-        key: package-app-gem-cache-${{ hashFiles(format('{0}/gemfiles/{1}.gemfile.lock', github.workspace, matrix.versions)) }}
+        key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ matrix.versions }}
+    - name: Dynamically add the right shakapacker version to the Gemfile
+      run: echo "gem 'shakapacker', '~> ${{ matrix.versions == 'oldest' && '6.6.0' || '8.0.0' }}'" >> Gemfile
     - name: Install Ruby Gems for package
       run: bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Run rspec tests
