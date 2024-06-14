@@ -7,7 +7,6 @@
 
 require "yaml"
 require "rails/version"
-require "react_on_rails"
 
 require_relative "example_type"
 require_relative "task_helpers"
@@ -36,7 +35,11 @@ namespace :examples do # rubocop:disable Metrics/BlockLength
       sh_in_dir(example_type.dir, "touch .gitignore")
       append_to_gemfile(example_type.gemfile, example_type.required_gems)
       bundle_install_in(example_type.dir)
-      sh_in_dir(example_type.dir, "rake #{ReactOnRails::PackerUtils.packer_type}:install")
+      begin
+        sh_in_dir(example_type.dir, "rake webpacker:install")
+      rescue
+        sh_in_dir(example_type.dir, "rake shakapacker:install")
+      end
       sh_in_dir(example_type.dir, example_type.generator_shell_commands)
       sh_in_dir(example_type.dir, "yarn")
     end

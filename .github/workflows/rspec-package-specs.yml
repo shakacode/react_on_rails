@@ -39,6 +39,7 @@ jobs:
       run: echo "gem 'shakapacker', '~> ${{ matrix.versions == 'oldest' && '6.6.0' || '8.0.0' }}'" >> Gemfile
     - name: Install Ruby Gems for package
       run: bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+    - run: git commit -am "to stop generators from complaining about uncommitted code"
     - name: Run rspec tests
       run: bundle exec rspec spec/react_on_rails
     - name: Store test results
