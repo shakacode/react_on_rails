@@ -109,12 +109,13 @@ module ReactOnRails
 
         context "with server file not in manifest", :shakapacker do
           it "returns the unhashed server path" do
+            Packer = ReactOnRails::PackerUtils.packer
             server_bundle_name = "server-bundle.js"
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
               .and_return(server_bundle_name)
             allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.manifest.lookup!")
               .with(server_bundle_name)
-              .and_raise(ReactOnRails::PackerUtils.packer::Manifest::MissingEntryError)
+              .and_raise(Packer::Manifest::MissingEntryError)
 
             path = described_class.server_bundle_js_file_path
 

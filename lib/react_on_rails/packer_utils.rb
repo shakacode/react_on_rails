@@ -162,7 +162,7 @@ module ReactOnRails
     def self.raise_shakapacker_not_installed
       msg = <<~MSG
         **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker \
-        #{semver_to_string(minimum_required_shakapacker_version)} or above to use the \
+        #{semver_to_string(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)} or above to use the \
         automated bundle generation feature.
       MSG
 

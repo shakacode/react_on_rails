@@ -1,4 +1,4 @@
-const { generateWebpackConfig, webpackConfig: v6WebpackConfig, merge } = require('shakapacker');
+const { env, generateWebpackConfig, webpackConfig: v6WebpackConfig, merge } = require('shakapacker');
 
 const generateWebpackConfigAlias = generateWebpackConfig ? generateWebpackConfig : () => undefined
 

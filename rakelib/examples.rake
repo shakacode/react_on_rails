@@ -12,7 +12,7 @@ require "pathname"
 require_relative "example_type"
 require_relative "task_helpers"
 
-namespace :examples [:packer_type] do # rubocop:disable Metrics/BlockLength
+namespace :examples, [:packer_type] do # rubocop:disable Metrics/BlockLength
   include ReactOnRails::TaskHelpers
   # Loads data from examples_config.yml and instantiates corresponding ExampleType objects
   examples_config_file = File.expand_path("examples_config.yml", __dir__)

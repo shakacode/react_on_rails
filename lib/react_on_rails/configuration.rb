@@ -111,7 +111,7 @@ module ReactOnRails
 
     # on ReactOnRails
     def setup_config_values
-      check_autobundling_requirements_if_configured
+      check_autobundling_requirements if auto_load_bundle
       ensure_webpack_generated_files_exists
       configure_generated_assets_dirs_deprecation
       configure_skip_display_none_deprecation
@@ -124,7 +124,7 @@ module ReactOnRails
 
     private
 
-    def check_autobundling_requirements_if_configured
+    def check_autobundling_requirements
       raise_missing_components_subdirectory if auto_load_bundle && !components_subdirectory.present?
       return unless components_subdirectory.present?
 

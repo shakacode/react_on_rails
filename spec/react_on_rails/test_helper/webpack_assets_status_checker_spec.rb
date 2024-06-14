@@ -63,7 +63,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
         let(:fixture_dirname) { "assets_with_manifest_exist_server_bundle_separate" }
 
         before do
-          require "shakapacker"
+          Packer = ReactOnRails::PackerUtils.packer
           allow(ReactOnRails::PackerUtils).to receive_messages(
             manifest_exists?: true,
             packer_public_output_path: generated_assets_full_path
@@ -74,7 +74,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
             .and_return(File.join(generated_assets_full_path, "manifest.json"))
           allow(ReactOnRails::Utils).to receive(:bundle_js_file_path)
             .with("server-bundle.js")
-            .and_raise(ReactOnRails::PackerUtils.packer::Manifest::MissingEntryError)
+            .and_raise(Packer::Manifest::MissingEntryError)
           touch_files_in_dir(generated_assets_full_path)
         end
 
