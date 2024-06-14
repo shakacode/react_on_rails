@@ -7,6 +7,7 @@
 
 require "yaml"
 require "rails/version"
+require "react_on_rails"
 
 require_relative "example_type"
 require_relative "task_helpers"

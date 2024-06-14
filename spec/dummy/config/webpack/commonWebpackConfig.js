@@ -4,6 +4,10 @@ const webpack = require('webpack');
 
 const aliasConfig = require('./alias.js');
 
+if(typeof generateWebpackConfig == 'undefined') {
+  generateWebpackConfig = () => undefined;
+}
+
 const baseClientWebpackConfig = v6WebpackConfig ? v6WebpackConfig : generateWebpackConfig();
 
 const commonOptions = {
