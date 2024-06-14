@@ -5,7 +5,7 @@ namespace :react_on_rails do
   namespace :assets do
     desc <<~DESC
       If config.build_production_command is defined, this command is automatically
-      added to task assets:precompile and the regular #{ReactOnRails::PackerUtils.packer_type.upcase_first} compile will not run.
+      added to task assets:precompile and the regular packer compile will not run.
       The defined command is either a script or a module with a method `call`.
     DESC
     task webpack: :locale do
