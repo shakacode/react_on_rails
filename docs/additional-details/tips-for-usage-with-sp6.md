@@ -6,7 +6,7 @@ As mentioned earlier in the documentation, we assume you install ReactOnRails in
 
 2. Check the following table to map the references in the documentation to the relevant ones in Shakapacker 6:
 
-  |Usage in Shakapacker 7      |Equivalant in Shakapacker 6|
+  |Usage in Shakapacker 7      |Equivalent in Shakapacker 6|
   |----------------------------|---------------------------|
   |`config/shakapacker.yml`    |`config/webpacker.yml`     |
   |`bin/shakapacker`           |`bin/webpacker`            |

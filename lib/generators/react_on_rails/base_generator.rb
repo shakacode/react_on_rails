@@ -81,7 +81,7 @@ module ReactOnRails
           run "yarn add react-on-rails@#{ReactOnRails::VERSION} --exact"
         else
           # otherwise add latest
-          puts "Adding the lastest react-on-rails NPM module. Double check this is correct in package.json"
+          puts "Adding the latest react-on-rails NPM module. Double check this is correct in package.json"
           run "yarn add react-on-rails --exact"
         end
 

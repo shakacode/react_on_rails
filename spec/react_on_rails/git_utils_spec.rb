@@ -5,7 +5,7 @@ require_relative "spec_helper"
 module ReactOnRails
   RSpec.describe GitUtils do
     describe ".uncommitted_changes?" do
-      context "with uncommited git changes" do
+      context "with uncommitted git changes" do
         let(:message_handler) { instance_double("MessageHandler") } # rubocop:disable RSpec/VerifiedDoubleReference
 
         it "returns true" do

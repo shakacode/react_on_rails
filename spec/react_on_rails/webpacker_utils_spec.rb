@@ -4,7 +4,7 @@ require_relative "spec_helper"
 
 module ReactOnRails
   describe WebpackerUtils do
-    describe ".using_webapcker?" do
+    describe ".using_webpacker?" do
       subject do
         described_class.using_webpacker?
       end

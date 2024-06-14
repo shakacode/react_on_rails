@@ -1,4 +1,4 @@
-# How React on Rails Works (with Shakapcker)
+# How React on Rails Works (with Shakapacker)
 
 *Note, older versions of React on Rails pushed the Webpack bundles through the Asset Pipeline. This older method has *many* disadvantages, such as broken sourcemaps, performance issues, etc. If you need help migrating to the current way of bypassing the Asset Pipeline, [email Justin](mailto:justin@shakacode.com).*
 

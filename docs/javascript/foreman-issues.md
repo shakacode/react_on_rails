@@ -1,6 +1,6 @@
 # Foreman Issues
 
-## It is not recomended to include foreman into Gemfile
+## It is not recommended to include foreman into Gemfile
 
 See: https://github.com/ddollar/foreman
 

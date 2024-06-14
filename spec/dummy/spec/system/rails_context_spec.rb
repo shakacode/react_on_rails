@@ -11,7 +11,7 @@ shared_examples "railsContext" do |pathname, id_base|
     visit "/#{pathname}?ab=cd"
   end
 
-  context "when visting /#{pathname}", :js do
+  context "when visiting /#{pathname}", :js do
     it "check rails context" do
       expect(page).to have_current_path("/#{pathname}", ignore_query: true)
       host = Capybara.current_session.server.host
