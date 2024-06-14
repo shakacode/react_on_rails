@@ -294,7 +294,7 @@ module ReactOnRails
               allow(Rails).to receive(:version).and_return("4.2")
             end
 
-            it "memoizes the result" do
+            it "memorizes the result" do
               2.times { described_class.rails_version_less_than("4") }
 
               expect(Rails).to have_received(:version).once

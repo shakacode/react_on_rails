@@ -2,9 +2,9 @@
 
 For some years, we used React on Rails for server-side rendering at [HVMN](https://hvmn.com). Our entire backend was already built in Rails, and we love React. As a content & e-commerce site, server-side rendering is critical, for UX performance and SEO crawler indexing.
 
-During the 12 months leading up to our React on Rails Pro transition, our traffic grew 10x. Our team of 2 engineers was focused on shipping features, and we started to face performance issues. We had some fragment caching of our React server rending, but it didn’t work that well.
+During the 12 months leading up to our React on Rails Pro transition, our traffic grew 10x. Our team of 2 engineers was focused on shipping features, and we started to face performance issues. We had some fragment caching of our React server rending, but it didn't work that well.
 
-I discussed our growing pains with Justin, and as it turned out, ShakaCode just came out with React on Rails Pro and set it up on [egghead.io](https://egghead.io). The performance improvements were impressive, and Justin’s team was an ideal partner to help with the integration.
+I discussed our growing pains with Justin, and as it turned out, ShakaCode just came out with React on Rails Pro and set it up on [egghead.io](https://egghead.io). The performance improvements were impressive, and Justin’s team was an ideal partner to help with the integration.
 
 We decided to give it a shot. Over three weeks, the ShakaCode team helped us migrate to React on Rails Pro, set up Webpack v4, migrated our entire asset pipeline to Webpack v4.
 

@@ -131,7 +131,7 @@ jobs:
           name: prettier
           command: yarn start format.listDifferent
 
-  # Install Node modules for Renderer package with Yarn and save them to chache.
+  # Install Node modules for Renderer package with Yarn and save them to cache.
   install-package-node-packages:
     docker: *docker-image
     steps:

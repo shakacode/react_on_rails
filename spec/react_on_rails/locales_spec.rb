@@ -6,11 +6,11 @@ module ReactOnRails
   RSpec.describe Locales do
     describe ".compile" do
       before do
-        @orginal_output_format = ReactOnRails.configuration.i18n_output_format
+        @original_output_format = ReactOnRails.configuration.i18n_output_format
       end
 
       after do
-        ReactOnRails.configuration.i18n_output_format = @orginal_output_format
+        ReactOnRails.configuration.i18n_output_format = @original_output_format
       end
 
       it "by default compiles to JSON" do

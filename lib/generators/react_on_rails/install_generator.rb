@@ -88,9 +88,9 @@ module ReactOnRails
         Dir.chdir("#{__dir__}/bin") do
           files_to_copy.concat(Dir.glob("*"))
         end
-        files_to_become_excutable = files_to_copy.map { |filename| "bin/#{filename}" }
+        files_to_become_executable = files_to_copy.map { |filename| "bin/#{filename}" }
 
-        File.chmod(0o755, *files_to_become_excutable)
+        File.chmod(0o755, *files_to_become_executable)
       end
 
       def add_post_install_message
