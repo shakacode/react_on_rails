@@ -9,8 +9,8 @@ ENV["BUNDLE_GEMFILE"] ||= File.expand_path("../../Gemfile",
 
 require "bundler/setup"
 require "rake"
-require "shakapacker"
-require "shakapacker/dev_server_runner"
+require "webpacker"
+require "webpacker/dev_server_runner"
 
 # Recommendation is to generate packs before compilation
 Rake.application.load_rakefile
@@ -18,5 +18,5 @@ Rake::Task["react_on_rails:generate_packs"].invoke
 
 APP_ROOT = File.expand_path("..", __dir__)
 Dir.chdir(APP_ROOT) do
-  Shakapacker::DevServerRunner.run(ARGV)
+  Webpacker::DevServerRunner.run(ARGV)
 end

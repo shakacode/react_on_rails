@@ -6,7 +6,7 @@ module ReactOnRails
   # rubocop:disable Metrics/ClassLength
   class PacksGenerator
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/
-    MINIMUM_SHAKAPACKER_VERSION = [7, 2, 1].freeze
+    MINIMUM_SHAKAPACKER_VERSION = [6, 5, 1].freeze
 
     def self.instance
       @instance ||= PacksGenerator.new

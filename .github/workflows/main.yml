@@ -10,9 +10,11 @@ jobs:
   build-dummy-app-webpack-test-bundles:
     strategy:
       matrix:
-        ruby: [3.0, 3.3]
-        node: [16, 20]
+        versions: ['oldest_versions', 'newest_versions']
     runs-on: ubuntu-22.04
+    env:
+      # $BUNDLE_GEMFILE must be set at the job level, so it is set for all steps
+      BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/shakapacker_${{ matrix.versions == 'oldest_versions' && '6' || '8' }}.gemfile
     steps:
     - uses: actions/checkout@v4
       with:
@@ -20,7 +22,7 @@ jobs:
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1
       with:
-        ruby-version: ${{ matrix.ruby }}
+        ruby-version: ${{ matrix.versions == 'oldest_versions' && '3.0' || '3.3' }}
         bundler: 2.5.9
     # libyaml-dev is needed for psych v5
     # this gem depends on sdoc which depends on rdoc which depends on psych
@@ -29,7 +31,7 @@ jobs:
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
-        node-version: ${{ matrix.node }}
+        node-version: ${{ matrix.versions == 'oldest_versions' && '16' || '20' }}
     - name: Print system information
       run: |
         echo "Linux release: "; cat /etc/issue
@@ -77,15 +79,17 @@ jobs:
       uses: actions/cache/save@v3
       with:
         path: spec/dummy/public/webpack
-        key: v5-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
+        key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
 
   main:
     needs: build-dummy-app-webpack-test-bundles
     strategy:
       matrix:
-        ruby: [3.0, 3.3]
-        node: [16, 20]
+        versions: ['oldest_versions', 'newest_versions']
     runs-on: ubuntu-22.04
+    env:
+      # $BUNDLE_GEMFILE must be set at the job level, so it is set for all steps
+      BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/shakapacker_${{ matrix.versions == 'oldest_versions' && '6' || '8' }}.gemfile
     steps:
     - uses: actions/checkout@v4
       with:
@@ -93,12 +97,12 @@ jobs:
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1
       with:
-        ruby-version: ${{ matrix.ruby }}
+        ruby-version: ${{ matrix.versions == 'oldest_versions' && '3.0' || '3.3' }}
         bundler: 2.5.9
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
-        node-version: ${{ matrix.node }}
+        node-version: ${{ matrix.versions == 'oldest_versions' && '16' || '20' }}
     - name: Print system information
       run: |
         echo "Linux release: "; cat /etc/issue
@@ -134,7 +138,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: spec/dummy/public/webpack
-        key: v5-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
+        key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji
