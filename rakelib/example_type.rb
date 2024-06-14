@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "rake"
-require "pathname"
 
 require_relative "task_helpers"
 
@@ -40,15 +39,6 @@ module ReactOnRails
 
       def gemfile
         File.join(dir, "Gemfile")
-      end
-
-      # Gems we need to add to the Gemfile before bundle installing
-      def required_gems
-        relative_gem_root = Pathname(gem_root).relative_path_from(Pathname(dir))
-        [
-          "gem 'react_on_rails', path: '#{relative_gem_root}'",
-          "gem 'shakapacker'"
-        ]
       end
 
       # Options we pass when running `rails new` from the command-line.

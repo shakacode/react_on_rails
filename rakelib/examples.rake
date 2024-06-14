@@ -7,11 +7,12 @@
 
 require "yaml"
 require "rails/version"
+require "pathname"
 
 require_relative "example_type"
 require_relative "task_helpers"
 
-namespace :examples do # rubocop:disable Metrics/BlockLength
+namespace :examples [:packer_type] do # rubocop:disable Metrics/BlockLength
   include ReactOnRails::TaskHelpers
   # Loads data from examples_config.yml and instantiates corresponding ExampleType objects
   examples_config_file = File.expand_path("examples_config.yml", __dir__)
@@ -33,13 +34,9 @@ namespace :examples do # rubocop:disable Metrics/BlockLength
       example_type.rails_options += "--skip-javascript"
       sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options}")
       sh_in_dir(example_type.dir, "touch .gitignore")
-      append_to_gemfile(example_type.gemfile, example_type.required_gems)
+      append_to_gemfile(packer_type, example_type.gemfile)
       bundle_install_in(example_type.dir)
-      begin
-        sh_in_dir(example_type.dir, "rake webpacker:install")
-      rescue
-        sh_in_dir(example_type.dir, "rake shakapacker:install")
-      end
+      sh_in_dir(example_type.dir, "rake #{packer_type.to_s}:install")
       sh_in_dir(example_type.dir, example_type.generator_shell_commands)
       sh_in_dir(example_type.dir, "yarn")
     end
@@ -55,13 +52,19 @@ namespace :examples do # rubocop:disable Metrics/BlockLength
 end
 
 desc "Generates all example apps. Run `rake -D examples` to see all available options"
-task examples: ["examples:gen_all"]
+task :examples, [:packer_type] => "examples:gen_all"
 
 private
 
 # Appends each string in an array as a new line of text in the given Gemfile.
 # Automatically adds line returns.
-def append_to_gemfile(gemfile, lines)
+def append_to_gemfile(packer_type, gemfile)
+  relative_gem_root = Pathname(gem_root).relative_path_from(Pathname(dir))
+  shakapacker_version = packer_type.to_s == 'webpacker' ? '6.6.0' : '8.0.0'
+  lines = [
+    "gem 'react_on_rails', path: '#{relative_gem_root}'",
+    "gem 'shakapacker', '~> #{shakapacker_version}'"
+  ]
   old_text = File.read(gemfile)
   new_text = lines.reduce(old_text) { |a, e| a << "#{e}\n" }
   File.open(gemfile, "w") { |f| f.puts(new_text) }
