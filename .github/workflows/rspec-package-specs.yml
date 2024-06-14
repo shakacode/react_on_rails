@@ -7,11 +7,14 @@ on:
   pull_request:
 
 jobs:
-  build:
+  rspec-package-tests:
     strategy:
       matrix:
-        ruby: [3.0, 3.3]
+        versions: ['shakapacker_v6', 'shakapacker_v8']
     runs-on: ubuntu-22.04
+    env:
+      # $BUNDLE_GEMFILE must be set at the job level, so it is set for all steps
+      BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/${{ matrix.versions }}.gemfile
     steps:
     - uses: actions/checkout@v4
       with:
@@ -19,7 +22,7 @@ jobs:
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1
       with:
-        ruby-version: ${{ matrix.ruby }}
+        ruby-version: ${{ matrix.versions == 'shakapacker_v6' && '3.0' || '3.3' }}
         bundler: 2.5.9
     - name: Print system information
       run: |
@@ -34,7 +37,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: vendor/bundle
-        key: v5-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
+        key: package-app-gem-cache-${{ hashFiles(format('{0}/gemfiles/{1}.gemfile.lock', github.workspace, matrix.versions)) }}
     - run: gem install appraisal
     - name: Install Ruby Gems for package
       run: bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3

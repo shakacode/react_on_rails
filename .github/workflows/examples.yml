@@ -56,10 +56,10 @@ jobs:
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji
-        yarn run eslint -v
         sudo yarn global add yalc
     - name: yalc publish for react-on-rails
       run: yalc publish
+    - run: gem install appraisal
     - name: Install Ruby Gems for package
       run:  bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Ensure minimum required Chrome version

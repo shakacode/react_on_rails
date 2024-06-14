@@ -63,7 +63,7 @@ jobs:
       run: cd spec/dummy && yalc add react-on-rails
     - name: Install Node modules with Yarn for dummy app
       run: cd spec/dummy && yarn install --no-progress --no-emoji
-    - run: cd spec/dummy && yarn install "shakapacker@${{ matrix.versions == 'shakapacker_v6' && '6.6.0' || '8.0.0' }}"
+    - run: cd spec/dummy && yarn add "shakapacker@${{ matrix.versions == 'shakapacker_v6' && '6.6.0' || '8.0.0' }}"
     - name: Save dummy app ruby gems to cache
       uses: actions/cache@v3
       with:
