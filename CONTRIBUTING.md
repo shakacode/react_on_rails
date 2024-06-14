@@ -132,17 +132,6 @@ yarn
 yarn build
 ```
 
-Or run this which builds the yarn package, then the webpack files for spec/dummy, and runs tests in
-spec/dummy.
-
-
-```sh
-# Optionally change default selenium_firefox driver
-export DRIVER=selenium_firefox
-cd react_on_rails/
-yarn run dummy:spec
-```
-
 ### Run NPM JS tests
 
 ```sh
@@ -153,11 +142,17 @@ yarn test
 ### Run spec/dummy tests
 
 ```sh
-cd react_on_rails/spec/dummy
+cd react_on_rails
+npm -g i yalc
+bundle && yarn
+yalc publish
+cd spec/dummy
+bundle && yarn
+yarn add shakapacker
 rspec
 ```
 
-### Run most tests and linting
+### Run package tests and linting
 
 ```sh
 cd react_on_rails/

@@ -10,11 +10,11 @@ jobs:
   build-dummy-app-webpack-test-bundles:
     strategy:
       matrix:
-        versions: ['oldest_versions', 'newest_versions']
+        versions: ['shakapacker_v6', 'shakapacker_v8']
     runs-on: ubuntu-22.04
     env:
       # $BUNDLE_GEMFILE must be set at the job level, so it is set for all steps
-      BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/shakapacker_${{ matrix.versions == 'oldest_versions' && '6' || '8' }}.gemfile
+      BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/${{ matrix.versions }}.gemfile
     steps:
     - uses: actions/checkout@v4
       with:
@@ -22,16 +22,17 @@ jobs:
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1
       with:
-        ruby-version: ${{ matrix.versions == 'oldest_versions' && '3.0' || '3.3' }}
+        ruby-version: ${{ matrix.versions == 'shakapacker_v6' && '3.0' || '3.3' }}
         bundler: 2.5.9
     # libyaml-dev is needed for psych v5
     # this gem depends on sdoc which depends on rdoc which depends on psych
+    - run: gem install appraisal
     - name: Fix dependency for libyaml-dev
       run: sudo apt install libyaml-dev
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
-        node-version: ${{ matrix.versions == 'oldest_versions' && '16' || '20' }}
+        node-version: ${{ matrix.versions == 'shakapacker_v6' && '16' || '20' }}
     - name: Print system information
       run: |
         echo "Linux release: "; cat /etc/issue
@@ -57,22 +58,23 @@ jobs:
       uses: actions/cache@v3
       with:
         path: spec/dummy/node_modules
-        key: v5-dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/yarn.lock') }}
+        key: v5-dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/yarn.lock') }}-${{ matrix.versions }}
     - name: yalc add react-on-rails
       run: cd spec/dummy && yalc add react-on-rails
     - name: Install Node modules with Yarn for dummy app
       run: cd spec/dummy && yarn install --no-progress --no-emoji
+    - run: cd spec/dummy && yarn install "shakapacker@${{ matrix.versions == 'shakapacker_v6' && '6.6.0' || '8.0.0' }}"
     - name: Save dummy app ruby gems to cache
       uses: actions/cache@v3
       with:
         path: spec/dummy/vendor/bundle
-        key: v5-dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
+        key: dummy-app-gem-cache-${{ hashFiles(format('{0}/gemfiles/{1}.gemfile.lock', github.workspace, matrix.versions)) }}
     - name: Install Ruby Gems for dummy app
       run: cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: generate file system-based packs
       run: cd spec/dummy && RAILS_ENV=test bundle exec rake react_on_rails:generate_packs
     - name: Build test bundles for dummy app
-      run: cd spec/dummy && yarn run build:test
+      run: cd spec/dummy && rm -rf public/webpack/test && yarn build:rescript && RAILS_ENV=test NODE_ENV=test bin/${{ matrix.versions == 'shakapacker_v6' && 'web' || 'shaka' }}packer
     - id: get-sha
       run: echo "::set-output name=sha::$(git rev-parse HEAD)"
     - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
@@ -85,11 +87,11 @@ jobs:
     needs: build-dummy-app-webpack-test-bundles
     strategy:
       matrix:
-        versions: ['oldest_versions', 'newest_versions']
+        versions: ['shakapacker_v6', 'shakapacker_v8']
     runs-on: ubuntu-22.04
     env:
       # $BUNDLE_GEMFILE must be set at the job level, so it is set for all steps
-      BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/shakapacker_${{ matrix.versions == 'oldest_versions' && '6' || '8' }}.gemfile
+      BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/${{ matrix.versions }}.gemfile
     steps:
     - uses: actions/checkout@v4
       with:
@@ -97,12 +99,12 @@ jobs:
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1
       with:
-        ruby-version: ${{ matrix.versions == 'oldest_versions' && '3.0' || '3.3' }}
+        ruby-version: ${{ matrix.versions == 'shakapacker_v6' && '3.0' || '3.3' }}
         bundler: 2.5.9
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
-        node-version: ${{ matrix.versions == 'oldest_versions' && '16' || '20' }}
+        node-version: ${{ matrix.versions == 'shakapacker_v6' && '16' || '20' }}
     - name: Print system information
       run: |
         echo "Linux release: "; cat /etc/issue
@@ -126,12 +128,12 @@ jobs:
       uses: actions/cache@v3
       with:
         path: spec/dummy/vendor/bundle
-        key: v5-dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
+        key: dummy-app-gem-cache-${{ hashFiles(format('{0}/gemfiles/{1}.gemfile.lock', github.workspace, matrix.versions)) }}
     - name: Save spec/dummy/node_modules to cache
       uses: actions/cache@v3
       with:
         path: spec/dummy/node_modules
-        key: v5-dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/yarn.lock') }}
+        key: v5-dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/yarn.lock') }}-${{ matrix.versions }}
     - id: get-sha
       run: echo "::set-output name=sha::$(git rev-parse HEAD)"
     - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
@@ -142,7 +144,6 @@ jobs:
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji
-        yarn run eslint -v
         sudo yarn global add yalc
     - name: yalc publish for react-on-rails
       run: yalc publish

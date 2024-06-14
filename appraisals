@@ -1,7 +1,7 @@
-appraise 'shakapacker_6' do
+appraise 'shakapacker_v6' do
   gem 'shakapacker', '~> 6.6.0'
 end
 
-appraise 'shakapacker_8' do
+appraise 'shakapacker_v8' do
   gem 'shakapacker', '~> 8.0.0'
 end
