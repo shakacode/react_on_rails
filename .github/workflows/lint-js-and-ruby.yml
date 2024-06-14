@@ -49,7 +49,6 @@ jobs:
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji
-    - run: gem install appraisal
     - name: Install Ruby Gems for package
       run: bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Linting of Ruby

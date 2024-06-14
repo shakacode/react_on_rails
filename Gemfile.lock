@@ -88,10 +88,6 @@ GEM
     addressable (2.8.6)
       public_suffix (>= 2.0.2, < 6.0)
     amazing_print (1.6.0)
-    appraisal (2.5.0)
-      bundler
-      rake
-      thor (>= 0.14.0)
     ast (2.4.2)
     base64 (0.2.0)
     bigdecimal (3.1.8)
@@ -390,7 +386,6 @@ PLATFORMS
 
 DEPENDENCIES
   amazing_print
-  appraisal
   bootsnap
   capybara
   capybara-screenshot

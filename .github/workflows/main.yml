@@ -26,7 +26,6 @@ jobs:
         bundler: 2.5.9
     # libyaml-dev is needed for psych v5
     # this gem depends on sdoc which depends on rdoc which depends on psych
-    - run: gem install appraisal
     - name: Fix dependency for libyaml-dev
       run: sudo apt install libyaml-dev
     - name: Setup Node

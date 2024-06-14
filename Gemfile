@@ -1,25 +1,11 @@
 # frozen_string_literal: true
 
-require 'appraisal/bundler_dsl'
-::Appraisal::BundlerDSL.class_eval do
-  def eval_gemfile(path, contents = nil)
-    (@eval_gemfile ||= []) << [path, contents]
-  end
-
-  private
-
-  def eval_gemfile_entry
-    @eval_gemfile.map { |(p, c)| "eval_gemfile(#{p.inspect}#{", #{c.inspect}" if c})" } * "\n\n"
-  end
-
-  alias_method :eval_gemfile_entry_for_dup, :eval_gemfile_entry
-
-  self::PARTS << 'eval_gemfile'
-end unless ::Appraisal::BundlerDSL::PARTS[-1] == 'eval_gemfile'
-
 source "https://rubygems.org"
 
-gem "appraisal"
+# to use appraisal to update ci gemfiles, see https://github.com/thoughtbot/appraisal/issues/154
+# following appraisal use, you will need to modify the created gemfiles to use relative paths instead of absolute paths
+# gem "appraisal"
+
 # Specify your gem"s dependencies in react_on_rails.gemspec
 gemspec
 

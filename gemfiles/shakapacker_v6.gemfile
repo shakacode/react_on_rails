@@ -7,4 +7,4 @@ gem "shakapacker", "~> 6.6.0"
 
 gemspec path: "../"
 
-eval_gemfile("/Users/judahmeek/apps/react_on_rails/Gemfile.development_dependencies")
+File.expand_path("../Gemfile.development_dependencies", __dir__)
