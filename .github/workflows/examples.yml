@@ -82,7 +82,7 @@ jobs:
       run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
     - name: Main CI
       if: steps.changed-files.outputs.any_changed == 'true'
-      run: bundle exec rake run_rspec:examples
+      run: bundle exec rake run_rspec:${{ matrix.versions == 'oldest' && 'web' || 'shaka' }}packer_examples
     - name: Store test results
       uses: actions/upload-artifact@v3
       with:

@@ -38,8 +38,13 @@ namespace :run_rspec do
     end
   end
 
-  desc "Runs Rspec for example apps only"
-  task examples: "examples:gen_all" do
+  desc "Runs Rspec for webpacker example apps only"
+  task webpacker_examples: "webpacker_examples:gen_all" do
+    ExampleType.all.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  end
+
+  desc "Runs Rspec for shakapacker example apps only"
+  task shakapacker_examples: "shakapacker_examples:gen_all" do
     ExampleType.all.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
@@ -56,7 +61,8 @@ namespace :run_rspec do
   end
 
   desc "run all tests"
-  task run_rspec: %i[all_but_examples examples] do
+  task :run_rspec, [:packer] => ["all_but_examples"] do
+    Rake::Task["run_rspec:#{packer}_examples"].invoke
     puts "Completed all RSpec tests"
   end
 end

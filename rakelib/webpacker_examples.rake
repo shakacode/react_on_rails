@@ -12,7 +12,7 @@ require "pathname"
 require_relative "example_type"
 require_relative "task_helpers"
 
-namespace :examples, [:packer_type] do # rubocop:disable Metrics/BlockLength
+namespace :webpacker_examples do # rubocop:disable Metrics/BlockLength
   include ReactOnRails::TaskHelpers
   # Loads data from examples_config.yml and instantiates corresponding ExampleType objects
   examples_config_file = File.expand_path("examples_config.yml", __dir__)
@@ -36,7 +36,7 @@ namespace :examples, [:packer_type] do # rubocop:disable Metrics/BlockLength
       sh_in_dir(example_type.dir, "touch .gitignore")
       append_to_gemfile(packer_type, example_type.gemfile)
       bundle_install_in(example_type.dir)
-      sh_in_dir(example_type.dir, "rake #{packer_type.to_s}:install")
+      sh_in_dir(example_type.dir, "rake webpacker:install")
       sh_in_dir(example_type.dir, example_type.generator_shell_commands)
       sh_in_dir(example_type.dir, "yarn")
     end
@@ -52,7 +52,7 @@ namespace :examples, [:packer_type] do # rubocop:disable Metrics/BlockLength
 end
 
 desc "Generates all example apps. Run `rake -D examples` to see all available options"
-task :examples, [:packer_type] => "examples:gen_all"
+task webpacker_examples: ["webpacker_examples:gen_all"]
 
 private
 

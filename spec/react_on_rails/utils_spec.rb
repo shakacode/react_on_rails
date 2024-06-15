@@ -113,7 +113,7 @@ module ReactOnRails
             server_bundle_name = "server-bundle.js"
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
               .and_return(server_bundle_name)
-            allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.manifest.lookup!")
+            allow(Packer).to receive_message_chain("manifest.lookup!")
               .with(server_bundle_name)
               .and_raise(Packer::Manifest::MissingEntryError)
 
@@ -125,11 +125,12 @@ module ReactOnRails
 
         context "with server file in the manifest, used for client", :shakapacker do
           it "returns the correct path hashed server path" do
+            Packer = ReactOnRails::PackerUtils.packer
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
               .and_return("webpack-bundle.js")
             allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
               .and_return(true)
-            allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.manifest.lookup!")
+            allow(Packer).to receive_message_chain("manifest.lookup!")
               .with("webpack-bundle.js")
               .and_return("webpack/development/webpack-bundle-123456.js")
 

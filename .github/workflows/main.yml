@@ -81,15 +81,12 @@ jobs:
         path: spec/dummy/public/webpack
         key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
 
-  main:
+  dummy-app-integration-tests:
     needs: build-dummy-app-webpack-test-bundles
     strategy:
       matrix:
         versions: ['oldest', 'newest']
     runs-on: ubuntu-22.04
-    env:
-      # $BUNDLE_GEMFILE must be set at the job level, so it is set for all steps
-      BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/${{ matrix.versions }}.gemfile
     steps:
     - uses: actions/checkout@v4
       with:
