@@ -91,6 +91,16 @@ module ReactOnRails
       end
     end
 
+    def stream_react_component(component_name, options = {})
+      options = options.merge(stream?: true)
+      result = internal_react_component(component_name, options)
+      build_react_component_result_for_server_streamed_content(
+        rendered_html_stream: result[:result],
+        component_specification_tag: result[:tag],
+        render_options: result[:render_options]
+      )
+    end
+
     # react_component_hash is used to return multiple HTML strings for server rendering, such as for
     # adding meta-tags to a page.
     # It is exactly like react_component except for the following:
@@ -334,6 +344,10 @@ module ReactOnRails
       "#{ReactOnRails::PackerUtils.packer_source_entry_path}/generated/#{component_name}.js"
     end
 
+    def get_content_tag_options_html_tag(render_options)
+
+    end
+
     def build_react_component_result_for_server_rendered_string(
       server_rendered_html: required("server_rendered_html"),
       component_specification_tag: required("component_specification_tag"),
@@ -359,6 +373,33 @@ module ReactOnRails
       )
 
       prepend_render_rails_context(result)
+    end
+
+    def build_react_component_result_for_server_streamed_content(
+      rendered_html_stream: required("rendered_html_stream"),
+      component_specification_tag: required("component_specification_tag"),
+      render_options: required("render_options")
+    )
+      content_tag_options_html_tag = render_options.html_options[:tag] || 'div'
+      # The component_specification_tag is appended to the first chunk
+      # We need to pass it early with the first chunk because it's needed in hydration
+      # We need to make sure that client can hydrate the app early even before all components are streamed
+      is_first_chunk = true
+
+      rendered_html_stream = rendered_html_stream.prepend { rails_context_if_not_already_rendered }
+                          .prepend { "<#{content_tag_options_html_tag} id=\"#{render_options.dom_id}\">" }
+                          .transform(&:html_safe)
+
+      rendered_html_stream = rendered_html_stream.transform do |chunk|
+        is_first_chunk = false
+        if is_first_chunk
+          return "#{chunk}\n#{component_specification_tag}"
+        end
+        chunk
+      end
+                          .append { "</#{content_tag_options_html_tag}>" }
+                          .append { component_specification_tag }
+      # TODO: handle console logs
     end
 
     def build_react_component_result_for_server_rendered_hash(
@@ -404,20 +445,22 @@ module ReactOnRails
       HTML
     end
 
-    # prepend the rails_context if not yet applied
-    def prepend_render_rails_context(render_value)
-      return render_value if @rendered_rails_context
+    def rails_context_if_not_already_rendered
+      return "" if @rendered_rails_context
 
       data = rails_context(server_side: false)
 
       @rendered_rails_context = true
 
-      rails_context_content = content_tag(:script,
-                                          json_safe_and_pretty(data).html_safe,
-                                          type: "application/json",
-                                          id: "js-react-on-rails-context")
+      content_tag(:script,
+                  json_safe_and_pretty(data).html_safe,
+                  type: "application/json",
+                  id: "js-react-on-rails-context")
+    end
 
-      "#{rails_context_content}\n#{render_value}".html_safe
+    # prepend the rails_context if not yet applied
+    def prepend_render_rails_context(render_value)
+      "#{rails_context_if_not_already_rendered}\n#{render_value}".html_safe
     end
 
     def internal_react_component(react_component_name, options = {})
@@ -511,6 +554,9 @@ module ReactOnRails
                                                err: err,
                                                js_code: js_code)
       end
+
+      # TODO: handle errors for streams
+      return result if render_options.stream?
 
       if result["hasErrors"] && render_options.raise_on_prerender_error
         # We caught this exception on our backtrace handler
