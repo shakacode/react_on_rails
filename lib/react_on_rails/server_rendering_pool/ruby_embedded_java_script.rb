@@ -92,6 +92,12 @@ module ReactOnRails
         end
         # rubocop:enable Metrics/CyclomaticComplexity, Metrics/AbcSize, Metrics/PerceivedComplexity
 
+        # TODO: merge with exec_server_render_js
+        def exec_server_render_streaming_js(js_code, render_options, js_evaluator = nil)
+          js_evaluator ||= self
+          js_evaluator.eval_streaming_js(js_code, render_options)
+        end
+
         def trace_js_code_used(msg, js_code, file_name = "tmp/server-generated.js", force: false)
           return unless ReactOnRails.configuration.trace || force
 
