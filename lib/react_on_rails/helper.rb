@@ -344,10 +344,6 @@ module ReactOnRails
       "#{ReactOnRails::PackerUtils.packer_source_entry_path}/generated/#{component_name}.js"
     end
 
-    def get_content_tag_options_html_tag(render_options)
-
-    end
-
     def build_react_component_result_for_server_rendered_string(
       server_rendered_html: required("server_rendered_html"),
       component_specification_tag: required("component_specification_tag"),
@@ -380,24 +376,24 @@ module ReactOnRails
       component_specification_tag: required("component_specification_tag"),
       render_options: required("render_options")
     )
-      content_tag_options_html_tag = render_options.html_options[:tag] || 'div'
       # The component_specification_tag is appended to the first chunk
       # We need to pass it early with the first chunk because it's needed in hydration
       # We need to make sure that client can hydrate the app early even before all components are streamed
       is_first_chunk = true
-
-      rendered_html_stream = rendered_html_stream.prepend { rails_context_if_not_already_rendered }
-                          .prepend { "<#{content_tag_options_html_tag} id=\"#{render_options.dom_id}\">" }
-                          .transform(&:html_safe)
-
       rendered_html_stream = rendered_html_stream.transform do |chunk|
-        is_first_chunk = false
         if is_first_chunk
-          return "#{chunk}\n#{component_specification_tag}"
+          is_first_chunk = false
+          next "#{chunk}\n#{component_specification_tag}"
         end
         chunk
       end
-                          .append { "</#{content_tag_options_html_tag}>" }
+
+      content_tag_options_html_tag = render_options.html_options[:tag] || "div"
+      rendered_html_stream = rendered_html_stream.prepend { rails_context_if_not_already_rendered }
+                                                 .prepend { "<#{content_tag_options_html_tag} id=\"#{render_options.dom_id}\">" }
+                                                 .transform(&:html_safe)
+
+      rendered_html_stream.append { "</#{content_tag_options_html_tag}>" }
                           .append { component_specification_tag }
       # TODO: handle console logs
     end
