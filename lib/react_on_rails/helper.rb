@@ -101,6 +101,16 @@ module ReactOnRails
       )
     end
 
+    def stream_react_component_async(component_name, options = {})
+      Fiber.new do
+        stream = stream_react_component(component_name, options)
+        stream.each_chunk do |chunk|
+          Fiber.yield chunk
+        end
+        Fiber.yield nil
+      end
+    end
+
     # react_component_hash is used to return multiple HTML strings for server rendering, such as for
     # adding meta-tags to a page.
     # It is exactly like react_component except for the following:
@@ -376,6 +386,7 @@ module ReactOnRails
       component_specification_tag: required("component_specification_tag"),
       render_options: required("render_options")
     )
+      content_tag_options_html_tag = render_options.html_options[:tag] || "div"
       # The component_specification_tag is appended to the first chunk
       # We need to pass it early with the first chunk because it's needed in hydration
       # We need to make sure that client can hydrate the app early even before all components are streamed
@@ -383,18 +394,16 @@ module ReactOnRails
       rendered_html_stream = rendered_html_stream.transform do |chunk|
         if is_first_chunk
           is_first_chunk = false
-          next "#{chunk}\n#{component_specification_tag}"
+          next <<-HTML
+            #{rails_context_if_not_already_rendered}
+            #{component_specification_tag}
+            <#{content_tag_options_html_tag} id="#{render_options.dom_id}">#{chunk}</#{content_tag_options_html_tag}>
+          HTML
         end
         chunk
       end
 
-      content_tag_options_html_tag = render_options.html_options[:tag] || "div"
-      rendered_html_stream = rendered_html_stream.prepend { rails_context_if_not_already_rendered }
-                                                 .prepend { "<#{content_tag_options_html_tag} id=\"#{render_options.dom_id}\">" }
-                                                 .transform(&:html_safe)
-
-      rendered_html_stream.append { "</#{content_tag_options_html_tag}>" }
-                          .append { component_specification_tag }
+      rendered_html_stream.transform(&:html_safe)
       # TODO: handle console logs
     end
 
