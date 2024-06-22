@@ -19,6 +19,9 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since the last non-beta release.
 
 #### Fixed
+- Fixed css-loader instalation with [PR 1634](https://github.com/shakacode/react_on_rails/pull/1634) by [vaukalak](https://github.com/vaukalak)
+
+#### Fixed
 - Address a number of typos and grammar mistakes [PR 1631](https://github.com/shakacode/react_on_rails/pull/1631) by [G-Rath](https://github.com/G-Rath)
 
 ### [14.0.2] - 2024-06-11

@@ -40,7 +40,8 @@ module ReactOnRails
       def copy_js_bundle_files
         base_path = "base/base/"
         base_files = %w[app/javascript/packs/server-bundle.js
-                        app/javascript/bundles/HelloWorld/components/HelloWorldServer.js]
+                        app/javascript/bundles/HelloWorld/components/HelloWorldServer.js
+                        app/javascript/bundles/HelloWorld/components/HelloWorld.module.css]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
@@ -91,7 +92,7 @@ module ReactOnRails
 
         puts "Adding CSS handlers"
 
-        run "yarn add css-loader css-minimizer-webpack-plugin mini-css-extract-plugin style-loader@"
+        run "yarn add -D css-loader css-minimizer-webpack-plugin mini-css-extract-plugin style-loader"
 
         puts "Adding dev dependencies"
         run "yarn add -D @pmmmwh/react-refresh-webpack-plugin react-refresh"
