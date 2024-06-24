@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gantt Chart</title>
+  <style>
+      body {
+          font-family: Arial, sans-serif;
+          padding: 20px;
+      }
+      .gantt-chart {
+          width: 100%;
+          position: relative;
+          height: auto;
+          border-left: 2px solid #000;
+          border-top: 1px solid #000;
+      }
+      .task {
+          position: absolute;
+          height: 30px;
+          background-color: #76A5AF;
+          color: white;
+          line-height: 30px;
+          padding-left: 5px;
+          border-radius: 5px;
+          border: 1px solid #639;
+      }
+  </style>
+</head>
+<body>
+<div id="chartContainer" class="gantt-chart"></div>
+
+<script>
+  window.OPERATIONS_TIMELINE = <%= raw @json_data %>
+</script>
+
+<script>
+  // Sample JSON data
+  const operations = window.OPERATIONS_TIMELINE;
+
+  function findMinStartTime(data) {
+    let minStartTime = Infinity;
+    data.forEach(item => {
+      item.operation_stack.forEach(op => {
+        minStartTime = Math.min(minStartTime, op.start_time);
+        op.suboperations.forEach(subOp => {
+          minStartTime = Math.min(minStartTime, subOp.start_time);
+        });
+      });
+    });
+    return minStartTime;
+  }
+
+  function renderGanttChart(data) {
+    const minStartTime = findMinStartTime(data);
+    let maxEndTime = 0;
+    data.forEach((item, index) => {
+      item.operation_stack.forEach((op, stackIndex) => {
+        const startTime = (op.start_time - minStartTime);
+        const duration = op.duration;
+        maxEndTime = Math.max(maxEndTime, startTime + duration);
+
+        op.suboperations.forEach(subOp => {
+          const subStartTime = (subOp.start_time - minStartTime);
+          const subDuration = subOp.duration;
+          maxEndTime = Math.max(maxEndTime, subStartTime + subDuration);
+        });
+      });
+    });
+
+    const scale = 1000 / maxEndTime; // Scaling to fit in 1000px width
+    function renderOperation(op, startTime, top) {
+      const duration = op.duration * scale;
+      const task = document.createElement('div');
+      task.className = 'task';
+      task.style.top = `${top}px`;
+      task.style.left = `${startTime*1000}px`;
+      task.style.width = `${duration}px`;
+      task.textContent = `${op.operation_name} (${op.duration.toFixed(2)} ms)`;
+      // add tooltip
+      task.title = `${op.operation_name}-${op.message} (${op.duration.toFixed(2)} ms)`;
+      chartContainer.appendChild(task);
+
+      let upperLevels = 0;
+      op.suboperations.forEach((subOp, subIndex) => {
+        const subStartTime = (subOp.start_time - minStartTime) * scale;
+        const upperBranchLevel = renderOperation(subOp, subStartTime, top + 40);
+        upperLevels = upperBranchLevel > upperLevels ? upperBranchLevel : upperLevels;
+      });
+      return upperLevels + 1;
+    }
+
+    let levels = 0;
+    data.forEach((item) => {
+      item.operation_stack.forEach((op) => {
+        const startTime = (op.start_time - minStartTime) * scale;
+        levels += renderOperation(op, startTime, levels * 40); // Increment top value for each operation, not suboperation
+      });
+      levels++;
+    });
+    chartContainer.style.height = `${(data[0].operation_stack.length * 40 + data[0].operation_stack.flatMap(op => op.suboperations).length * 40 + 40)}px`;
+  }
+
+  renderGanttChart(operations);
+</script>
+</body>
+</html>

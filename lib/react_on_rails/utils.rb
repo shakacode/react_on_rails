@@ -213,5 +213,24 @@ module ReactOnRails
 
       puts "Prepended\n#{text_to_prepend}to #{file}."
     end
+
+    def self.with_trace(message = nil)
+      return yield unless ReactOnRails.configuration.trace
+
+      caller_method = caller(1..1).first
+      start_time = Time.current.to_f
+      # show start log
+      Rails.logger.info "[ReactOnRails] [operation-start] PID:#{Process.pid} #{caller_method[/`.*'/][1..-2]}: #{message}, #{start_time}"
+      start = Time.current
+      result = yield
+      finish = Time.current
+
+      Rails.logger.info do
+        timing = "#{((finish - start) * 1_000).round(1)}ms"
+        "[ReactOnRails] PID:#{Process.pid} #{caller_method[/`.*'/][1..-2]}: #{message}, #{timing}"
+      end
+
+      result
+    end
   end
 end

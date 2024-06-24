@@ -18,20 +18,21 @@ module ReactOnRails
         react_component_name: nil,
         render_options: nil
       )
+        ReactOnRails::Utils.with_trace(react_component_name) do
+          config_server_bundle_js = ReactOnRails.configuration.server_bundle_js_file
 
-        config_server_bundle_js = ReactOnRails.configuration.server_bundle_js_file
+          if render_options.prerender == true && config_server_bundle_js.blank?
+            msg = <<~MSG
+              The `prerender` option to allow Server Side Rendering is marked as true but the ReactOnRails configuration
+              for `server_bundle_js_file` is nil or not present in `config/initializers/react_on_rails.rb`.
+              Set `config.server_bundle_js_file` to your javascript bundle to allow server side rendering.
+              Read more at https://www.shakacode.com/react-on-rails/docs/guides/react-server-rendering/
+            MSG
+            raise ReactOnRails::Error, msg
+          end
 
-        if render_options.prerender == true && config_server_bundle_js.blank?
-          msg = <<~MSG
-            The `prerender` option to allow Server Side Rendering is marked as true but the ReactOnRails configuration
-            for `server_bundle_js_file` is nil or not present in `config/initializers/react_on_rails.rb`.
-            Set `config.server_bundle_js_file` to your javascript bundle to allow server side rendering.
-            Read more at https://www.shakacode.com/react-on-rails/docs/guides/react-server-rendering/
-          MSG
-          raise ReactOnRails::Error, msg
+          js_code_renderer.render(props_string, rails_context, redux_stores, react_component_name, render_options)
         end
-
-        js_code_renderer.render(props_string, rails_context, redux_stores, react_component_name, render_options)
       end
 
       def render(props_string, rails_context, redux_stores, react_component_name, render_options)
