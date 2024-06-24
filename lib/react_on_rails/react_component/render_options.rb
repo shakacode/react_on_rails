@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "react_on_rails/utils"
+require_relative '../profiler'
 
 module ReactOnRails
   module ReactComponent
@@ -15,9 +16,11 @@ module ReactOnRails
       def initialize(react_component_name: required("react_component_name"), options: required("options"))
         @react_component_name = react_component_name.camelize
         @options = options
+        @profiler = ReactOnRails::Profiler.new(component_name: @react_component_name)
       end
 
       attr_reader :react_component_name
+      attr_reader :profiler
 
       def throw_js_errors
         options.fetch(:throw_js_errors, false)
