@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gantt Chart</title>
+  <title>React on Rails Performance Report</title>
   <style>
       body {
           font-family: Arial, sans-serif;
@@ -39,33 +39,30 @@
   // Sample JSON data
   const operations = window.OPERATIONS_TIMELINE;
 
-  function findMinStartTime(data) {
+  function findMinStartTime(requestData) {
     let minStartTime = Infinity;
-    data.forEach(item => {
-      item.operation_stack.forEach(op => {
-        minStartTime = Math.min(minStartTime, op.start_time);
-        op.suboperations.forEach(subOp => {
-          minStartTime = Math.min(minStartTime, subOp.start_time);
-        });
+    requestData.operation_stack.forEach(op => {
+      minStartTime = Math.min(minStartTime, op.start_time);
+      op.suboperations.forEach(subOp => {
+        minStartTime = Math.min(minStartTime, subOp.start_time);
       });
     });
     return minStartTime;
   }
 
-  function renderGanttChart(data) {
-    const minStartTime = findMinStartTime(data);
+  function renderGanttChart(requestData, requestLevel) {
+    const minStartTime = findMinStartTime(requestData);
+    console.log(`MIN Start Time: ${minStartTime}`);
     let maxEndTime = 0;
-    data.forEach((item, index) => {
-      item.operation_stack.forEach((op, stackIndex) => {
-        const startTime = (op.start_time - minStartTime);
-        const duration = op.duration;
-        maxEndTime = Math.max(maxEndTime, startTime + duration);
+    requestData.operation_stack.forEach((op, stackIndex) => {
+      const startTime = (op.start_time - minStartTime);
+      const duration = op.duration;
+      maxEndTime = Math.max(maxEndTime, startTime + duration);
 
-        op.suboperations.forEach(subOp => {
-          const subStartTime = (subOp.start_time - minStartTime);
-          const subDuration = subOp.duration;
-          maxEndTime = Math.max(maxEndTime, subStartTime + subDuration);
-        });
+      op.suboperations.forEach(subOp => {
+        const subStartTime = (subOp.start_time - minStartTime);
+        const subDuration = subOp.duration;
+        maxEndTime = Math.max(maxEndTime, subStartTime + subDuration);
       });
     });
 
@@ -91,18 +88,21 @@
       return upperLevels + 1;
     }
 
-    let levels = 0;
-    data.forEach((item) => {
-      item.operation_stack.forEach((op) => {
-        const startTime = (op.start_time - minStartTime) * scale;
-        levels += renderOperation(op, startTime, levels * 40); // Increment top value for each operation, not suboperation
-      });
-      levels++;
+    let levels = requestLevel;
+    requestData.operation_stack.forEach((op) => {
+      const startTime = (op.start_time - minStartTime) * scale;
+      levels += renderOperation(op, startTime, levels * 40); // Increment top value for each operation, not suboperation
     });
-    chartContainer.style.height = `${(data[0].operation_stack.length * 40 + data[0].operation_stack.flatMap(op => op.suboperations).length * 40 + 40)}px`;
+    levels++;
+    return levels;
   }
 
-  renderGanttChart(operations);
+  let requestLevels = 0;
+  operations.forEach(requestData => {
+    const currentRequestLevels = renderGanttChart(requestData, requestLevels)
+    requestLevels += currentRequestLevels;
+  });
+  chartContainer.height = `${requestLevels * 40 + 80}px`
 </script>
 </body>
 </html>
