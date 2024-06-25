@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
+require ReactOnRails::PackerUtils.packer_type
 
 # rubocop:disable Metrics/ModuleLength, Metrics/BlockLength
 module ReactOnRails
@@ -109,13 +110,12 @@ module ReactOnRails
 
         context "with server file not in manifest", :shakapacker do
           it "returns the unhashed server path" do
-            Packer = ReactOnRails::PackerUtils.packer
             server_bundle_name = "server-bundle.js"
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
               .and_return(server_bundle_name)
-            allow(Packer).to receive_message_chain("manifest.lookup!")
+            allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("manifest.lookup!")
               .with(server_bundle_name)
-              .and_raise(Packer::Manifest::MissingEntryError)
+              .and_raise(Object.const_get(ReactOnRails::PackerUtils.packer_type.capitalize)::Manifest::MissingEntryError)
 
             path = described_class.server_bundle_js_file_path
 
@@ -133,6 +133,8 @@ module ReactOnRails
             allow(Packer).to receive_message_chain("manifest.lookup!")
               .with("webpack-bundle.js")
               .and_return("webpack/development/webpack-bundle-123456.js")
+              allow(Packer).to receive_message_chain("dev_server.running?")
+                .and_return(false)
 
             path = described_class.server_bundle_js_file_path
             expect(path).to end_with("public/webpack/development/webpack-bundle-123456.js")

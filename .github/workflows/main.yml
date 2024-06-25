@@ -167,8 +167,13 @@ jobs:
       run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
     - name: generate file system-based packs
       run: cd spec/dummy && RAILS_ENV=test bundle exec rake react_on_rails:generate_packs
+    - name: Git Stuff
+      run: |
+        git config user.email "you@example.com"
+        git config user.name "Your Name"
+        git commit -am "stop generators from complaining about uncommitted code"
     - name: Main CI
-      run: bundle exec rake run_rspec:all_but_examples
+      run: bundle exec rake run_rspec:all_dummy
     - name: Store test results
       uses: actions/upload-artifact@v3
       with:

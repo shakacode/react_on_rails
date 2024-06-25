@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
+require ReactOnRails::PackerUtils.packer_type
 
 # rubocop:disable Metrics/ModuleLength
 
@@ -75,7 +76,7 @@ module ReactOnRails
     end
 
     describe ".build_production_command" do
-      context "when using Shakapacker 7", :unless ReactOnRails::PackerUtils.packer_type == "shakapacker" do
+      context "when using Shakapacker 6", if: ReactOnRails::PackerUtils.packer_type != "shakapacker" do
 
         it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
           allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
@@ -84,7 +85,7 @@ module ReactOnRails
             ReactOnRails.configure do |config|
               config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
             end
-          end.to raise_error(ReactOnRails::Error, /shakapacker_precompile: false/)
+          end.to raise_error(ReactOnRails::Error, /webpacker_precompile: false/)
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is truly" do
@@ -114,7 +115,7 @@ module ReactOnRails
         end
       end
 
-      context "when using Shakapacker 8", :unless ReactOnRails::PackerUtils.packer_type == "shakapacker" do
+      context "when using Shakapacker 8", if: ReactOnRails::PackerUtils.packer_type == "shakapacker" do
 
         it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
           allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
