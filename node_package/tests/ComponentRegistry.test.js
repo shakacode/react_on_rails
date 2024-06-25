@@ -71,7 +71,7 @@ describe('ComponentRegistry', () => {
 
   /*
    * NOTE: Since is a singleton, it preserves value as the tests run.
-   * Thus, tests are cummulative.
+   * Thus, tests are cumulative.
    */
   it('registers and retrieves multiple components', () => {
     expect.assertions(4);

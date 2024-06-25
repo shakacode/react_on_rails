@@ -14,7 +14,7 @@ import ReactHelmet from '../components/ReactHelmet';
  *  This is imported as "ReactHelmetApp" by "serverRegistration.jsx". Note that rendered
  *  component markup must go under "componentHtml" key.
  *
- *  Note that the function should take 2 params to identify this as a generator fuction.
+ *  Note that the function should take 2 params to identify this as a generator function.
  *  Alternately, the function could get the property of `.renderFunction = true` added to it.
  */
 export default (props) => {

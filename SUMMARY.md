@@ -1,6 +1,6 @@
 # Table of Contents
 
-Doccumentation for React on Rails has moved!
+Documentation for React on Rails has moved!
 
 Here is the new link:
 

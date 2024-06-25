@@ -294,7 +294,7 @@ If you want to test this out with HMR, then you also need to add this line to yo
 ```
 
 More likely, you will create a different build file for server rendering. However, if you want to
-use the same file from the shakapack-dev-server, you'll need to add that line.
+use the same file from the shakapacker-dev-server, you'll need to add that line.
 
 When you look at the source code for the page (right click, view source in Chrome), you can see the difference between non-server rendering, where your DIV containing your React looks like this:
 

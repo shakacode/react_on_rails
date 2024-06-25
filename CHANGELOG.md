@@ -18,6 +18,11 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+#### Fixed
+- Fixed css-loader installation with [PR 1634](https://github.com/shakacode/react_on_rails/pull/1634) by [vaukalak](https://github.com/vaukalak)
+#### Fixed
+- Address a number of typos and grammar mistakes [PR 1631](https://github.com/shakacode/react_on_rails/pull/1631) by [G-Rath](https://github.com/G-Rath)
+
 ### [14.0.2] - 2024-06-11
 
 #### Fixed
@@ -174,7 +179,7 @@ which was only used in the workaround. [PR 1580](https://github.com/shakacode/re
 
 #### Changed
 - Changed logic of determining the usage of the default rails/webpacker webpack config or a custom command to only check if the config.build_production_command is defined. [PR 1402](https://github.com/shakacode/react_on_rails/pull/1402) by [justin808](https://github.com/justin808) and [gscarv13](https://github.com/gscarv13).
-- Minimimum required Ruby is 2.7 to match lastest rails/webpacker.
+- Minimum required Ruby is 2.7 to match latest rails/webpacker.
 
 ### [12.4.0] - 2021-09-22
 #### Added
@@ -201,7 +206,7 @@ which was only used in the workaround. [PR 1580](https://github.com/shakacode/re
 - Added the ability to assign a module with a `call` method to `config.build_production_command`. See [the configuration docs](https://www.shakacode.com/react-on-rails/docs/guides/configuration). [PR 1362: Accept custom module for config.build_production_command](https://github.com/shakacode/react_on_rails/pull/1362).
 
 #### Fixed
-- Stop setting NODE_ENV value during precompile, as it interferred with rails/webpacker's setting of NODE_ENV to production by default. Fixes [#1334](https://github.com/shakacode/react_on_rails/issues/1334). [PR 1356: Don't set NODE_ENV in assets.rake](https://github.com/shakacode/react_on_rails/pull/1356) by [alexrozanski](https://github.com/alexrozanski).
+- Stop setting NODE_ENV value during precompile, as it interfered with rails/webpacker's setting of NODE_ENV to production by default. Fixes [#1334](https://github.com/shakacode/react_on_rails/issues/1334). [PR 1356: Don't set NODE_ENV in assets.rake](https://github.com/shakacode/react_on_rails/pull/1356) by [alexrozanski](https://github.com/alexrozanski).
 
 ### [12.0.4] - 2020-11-14
 #### Fixed
@@ -221,7 +226,7 @@ which was only used in the workaround. [PR 1580](https://github.com/shakacode/re
 
 ### [12.0.1] - 2020-07-09
 #### Fixed
-- Changed invocation of webpacker:clean to use a very large number of versions so it does not acidentally delete the server-bundle.js. [PR 1306](https://github.com/shakacode/react_on_rails/pull/1306) by By [justin808](https://github.com/justin808).
+- Changed invocation of webpacker:clean to use a very large number of versions so it does not accidentally delete the server-bundle.js. [PR 1306](https://github.com/shakacode/react_on_rails/pull/1306) by By [justin808](https://github.com/justin808).
 
 ### [12.0.0] - 2020-07-08
 For upgrade instructions, see [docs/guides/upgrading-react-on-rails.md](https://www.shakacode.com/react-on-rails/docs/guides/upgrading-react-on-rails).
@@ -380,7 +385,7 @@ Do not use. Unpublished. Caused by an issue with the release script.
 
 ### [11.0.7] - 2018-05-16
 #### Fixed
-- Fix npm publshing. [PR 1090](https://github.com/shakacode/react_on_rails/pull/1090) by [justin808](https://github.com/justin808).
+- Fix npm publishing. [PR 1090](https://github.com/shakacode/react_on_rails/pull/1090) by [justin808](https://github.com/justin808).
 
 ### [11.0.6] - 2018-05-15
 #### Changed
@@ -756,7 +761,7 @@ No changes.
 - Don't assume ActionMailer is available. [#608](https://github.com/shakacode/react_on_rails/pull/608) by [tuzz](https://github.com/tuzz).
 
 ## [6.2.1] - 2016-11-19
-- Removed unnecesary passing of context in the HelloWorld Container example and basic generator. [#612](https://github.com/shakacode/react_on_rails/pull/612) by [justin808](https://github.com/justin808)
+- Removed unnecessary passing of context in the HelloWorld Container example and basic generator. [#612](https://github.com/shakacode/react_on_rails/pull/612) by [justin808](https://github.com/justin808)
 
 - Turbolinks 5 bugfix to use `before-cache`, not `before-render`. [#611](https://github.com/shakacode/react_on_rails/pull/611) by [volkanunsal](https://github.com/volkanunsal).
 
@@ -782,12 +787,12 @@ No changes.
 
 ##### Fixed
 - React on Rails now correctly parses single-digit version strings from package.json [#491](https://github.com/shakacode/react_on_rails/pull/491) by [samphilipd ](https://github.com/samphilipd).
-- Fixed assets symlinking to correctly use filenames with spaces. Begining in [#510](https://github.com/shakacode/react_on_rails/pull/510), ending in [#513](https://github.com/shakacode/react_on_rails/pull/513) by [dzirtusss](https://github.com/dzirtusss).
+- Fixed assets symlinking to correctly use filenames with spaces. Beginning in [#510](https://github.com/shakacode/react_on_rails/pull/510), ending in [#513](https://github.com/shakacode/react_on_rails/pull/513) by [dzirtusss](https://github.com/dzirtusss).
 - Check encoding of request's original URL and force it to UTF-8 [#527](https://github.com/shakacode/react_on_rails/pull/527) by [lucke84](https://github.com/lucke84)
 
 ## [6.0.5] - 2016-07-11
 ##### Added
-- Added better error messages to avoid issues with shared redux stores [#470](https://github.com/shakacode/react_on_rails/pull/470) by by [justin808](https://github.com/justin808).
+- Added better error messages to avoid issues with shared redux stores [#470](https://github.com/shakacode/react_on_rails/pull/470) by [justin808](https://github.com/justin808).
 
 ## [6.0.4] - 2016-06-13
 ##### Fixed
@@ -799,7 +804,7 @@ No changes.
 
 ## [6.0.2] - 2016-06-06
 ##### Fixed
-- Fix colisions in ids of DOM nodes generated by `react_component` by indexing in using an UUID rather than an auto-increment value. This means that it should be overriden using the `id` parameter of `react_component` if one wants to generate a predictable id (_e.g._ for testing purpose). See [Issue #437](https://github.com/shakacode/react_on_rails/issues/437). Fixed in [#438](https://github.com/shakacode/react_on_rails/pull/438) by [Michael Baudino](https://github.com/michaelbaudino).
+- Fix collisions in ids of DOM nodes generated by `react_component` by indexing in using a UUID rather than an auto-increment value. This means that it should be overridden using the `id` parameter of `react_component` if one wants to generate a predictable id (_e.g._ for testing purpose). See [Issue #437](https://github.com/shakacode/react_on_rails/issues/437). Fixed in [#438](https://github.com/shakacode/react_on_rails/pull/438) by [Michael Baudino](https://github.com/michaelbaudino).
 
 ## [6.0.1] - 2016-05-27
 ##### Fixed
@@ -807,16 +812,16 @@ No changes.
 
 ## [6.0.0] - 2016-05-25
 ##### Breaking Changes
-- Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own assets.rake file that does the precompilation.
+- Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own `assets.rake` file that does the precompilation.
   [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808).
 - **Migration to v6**
   - Do not run the generator again if you've already run it.
 
   - See [shakacode/react-webpack-rails-tutorial/pull/287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287) for an    example of upgrading from v5.
 
-  - To configure the asset compliation you can either
+  - To configure the asset compilation you can either
     1. Specify a `config/react_on_rails` setting for `build_production_command` to be nil to turn this feature off.
-    2. Specify the script command you want to run to build your production assets, and remove your assets.rake file.
+    2. Specify the script command you want to run to build your production assets, and remove your `assets.rake` file.
 
   - If you are using the ReactOnRails test helper, then you will need to add the 'config.npm_build_test_command' to your config to tell react_on_rails what command to run when you run rspec.
 
@@ -903,7 +908,7 @@ All 5.1.0 changes can be found in [#362](https://github.com/shakacode/react_on_r
 ## [4.0.3] - 2016-03-17
 
 ##### Fixed
-- `ReactOnRailsHelper#react_component`: Invalid deprecation message when called with only one paramter, the component name.
+- `ReactOnRailsHelper#react_component`: Invalid deprecation message when called with only one parameter, the component name.
 
 ## [4.0.2] - 2016-03-17
 

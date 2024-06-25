@@ -43,11 +43,11 @@ At the same time dev/prod environments works fine (with extra webpack calling st
 
 ### webpack.config.js
 
-See [Shakapcker Webpack Configuration](https://github.com/shakacode/shakapacker/blob/master/README.md#webpack-configuration).
+See [Shakapacker Webpack Configuration](https://github.com/shakacode/shakapacker/blob/master/README.md#webpack-configuration).
 
 ### config/webpacker.yml
 
-is default from sample appliction v9.x
+is default from sample application v9.x
 
 ### config/initializers/react_on_rails.rb
 

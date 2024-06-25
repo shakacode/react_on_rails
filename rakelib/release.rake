@@ -34,7 +34,7 @@ Example: `rake release[2.1.0,false]`")
 task :release, %i[gem_version dry_run tools_install] do |_t, args|
   include ReactOnRails::TaskHelpers
 
-  # Check if there are uncommited changes
+  # Check if there are uncommitted changes
   ReactOnRails::GitUtils.uncommitted_changes?(RaisingMessageHandler.new)
   args_hash = args.to_hash
 

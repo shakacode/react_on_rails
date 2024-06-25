@@ -40,7 +40,8 @@ module ReactOnRails
       def copy_js_bundle_files
         base_path = "base/base/"
         base_files = %w[app/javascript/packs/server-bundle.js
-                        app/javascript/bundles/HelloWorld/components/HelloWorldServer.js]
+                        app/javascript/bundles/HelloWorld/components/HelloWorldServer.js
+                        app/javascript/bundles/HelloWorld/components/HelloWorld.module.css]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
@@ -81,7 +82,7 @@ module ReactOnRails
           package_json.manager.add(["react-on-rails@#{ReactOnRails::VERSION}"])
         else
           # otherwise add latest
-          puts "Adding the lastest react-on-rails NPM module. Double check this is correct in package.json"
+          puts "Adding the latest react-on-rails NPM module. Double check this is correct in package.json"
           package_json.manager.add(["react-on-rails"])
         end
 
@@ -101,7 +102,7 @@ module ReactOnRails
           "css-loader",
           "css-minimizer-webpack-plugin",
           "mini-css-extract-plugin",
-          "style-loader@"
+          "style-loader"
         ])
 
         puts "Adding dev dependencies"

@@ -273,7 +273,7 @@ module ReactOnRails
         ReactOnRails.configure do |config|
           config.auto_load_bundle = true
         end
-      end.to raise_error(ReactOnRails::Error, /components_subdirectory is unconfigured/)
+      end.to raise_error(ReactOnRails::Error, /components_subdirectory is not configured/)
     end
 
     it "checks that autobundling requirements are met if configuration options for autobundling are set" do
