@@ -67,7 +67,7 @@ module ReactOnRails
       def copy_packer_config
         puts "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
         base_path = "base/base/"
-        config = "config/#{ReactOnRails::PackerUtils.packer_type}.yml"
+        config = "config/shakapacker.yml"
         copy_file("#{base_path}#{config}", config)
       end
 
