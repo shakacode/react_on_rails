@@ -34,7 +34,9 @@ namespace :webpacker_examples do # rubocop:disable Metrics/BlockLength
       example_type.rails_options += "--skip-javascript"
       sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options}")
       sh_in_dir(example_type.dir, "touch .gitignore")
+      sh_in_dir(example_type.dir, "cat Gemfile")
       append_to_gemfile(example_type.gemfile, example_type.dir)
+      sh_in_dir(example_type.dir, "cat Gemfile")
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, "rake webpacker:install")
       sh_in_dir(example_type.dir, example_type.generator_shell_commands)
