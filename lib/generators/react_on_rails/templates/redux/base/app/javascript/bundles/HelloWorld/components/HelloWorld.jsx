@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import React from 'react';
-import style from './HelloWorld.module.css';
+import * as style from './HelloWorld.module.css';
 
 const HelloWorld = ({ name, updateName }) => (
   <div>
