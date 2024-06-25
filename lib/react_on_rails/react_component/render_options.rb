@@ -103,6 +103,10 @@ module ReactOnRails
         options[key] = value
       end
 
+      def stream?
+        options[:stream?]
+      end
+
       private
 
       attr_reader :options
