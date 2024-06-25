@@ -172,6 +172,7 @@ jobs:
         git config user.email "you@example.com"
         git config user.name "Your Name"
         git commit -am "stop generators from complaining about uncommitted code"
+    - run: bundle info shakapacker
     - name: Main CI
       run: bundle exec rake run_rspec:all_dummy
     - name: Store test results
