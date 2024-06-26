@@ -31,12 +31,18 @@ namespace :run_rspec do
   end
 
   # Dynamically define Rake tasks for each example app found in the examples directory
-  ExampleType.all.each do |packer_type|
-    packer_type.each do |example_type|
-      desc "Runs RSpec for #{example_type.name_pretty} only"
-      task example_type.rspec_task_name_short => example_type.gen_task_name do
-        run_tests_in(File.join(examples_dir, example_type.name)) # have to use relative path
-      end
+  ExampleType.all[:webpacker_examples].each do |example_type|
+    desc "Runs RSpec for #{example_type.name_pretty} only"
+    task example_type.rspec_task_name_short => example_type.gen_task_name do
+      run_tests_in(File.join(examples_dir, example_type.name)) # have to use relative path
+    end
+  end
+
+  # Dynamically define Rake tasks for each example app found in the examples directory
+  ExampleType.all[:shakapacker_examples].each do |example_type|
+    desc "Runs RSpec for #{example_type.name_pretty} only"
+    task example_type.rspec_task_name_short => example_type.gen_task_name do
+      run_tests_in(File.join(examples_dir, example_type.name)) # have to use relative path
     end
   end
 
