@@ -25,6 +25,11 @@ module ReactOnRails
       ReactOnRails.configuration.server_bundle_js_file = server_bundle_js_file
       ReactOnRails.configuration.components_subdirectory = "ror_components"
       ReactOnRails.configuration.webpack_generated_files = webpack_generated_files
+      allow(ReactOnRails::PackerUtils).to receive_messages(
+        manifest_exists?: true,
+        nested_entries?: true,
+        packer_source_entry_path: packer_source_entry_path,
+      )
       allow(ReactOnRails::Utils).to receive_messages(generated_assets_full_path: packer_source_entry_path,
                                                      server_bundle_js_file_path: server_bundle_js_file_path)
     end
