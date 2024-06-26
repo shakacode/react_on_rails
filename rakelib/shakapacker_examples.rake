@@ -55,7 +55,7 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
   end
 
   desc "Generates all example apps"
-  task gen_all: ExampleType.all.map(&:gen_task_name)
+  task gen_all: ExampleType.all[:shakapacker_examples].map(&:gen_task_name)
 end
 
 desc "Generates all example apps. Run `rake -D examples` to see all available options"
