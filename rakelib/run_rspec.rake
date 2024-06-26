@@ -48,12 +48,12 @@ namespace :run_rspec do
 
   desc "Runs Rspec for webpacker example apps only"
   task webpacker_examples: "webpacker_examples:gen_all" do
-    ExampleType.all.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+    ExampleType.all[:webpacker_examples].each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
   desc "Runs Rspec for shakapacker example apps only"
   task shakapacker_examples: "shakapacker_examples:gen_all" do
-    ExampleType.all.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+    ExampleType.all[:shakapacker_examples].each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
   Coveralls::RakeTask.new if ENV["USE_COVERALLS"] == "TRUE"
