@@ -76,6 +76,9 @@ module ReactOnRails
       end
 
       def add_yarn_dependencies
+        `cat package.json`
+        gsub_file("package.json", /^"packageManager": ".*"(,?)$/, '^"packageManager": "yarn@1.22.22"\1$')
+        `cat package.json`
         major_minor_patch_only = /\A\d+\.\d+\.\d+\z/
         if ReactOnRails::VERSION.match?(major_minor_patch_only)
           run "yarn add react-on-rails@#{ReactOnRails::VERSION} --exact"
