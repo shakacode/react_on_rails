@@ -13,7 +13,7 @@ module ReactOnRails
         @all ||= []
       end
 
-      attr_reader :name, :generator_options
+      attr_reader :packer_type, :name, :generator_options
 
       def initialize(packer_type: nil, name: nil, generator_options: nil)
         @packer_type = packer_type

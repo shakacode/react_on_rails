@@ -146,8 +146,9 @@ jobs:
       run: cd spec/dummy && yalc add react-on-rails
     - run: cd spec/dummy && yarn add "shakapacker@${{ matrix.versions == 'oldest' && '6.6.0' || '8.0.0' }}"
     - name: Dynamically add the right shakapacker version to Gemfiles
-      run: echo "gem 'shakapacker', '~> ${{ matrix.versions == 'oldest' && '6.6.0' || '8.0.0' }}'" >> Gemfile
-      run: echo "gem 'shakapacker', '~> ${{ matrix.versions == 'oldest' && '6.6.0' || '8.0.0' }}'" >> spec/dummy/Gemfile
+      run: |
+        echo "gem 'shakapacker', '~> ${{ matrix.versions == 'oldest' && '6.6.0' || '8.0.0' }}'" >> Gemfile
+        echo "gem 'shakapacker', '~> ${{ matrix.versions == 'oldest' && '6.6.0' || '8.0.0' }}'" >> spec/dummy/Gemfile
     - name: Install Ruby Gems for package
       run:  bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Install Ruby Gems for dummy app
