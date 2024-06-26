@@ -83,6 +83,9 @@ jobs:
     - name: Main CI
       if: steps.changed-files.outputs.any_changed == 'true'
       run: bundle exec rake run_rspec:${{ matrix.versions == 'oldest' && 'web' || 'shaka' }}packer_examples
+    - name: print yarn error log
+      if: failure()
+      run: cat react_on_rails/gen-examples/examples/basic/yarn-error.log
     - name: Store test results
       uses: actions/upload-artifact@v3
       with:
