@@ -1,0 +1,55 @@
+name: Lint JS and Ruby
+
+
+on:
+  push:
+    branches:
+      - 'master'
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3
+        bundler: 2.5.9
+    - name: Setup Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20
+    - name: Print system information
+      run: |
+        echo "Linux release: "; cat /etc/issue
+        echo "Current user: "; whoami
+        echo "Current directory: "; pwd
+        echo "Ruby version: "; ruby -v
+        echo "Node version: "; node -v
+        echo "Yarn version: "; yarn --version
+        echo "Bundler version: "; bundle --version
+    - name: Save root node_modules to cache
+      uses: actions/cache@v3
+      with:
+        path: node_modules
+        key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+    - name: Save root ruby gems to cache
+      uses: actions/cache@v3
+      with:
+        path: vendor/bundle
+        key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-oldest
+    - name: Install Node modules with Yarn for renderer package
+      run: |
+        yarn install --no-progress --no-emoji
+    - name: Install Ruby Gems for package
+      run: bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+    - name: Linting of Ruby
+      run: bundle exec rubocop
+    - name: Linting of JS
+      run: yarn start lint
+    - name: Check formatting
+      run: yarn start format.listDifferent
