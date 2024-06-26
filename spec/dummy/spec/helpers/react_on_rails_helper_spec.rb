@@ -9,7 +9,7 @@ end
 
 # rubocop:disable Metrics/BlockLength
 describe ReactOnRailsHelper do
-  include Shakapacker::Helper
+  include Object.const_get(ReactOnRails::PackerUtils.packer_type.capitalize)::Helper
   before do
     allow(self).to receive(:request) {
       Struct.new("Request", :original_url, :env)
