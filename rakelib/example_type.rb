@@ -15,7 +15,8 @@ module ReactOnRails
 
       attr_reader :name, :generator_options
 
-      def initialize(name: nil, generator_options: nil)
+      def initialize(packer_type: nil, name: nil, generator_options: nil)
+        @packer_type = packer_type
         @name = name
         @generator_options = generator_options
         self.class.all << self
@@ -48,14 +49,12 @@ module ReactOnRails
                            end
       end
 
-      %w[webpacker_examples shakapacker_examples].each do |packer_type|
-        %w[gen clobber npm_install build_webpack_bundles].each do |task_type|
-          method_name_normal = "#{task_type}_task_name"          # ex: `clean_task_name`
-          method_name_short = "#{method_name_normal}_short"      # ex: `clean_task_name_short`
+      %w[gen clobber npm_install build_webpack_bundles].each do |task_type|
+        method_name_normal = "#{task_type}_task_name"          # ex: `clean_task_name`
+        method_name_short = "#{method_name_normal}_short"      # ex: `clean_task_name_short`
 
-          define_method(method_name_normal) { "#{packer_type}:#{task_type}_#{name}" }
-          define_method(method_name_short) { "#{task_type}_#{name}" }
-        end
+        define_method(method_name_normal) { "#{@packer_type}:#{task_type}_#{name}" }
+        define_method(method_name_short) { "#{task_type}_#{name}" }
       end
 
       def rspec_task_name_short
