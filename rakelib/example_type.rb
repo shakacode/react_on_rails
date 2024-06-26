@@ -58,7 +58,7 @@ module ReactOnRails
       end
 
       def rspec_task_name_short
-        "example_#{name}"
+        "#{packer_type}_#{name}"
       end
 
       def rspec_task_name
