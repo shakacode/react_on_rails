@@ -10,7 +10,7 @@ module ReactOnRails
   module TaskHelpers
     class ExampleType
       def self.all
-        @all ||= []
+        @all ||= {webpacker_examples: [], shakapacker_examples: []}
       end
 
       attr_reader :packer_type, :name, :generator_options
@@ -19,7 +19,7 @@ module ReactOnRails
         @packer_type = packer_type
         @name = name
         @generator_options = generator_options
-        self.class.all << self
+        self.class.all[packer_type.to_sym] << self
       end
 
       def name_pretty

@@ -22,7 +22,7 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
   end
 
   # Define tasks for each example type
-  ExampleType.all.each do |example_type|
+  ExampleType.all[:shakapacker_examples].each do |example_type|
     relative_gem_root = Pathname(gem_root).relative_path_from(Pathname(example_type.dir))
     # CLOBBER
     desc "Clobbers (deletes) #{example_type.name_pretty}"
