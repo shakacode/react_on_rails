@@ -35,7 +35,8 @@ namespace :webpacker_examples do # rubocop:disable Metrics/BlockLength
       example_type.rails_options += "--skip-javascript"
       sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options}")
       sh_in_dir(example_type.dir, "touch .gitignore")
-      append_to_gemfile(example_type.gemfile, example_type.dir)
+      sh_in_dir(example_type.dir, "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" > Gemfile")
+      sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '~> 6.6.0'\" > Gemfile")
       sh_in_dir(example_type.dir, "cat Gemfile")
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, "rake webpacker:install")
@@ -55,19 +56,3 @@ end
 
 desc "Generates all example apps. Run `rake -D examples` to see all available options"
 task webpacker_examples: ["webpacker_examples:gen_all"]
-
-private
-
-# Appends each string in an array as a new line of text in the given Gemfile.
-# Automatically adds line returns.
-def append_to_gemfile(gemfile, dir)
-  relative_gem_root = Pathname(gem_root).relative_path_from(Pathname(dir))
-  lines = [
-    "gem 'react_on_rails', path: '#{relative_gem_root}'",
-    "gem 'shakapacker', '~> 6.6.0'"
-  ]
-  puts "appending #{lines}"
-  old_text = File.read(gemfile)
-  new_text = lines.reduce(old_text) { |a, e| a << "#{e}\n" }
-  File.open(gemfile, "w") { |f| f.puts(new_text) }
-end

@@ -19,6 +19,8 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
   examples_config = symbolize_keys(YAML.safe_load_file(examples_config_file))
   examples_config[:example_type_data].each { |example_type_data| ExampleType.new(packer_type: "shakapacker_examples", **symbolize_keys(example_type_data)) }
 
+  relative_gem_root = Pathname(gem_root).relative_path_from(Pathname(example_type.dir))
+
   # Define tasks for each example type
   ExampleType.all.each do |example_type|
     # CLOBBER
@@ -35,7 +37,8 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       example_type.rails_options += "--skip-javascript"
       sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options}")
       sh_in_dir(example_type.dir, "touch .gitignore")
-      append_to_gemfile(example_type.gemfile, example_type.dir)
+      sh_in_dir(example_type.dir, "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" > Gemfile")
+      sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '~> 8.0.0'\" > Gemfile")
       sh_in_dir(example_type.dir, "cat Gemfile")
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, "rake shakapacker:install")
@@ -55,19 +58,3 @@ end
 
 desc "Generates all example apps. Run `rake -D examples` to see all available options"
 task shakapacker_examples: ["shakapacker_examples:gen_all"]
-
-private
-
-# Appends each string in an array as a new line of text in the given Gemfile.
-# Automatically adds line returns.
-def append_to_gemfile(gemfile, dir)
-  relative_gem_root = Pathname(gem_root).relative_path_from(Pathname(dir))
-  lines = [
-    "gem 'react_on_rails', path: '#{relative_gem_root}'",
-    "gem 'shakapacker', '~> 8.0.0'"
-  ]
-  puts "appending #{lines}"
-  old_text = File.read(gemfile)
-  new_text = lines.reduce(old_text) { |a, e| a << "#{e}\n" }
-  File.open(gemfile, "w") { |f| f.puts(new_text) }
-end
