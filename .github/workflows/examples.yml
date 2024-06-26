@@ -85,7 +85,10 @@ jobs:
       run: bundle exec rake run_rspec:${{ matrix.versions == 'oldest' && 'web' || 'shaka' }}packer_examples
     - name: print yarn error log
       if: failure()
-      run: cat react_on_rails/gen-examples/examples/basic/yarn-error.log
+      run: cat gen-examples/examples/basic/yarn-error.log
+    - name: print yarn error log
+      if: failure()
+      run: cd gen-examples/examples/basic && yarn
     - name: Store test results
       uses: actions/upload-artifact@v3
       with:
