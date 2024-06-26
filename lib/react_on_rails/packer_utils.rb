@@ -8,7 +8,7 @@ module ReactOnRails
 
     def self.using_shakapacker?
       return @using_shakapacker if defined?(@using_shakapacker)
-      puts "ReactOnRails::Utils.gem_available?("shakapacker")? #{ReactOnRails::Utils.gem_available?("shakapacker")}"
+      puts "ReactOnRails::Utils.gem_available?('shakapacker')? #{ReactOnRails::Utils.gem_available?('shakapacker')}"
       puts "shakapacker_version_requirement_met?([7, 0, 0])? #{shakapacker_version_requirement_met?([7, 0, 0])}"
       @using_shakapacker = ReactOnRails::Utils.gem_available?("shakapacker") &&
                            shakapacker_version_requirement_met?([7, 0, 0])
