@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    react_on_rails (14.0.0)
+    react_on_rails (14.0.2)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -119,6 +119,9 @@ GEM
       tins (~> 1.6)
     crass (1.0.6)
     date (3.3.4)
+    debug (1.9.2)
+      irb (~> 1.10)
+      reline (>= 0.3.8)
     diff-lcs (1.5.1)
     docile (1.4.0)
     drb (2.2.1)
@@ -397,6 +400,7 @@ DEPENDENCIES
   capybara
   capybara-screenshot
   coveralls
+  debug
   equivalent-xml
   gem-release
   generator_spec

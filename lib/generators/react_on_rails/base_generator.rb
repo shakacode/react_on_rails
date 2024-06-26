@@ -88,28 +88,28 @@ module ReactOnRails
 
         puts "Adding React dependencies"
         package_json.manager.add([
-          "react",
-          "react-dom",
-          "@babel/preset-react",
-          "prop-types",
-          "babel-plugin-transform-react-remove-prop-types",
-          "babel-plugin-macros"
-        ])
+                                   "react",
+                                   "react-dom",
+                                   "@babel/preset-react",
+                                   "prop-types",
+                                   "babel-plugin-transform-react-remove-prop-types",
+                                   "babel-plugin-macros"
+                                 ])
 
         puts "Adding CSS handlers"
 
-        package_json.manager.add([
-          "css-loader",
-          "css-minimizer-webpack-plugin",
-          "mini-css-extract-plugin",
-          "style-loader"
-        ])
+        package_json.manager.add(%w[
+                                   css-loader
+                                   css-minimizer-webpack-plugin
+                                   mini-css-extract-plugin
+                                   style-loader
+                                 ])
 
         puts "Adding dev dependencies"
         package_json.manager.add([
-          "@pmmmwh/react-refresh-webpack-plugin",
-          "react-refresh"
-        ], type: :dev)
+                                   "@pmmmwh/react-refresh-webpack-plugin",
+                                   "react-refresh"
+                                 ], type: :dev)
       end
 
       def append_to_spec_rails_helper
