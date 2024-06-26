@@ -49,7 +49,7 @@ module ReactOnRails
     def self.shakapacker_version
       return @shakapacker_version if defined?(@shakapacker_version)
       return nil unless ReactOnRails::Utils.gem_available?("shakapacker")
-      puts "Gem.loaded_specs["shakapacker"].version.to_s: #{Gem.loaded_specs["shakapacker"].version.to_s}"
+      puts "Gem.loaded_specs['shakapacker'].version.to_s: #{Gem.loaded_specs['shakapacker'].version.to_s}"
       @shakapacker_version = Gem.loaded_specs["shakapacker"].version.to_s
     end
 
