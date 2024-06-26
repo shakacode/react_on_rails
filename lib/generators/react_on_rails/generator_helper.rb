@@ -15,7 +15,7 @@ module GeneratorHelper
     if @package_json.nil?
       require_package_json_gem
 
-      @package_json = PackageJson.read(@app_path)
+      @package_json = PackageJson.read(Rails.root.to_s)
     end
 
     @package_json

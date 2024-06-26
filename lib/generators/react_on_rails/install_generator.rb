@@ -3,6 +3,7 @@
 require "rails/generators"
 require_relative "generator_helper"
 require_relative "generator_messages"
+require 'shakapacker'
 
 module ReactOnRails
   module Generators
@@ -104,7 +105,24 @@ module ReactOnRails
       end
 
       def using_shakapacker_7_or_above?
+        # require 'shakapacker'
+        Gem.activate('shakapacker')
+        # true
+        puts ">>> detect version"
+        puts Gem.loaded_specs.keys
+        puts ">>> VERSION: #{Shakapacker::VERSION}"
+        # puts ">>> Gem.path: #{Gem.path}"
+        # puts ">>> $LOAD_PATH: #{$LOAD_PATH}"
+        puts ">>> actived: #{Gem.loaded_specs['shakapacker'].activated?}"
+        puts ">>> dependencies:: #{Gem.loaded_specs['shakapacker'].dependencies}"
+
+        shakapacker_spec = Gem::Specification.find_all_by_name("shakapacker").first
+        # puts "SP: #{shakapacker_spec.version}" if shakapacker_spec
+        puts Gem::Specification.map(&:name)
         shakapacker_gem = Gem::Specification.find_by_name("shakapacker")
+        puts ">>> PASS"
+        puts ">>> VERSION: #{shakapacker_gem.version.segments.first}"
+        puts ">>> IS NEW: #{shakapacker_gem.version.segments.first >= 7}"
         shakapacker_gem.version.segments.first >= 7
       rescue Gem::MissingSpecError
         # In case using Webpacker
