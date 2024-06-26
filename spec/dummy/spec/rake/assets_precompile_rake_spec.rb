@@ -14,7 +14,8 @@ describe "rake assets:precompile task" do
     Rails.application.load_tasks
 
     ReactOnRails.configure do |config|
-      config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/#{ReactOnRails::PackerUtils.packer_type}"
+      config.build_production_command = "RAILS_ENV=production NODE_ENV=production /
+      bin/#{ReactOnRails::PackerUtils.packer_type}"
     end
 
     expect do

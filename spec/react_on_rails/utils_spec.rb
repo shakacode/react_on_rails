@@ -84,8 +84,8 @@ module ReactOnRails
         it "returns false if source_path is defined in the config/webpacker.yml and node_modules defined" do
           allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
             .and_return("client")
-          allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.send").with(:data)
-                                                                                         .and_return(source_path: "client/app")
+          allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.send")
+            .with(:data).and_return(source_path: "client/app")
 
           expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to be(false)
         end
@@ -115,7 +115,9 @@ module ReactOnRails
               .and_return(server_bundle_name)
             allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("manifest.lookup!")
               .with(server_bundle_name)
-              .and_raise(Object.const_get(ReactOnRails::PackerUtils.packer_type.capitalize)::Manifest::MissingEntryError)
+              .and_raise(Object.const_get(
+                ReactOnRails::PackerUtils.packer_type.capitalize
+              )::Manifest::MissingEntryError)
 
             path = described_class.server_bundle_js_file_path
 
@@ -125,7 +127,7 @@ module ReactOnRails
 
         context "with server file in the manifest, used for client", :shakapacker do
           it "returns the correct path hashed server path" do
-            Packer = ReactOnRails::PackerUtils.packer
+            Packer = ReactOnRails::PackerUtils.packer # rubocop:disable Lint/ConstantDefinitionInBlock, RSpec/LeakyConstantDeclaration
             allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
               .and_return("webpack-bundle.js")
             allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
