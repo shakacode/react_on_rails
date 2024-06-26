@@ -7,23 +7,19 @@
 
 require "yaml"
 require "rails/version"
-require "pathname"
 
 require_relative "example_type"
 require_relative "task_helpers"
 
-namespace :webpacker_examples do # rubocop:disable Metrics/BlockLength
+namespace :examples do # rubocop:disable Metrics/BlockLength
   include ReactOnRails::TaskHelpers
   # Loads data from examples_config.yml and instantiates corresponding ExampleType objects
   examples_config_file = File.expand_path("examples_config.yml", __dir__)
   examples_config = symbolize_keys(YAML.safe_load_file(examples_config_file))
-  examples_config[:example_type_data].each do |example_type_data|
-    ExampleType.new(packer_type: "webpacker_examples", **symbolize_keys(example_type_data))
-  end
+  examples_config[:example_type_data].each { |example_type_data| ExampleType.new(**symbolize_keys(example_type_data)) }
 
   # Define tasks for each example type
-  ExampleType.all[:webpacker_examples].each do |example_type|
-    relative_gem_root = Pathname(gem_root).relative_path_from(Pathname(example_type.dir))
+  ExampleType.all.each do |example_type|
     # CLOBBER
     desc "Clobbers (deletes) #{example_type.name_pretty}"
     task example_type.clobber_task_name_short do
@@ -33,15 +29,11 @@ namespace :webpacker_examples do # rubocop:disable Metrics/BlockLength
     # GENERATE
     desc "Generates #{example_type.name_pretty}"
     task example_type.gen_task_name_short => example_type.clobber_task_name do
-      puts "Running webpacker_examples:#{example_type.gen_task_name_short}"
       mkdir_p(example_type.dir)
       example_type.rails_options += "--skip-javascript"
       sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options}")
       sh_in_dir(example_type.dir, "touch .gitignore")
-      sh_in_dir(example_type.dir,
-                "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" >> #{example_type.gemfile}")
-      sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '~> 6.6.0'\" >> #{example_type.gemfile}")
-      sh_in_dir(example_type.dir, "cat #{example_type.gemfile}")
+      append_to_gemfile(example_type.gemfile, example_type.required_gems)
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, "rake webpacker:install")
       sh_in_dir(example_type.dir, example_type.generator_shell_commands)
@@ -55,8 +47,18 @@ namespace :webpacker_examples do # rubocop:disable Metrics/BlockLength
   end
 
   desc "Generates all example apps"
-  task gen_all: ExampleType.all[:webpacker_examples].map(&:gen_task_name)
+  task gen_all: ExampleType.all.map(&:gen_task_name)
 end
 
 desc "Generates all example apps. Run `rake -D examples` to see all available options"
-task webpacker_examples: ["webpacker_examples:gen_all"]
+task examples: ["examples:gen_all"]
+
+private
+
+# Appends each string in an array as a new line of text in the given Gemfile.
+# Automatically adds line returns.
+def append_to_gemfile(gemfile, lines)
+  old_text = File.read(gemfile)
+  new_text = lines.reduce(old_text) { |a, e| a << "#{e}\n" }
+  File.open(gemfile, "w") { |f| f.puts(new_text) }
+end

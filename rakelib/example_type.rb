@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rake"
+require "pathname"
 
 require_relative "task_helpers"
 
@@ -10,16 +11,19 @@ module ReactOnRails
   module TaskHelpers
     class ExampleType
       def self.all
-        @all ||= {webpacker_examples: [], shakapacker_examples: []}
+        @all ||= []
       end
 
-      attr_reader :packer_type, :name, :generator_options
+      def self.namespace_name
+        "examples"
+      end
 
-      def initialize(packer_type: nil, name: nil, generator_options: nil)
-        @packer_type = packer_type
+      attr_reader :name, :generator_options
+
+      def initialize(name: nil, generator_options: nil)
         @name = name
         @generator_options = generator_options
-        self.class.all[packer_type.to_sym] << self
+        self.class.all << self
       end
 
       def name_pretty
@@ -38,6 +42,15 @@ module ReactOnRails
         File.join(dir, "Gemfile")
       end
 
+      # Gems we need to add to the Gemfile before bundle installing
+      def required_gems
+        relative_gem_root = Pathname(gem_root).relative_path_from(Pathname(dir))
+        [
+          "gem 'react_on_rails', path: '#{relative_gem_root}'",
+          "gem 'shakapacker'"
+        ]
+      end
+
       # Options we pass when running `rails new` from the command-line.
       attr_writer :rails_options
 
@@ -53,12 +66,12 @@ module ReactOnRails
         method_name_normal = "#{task_type}_task_name"          # ex: `clean_task_name`
         method_name_short = "#{method_name_normal}_short"      # ex: `clean_task_name_short`
 
-        define_method(method_name_normal) { "#{@packer_type}:#{task_type}_#{name}" }
+        define_method(method_name_normal) { "#{self.class.namespace_name}:#{task_type}_#{name}" }
         define_method(method_name_short) { "#{task_type}_#{name}" }
       end
 
       def rspec_task_name_short
-        "#{packer_type}_#{name}"
+        "example_#{name}"
       end
 
       def rspec_task_name
