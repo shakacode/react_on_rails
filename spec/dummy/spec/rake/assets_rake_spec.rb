@@ -35,7 +35,7 @@ describe "Rake assets:webpack task" do
 
     Rake::Task["react_on_rails:assets:webpack"].execute
 
-    expect(BuildProductionCommand).to have_received(:call)
+    expect(BuildProductionCommand).to have_received(:call).twice
     expect(File).to exist(filepath)
   end
 

@@ -84,6 +84,7 @@ jobs:
   dummy-app-integration-tests:
     needs: build-dummy-app-webpack-test-bundles
     strategy:
+      fail-fast: false
       matrix:
         versions: ['oldest', 'newest']
     runs-on: ubuntu-22.04
