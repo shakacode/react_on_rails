@@ -77,7 +77,6 @@ module ReactOnRails
 
     describe ".build_production_command" do
       context "when using Shakapacker 6", if: ReactOnRails::PackerUtils.packer_type != "shakapacker" do
-
         it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
           allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
             .and_return(true)
@@ -116,7 +115,6 @@ module ReactOnRails
       end
 
       context "when using Shakapacker 8", if: ReactOnRails::PackerUtils.packer_type == "shakapacker" do
-
         it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
           allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
             .and_return(true)

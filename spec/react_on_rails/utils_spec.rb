@@ -76,7 +76,7 @@ module ReactOnRails
           allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
             .and_return("")
           allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.send").with(:data)
-                                                                    .and_return({})
+                                                                                         .and_return({})
 
           expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to be(false)
         end
@@ -85,7 +85,7 @@ module ReactOnRails
           allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
             .and_return("client")
           allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.send").with(:data)
-                                                                    .and_return(source_path: "client/app")
+                                                                                         .and_return(source_path: "client/app")
 
           expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to be(false)
         end
@@ -94,7 +94,7 @@ module ReactOnRails
           allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
             .and_return("node_modules")
           allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.send").with(:data)
-                                                                    .and_return({})
+                                                                                         .and_return({})
 
           expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to be(true)
         end
@@ -133,8 +133,8 @@ module ReactOnRails
             allow(Packer).to receive_message_chain("manifest.lookup!")
               .with("webpack-bundle.js")
               .and_return("webpack/development/webpack-bundle-123456.js")
-              allow(Packer).to receive_message_chain("dev_server.running?")
-                .and_return(false)
+            allow(Packer).to receive_message_chain("dev_server.running?")
+              .and_return(false)
 
             path = described_class.server_bundle_js_file_path
             expect(path).to end_with("public/webpack/development/webpack-bundle-123456.js")

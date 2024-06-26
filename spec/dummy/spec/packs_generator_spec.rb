@@ -28,7 +28,7 @@ module ReactOnRails
       allow(ReactOnRails::PackerUtils).to receive_messages(
         manifest_exists?: true,
         nested_entries?: true,
-        packer_source_entry_path: packer_source_entry_path,
+        packer_source_entry_path: packer_source_entry_path
       )
       allow(ReactOnRails::Utils).to receive_messages(generated_assets_full_path: packer_source_entry_path,
                                                      server_bundle_js_file_path: server_bundle_js_file_path)

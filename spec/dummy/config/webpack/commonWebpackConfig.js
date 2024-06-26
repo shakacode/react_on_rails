@@ -1,7 +1,7 @@
 // Common configuration applying to client and server configuration
 const { generateWebpackConfig, webpackConfig: v6WebpackConfig, merge } = require('shakapacker');
 
-const generateWebpackConfigAlias = generateWebpackConfig ? generateWebpackConfig : () => undefined
+const generateWebpackConfigAlias = generateWebpackConfig ? generateWebpackConfig : () => undefined;
 
 const baseClientWebpackConfig = v6WebpackConfig ? v6WebpackConfig : generateWebpackConfigAlias();
 

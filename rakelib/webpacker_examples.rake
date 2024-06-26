@@ -17,7 +17,9 @@ namespace :webpacker_examples do # rubocop:disable Metrics/BlockLength
   # Loads data from examples_config.yml and instantiates corresponding ExampleType objects
   examples_config_file = File.expand_path("examples_config.yml", __dir__)
   examples_config = symbolize_keys(YAML.safe_load_file(examples_config_file))
-  examples_config[:example_type_data].each { |example_type_data| ExampleType.new(packer_type: "webpacker_examples", **symbolize_keys(example_type_data)) }
+  examples_config[:example_type_data].each do |example_type_data|
+    ExampleType.new(packer_type: "webpacker_examples", **symbolize_keys(example_type_data))
+  end
 
   # Define tasks for each example type
   ExampleType.all.each do |example_type|
@@ -36,7 +38,8 @@ namespace :webpacker_examples do # rubocop:disable Metrics/BlockLength
       example_type.rails_options += "--skip-javascript"
       sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options}")
       sh_in_dir(example_type.dir, "touch .gitignore")
-      sh_in_dir(example_type.dir, "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" >> #{example_type.gemfile}")
+      sh_in_dir(example_type.dir,
+                "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" >> #{example_type.gemfile}")
       sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '~> 6.6.0'\" >> #{example_type.gemfile}")
       sh_in_dir(example_type.dir, "cat #{example_type.gemfile}")
       bundle_install_in(example_type.dir)
