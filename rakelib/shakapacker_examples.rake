@@ -19,10 +19,11 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
   examples_config = symbolize_keys(YAML.safe_load_file(examples_config_file))
   examples_config[:example_type_data].each { |example_type_data| ExampleType.new(packer_type: "shakapacker_examples", **symbolize_keys(example_type_data)) }
 
-  relative_gem_root = Pathname(gem_root).relative_path_from(Pathname(example_type.dir))
+  
 
   # Define tasks for each example type
   ExampleType.all.each do |example_type|
+    relative_gem_root = Pathname(gem_root).relative_path_from(Pathname(example_type.dir))
     # CLOBBER
     desc "Clobbers (deletes) #{example_type.name_pretty}"
     task example_type.clobber_task_name_short do
