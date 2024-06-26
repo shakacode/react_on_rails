@@ -83,7 +83,7 @@ module ReactOnRails
                               begin
                                 bundle_js_file_path(bundle_name)
                               rescue Object.const_get(
-                                ReactOnRails::PackerUtils..capitalize
+                                ReactOnRails::PackerUtils.packer_type.capitalize
                               )::Manifest::MissingEntryError
                                 File.expand_path(
                                   File.join(ReactOnRails::PackerUtils.packer_public_output_path,
