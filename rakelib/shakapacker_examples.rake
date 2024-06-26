@@ -38,9 +38,9 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       example_type.rails_options += "--skip-javascript"
       sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options}")
       sh_in_dir(example_type.dir, "touch .gitignore")
-      sh_in_dir(example_type.dir, "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" > Gemfile")
-      sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '~> 8.0.0'\" > Gemfile")
-      sh_in_dir(example_type.dir, "cat Gemfile")
+      sh_in_dir(example_type.dir, "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" >> #{example_type.gemfile}")
+      sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '~> 8.0.0'\" >> #{example_type.gemfile}")
+      sh_in_dir(example_type.dir, "cat #{example_type.gemfile}")
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, "rake shakapacker:install")
       sh_in_dir(example_type.dir, example_type.generator_shell_commands)
