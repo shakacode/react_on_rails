@@ -11,6 +11,7 @@ jobs:
     env:
       SKIP_YARN_COREPACK_CHECK: 0
     strategy:
+      fail-fast: false
       matrix:
         versions: ['oldest', 'newest']
     runs-on: ubuntu-22.04
@@ -85,12 +86,6 @@ jobs:
     - name: Main CI
       if: steps.changed-files.outputs.any_changed == 'true'
       run: bundle exec rake run_rspec:${{ matrix.versions == 'oldest' && 'web' || 'shaka' }}packer_examples
-    - name: print yarn error log
-      if: failure()
-      run: cat gen-examples/examples/basic/yarn-error.log
-    - name: print yarn error log
-      if: failure()
-      run: cd gen-examples/examples/basic && yarn
     - name: Store test results
       uses: actions/upload-artifact@v3
       with:
