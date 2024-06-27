@@ -14,12 +14,6 @@ require_relative "task_helpers"
 
 namespace :webpacker_examples do # rubocop:disable Metrics/BlockLength
   include ReactOnRails::TaskHelpers
-  # Loads data from examples_config.yml and instantiates corresponding ExampleType objects
-  examples_config_file = File.expand_path("examples_config.yml", __dir__)
-  examples_config = symbolize_keys(YAML.safe_load_file(examples_config_file))
-  examples_config[:example_type_data].each do |example_type_data|
-    ExampleType.new(packer_type: "webpacker_examples", **symbolize_keys(example_type_data))
-  end
 
   # Define tasks for each example type
   ExampleType.all[:webpacker_examples].each do |example_type|
