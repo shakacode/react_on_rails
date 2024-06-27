@@ -37,7 +37,7 @@ jobs:
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
-        node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
+        node-version: 20
     - name: Print system information
       run: |
         echo "Linux release: "; cat /etc/issue
