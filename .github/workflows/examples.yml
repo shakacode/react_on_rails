@@ -10,6 +10,10 @@ jobs:
  examples:
     env:
       SKIP_YARN_COREPACK_CHECK: 0
+    strategy:
+      fail-fast: false
+      matrix:
+        versions: ['oldest', 'newest']
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
@@ -28,12 +32,12 @@ jobs:
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1
       with:
-        ruby-version: 3.3
+        ruby-version: ${{ matrix.versions == 'oldest' && '3.0' || '3.3' }}
         bundler: 2.5.9
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
-        node-version: 20
+        node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
     - name: Print system information
       run: |
         echo "Linux release: "; cat /etc/issue
@@ -52,7 +56,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: vendor/bundle
-        key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-newest
+        key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
     - id: get-sha
       run: echo "::set-output name=sha::$(git rev-parse HEAD)"
     - name: Install Node modules with Yarn for renderer package
@@ -62,7 +66,7 @@ jobs:
     - name: yalc publish for react-on-rails
       run: yalc publish
     - name: Dynamically add the right shakapacker version to the Gemfile
-      run: echo "gem 'shakapacker', '~> 8.0.0'" >> Gemfile
+      run: echo "gem 'shakapacker', '~> ${{ matrix.versions == 'oldest' && '6.6.0' || '8.0.0' }}'" >> Gemfile
     - name: Install Ruby Gems for package
       run:  bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Ensure minimum required Chrome version
@@ -81,7 +85,7 @@ jobs:
       run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
     - name: Main CI
       if: steps.changed-files.outputs.any_changed == 'true'
-      run: bundle exec rake run_rspec:examples
+      run: bundle exec rake run_rspec:${{ matrix.versions == 'oldest' && 'web' || 'shaka' }}packer_examples
     - name: Store test results
       uses: actions/upload-artifact@v3
       with:
