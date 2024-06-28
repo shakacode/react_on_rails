@@ -5,7 +5,7 @@ def gsub_file_content(path, old_content, new_content)
   path = File.expand_path(path, __dir__)
   content = File.binread(path)
   content.gsub!(old_content, new_content)
-  File.open(path, "wb") { |file| file.write(content) }
+  File.binwrite(path, content)
 end
 
 old_config = File.expand_path("../spec/dummy/config/shakapacker.yml", __dir__)
@@ -17,6 +17,7 @@ gsub_file_content("../Gemfile.development_dependencies", 'gem "shakapacker", "8.
 
 gsub_file_content("../spec/dummy/package.json", '"shakapacker": "8.0.0",', '"shakapacker": "6.6.0",')
 
-gsub_file_content("../spec/dummy/config/webpack/commonWebpackConfig.js", /generateWebpackConfig(\(\))?/, 'webpackConfig')
+gsub_file_content("../spec/dummy/config/webpack/commonWebpackConfig.js", /generateWebpackConfig(\(\))?/,
+                  "webpackConfig")
 
-gsub_file_content("../spec/dummy/config/webpack/webpack.config.js", /generateWebpackConfig(\(\))?/, 'webpackConfig')
+gsub_file_content("../spec/dummy/config/webpack/webpack.config.js", /generateWebpackConfig(\(\))?/, "webpackConfig")
