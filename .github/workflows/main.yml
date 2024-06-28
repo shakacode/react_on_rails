@@ -143,11 +143,12 @@ jobs:
       run: |
         yarn install --no-progress --no-emoji
         sudo yarn global add yalc
-        cd spec/dummy && yarn install --no-progress --no-emoji
     - name: yalc publish for react-on-rails
       run: yalc publish
     - name: yalc add react-on-rails
       run: cd spec/dummy && yalc add react-on-rails
+    - name: Install Node modules with Yarn for dummy app
+      run: cd spec/dummy && yarn install --no-progress --no-emoji
     - name: Install Ruby Gems for package
       run:  bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Install Ruby Gems for dummy app

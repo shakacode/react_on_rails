@@ -42,6 +42,7 @@ jobs:
     - name: Install Ruby Gems for package
       run: bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Git Stuff
+      if: matrix.versions == 'oldest'
       run: |
         git config user.email "you@example.com"
         git config user.name "Your Name"
