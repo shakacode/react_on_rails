@@ -132,6 +132,27 @@ yarn
 yarn build
 ```
 
+Or run this which builds the yarn package, then the webpack files for spec/dummy, and runs tests in
+spec/dummy.
+
+
+```sh
+# Optionally change default capybara driver
+export DRIVER=selenium_firefox
+cd react_on_rails/
+yarn run dummy:spec
+```
+
+To convert the development environment over to Shakapacker v6 instead of the default Shakapacker v8:
+
+```sh
+# Optionally change default capybara driver
+export DRIVER=selenium_firefox
+cd react_on_rails/
+script/convert
+yarn run dummy:spec
+```
+
 ### Run NPM JS tests
 
 ```sh
@@ -142,17 +163,11 @@ yarn test
 ### Run spec/dummy tests
 
 ```sh
-cd react_on_rails
-npm -g i yalc
-bundle && yarn
-yalc publish
-cd spec/dummy
-bundle && yarn
-yarn add shakapacker
+cd react_on_rails/spec/dummy
 rspec
 ```
 
-### Run package tests and linting
+### Run most tests and linting
 
 ```sh
 cd react_on_rails/
