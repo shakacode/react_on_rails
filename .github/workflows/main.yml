@@ -38,6 +38,9 @@ jobs:
         echo "Node version: "; node -v
         echo "Yarn version: "; yarn --version
         echo "Bundler version: "; bundle --version
+    - name: run conversion script to support shakapacker v6
+      if: matrix.versions == 'oldest'
+      run: script/convert
     - name: Save root node_modules to cache
       uses: actions/cache@v3
       with:
@@ -59,14 +62,11 @@ jobs:
       run: cd spec/dummy && yalc add react-on-rails
     - name: Install Node modules with Yarn for dummy app
       run: cd spec/dummy && yarn install --no-progress --no-emoji
-    - run: cd spec/dummy && yarn add "shakapacker@${{ matrix.versions == 'oldest' && '6.6.0' || '8.0.0' }}"
     - name: Save dummy app ruby gems to cache
       uses: actions/cache@v3
       with:
         path: spec/dummy/vendor/bundle
         key: dummy-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
-    - name: Dynamically add the right shakapacker version to the Gemfile
-      run: echo "gem 'shakapacker', '~> ${{ matrix.versions == 'oldest' && '6.6.0' || '8.0.0' }}'" >> spec/dummy/Gemfile
     - name: Install Ruby Gems for dummy app
       run: cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: generate file system-based packs
@@ -110,6 +110,9 @@ jobs:
         echo "Node version: "; node -v
         echo "Yarn version: "; yarn --version
         echo "Bundler version: "; bundle --version
+    - name: run conversion script to support shakapacker v6
+      if: matrix.versions == 'oldest'
+      run: script/convert
     - name: Save root node_modules to cache
       uses: actions/cache@v3
       with:
@@ -145,11 +148,6 @@ jobs:
       run: yalc publish
     - name: yalc add react-on-rails
       run: cd spec/dummy && yalc add react-on-rails
-    - run: cd spec/dummy && yarn add "shakapacker@${{ matrix.versions == 'oldest' && '6.6.0' || '8.0.0' }}"
-    - name: Dynamically add the right shakapacker version to Gemfiles
-      run: |
-        echo "gem 'shakapacker', '~> ${{ matrix.versions == 'oldest' && '6.6.0' || '8.0.0' }}'" >> Gemfile
-        echo "gem 'shakapacker', '~> ${{ matrix.versions == 'oldest' && '6.6.0' || '8.0.0' }}'" >> spec/dummy/Gemfile
     - name: Install Ruby Gems for package
       run:  bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Install Ruby Gems for dummy app

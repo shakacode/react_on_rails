@@ -30,13 +30,14 @@ jobs:
         echo "Node version: "; node -v
         echo "Yarn version: "; yarn --version
         echo "Bundler version: "; bundle --version
+    - name: run conversion script to support shakapacker v6
+      if: matrix.versions == 'oldest'
+      run: script/convert
     - name: Save root ruby gems to cache
       uses: actions/cache@v3
       with:
         path: vendor/bundle
         key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ matrix.versions }}
-    - name: Dynamically add the right shakapacker version to the Gemfile
-      run: echo "gem 'shakapacker', '~> ${{ matrix.versions == 'oldest' && '6.6.0' || '8.0.0' }}'" >> Gemfile
     - name: Install Ruby Gems for package
       run: bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Git Stuff
