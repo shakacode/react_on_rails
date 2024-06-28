@@ -26,12 +26,12 @@ namespace :run_rspec do
   end
 
   desc "Runs dummy rspec with turbolinks"
-  task :dummy do
+  task dummy: ["dummy_apps:dummy_app"] do
     run_tests_in(spec_dummy_dir)
   end
 
   desc "Runs dummy rspec without turbolinks"
-  task :dummy_no_turbolinks do
+  task dummy_no_turbolinks: ["dummy_apps:dummy_app"] do
     run_tests_in(spec_dummy_dir,
                  env_vars: "DISABLE_TURBOLINKS=TRUE",
                  command_name: "dummy_no_turbolinks")
