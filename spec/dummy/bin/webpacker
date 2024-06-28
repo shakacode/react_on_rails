@@ -1,0 +1,25 @@
+#!/usr/bin/env ruby
+
+require "pathname"
+require "bundler/setup"
+require "webpacker"
+require "webpacker/webpack_runner"
+
+ENV["RAILS_ENV"] ||= "development"
+ENV["NODE_ENV"]  ||= ENV["RAILS_ENV"]
+ENV["BUNDLE_GEMFILE"] ||= File.expand_path("../../Gemfile", Pathname.new(__FILE__).realpath)
+
+require "rake"
+
+# Recommendation is to generate packs before compilation.
+# SERVER_BUNDLE_ONLY is true when also running the bin/webpacker-dev-server,
+# so no need to run twice.
+unless ENV["SERVER_BUNDLE_ONLY"] == "true"
+  Rake.application.load_rakefile
+  Rake::Task["react_on_rails:generate_packs"].invoke
+end
+
+APP_ROOT = File.expand_path("..", __dir__)
+Dir.chdir(APP_ROOT) do
+  Webpacker::WebpackRunner.run(ARGV)
+end

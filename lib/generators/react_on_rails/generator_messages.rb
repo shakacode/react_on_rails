@@ -65,16 +65,9 @@ module GeneratorMessages
 
         Alternative steps to run the app:
 
-          - Run `rails s` to start the Rails server.
-
-          - Run bin/shakapacker-dev-server to start the Webpack dev server for compilation of Webpack
-            assets as soon as you save. This default setup with the dev server does not work
-            for server rendering
+          - We recommend using Procfile.dev with foreman, overmind, or a similar program. Alternately, you can run each of the processes listed in Procfile.dev in a separate tab in your terminal.
 
           - Visit http://localhost:3000/hello_world and see your React On Rails app running!
-
-          - To turn on HMR, edit config/shakapacker.yml and set HMR to true. Restart the rails server
-            and bin/shakapacker-dev-server. Or use Procfile.dev.
       MSG
     end
   end

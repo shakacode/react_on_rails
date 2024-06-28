@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    react_on_rails (14.0.0)
+    react_on_rails (14.0.2)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -119,6 +119,9 @@ GEM
       tins (~> 1.6)
     crass (1.0.6)
     date (3.3.4)
+    debug (1.9.2)
+      irb (~> 1.10)
+      reline (>= 0.3.8)
     diff-lcs (1.5.1)
     docile (1.4.0)
     drb (2.2.1)
@@ -334,7 +337,7 @@ GEM
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
     semantic_range (3.0.0)
-    shakapacker (7.2.1)
+    shakapacker (8.0.0)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -397,6 +400,7 @@ DEPENDENCIES
   capybara
   capybara-screenshot
   coveralls
+  debug
   equivalent-xml
   gem-release
   generator_spec
@@ -422,7 +426,7 @@ DEPENDENCIES
   scss_lint
   sdoc
   selenium-webdriver (= 4.9.0)
-  shakapacker (= 7.2.1)
+  shakapacker (= 8.0.0)
   spring (~> 4.0)
   sprockets (~> 4.0)
   sqlite3 (~> 1.6)

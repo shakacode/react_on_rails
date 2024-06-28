@@ -10,6 +10,13 @@ require_relative "example_type"
 # rubocop:disable Metrics/BlockLength
 namespace :run_rspec do
   include ReactOnRails::TaskHelpers
+  # Loads data from examples_config.yml and instantiates corresponding ExampleType objects
+  examples_config_file = File.expand_path("examples_config.yml", __dir__)
+  examples_config = symbolize_keys(YAML.safe_load_file(examples_config_file))
+  examples_config[:example_type_data].each do |example_type_data|
+    ExampleType.new(packer_type: "shakapacker_examples", **symbolize_keys(example_type_data))
+    ExampleType.new(packer_type: "webpacker_examples", **symbolize_keys(example_type_data))
+  end
 
   spec_dummy_dir = File.join("spec", "dummy")
 
@@ -31,16 +38,31 @@ namespace :run_rspec do
   end
 
   # Dynamically define Rake tasks for each example app found in the examples directory
-  ExampleType.all.each do |example_type|
+  ExampleType.all[:webpacker_examples].each do |example_type|
+    puts "Creating #{example_type.rspec_task_name} task"
     desc "Runs RSpec for #{example_type.name_pretty} only"
     task example_type.rspec_task_name_short => example_type.gen_task_name do
       run_tests_in(File.join(examples_dir, example_type.name)) # have to use relative path
     end
   end
 
-  desc "Runs Rspec for example apps only"
-  task examples: "examples:gen_all" do
-    ExampleType.all.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  # Dynamically define Rake tasks for each example app found in the examples directory
+  ExampleType.all[:shakapacker_examples].each do |example_type|
+    puts "Creating #{example_type.rspec_task_name} task"
+    desc "Runs RSpec for #{example_type.name_pretty} only"
+    task example_type.rspec_task_name_short => example_type.gen_task_name do
+      run_tests_in(File.join(examples_dir, example_type.name)) # have to use relative path
+    end
+  end
+
+  desc "Runs Rspec for webpacker example apps only"
+  task webpacker_examples: "webpacker_examples:gen_all" do
+    ExampleType.all[:webpacker_examples].each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  end
+
+  desc "Runs Rspec for shakapacker example apps only"
+  task shakapacker_examples: "shakapacker_examples:gen_all" do
+    ExampleType.all[:shakapacker_examples].each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
   Coveralls::RakeTask.new if ENV["USE_COVERALLS"] == "TRUE"
@@ -56,7 +78,8 @@ namespace :run_rspec do
   end
 
   desc "run all tests"
-  task run_rspec: %i[all_but_examples examples] do
+  task :run_rspec, [:packer] => ["all_but_examples"] do
+    Rake::Task["run_rspec:#{packer}_examples"].invoke
     puts "Completed all RSpec tests"
   end
 end
