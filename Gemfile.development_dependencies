@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
+gem "shakapacker", "8.0.0"
 gem "bootsnap", require: false
 gem "rails", "~> 7.1"
-gem "rake", "~> 13.2.1"
 
 gem "sqlite3", "~> 1.6"
 gem "sass-rails", "~> 6.0"
