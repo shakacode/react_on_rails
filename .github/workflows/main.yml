@@ -49,7 +49,6 @@ jobs:
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji
-        yarn run eslint -v
         sudo yarn global add yalc
     - name: yalc publish for react-on-rails
       run: yalc publish
@@ -140,10 +139,11 @@ jobs:
       with:
         path: spec/dummy/public/webpack
         key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
-    - name: Install Node modules with Yarn for renderer package
+    - name: Install Node modules with Yarn
       run: |
         yarn install --no-progress --no-emoji
         sudo yarn global add yalc
+        cd spec/dummy && yarn install --no-progress --no-emoji
     - name: yalc publish for react-on-rails
       run: yalc publish
     - name: yalc add react-on-rails
@@ -169,6 +169,7 @@ jobs:
     - name: generate file system-based packs
       run: cd spec/dummy && RAILS_ENV=test bundle exec rake react_on_rails:generate_packs
     - name: Git Stuff
+      if: matrix.versions == 'oldest'
       run: |
         git config user.email "you@example.com"
         git config user.name "Your Name"

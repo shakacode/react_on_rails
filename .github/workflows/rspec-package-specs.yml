@@ -9,6 +9,7 @@ on:
 jobs:
   rspec-package-tests:
     strategy:
+      fail-fast: false
       matrix:
         versions: ['oldest', 'newest']
     runs-on: ubuntu-22.04
