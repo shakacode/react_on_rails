@@ -408,6 +408,7 @@ DEPENDENCIES
   jquery-rails
   launchy
   listen
+  package_json
   pry
   pry-byebug
   pry-doc
