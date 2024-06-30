@@ -19,7 +19,7 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since the last non-beta release.
 
 #### Improved
-- Improved dependency management by integrating package_json. [PR 1544](https://github.com/shakacode/react_on_rails/pull/1639) by [vaukalak](https://github.com/vaukalak).
+- Improved dependency management by integrating package_json. [PR 1639](https://github.com/shakacode/react_on_rails/pull/1639) by [vaukalak](https://github.com/vaukalak).
 
 ### [14.0.3] - 2024-06-28
 
