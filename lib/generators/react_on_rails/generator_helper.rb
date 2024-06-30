@@ -5,7 +5,7 @@ require "rainbow"
 
 module GeneratorHelper
   def package_json
-    @package_json ||= PackageJson.read(Rails.root.to_s)
+    @package_json ||= PackageJson.read
   end
 
   # Takes a relative path from the destination root, such as `.gitignore` or `app/assets/javascripts/application.js`
