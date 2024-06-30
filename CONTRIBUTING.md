@@ -137,9 +137,19 @@ spec/dummy.
 
 
 ```sh
-# Optionally change default selenium_firefox driver
+# Optionally change default capybara driver
 export DRIVER=selenium_firefox
 cd react_on_rails/
+yarn run dummy:spec
+```
+
+To convert the development environment over to Shakapacker v6 instead of the default Shakapacker v8:
+
+```sh
+# Optionally change default capybara driver
+export DRIVER=selenium_firefox
+cd react_on_rails/
+script/convert
 yarn run dummy:spec
 ```
 

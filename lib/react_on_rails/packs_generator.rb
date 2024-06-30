@@ -102,7 +102,7 @@ module ReactOnRails
 
       generated_interim_server_bundle_path = server_bundle_entrypoint.sub(".js", "-generated.js")
       generated_server_bundle_file_name = component_name(generated_interim_server_bundle_path)
-      source_entrypoint_parent = Pathname(ReactOnRails::WebpackerUtils.webpacker_source_entry_path).parent
+      source_entrypoint_parent = Pathname(ReactOnRails::PackerUtils.packer_source_entry_path).parent
       generated_nonentrypoints_path = "#{source_entrypoint_parent}/generated"
 
       FileUtils.mkdir_p(generated_nonentrypoints_path)
@@ -115,12 +115,12 @@ module ReactOnRails
     end
 
     def server_bundle_entrypoint
-      Rails.root.join(ReactOnRails::WebpackerUtils.webpacker_source_entry_path,
+      Rails.root.join(ReactOnRails::PackerUtils.packer_source_entry_path,
                       ReactOnRails.configuration.server_bundle_js_file)
     end
 
     def generated_packs_directory_path
-      source_entry_path = ReactOnRails::WebpackerUtils.webpacker_source_entry_path
+      source_entry_path = ReactOnRails::PackerUtils.packer_source_entry_path
 
       "#{source_entry_path}/generated"
     end
@@ -185,7 +185,7 @@ module ReactOnRails
     end
 
     def components_search_path
-      source_path = ReactOnRails::WebpackerUtils.webpacker_source_path
+      source_path = ReactOnRails::PackerUtils.packer_source_path
 
       "#{source_path}/**/#{ReactOnRails.configuration.components_subdirectory}"
     end

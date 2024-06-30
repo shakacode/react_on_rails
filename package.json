@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails",
-  "version": "14.0.2",
+  "version": "14.0.3",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "node_package/lib/ReactOnRails.js",
   "directories": {
@@ -70,9 +70,7 @@
     "prerelease": "yarn run check && yarn run clean && yarn run build",
     "release:patch": "node_package/scripts/release patch",
     "release:minor": "node_package/scripts/release minor",
-    "release:major": "node_package/scripts/release major",
-    "dummy:install": "rake dummy_apps",
-    "dummy:spec": "rake run_rspec:dummy"
+    "release:major": "node_package/scripts/release major"
   },
   "repository": {
     "type": "git",

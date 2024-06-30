@@ -111,29 +111,29 @@ module ReactOnRails
 
     # on ReactOnRails
     def setup_config_values
-      check_autobundling_requirements_if_configured
+      check_autobundling_requirements if auto_load_bundle
       ensure_webpack_generated_files_exists
       configure_generated_assets_dirs_deprecation
       configure_skip_display_none_deprecation
       ensure_generated_assets_dir_present
       check_server_render_method_is_only_execjs
-      error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
+      error_if_using_packer_and_generated_assets_dir_not_match_public_output_path
       # check_deprecated_settings
       adjust_precompile_task
     end
 
     private
 
-    def check_autobundling_requirements_if_configured
+    def check_autobundling_requirements
       raise_missing_components_subdirectory if auto_load_bundle && !components_subdirectory.present?
       return unless components_subdirectory.present?
 
-      ReactOnRails::WebpackerUtils.raise_shakapacker_not_installed unless ReactOnRails::WebpackerUtils.using_webpacker?
-      ReactOnRails::WebpackerUtils.raise_shakapacker_version_incompatible_for_autobundling unless
-        ReactOnRails::WebpackerUtils.shackapacker_version_requirement_met?(
+      ReactOnRails::PackerUtils.raise_shakapacker_not_installed unless ReactOnRails::PackerUtils.using_packer?
+      ReactOnRails::PackerUtils.raise_shakapacker_version_incompatible_for_autobundling unless
+        ReactOnRails::PackerUtils.shakapacker_version_requirement_met?(
           ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION
         )
-      ReactOnRails::WebpackerUtils.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
+      ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
     end
 
     def adjust_precompile_task
@@ -141,7 +141,7 @@ module ReactOnRails
 
       return if skip_react_on_rails_precompile || build_production_command.blank?
 
-      raise(ReactOnRails::Error, compile_command_conflict_message) if shakapacker_precompile?
+      raise(ReactOnRails::Error, compile_command_conflict_message) if ReactOnRails::PackerUtils.precompile?
 
       precompile_tasks = lambda {
         Rake::Task["react_on_rails:generate_packs"].invoke
@@ -151,9 +151,8 @@ module ReactOnRails
         # We set it very big so that it is not used, and then clean just
         # removes files older than 1 hour.
         versions = 100_000
-
-        puts "Invoking task #{shakapacker_clean_task} from React on Rails"
-        Rake::Task[shakapacker_clean_task].invoke(versions)
+        puts "Invoking task #{ReactOnRails::PackerUtils.packer_type}:clean from React on Rails"
+        Rake::Task["#{ReactOnRails::PackerUtils.packer_type}:clean"].invoke(versions)
       }
 
       if Rake::Task.task_defined?("assets:precompile")
@@ -167,22 +166,23 @@ module ReactOnRails
       end
     end
 
-    def error_if_using_webpacker_and_generated_assets_dir_not_match_public_output_path
-      return unless ReactOnRails::WebpackerUtils.using_webpacker?
+    def error_if_using_packer_and_generated_assets_dir_not_match_public_output_path
+      return unless ReactOnRails::PackerUtils.using_packer?
 
       return if generated_assets_dir.blank?
 
-      webpacker_public_output_path = ReactOnRails::WebpackerUtils.webpacker_public_output_path
+      packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
 
-      if File.expand_path(generated_assets_dir) == webpacker_public_output_path.to_s
+      if File.expand_path(generated_assets_dir) == packer_public_output_path.to_s
         Rails.logger.warn("You specified generated_assets_dir in `config/initializers/react_on_rails.rb` " \
-                          "with Webpacker. Remove this line from your configuration file.")
+                          "with #{ReactOnRails::PackerUtils.packer_type}. " \
+                          "Remove this line from your configuration file.")
       else
         msg = <<~MSG
-          Error configuring /config/initializers/react_on_rails.rb: You are using webpacker
+          Error configuring /config/initializers/react_on_rails.rb: You are using #{ReactOnRails::PackerUtils.packer_type}
           and your specified value for generated_assets_dir = #{generated_assets_dir}
           that does not match the value for public_output_path specified in
-          webpacker.yml = #{webpacker_public_output_path}. You should remove the configuration
+          #{ReactOnRails::PackerUtils.packer_type}.yml = #{packer_public_output_path}. You should remove the configuration
           value for "generated_assets_dir" from your config/initializers/react_on_rails.rb file.
         MSG
         raise ReactOnRails::Error, msg
@@ -202,7 +202,7 @@ module ReactOnRails
     end
 
     def ensure_generated_assets_dir_present
-      return if generated_assets_dir.present? || ReactOnRails::WebpackerUtils.using_webpacker?
+      return if generated_assets_dir.present? || ReactOnRails::PackerUtils.using_packer?
 
       self.generated_assets_dir = DEFAULT_GENERATED_ASSETS_DIR
       Rails.logger.warn "ReactOnRails: Set generated_assets_dir to default: #{DEFAULT_GENERATED_ASSETS_DIR}"
@@ -211,11 +211,13 @@ module ReactOnRails
     def configure_generated_assets_dirs_deprecation
       return if generated_assets_dirs.blank?
 
-      if ReactOnRails::WebpackerUtils.using_webpacker?
-        webpacker_public_output_path = ReactOnRails::WebpackerUtils.webpacker_public_output_path
-        Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the " \
-                          "generated_assets_dirs no the generated_assets_dir when using Webpacker. This is defined " \
-                          "by public_output_path specified in webpacker.yml = #{webpacker_public_output_path}."
+      if ReactOnRails::PackerUtils.using_packer?
+        packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
+        # rubocop:disable Layout/LineLength
+        Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the generated_assets_dirs nor " \
+                          "the generated_assets_dir when using #{ReactOnRails::PackerUtils.packer_type.upcase_first}. This is defined by " \
+                          "public_output_path specified in #{ReactOnRails::PackerUtils.packer_type}.yml = #{packer_public_output_path}."
+        # rubocop:enable Layout/LineLength
         return
       end
 
@@ -225,7 +227,7 @@ module ReactOnRails
         self.generated_assets_dir = generated_assets_dirs
       else
         Rails.logger.warn "[DEPRECATION] ReactOnRails. You have both generated_assets_dirs and " \
-                          "generated_assets_dir defined. Define ONLY generated_assets_dir if NOT using Webpacker " \
+                          "generated_assets_dir defined. Define ONLY generated_assets_dir if NOT using Shakapacker " \
                           "and define neither if using Webpacker"
       end
     end
@@ -255,28 +257,16 @@ module ReactOnRails
       raise ReactOnRails::Error, msg
     end
 
-    def shakapacker_precompile?
-      return Webpacker.config.webpacker_precompile? if ReactOnRails::WebpackerUtils.using_shakapacker_6?
-
-      Webpacker.config.shakapacker_precompile?
-    end
-
-    def shakapacker_clean_task
-      ReactOnRails::WebpackerUtils.using_shakapacker_6? ? "webpacker:clean" : "shakapacker:clean"
-    end
-
     def compile_command_conflict_message
-      packer = ReactOnRails::WebpackerUtils.using_shakapacker_6? ? "webpacker" : "shakapacker"
-
       <<~MSG
 
-        React on Rails and Shakapacker error in configuration!
+        React on Rails and #{ReactOnRails::PackerUtils.packer_type.upcase_first} error in configuration!
         In order to use config/react_on_rails.rb config.build_production_command,
-        you must edit config/#{packer}.yml to include this value in the default configuration:
-        '#{packer}_precompile: false'
+        you must edit config/#{ReactOnRails::PackerUtils.packer_type}.yml to include this value in the default configuration:
+        '#{ReactOnRails::PackerUtils.packer_type}_precompile: false'
 
         Alternatively, remove the config/react_on_rails.rb config.build_production_command and the
-        default bin/#{packer} script will be used for assets:precompile.
+        default bin/#{ReactOnRails::PackerUtils.packer_type} script will be used for assets:precompile.
 
       MSG
     end

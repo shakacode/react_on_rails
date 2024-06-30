@@ -3,13 +3,15 @@
 require "rails_helper"
 require "support/script_tag_utils"
 
+Packer = Object.const_get(ReactOnRails::PackerUtils.packer_type.capitalize)
+
 class PlainReactOnRailsHelper
   include ReactOnRailsHelper
 end
 
 # rubocop:disable Metrics/BlockLength
 describe ReactOnRailsHelper do
-  include Webpacker::Helper
+  include Packer::Helper
   before do
     allow(self).to receive(:request) {
       Struct.new("Request", :original_url, :env)

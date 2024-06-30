@@ -18,15 +18,17 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+### [14.0.3] - 2024-06-28
+
 #### Fixed
-- Fixed css-loader installation with [PR 1634](https://github.com/shakacode/react_on_rails/pull/1634) by [vaukalak](https://github.com/vaukalak)
-#### Fixed
-- Address a number of typos and grammar mistakes [PR 1631](https://github.com/shakacode/react_on_rails/pull/1631) by [G-Rath](https://github.com/G-Rath)
+- Fixed css-loader installation with [PR 1634](https://github.com/shakacode/react_on_rails/pull/1634) by [vaukalak](https://github.com/vaukalak).
+- Address a number of typos and grammar mistakes [PR 1631](https://github.com/shakacode/react_on_rails/pull/1631) by [G-Rath](https://github.com/G-Rath).
+- Adds an adapter module & improves test suite to support all versions of Shakapacker. [PR 1622](https://github.com/shakacode/react_on_rails/pull/1622) by [adriangohjw](https://github.com/adriangohjw) and [judahmeek](https://github.com/judahmeek).
 
 ### [14.0.2] - 2024-06-11
 
 #### Fixed
-- Project initialization with Shakapacker v8+ fixed [PR 1629](https://github.com/shakacode/react_on_rails/pull/1629) by [vaukalak](https://github.com/vaukalak)
+- Generator errors with Shakapacker v8+ fixed [PR 1629](https://github.com/shakacode/react_on_rails/pull/1629) by [vaukalak](https://github.com/vaukalak)
 
 ### [14.0.1] - 2024-05-16
 
@@ -1138,7 +1140,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.0.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.0.3...master
+[14.0.3]: https://github.com/shakacode/react_on_rails/compare/14.0.2...14.0.3
 [14.0.2]: https://github.com/shakacode/react_on_rails/compare/14.0.1...14.0.2
 [14.0.1]: https://github.com/shakacode/react_on_rails/compare/14.0.0...14.0.1
 [14.0.0]: https://github.com/shakacode/react_on_rails/compare/13.4.0...14.0.0

@@ -8,13 +8,19 @@ on:
 
 jobs:
  examples:
+    env:
+      SKIP_YARN_COREPACK_CHECK: 0
+    strategy:
+      fail-fast: false
+      matrix:
+        versions: ['oldest', 'newest']
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
       with:
         persist-credentials: false
     - name: Get changed files
-      id: changed-files-specific
+      id: changed-files
       uses: tj-actions/changed-files@v44
       with:
         files: |
@@ -26,7 +32,7 @@ jobs:
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1
       with:
-        ruby-version: 3.3
+        ruby-version: ${{ matrix.versions == 'oldest' && '3.0' || '3.3' }}
         bundler: 2.5.9
     - name: Setup Node
       uses: actions/setup-node@v3
@@ -41,6 +47,9 @@ jobs:
         echo "Node version: "; node -v
         echo "Yarn version: "; yarn --version
         echo "Bundler version: "; bundle --version
+    - name: run conversion script to support shakapacker v6
+      if: matrix.versions == 'oldest'
+      run: script/convert
     - name: Save root node_modules to cache
       uses: actions/cache@v3
       with:
@@ -50,13 +59,12 @@ jobs:
       uses: actions/cache@v3
       with:
         path: vendor/bundle
-        key: v5-package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}
+        key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
     - id: get-sha
       run: echo "::set-output name=sha::$(git rev-parse HEAD)"
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji
-        yarn run eslint -v
         sudo yarn global add yalc
     - name: yalc publish for react-on-rails
       run: yalc publish
@@ -78,7 +86,7 @@ jobs:
       run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
     - name: Main CI
       if: steps.changed-files.outputs.any_changed == 'true'
-      run: bundle exec rake run_rspec:examples
+      run: bundle exec rake run_rspec:${{ matrix.versions == 'oldest' && 'web' || 'shaka' }}packer_examples
     - name: Store test results
       uses: actions/upload-artifact@v3
       with:

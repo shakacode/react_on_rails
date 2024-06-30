@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
+require ReactOnRails::PackerUtils.packer_type
 
 # rubocop:disable Metrics/ModuleLength
 
@@ -8,10 +9,10 @@ module ReactOnRails
   RSpec.describe Configuration do
     let(:existing_path) { Pathname.new(Dir.mktmpdir) }
     let(:not_existing_path) { "/path/to/#{SecureRandom.hex(4)}" }
-    let(:using_webpacker) { false }
+    let(:using_packer) { false }
 
     before do
-      allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(using_webpacker)
+      allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(using_packer)
       ReactOnRails.instance_variable_set(:@configuration, nil)
     end
 
@@ -20,15 +21,15 @@ module ReactOnRails
     end
 
     describe "generated_assets_dir" do
-      let(:using_webpacker) { true }
-      let(:webpacker_public_output_path) do
+      let(:using_packer) { true }
+      let(:packer_public_output_path) do
         File.expand_path(File.join(Rails.root, "public/webpack/dev"))
       end
 
       before do
         allow(Rails).to receive(:root).and_return(File.expand_path("."))
-        allow(Webpacker).to receive_message_chain("config.public_output_path")
-          .and_return(webpacker_public_output_path)
+        allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.public_output_path")
+          .and_return(packer_public_output_path)
       end
 
       it "does not throw if the generated assets dir is blank with webpacker" do
@@ -39,7 +40,7 @@ module ReactOnRails
         end.not_to raise_error
       end
 
-      it "does not throw if the webpacker_public_output_path does match the generated assets dir" do
+      it "does not throw if the packer_public_output_path does match the generated assets dir" do
         expect do
           ReactOnRails.configure do |config|
             config.generated_assets_dir = "public/webpack/dev"
@@ -47,7 +48,7 @@ module ReactOnRails
         end.not_to raise_error
       end
 
-      it "does throw if the webpacker_public_output_path does not match the generated assets dir" do
+      it "does throw if the packer_public_output_path does not match the generated assets dir" do
         expect do
           ReactOnRails.configure do |config|
             config.generated_assets_dir = "public/webpack/other"
@@ -75,80 +76,19 @@ module ReactOnRails
     end
 
     describe ".build_production_command" do
-      context "when using Shakapacker 6" do
-        before do
-          allow(ReactOnRails::WebpackerUtils)
-            .to receive("shakapacker_version")
-            .and_return("6.0.0")
-        end
-
-        it "fails when \"webpacker_precompile\" is truly and \"build_production_command\" is truly" do
+      context "when using Shakapacker 6", if: ReactOnRails::PackerUtils.packer_type != "shakapacker" do
+        it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
           allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
             .and_return(true)
           expect do
             ReactOnRails.configure do |config|
-              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
+              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
             end
           end.to raise_error(ReactOnRails::Error, /webpacker_precompile: false/)
         end
 
-        it "doesn't fail when \"webpacker_precompile\" is falsy and \"build_production_command\" is truly" do
-          allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
-            .and_return(false)
-          expect do
-            ReactOnRails.configure do |config|
-              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/webpacker"
-            end
-          end.not_to raise_error
-        end
-
-        it "doesn't fail when \"webpacker_precompile\" is truly and \"build_production_command\" is falsy" do
-          allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
-            .and_return(true)
-          expect do
-            ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
-          end.not_to raise_error
-        end
-
-        it "doesn't fail when \"webpacker_precompile\" is falsy and \"build_production_command\" is falsy" do
-          allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
-            .and_return(false)
-          expect do
-            ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
-          end.not_to raise_error
-        end
-      end
-
-      context "when using Shakapacker 7" do
-        before do
-          allow(ReactOnRails::WebpackerUtils)
-            .to receive("shakapacker_version")
-            .and_return("7.0.0")
-        end
-
-        it "doesn't show deprecation message for webpacker_precompile?" do
-          allow(Webpacker).to receive_message_chain("config.shakapacker_precompile?")
-            .and_return(false)
-
-          expect do
-            ReactOnRails.configure do |config|
-              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
-            end
-          end.not_to output(/Consider using `shakapacker_precompile?`/).to_stdout
-        end
-
-        it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
-          allow(Webpacker).to receive_message_chain("config.shakapacker_precompile?")
-            .and_return(true)
-          expect do
-            ReactOnRails.configure do |config|
-              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
-            end
-          end.to raise_error(ReactOnRails::Error, /shakapacker_precompile: false/)
-        end
-
         it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is truly" do
-          allow(Webpacker).to receive_message_chain("config.shakapacker_precompile?")
+          allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
             .and_return(false)
           expect do
             ReactOnRails.configure do |config|
@@ -158,7 +98,7 @@ module ReactOnRails
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is truly and \"build_production_command\" is falsy" do
-          allow(Webpacker).to receive_message_chain("config.shakapacker_precompile?")
+          allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
             .and_return(true)
           expect do
             ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
@@ -166,7 +106,45 @@ module ReactOnRails
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is falsy" do
-          allow(Webpacker).to receive_message_chain("config.shakapacker_precompile?")
+          allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
+            .and_return(false)
+          expect do
+            ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
+          end.not_to raise_error
+        end
+      end
+
+      context "when using Shakapacker 8", if: ReactOnRails::PackerUtils.packer_type == "shakapacker" do
+        it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
+          allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
+            .and_return(true)
+          expect do
+            ReactOnRails.configure do |config|
+              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
+            end
+          end.to raise_error(ReactOnRails::Error, /shakapacker_precompile: false/)
+        end
+
+        it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is truly" do
+          allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
+            .and_return(false)
+          expect do
+            ReactOnRails.configure do |config|
+              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
+            end
+          end.not_to raise_error
+        end
+
+        it "doesn't fail when \"shakapacker_precompile\" is truly and \"build_production_command\" is falsy" do
+          allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
+            .and_return(true)
+          expect do
+            ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
+          end.not_to raise_error
+        end
+
+        it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is falsy" do
+          allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
             .and_return(false)
           expect do
             ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
@@ -277,18 +255,18 @@ module ReactOnRails
     end
 
     it "checks that autobundling requirements are met if configuration options for autobundling are set" do
-      allow(ReactOnRails::WebpackerUtils).to receive_messages(using_webpacker?: true,
-                                                              shackapacker_version_requirement_met?: true,
-                                                              nested_entries?: true)
+      allow(ReactOnRails::PackerUtils).to receive_messages(using_packer?: true,
+                                                           shakapacker_version_requirement_met?: true,
+                                                           nested_entries?: true)
 
       ReactOnRails.configure do |config|
         config.auto_load_bundle = true
         config.components_subdirectory = "something"
       end
 
-      expect(ReactOnRails::WebpackerUtils).to have_received(:using_webpacker?).thrice
-      expect(ReactOnRails::WebpackerUtils).to have_received(:shackapacker_version_requirement_met?)
-      expect(ReactOnRails::WebpackerUtils).to have_received(:nested_entries?)
+      expect(ReactOnRails::PackerUtils).to have_received(:using_packer?).thrice
+      expect(ReactOnRails::PackerUtils).to have_received(:shakapacker_version_requirement_met?)
+      expect(ReactOnRails::PackerUtils).to have_received(:nested_entries?)
     end
 
     it "has a default configuration of the gem" do

@@ -316,7 +316,7 @@ module ReactOnRails
     def load_pack_for_generated_component(react_component_name, render_options)
       return unless render_options.auto_load_bundle
 
-      ReactOnRails::WebpackerUtils.raise_nested_entries_disabled unless ReactOnRails::WebpackerUtils.nested_entries?
+      ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
       if Rails.env.development?
         is_component_pack_present = File.exist?(generated_components_pack_path(react_component_name))
         raise_missing_autoloaded_bundle(react_component_name) unless is_component_pack_present
@@ -330,8 +330,8 @@ module ReactOnRails
 
     private
 
-    def generated_components_pack_path(react_component_name)
-      "#{ReactOnRails::WebpackerUtils.webpacker_source_entry_path}/generated/#{react_component_name}.js"
+    def generated_components_pack_path(component_name)
+      "#{ReactOnRails::PackerUtils.packer_source_entry_path}/generated/#{component_name}.js"
     end
 
     def build_react_component_result_for_server_rendered_string(
