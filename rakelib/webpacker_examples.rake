@@ -37,7 +37,11 @@ namespace :webpacker_examples do # rubocop:disable Metrics/BlockLength
       sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '~> 6.6.0'\" >> #{example_type.gemfile}")
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, "rake webpacker:install")
-      sh_in_dir(example_type.dir, example_type.generator_shell_commands)
+      shell_commands = []
+      env = "PACKAGE_JSON_FALLBACK_MANAGER=yarn_classic"
+      options = example_type.generator_options
+      shell_commands << "#{env} rails generate react_on_rails:install #{options} --ignore-warnings --force"
+      shell_commands << "#{env} rails generate react_on_rails:dev_tests #{options}"
       sh_in_dir(example_type.dir, "yarn")
     end
   end

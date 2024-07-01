@@ -5,6 +5,7 @@ require "rails/generators"
 module ReactOnRails
   module Generators
     class ReactWithReduxGenerator < Rails::Generators::Base
+      include GeneratorHelper
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
 

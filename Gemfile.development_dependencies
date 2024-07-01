@@ -23,6 +23,7 @@ gem "sprockets", "~> 4.0"
 gem "amazing_print"
 
 group :development, :test do
+  gem "package_json"
   gem "listen"
   gem "debug"
   gem "pry"

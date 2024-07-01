@@ -76,26 +76,40 @@ module ReactOnRails
         run "bundle"
       end
 
-      def add_yarn_dependencies
+      def add_js_dependencies
         major_minor_patch_only = /\A\d+\.\d+\.\d+\z/
         if ReactOnRails::VERSION.match?(major_minor_patch_only)
-          run "yarn add react-on-rails@#{ReactOnRails::VERSION} --exact"
+          package_json.manager.add(["react-on-rails@#{ReactOnRails::VERSION}"])
         else
           # otherwise add latest
           puts "Adding the latest react-on-rails NPM module. Double check this is correct in package.json"
-          run "yarn add react-on-rails --exact"
+          package_json.manager.add(["react-on-rails"])
         end
 
         puts "Adding React dependencies"
-        run "yarn add react react-dom @babel/preset-react prop-types babel-plugin-transform-react-remove-prop-types \
-            babel-plugin-macros"
+        package_json.manager.add([
+                                   "react",
+                                   "react-dom",
+                                   "@babel/preset-react",
+                                   "prop-types",
+                                   "babel-plugin-transform-react-remove-prop-types",
+                                   "babel-plugin-macros"
+                                 ])
 
         puts "Adding CSS handlers"
 
-        run "yarn add -D css-loader css-minimizer-webpack-plugin mini-css-extract-plugin style-loader"
+        package_json.manager.add(%w[
+                                   css-loader
+                                   css-minimizer-webpack-plugin
+                                   mini-css-extract-plugin
+                                   style-loader
+                                 ])
 
         puts "Adding dev dependencies"
-        run "yarn add -D @pmmmwh/react-refresh-webpack-plugin react-refresh"
+        package_json.manager.add([
+                                   "@pmmmwh/react-refresh-webpack-plugin",
+                                   "react-refresh"
+                                 ], type: :dev)
       end
 
       def append_to_spec_rails_helper
