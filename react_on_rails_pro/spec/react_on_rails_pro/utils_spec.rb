@@ -170,7 +170,7 @@ module ReactOnRailsPro
             described_class.mine_type_from_file_name("loadable-stats.js")
           end
 
-          it { is_expected.to eq("application/javascript") }
+          it { is_expected.to eq("text/javascript") }
         end
       end
 
