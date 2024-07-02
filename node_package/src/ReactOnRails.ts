@@ -133,6 +133,10 @@ ctx.ReactOnRails = {
     ClientStartup.reactOnRailsPageLoaded();
   },
 
+  reactOnRailsComponentLoaded(domId: string): void {
+    ClientStartup.reactOnRailsComponentLoaded(domId);
+  },
+
   /**
    * Returns CSRF authenticity token inserted by Rails csrf_meta_tags
    * @returns String or null

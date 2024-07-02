@@ -91,6 +91,10 @@ module ReactOnRails
         retrieve_configuration_value_for(:logging_on_server)
       end
 
+      def force_load
+        retrieve_configuration_value_for(:force_load)
+      end
+
       def to_s
         "{ react_component_name = #{react_component_name}, options = #{options}, request_digest = #{request_digest}"
       end
