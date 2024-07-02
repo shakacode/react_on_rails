@@ -431,25 +431,27 @@ module ReactOnRails
       render_options = ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: react_component_name,
                                                                        options: options)
 
-      # Setup the page_loaded_js, which is the same regardless of prerendering or not!
-      # The reason is that React is smart about not doing extra work if the server rendering did its job.
-      component_specification_tag = content_tag(:script,
-                                                json_safe_and_pretty(render_options.client_props).html_safe,
-                                                type: "application/json",
-                                                class: "js-react-on-rails-component",
-                                                "data-component-name" => render_options.react_component_name,
-                                                "data-trace" => (render_options.trace ? true : nil),
-                                                "data-dom-id" => render_options.dom_id)
+      ReactOnRails::Utils.with_trace "#{react_component_name}: Full rendering process" do
+        # Setup the page_loaded_js, which is the same regardless of prerendering or not!
+        # The reason is that React is smart about not doing extra work if the server rendering did its job.
+        component_specification_tag = content_tag(:script,
+                                                  json_safe_and_pretty(render_options.client_props).html_safe,
+                                                  type: "application/json",
+                                                  class: "js-react-on-rails-component",
+                                                  "data-component-name" => render_options.react_component_name,
+                                                  "data-trace" => (render_options.trace ? true : nil),
+                                                  "data-dom-id" => render_options.dom_id)
 
-      load_pack_for_generated_component(react_component_name, render_options)
-      # Create the HTML rendering part
-      result = server_rendered_react_component(render_options)
+        load_pack_for_generated_component(react_component_name, render_options)
+        # Create the HTML rendering part
+        result = server_rendered_react_component(render_options)
 
-      {
-        render_options: render_options,
-        tag: component_specification_tag,
-        result: result
-      }
+        {
+          render_options: render_options,
+          tag: component_specification_tag,
+          result: result
+        }
+      end
     end
 
     def render_redux_store_data(redux_store_data)
@@ -477,7 +479,7 @@ module ReactOnRails
 
       # Make sure that we use up-to-date bundle file used for server rendering, which is defined
       # by config file value for config.server_bundle_js_file
-      ReactOnRails::ServerRenderingPool.reset_pool_if_server_bundle_was_modified
+      ReactOnRails::ServerRenderingPool.reset_pool_if_server_bundle_was_modified(react_component_name)
 
       # Since this code is not inserted on a web page, we don't need to escape props
       #

@@ -16,21 +16,26 @@ module ReactOnRails
           @js_context_pool = ConnectionPool.new(options) { create_js_context }
         end
 
-        def reset_pool_if_server_bundle_was_modified
+        def reset_pool_if_server_bundle_was_modified(react_component_name)
           return unless ReactOnRails.configuration.development_mode
 
-          if ReactOnRails::Utils.server_bundle_path_is_http?
-            return if @server_bundle_url == ReactOnRails::Utils.server_bundle_js_file_path
+          ReactOnRails::Utils.with_trace("#{react_component_name}: checking if pool should be reset") do
+            if ReactOnRails::Utils.server_bundle_path_is_http?
+              return if @server_bundle_url == ReactOnRails::Utils.server_bundle_js_file_path
 
-            @server_bundle_url = ReactOnRails::Utils.server_bundle_js_file_path
-          else
-            file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
-            @server_bundle_timestamp ||= file_mtime
-            return if @server_bundle_timestamp == file_mtime
+              @server_bundle_url = ReactOnRails::Utils.server_bundle_js_file_path
+            else
+              file_mtime = File.mtime(ReactOnRails::Utils.server_bundle_js_file_path)
+              @server_bundle_timestamp ||= file_mtime
+              return if @server_bundle_timestamp == file_mtime
 
-            @server_bundle_timestamp = file_mtime
+              @server_bundle_timestamp = file_mtime
+            end
           end
-          ReactOnRails::ServerRenderingPool.reset_pool
+
+          ReactOnRails::Utils.with_trace("#{react_component_name}: resetting pool") do
+            ReactOnRails::ServerRenderingPool.reset_pool
+          end
         end
 
         # js_code: JavaScript expression that returns a string.
@@ -73,19 +78,21 @@ module ReactOnRails
           end
           result = nil
           begin
-            result = JSON.parse(json_string)
+            result = ReactOnRails::Utils.with_trace("#{render_options.react_component_name}parsing JSON result") { JSON.parse(json_string) }
           rescue JSON::ParserError => e
             raise ReactOnRails::JsonParseError.new(parse_error: e, json: json_string)
           end
 
           if render_options.logging_on_server
-            console_script = result["consoleReplayScript"]
-            console_script_lines = console_script.split("\n")
-            console_script_lines = console_script_lines[2..-2]
-            re = /console\.(?:log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
-            console_script_lines&.each do |line|
-              match = re.match(line)
-              Rails.logger.info { "[react_on_rails] #{match[:msg]}" } if match
+            ReactOnRails::Utils.with_trace("#{render_options.react_component_name}: logging console messages on server") do
+              console_script = result["consoleReplayScript"]
+              console_script_lines = console_script.split("\n")
+              console_script_lines = console_script_lines[2..-2]
+              re = /console\.(?:log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
+              console_script_lines&.each do |line|
+                match = re.match(line)
+                Rails.logger.info { "[react_on_rails] #{match[:msg]}" } if match
+              end
             end
           end
           result
@@ -95,18 +102,20 @@ module ReactOnRails
         def trace_js_code_used(msg, js_code, file_name = "tmp/server-generated.js", force: false)
           return unless ReactOnRails.configuration.trace || force
 
-          # Set to anything to print generated code.
-          File.write(file_name, js_code)
-          msg = <<-MSG.strip_heredoc
-            #{'Z' * 80}
-            [react_on_rails] #{msg}
-            JavaScript code used: #{file_name}
-            #{'Z' * 80}
-          MSG
-          if force
-            Rails.logger.error(msg)
-          else
-            Rails.logger.info(msg)
+          ReactOnRails::Utils.with_trace do
+            # Set to anything to print generated code.
+            File.write(file_name, js_code)
+            msg = <<-MSG.strip_heredoc
+              #{'Z' * 80}
+              [react_on_rails] #{msg}
+              JavaScript code used: #{file_name}
+              #{'Z' * 80}
+            MSG
+            if force
+              Rails.logger.error(msg)
+            else
+              Rails.logger.info(msg)
+            end
           end
         end
 

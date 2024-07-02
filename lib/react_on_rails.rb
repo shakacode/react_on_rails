@@ -26,3 +26,4 @@ require "react_on_rails/test_helper/ensure_assets_compiled"
 require "react_on_rails/locales/base"
 require "react_on_rails/locales/to_js"
 require "react_on_rails/locales/to_json"
+require 'trace_visualizer/engine'
