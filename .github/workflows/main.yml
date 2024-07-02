@@ -75,7 +75,7 @@ jobs:
     - id: get-sha
       run: echo "::set-output name=sha::$(git rev-parse HEAD)"
     - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
-      uses: actions/cache/save@v3
+      uses: actions/cache/save@v4
       with:
         path: spec/dummy/public/webpack
         key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
