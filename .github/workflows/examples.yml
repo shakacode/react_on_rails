@@ -90,5 +90,5 @@ jobs:
     - name: Store test results
       uses: actions/upload-artifact@v4
       with:
-        name: main-rspec
+        name: main-rspec-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
         path: ~/rspec
