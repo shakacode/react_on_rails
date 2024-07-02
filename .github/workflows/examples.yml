@@ -35,7 +35,7 @@ jobs:
         ruby-version: ${{ matrix.versions == 'oldest' && '3.0' || '3.3' }}
         bundler: 2.5.9
     - name: Setup Node
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: 20
     - name: Print system information
@@ -51,12 +51,12 @@ jobs:
       if: matrix.versions == 'oldest'
       run: script/convert
     - name: Save root node_modules to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: node_modules
         key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
     - name: Save root ruby gems to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: vendor/bundle
         key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
@@ -88,7 +88,7 @@ jobs:
       if: steps.changed-files.outputs.any_changed == 'true'
       run: bundle exec rake run_rspec:${{ matrix.versions == 'oldest' && 'web' || 'shaka' }}packer_examples
     - name: Store test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: main-rspec
+        name: main-rspec-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
         path: ~/rspec
