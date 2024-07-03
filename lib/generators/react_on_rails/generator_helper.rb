@@ -1,8 +1,13 @@
 # frozen_string_literal: true
 
+require "package_json"
 require "rainbow"
 
 module GeneratorHelper
+  def package_json
+    @package_json ||= PackageJson.read
+  end
+
   # Takes a relative path from the destination root, such as `.gitignore` or `app/assets/javascripts/application.js`
   def dest_file_exists?(file)
     dest_file = File.join(destination_root, file)

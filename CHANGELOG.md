@@ -18,8 +18,13 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+
+#### Improved
+- Improved dependency management by integrating package_json. [PR 1639](https://github.com/shakacode/react_on_rails/pull/1639) by [vaukalak](https://github.com/vaukalak).
+
 #### Changed
 - Update outdated GitHub Actions to use Node.js 20.0 versions instead [PR 1623](https://github.com/shakacode/react_on_rails/pull/1623) by [adriangohjw](https://github.com/adriangohjw).
+
 
 ### [14.0.3] - 2024-06-28
 
