@@ -35,7 +35,7 @@ jobs:
       if: matrix.versions == 'oldest'
       run: script/convert
     - name: Save root ruby gems to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: vendor/bundle
         key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ matrix.versions }}
@@ -50,12 +50,12 @@ jobs:
     - name: Run rspec tests
       run: bundle exec rspec spec/react_on_rails
     - name: Store test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: main-rspec
+        name: main-rspec-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
         path: ~/rspec
     - name: Store artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: main-test-log
+        name: main-test-log-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
         path: log/test.log

@@ -18,7 +18,7 @@ jobs:
       with:
         persist-credentials: false
     - name: Setup Node
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
     - name: Print system information
@@ -29,7 +29,7 @@ jobs:
         echo "Node version: "; node -v
         echo "Yarn version: "; yarn --version
     - name: Save root node_modules to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: node_modules
         key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}

@@ -26,7 +26,7 @@ jobs:
     - name: Fix dependency for libyaml-dev
       run: sudo apt install libyaml-dev
     - name: Setup Node
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
     - name: Print system information
@@ -42,7 +42,7 @@ jobs:
       if: matrix.versions == 'oldest'
       run: script/convert
     - name: Save root node_modules to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: node_modules
         key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
@@ -53,7 +53,7 @@ jobs:
     - name: yalc publish for react-on-rails
       run: yalc publish
     - name: Save spec/dummy/node_modules to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: spec/dummy/node_modules
         key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-${{ matrix.versions }}
@@ -62,7 +62,7 @@ jobs:
     - name: Install Node modules with Yarn for dummy app
       run: cd spec/dummy && yarn install --no-progress --no-emoji
     - name: Save dummy app ruby gems to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: spec/dummy/vendor/bundle
         key: dummy-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
@@ -75,7 +75,7 @@ jobs:
     - id: get-sha
       run: echo "::set-output name=sha::$(git rev-parse HEAD)"
     - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
-      uses: actions/cache/save@v3
+      uses: actions/cache/save@v4
       with:
         path: spec/dummy/public/webpack
         key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
@@ -97,7 +97,7 @@ jobs:
         ruby-version: ${{ matrix.versions == 'oldest' && '3.0' || '3.3' }}
         bundler: 2.5.9
     - name: Setup Node
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
     - name: Print system information
@@ -113,29 +113,29 @@ jobs:
       if: matrix.versions == 'oldest'
       run: script/convert
     - name: Save root node_modules to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: node_modules
         key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
     - name: Save root ruby gems to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: vendor/bundle
         key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
     - name: Save dummy app ruby gems to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: spec/dummy/vendor/bundle
         key: dummy-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
     - name: Save spec/dummy/node_modules to cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: spec/dummy/node_modules
         key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-${{ matrix.versions }}
     - id: get-sha
       run: echo "::set-output name=sha::$(git rev-parse HEAD)"
     - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: spec/dummy/public/webpack
         key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
@@ -179,22 +179,22 @@ jobs:
     - name: Main CI
       run: bundle exec rake run_rspec:all_dummy
     - name: Store test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: main-rspec
+        name: main-rspec-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
         path: ~/rspec
     - name: Store artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: dummy-app-capybara
+        name: dummy-app-capybara-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
         path: spec/dummy/tmp/capybara
     - name: Store artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: dummy-app-test-log
+        name: dummy-app-test-log-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
         path: spec/dummy/log/test.log
     - name: Store artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: dummy-app-yarn-log
+        name: dummy-app-yarn-log-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
         path: spec/dummy/yarn-error.log
