@@ -19,6 +19,9 @@ export const initializeApolloClient = () => {
   }
 
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+  if (!csrfToken) {
+    throw new Error('CSRF token not found: Are you missing a meta tag in your layout?');
+  }
   // fulfill the store with the server data
   const initialState = window.__APOLLO_STATE__;
 

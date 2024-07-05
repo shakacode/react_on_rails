@@ -18,6 +18,9 @@ export = function restartWorkers(delayBetweenIndividualWorkerRestarts: number) {
   log.info('Started scheduled restart of workers');
 
   let delay = 0;
+  if (!cluster.workers) {
+    throw new Error('No workers to restart');
+  }
   Object.values(cluster.workers).forEach((worker) => {
     const killWorker = () => {
       if (!worker) return;

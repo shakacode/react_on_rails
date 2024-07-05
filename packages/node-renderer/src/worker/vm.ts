@@ -52,6 +52,7 @@ function replayVmConsole() {
   });
 }
 
+// This works before node 16
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace -- needed to augment
   namespace NodeJS {
@@ -59,6 +60,11 @@ declare global {
       ReactOnRails?: unknown;
     }
   }
+}
+// This works on node 16+
+declare global {
+  // eslint-disable-next-line vars-on-top, no-var
+  var ReactOnRails: unknown;
 }
 
 export async function buildVM(filePath: string) {
@@ -146,8 +152,8 @@ export async function buildVM(filePath: string) {
       vm.runInContext(bundleContents, context);
     }
 
-    // !isMaster check is required for JS unit testing:
-    if (!cluster.isMaster) {
+    // isWorker check is required for JS unit testing:
+    if (cluster.isWorker && cluster.worker !== undefined) {
       log.debug(`Built VM for worker #${cluster.worker.id}`);
     }
 
@@ -189,7 +195,7 @@ export async function runInVM(
     }
 
     if (log.level === 'debug') {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- worker is nullable in the primary process
+      // worker is nullable in the primary process
       const workerId = vmCluster?.worker?.id;
       log.debug(`worker ${workerId ? `${workerId} ` : ''}received render request with code
 ${smartTrim(renderingRequest)}`);

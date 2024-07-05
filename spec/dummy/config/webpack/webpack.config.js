@@ -1,4 +1,4 @@
-const { env, webpackConfig } = require('shakapacker');
+const { env } = require('shakapacker');
 const { existsSync } = require('fs');
 const { resolve } = require('path');
 
@@ -8,7 +8,9 @@ const envSpecificConfig = () => {
     console.log(`Loading ENV specific webpack configuration file ${path}`);
     return require(path);
   } else {
-    return webpackConfig;
+    throw new Error(
+      `Invalid NODE_ENV = ${env.nodeEnv}. Please use one of the following 'test', 'development' or 'production'.`,
+    );
   }
 };
 

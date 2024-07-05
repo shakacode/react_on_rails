@@ -34,7 +34,7 @@ Run one of these Procfiles:
 This example builds on the standard @rails/webpacker configuration, as demonstrated
 by repo (shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) 
 
-* [config/webpacker.yml](./config/webpacker.yml)
+* [config/shakapacker.yml](./config/shakapacker.yml)
 * [config/webpack directory](./config/webpack)
 
 ## Loadable Components
@@ -50,6 +50,10 @@ To toggle caching in development, as explained in [this article](http://guides.r
 ## Error Handling
 
 This sample app includes both Honeybadger and Sentry integration, including Sentry tracing integration.
+
+## Other needed steps
+
+please check [CONTRIBUTING.md](../../CONTRIBUTING.md) it has other needed steps before you are able to run the demo app.
 
 ## Starting the Sample App
                              

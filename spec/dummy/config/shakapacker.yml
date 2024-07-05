@@ -1,4 +1,4 @@
-# Note: You must restart bin/webpacker-dev-server for changes to take effect
+# Note: You must restart bin/shakapacker-dev-server for changes to take effect
 
 default: &default
   source_path: client/app
@@ -6,7 +6,7 @@ default: &default
   public_root_path: public
   public_output_path: packs
   nested_entries: true
- 
+
   cache_path: tmp/cache/webpacker
   check_yarn_integrity: false
   webpack_compile_output: false
@@ -52,7 +52,7 @@ development:
     # Should we use gzip compression?
     compress: true
     # Note that apps that do not check the host are vulnerable to DNS rebinding attacks
-    allowed_hosts: "all"
+    allowed_hosts: 'all'
     pretty: true
     use_local_ip: false
     quiet: false

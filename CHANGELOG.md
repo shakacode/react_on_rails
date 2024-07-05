@@ -16,6 +16,7 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ### Removed
 - Drop support for EOL'd Ruby 2.7 [PR 365](https://github.com/shakacode/react_on_rails_pro/pull/365) by [ahangarha](https://github.com/ahangarha).
+- Drop support for React on Rails below 14.0.4 [PR 415](https://github.com/shakacode/react_on_rails_pro/pull/415) by [rameziophobia](https://github.com/rameziophobia).
 
 ### Fixed
 - Updated multiple JS dependencies for bug fixes.
@@ -24,6 +25,7 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ### Changed
 - Converted JS code to TS [PR 386](https://github.com/shakacode/react_on_rails_pro/pull/386) and [PR 389](https://github.com/shakacode/react_on_rails_pro/pull/389) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- Support Shakapacker 8.0.0, Modified webpack configurations to use shakapacker instead of webpacker. This drops support for shakapacker 6.X [PR 415](https://github.com/shakacode/react_on_rails_pro/pull/415) by [rameziophobia](https://github.com/rameziophobia).
 
 ## [3.2.1] - 2023-06-07
 Fixed release, supports Ruby 2.7.5.
