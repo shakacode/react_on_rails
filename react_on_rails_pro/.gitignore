@@ -28,6 +28,7 @@ tmp
 
 # NVM
 .nvmrc
+!/spec/dummy/.nvmrc
 # nodenv
 .node-version
 

@@ -273,7 +273,7 @@ bundle exec rake react_on_rails:generate_packs
 yarn run preinstall
 yarn install
 
-RAILS_ENV=test bin/webpacker # to generate assets for test environment
+RAILS_ENV=test bin/shakapacker # to generate assets for test environment
 ```
 
 Then in a separate terminal, run the following to get node rendered run in background:

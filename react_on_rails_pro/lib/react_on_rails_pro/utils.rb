@@ -57,11 +57,11 @@ module ReactOnRailsPro
 
     # Returns the hashed file name when using webpacker. Useful for creating cache keys.
     def self.bundle_file_name(bundle_name)
-      unless ReactOnRails::WebpackerUtils.using_webpacker?
+      unless ReactOnRails::PackerUtils.using_packer?
         raise ReactOnRailsPro::Error, "Only call bundle_file_name if using webpacker"
       end
 
-      full_path = ReactOnRails::WebpackerUtils.bundle_js_uri_from_webpacker(bundle_name)
+      full_path = ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
       pathname = Pathname.new(full_path)
       pathname.basename.to_s
     end

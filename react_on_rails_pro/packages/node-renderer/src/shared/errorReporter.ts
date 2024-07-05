@@ -1,6 +1,6 @@
 import type { Types } from '@honeybadger-io/js/dist/server/honeybadger';
 import type { CaptureContext } from '@sentry/types';
-import { NodeOptions } from '@sentry/node/dist/backend';
+import { NodeOptions } from '@sentry/node';
 import requireOptional from './requireOptional';
 import log from './log';
 

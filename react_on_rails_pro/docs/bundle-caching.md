@@ -8,7 +8,7 @@ change to production, but you will have to wait minutes for your bundles to be b
 
 ## Solution
 React on Rails 2.1.0 introduces bundle caching based on a digest of all the source files, defined
-in the `config/webpacker.yml` file, plus other files defined with `config.dependency_globs` and
+in the `config/shakapacker.yml` file, plus other files defined with `config.dependency_globs` and
 excluding any files from `config.excluded_dependency_globs`. Creating this hash key takes at most a
 few seconds for even large projects. Additionally, the cache key includes 
 1. NODE_ENV

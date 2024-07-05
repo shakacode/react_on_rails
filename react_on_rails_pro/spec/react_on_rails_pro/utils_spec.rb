@@ -10,9 +10,9 @@ module ReactOnRailsPro
           allow(Rails).to receive(:root).and_return(Pathname.new("."))
           allow(ReactOnRails).to receive_message_chain("configuration.generated_assets_dir")
             .and_return("public/webpack/production")
-          allow(Webpacker).to receive_message_chain("config.public_output_path")
+          allow(Shakapacker).to receive_message_chain("config.public_output_path")
             .and_return("public/webpack/production")
-          allow(ReactOnRails::WebpackerUtils).to receive(:using_webpacker?).and_return(true)
+          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
         end
 
         describe ".bundle_file_name" do
@@ -23,7 +23,7 @@ module ReactOnRailsPro
           before do
             allow(ReactOnRails.configuration)
               .to receive(:server_bundle_js_file).and_return(nil)
-            allow(Webpacker).to receive_message_chain("manifest.lookup!")
+            allow(Shakapacker).to receive_message_chain("manifest.lookup!")
               .with("client-bundle.js")
               .and_return("/webpack/production/client-bundle-0123456789abcdef.js")
           end
@@ -36,7 +36,7 @@ module ReactOnRailsPro
             it "returns path for server bundle file name" do
               server_bundle_js_file = "/webpack/production/webpack-bundle-0123456789abcdef.js"
               server_bundle_js_file_path = File.expand_path("./public/#{server_bundle_js_file}")
-              allow(Webpacker).to receive_message_chain("manifest.lookup!")
+              allow(Shakapacker).to receive_message_chain("manifest.lookup!")
                 .and_return(server_bundle_js_file)
               allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
                 .and_return(server_bundle_js_file_path)
@@ -54,7 +54,7 @@ module ReactOnRailsPro
             it "returns MD5 for server bundle file name" do
               server_bundle_js_file = "webpack/production/webpack-bundle.js"
               server_bundle_js_file_path = File.expand_path("./public/#{server_bundle_js_file}")
-              allow(Webpacker).to receive_message_chain("manifest.lookup!")
+              allow(Shakapacker).to receive_message_chain("manifest.lookup!")
                 .and_return(server_bundle_js_file)
               allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
                 .and_return(server_bundle_js_file_path)

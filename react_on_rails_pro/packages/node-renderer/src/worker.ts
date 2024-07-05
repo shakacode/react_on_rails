@@ -4,7 +4,7 @@
  */
 
 import path from 'path';
-import cluster from 'cluster';
+import cluster, { Worker } from 'cluster';
 import express, { Request, Response } from 'express';
 import busBoy from 'express-busboy';
 import log from './shared/log';
@@ -286,9 +286,10 @@ export = function run(config: Partial<Config>) {
 
   // In tests we will run worker in master thread, so we need to ensure server
   // will not listen:
-  if (!cluster.isMaster) {
+  if (cluster.isWorker && cluster.worker !== undefined) {
     app.listen(port, () => {
-      log.info(`Node renderer worker #${cluster.worker.id} listening on port ${port}!`);
+      // we are using as Worker type assertion to avoid false TS error. it is complaining although we are checking if it is defined
+      log.info(`Node renderer worker #${(cluster.worker as Worker).id} listening on port ${port}!`);
     });
   }
 

@@ -1,4 +1,4 @@
-const { webpackConfig: baseClientWebpackConfig, merge } = require('shakapacker');
+const { generateWebpackConfig, merge } = require('shakapacker');
 const webpack = require('webpack');
 
 const sassResources = ['./client/app/assets/styles/app-variables.scss'];
@@ -25,6 +25,7 @@ const sassLoaderConfig = {
   },
 };
 
+const baseClientWebpackConfig = generateWebpackConfig();
 const scssConfigIndex = baseClientWebpackConfig.module.rules.findIndex((config) =>
   '.scss'.match(config.test),
 );

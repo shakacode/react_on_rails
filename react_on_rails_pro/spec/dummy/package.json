@@ -50,7 +50,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-helmet": "^6.0.0-beta.2",
-    "react-on-rails": "13.4.0",
+    "react-on-rails": "14.0.4",
     "react-proptypes": "^1.0.0",
     "react-redux": "^5.0.5",
     "react-refresh": "^0.11.0",
@@ -62,7 +62,7 @@
     "sass": "^1.43.4",
     "sass-loader": "^12.3.0",
     "sass-resources-loader": "^2.0.0",
-    "shakapacker": "6.5.6",
+    "shakapacker": "8.0.0",
     "style-loader": "^3.3.1",
     "tailwindcss": "^3.2.7",
     "terser-webpack-plugin": "5",
@@ -96,11 +96,11 @@
     "lint": "cd ../.. && nps lint",
     "preinstall": "yarn run link-source && yalc add --link @shakacode-tools/react-on-rails-pro-node-renderer",
     "link-source": "cd ../.. && yarn run nps build && yalc publish",
-    "build:test": "rm -rf public/webpack/test && RAILS_ENV=test NODE_ENV=test bin/webpacker",
-    "build:dev": "rm -rf public/webpack/development && RAILS_ENV=development NODE_ENV=development bin/webpacker",
-    "build:dev:watch": "RAILS_ENV=development NODE_ENV=development bin/webpacker --watch",
-    "build:client": "RAILS_ENV=production NODE_ENV=production bin/webpacker",
-    "build:server": "RAILS_ENV=production NODE_ENV=production SERVER=true bin/webpacker",
+    "build:test": "rm -rf public/webpack/test && RAILS_ENV=test NODE_ENV=test bin/shakapacker",
+    "build:dev": "rm -rf public/webpack/development && RAILS_ENV=development NODE_ENV=development bin/shakapacker",
+    "build:dev:watch": "RAILS_ENV=development NODE_ENV=development bin/shakapacker --watch",
+    "build:client": "RAILS_ENV=production NODE_ENV=production bin/shakapacker",
+    "build:server": "RAILS_ENV=production NODE_ENV=production SERVER=true bin/shakapacker",
     "build:clean": "rm -rf public/webpack || true",
     "node-renderer-debug": "RENDERER_PORT=3800 ndb client/node-renderer.js",
     "node-renderer": "RENDERER_PORT=3800 node client/node-renderer.js"
@@ -114,5 +114,6 @@
   "author": "justin808",
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails_pro/issues"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

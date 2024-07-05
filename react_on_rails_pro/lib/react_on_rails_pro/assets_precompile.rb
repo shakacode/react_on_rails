@@ -29,7 +29,7 @@ module ReactOnRailsPro
         begin
           ReactOnRailsPro::Utils.rorp_puts "Calculating digest of bundle dependencies."
           starting = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          cache_dependencies = [Webpacker.config.source_path.join("**", "*")]
+          cache_dependencies = [Shakapacker.config.source_path.join("**", "*")]
                                .union(ReactOnRailsPro.configuration.dependency_globs)
           # Note, digest_of_globs removes excluded globs
           digest = ReactOnRailsPro::Utils.digest_of_globs(cache_dependencies)
@@ -130,7 +130,7 @@ module ReactOnRailsPro
 
       if File.exist?(zipped_bundles_filepath)
         ReactOnRailsPro::Utils.rorp_puts "gunzipping bundle cache: #{zipped_bundles_filepath}"
-        public_output_path = Webpacker.config.public_output_path
+        public_output_path = Shakapacker.config.public_output_path
         FileUtils.mkdir_p(public_output_path)
         Dir.chdir(public_output_path) do
           Rake.sh "tar -xzf #{zipped_bundles_filepath}"
@@ -144,7 +144,7 @@ module ReactOnRailsPro
     end
 
     def extra_files_path
-      Rails.root.join(Webpacker.config.public_output_path, "extra_files")
+      Rails.root.join(Shakapacker.config.public_output_path, "extra_files")
     end
 
     def copy_extra_files_to_cache_dir
@@ -196,12 +196,12 @@ module ReactOnRailsPro
     def cache_bundles
       begin
         copy_extra_files_to_cache_dir
-        public_output_path = Webpacker.config.public_output_path
+        public_output_path = Shakapacker.config.public_output_path
         ReactOnRailsPro::Utils.rorp_puts "Gzipping built bundles to #{zipped_bundles_filepath} with " \
                                          "files in #{public_output_path}"
         Dir.chdir(public_output_path) do
           Rake.sh "tar -czf #{zipped_bundles_filepath} --auto-compress -C " \
-                  "#{Webpacker.config.public_output_path} ."
+                  "#{Shakapacker.config.public_output_path} ."
         end
       rescue StandardError => e
         ReactOnRailsPro::Utils.rorp_puts "An error occurred while attempting to zip the built bundles."
