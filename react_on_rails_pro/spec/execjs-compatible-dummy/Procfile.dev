@@ -7,6 +7,3 @@ webpack-dev-server: HMR=true bin/shakapacker-dev-server
 
 # Keep the JS fresh for server rendering. Remove if not server rendering
 rails-server-assets: HMR=true SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch
-
-# Start Node server for server rendering.
-node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect client/node-renderer.js
