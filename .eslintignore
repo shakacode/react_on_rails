@@ -3,6 +3,7 @@ coverage
 gen-documentation/**
 spec/react_on_rails/dummy-for-generators
 spec/dummy
+spec/execjs-compatible-dummy
 packages/node-renderer/src/__obsolete
 packages/node-renderer/lib/
 packages/node-renderer/tests/node_modules

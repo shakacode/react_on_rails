@@ -25,7 +25,8 @@ module ReactOnRailsPro
       assets_to_copy: nil,
       renderer_request_retry_limit: Configuration::DEFAULT_RENDERER_REQUEST_RETRY_LIMIT,
       throw_js_errors: Configuration::DEFAULT_THROW_JS_ERRORS,
-      rendering_returns_promises: Configuration::DEFAULT_RENDERING_RETURNS_PROMISES
+      rendering_returns_promises: Configuration::DEFAULT_RENDERING_RETURNS_PROMISES,
+      profile_server_rendering_js_code: Configuration::DEFAULT_PROFILE_SERVER_RENDERING_JS_CODE
     )
   end
 
@@ -45,13 +46,15 @@ module ReactOnRailsPro
     DEFAULT_RENDERER_REQUEST_RETRY_LIMIT = 5
     DEFAULT_THROW_JS_ERRORS = true
     DEFAULT_RENDERING_RETURNS_PROMISES = false
+    DEFAULT_PROFILE_SERVER_RENDERING_JS_CODE = false
 
     attr_accessor :renderer_url, :renderer_password, :tracing,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
                   :renderer_http_pool_size, :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout,
                   :dependency_globs, :excluded_dependency_globs, :rendering_returns_promises,
                   :remote_bundle_cache_adapter, :ssr_pre_hook_js, :assets_to_copy,
-                  :renderer_request_retry_limit, :throw_js_errors, :ssr_timeout
+                  :renderer_request_retry_limit, :throw_js_errors, :ssr_timeout,
+                  :profile_server_rendering_js_code
 
     def initialize(renderer_url: nil, renderer_password: nil, server_renderer: nil,
                    renderer_use_fallback_exec_js: nil, prerender_caching: nil,
@@ -59,7 +62,8 @@ module ReactOnRailsPro
                    renderer_http_pool_warn_timeout: nil, tracing: nil,
                    dependency_globs: nil, excluded_dependency_globs: nil, rendering_returns_promises: nil,
                    remote_bundle_cache_adapter: nil, ssr_pre_hook_js: nil, assets_to_copy: nil,
-                   renderer_request_retry_limit: nil, throw_js_errors: nil, ssr_timeout: nil)
+                   renderer_request_retry_limit: nil, throw_js_errors: nil, ssr_timeout: nil,
+                   profile_server_rendering_js_code: nil)
       self.renderer_url = renderer_url
       self.renderer_password = renderer_password
       self.server_renderer = server_renderer
@@ -78,6 +82,7 @@ module ReactOnRailsPro
       self.renderer_request_retry_limit = renderer_request_retry_limit
       self.throw_js_errors = throw_js_errors
       self.ssr_timeout = ssr_timeout
+      self.profile_server_rendering_js_code = profile_server_rendering_js_code
     end
 
     def setup_config_values
@@ -86,6 +91,35 @@ module ReactOnRailsPro
       validate_remote_bundle_cache_adapter
       setup_renderer_password
       setup_assets_to_copy
+      setup_execjs_profiler_if_needed
+    end
+
+    def setup_execjs_profiler_if_needed
+      return unless profile_server_rendering_js_code && server_renderer == "ExecJS"
+
+      if ExecJS.runtime == ExecJS::Runtimes::Node
+        ExecJS.runtime = ExecJS::ExternalRuntime.new(
+          name: "Node.js (V8)",
+          command: ["node --prof"],
+          runner_path: "#{ExecJS.root}/support/node_runner.js",
+          encoding: "UTF-8"
+        )
+      elsif ExecJS.runtime == ExecJS::Runtimes::V8
+        ExecJS.runtime = ExecJS::ExternalRuntime.new(
+          name: "V8",
+          command: ["d8 --prof"],
+          runner_path: "#{ExecJS.root}/support/v8_runner.js",
+          encoding: "UTF-8"
+        )
+      else
+        current_runtime = ExecJS.runtime.name
+        message = <<~MSG
+          You have set `profile_server_rendering_js_code` to true, but the current execjs runtime is #{current_runtime}.
+          ExecJS profiler only supports Node.js (V8) or V8 runtimes.
+          You can set the runtime by setting the `EXECJS_RUNTIME` environment variable to either `Node` or `V8`.
+        MSG
+        raise ReactOnRailsPro::Error, message
+      end
     end
 
     def node_renderer?
