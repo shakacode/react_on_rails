@@ -154,5 +154,49 @@ module ReactOnRailsPro
         expect(ReactOnRailsPro.configuration.renderer_password).to be_nil
       end
     end
+
+    describe ".profile_server_rendering_js_code" do
+      before do
+        # mock the ExecJS runtime to be Node
+        allow(ExecJS).to receive(:runtime).and_return(ExecJS::Runtimes::Node)
+      end
+
+      it "is the profile_server_rendering_js_code if provided" do
+        ReactOnRailsPro.configure do |config|
+          config.profile_server_rendering_js_code = true
+        end
+
+        expect(ReactOnRailsPro.configuration.profile_server_rendering_js_code).to be(true)
+      end
+
+      it "is false if not provided" do
+        ReactOnRailsPro.configure do |_config|
+          # Do nothing
+        end
+
+        expect(ReactOnRailsPro.configuration.profile_server_rendering_js_code).to be(false)
+      end
+
+      it "configures the ExecJS runtime if profile_server_rendering_js_code is true and server_renderer is ExecJS" do
+        ReactOnRailsPro.configure do |config|
+          config.profile_server_rendering_js_code = true
+          config.server_renderer = "ExecJS"
+        end
+
+        expect(ExecJS.runtime).to be_a(ExecJS::ExternalRuntime)
+      end
+
+      it "raises an error if profile_server_rendering_js_code is true and used ExecJS runtime is not Node or V8" do
+        allow(ExecJS).to receive(:runtime).and_return(ExecJS::Runtimes::Bun)
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.profile_server_rendering_js_code = true
+            config.server_renderer = "ExecJS"
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /ExecJS profiler only supports Node.js \(V8\) or V8 runtimes./)
+      end
+    end
   end
 end
