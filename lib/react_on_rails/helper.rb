@@ -149,6 +149,15 @@ module ReactOnRails
       rendering_fiber.resume
     end
 
+    def rsc_react_component(component_name, options = {})
+      res = internal_rsc_react_component(component_name, options)
+      s = ""
+      res.each_chunk do |chunk|
+        s += chunk
+      end
+      s
+    end
+
     # react_component_hash is used to return multiple HTML strings for server rendering, such as for
     # adding meta-tags to a page.
     # It is exactly like react_component except for the following:
@@ -517,6 +526,13 @@ module ReactOnRails
       "#{rails_context_if_not_already_rendered}\n#{render_value}".strip.html_safe
     end
 
+    def internal_rsc_react_component(react_component_name, options = {})
+      options = options.merge(rsc?: true)
+      render_options = ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: react_component_name,
+                                                                       options: options)
+      server_rendered_react_component(render_options)
+    end
+
     def internal_react_component(react_component_name, options = {})
       # Create the JavaScript and HTML to allow either client or server rendering of the
       # react_component.
@@ -635,6 +651,9 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
                                                err: err,
                                                js_code: js_code)
       end
+
+      # TODO: handle errors for rsc streams
+      return result if render_options.rsc?
 
       if render_options.stream?
         result.transform do |chunk_json_result|

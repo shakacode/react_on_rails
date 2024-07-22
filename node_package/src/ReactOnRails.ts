@@ -256,6 +256,15 @@ ctx.ReactOnRails = {
   },
 
   /**
+   * Used by server rendering by Rails
+   * @param options
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  serverRenderRSCReactComponent(options: RenderParams): PassThrough {
+    throw new Error('serverRenderRSCReactComponent is supported in RSC bundle only.');
+  },
+
+  /**
    * Used by Rails to catch errors in rendering
    * @param options
    */

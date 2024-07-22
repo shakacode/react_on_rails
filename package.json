@@ -5,6 +5,7 @@
   "exports": {
     ".": {
       "node": "./node_package/lib/ReactOnRails.node.js",
+      "rsc-server": "./node_package/lib/ReactOnRailsRSC.js",
       "default": "./node_package/lib/ReactOnRails.js"
     }
   },
@@ -38,6 +39,7 @@
     "prop-types": "^15.8.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-server-dom-webpack": "^19.0.0",
     "redux": "^4.2.1",
     "ts-jest": "^29.2.5",
     "typescript": "^5.6.2"
