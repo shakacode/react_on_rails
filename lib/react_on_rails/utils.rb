@@ -66,6 +66,33 @@ module ReactOnRails
       server_bundle_js_file_path =~ %r{https?://}
     end
 
+    def self.bundle_js_file_path(bundle_name)
+      # Either:
+      # 1. Using same bundle for both server and client, so server bundle will be hashed in manifest
+      # 2. Using a different bundle (different Webpack config), so file is not hashed, and
+      #    bundle_js_path will throw so the default path is used without a hash.
+      # 3. The third option of having the server bundle hashed and a different configuration than
+      #    the client bundle is not supported for 2 reasons:
+      #    a. The webpack manifest plugin would have a race condition where the same manifest.json
+      #       is edited by both the webpack-dev-server
+      #    b. There is no good reason to hash the server bundle name.
+      @server_bundle_path = if ReactOnRails::WebpackerUtils.using_webpacker? && bundle_name != "manifest.json"
+                              begin
+                                ReactOnRails::WebpackerUtils.bundle_js_uri_from_webpacker(bundle_name)
+                              rescue Webpacker::Manifest::MissingEntryError
+                                File.expand_path(
+                                  File.join(ReactOnRails::WebpackerUtils.webpacker_public_output_path,
+                                            bundle_name)
+                                )
+                              end
+                            else
+                              # Default to the non-hashed name in the specified output directory, which, for legacy
+                              # React on Rails, this is the output directory picked up by the asset pipeline.
+                              # For Webpacker, this is the public output path defined in the webpacker.yml file.
+                              File.join(generated_assets_full_path, bundle_name)
+                            end
+    end
+
     def self.server_bundle_js_file_path
       # Either:
       # 1. Using same bundle for both server and client, so server bundle will be hashed in manifest
@@ -79,29 +106,15 @@ module ReactOnRails
       return @server_bundle_path if @server_bundle_path && !Rails.env.development?
 
       bundle_name = ReactOnRails.configuration.server_bundle_js_file
-      @server_bundle_path = if ReactOnRails::WebpackerUtils.using_webpacker?
-                              begin
-                                bundle_js_file_path(bundle_name)
-                              rescue Webpacker::Manifest::MissingEntryError
-                                File.expand_path(
-                                  File.join(ReactOnRails::WebpackerUtils.webpacker_public_output_path,
-                                            bundle_name)
-                                )
-                              end
-                            else
-                              bundle_js_file_path(bundle_name)
-                            end
+      @server_bundle_path = bundle_js_file_path(bundle_name)
     end
 
-    def self.bundle_js_file_path(bundle_name)
-      if ReactOnRails::WebpackerUtils.using_webpacker? && bundle_name != "manifest.json"
-        ReactOnRails::WebpackerUtils.bundle_js_uri_from_webpacker(bundle_name)
-      else
-        # Default to the non-hashed name in the specified output directory, which, for legacy
-        # React on Rails, this is the output directory picked up by the asset pipeline.
-        # For Webpacker, this is the public output path defined in the webpacker.yml file.
-        File.join(generated_assets_full_path, bundle_name)
-      end
+    def self.rsc_bundle_js_file_path
+      return @rsc_bundle_path if @rsc_bundle_path && !Rails.env.development?
+
+      # TODO: make it configurable
+      bundle_name = "rsc-bundle.js"
+      @server_bundle_path = bundle_js_file_path(bundle_name)
     end
 
     def self.running_on_windows?
