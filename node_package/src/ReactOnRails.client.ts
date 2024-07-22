@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import type { PassThrough } from 'stream';
 
 import * as ClientStartup from './clientStartup';
 import ComponentRegistry from './ComponentRegistry';
@@ -11,6 +12,7 @@ import type {
   RegisteredComponent,
   RenderResult,
   RenderReturnType,
+  RenderParams,
   ReactComponentOrRenderFunction,
   AuthenticityHeaders,
   Store,
@@ -249,6 +251,15 @@ ctx.ReactOnRails = {
    */
   streamServerRenderedReactComponent() {
     throw new Error('streamServerRenderedReactComponent is only supported when using a bundle built for Node.js environments');
+  },
+
+  /**
+   * Used by server rendering by Rails
+   * @param options
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  serverRenderRSCReactComponent(options: RenderParams): PassThrough {
+    throw new Error('serverRenderRSCReactComponent is supported in RSC bundle only.');
   },
 
   /**
