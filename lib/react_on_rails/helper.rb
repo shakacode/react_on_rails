@@ -91,6 +91,15 @@ module ReactOnRails
       end
     end
 
+    def rsc_react_component(component_name, options = {})
+      res = internal_rsc_react_component(component_name, options)
+      s = ""
+      res.each_chunk do |chunk|
+        s += chunk
+      end
+      s
+    end
+
     def stream_react_component(component_name, options = {})
       rendering_fiber = Fiber.new do
         stream = stream_react_component_internal(component_name, options)
@@ -481,6 +490,13 @@ module ReactOnRails
       "#{rails_context_if_not_already_rendered}\n#{render_value}".strip.html_safe
     end
 
+    def internal_rsc_react_component(react_component_name, options = {})
+      options = options.merge(rsc?: true)
+      render_options = ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: react_component_name,
+                                                                       options: options)
+      server_rendered_react_component(render_options)
+    end
+
     def internal_react_component(react_component_name, options = {})
       # Create the JavaScript and HTML to allow either client or server rendering of the
       # react_component.
@@ -574,7 +590,7 @@ module ReactOnRails
       end
 
       # TODO: handle errors for streams
-      return result if render_options.stream?
+      return result if render_options.stream? || render_options.rsc?
 
       if result["hasErrors"] && render_options.raise_on_prerender_error
         # We caught this exception on our backtrace handler
