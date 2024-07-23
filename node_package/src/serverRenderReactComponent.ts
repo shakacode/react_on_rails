@@ -71,34 +71,7 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
 
     const processReactElement = () => {
       try {
-        // const readableStreamPromise = ReactDOMServer.renderToReadableStream(reactRenderingResult as ReactElement);
-        // return readableStreamPromise.then(async (readableStream) => {
-        //   const reader = readableStream.getReader();
-        //   let html = '';
-        //   while (true) {
-        //     const { done, value } = await reader.read();
-        //     if (done) {
-        //       break;
-        //     }
-        //     html += value;
-        //   }
-        //   return html;
-        // })
-        const pipeableStream = ReactDOMServer.renderToPipeableStream(reactRenderingResult as ReactElement);
-        return new Promise<string>((resolve, reject) => {
-          let html = '';
-          const stream = new PassThrough();
-          stream.on('data', (chunk) => {
-            html += chunk.toString();
-          });
-          stream.on('end', () => {
-            resolve(html);
-          });
-          stream.on('error', reject);
-          pipeableStream.pipe(stream);
-
-        });
-        // return ReactDOMServer.renderToString(reactRenderingResult as ReactElement);
+        return ReactDOMServer.renderToString(reactRenderingResult as ReactElement);
       } catch (error) {
         console.error(`Invalid call to renderToString. Possibly you have a renderFunction, a function that already
 calls renderToString, that takes one parameter. You need to add an extra unused parameter to identify this function
@@ -107,15 +80,11 @@ as a renderFunction and not a simple React Function Component.`);
       }
     };
 
-    console.log('\n\n\n\n\n\n\n\n\n\n\n\nserverRenderReactComponentInternal\n\n\n\n\n\n\n\n\n\n\n\n', React.version);
     if (isServerRenderHash(reactRenderingResult)) {
-      console.log('isServerRenderHash');
       renderResult = processServerRenderHash();
     } else if (isPromise(reactRenderingResult)) {
-      console.log('isPromise');
       renderResult = processPromise() as Promise<string>;
     } else {
-      console.log('isReactElement', React.version);
       renderResult = processReactElement();
     }
   } catch (e: any) {
@@ -207,7 +176,7 @@ const stringToStream = (str: string) => {
 };
 
 export const streamServerRenderedReactComponent = (options: RenderParams) => {
-  const { name, domNodeId, trace, props, railsContext, renderingReturnsPromises, throwJsErrors } = options;
+  const { name, domNodeId, trace, props, railsContext, throwJsErrors } = options;
 
   let renderResult: null | PassThrough = null;
 
@@ -233,6 +202,9 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
 
     renderResult = new PassThrough();
     ReactDOMServer.renderToPipeableStream(reactRenderingResult as ReactElement).pipe(renderResult);
+
+    // TODO: Add console replay script to the stream
+    // Ensure to avoid console messages leaking between different components rendering
   } catch (e: any) {
     if (throwJsErrors) {
       throw e;
