@@ -206,7 +206,7 @@ const stringToStream = (str: string) => {
 };
 
 export const streamServerRenderedReactComponent = (options: RenderParams) => {
-  const { name, domNodeId, trace, props, railsContext, renderingReturnsPromises, throwJsErrors } = options;
+  const { name, domNodeId, trace, props, railsContext, throwJsErrors } = options;
 
   let renderResult: null | PassThrough = null;
 
@@ -232,6 +232,9 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
 
     renderResult = new PassThrough();
     ReactDOMServer.renderToPipeableStream(reactRenderingResult as ReactElement).pipe(renderResult);
+
+    // TODO: Add console replay script to the stream
+    // Ensure to avoid console messages leaking between different components rendering
   } catch (e: any) {
     if (throwJsErrors) {
       throw e;
