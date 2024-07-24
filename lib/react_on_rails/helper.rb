@@ -102,13 +102,23 @@ module ReactOnRails
     end
 
     def stream_react_component_async(component_name, options = {})
-      Fiber.new do
+      rendering_fiber = Fiber.new do
         stream = stream_react_component(component_name, options)
         stream.each_chunk do |chunk|
           Fiber.yield chunk
         end
         Fiber.yield nil
       end
+
+      if @rorp_rendering_fibers.nil?
+        raise ReactOnRails::Error, "You must call stream_view_containing_react_components to render the view containing the react component"
+      end
+      @rorp_rendering_fibers << rendering_fiber
+
+      # return the first chunk of the fiber
+      # It contains the initial html of the component
+      # all updates will be appended to the stream sent to browser
+      rendering_fiber.resume
     end
 
     # react_component_hash is used to return multiple HTML strings for server rendering, such as for
