@@ -28,7 +28,7 @@ scripts:
 
   build:
     description: Build the project
-    script: echo "building the project" && tsc --project packages/node-renderer/src
+    script: echo "building the project" && rm -rf packages/node-renderer/dist && tsc --project packages/node-renderer/src
 
   clean:
     description: Clean the project
