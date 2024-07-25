@@ -82,7 +82,7 @@
     "nps": "^5.9.12",
     "prettier": "^3.2.5",
     "react-on-rails": "14.0.4",
-    "release-it": "^15.5.0",
+    "release-it": "^17.6.0",
     "supertest": "^4.0.2",
     "tap-diff": "git+https://github.com/vaguilera/tap-diff.git",
     "tap-spec": "^5.0.0",
