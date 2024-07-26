@@ -23,9 +23,10 @@ rails shakapacker:install
 You may need to check [the instructions for installing into an existing Rails app](https://www.shakacode.com/react-on-rails/docs/guides/installation-into-an-existing-rails-app/) if you have an already working Rails application.
 
 1. Add the `react_on_rails` gem to Gemfile:
+   Please use [the latest version](https://rubygems.org/gems/react_on_rails) to ensure you get all the security patches and the best support.
 
    ```bash
-   bundle add react_on_rails --strict
+   bundle add react_on_rails --version=14.0.4 --strict
    ```
 
    Commit this to git (or else you cannot run the generator in the next step unless you pass the option `--ignore-warnings`).
