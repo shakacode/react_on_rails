@@ -92,18 +92,8 @@ module ReactOnRails
     end
 
     def stream_react_component(component_name, options = {})
-      options = options.merge(stream?: true)
-      result = internal_react_component(component_name, options)
-      build_react_component_result_for_server_streamed_content(
-        rendered_html_stream: result[:result],
-        component_specification_tag: result[:tag],
-        render_options: result[:render_options]
-      )
-    end
-
-    def stream_react_component_async(component_name, options = {})
       rendering_fiber = Fiber.new do
-        stream = stream_react_component(component_name, options)
+        stream = stream_react_component_internal(component_name, options)
         stream.each_chunk do |chunk|
           Fiber.yield chunk
         end
@@ -361,6 +351,16 @@ module ReactOnRails
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
     private
+
+    def stream_react_component_internal(component_name, options = {})
+      options = options.merge(stream?: true)
+      result = internal_react_component(component_name, options)
+      build_react_component_result_for_server_streamed_content(
+        rendered_html_stream: result[:result],
+        component_specification_tag: result[:tag],
+        render_options: result[:render_options]
+      )
+    end
 
     def generated_components_pack_path(component_name)
       "#{ReactOnRails::PackerUtils.packer_source_entry_path}/generated/#{component_name}.js"
