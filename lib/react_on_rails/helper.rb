@@ -111,8 +111,10 @@ module ReactOnRails
       end
 
       if @rorp_rendering_fibers.nil?
-        raise ReactOnRails::Error, "You must call stream_view_containing_react_components to render the view containing the react component"
+        raise ReactOnRails::Error,
+              "You must call stream_view_containing_react_components to render the view containing the react component"
       end
+
       @rorp_rendering_fibers << rendering_fiber
 
       # return the first chunk of the fiber
