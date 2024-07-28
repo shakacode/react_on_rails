@@ -478,7 +478,7 @@ module ReactOnRails
 
     # prepend the rails_context if not yet applied
     def prepend_render_rails_context(render_value)
-      "#{rails_context_if_not_already_rendered}\n#{render_value}".html_safe
+      "#{rails_context_if_not_already_rendered}\n#{render_value}".strip.html_safe
     end
 
     def internal_react_component(react_component_name, options = {})
