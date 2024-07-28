@@ -226,7 +226,7 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
     }
 
     renderResult = new PassThrough();
-    ReactDOMServer.renderToPipeableStream(reactRenderingResult as ReactElement).pipe(renderResult);
+    ReactDOMServer.renderToPipeableStream(reactRenderingResult).pipe(renderResult);
 
     // TODO: Add console replay script to the stream
     // Ensure to avoid console messages leaking between different components rendering
