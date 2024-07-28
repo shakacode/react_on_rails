@@ -406,11 +406,12 @@ module ReactOnRails
       rendered_html_stream = rendered_html_stream.transform do |chunk|
         if is_first_chunk
           is_first_chunk = false
-          next <<-HTML
+          html_content = <<-HTML
             #{rails_context_if_not_already_rendered}
             #{component_specification_tag}
             <#{content_tag_options_html_tag} id="#{render_options.dom_id}">#{chunk}</#{content_tag_options_html_tag}>
           HTML
+          html_content.strip
         end
         chunk
       end
