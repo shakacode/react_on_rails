@@ -41,6 +41,7 @@ baseClientWebpackConfig.plugins.push(
   new webpack.ProvidePlugin({
     $: 'jquery',
     jQuery: 'jquery',
+    process: 'process/browser',
   }),
 );
 
