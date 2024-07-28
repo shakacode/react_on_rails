@@ -1,5 +1,4 @@
-import React from 'react';
-import ReactDOMServer, { PipeableStream } from 'react-dom/server';
+import ReactDOMServer from 'react-dom/server';
 import { PassThrough } from 'stream';
 import type { ReactElement } from 'react';
 
