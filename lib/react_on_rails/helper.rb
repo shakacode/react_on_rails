@@ -150,12 +150,14 @@ module ReactOnRails
     end
 
     def rsc_react_component(component_name, options = {})
-      res = internal_rsc_react_component(component_name, options)
-      s = ""
-      res.each_chunk do |chunk|
-        s += chunk
+      rendering_fiber = Fiber.new do
+        res = internal_rsc_react_component(component_name, options)
+        res.each_chunk do |chunk|
+          Fiber.yield chunk
+        end
+        Fiber.yield nil
       end
-      s
+      rendering_fiber
     end
 
     # react_component_hash is used to return multiple HTML strings for server rendering, such as for
@@ -384,13 +386,14 @@ module ReactOnRails
       return unless render_options.auto_load_bundle
 
       ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
-      if Rails.env.development?
-        is_component_pack_present = File.exist?(generated_components_pack_path(react_component_name))
-        raise_missing_autoloaded_bundle(react_component_name) unless is_component_pack_present
-      end
-      append_javascript_pack_tag("generated/#{react_component_name}",
-                                 defer: ReactOnRails.configuration.defer_generated_component_packs)
-      append_stylesheet_pack_tag("generated/#{react_component_name}")
+      append_javascript_pack_tag("client-bundle")
+      # if Rails.env.development?
+      #   is_component_pack_present = File.exist?(generated_components_pack_path(react_component_name))
+      #   raise_missing_autoloaded_bundle(react_component_name) unless is_component_pack_present
+      # end
+      # append_javascript_pack_tag("generated/#{react_component_name}",
+      #                            defer: ReactOnRails.configuration.defer_generated_component_packs)
+      # append_stylesheet_pack_tag("generated/#{react_component_name}")
     end
 
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
