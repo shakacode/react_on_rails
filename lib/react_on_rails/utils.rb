@@ -76,23 +76,23 @@ module ReactOnRails
       #    a. The webpack manifest plugin would have a race condition where the same manifest.json
       #       is edited by both the webpack-dev-server
       #    b. There is no good reason to hash the server bundle name.
-      @server_bundle_path ||= if ReactOnRails::PackerUtils.using_packer? && bundle_name != "manifest.json"
-                              begin
-                                ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
-                              rescue Object.const_get(
-                                ReactOnRails::PackerUtils.packer_type.capitalize
-                              )::Manifest::MissingEntryError
-                                File.expand_path(
-                                  File.join(ReactOnRails::PackerUtils.packer_public_output_path,
-                                            bundle_name)
-                                )
-                              end
-                            else
-                              # Default to the non-hashed name in the specified output directory, which, for legacy
-                              # React on Rails, this is the output directory picked up by the asset pipeline.
-                              # For Webpacker, this is the public output path defined in the webpacker.yml file.
-                              File.join(generated_assets_full_path, bundle_name)
-                            end
+      if ReactOnRails::PackerUtils.using_packer? && bundle_name != "manifest.json"
+        begin
+          ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
+        rescue Object.const_get(
+          ReactOnRails::PackerUtils.packer_type.capitalize
+        )::Manifest::MissingEntryError
+          File.expand_path(
+            File.join(ReactOnRails::PackerUtils.packer_public_output_path,
+                      bundle_name)
+          )
+        end
+      else
+        # Default to the non-hashed name in the specified output directory, which, for legacy
+        # React on Rails, this is the output directory picked up by the asset pipeline.
+        # For Webpacker, this is the public output path defined in the webpacker.yml file.
+        File.join(generated_assets_full_path, bundle_name)
+      end
     end
 
     def self.server_bundle_js_file_path
@@ -108,7 +108,7 @@ module ReactOnRails
       return @server_bundle_path if @server_bundle_path && !Rails.env.development?
 
       bundle_name = ReactOnRails.configuration.server_bundle_js_file
-      bundle_js_file_path(bundle_name)
+      @server_bundle_path = bundle_js_file_path(bundle_name)
     end
 
     def self.rsc_bundle_js_file_path
@@ -116,7 +116,7 @@ module ReactOnRails
 
       # TODO: make it configurable
       bundle_name = "rsc-bundle.js"
-      @server_bundle_path = bundle_js_file_path(bundle_name)
+      @rsc_bundle_path = bundle_js_file_path(bundle_name)
     end
 
     def self.running_on_windows?
