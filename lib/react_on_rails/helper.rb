@@ -411,7 +411,7 @@ module ReactOnRails
             #{component_specification_tag}
             <#{content_tag_options_html_tag} id="#{render_options.dom_id}">#{chunk}</#{content_tag_options_html_tag}>
           HTML
-          html_content.strip
+          next html_content.strip
         end
         chunk
       end
