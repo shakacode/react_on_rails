@@ -5,23 +5,23 @@
 
 import path from 'path';
 import cluster from 'cluster';
-import express, { Request, Response } from 'express';
-import busBoy from 'express-busboy';
+import fastify, { FastifyReply, FastifyRequest } from 'fastify';
+import fastifyMultipart from '@fastify/multipart';
 import log from './shared/log';
 import packageJson from './shared/packageJson';
 import { buildConfig, Config, getConfig } from './shared/configBuilder';
-import asyncHandler from './shared/expressAsyncHandler';
 import fileExistsAsync from './shared/fileExistsAsync';
 import checkProtocolVersion from './worker/checkProtocolVersionHandler';
 import authenticate from './worker/authHandler';
 import handleRenderRequest from './worker/handleRenderRequest';
 import {
-  Asset,
   errorResponseResult,
   formatExceptionMessage,
   moveUploadedAssets,
   ResponseResult,
   workerIdLabel,
+  saveMultipartFile,
+  Asset,
 } from './shared/utils';
 import errorReporter from './shared/errorReporter';
 import tracing from './shared/tracing';
@@ -38,11 +38,19 @@ import { lock, unlock } from './shared/locks';
 //   return Math.floor(Math.random() * Math.floor(max));
 // }
 
-function setHeaders(headers: ResponseResult['headers'], res: Response) {
-  Object.entries(headers).forEach(([key, header]) => res.set(key, header));
+declare module '@fastify/multipart' {
+  interface MultipartFile {
+    // We save all uploaded files and store this value
+    value: Asset;
+  }
 }
 
-const setResponse = (result: ResponseResult, res: Response) => {
+function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- fixing it with `void` just violates no-void
+  Object.entries(headers).forEach(([key, header]) => res.header(key, header));
+}
+
+const setResponse = (result: ResponseResult, res: FastifyReply) => {
   const { status, data, headers } = result;
   if (status !== 200 && status !== 410) {
     log.info(`Sending non-200, non-410 data back: ${typeof data === 'string' ? data : JSON.stringify(data)}`);
@@ -52,37 +60,40 @@ const setResponse = (result: ResponseResult, res: Response) => {
   res.send(data);
 };
 
-declare module 'express' {
-  // eslint-disable-next-line no-shadow -- augmentation
-  interface Request {
-    body: {
-      renderingRequest: string;
-    };
-    files?: Record<string, Asset>;
-  }
-}
+const isAsset = (value: unknown): value is Asset => (value as { type?: string }).type === 'asset';
 
 export = function run(config: Partial<Config>) {
   // Store config in app state. From now it can be loaded by any module using
   // getConfig():
   buildConfig(config);
 
-  const { bundlePath, port } = getConfig();
+  const { bundlePath, logLevel, port } = getConfig();
 
-  const app = express();
+  const app = fastify({ logger: logLevel === 'debug' });
 
   // 10 MB limit for code including props
   const fieldSizeLimit = 1024 * 1024 * 10;
 
-  busBoy.extend(app, {
-    upload: true,
-    path: path.join(bundlePath, 'uploads'),
+  void app.register(fastifyMultipart, {
+    attachFieldsToBody: 'keyValues',
     limits: {
       fieldSize: fieldSizeLimit,
+      fileSize: fieldSizeLimit,
+    },
+    onFile: async (part) => {
+      const destinationPath = path.join(bundlePath, 'uploads', part.filename);
+      // TODO: inline here
+      await saveMultipartFile(part, destinationPath);
+      // eslint-disable-next-line no-param-reassign
+      part.value = {
+        filename: part.filename,
+        savedFilePath: destinationPath,
+        type: 'asset',
+      };
     },
   });
 
-  const isProtocolVersionMatch = (req: Request, res: Response) => {
+  const isProtocolVersionMatch = (req: FastifyRequest, res: FastifyReply) => {
     // Check protocol version
     const protocolVersionCheckingResult = checkProtocolVersion(req);
 
@@ -94,7 +105,7 @@ export = function run(config: Partial<Config>) {
     return true;
   };
 
-  const isAuthenticated = (req: Request, res: Response) => {
+  const isAuthenticated = (req: FastifyRequest, res: FastifyReply) => {
     // Authenticate Ruby client
     const authResult = authenticate(req);
 
@@ -106,7 +117,7 @@ export = function run(config: Partial<Config>) {
     return true;
   };
 
-  const requestPrechecks = (req: Request, res: Response) => {
+  const requestPrechecks = (req: FastifyRequest, res: FastifyReply) => {
     if (!isProtocolVersionMatch(req, res)) {
       return false;
     }
@@ -121,161 +132,165 @@ export = function run(config: Partial<Config>) {
   // See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
   // the digest is part of the request URL. Yes, it's not used here, but the
   // server logs might show it to distinguish different requests.
-  const bundleRoute = '/bundles/:bundleTimestamp/render/:renderRequestDigest';
-  app.route(bundleRoute).post(
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises,@typescript-eslint/require-await -- Express types don't expect async handler
-    asyncHandler<typeof bundleRoute>(async (req, res, _next) => {
-      if (!requestPrechecks(req, res)) {
-        return;
+  app.post<{
+    Body: { renderingRequest: string } & Record<string, Asset>;
+    // Can't infer from the route like Express can
+    Params: { bundleTimestamp: string; renderRequestDigest: string };
+  }>('/bundles/:bundleTimestamp/render/:renderRequestDigest', async (req, res) => {
+    if (!requestPrechecks(req, res)) {
+      return;
+    }
+
+    // DO NOT REMOVE (REQUIRED FOR TIMEOUT TESTING)
+    // if(TESTING_TIMEOUTS && getRandomInt(2) === 1) {
+    //   console.log(
+    //     'ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ');
+    //   console.log(`Sleeping, to test timeouts`);
+    //   console.log(
+    //     'ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ');
+    //
+    //   await sleep(100000);
+    // }
+
+    const { renderingRequest } = req.body;
+    const { bundleTimestamp } = req.params;
+    let providedNewBundle: Asset | undefined;
+    const assetsToCopy: Asset[] = [];
+    Object.entries(req.body).forEach(([key, value]) => {
+      if (key === 'bundle') {
+        providedNewBundle = value as Asset;
+      } else if (isAsset(value)) {
+        assetsToCopy.push(value);
       }
+    });
 
-      // DO NOT REMOVE (REQUIRED FOR TIMEOUT TESTING)
-      // if(TESTING_TIMEOUTS && getRandomInt(2) === 1) {
-      //   console.log(
-      //     'ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ');
-      //   console.log(`Sleeping, to test timeouts`);
-      //   console.log(
-      //     'ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ');
-      //
-      //   await sleep(100000);
-      // }
+    try {
+      await tracing.withinTransaction(
+        async (transaction) => {
+          try {
+            const result = await handleRenderRequest({
+              renderingRequest,
+              bundleTimestamp,
+              providedNewBundle,
+              assetsToCopy,
+            });
+            setResponse(result, res);
+          } catch (err) {
+            const exceptionMessage = formatExceptionMessage(
+              renderingRequest,
+              err,
+              'UNHANDLED error in handleRenderRequest',
+            );
+            log.error(exceptionMessage);
+            errorReporter.notify(exceptionMessage, {}, (scope) => {
+              if (transaction) {
+                scope.setSpan(transaction);
+              }
+              return scope;
+            });
+            setResponse(errorResponseResult(exceptionMessage), res);
+          }
+        },
+        'handleRenderRequest',
+        'SSR Request',
+      );
+    } catch (theErr) {
+      const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
+      log.error(`UNHANDLED TOP LEVEL error ${exceptionMessage}`);
+      errorReporter.notify(exceptionMessage);
+      setResponse(errorResponseResult(exceptionMessage), res);
+    }
+  });
 
-      const { renderingRequest } = req.body;
-      const { bundleTimestamp } = req.params;
-      const { bundle: providedNewBundle, ...assetsToCopyObj } = req.files ?? {};
+  // There can be additional files that might be required at the runtime.
+  // Since the remote renderer doesn't contain any assets, they must be uploaded manually.
+  app.post<{
+    Body: Record<string, Asset>;
+  }>('/upload-assets', async (req, res) => {
+    if (!requestPrechecks(req, res)) {
+      return;
+    }
+    let lockAcquired = false;
+    let lockfileName: string | undefined;
+    const assets: Asset[] = Object.values(req.body).filter(isAsset);
+    const assetsDescription = JSON.stringify(assets.map((asset) => asset.filename));
+    const taskDescription = `Uploading files ${assetsDescription} to ${bundlePath}`;
+    try {
+      const { lockfileName: name, wasLockAcquired, errorMessage } = await lock('transferring-assets');
+      lockfileName = name;
+      lockAcquired = wasLockAcquired;
 
-      try {
-        const assetsToCopy = Object.values(assetsToCopyObj);
-        void tracing.withinTransaction(
-          async (transaction) => {
-            try {
-              const result = await handleRenderRequest({
-                renderingRequest,
-                bundleTimestamp,
-                providedNewBundle,
-                assetsToCopy,
-              });
-              setResponse(result, res);
-            } catch (err) {
-              const exceptionMessage = formatExceptionMessage(
-                renderingRequest,
-                err,
-                'UNHANDLED error in handleRenderRequest',
-              );
-              log.error(exceptionMessage);
-              errorReporter.notify(exceptionMessage, {}, (scope) => {
-                if (transaction) {
-                  scope.setSpan(transaction);
-                }
-                return scope;
-              });
-              setResponse(errorResponseResult(exceptionMessage), res);
-            }
-          },
-          'handleRenderRequest',
-          'SSR Request',
+      if (!wasLockAcquired) {
+        const msg = formatExceptionMessage(
+          taskDescription,
+          errorMessage,
+          `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
         );
-      } catch (theErr) {
-        const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
-        log.error(`UNHANDLED TOP LEVEL error ${exceptionMessage}`);
-        errorReporter.notify(exceptionMessage);
-        setResponse(errorResponseResult(exceptionMessage), res);
+        setResponse(errorResponseResult(msg), res);
+      } else {
+        log.info(taskDescription);
+        try {
+          await moveUploadedAssets(assets);
+          setResponse(
+            {
+              status: 200,
+              headers: {},
+            },
+            res,
+          );
+        } catch (err) {
+          const message = `ERROR when trying to copy assets. ${err}. Task: ${taskDescription}`;
+          log.info(message);
+          setResponse(errorResponseResult(message), res);
+        }
       }
-    }),
-  );
-
-  // There can be additional files that might be required
-  // in the runtime. Since remote renderer doesn't contain
-  // any assets, they must be uploaded manually.
-  app.route('/upload-assets').post(
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Express types don't expect async handler
-    asyncHandler(async (req, res, _next) => {
-      if (!requestPrechecks(req, res)) {
-        return;
-      }
-      let lockAcquired = false;
-      let lockfileName: string | undefined;
-      const assets = Object.values(req.files ?? {});
-      const assetsDescription = JSON.stringify(assets.map((asset) => asset.filename));
-      const taskDescription = `Uploading files ${assetsDescription} to ${bundlePath}`;
-      try {
-        const { lockfileName: name, wasLockAcquired, errorMessage } = await lock('transferring-assets');
-        lockfileName = name;
-        lockAcquired = wasLockAcquired;
-
-        if (!wasLockAcquired) {
+    } finally {
+      if (lockAcquired) {
+        try {
+          if (lockfileName) {
+            await unlock(lockfileName);
+          }
+        } catch (error) {
           const msg = formatExceptionMessage(
             taskDescription,
-            errorMessage,
-            `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
+            error,
+            `Error unlocking ${lockfileName} from worker ${workerIdLabel()}.`,
           );
-          setResponse(errorResponseResult(msg), res);
-        } else {
-          log.info(taskDescription);
-          try {
-            await moveUploadedAssets(assets);
-            setResponse(
-              {
-                status: 200,
-                headers: {},
-              },
-              res,
-            );
-          } catch (err) {
-            const message = `ERROR when trying to copy assets. ${err}. Task: ${taskDescription}`;
-            log.info(message);
-            setResponse(errorResponseResult(message), res);
-          }
-        }
-      } finally {
-        if (lockAcquired) {
-          try {
-            if (lockfileName) {
-              await unlock(lockfileName);
-            }
-          } catch (error) {
-            const msg = formatExceptionMessage(
-              taskDescription,
-              error,
-              `Error unlocking ${lockfileName} from worker ${workerIdLabel()}.`,
-            );
-            log.warn(msg);
-          }
+          log.warn(msg);
         }
       }
-    }),
-  );
+    }
+  });
 
   // Checks if file exist
-  app.route('/asset-exists').post(
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Express types don't expect async handler
-    asyncHandler(async (req, res, _next) => {
-      if (!isAuthenticated(req, res)) {
-        return;
-      }
+  app.post<{
+    Querystring: { filename: string };
+  }>('/asset-exists', async (req, res) => {
+    if (!isAuthenticated(req, res)) {
+      return;
+    }
 
-      const { filename } = req.query;
+    const { filename } = req.query;
 
-      if (!filename) {
-        const message = `ERROR: filename param not provided to GET /asset-exists`;
-        log.info(message);
-        setResponse(errorResponseResult(message), res);
-        return;
-      }
+    if (!filename) {
+      const message = `ERROR: filename param not provided to GET /asset-exists`;
+      log.info(message);
+      setResponse(errorResponseResult(message), res);
+      return;
+    }
 
-      const assetPath = path.join(bundlePath, filename as string);
+    const assetPath = path.join(bundlePath, filename);
 
-      const fileExists = await fileExistsAsync(assetPath);
+    const fileExists = await fileExistsAsync(assetPath);
 
-      if (fileExists) {
-        log.info(`/asset-exists Uploaded asset DOES exist: ${assetPath}`);
-        setResponse({ status: 200, data: { exists: true }, headers: {} }, res);
-      } else {
-        log.info(`/asset-exists Uploaded asset DOES NOT exist: ${assetPath}`);
-        setResponse({ status: 200, data: { exists: false }, headers: {} }, res);
-      }
-    }),
-  );
+    if (fileExists) {
+      log.info(`/asset-exists Uploaded asset DOES exist: ${assetPath}`);
+      setResponse({ status: 200, data: { exists: true }, headers: {} }, res);
+    } else {
+      log.info(`/asset-exists Uploaded asset DOES NOT exist: ${assetPath}`);
+      setResponse({ status: 200, data: { exists: false }, headers: {} }, res);
+    }
+  });
 
   app.get('/info', (_req, res) => {
     res.send({
@@ -289,8 +304,7 @@ export = function run(config: Partial<Config>) {
   // we are extracting worker from cluster to avoid false TS error
   const { worker } = cluster;
   if (cluster.isWorker && worker !== undefined) {
-    app.listen(port, () => {
-      // we are using as Worker type assertion to avoid false TS error. it is complaining although we are checking if it is defined
+    app.listen({ port }, () => {
       log.info(`Node renderer worker #${worker.id} listening on port ${port}!`);
     });
   }

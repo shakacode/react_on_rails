@@ -12,9 +12,14 @@ import {
 } from './helper';
 import { getVmBundleFilePath } from '../src/worker/vm';
 import handleRenderRequest from '../src/worker/handleRenderRequest';
+import { Asset } from '../src/shared/utils';
 
 const testName = 'handleRenderRequest';
-const uploadedBundlePathForTest = () => uploadedBundlePath(testName);
+const uploadedBundleForTest = (): Asset => ({
+  filename: '', // Not used in these tests
+  savedFilePath: uploadedBundlePath(testName),
+  type: 'asset',
+});
 const createUploadedBundleForTest = () => createUploadedBundle(testName);
 const lockfilePathForTest = () => lockfilePath(testName);
 const createVmBundleForTest = () => createVmBundle(testName);
@@ -40,7 +45,7 @@ describe(testName, () => {
     const result = await handleRenderRequest({
       renderingRequest: 'ReactOnRails.dummy',
       bundleTimestamp: BUNDLE_TIMESTAMP,
-      providedNewBundle: { file: uploadedBundlePathForTest() },
+      providedNewBundle: uploadedBundleForTest(),
     });
 
     expect(result).toEqual(renderResult);
@@ -88,7 +93,7 @@ describe(testName, () => {
     const result = await handleRenderRequest({
       renderingRequest: 'ReactOnRails.dummy',
       bundleTimestamp: BUNDLE_TIMESTAMP,
-      providedNewBundle: { file: uploadedBundlePathForTest() },
+      providedNewBundle: uploadedBundleForTest(),
     });
 
     expect(result).toEqual(renderResult);
@@ -113,7 +118,7 @@ describe(testName, () => {
     const result = await handleRenderRequest({
       renderingRequest: 'ReactOnRails.dummy',
       bundleTimestamp: BUNDLE_TIMESTAMP,
-      providedNewBundle: { file: uploadedBundlePathForTest() },
+      providedNewBundle: uploadedBundleForTest(),
     });
 
     expect(result).toEqual(renderResult);
