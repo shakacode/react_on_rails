@@ -1,6 +1,9 @@
 import cluster from 'cluster';
 import path from 'path';
-import fsExtra from 'fs-extra';
+import { MultipartFile } from '@fastify/multipart';
+import { createWriteStream, ensureDir, move, MoveOptions } from 'fs-extra';
+import { pipeline } from 'stream';
+import { promisify } from 'util';
 import errorReporter from './errorReporter';
 import { getConfig } from './configBuilder';
 import log from './log';
@@ -68,20 +71,37 @@ STACK:
 ${(error as Error).stack}`;
 }
 
+// https://github.com/fastify/fastify-multipart?tab=readme-ov-file#usage
+const pump = promisify(pipeline);
+
+export async function saveMultipartFile(
+  multipartFile: MultipartFile,
+  destinationPath: string,
+): Promise<void> {
+  await ensureDir(path.dirname(destinationPath));
+  return pump(multipartFile.file, createWriteStream(destinationPath));
+}
+
 export interface Asset {
-  file: string;
+  type: 'asset';
+  savedFilePath: string;
   filename: string;
 }
 
-/**
- * @param uploadedAssets array of objects with values { file, filename }
- */
+export function moveUploadedAsset(
+  asset: Asset,
+  destinationPath: string,
+  options: MoveOptions = {},
+): Promise<void> {
+  return move(asset.savedFilePath, destinationPath, options);
+}
+
 export async function moveUploadedAssets(uploadedAssets: Asset[]): Promise<void> {
   const { bundlePath } = getConfig();
 
   const moveMultipleAssets = uploadedAssets.map((asset) => {
     const destinationAssetFilePath = path.join(bundlePath, asset.filename);
-    return fsExtra.move(asset.file, destinationAssetFilePath, { overwrite: true });
+    return moveUploadedAsset(asset, destinationAssetFilePath, { overwrite: true });
   });
   await Promise.all(moveMultipleAssets);
   log.info(`Moved assets ${JSON.stringify(uploadedAssets.map((fileDescriptor) => fileDescriptor.filename))}`);

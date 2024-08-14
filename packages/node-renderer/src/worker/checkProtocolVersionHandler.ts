@@ -2,10 +2,10 @@
  * Logic for checking protocol version.
  * @module worker/checkProtocVersionHandler
  */
-import type { Request } from 'express';
+import type { FastifyRequest } from 'fastify';
 import packageJson from '../shared/packageJson';
 
-export = function checkProtocolVersion(req: Request) {
+export = function checkProtocolVersion(req: FastifyRequest) {
   const reqProtocolVersion = (req.body as { protocolVersion?: string }).protocolVersion;
   if (reqProtocolVersion !== packageJson.protocolVersion) {
     return {

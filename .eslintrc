@@ -37,6 +37,8 @@ rules:
     - error
     # Allow using void to suppress errors about misused promises
     - { allowAsStatement: true }
+  # The reason for disabling for-of loops doesn't apply to Node
+  no-restricted-syntax: off
 
   # https://github.com/benmosher/eslint-plugin-import/issues/340
   import/no-extraneous-dependencies: 0
@@ -67,6 +69,10 @@ overrides:
       "@typescript-eslint/no-unused-vars":
         - error
         - { argsIgnorePattern: "^_" }
+      "@typescript-eslint/no-floating-promises":
+        - error
+        - allowForKnownSafePromises:
+            - { from: "package", package: "fastify", name: "FastifyReply" }
   - files: "packages/node-renderer/tests/**"
     rules:
       # Allows Jest mocks before import

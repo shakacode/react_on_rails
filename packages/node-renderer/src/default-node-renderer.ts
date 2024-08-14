@@ -3,4 +3,6 @@ import { reactOnRailsProNodeRenderer } from './ReactOnRailsProNodeRenderer';
 
 console.log('React on Rails Pro Node Renderer with ENV config');
 
-reactOnRailsProNodeRenderer();
+reactOnRailsProNodeRenderer().catch((e: unknown) => {
+  throw e;
+});

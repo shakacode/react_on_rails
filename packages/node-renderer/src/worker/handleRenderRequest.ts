@@ -1,24 +1,24 @@
 /**
  * Isolates logic for handling render request. We don't want this module to
- * know about Express server and its req and res objects. This allows to test
+ * Fastify server and its Request and Reply objects. This allows to test
  * module in isolation and without async calls.
  * @module worker/handleRenderRequest
  */
 
 import cluster from 'cluster';
 import path from 'path';
-import fsExtra from 'fs-extra';
 
 import { lock, unlock } from '../shared/locks';
 import fileExistsAsync from '../shared/fileExistsAsync';
 import log from '../shared/log';
 import {
+  Asset,
   formatExceptionMessage,
   errorResponseResult,
   workerIdLabel,
   moveUploadedAssets,
-  Asset,
   ResponseResult,
+  moveUploadedAsset,
 } from '../shared/utils';
 import { getConfig } from '../shared/configBuilder';
 import errorReporter from '../shared/errorReporter';
@@ -56,8 +56,6 @@ function getRequestBundleFilePath(bundleTimestamp: string | number) {
   return path.join(bundlePath, `${bundleTimestamp}.js`);
 }
 
-type Bundle = Pick<Asset, 'file'>;
-
 /**
  * @param bundleFilePathPerTimestamp
  * @param providedNewBundle
@@ -66,7 +64,7 @@ type Bundle = Pick<Asset, 'file'>;
  */
 async function handleNewBundleProvided(
   bundleFilePathPerTimestamp: string,
-  providedNewBundle: Bundle,
+  providedNewBundle: Asset,
   renderingRequest: string,
   assetsToCopy: Asset[] | null | undefined,
 ): Promise<ResponseResult> {
@@ -89,20 +87,22 @@ async function handleNewBundleProvided(
     }
 
     try {
-      log.info(`Moving uploaded file ${providedNewBundle.file} to ${bundleFilePathPerTimestamp}`);
-      await fsExtra.move(providedNewBundle.file, bundleFilePathPerTimestamp);
+      log.info(`Moving uploaded file ${providedNewBundle.savedFilePath} to ${bundleFilePathPerTimestamp}`);
+      await moveUploadedAsset(providedNewBundle, bundleFilePathPerTimestamp);
       if (assetsToCopy) {
         await moveUploadedAssets(assetsToCopy);
       }
 
-      log.info(`Completed moving uploaded file ${providedNewBundle.file} to ${bundleFilePathPerTimestamp}`);
+      log.info(
+        `Completed moving uploaded file ${providedNewBundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
+      );
     } catch (error) {
       const fileExists = await fileExistsAsync(bundleFilePathPerTimestamp);
       if (!fileExists) {
         const msg = formatExceptionMessage(
           renderingRequest,
           error,
-          `Unexpected error when moving the bundle from ${providedNewBundle.file} \
+          `Unexpected error when moving the bundle from ${providedNewBundle.savedFilePath} \
 to ${bundleFilePathPerTimestamp})`,
         );
         log.error(msg);
@@ -148,7 +148,7 @@ to ${bundleFilePathPerTimestamp})`,
 }
 
 /**
- * Creates the result for the express server to use.
+ * Creates the result for the Fastify server to use.
  * @returns Promise where the result contains { status, data, headers } to
  * send back to the browser.
  */
@@ -160,7 +160,7 @@ export = async function handleRenderRequest({
 }: {
   renderingRequest: string;
   bundleTimestamp: string | number;
-  providedNewBundle?: Bundle | null;
+  providedNewBundle?: Asset | null;
   assetsToCopy?: Asset[] | null;
 }): Promise<ResponseResult> {
   try {
@@ -172,7 +172,7 @@ export = async function handleRenderRequest({
     }
 
     // If gem has posted updated bundle:
-    if (providedNewBundle && providedNewBundle.file) {
+    if (providedNewBundle) {
       return handleNewBundleProvided(
         bundleFilePathPerTimestamp,
         providedNewBundle,
