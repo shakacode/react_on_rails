@@ -8,15 +8,9 @@ import ReactOnRails from 'react-on-rails';
 
 import SharedReduxStore from '../stores/SharedReduxStore';
 
-import HelloTurboStream from '../startup/HelloTurboStream';
-
 ReactOnRails.setOptions({
   traceTurbolinks: true,
-  turbo: true
-});
-
-ReactOnRails.register({
-  HelloTurboStream
+  turbo: true,
 });
 
 ReactOnRails.registerStore({

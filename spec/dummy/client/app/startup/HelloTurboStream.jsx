@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import RailsContext from '../components/RailsContext';
 
 import css from '../components/HelloWorld.module.scss';
