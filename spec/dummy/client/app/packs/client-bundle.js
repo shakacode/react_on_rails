@@ -15,7 +15,7 @@ ReactOnRails.setOptions({
 });
 
 ReactOnRails.register({
-  HelloTurboStream
+  HelloTurboStream,
 });
 
 ReactOnRails.registerStore({
