@@ -173,8 +173,7 @@ describe "React Router", :js do
   subject { page }
 
   before do
-    visit "/"
-    click_on "React Router"
+    visit "/react_router"
   end
 
   context "when rendering /react_router" do
