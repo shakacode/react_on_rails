@@ -93,7 +93,7 @@ module ReactOnRails
 
     def stream_react_component(component_name, options = {})
       rendering_fiber = Fiber.new do
-        stream = stream_react_component_internal(component_name, options)
+        stream = internal_stream_react_component(component_name, options)
         stream.each_chunk do |chunk|
           Fiber.yield chunk
         end
@@ -352,7 +352,7 @@ module ReactOnRails
 
     private
 
-    def stream_react_component_internal(component_name, options = {})
+    def internal_stream_react_component(component_name, options = {})
       options = options.merge(stream?: true)
       result = internal_react_component(component_name, options)
       build_react_component_result_for_server_streamed_content(
