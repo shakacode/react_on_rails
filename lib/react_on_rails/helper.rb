@@ -91,6 +91,17 @@ module ReactOnRails
       end
     end
 
+    def rsc_react_component(component_name, options = {})
+      rendering_fiber = Fiber.new do
+        res = internal_rsc_react_component(component_name, options)
+        res.each_chunk do |chunk|
+          Fiber.yield chunk
+        end
+        Fiber.yield nil
+      end
+      rendering_fiber
+    end
+
     def stream_react_component(component_name, options = {})
       rendering_fiber = Fiber.new do
         stream = internal_stream_react_component(component_name, options)
@@ -339,13 +350,14 @@ module ReactOnRails
       return unless render_options.auto_load_bundle
 
       ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
-      if Rails.env.development?
-        is_component_pack_present = File.exist?(generated_components_pack_path(react_component_name))
-        raise_missing_autoloaded_bundle(react_component_name) unless is_component_pack_present
-      end
-      append_javascript_pack_tag("generated/#{react_component_name}",
-                                 defer: ReactOnRails.configuration.defer_generated_component_packs)
-      append_stylesheet_pack_tag("generated/#{react_component_name}")
+      append_javascript_pack_tag("client-bundle")
+      # if Rails.env.development?
+      #   is_component_pack_present = File.exist?(generated_components_pack_path(react_component_name))
+      #   raise_missing_autoloaded_bundle(react_component_name) unless is_component_pack_present
+      # end
+      # append_javascript_pack_tag("generated/#{react_component_name}",
+      #                            defer: ReactOnRails.configuration.defer_generated_component_packs)
+      # append_stylesheet_pack_tag("generated/#{react_component_name}")
     end
 
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
@@ -481,6 +493,13 @@ module ReactOnRails
       "#{rails_context_if_not_already_rendered}\n#{render_value}".strip.html_safe
     end
 
+    def internal_rsc_react_component(react_component_name, options = {})
+      options = options.merge(rsc?: true)
+      render_options = ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: react_component_name,
+                                                                       options: options)
+      server_rendered_react_component(render_options)
+    end
+
     def internal_react_component(react_component_name, options = {})
       # Create the JavaScript and HTML to allow either client or server rendering of the
       # react_component.
@@ -574,7 +593,7 @@ module ReactOnRails
       end
 
       # TODO: handle errors for streams
-      return result if render_options.stream?
+      return result if render_options.stream? || render_options.rsc?
 
       if result["hasErrors"] && render_options.raise_on_prerender_error
         # We caught this exception on our backtrace handler
