@@ -367,7 +367,7 @@ ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');
     end
   end
 
-  describe "#rails_context_if_not_already_rendered", :focus do
+  describe "#rails_context_if_not_already_rendered" do
     let(:helper) { PlainReactOnRailsHelper.new }
 
     before do
