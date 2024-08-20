@@ -218,6 +218,25 @@ export function reactOnRailsPageLoaded(): void {
   forEachReactOnRailsComponentRender(context, railsContext);
 }
 
+export function reactOnRailsComponentLoaded(domId: string): void {
+  debugTurbolinks(`reactOnRailsComponentLoaded ${domId}`);
+
+  const railsContext = parseRailsContext();
+
+  // If no react on rails components
+  if (!railsContext) return;
+
+  const context = findContext();
+  if (supportsRootApi) {
+    context.roots = [];
+  }
+
+  const el = document.querySelector(`[data-dom-id=${domId}]`);
+  if (!el) return;
+
+  render(el, context, railsContext);
+}
+
 function unmount(el: Element): void {
   const domNodeId = domNodeIdForEl(el);
   const domNode = document.getElementById(domNodeId);

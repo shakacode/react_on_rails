@@ -362,6 +362,10 @@ GEM
     timeout (0.4.1)
     tins (1.32.1)
       sync
+    turbo-rails (2.0.6)
+      actionpack (>= 6.0.0)
+      activejob (>= 6.0.0)
+      railties (>= 6.0.0)
     turbolinks (5.2.1)
       turbolinks-source (~> 5.2)
     turbolinks-source (5.2.0)
@@ -423,6 +427,7 @@ DEPENDENCIES
   spring (~> 4.0)
   sprockets (~> 4.0)
   sqlite3 (~> 1.6)
+  turbo-rails
   turbolinks
   uglifier
   webdrivers (= 5.3.0)

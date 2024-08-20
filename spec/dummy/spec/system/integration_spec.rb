@@ -97,6 +97,16 @@ describe "Turbolinks across pages", :js do
   end
 end
 
+describe "TurboStream send react component", :js do
+  subject { page }
+
+  it "force load hello-world component immediately" do
+    visit "/turbo_frame_tag_hello_world"
+    click_on "send me hello-turbo-stream component"
+    expect(page).to have_text "Hello, Mrs. Client Side Rendering From Turbo Stream!"
+  end
+end
+
 describe "Pages/client_side_log_throw", :ignore_js_errors, :js do
   subject { page }
 
@@ -163,8 +173,7 @@ describe "React Router", :js do
   subject { page }
 
   before do
-    visit "/"
-    click_on "React Router"
+    visit "/react_router"
   end
 
   context "when rendering /react_router" do

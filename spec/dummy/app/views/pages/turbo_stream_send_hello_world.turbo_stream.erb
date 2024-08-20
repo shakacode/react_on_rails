@@ -1,0 +1,3 @@
+<%= turbo_stream.update 'hello-turbo-stream' do %>
+    <%= react_component("HelloTurboStream", props: @app_props_hello_from_turbo_stream, force_load: true) %>
+<% end %>
