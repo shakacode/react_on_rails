@@ -18,6 +18,10 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+### [14.0.5] - 2024-08-20
+#### Fixed
+- Should force load react-components which send over turbo-stream [PR #1620](https://github.com/shakacode/react_on_rails/pull/1620) by [theforestvn88](https://github.com/theforestvn88).
+
 ### [14.0.4] - 2024-07-02
 
 #### Improved
@@ -1148,7 +1152,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.0.4...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.0.5...master
+[14.0.5]: https://github.com/shakacode/react_on_rails/compare/14.0.4...14.0.5
 [14.0.4]: https://github.com/shakacode/react_on_rails/compare/14.0.3...14.0.4
 [14.0.3]: https://github.com/shakacode/react_on_rails/compare/14.0.2...14.0.3
 [14.0.2]: https://github.com/shakacode/react_on_rails/compare/14.0.1...14.0.2
