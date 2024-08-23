@@ -287,7 +287,9 @@ workflows:
     jobs:
       - install-package-node-packages
       - install-package-ruby-gems
-      - install-dummy-app-node-packages
+      - install-dummy-app-node-packages:
+          requires:
+            - install-package-node-packages
       - install-dummy-app-ruby-gems
       - lint-js-and-ruby:
           requires:
