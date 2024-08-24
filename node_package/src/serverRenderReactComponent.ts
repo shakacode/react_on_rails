@@ -1,5 +1,5 @@
 import ReactDOMServer from 'react-dom/server';
-import { PassThrough } from 'stream';
+import { PassThrough, Readable } from 'stream';
 import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
@@ -197,17 +197,17 @@ const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (o
   return result;
 };
 
-const stringToStream = (str: string) => {
+const stringToStream = (str: string): Readable => {
   const stream = new PassThrough();
   stream.push(str);
   stream.push(null);
   return stream;
 };
 
-export const streamServerRenderedReactComponent = (options: RenderParams) => {
+export const streamServerRenderedReactComponent = (options: RenderParams): Readable => {
   const { name, domNodeId, trace, props, railsContext, throwJsErrors } = options;
 
-  let renderResult: null | PassThrough = null;
+  let renderResult: null | Readable = null;
 
   try {
     const componentObj = ComponentRegistry.get(name);
@@ -229,8 +229,9 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
       throw new Error('Server rendering of streams is not supported for server render hashes or promises.');
     }
 
-    renderResult = new PassThrough();
-    ReactDOMServer.renderToPipeableStream(reactRenderingResult).pipe(renderResult);
+    const renderStream = new PassThrough();
+    ReactDOMServer.renderToPipeableStream(reactRenderingResult).pipe(renderStream);
+    renderResult = renderStream;
 
     // TODO: Add console replay script to the stream
     // Ensure to avoid console messages leaking between different components rendering
