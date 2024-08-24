@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
-import type { PassThrough } from 'stream';
+import type { Readable } from 'stream';
 
 // Don't import redux just for the type definitions
 // See https://github.com/shakacode/react_on_rails/issues/1321
@@ -139,7 +139,7 @@ export interface ReactOnRails {
   ): RenderReturnType;
   getComponent(name: string): RegisteredComponent;
   serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;
-  streamServerRenderedReactComponent(options: RenderParams): PassThrough;
+  streamServerRenderedReactComponent(options: RenderParams): Readable;
   handleError(options: ErrorOptions): string | undefined;
   buildConsoleReplay(): string;
   registeredComponents(): Map<string, RegisteredComponent>;

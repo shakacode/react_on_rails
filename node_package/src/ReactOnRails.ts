@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import type { PassThrough } from 'stream';
+import type { Readable } from 'stream';
 
 import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
@@ -250,7 +250,7 @@ ctx.ReactOnRails = {
    * Used by server rendering by Rails
    * @param options
    */
-  streamServerRenderedReactComponent(options: RenderParams): PassThrough {
+  streamServerRenderedReactComponent(options: RenderParams): Readable {
     return streamServerRenderedReactComponent(options);
   },
 
