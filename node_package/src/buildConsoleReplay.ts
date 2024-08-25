@@ -9,7 +9,7 @@ declare global {
   }
 }
 
-export function consoleReplay(customConsoleHistory: typeof console['history'] | undefined = undefined): string {
+export function consoleReplay(customConsoleHistory: typeof console['history'] | undefined = undefined, skipFirstNumberOfMessages: number = 0): string {
   // console.history is a global polyfill used in server rendering.
   const consoleHistory = customConsoleHistory ?? console.history;
 
@@ -17,7 +17,7 @@ export function consoleReplay(customConsoleHistory: typeof console['history'] | 
     return '';
   }
 
-  const lines = consoleHistory.map(msg => {
+  const lines = consoleHistory.slice(skipFirstNumberOfMessages).map(msg => {
     const stringifiedList = msg.arguments.map(arg => {
       let val: string;
       try {
@@ -44,6 +44,6 @@ export function consoleReplay(customConsoleHistory: typeof console['history'] | 
   return lines.join('\n');
 }
 
-export default function buildConsoleReplay(customConsoleHistory: typeof console['history'] | undefined = undefined): string {
-  return RenderUtils.wrapInScriptTags('consoleReplayLog', consoleReplay(customConsoleHistory));
+export default function buildConsoleReplay(customConsoleHistory: typeof console['history'] | undefined = undefined, skipFirstNumberOfMessages: number = 0): string {
+  return RenderUtils.wrapInScriptTags('consoleReplayLog', consoleReplay(customConsoleHistory, skipFirstNumberOfMessages));
 }
