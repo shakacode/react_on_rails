@@ -56,7 +56,11 @@ module ReactOnRails
             @file_index += 1
           end
           begin
-            json_string = js_evaluator.eval_js(js_code, render_options)
+            result = if render_options.stream?
+              js_evaluator.eval_streaming_js(js_code, render_options)
+            else
+              js_evaluator.eval_js(js_code, render_options)
+            end
           rescue StandardError => err
             msg = <<~MSG
               Error evaluating server bundle. Check your webpack configuration.
@@ -71,32 +75,14 @@ module ReactOnRails
             end
             raise ReactOnRails::Error, msg, err.backtrace
           end
-          result = nil
-          begin
-            result = JSON.parse(json_string)
-          rescue JSON::ParserError => e
-            raise ReactOnRails::JsonParseError.new(parse_error: e, json: json_string)
-          end
+          
+          return parse_result_and_replay_console_messages(result, render_options) unless render_options.stream?
 
-          if render_options.logging_on_server
-            console_script = result["consoleReplayScript"]
-            console_script_lines = console_script.split("\n")
-            console_script_lines = console_script_lines[2..-2]
-            re = /console\.(?:log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
-            console_script_lines&.each do |line|
-              match = re.match(line)
-              Rails.logger.info { "[react_on_rails] #{match[:msg]}" } if match
-            end
-          end
-          result
+          # Streamed component is returned as stream of strings.
+          # We need to parse each chunk and replay the console messages.
+          result.transform { |chunk| parse_result_and_replay_console_messages(chunk, render_options) }
         end
         # rubocop:enable Metrics/CyclomaticComplexity, Metrics/AbcSize, Metrics/PerceivedComplexity
-
-        # TODO: merge with exec_server_render_js
-        def exec_server_render_streaming_js(js_code, render_options, js_evaluator = nil)
-          js_evaluator ||= self
-          js_evaluator.eval_streaming_js(js_code, render_options)
-        end
 
         def trace_js_code_used(msg, js_code, file_name = "tmp/server-generated.js", force: false)
           return unless ReactOnRails.configuration.trace || force
@@ -238,6 +224,27 @@ module ReactOnRails
         rescue StandardError => e
           msg = "file_url_to_string #{url} failed\nError is: #{e}"
           raise ReactOnRails::Error, msg
+        end
+
+        def parse_result_and_replay_console_messages(result_string, render_options)
+          result = nil
+          begin
+            result = JSON.parse(result_string)
+          rescue JSON::ParserError => e
+            raise ReactOnRails::JsonParseError.new(parse_error: e, json: result_string)
+          end
+
+          if render_options.logging_on_server
+            console_script = result["consoleReplayScript"]
+            console_script_lines = console_script.split("\n")
+            console_script_lines = console_script_lines[2..-2]
+            re = /console\.(?:log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
+            console_script_lines&.each do |line|
+              match = re.match(line)
+              Rails.logger.info { "[react_on_rails] #{match[:msg]}" } if match
+            end
+          end
+          result
         end
       end
       # rubocop:enable Metrics/ClassLength
