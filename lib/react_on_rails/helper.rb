@@ -435,7 +435,7 @@ module ReactOnRails
       render_options: required("render_options")
     )
       is_first_chunk = true
-      rendered_html_stream = rendered_html_stream.transform do |chunk_json_result|
+      rendered_html_stream.transform do |chunk_json_result|
         if is_first_chunk
           is_first_chunk = false
           next build_react_component_result_for_server_rendered_string(
@@ -447,7 +447,8 @@ module ReactOnRails
         end
 
         result_console_script = render_options.replay_console ? chunk_json_result["consoleReplayScript"] : ""
-        # No need to prepend component_specification_tag or add rails context again as they're already included in the first chunk
+        # No need to prepend component_specification_tag or add rails context again
+        # as they're already included in the first chunk
         compose_react_component_html_with_spec_and_console(
           "", chunk_json_result["html"], result_console_script
         )
