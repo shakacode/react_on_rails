@@ -435,26 +435,24 @@ module ReactOnRails
       component_specification_tag: required("component_specification_tag"),
       render_options: required("render_options")
     )
-      content_tag_options_html_tag = render_options.html_options[:tag] || "div"
-      # The component_specification_tag is appended to the first chunk
-      # We need to pass it early with the first chunk because it's needed in hydration
-      # We need to make sure that client can hydrate the app early even before all components are streamed
       is_first_chunk = true
-      rendered_html_stream = rendered_html_stream.transform do |chunk|
+      rendered_html_stream = rendered_html_stream.transform do |chunk_json_result|
         if is_first_chunk
           is_first_chunk = false
-          html_content = <<-HTML
-            #{rails_context_if_not_already_rendered}
-            #{component_specification_tag}
-            <#{content_tag_options_html_tag} id="#{render_options.dom_id}">#{chunk}</#{content_tag_options_html_tag}>
-          HTML
-          next html_content.strip
+          next build_react_component_result_for_server_rendered_string(
+            server_rendered_html: chunk_json_result["html"],
+            component_specification_tag: component_specification_tag,
+            console_script: chunk_json_result["consoleReplayScript"],
+            render_options: render_options
+          )
         end
-        chunk
-      end
 
-      rendered_html_stream.transform(&:html_safe)
-      # TODO: handle console logs
+        result_console_script = render_options.replay_console ? chunk_json_result["consoleReplayScript"] : ""
+        # No need to prepend component_specification_tag or add rails context again as they're already included in the first chunk
+        compose_react_component_html_with_spec_and_console(
+          "", chunk_json_result["html"], result_console_script
+        )
+      end
     end
 
     def build_react_component_result_for_server_rendered_hash(
@@ -493,11 +491,12 @@ module ReactOnRails
 
     def compose_react_component_html_with_spec_and_console(component_specification_tag, rendered_output, console_script)
       # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
-      <<~HTML.html_safe
+      html_content = <<~HTML
         #{rendered_output}
               #{component_specification_tag}
               #{console_script}
       HTML
+      html_content.strip.html_safe
     end
 
     def rails_context_if_not_already_rendered
