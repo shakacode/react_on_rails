@@ -169,8 +169,8 @@ const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (o
 
 const stringToStream = (str: string): Readable => {
   const stream = new PassThrough();
-  stream.push(str);
-  stream.push(null);
+  stream.write(str);
+  stream.end();
   return stream;
 };
 
@@ -178,6 +178,8 @@ export const streamServerRenderedReactComponent = (options: RenderParams): Reada
   const { name, domNodeId, trace, props, railsContext, throwJsErrors } = options;
 
   let renderResult: null | Readable = null;
+  let hasErrors = false;
+  let isShellReady = false;
   let previouslyReplayedConsoleMessages: number = 0;
 
   try {
@@ -200,24 +202,47 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
       throw new Error('Server rendering of streams is not supported for server render hashes or promises.');
     }
 
-    const transformStream = new Transform({
+    const transformStream = new PassThrough({
       transform(chunk, _, callback) {
         const htmlChunk = chunk.toString();
+        console.log('htmlChunk', htmlChunk);
         const consoleReplayScript = buildConsoleReplay(previouslyReplayedConsoleMessages);
         previouslyReplayedConsoleMessages = console.history?.length || 0;
         
         const jsonChunk = JSON.stringify({
           html: htmlChunk,
           consoleReplayScript,
+          hasErrors,
+          isShellReady,
         });
-        
+
         this.push(jsonChunk);
         callback();
       }
     });
 
-    ReactDOMServer.renderToPipeableStream(reactRenderingResult)
-      .pipe(transformStream);
+    const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderingResult, {
+      onShellError(error) {
+        // Can't through error here if throwJsErrors is true because the error will happen inside the stream
+        // And will not be handled by any catch clause
+        hasErrors = true;
+        transformStream.write(handleError({
+          e: error as any,
+          name,
+          serverSide: true,
+        }));
+        transformStream.end();
+      },
+      onShellReady() {
+        isShellReady = true;
+        renderingStream.pipe(transformStream);
+      },
+      onError(_) {
+        // Can't through error here if throwJsErrors is true because the error will happen inside the stream
+        // And will not be handled by any catch clause
+        hasErrors = true;
+      },
+    });
 
     renderResult = transformStream;
   } catch (e: any) {
@@ -225,10 +250,15 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
       throw e;
     }
 
-    renderResult = stringToStream(handleError({
-      e,
-      name,
-      serverSide: true,
+    renderResult = stringToStream(JSON.stringify({
+      html: handleError({
+        e,
+        name,
+        serverSide: true,
+      }),
+      consoleReplayScript: buildConsoleReplay(previouslyReplayedConsoleMessages),
+      hasErrors: true,
+      isShellReady,
     }));
   }
 
