@@ -17,6 +17,7 @@
 [![Linting](https://github.com/shakacode/react_on_rails/actions/workflows/lint-js-and-ruby.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/lint-js-and-ruby.yml)
 
 # News
+* [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) supports the latest features of React 18, including [React Server Components](https://react.dev/reference/rsc/server-components) and [streaming](https://react.dev/reference/react-dom/server/renderToPipeableStream). Contact [Justin Gordon](mailto:justin@shakacode.com) for more information.
 * ShakaCode now maintains the official successor to `rails/webpacker`, [`shakapacker`](https://github.com/shakacode/shakapacker).
 * Project is updated to support Rails 7 and Shakapacker v6+!
 
