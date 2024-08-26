@@ -1,5 +1,5 @@
 import ReactDOMServer from 'react-dom/server';
-import { PassThrough, Readable, Transform } from 'stream';
+import { PassThrough, Readable } from 'stream';
 import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
@@ -195,8 +195,8 @@ const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (o
 
 const stringToStream = (str: string): Readable => {
   const stream = new PassThrough();
-  stream.push(str);
-  stream.push(null);
+  stream.write(str);
+  stream.end();
   return stream;
 };
 
@@ -204,7 +204,10 @@ export const streamServerRenderedReactComponent = (options: RenderParams): Reada
   const { name: componentName, domNodeId, trace, props, railsContext, throwJsErrors } = options;
 
   let renderResult: null | Readable = null;
+  let hasErrors = false;
+  let isShellReady = false;
   let previouslyReplayedConsoleMessages: number = 0;
+  let consoleHistory: typeof console['history'] | undefined;
 
   try {
     const componentObj = ComponentRegistry.get(componentName);
@@ -222,24 +225,49 @@ export const streamServerRenderedReactComponent = (options: RenderParams): Reada
       throw new Error('Server rendering of streams is not supported for server render hashes or promises.');
     }
 
-    const consoleHistory = console.history;
-    const transformStream = new Transform({
+    consoleHistory = console.history;
+    const transformStream = new PassThrough({
       transform(chunk, _, callback) {
         const htmlChunk = chunk.toString();
+        console.log('htmlChunk', htmlChunk);
         const consoleReplayScript = buildConsoleReplay(consoleHistory, previouslyReplayedConsoleMessages);
         previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
 
         const jsonChunk = JSON.stringify({
           html: htmlChunk,
           consoleReplayScript,
+          hasErrors,
+          isShellReady,
         });
-        
+
         this.push(jsonChunk);
         callback();
       }
     });
 
-    ReactDOMServer.renderToPipeableStream(reactRenderingResult).pipe(transformStream);
+    const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderingResult, {
+      onShellError(e) {
+        // Can't through error here if throwJsErrors is true because the error will happen inside the stream
+        // And will not be handled by any catch clause
+        hasErrors = true;
+        const error = e instanceof Error ? e : new Error(String(e));
+        transformStream.write(handleError({
+          e: error,
+          name: componentName,
+          serverSide: true,
+        }));
+        transformStream.end();
+      },
+      onShellReady() {
+        isShellReady = true;
+        renderingStream.pipe(transformStream);
+      },
+      onError() {
+        // Can't through error here if throwJsErrors is true because the error will happen inside the stream
+        // And will not be handled by any catch clause
+        hasErrors = true;
+      },
+    });
 
     renderResult = transformStream;
   } catch (e) {
@@ -248,10 +276,15 @@ export const streamServerRenderedReactComponent = (options: RenderParams): Reada
     }
 
     const error = e instanceof Error ? e : new Error(String(e));
-    renderResult = stringToStream(handleError({
-      e: error,
-      name: componentName,
-      serverSide: true,
+    renderResult = stringToStream(JSON.stringify({
+      html: handleError({
+        e: error,
+        name: componentName,
+        serverSide: true,
+      }),
+      consoleReplayScript: buildConsoleReplay(consoleHistory, previouslyReplayedConsoleMessages),
+      hasErrors: true,
+      isShellReady,
     }));
   }
 

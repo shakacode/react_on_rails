@@ -87,6 +87,10 @@ module ReactOnRails
         retrieve_configuration_value_for(:raise_on_prerender_error)
       end
 
+      def raise_non_shell_server_rendering_errors
+        retrieve_react_on_rails_pro_config_value_for(:raise_non_shell_server_rendering_errors)
+      end
+
       def logging_on_server
         retrieve_configuration_value_for(:logging_on_server)
       end
@@ -126,6 +130,13 @@ module ReactOnRails
       def retrieve_configuration_value_for(key)
         options.fetch(key) do
           ReactOnRails.configuration.public_send(key)
+        end
+      end
+
+      def retrieve_react_on_rails_pro_config_value_for(key)
+        options.fetch(key) do
+          return nil unless ReactOnRails::Utils.react_on_rails_pro?
+          ReactOnRailsPro.configuration.public_send(key)
         end
       end
     end

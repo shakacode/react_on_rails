@@ -570,6 +570,22 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
       props.is_a?(String) ? props : props.to_json
     end
 
+    def raise_prerender_error(json_result, react_component_name, props, js_code)
+      raise ReactOnRails::PrerenderError.new(
+        component_name: react_component_name,
+        props: sanitized_props_string(props),
+        err: nil,
+        js_code: js_code,
+        console_messages: json_result["consoleReplayScript"]
+      )
+    end
+
+    def should_raise_streaming_prerender_error?(chunk_json_result, render_options)
+      chunk_json_result["hasErrors"] && 
+        ((render_options.raise_on_prerender_error && !chunk_json_result["isShellReady"]) || 
+         (render_options.raise_non_shell_server_rendering_errors && chunk_json_result["isShellReady"]))
+    end
+
     # Returns object with values that are NOT html_safe!
     def server_rendered_react_component(render_options)
       return { "html" => "", "consoleReplayScript" => "" } unless render_options.prerender
@@ -617,19 +633,20 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
                                                js_code: js_code)
       end
 
-      # TODO: handle errors for streams
-      return result if render_options.stream?
-
-      if result["hasErrors"] && render_options.raise_on_prerender_error
-        # We caught this exception on our backtrace handler
-        raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
-                                               # Sanitize as this might be browser logged
-                                               props: sanitized_props_string(props),
-                                               err: nil,
-                                               js_code: js_code,
-                                               console_messages: result["consoleReplayScript"])
-
+      if render_options.stream?
+        # It doesn't make any transformation, it just listening to the streamed chunks and raise error if it has errors
+        result.transform do |chunk_json_result|
+          if should_raise_streaming_prerender_error?(chunk_json_result, render_options)
+            raise_prerender_error(chunk_json_result, react_component_name, props, js_code)
+          end
+          chunk_json_result
+        end
+      else
+        if result["hasErrors"] && render_options.raise_on_prerender_error
+          raise_prerender_error(result, react_component_name, props, js_code)
+        end
       end
+      
       result
     end
 
