@@ -229,7 +229,6 @@ export const streamServerRenderedReactComponent = (options: RenderParams): Reada
     const transformStream = new PassThrough({
       transform(chunk, _, callback) {
         const htmlChunk = chunk.toString();
-        console.log('htmlChunk', htmlChunk);
         const consoleReplayScript = buildConsoleReplay(consoleHistory, previouslyReplayedConsoleMessages);
         previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
 

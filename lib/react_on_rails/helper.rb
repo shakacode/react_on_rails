@@ -634,11 +634,11 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
       end
 
       if render_options.stream?
-        # It doesn't make any transformation, it just listening to the streamed chunks and raise error if it has errors
         result.transform do |chunk_json_result|
           if should_raise_streaming_prerender_error?(chunk_json_result, render_options)
             raise_prerender_error(chunk_json_result, react_component_name, props, js_code)
           end
+        # It doesn't make any transformation, it listens to the streamed chunks and raise error if it has errors
           chunk_json_result
         end
       else
