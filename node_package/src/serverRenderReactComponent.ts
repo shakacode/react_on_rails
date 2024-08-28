@@ -205,7 +205,6 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
     const transformStream = new PassThrough({
       transform(chunk, _, callback) {
         const htmlChunk = chunk.toString();
-        console.log('htmlChunk', htmlChunk);
         const consoleReplayScript = buildConsoleReplay(previouslyReplayedConsoleMessages);
         previouslyReplayedConsoleMessages = console.history?.length || 0;
         
