@@ -1,5 +1,5 @@
 import ReactDOMServer from 'react-dom/server';
-import { PassThrough, Readable, Transform } from 'stream';
+import { PassThrough, Readable } from 'stream';
 import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
@@ -236,7 +236,7 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
         isShellReady = true;
         renderingStream.pipe(transformStream);
       },
-      onError(_) {
+      onError() {
         // Can't through error here if throwJsErrors is true because the error will happen inside the stream
         // And will not be handled by any catch clause
         hasErrors = true;
