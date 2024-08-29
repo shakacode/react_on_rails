@@ -132,6 +132,7 @@ module ReactOnRails
       def retrieve_react_on_rails_pro_config_value_for(key)
         options.fetch(key) do
           return nil unless ReactOnRails::Utils.react_on_rails_pro?
+
           ReactOnRailsPro.configuration.public_send(key)
         end
       end
