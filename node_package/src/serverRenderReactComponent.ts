@@ -3,8 +3,7 @@ import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
 import createReactOutput from './createReactOutput';
-import {isServerRenderHash, isPromise} from
-    './isServerRenderResult';
+import { isServerRenderHash, isPromise } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import type { RenderParams, RenderResult, RenderingError } from './types/index';
@@ -162,12 +161,12 @@ const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (o
   } finally {
     // Reset console history after each render.
     // See `RubyEmbeddedJavaScript.console_polyfill` for initialization.
-    if (!result || typeof(result) === 'string') {
-      console.history = [];
-    } else {
+    if (result && isPromise(result)) {
       result.finally(() => {
         console.history = [];
       });
+    } else {
+      console.history = [];
     }
   }
   return result;
