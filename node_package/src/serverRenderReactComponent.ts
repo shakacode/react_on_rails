@@ -99,7 +99,6 @@ as a renderFunction and not a simple React Function Component.`);
     renderingError = e;
   }
 
-  const consoleReplayScript = buildConsoleReplay();
   const addRenderingErrors = (resultObject: RenderResult, renderError: RenderingError) => {
     resultObject.renderingError = { // eslint-disable-line no-param-reassign
       message: renderError.message,
@@ -114,7 +113,7 @@ as a renderFunction and not a simple React Function Component.`);
       try {
         promiseResult = {
           html: await renderResult,
-          consoleReplayScript,
+          consoleReplayScript: buildConsoleReplay(),
           hasErrors,
         };
       } catch (e: any) {
@@ -127,7 +126,7 @@ as a renderFunction and not a simple React Function Component.`);
             name,
             serverSide: true,
           }),
-          consoleReplayScript,
+          consoleReplayScript: buildConsoleReplay(),
           hasErrors: true,
         }
         renderingError = e;
@@ -145,7 +144,7 @@ as a renderFunction and not a simple React Function Component.`);
 
   const result = {
     html: renderResult,
-    consoleReplayScript,
+    consoleReplayScript: buildConsoleReplay(),
     hasErrors,
   } as RenderResult;
 
@@ -157,12 +156,20 @@ as a renderFunction and not a simple React Function Component.`);
 }
 
 const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (options) => {
+  let result: string | Promise<RenderResult> | null = null;
   try {
-    return serverRenderReactComponentInternal(options);
+    result = serverRenderReactComponentInternal(options);
   } finally {
     // Reset console history after each render.
     // See `RubyEmbeddedJavaScript.console_polyfill` for initialization.
-    console.history = [];
+    if (!result || typeof(result) === 'string') {
+      console.history = [];
+    } else {
+      result.finally(() => {
+        console.history = [];
+      });
+    }
   }
+  return result;
 };
 export default serverRenderReactComponent;
