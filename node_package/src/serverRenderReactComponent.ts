@@ -105,16 +105,22 @@ function createResultObject(html: string | null, consoleReplayScript: string, re
 
 async function createPromiseResult(
   renderState: RenderState & { result: Promise<string> },
-  consoleReplayScript: string,
   componentName: string,
   throwJsErrors: boolean
 ): Promise<RenderResult> {
+  // Capture console history before awaiting the promise
+  // Node renderer will reset the global console.history after executing the synchronous part of the request.
+  // It resets it only if replayServerAsyncOperationLogs renderer config is set to false.
+  // In both cases, we need to keep a reference to console.history to avoid losing console logs in case of reset.
+  const consoleHistory = console.history;
   try {
     const html = await renderState.result;
+    const consoleReplayScript = buildConsoleReplay(consoleHistory);
     return createResultObject(html, consoleReplayScript, renderState);
   } catch (e: unknown) {
     const errorRenderState = handleRenderingError(e, { componentName, throwJsErrors });
-    return createResultObject(errorRenderState.result, consoleReplayScript, errorRenderState);
+    const consoleReplayScript = buildConsoleReplay(consoleHistory);
+    return createResultObject(errorRenderState.result, consoleReplayScript, renderState);
   }
 }
 
@@ -123,20 +129,12 @@ function createFinalResult(
   componentName: string,
   throwJsErrors: boolean
 ): null | string | Promise<RenderResult> {
-  // Console history is stored globally in `console.history`.
-  // If node renderer is handling a render request that returns a promise,
-  // It can handle another request while awaiting the promise.
-  // To prevent cross-request console logs leakage between these requests,
-  // we build the consoleReplayScript before awaiting any promises.
-  // The console history is reset after the synchronous part of each request.
-  // This causes console logs happening during async operations to not be captured.
-  const consoleReplayScript = buildConsoleReplay();
-
   const { result } = renderState;
   if (isPromise(result)) {
-    return createPromiseResult({ ...renderState, result }, consoleReplayScript, componentName, throwJsErrors);
+    return createPromiseResult({ ...renderState, result }, componentName, throwJsErrors);
   }
 
+  const consoleReplayScript = buildConsoleReplay();
   return JSON.stringify(createResultObject(result, consoleReplayScript, renderState));
 }
 
@@ -183,13 +181,19 @@ function serverRenderReactComponentInternal(options: RenderParams): null | strin
 }
 
 const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (options) => {
+  let result: string | Promise<RenderResult> | null = null;
   try {
-    return serverRenderReactComponentInternal(options);
+    result = serverRenderReactComponentInternal(options);
   } finally {
     // Reset console history after each render.
     // See `RubyEmbeddedJavaScript.console_polyfill` for initialization.
-    console.history = [];
+    // We don't need to clear the console history if the result is a promise
+    // Promises only supported in node renderer and node renderer takes care of cleanining console history
+    if (typeof result === 'string') {
+      console.history = [];
+    }
   }
+  return result;
 };
 
 export default serverRenderReactComponent;
