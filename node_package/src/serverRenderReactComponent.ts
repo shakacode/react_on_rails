@@ -98,6 +98,7 @@ as a renderFunction and not a simple React Function Component.`);
     renderingError = e;
   }
 
+  const consoleHistoryAfterSyncExecution = console.history;
   const addRenderingErrors = (resultObject: RenderResult, renderError: RenderingError) => {
     resultObject.renderingError = { // eslint-disable-line no-param-reassign
       message: renderError.message,
@@ -110,9 +111,17 @@ as a renderFunction and not a simple React Function Component.`);
       let promiseResult;
 
       try {
+        const awaitedRenderResult = await renderResult;
+        const consoleHistoryAfterAsyncExecution = console.history;
+        let consoleReplayScript = '';
+        if ((consoleHistoryAfterAsyncExecution?.length ?? 0) > (consoleHistoryAfterSyncExecution?.length ?? 0)) {
+          consoleReplayScript = buildConsoleReplay(consoleHistoryAfterAsyncExecution);
+        } else {
+          consoleReplayScript = buildConsoleReplay(consoleHistoryAfterSyncExecution);
+        }
         promiseResult = {
-          html: await renderResult,
-          consoleReplayScript: buildConsoleReplay(),
+          html: awaitedRenderResult,
+          consoleReplayScript,
           hasErrors,
         };
       } catch (e: any) {
@@ -125,7 +134,7 @@ as a renderFunction and not a simple React Function Component.`);
             name,
             serverSide: true,
           }),
-          consoleReplayScript: buildConsoleReplay(),
+          consoleReplayScript: buildConsoleReplay(consoleHistoryAfterSyncExecution),
           hasErrors: true,
         }
         renderingError = e;
@@ -143,7 +152,7 @@ as a renderFunction and not a simple React Function Component.`);
 
   const result = {
     html: renderResult,
-    consoleReplayScript: buildConsoleReplay(),
+    consoleReplayScript: buildConsoleReplay(consoleHistoryAfterSyncExecution),
     hasErrors,
   } as RenderResult;
 
@@ -161,11 +170,9 @@ const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (o
   } finally {
     // Reset console history after each render.
     // See `RubyEmbeddedJavaScript.console_polyfill` for initialization.
-    if (result && isPromise(result)) {
-      result.finally(() => {
-        console.history = [];
-      });
-    } else {
+    // We don't need to clear the console history if the result is a promise
+    // Promises only supported in node renderer and node renderer takes care of cleanining console history
+    if (typeof result === 'string') {
       console.history = [];
     }
   }

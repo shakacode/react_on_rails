@@ -257,7 +257,7 @@ ctx.ReactOnRails = {
    * Used by Rails server rendering to replay console messages.
    */
   buildConsoleReplay(): string {
-    return buildConsoleReplay();
+    return buildConsoleReplay(console.history);
   },
 
   /**

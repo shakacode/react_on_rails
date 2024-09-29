@@ -11,16 +11,16 @@ declare global {
   }
 }
 
-export function consoleReplay(): string {
+export function consoleReplay(consoleHistory: typeof console['history']): string {
   // console.history is a global polyfill used in server rendering.
   // Must use Array.isArray instead of instanceof Array the history array is defined outside the vm if node renderer is used.
   // In this case, the Array prototype used to define the array is not the same as the one in the global scope inside the vm.
   // $FlowFixMe
-  if (!(Array.isArray(console.history))) {
+  if (!(Array.isArray(consoleHistory))) {
     return '';
   }
 
-  const lines = console.history.map(msg => {
+  const lines = consoleHistory.map(msg => {
     const stringifiedList = msg.arguments.map(arg => {
       let val;
       try {
@@ -41,6 +41,6 @@ export function consoleReplay(): string {
   return lines.join('\n');
 }
 
-export default function buildConsoleReplay(): string {
-  return RenderUtils.wrapInScriptTags('consoleReplayLog', consoleReplay());
+export default function buildConsoleReplay(consoleHistory: typeof console['history']): string {
+  return RenderUtils.wrapInScriptTags('consoleReplayLog', consoleReplay(consoleHistory));
 }
