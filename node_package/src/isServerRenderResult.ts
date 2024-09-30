@@ -9,7 +9,7 @@ export function isServerRenderHash(testValue: CreateReactOutputResult):
     (testValue as ServerRenderResult).error);
 }
 
-export function isPromise(testValue: CreateReactOutputResult):
-  testValue is Promise<string> {
-  return !!((testValue as Promise<string>).then);
+export function isPromise<T>(testValue: CreateReactOutputResult | Promise<T> | string):
+  testValue is Promise<T> {
+  return !!((testValue as Promise<T>).then);
 }

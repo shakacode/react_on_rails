@@ -3,8 +3,7 @@ import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
 import createReactOutput from './createReactOutput';
-import {isServerRenderHash, isPromise} from
-    './isServerRenderResult';
+import { isServerRenderHash, isPromise } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import type { RenderParams, RenderResult, RenderingError } from './types/index';
@@ -99,7 +98,7 @@ as a renderFunction and not a simple React Function Component.`);
     renderingError = e;
   }
 
-  const consoleReplayScript = buildConsoleReplay();
+  const consoleHistoryAfterSyncExecution = console.history;
   const addRenderingErrors = (resultObject: RenderResult, renderError: RenderingError) => {
     resultObject.renderingError = { // eslint-disable-line no-param-reassign
       message: renderError.message,
@@ -112,8 +111,21 @@ as a renderFunction and not a simple React Function Component.`);
       let promiseResult;
 
       try {
+        const awaitedRenderResult = await renderResult;
+
+        // If replayServerAsyncOperationLogs node renderer config is enabled, the console.history will contain all logs happened during sync and async operations.
+        // If the config is disabled, the console.history will be empty, because it will clear the history after the sync execution.
+        // In case of disabled config, we will use the console.history after sync execution, which contains all logs happened during sync execution.
+        const consoleHistoryAfterAsyncExecution = console.history;
+        let consoleReplayScript = '';
+        if ((consoleHistoryAfterAsyncExecution?.length ?? 0) > (consoleHistoryAfterSyncExecution?.length ?? 0)) {
+          consoleReplayScript = buildConsoleReplay(consoleHistoryAfterAsyncExecution);
+        } else {
+          consoleReplayScript = buildConsoleReplay(consoleHistoryAfterSyncExecution);
+        }
+
         promiseResult = {
-          html: await renderResult,
+          html: awaitedRenderResult,
           consoleReplayScript,
           hasErrors,
         };
@@ -127,7 +139,7 @@ as a renderFunction and not a simple React Function Component.`);
             name,
             serverSide: true,
           }),
-          consoleReplayScript,
+          consoleReplayScript: buildConsoleReplay(consoleHistoryAfterSyncExecution),
           hasErrors: true,
         }
         renderingError = e;
@@ -145,7 +157,7 @@ as a renderFunction and not a simple React Function Component.`);
 
   const result = {
     html: renderResult,
-    consoleReplayScript,
+    consoleReplayScript: buildConsoleReplay(consoleHistoryAfterSyncExecution),
     hasErrors,
   } as RenderResult;
 
@@ -157,12 +169,18 @@ as a renderFunction and not a simple React Function Component.`);
 }
 
 const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (options) => {
+  let result: string | Promise<RenderResult> | null = null;
   try {
-    return serverRenderReactComponentInternal(options);
+    result = serverRenderReactComponentInternal(options);
   } finally {
     // Reset console history after each render.
     // See `RubyEmbeddedJavaScript.console_polyfill` for initialization.
-    console.history = [];
+    // We don't need to clear the console history if the result is a promise.
+    // Promises are only supported in the node renderer and it takes care of cleaning console history.
+    if (typeof result === 'string') {
+      console.history = [];
+    }
   }
+  return result;
 };
 export default serverRenderReactComponent;
