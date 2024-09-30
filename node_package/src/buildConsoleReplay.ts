@@ -15,8 +15,6 @@ export function consoleReplay(customConsoleHistory: typeof console['history'] | 
   const consoleHistory = customConsoleHistory ?? console.history;
 
   // console.history is a global polyfill used in server rendering.
-  // Must use Array.isArray instead of instanceof Array the history array is defined outside the vm if node renderer is used.
-  // In this case, the Array prototype used to define the array is not the same as the one in the global scope inside the vm.
   // $FlowFixMe
   if (!(Array.isArray(consoleHistory))) {
     return '';

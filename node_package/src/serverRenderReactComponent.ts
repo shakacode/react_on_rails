@@ -112,6 +112,10 @@ as a renderFunction and not a simple React Function Component.`);
 
       try {
         const awaitedRenderResult = await renderResult;
+
+        // If replayServerAsyncOperationLogs node renderer config is enabled, the console.history will contain all logs happened during sync and async operations.
+        // If replayServerAsyncOperationLogs node renderer config is disabled, the console.history will be empty, because it will clear the history after the sync execution.
+        // If the config is disabled, we will return the logs accumulated during the sync execution only.
         const consoleHistoryAfterAsyncExecution = console.history;
         let consoleReplayScript = '';
         if ((consoleHistoryAfterAsyncExecution?.length ?? 0) > (consoleHistoryAfterSyncExecution?.length ?? 0)) {
@@ -119,6 +123,7 @@ as a renderFunction and not a simple React Function Component.`);
         } else {
           consoleReplayScript = buildConsoleReplay(consoleHistoryAfterSyncExecution);
         }
+
         promiseResult = {
           html: awaitedRenderResult,
           consoleReplayScript,
