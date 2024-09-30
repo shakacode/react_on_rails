@@ -15,7 +15,6 @@ export function consoleReplay(customConsoleHistory: typeof console['history'] | 
   // console.history is a global polyfill used in server rendering.
   const consoleHistory = customConsoleHistory ?? console.history;
 
-  // $FlowFixMe
   if (!(Array.isArray(consoleHistory))) {
     return '';
   }
