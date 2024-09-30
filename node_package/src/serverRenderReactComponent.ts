@@ -1,10 +1,10 @@
 import ReactDOMServer from 'react-dom/server';
+import { PassThrough, Readable } from 'stream';
 import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
 import createReactOutput from './createReactOutput';
-import {isServerRenderHash, isPromise} from
-    './isServerRenderResult';
+import { isServerRenderHash, isPromise } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import type { RenderParams, RenderResult, RenderingError } from './types/index';
@@ -99,7 +99,7 @@ as a renderFunction and not a simple React Function Component.`);
     renderingError = e;
   }
 
-  const consoleReplayScript = buildConsoleReplay();
+  const consoleHistoryAfterSyncExecution = console.history;
   const addRenderingErrors = (resultObject: RenderResult, renderError: RenderingError) => {
     resultObject.renderingError = { // eslint-disable-line no-param-reassign
       message: renderError.message,
@@ -112,8 +112,21 @@ as a renderFunction and not a simple React Function Component.`);
       let promiseResult;
 
       try {
+        const awaitedRenderResult = await renderResult;
+
+        // If replayServerAsyncOperationLogs node renderer config is enabled, the console.history will contain all logs happened during sync and async operations.
+        // If the config is disabled, the console.history will be empty, because it will clear the history after the sync execution.
+        // In case of disabled config, we will use the console.history after sync execution, which contains all logs happened during sync execution.
+        const consoleHistoryAfterAsyncExecution = console.history;
+        let consoleReplayScript = '';
+        if ((consoleHistoryAfterAsyncExecution?.length ?? 0) > (consoleHistoryAfterSyncExecution?.length ?? 0)) {
+          consoleReplayScript = buildConsoleReplay(consoleHistoryAfterAsyncExecution);
+        } else {
+          consoleReplayScript = buildConsoleReplay(consoleHistoryAfterSyncExecution);
+        }
+
         promiseResult = {
-          html: await renderResult,
+          html: awaitedRenderResult,
           consoleReplayScript,
           hasErrors,
         };
@@ -127,7 +140,7 @@ as a renderFunction and not a simple React Function Component.`);
             name,
             serverSide: true,
           }),
-          consoleReplayScript,
+          consoleReplayScript: buildConsoleReplay(consoleHistoryAfterSyncExecution),
           hasErrors: true,
         }
         renderingError = e;
@@ -145,7 +158,7 @@ as a renderFunction and not a simple React Function Component.`);
 
   const result = {
     html: renderResult,
-    consoleReplayScript,
+    consoleReplayScript: buildConsoleReplay(consoleHistoryAfterSyncExecution),
     hasErrors,
   } as RenderResult;
 
@@ -157,12 +170,72 @@ as a renderFunction and not a simple React Function Component.`);
 }
 
 const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (options) => {
+  let result: string | Promise<RenderResult> | null = null;
   try {
-    return serverRenderReactComponentInternal(options);
+    result = serverRenderReactComponentInternal(options);
   } finally {
     // Reset console history after each render.
     // See `RubyEmbeddedJavaScript.console_polyfill` for initialization.
-    console.history = [];
+    // We don't need to clear the console history if the result is a promise
+    // Promises only supported in node renderer and node renderer takes care of cleanining console history
+    if (typeof result === 'string') {
+      console.history = [];
+    }
   }
+  return result;
 };
+
+const stringToStream = (str: string): Readable => {
+  const stream = new PassThrough();
+  stream.push(str);
+  stream.push(null);
+  return stream;
+};
+
+export const streamServerRenderedReactComponent = (options: RenderParams): Readable => {
+  const { name, domNodeId, trace, props, railsContext, throwJsErrors } = options;
+
+  let renderResult: null | Readable = null;
+
+  try {
+    const componentObj = ComponentRegistry.get(name);
+    if (componentObj.isRenderer) {
+      throw new Error(`\
+Detected a renderer while server rendering component '${name}'. \
+See https://github.com/shakacode/react_on_rails#renderer-functions`);
+    }
+
+    const reactRenderingResult = createReactOutput({
+      componentObj,
+      domNodeId,
+      trace,
+      props,
+      railsContext,
+    });
+
+    if (isServerRenderHash(reactRenderingResult) || isPromise(reactRenderingResult)) {
+      throw new Error('Server rendering of streams is not supported for server render hashes or promises.');
+    }
+
+    const renderStream = new PassThrough();
+    ReactDOMServer.renderToPipeableStream(reactRenderingResult).pipe(renderStream);
+    renderResult = renderStream;
+
+    // TODO: Add console replay script to the stream
+    // Ensure to avoid console messages leaking between different components rendering
+  } catch (e: any) {
+    if (throwJsErrors) {
+      throw e;
+    }
+
+    renderResult = stringToStream(handleError({
+      e,
+      name,
+      serverSide: true,
+    }));
+  }
+
+  return renderResult;
+};
+
 export default serverRenderReactComponent;

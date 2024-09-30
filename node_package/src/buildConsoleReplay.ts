@@ -11,14 +11,15 @@ declare global {
   }
 }
 
-export function consoleReplay(): string {
+export function consoleReplay(customConsoleHistory: typeof console['history'] | undefined = undefined): string {
   // console.history is a global polyfill used in server rendering.
-  // $FlowFixMe
-  if (!(console.history instanceof Array)) {
+  const consoleHistory = customConsoleHistory ?? console.history;
+
+  if (!(Array.isArray(consoleHistory))) {
     return '';
   }
 
-  const lines = console.history.map(msg => {
+  const lines = consoleHistory.map(msg => {
     const stringifiedList = msg.arguments.map(arg => {
       let val;
       try {
@@ -39,6 +40,6 @@ export function consoleReplay(): string {
   return lines.join('\n');
 }
 
-export default function buildConsoleReplay(): string {
-  return RenderUtils.wrapInScriptTags('consoleReplayLog', consoleReplay());
+export default function buildConsoleReplay(customConsoleHistory: typeof console['history'] | undefined = undefined): string {
+  return RenderUtils.wrapInScriptTags('consoleReplayLog', consoleReplay(customConsoleHistory));
 }
