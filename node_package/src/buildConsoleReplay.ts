@@ -12,9 +12,9 @@ declare global {
 }
 
 export function consoleReplay(customConsoleHistory: typeof console['history'] | undefined = undefined): string {
+  // console.history is a global polyfill used in server rendering.
   const consoleHistory = customConsoleHistory ?? console.history;
 
-  // console.history is a global polyfill used in server rendering.
   // $FlowFixMe
   if (!(Array.isArray(consoleHistory))) {
     return '';
