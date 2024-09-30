@@ -175,8 +175,8 @@ const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (o
   } finally {
     // Reset console history after each render.
     // See `RubyEmbeddedJavaScript.console_polyfill` for initialization.
-    // We don't need to clear the console history if the result is a promise
-    // Promises only supported in node renderer and node renderer takes care of cleanining console history
+    // We don't need to clear the console history if the result is a promise.
+    // Promises are only supported in the node renderer and it takes care of cleaning console history.
     if (typeof result === 'string') {
       console.history = [];
     }
