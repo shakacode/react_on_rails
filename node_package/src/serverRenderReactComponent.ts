@@ -114,8 +114,8 @@ as a renderFunction and not a simple React Function Component.`);
         const awaitedRenderResult = await renderResult;
 
         // If replayServerAsyncOperationLogs node renderer config is enabled, the console.history will contain all logs happened during sync and async operations.
-        // If replayServerAsyncOperationLogs node renderer config is disabled, the console.history will be empty, because it will clear the history after the sync execution.
-        // If the config is disabled, we will return the logs accumulated during the sync execution only.
+        // If the config is disabled, the console.history will be empty, because it will clear the history after the sync execution.
+        // In case of disabled config, we will use the console.history after sync execution, which contains all logs happened during sync execution.
         const consoleHistoryAfterAsyncExecution = console.history;
         let consoleReplayScript = '';
         if ((consoleHistoryAfterAsyncExecution?.length ?? 0) > (consoleHistoryAfterSyncExecution?.length ?? 0)) {
