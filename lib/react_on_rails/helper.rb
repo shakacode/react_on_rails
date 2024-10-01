@@ -54,9 +54,7 @@ module ReactOnRails
     # random_dom_id can be set to override the default from the config/initializers. That's only
     # used if you have multiple instance of the same component on the Rails view.
     def react_component(component_name, options = {}, &block)
-      (options[:props] ||= {})[:children_html] = capture(&block) if block
-
-      internal_result = internal_react_component(component_name, options)
+      internal_result = internal_react_component(component_name, options, &block)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
       render_options = internal_result[:render_options]
@@ -111,10 +109,9 @@ module ReactOnRails
     #    <%= react_helmet_app["componentHtml"] %>
     #
     def react_component_hash(component_name, options = {}, &block)
-      (options[:props] ||= {})[:children_html] = capture(&block) if block
       options[:prerender] = true
 
-      internal_result = internal_react_component(component_name, options)
+      internal_result = internal_react_component(component_name, options, &block)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
       render_options = internal_result[:render_options]
@@ -424,13 +421,15 @@ module ReactOnRails
       "#{rails_context_content}\n#{render_value}".html_safe
     end
 
-    def internal_react_component(react_component_name, options = {})
+    def internal_react_component(react_component_name, options = {}, &block)
       # Create the JavaScript and HTML to allow either client or server rendering of the
       # react_component.
       #
       # Create the JavaScript setup of the global to initialize the client rendering
       # (re-hydrate the data). This enables react rendered on the client to see that the
       # server has already rendered the HTML.
+
+      (options[:props] ||= {})[:children_html] = capture(&block) if block
 
       render_options = ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: react_component_name,
                                                                        options: options)
