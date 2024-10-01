@@ -53,7 +53,9 @@ module ReactOnRails
     # Any other options are passed to the content tag, including the id.
     # random_dom_id can be set to override the default from the config/initializers. That's only
     # used if you have multiple instance of the same component on the Rails view.
-    def react_component(component_name, options = {})
+    def react_component(component_name, options = {}, &block)
+      (options[:props] ||= {})[:children_html] = capture(&block) if block
+
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]

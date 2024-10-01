@@ -26,6 +26,8 @@ export default function createReactOutput({
 }: CreateParams): CreateReactOutputResult {
   const { name, component, renderFunction } = componentObj;
 
+  const children = props?.children_html ? React.createElement('div', {dangerouslySetInnerHTML: {__html: props.children_html }}) : null;
+
   if (trace) {
     if (railsContext && railsContext.serverSide) {
       console.log(`RENDERED ${name} to dom node with id: ${domNodeId}`);
@@ -68,8 +70,8 @@ work if you return JSX. Update by wrapping the result JSX of ${name} in a fat ar
 
     // If a component, then wrap in an element
     const reactComponent = renderFunctionResult as ReactComponent;
-    return React.createElement(reactComponent, props);
+    return React.createElement(reactComponent, props, children);
   }
   // else
-  return React.createElement(component as ReactComponent, props);
+  return React.createElement(component as ReactComponent, props, children);
 }
