@@ -131,13 +131,13 @@ issue.
   ```js
   import React from 'react';
 
-  export default (props) => {
-    return () => (
-      <div>{ props.children }</div>
-    );
-  };
+  const YourComponent = (props) => (
+    <div>{ props.children }</div>
+  );
+  
+  export default YourComponent;
   ```
-  **Note that this is implementing using React's [dangerouslySetInnerHtml](https://react.dev/reference/react-dom/components/common#dangerously-setting-the-inner-html)**, so named because of the exposure to cross-site scripting attacks. You should generally be fine since the HTML is coming from your own code via the Rails rendering engine, but this is sharp knife so please exercise caution :)
+  **Security Note**: This feature is implemented using React's [dangerouslySetInnerHtml](https://react.dev/reference/react-dom/components/common#dangerously-setting-the-inner-html)**. While generally safe when the HTML comes from your own Rails rendering engine, it can expose your application to cross-site scripting (XSS) attacks if not used carefully. Always ensure that the content passed to the block is properly sanitized and comes from trusted sources. Avoid passing user-generated content without proper sanitization.
 
 See the [View Helpers API](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/) for more details on `react_component` and its sibling function `react_component_hash`.
 
