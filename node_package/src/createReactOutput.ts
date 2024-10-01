@@ -26,8 +26,6 @@ export default function createReactOutput({
 }: CreateParams): CreateReactOutputResult {
   const { name, component, renderFunction } = componentObj;
 
-  const children = props?.children_html ? React.createElement('div', {dangerouslySetInnerHTML: {__html: props.children_html }}) : null;
-
   if (trace) {
     if (railsContext && railsContext.serverSide) {
       console.log(`RENDERED ${name} to dom node with id: ${domNodeId}`);
@@ -38,13 +36,20 @@ export default function createReactOutput({
       console.log(`RENDERED ${name} to dom node with id: ${domNodeId} with props, railsContext:`,
         props, railsContext);
     }
+
+    if (renderFunction) {
+      console.log(`${name} is a renderFunction`);
+    }
   }
+
+  // Convert any nested content passed to the component into a React element.
+  const children = props?.children_html ? React.createElement('div', {dangerouslySetInnerHTML: {__html: props.children_html }}) : null;
+
+  const createElementFromComponent = (komponent: ReactComponent) => React.createElement(komponent, props, children);
 
   if (renderFunction) {
     // Let's invoke the function to get the result
-    if (trace) {
-      console.log(`${name} is a renderFunction`);
-    }
+
     const renderFunctionResult = (component as RenderFunction)(props, railsContext);
     if (isServerRenderHash(renderFunctionResult as CreateReactOutputResult)) {
       // We just return at this point, because calling function knows how to handle this case and
@@ -70,8 +75,8 @@ work if you return JSX. Update by wrapping the result JSX of ${name} in a fat ar
 
     // If a component, then wrap in an element
     const reactComponent = renderFunctionResult as ReactComponent;
-    return React.createElement(reactComponent, props, children);
+    return createElementFromComponent(reactComponent);
   }
   // else
-  return React.createElement(component as ReactComponent, props, children);
+  return createElementFromComponent(component as ReactComponent);
 }

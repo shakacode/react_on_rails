@@ -284,6 +284,21 @@ describe "display images", :js do
   end
 end
 
+describe "with children", :js do
+  subject { page }
+
+  before { visit "/children_example" }
+
+  it "children_example should not have any errors" do
+    expect(page).to have_text(
+      "This page demonstrates using Rails to produce content for child nodes of React components"
+    )
+    expect(page).to have_text(
+      "And, just to check that multiple DOM nodes are fine"
+    )
+  end
+end
+
 describe "use different props for server/client", :js do
   subject { page }
 

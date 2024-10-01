@@ -110,8 +110,10 @@ module ReactOnRails
     #    <% end %>
     #    <%= react_helmet_app["componentHtml"] %>
     #
-    def react_component_hash(component_name, options = {})
+    def react_component_hash(component_name, options = {}, &block)
+      (options[:props] ||= {})[:children_html] = capture(&block) if block
       options[:prerender] = true
+
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]

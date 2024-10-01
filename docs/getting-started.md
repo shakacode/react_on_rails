@@ -121,6 +121,24 @@ issue.
   };
   ```
 
+- You can pass a block to `react_component`, and it will be provided as the `children` prop to the React component, as a React element:
+  ```ruby
+    <%= react_component("YourComponent") do %>
+      <p>Contained HTML<p>
+      <%= render "your/partial" %>
+    <% end %>
+  ```
+  ```js
+  import React from 'react';
+
+  export default (props) => {
+    return () => (
+      <div>{ props.children }</div>
+    );
+  };
+  ```
+  **Note that this is implementing using React's [dangerouslySetInnerHtml](https://react.dev/reference/react-dom/components/common#dangerously-setting-the-inner-html)**, so named because of the exposure to cross-site scripting attacks. You should generally be fine since the HTML is coming from your own code via the Rails rendering engine, but this is sharp knife so please exercise caution :)
+
 See the [View Helpers API](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/) for more details on `react_component` and its sibling function `react_component_hash`.
 
 ## Globally Exposing Your React Components
