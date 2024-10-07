@@ -3,7 +3,7 @@ import type { AuthenticityHeaders } from './types/index';
 export default {
   authenticityToken(): string | null {
     const token = document.querySelector('meta[name="csrf-token"]');
-    if (token && (token instanceof window.HTMLMetaElement)) {
+    if (token instanceof HTMLMetaElement) {
       return token.content;
     }
     return null;

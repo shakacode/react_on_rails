@@ -1,7 +1,7 @@
 import type { RegisteredComponent, ReactComponentOrRenderFunction, RenderFunction } from './types/index';
 import isRenderFunction from './isRenderFunction';
 
-const registeredComponents = new Map();
+const registeredComponents = new Map<string, RegisteredComponent>();
 
 export default {
   /**
@@ -35,8 +35,9 @@ export default {
    * @returns { name, component, isRenderFunction, isRenderer }
    */
   get(name: string): RegisteredComponent {
-    if (registeredComponents.has(name)) {
-      return registeredComponents.get(name);
+    const registeredComponent = registeredComponents.get(name);
+    if (registeredComponent !== undefined) {
+      return registeredComponent;
     }
 
     const keys = Array.from(registeredComponents.keys()).join(', ');

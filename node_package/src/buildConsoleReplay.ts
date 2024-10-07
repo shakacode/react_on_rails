@@ -1,8 +1,6 @@
 import RenderUtils from './RenderUtils';
 import scriptSanitizedVal from './scriptSanitizedVal';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 declare global {
   interface Console {
     history?: {
@@ -13,24 +11,26 @@ declare global {
 
 export function consoleReplay(): string {
   // console.history is a global polyfill used in server rendering.
-  // $FlowFixMe
   if (!(console.history instanceof Array)) {
     return '';
   }
 
   const lines = console.history.map(msg => {
     const stringifiedList = msg.arguments.map(arg => {
-      let val;
+      let val: string | undefined;
       try {
-        val = (typeof arg === 'string' || arg instanceof String) ? arg : JSON.stringify(arg);
+        // eslint-disable-next-line no-nested-ternary
+        val = typeof arg === 'string' ? arg :
+          arg instanceof String ? String(arg) :
+            JSON.stringify(arg);
         if (val === undefined) {
           val = 'undefined';
         }
-      } catch (e: any) {
-        val = `${e.message}: ${arg}`;
+      } catch (e) {
+        val = `${(e as Error).message}: ${arg}`;
       }
 
-      return scriptSanitizedVal(val as string);
+      return scriptSanitizedVal(val);
     });
 
     return `console.${msg.level}.apply(console, ${JSON.stringify(stringifiedList)});`;
