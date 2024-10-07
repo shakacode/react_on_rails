@@ -100,6 +100,7 @@ as a renderFunction and not a simple React Function Component.`);
 
   const consoleReplayScript = buildConsoleReplay();
   const addRenderingErrors = (resultObject: RenderResult, renderError: RenderingError) => {
+    // Do not use `resultObject.renderingError = renderError` because JSON.stringify will turn it into '{}'.
     resultObject.renderingError = { // eslint-disable-line no-param-reassign
       message: renderError.message,
       stack: renderError.stack,
