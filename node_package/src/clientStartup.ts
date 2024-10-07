@@ -13,8 +13,6 @@ import { isServerRenderHash } from './isServerRenderResult';
 import reactHydrateOrRender from './reactHydrateOrRender';
 import { supportsRootApi } from './reactApis';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 declare global {
   interface Window {
     ReactOnRails: ReactOnRailsType;

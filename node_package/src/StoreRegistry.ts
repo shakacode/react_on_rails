@@ -3,8 +3,8 @@ import type { StoreGenerator } from './types';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Store = any;
 
-const registeredStoreGenerators = new Map();
-const hydratedStores = new Map();
+const registeredStoreGenerators = new Map<string, StoreGenerator>();
+const hydratedStores = new Map<string, Store>();
 
 export default {
   /**
@@ -66,8 +66,9 @@ This can happen if you are server rendering and either:
    * @returns storeCreator with given name
    */
   getStoreGenerator(name: string): StoreGenerator {
-    if (registeredStoreGenerators.has(name)) {
-      return registeredStoreGenerators.get(name);
+    const registeredStoreGenerator = registeredStoreGenerators.get(name);
+    if (registeredStoreGenerator) {
+      return registeredStoreGenerator;
     }
 
     const storeKeys = Array.from(registeredStoreGenerators.keys()).join(', ');
