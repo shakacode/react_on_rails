@@ -28,6 +28,10 @@ aliases:
     name: Check formatting
     command: yarn start format.listDifferent
 
+  - &type-check
+    name: Type-check TypeScript
+    command: yarn run type-check
+
   # Install/update Node modules for renderer package unless existing set of modules is satisfying Yarn.
   - &install-package-node-modules
     name: Install Node modules with Yarn for renderer package
@@ -120,6 +124,7 @@ jobs:
       - run: *lint-ruby
       - run: *lint-js
       - run: *format
+      - run: *type-check
 
   prettier:
     docker: *docker-image
