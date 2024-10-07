@@ -18,6 +18,9 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+#### Fixed
+- Incorrect type and confusing name for `ReactOnRails.registerStore`, use `registerStoreGenerators` instead. [PR 1651](https://github.com/shakacode/react_on_rails/pull/1651) by [alexeyr-ci](https://github.com/alexeyr-ci).
+
 ### [14.0.5] - 2024-08-20
 #### Fixed
 - Should force load react-components which send over turbo-stream [PR #1620](https://github.com/shakacode/react_on_rails/pull/1620) by [theforestvn88](https://github.com/theforestvn88).
