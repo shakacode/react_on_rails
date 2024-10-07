@@ -46,7 +46,7 @@ interface RenderFunction {
   (props?: any, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
   // We allow specifying that the function is RenderFunction and not a React Function Component
   // by setting this property
-  renderFunction?: boolean;
+  renderFunction?: true;
 }
 
 type ReactComponentOrRenderFunction = ReactComponent | RenderFunction;
@@ -87,22 +87,16 @@ export interface CreateParams extends Params {
   shouldHydrate?: boolean;
 }
 
-interface FileError extends Error {
-  fileName: string;
-  lineNumber: string;
-}
-
 export interface ErrorOptions {
-  e: FileError;
+  // fileName and lineNumber are non-standard, but useful if present
+  // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/fileName
+  e: Error & { fileName?: string; lineNumber?: string };
   name?: string;
   jsCode?: string;
   serverSide: boolean;
 }
 
-export interface RenderingError {
-  message: string;
-  stack: string;
-}
+export type RenderingError = Pick<Error, 'message' | 'stack'>;
 
 export interface RenderResult {
   html: string | null;
