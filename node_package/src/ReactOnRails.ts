@@ -17,12 +17,10 @@ import type {
   ErrorOptions,
   ReactComponentOrRenderFunction,
   AuthenticityHeaders,
+  Store,
   StoreGenerator,
 } from './types';
 import reactHydrateOrRender from './reactHydrateOrRender';
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-type Store = any;
 
 const ctx = context();
 
@@ -56,19 +54,23 @@ ctx.ReactOnRails = {
     ComponentRegistry.register(components);
   },
 
+  registerStore(stores: { [id: string]: StoreGenerator }): void {
+    this.registerStoreGenerators(stores);
+  },
+
   /**
-   * Allows registration of store generators to be used by multiple react components on one Rails
+   * Allows registration of store generators to be used by multiple React components on one Rails
    * view. store generators are functions that take one arg, props, and return a store. Note that
    * the setStore API is different in that it's the actual store hydrated with props.
-   * @param stores (keys are store names, values are the store generators)
+   * @param storeGenerators (keys are store names, values are the store generators)
    */
-  registerStore(stores: { [id: string]: Store }): void {
-    if (!stores) {
-      throw new Error('Called ReactOnRails.registerStores with a null or undefined, rather than ' +
+  registerStoreGenerators(storeGenerators: { [id: string]: StoreGenerator }): void {
+    if (!storeGenerators) {
+      throw new Error('Called ReactOnRails.registerStoreGenerators with a null or undefined, rather than ' +
         'an Object with keys being the store names and the values are the store generators.');
     }
 
-    StoreRegistry.register(stores);
+    StoreRegistry.register(storeGenerators);
   },
 
   /**
@@ -148,7 +150,7 @@ ctx.ReactOnRails = {
 
   /**
    * Returns header with csrf authenticity token and XMLHttpRequest
-   * @param {*} other headers
+   * @param otherHeaders Other headers
    * @returns {*} header
    */
 
@@ -171,7 +173,7 @@ ctx.ReactOnRails = {
 
   /**
    * Allows retrieval of the store generator by name. This is used internally by ReactOnRails after
-   * a rails form loads to prepare stores.
+   * a Rails form loads to prepare stores.
    * @param name
    * @returns Redux Store generator function
    */

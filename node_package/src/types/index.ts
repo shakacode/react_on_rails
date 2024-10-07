@@ -2,8 +2,9 @@ import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
 
 // Don't import redux just for the type definitions
 // See https://github.com/shakacode/react_on_rails/issues/1321
+// and https://redux.js.org/api/store for the actual API.
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type Store = any;
+type Store = unknown;
 
 type ReactComponent = ComponentType<any> | string;
 
@@ -57,6 +58,7 @@ export type { // eslint-disable-line import/prefer-default-export
   AuthenticityHeaders,
   RenderFunction,
   RenderFunctionResult,
+  Store,
   StoreGenerator,
   CreateReactOutputResult,
   ServerRenderResult,
@@ -115,7 +117,9 @@ export type RenderReturnType = void | Element | Component | Root;
 
 export interface ReactOnRails {
   register(components: { [id: string]: ReactComponentOrRenderFunction }): void;
-  registerStore(stores: { [id: string]: Store }): void;
+  /** @deprecated Use registerStoreGenerators instead */
+  registerStore(stores: { [id: string]: StoreGenerator }): void;
+  registerStoreGenerators(storeGenerators: { [id: string]: StoreGenerator }): void;
   getStore(name: string, throwIfMissing?: boolean): Store | undefined;
   setOptions(newOptions: {traceTurbolinks: boolean}): void;
   reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType;
