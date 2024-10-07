@@ -32,3 +32,9 @@ npm-debug.*
 yalc.lock
 
 .byebug_history
+
+# IDE
+.idea/
+
+# TypeScript
+*.tsbuildinfo

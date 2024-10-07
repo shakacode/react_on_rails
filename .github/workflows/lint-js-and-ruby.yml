@@ -53,3 +53,5 @@ jobs:
       run: yarn start lint
     - name: Check formatting
       run: yarn start format.listDifferent
+    - name: Type-check TypeScript
+      run: yarn run type-check
