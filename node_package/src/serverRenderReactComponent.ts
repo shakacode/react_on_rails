@@ -3,11 +3,10 @@ import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
 import createReactOutput from './createReactOutput';
-import {isServerRenderHash, isPromise} from
-    './isServerRenderResult';
+import { isPromise, isServerRenderHash } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
-import type { RenderParams, RenderResult, RenderingError } from './types/index';
+import type { RenderParams, RenderResult, RenderingError, ServerRenderResult } from './types';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -35,37 +34,37 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
     });
 
     const processServerRenderHash = () => {
-        // We let the client side handle any redirect
-        // Set hasErrors in case we want to throw a Rails exception
-        hasErrors = !!(reactRenderingResult as {routeError: Error}).routeError;
+      // We let the client side handle any redirect
+      // Set hasErrors in case we want to throw a Rails exception
+      const { redirectLocation, routeError } = reactRenderingResult as ServerRenderResult;
+      hasErrors = !!routeError;
 
-        if (hasErrors) {
-          console.error(
-            `React Router ERROR: ${JSON.stringify((reactRenderingResult as {routeError: Error}).routeError)}`,
+      if (hasErrors) {
+        console.error(
+          `React Router ERROR: ${JSON.stringify(routeError)}`,
+        );
+      }
+
+      if (redirectLocation) {
+        if (trace) {
+          const redirectPath = redirectLocation.pathname + redirectLocation.search;
+          console.log(`\
+  ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redirectPath}`,
           );
         }
-
-        if ((reactRenderingResult as {redirectLocation: {pathname: string; search: string}}).redirectLocation) {
-          if (trace) {
-            const { redirectLocation } = (reactRenderingResult as {redirectLocation: {pathname: string; search: string}});
-            const redirectPath = redirectLocation.pathname + redirectLocation.search;
-            console.log(`\
-  ROUTER REDIRECT: ${name} to dom node with id: ${domNodeId}, redirect to ${redirectPath}`,
-            );
-          }
-          // For redirects on server rendering, we can't stop Rails from returning the same result.
-          // Possibly, someday, we could have the rails server redirect.
-          return '';
-        }
-        return (reactRenderingResult as { renderedHtml: string }).renderedHtml;
+        // For redirects on server rendering, we can't stop Rails from returning the same result.
+        // Possibly, someday, we could have the rails server redirect.
+        return '';
+      }
+      return (reactRenderingResult as ServerRenderResult).renderedHtml as string;
     };
 
     const processPromise = () => {
       if (!renderingReturnsPromises) {
-        console.error('Your render function returned a Promise, which is only supported by a node renderer, not ExecJS.')
+        console.error('Your render function returned a Promise, which is only supported by a node renderer, not ExecJS.');
       }
       return reactRenderingResult;
-    }
+    };
 
     const processReactElement = () => {
       try {
@@ -101,15 +100,16 @@ as a renderFunction and not a simple React Function Component.`);
 
   const consoleReplayScript = buildConsoleReplay();
   const addRenderingErrors = (resultObject: RenderResult, renderError: RenderingError) => {
+    // Do not use `resultObject.renderingError = renderError` because JSON.stringify will turn it into '{}'.
     resultObject.renderingError = { // eslint-disable-line no-param-reassign
       message: renderError.message,
       stack: renderError.stack,
     };
-  }
+  };
 
-  if(renderingReturnsPromises) {
+  if (renderingReturnsPromises) {
     const resolveRenderResult = async () => {
-      let promiseResult;
+      let promiseResult: RenderResult;
 
       try {
         promiseResult = {
@@ -129,7 +129,7 @@ as a renderFunction and not a simple React Function Component.`);
           }),
           consoleReplayScript,
           hasErrors: true,
-        }
+        };
         renderingError = e;
       }
 
@@ -143,11 +143,11 @@ as a renderFunction and not a simple React Function Component.`);
     return resolveRenderResult();
   }
 
-  const result = {
-    html: renderResult,
+  const result: RenderResult = {
+    html: renderResult as string,
     consoleReplayScript,
     hasErrors,
-  } as RenderResult;
+  };
 
   if (renderingError) {
     addRenderingErrors(result, renderingError);

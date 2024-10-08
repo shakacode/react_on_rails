@@ -8,6 +8,7 @@
     "noImplicitAny": true,
     "outDir": "node_package/lib",
     "strict": true,
+    "incremental": true,
     "target": "es5"
   },
   "include": ["node_package/src/**/*"]

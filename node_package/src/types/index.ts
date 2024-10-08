@@ -2,8 +2,9 @@ import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
 
 // Don't import redux just for the type definitions
 // See https://github.com/shakacode/react_on_rails/issues/1321
+// and https://redux.js.org/api/store for the actual API.
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type Store = any;
+type Store = unknown;
 
 type ReactComponent = ComponentType<any> | string;
 
@@ -46,7 +47,7 @@ interface RenderFunction {
   (props?: any, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
   // We allow specifying that the function is RenderFunction and not a React Function Component
   // by setting this property
-  renderFunction?: boolean;
+  renderFunction?: true;
 }
 
 type ReactComponentOrRenderFunction = ReactComponent | RenderFunction;
@@ -57,6 +58,7 @@ export type { // eslint-disable-line import/prefer-default-export
   AuthenticityHeaders,
   RenderFunction,
   RenderFunctionResult,
+  Store,
   StoreGenerator,
   CreateReactOutputResult,
   ServerRenderResult,
@@ -87,22 +89,16 @@ export interface CreateParams extends Params {
   shouldHydrate?: boolean;
 }
 
-interface FileError extends Error {
-  fileName: string;
-  lineNumber: string;
-}
-
 export interface ErrorOptions {
-  e: FileError;
+  // fileName and lineNumber are non-standard, but useful if present
+  // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/fileName
+  e: Error & { fileName?: string; lineNumber?: string };
   name?: string;
   jsCode?: string;
   serverSide: boolean;
 }
 
-export interface RenderingError {
-  message: string;
-  stack: string;
-}
+export type RenderingError = Pick<Error, 'message' | 'stack'>;
 
 export interface RenderResult {
   html: string | null;
@@ -121,7 +117,9 @@ export type RenderReturnType = void | Element | Component | Root;
 
 export interface ReactOnRails {
   register(components: { [id: string]: ReactComponentOrRenderFunction }): void;
-  registerStore(stores: { [id: string]: Store }): void;
+  /** @deprecated Use registerStoreGenerators instead */
+  registerStore(stores: { [id: string]: StoreGenerator }): void;
+  registerStoreGenerators(storeGenerators: { [id: string]: StoreGenerator }): void;
   getStore(name: string, throwIfMissing?: boolean): Store | undefined;
   setOptions(newOptions: {traceTurbolinks: boolean}): void;
   reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType;

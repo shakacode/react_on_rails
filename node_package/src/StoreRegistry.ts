@@ -1,17 +1,14 @@
-import type { StoreGenerator } from './types';
+import type { Store, StoreGenerator } from './types';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-type Store = any;
-
-const registeredStoreGenerators = new Map();
-const hydratedStores = new Map();
+const registeredStoreGenerators = new Map<string, StoreGenerator>();
+const hydratedStores = new Map<string, Store>();
 
 export default {
   /**
    * Register a store generator, a function that takes props and returns a store.
    * @param storeGenerators { name1: storeGenerator1, name2: storeGenerator2 }
    */
-  register(storeGenerators: { [id: string]: Store }): void {
+  register(storeGenerators: { [id: string]: StoreGenerator }): void {
     Object.keys(storeGenerators).forEach(name => {
       if (registeredStoreGenerators.has(name)) {
         console.warn('Called registerStore for store that is already registered', name);
@@ -66,8 +63,9 @@ This can happen if you are server rendering and either:
    * @returns storeCreator with given name
    */
   getStoreGenerator(name: string): StoreGenerator {
-    if (registeredStoreGenerators.has(name)) {
-      return registeredStoreGenerators.get(name);
+    const registeredStoreGenerator = registeredStoreGenerators.get(name);
+    if (registeredStoreGenerator) {
+      return registeredStoreGenerator;
     }
 
     const storeKeys = Array.from(registeredStoreGenerators.keys()).join(', ');

@@ -8,11 +8,9 @@ import { ReactComponentOrRenderFunction, RenderFunction } from "./types/index";
  * @param component
  * @returns {boolean}
  */
-export default function isRenderFunction(component: ReactComponentOrRenderFunction): boolean {
+export default function isRenderFunction(component: ReactComponentOrRenderFunction): component is RenderFunction {
   // No for es5 or es6 React Component
-  if (
-    (component as RenderFunction).prototype &&
-    (component as RenderFunction).prototype.isReactComponent) {
+  if ((component as RenderFunction).prototype?.isReactComponent) {
     return false;
   }
 
@@ -22,7 +20,7 @@ export default function isRenderFunction(component: ReactComponentOrRenderFuncti
 
   // If zero or one args, then we know that this is a regular function that will
   // return a React component
-  if (component.length >= 2) {
+  if ((component as RenderFunction).length >= 2) {
     return true;
   }
 
