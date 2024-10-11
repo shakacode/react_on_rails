@@ -67,7 +67,15 @@ export type { // eslint-disable-line import/prefer-default-export
 export interface RegisteredComponent {
   name: string;
   component: ReactComponentOrRenderFunction;
+  // Indicates if the registered component is a Render-function.
+  // Render-functions receive two arguments: props and railsContext.
+  // They should return a string, React component, React element, or a Promise.
+  // These functions are used to create dynamic React components or server-rendered HTML.
   renderFunction: boolean;
+  // Indicates if the registered component is a Renderer function.
+  // Renderer function handles DOM rendering or hydration with 3 args: (props, railsContext, domNodeId)
+  // Supported on the client side only.
+  // All renderer functions are render functions, but not all render functions are renderer functions.
   isRenderer: boolean;
 }
 
