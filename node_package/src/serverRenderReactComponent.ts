@@ -121,11 +121,12 @@ function createFinalResult(
   componentName: string,
   throwJsErrors: boolean
 ): null | string | Promise<RenderResult> {
-  // Node can handle multiple rendering requests simultaneously.
   // Console history is stored globally in `console.history`.
-  // To prevent cross-request data leakage:
-  // 1. We build the consoleReplayScript here, before any async operations.
-  // 2. The console history is reset after the sync part of each request.
+  // If node renderer is handling a render request that returns a promise,
+  // It can handle another request while awaiting the promise.
+  // To prevent cross-request console logs leakage between these requests,
+  // we build the consoleReplayScript before awaiting any promises.
+  // The console history is reset after the synchronous part of each request.
   // This causes console logs happening during async operations to not be captured.
   const consoleReplayScript = buildConsoleReplay();
 
