@@ -121,6 +121,12 @@ function createFinalResult(
   componentName: string,
   throwJsErrors: boolean
 ): null | string | Promise<RenderResult> {
+  // Node can handle multiple rendering requests simultaneously.
+  // Console history is stored globally in `console.history`.
+  // To prevent cross-request data leakage:
+  // 1. We build the consoleReplayScript here, before any async operations.
+  // 2. The console history is reset after the sync part of each request.
+  // This causes console logs happening during async operations to not be captured.
   const consoleReplayScript = buildConsoleReplay();
 
   const { result } = renderState;
@@ -163,7 +169,7 @@ function serverRenderReactComponentInternal(options: RenderParams): null | strin
 
   // Finalize the rendering result and prepare it for server response
   // 1. Builds the consoleReplayScript for client-side console replay
-  // 2. Handles both synchronous and asynchronous (Promise) results
+  // 2. Extract the result from promise (if needed) by awaiting it
   // 3. Constructs a JSON object with the following properties:
   //    - html: string | null (The rendered component HTML)
   //    - consoleReplayScript: string (Script to replay console outputs on the client)
