@@ -11,23 +11,23 @@ import type { CreateReactOutputResult, RegisteredComponent, RenderParams, Render
 type RenderState = {
   result: null | string | Promise<string>;
   hasErrors: boolean;
-  error: null | RenderingError;
+  error?: RenderingError;
 };
 
 type RenderOptions = {
-  name: string;
+  componentName: string;
   domNodeId?: string;
   trace?: boolean;
   renderingReturnsPromises: boolean;
 };
 
-function validateComponent(componentObj: RegisteredComponent, name: string) {
+function validateComponent(componentObj: RegisteredComponent, componentName: string) {
   if (componentObj.isRenderer) {
-    throw new Error(`Detected a renderer while server rendering component '${name}'. See https://github.com/shakacode/react_on_rails#renderer-functions`);
+    throw new Error(`Detected a renderer while server rendering component '${componentName}'. See https://github.com/shakacode/react_on_rails#renderer-functions`);
   }
 }
 
-function processServerRenderHash(result: ServerRenderResult, options: RenderOptions): string {
+function processServerRenderHash(result: ServerRenderResult, options: RenderOptions): RenderState {
   const { redirectLocation, routeError } = result;
   const hasErrors = !!routeError;
 
@@ -35,15 +35,18 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
     console.error(`React Router ERROR: ${JSON.stringify(routeError)}`);
   }
 
+  let htmlResult: string;
   if (redirectLocation) {
     if (options.trace) {
       const redirectPath = redirectLocation.pathname + redirectLocation.search;
-      console.log(`ROUTER REDIRECT: ${options.name} to dom node with id: ${options.domNodeId}, redirect to ${redirectPath}`);
+      console.log(`ROUTER REDIRECT: ${options.componentName} to dom node with id: ${options.domNodeId}, redirect to ${redirectPath}`);
     }
-    return '';
+    htmlResult = '';
+  } else {
+    htmlResult = result.renderedHtml as string;
   }
 
-  return result.renderedHtml as string;
+  return { result: htmlResult, hasErrors };
 }
 
 function processPromise(result: Promise<unknown>, renderingReturnsPromises: boolean): Promise<string> | string {
@@ -67,79 +70,78 @@ as a renderFunction and not a simple React Function Component.`);
   }
 }
 
-function processRenderingResult(result: CreateReactOutputResult, options: RenderOptions): string | Promise<string> {
+function processRenderingResult(result: CreateReactOutputResult, options: RenderOptions): RenderState {
   if (isServerRenderHash(result)) {
     return processServerRenderHash(result, options);
   }
   if (isPromise(result)) {
-    return processPromise(result, options.renderingReturnsPromises);
+    return { result: processPromise(result, options.renderingReturnsPromises), hasErrors: false };
   }
-  return processReactElement(result);
+  return { result: processReactElement(result), hasErrors: false };
 }
 
-function handleRenderingError(e: Error, renderState: RenderState, options: { name: string, throwJsErrors: boolean }) {
+function handleRenderingError(e: unknown, options: { componentName: string, throwJsErrors: boolean }) {
   if (options.throwJsErrors) {
     throw e;
   }
+  const error = e instanceof Error ? e : new Error(String(e));
   return {
-    ...renderState,
     hasErrors: true,
-    result: handleError({ e, name: options.name, serverSide: true }),
-    error: e,
+    result: handleError({ e: error, name: options.componentName, serverSide: true }),
+    error,
   };
 }
 
-function createResultObject(html: string | null, consoleReplayScript: string, hasErrors: boolean, error: RenderingError | null): RenderResult {
-  const result: RenderResult = { html, consoleReplayScript, hasErrors };
-  if (error) {
-    result.renderingError = {
-      message: error.message,
-      stack: error.stack,
-    };
+function createResultObject(html: string | null, consoleReplayScript: string, hasErrors: boolean, error?: RenderingError): RenderResult {
+  return {
+    html,
+    consoleReplayScript,
+    hasErrors,
+    renderingError: error && { message: error.message, stack: error.stack },
+  };
+}
+
+async function createPromiseResult(
+  renderState: RenderState & { result: Promise<string> },
+  consoleReplayScript: string,
+  componentName: string,
+  throwJsErrors: boolean
+): Promise<RenderResult> {
+  try {
+    const html = await renderState.result;
+    return createResultObject(html, consoleReplayScript, renderState.hasErrors, renderState.error);
+  } catch (e: unknown) {
+    const errorRenderState = handleRenderingError(e, { componentName, throwJsErrors });
+    return createResultObject(errorRenderState.result, consoleReplayScript, errorRenderState.hasErrors, errorRenderState.error);
   }
-  return result;
 }
 
-function createSyncResult(renderState: RenderState & { result: string | null }, consoleReplayScript: string): RenderResult {
-  return createResultObject(renderState.result, consoleReplayScript, renderState.hasErrors, renderState.error);
-}
-
-function createPromiseResult(renderState: RenderState & { result: Promise<string> }, consoleReplayScript: string): Promise<RenderResult> {
-  return (async () => {
-    try {
-      const html = await renderState.result;
-      return createResultObject(html, consoleReplayScript, renderState.hasErrors, renderState.error);
-    } catch (e: unknown) {
-      const error = e instanceof Error ? e : new Error(String(e));
-      const html = handleError({ e: error, name: 'Unknown', serverSide: true });
-      return createResultObject(html, consoleReplayScript, true, error);
-    }
-  })();
-}
-
-function createFinalResult(renderState: RenderState): null | string | Promise<RenderResult> {
+function createFinalResult(
+  renderState: RenderState,
+  componentName: string,
+  throwJsErrors: boolean
+): null | string | Promise<RenderResult> {
   const consoleReplayScript = buildConsoleReplay();
 
   const { result } = renderState;
   if (isPromise(result)) {
-    return createPromiseResult({ ...renderState, result }, consoleReplayScript);
+    return createPromiseResult({ ...renderState, result }, consoleReplayScript, componentName, throwJsErrors);
   }
 
-  return JSON.stringify(createSyncResult({ ...renderState, result }, consoleReplayScript));
+  return JSON.stringify(createResultObject(result, consoleReplayScript, renderState.hasErrors, renderState.error));
 }
 
 function serverRenderReactComponentInternal(options: RenderParams): null | string | Promise<RenderResult> {
-  const { name, domNodeId, trace, props, railsContext, renderingReturnsPromises, throwJsErrors } = options;
+  const { name: componentName, domNodeId, trace, props, railsContext, renderingReturnsPromises, throwJsErrors } = options;
 
   let renderState: RenderState = {
     result: null,
     hasErrors: false,
-    error: null,
   };
 
   try {
-    const componentObj = ComponentRegistry.get(name);
-    validateComponent(componentObj, name);
+    const componentObj = ComponentRegistry.get(componentName);
+    validateComponent(componentObj, componentName);
 
     // Renders the component or executes the render function
     // - If the registered component is a React element or component, it renders it
@@ -149,13 +151,14 @@ function serverRenderReactComponentInternal(options: RenderParams): null | strin
     //   - For other values (e.g., strings), it returns them directly
     // Note: Only synchronous operations are performed at this stage
     const reactRenderingResult = createReactOutput({ componentObj, domNodeId, trace, props, railsContext });
+
     // Processes the result from createReactOutput:
     // 1. Converts React elements to HTML strings
     // 2. Returns rendered HTML from serverRenderHash
     // 3. Handles promises for async rendering
-    renderState.result = processRenderingResult(reactRenderingResult, { name, domNodeId, trace, renderingReturnsPromises });
-  } catch (e) {
-    renderState = handleRenderingError(e as Error, renderState, { name, throwJsErrors });
+    renderState = processRenderingResult(reactRenderingResult, { componentName, domNodeId, trace, renderingReturnsPromises });
+  } catch (e: unknown) {
+    renderState = handleRenderingError(e, { componentName, throwJsErrors });
   }
 
   // Finalize the rendering result and prepare it for server response
@@ -167,7 +170,7 @@ function serverRenderReactComponentInternal(options: RenderParams): null | strin
   //    - hasErrors: boolean (Indicates if any errors occurred during rendering)
   //    - renderingError: Error | null (The error object if an error occurred, null otherwise)
   // 4. For Promise results, it awaits resolution before creating the final JSON
-  return createFinalResult(renderState);
+  return createFinalResult(renderState, componentName, throwJsErrors);
 }
 
 const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (options) => {
