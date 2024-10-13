@@ -205,17 +205,13 @@ const stringToStream = (str: string): Readable => {
 };
 
 export const streamServerRenderedReactComponent = (options: RenderParams): Readable => {
-  const { name, domNodeId, trace, props, railsContext, throwJsErrors } = options;
+  const { name: componentName, domNodeId, trace, props, railsContext, throwJsErrors } = options;
 
   let renderResult: null | Readable = null;
 
   try {
-    const componentObj = ComponentRegistry.get(name);
-    if (componentObj.isRenderer) {
-      throw new Error(`\
-Detected a renderer while server rendering component '${name}'. \
-See https://github.com/shakacode/react_on_rails#renderer-functions`);
-    }
+    const componentObj = ComponentRegistry.get(componentName);
+    validateComponent(componentObj, componentName);
 
     const reactRenderingResult = createReactOutput({
       componentObj,
@@ -242,7 +238,7 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
 
     renderResult = stringToStream(handleError({
       e,
-      name,
+      name: componentName,
       serverSide: true,
     }));
   }
