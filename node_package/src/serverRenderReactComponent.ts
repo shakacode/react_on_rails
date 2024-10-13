@@ -230,14 +230,14 @@ export const streamServerRenderedReactComponent = (options: RenderParams): Reada
     renderResult = renderStream;
 
     // TODO: Add console replay script to the stream
-    // Ensure to avoid console messages leaking between different components rendering
-  } catch (e: any) {
+  } catch (e) {
     if (throwJsErrors) {
       throw e;
     }
 
+    const error = e instanceof Error ? e : new Error(String(e));
     renderResult = stringToStream(handleError({
-      e,
+      e: error,
       name: componentName,
       serverSide: true,
     }));
