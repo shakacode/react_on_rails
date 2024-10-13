@@ -41,6 +41,8 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
       const redirectPath = redirectLocation.pathname + redirectLocation.search;
       console.log(`ROUTER REDIRECT: ${options.componentName} to dom node with id: ${options.domNodeId}, redirect to ${redirectPath}`);
     }
+    // For redirects on server rendering, we can't stop Rails from returning the same result.
+    // Possibly, someday, we could have the rails server redirect.
     htmlResult = '';
   } else {
     htmlResult = result.renderedHtml as string;
