@@ -94,12 +94,12 @@ function handleRenderingError(e: unknown, options: { componentName: string, thro
   };
 }
 
-function createResultObject(html: string | null, consoleReplayScript: string, hasErrors: boolean, error?: RenderingError): RenderResult {
+function createResultObject(html: string | null, consoleReplayScript: string, renderState: RenderState): RenderResult {
   return {
     html,
     consoleReplayScript,
-    hasErrors,
-    renderingError: error && { message: error.message, stack: error.stack },
+    hasErrors: renderState.hasErrors,
+    renderingError: renderState.error && { message: renderState.error.message, stack: renderState.error.stack },
   };
 }
 
@@ -111,10 +111,10 @@ async function createPromiseResult(
 ): Promise<RenderResult> {
   try {
     const html = await renderState.result;
-    return createResultObject(html, consoleReplayScript, renderState.hasErrors, renderState.error);
+    return createResultObject(html, consoleReplayScript, renderState);
   } catch (e: unknown) {
     const errorRenderState = handleRenderingError(e, { componentName, throwJsErrors });
-    return createResultObject(errorRenderState.result, consoleReplayScript, errorRenderState.hasErrors, errorRenderState.error);
+    return createResultObject(errorRenderState.result, consoleReplayScript, errorRenderState);
   }
 }
 
@@ -137,7 +137,7 @@ function createFinalResult(
     return createPromiseResult({ ...renderState, result }, consoleReplayScript, componentName, throwJsErrors);
   }
 
-  return JSON.stringify(createResultObject(result, consoleReplayScript, renderState.hasErrors, renderState.error));
+  return JSON.stringify(createResultObject(result, consoleReplayScript, renderState));
 }
 
 function serverRenderReactComponentInternal(options: RenderParams): null | string | Promise<RenderResult> {
