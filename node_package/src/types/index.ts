@@ -43,6 +43,30 @@ type CreateReactOutputResult = ServerRenderResult | ReactElement | Promise<strin
 
 type RenderFunctionResult = ReactComponent | ServerRenderResult | Promise<string>;
 
+/**
+ * Render functions are used to create dynamic React components or server-rendered HTML with side effects.
+ * They receive two arguments: props and railsContext.
+ * 
+ * @param props - The component props passed to the render function
+ * @param railsContext - The Rails context object containing environment information
+ * @returns A string, React component, React element, or a Promise resolving to a string
+ * 
+ * @remarks
+ * To distinguish a render function from a React Function Component:
+ * 1. Ensure it accepts two parameters (props and railsContext), even if railsContext is unused, or
+ * 2. Set the `renderFunction` property to `true` on the function object.
+ * 
+ * If neither condition is met, it will be treated as a React Function Component,
+ * and ReactDOMServer will attempt to render it.
+ * 
+ * @example
+ * // Option 1: Two-parameter function
+ * const renderFunction = (props, railsContext) => { ... };
+ * 
+ * // Option 2: Using renderFunction property
+ * const anotherRenderFunction = (props) => { ... };
+ * anotherRenderFunction.renderFunction = true;
+ */
 interface RenderFunction {
   (props?: any, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
   // We allow specifying that the function is RenderFunction and not a React Function Component
@@ -67,7 +91,15 @@ export type { // eslint-disable-line import/prefer-default-export
 export interface RegisteredComponent {
   name: string;
   component: ReactComponentOrRenderFunction;
+  /**
+   * Indicates if the registered component is a RenderFunction
+   * @see RenderFunction for more details on its behavior and usage.
+   */
   renderFunction: boolean;
+  // Indicates if the registered component is a Renderer function.
+  // Renderer function handles DOM rendering or hydration with 3 args: (props, railsContext, domNodeId)
+  // Supported on the client side only.
+  // All renderer functions are render functions, but not all render functions are renderer functions.
   isRenderer: boolean;
 }
 
