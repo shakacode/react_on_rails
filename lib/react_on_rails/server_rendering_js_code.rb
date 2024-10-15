@@ -40,6 +40,7 @@ module ReactOnRails
           var railsContext = #{rails_context};
         #{redux_stores}
           var props = #{props_string};
+          console.history = [];
           return ReactOnRails.serverRenderReactComponent({
             name: '#{react_component_name}',
             domNodeId: '#{render_options.dom_id}',
