@@ -19,10 +19,15 @@ describe('ReactOnRails', () => {
     });
     ReactOnRails.register({ R1 });
 
-    document.body.innerHTML = '<div id="root"></div>';
-    // eslint-disable-next-line no-underscore-dangle
-    const actual = ReactOnRails.render('R1', {}, 'root')._reactInternals.type;
-    expect(actual).toEqual(R1);
+    const root = document.createElement('div');
+    root.id = 'root';
+    root.textContent = ' WORLD ';
+
+    document.body.innerHTML = '';
+    document.body.appendChild(root);
+    ReactOnRails.render('R1', {}, 'root');
+
+    expect(document.getElementById('root').textContent).toEqual(' WORLD ');
   });
 
   it('accepts traceTurbolinks as an option true', () => {

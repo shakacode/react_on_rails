@@ -7,6 +7,7 @@ Packer = Object.const_get(ReactOnRails::PackerUtils.packer_type.capitalize)
 
 class PlainReactOnRailsHelper
   include ReactOnRailsHelper
+  include ActionView::Helpers::TagHelper
 end
 
 # rubocop:disable Metrics/BlockLength
@@ -363,6 +364,31 @@ ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');
       ob = PlainReactOnRailsHelper.new
       expect { ob.send(:rails_context, server_side: true) }.not_to raise_error
       expect { ob.send(:rails_context, server_side: false) }.not_to raise_error
+    end
+  end
+
+  describe "#rails_context_if_not_already_rendered" do
+    let(:helper) { PlainReactOnRailsHelper.new }
+
+    before do
+      allow(helper).to receive(:rails_context).and_return({ some: "context" })
+    end
+
+    it "returns a script tag with rails context when not already rendered" do
+      result = helper.send(:rails_context_if_not_already_rendered)
+      expect(result).to include('<script type="application/json" id="js-react-on-rails-context">')
+      expect(result).to include('"some":"context"')
+    end
+
+    it "returns an empty string when already rendered" do
+      helper.instance_variable_set(:@rendered_rails_context, true)
+      result = helper.send(:rails_context_if_not_already_rendered)
+      expect(result).to eq("")
+    end
+
+    it "calls rails_context with server_side: false" do
+      helper.send(:rails_context_if_not_already_rendered)
+      expect(helper).to have_received(:rails_context).with(server_side: false)
     end
   end
 end
