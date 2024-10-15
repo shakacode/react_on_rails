@@ -91,18 +91,55 @@ module ReactOnRails
       end
     end
 
+    # Streams a server-side rendered React component using React's `renderToPipeableStream`.
+    # Supports React 18 features like Suspense, concurrent rendering, and selective hydration.
+    # Enables progressive rendering and improved performance for large components.
+    #
+    # Note: This function can only be used with React on Rails Pro.
+    # The view that uses this function must be rendered using the
+    # `stream_view_containing_react_components` method from the React on Rails Pro gem.
+    #
+    # Example of an async React component that can benefit from streaming:
+    #
+    # const AsyncComponent = async () => {
+    #   const data = await fetchData();
+    #   return <div>{data}</div>;
+    # };
+    #
+    # function App() {
+    #   return (
+    #     <Suspense fallback={<div>Loading...</div>}>
+    #       <AsyncComponent />
+    #     </Suspense>
+    #   );
+    # }
+    #
+    # @param [String] component_name Name of your registered component
+    # @param [Hash] options Options for rendering
+    # @option options [Hash] :props Props to pass to the react component
+    # @option options [String] :dom_id DOM ID of the component container
+    # @option options [Hash] :html_options Options passed to content_tag
+    # @option options [Boolean] :prerender Set to false to disable server-side rendering
+    # @option options [Boolean] :trace Set to true to add extra debugging information to the HTML
+    # @option options [Boolean] :raise_on_prerender_error Set to true to raise exceptions during server-side rendering
+    # Any other options are passed to the content tag, including the id.
     def stream_react_component(component_name, options = {})
+      unless ReactOnRails::Utils.react_on_rails_pro?
+        raise ReactOnRails::Error,
+              "You must use React on Rails Pro to use the stream_react_component method."
+      end
+
+      if @rorp_rendering_fibers.nil?
+        raise ReactOnRails::Error,
+              "You must call stream_view_containing_react_components to render the view containing the react component"
+      end
+
       rendering_fiber = Fiber.new do
         stream = internal_stream_react_component(component_name, options)
         stream.each_chunk do |chunk|
           Fiber.yield chunk
         end
         Fiber.yield nil
-      end
-
-      if @rorp_rendering_fibers.nil?
-        raise ReactOnRails::Error,
-              "You must call stream_view_containing_react_components to render the view containing the react component"
       end
 
       @rorp_rendering_fibers << rendering_fiber
