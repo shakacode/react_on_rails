@@ -181,19 +181,15 @@ function serverRenderReactComponentInternal(options: RenderParams): null | strin
 }
 
 const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (options) => {
-  let result: string | Promise<RenderResult> | null = null;
   try {
-    result = serverRenderReactComponentInternal(options);
+    return serverRenderReactComponentInternal(options);
   } finally {
     // Reset console history after each render.
     // See `RubyEmbeddedJavaScript.console_polyfill` for initialization.
-    // We don't need to clear the console history if the result is a promise
-    // Promises only supported in node renderer and node renderer takes care of cleanining console history
-    if (typeof result === 'string') {
-      console.history = [];
-    }
+    // This is necessary when ExecJS and old versions of node renderer are used.
+    // New versions of node renderer reset the console history automatically.
+    console.history = [];
   }
-  return result;
 };
 
 export default serverRenderReactComponent;
