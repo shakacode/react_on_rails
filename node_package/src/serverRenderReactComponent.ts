@@ -138,7 +138,7 @@ function createFinalResult(
   return JSON.stringify(createResultObject(result, consoleReplayScript, renderState));
 }
 
-function serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult> {
+function serverRenderReactComponentInternal(options: RenderParams): null | string | Promise<RenderResult> {
   const { name: componentName, domNodeId, trace, props, railsContext, renderingReturnsPromises, throwJsErrors } = options;
 
   let renderState: RenderState = {
@@ -179,5 +179,21 @@ function serverRenderReactComponent(options: RenderParams): null | string | Prom
   // 4. For Promise results, it awaits resolution before creating the final JSON
   return createFinalResult(renderState, componentName, throwJsErrors);
 }
+
+const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (options) => {
+  let result: string | Promise<RenderResult> | null = null;
+  try {
+    result = serverRenderReactComponentInternal(options);
+  } finally {
+    // Reset console history after each render.
+    // See `RubyEmbeddedJavaScript.console_polyfill` for initialization.
+    // We don't need to clear the console history if the result is a promise
+    // Promises only supported in node renderer and node renderer takes care of cleanining console history
+    if (typeof result === 'string') {
+      console.history = [];
+    }
+  }
+  return result;
+};
 
 export default serverRenderReactComponent;
