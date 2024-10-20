@@ -1,5 +1,5 @@
 import ReactDOMServer from 'react-dom/server';
-import { PassThrough, Readable } from 'stream';
+import { PassThrough, Readable, Transform } from 'stream';
 import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
@@ -204,6 +204,7 @@ export const streamServerRenderedReactComponent = (options: RenderParams): Reada
   const { name: componentName, domNodeId, trace, props, railsContext, throwJsErrors } = options;
 
   let renderResult: null | Readable = null;
+  let previouslyReplayedConsoleMessages: number = 0;
 
   try {
     const componentObj = ComponentRegistry.get(componentName);
@@ -221,11 +222,26 @@ export const streamServerRenderedReactComponent = (options: RenderParams): Reada
       throw new Error('Server rendering of streams is not supported for server render hashes or promises.');
     }
 
-    const renderStream = new PassThrough();
-    ReactDOMServer.renderToPipeableStream(reactRenderingResult).pipe(renderStream);
-    renderResult = renderStream;
+    const consoleHistory = console.history;
+    const transformStream = new Transform({
+      transform(chunk, _, callback) {
+        const htmlChunk = chunk.toString();
+        const consoleReplayScript = buildConsoleReplay(consoleHistory, previouslyReplayedConsoleMessages);
+        previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
 
-    // TODO: Add console replay script to the stream
+        const jsonChunk = JSON.stringify({
+          html: htmlChunk,
+          consoleReplayScript,
+        });
+        
+        this.push(jsonChunk);
+        callback();
+      }
+    });
+
+    ReactDOMServer.renderToPipeableStream(reactRenderingResult).pipe(transformStream);
+
+    renderResult = transformStream;
   } catch (e) {
     if (throwJsErrors) {
       throw e;
