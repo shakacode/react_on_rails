@@ -431,29 +431,28 @@ module ReactOnRails
     end
 
     def build_react_component_result_for_server_streamed_content(
-      rendered_html_stream: required("rendered_html_stream"),
-      component_specification_tag: required("component_specification_tag"),
-      render_options: required("render_options")
+      rendered_html_stream:,
+      component_specification_tag:,
+      render_options:
     )
       is_first_chunk = true
       rendered_html_stream.transform do |chunk_json_result|
         if is_first_chunk
           is_first_chunk = false
-          next build_react_component_result_for_server_rendered_string(
+          build_react_component_result_for_server_rendered_string(
             server_rendered_html: chunk_json_result["html"],
             component_specification_tag: component_specification_tag,
             console_script: chunk_json_result["consoleReplayScript"],
             render_options: render_options
           )
+        else
+          result_console_script = render_options.replay_console ? chunk_json_result["consoleReplayScript"] : ""
+          # No need to prepend component_specification_tag or add rails context again
+          # as they're already included in the first chunk
+          compose_react_component_html_with_spec_and_console(
+            "", chunk_json_result["html"], result_console_script
+          )
         end
-
-        result_console_script = render_options.replay_console ? chunk_json_result["consoleReplayScript"] : ""
-        # No need to prepend component_specification_tag or add rails context again
-        # as they're already included in the first chunk
-        compose_react_component_html_with_spec_and_console(
-          "", chunk_json_result["html"], result_console_script
-        )
-      end
     end
 
     def build_react_component_result_for_server_rendered_hash(
@@ -688,3 +687,4 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
 end
 # rubocop:enable Metrics/ModuleLength
 # rubocop:enable Metrics/MethodLength
+
