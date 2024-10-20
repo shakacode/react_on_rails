@@ -453,6 +453,7 @@ module ReactOnRails
             "", chunk_json_result["html"], result_console_script
           )
         end
+      end
     end
 
     def build_react_component_result_for_server_rendered_hash(
@@ -687,4 +688,3 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
 end
 # rubocop:enable Metrics/ModuleLength
 # rubocop:enable Metrics/MethodLength
-
