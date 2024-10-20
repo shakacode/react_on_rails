@@ -18,6 +18,9 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+#### Changed
+- Console replay script generation now awaits the render request promise before generating, allowing it to capture console logs from asynchronous operations. This requires using a version of the Node renderer that supports replaying async console logs. [PR #1649](https://github.com/shakacode/react_on_rails/pull/1649) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Fixed
 - Incorrect type and confusing name for `ReactOnRails.registerStore`, use `registerStoreGenerators` instead. [PR 1651](https://github.com/shakacode/react_on_rails/pull/1651) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
