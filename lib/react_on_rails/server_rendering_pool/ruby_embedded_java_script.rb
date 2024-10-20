@@ -237,8 +237,6 @@ module ReactOnRails
           if render_options.logging_on_server
             console_script = result["consoleReplayScript"]
             console_script_lines = console_script.split("\n")
-            # Skip the first two lines (new line and opening <script> tag) and the last line (closing </script> tag)
-            console_script_lines = console_script_lines[2..-2]
             # Regular expression to match console.log or console.error calls with SERVER prefix
             re = /console\.(?:log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
             console_script_lines&.each do |line|
