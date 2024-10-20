@@ -1,4 +1,5 @@
 import ReactDOMServer from 'react-dom/server';
+import { PassThrough, Readable } from 'stream';
 import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
@@ -190,6 +191,55 @@ const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (o
     // New versions of node renderer reset the console history automatically.
     console.history = [];
   }
+};
+
+const stringToStream = (str: string): Readable => {
+  const stream = new PassThrough();
+  stream.push(str);
+  stream.push(null);
+  return stream;
+};
+
+export const streamServerRenderedReactComponent = (options: RenderParams): Readable => {
+  const { name: componentName, domNodeId, trace, props, railsContext, throwJsErrors } = options;
+
+  let renderResult: null | Readable = null;
+
+  try {
+    const componentObj = ComponentRegistry.get(componentName);
+    validateComponent(componentObj, componentName);
+
+    const reactRenderingResult = createReactOutput({
+      componentObj,
+      domNodeId,
+      trace,
+      props,
+      railsContext,
+    });
+
+    if (isServerRenderHash(reactRenderingResult) || isPromise(reactRenderingResult)) {
+      throw new Error('Server rendering of streams is not supported for server render hashes or promises.');
+    }
+
+    const renderStream = new PassThrough();
+    ReactDOMServer.renderToPipeableStream(reactRenderingResult).pipe(renderStream);
+    renderResult = renderStream;
+
+    // TODO: Add console replay script to the stream
+  } catch (e) {
+    if (throwJsErrors) {
+      throw e;
+    }
+
+    const error = e instanceof Error ? e : new Error(String(e));
+    renderResult = stringToStream(handleError({
+      e: error,
+      name: componentName,
+      serverSide: true,
+    }));
+  }
+
+  return renderResult;
 };
 
 export default serverRenderReactComponent;
