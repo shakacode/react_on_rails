@@ -239,11 +239,10 @@ export const streamServerRenderedReactComponent = (options: RenderParams): Reada
       }
     });
 
-    ReactDOMServer.renderToPipeableStream(reactRenderingResult)
-      .pipe(transformStream);
+    ReactDOMServer.renderToPipeableStream(reactRenderingResult).pipe(transformStream);
 
     renderResult = transformStream;
-  } catch (e: unknown) {
+  } catch (e) {
     if (throwJsErrors) {
       throw e;
     }
