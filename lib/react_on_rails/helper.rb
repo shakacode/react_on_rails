@@ -139,7 +139,6 @@ module ReactOnRails
         stream.each_chunk do |chunk|
           Fiber.yield chunk
         end
-        Fiber.yield nil
       end
 
       @rorp_rendering_fibers << rendering_fiber
