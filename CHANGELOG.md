@@ -18,6 +18,13 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+### Added
+- Added streaming server rendering support:
+  - New `stream_react_component` helper for adding streamed components to views
+  - New `streamServerRenderedReactComponent` function in the react-on-rails package that uses React 18's `renderToPipeableStream` API
+  - Enables progressive page loading and improved performance for server-rendered React components
+  [PR #1633](https://github.com/shakacode/react_on_rails/pull/1633) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Changed
 - Console replay script generation now awaits the render request promise before generating, allowing it to capture console logs from asynchronous operations. This requires using a version of the Node renderer that supports replaying async console logs. [PR #1649](https://github.com/shakacode/react_on_rails/pull/1649) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 

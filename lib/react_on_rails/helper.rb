@@ -91,6 +91,64 @@ module ReactOnRails
       end
     end
 
+    # Streams a server-side rendered React component using React's `renderToPipeableStream`.
+    # Supports React 18 features like Suspense, concurrent rendering, and selective hydration.
+    # Enables progressive rendering and improved performance for large components.
+    #
+    # Note: This function can only be used with React on Rails Pro.
+    # The view that uses this function must be rendered using the
+    # `stream_view_containing_react_components` method from the React on Rails Pro gem.
+    #
+    # Example of an async React component that can benefit from streaming:
+    #
+    # const AsyncComponent = async () => {
+    #   const data = await fetchData();
+    #   return <div>{data}</div>;
+    # };
+    #
+    # function App() {
+    #   return (
+    #     <Suspense fallback={<div>Loading...</div>}>
+    #       <AsyncComponent />
+    #     </Suspense>
+    #   );
+    # }
+    #
+    # @param [String] component_name Name of your registered component
+    # @param [Hash] options Options for rendering
+    # @option options [Hash] :props Props to pass to the react component
+    # @option options [String] :dom_id DOM ID of the component container
+    # @option options [Hash] :html_options Options passed to content_tag
+    # @option options [Boolean] :prerender Set to false to disable server-side rendering
+    # @option options [Boolean] :trace Set to true to add extra debugging information to the HTML
+    # @option options [Boolean] :raise_on_prerender_error Set to true to raise exceptions during server-side rendering
+    # Any other options are passed to the content tag, including the id.
+    def stream_react_component(component_name, options = {})
+      unless ReactOnRails::Utils.react_on_rails_pro?
+        raise ReactOnRails::Error,
+              "You must use React on Rails Pro to use the stream_react_component method."
+      end
+
+      if @rorp_rendering_fibers.nil?
+        raise ReactOnRails::Error,
+              "You must call stream_view_containing_react_components to render the view containing the react component"
+      end
+
+      rendering_fiber = Fiber.new do
+        stream = internal_stream_react_component(component_name, options)
+        stream.each_chunk do |chunk|
+          Fiber.yield chunk
+        end
+      end
+
+      @rorp_rendering_fibers << rendering_fiber
+
+      # return the first chunk of the fiber
+      # It contains the initial html of the component
+      # all updates will be appended to the stream sent to browser
+      rendering_fiber.resume
+    end
+
     # react_component_hash is used to return multiple HTML strings for server rendering, such as for
     # adding meta-tags to a page.
     # It is exactly like react_component except for the following:
@@ -330,6 +388,16 @@ module ReactOnRails
 
     private
 
+    def internal_stream_react_component(component_name, options = {})
+      options = options.merge(stream?: true)
+      result = internal_react_component(component_name, options)
+      build_react_component_result_for_server_streamed_content(
+        rendered_html_stream: result[:result],
+        component_specification_tag: result[:tag],
+        render_options: result[:render_options]
+      )
+    end
+
     def generated_components_pack_path(component_name)
       "#{ReactOnRails::PackerUtils.packer_source_entry_path}/generated/#{component_name}.js"
     end
@@ -359,6 +427,33 @@ module ReactOnRails
       )
 
       prepend_render_rails_context(result)
+    end
+
+    def build_react_component_result_for_server_streamed_content(
+      rendered_html_stream: required("rendered_html_stream"),
+      component_specification_tag: required("component_specification_tag"),
+      render_options: required("render_options")
+    )
+      content_tag_options_html_tag = render_options.html_options[:tag] || "div"
+      # The component_specification_tag is appended to the first chunk
+      # We need to pass it early with the first chunk because it's needed in hydration
+      # We need to make sure that client can hydrate the app early even before all components are streamed
+      is_first_chunk = true
+      rendered_html_stream = rendered_html_stream.transform do |chunk|
+        if is_first_chunk
+          is_first_chunk = false
+          html_content = <<-HTML
+            #{rails_context_if_not_already_rendered}
+            #{component_specification_tag}
+            <#{content_tag_options_html_tag} id="#{render_options.dom_id}">#{chunk}</#{content_tag_options_html_tag}>
+          HTML
+          next html_content.strip
+        end
+        chunk
+      end
+
+      rendered_html_stream.transform(&:html_safe)
+      # TODO: handle console logs
     end
 
     def build_react_component_result_for_server_rendered_hash(
@@ -404,20 +499,22 @@ module ReactOnRails
       HTML
     end
 
-    # prepend the rails_context if not yet applied
-    def prepend_render_rails_context(render_value)
-      return render_value if @rendered_rails_context
+    def rails_context_if_not_already_rendered
+      return "" if @rendered_rails_context
 
       data = rails_context(server_side: false)
 
       @rendered_rails_context = true
 
-      rails_context_content = content_tag(:script,
-                                          json_safe_and_pretty(data).html_safe,
-                                          type: "application/json",
-                                          id: "js-react-on-rails-context")
+      content_tag(:script,
+                  json_safe_and_pretty(data).html_safe,
+                  type: "application/json",
+                  id: "js-react-on-rails-context")
+    end
 
-      "#{rails_context_content}\n#{render_value}".html_safe
+    # prepend the rails_context if not yet applied
+    def prepend_render_rails_context(render_value)
+      "#{rails_context_if_not_already_rendered}\n#{render_value}".strip.html_safe
     end
 
     def internal_react_component(react_component_name, options = {})
@@ -519,6 +616,9 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
                                                err: err,
                                                js_code: js_code)
       end
+
+      # TODO: handle errors for streams
+      return result if render_options.stream?
 
       if result["hasErrors"] && render_options.raise_on_prerender_error
         # We caught this exception on our backtrace handler
