@@ -17,6 +17,7 @@ Here is the new link:
   + [How React on Rails Works](docs/outdated/how-react-on-rails-works.md)
   + [Client vs. Server Rendering](./docs/guides/client-vs-server-rendering.md)
   + [React Server Rendering](./docs/guides/react-server-rendering.md)
+  + [🚀 Next-Gen Server Rendering: Streaming with React 18's Latest APIs](./docs/guides/streaming-server-rendering.md)
   + [Render-Functions and the RailsContext](docs/guides/render-functions-and-railscontext.md)
   + [Caching and Performance: React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
   + [Deployment](docs/guides/deployment.md).
