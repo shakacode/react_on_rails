@@ -7,6 +7,7 @@ React on Rails Pro supports streaming server rendering using React 18's latest A
 - React on Rails Pro subscription
 - React 18 or higher (experimental version)
 - React on Rails v15.0.0-alpha.0 or higher
+- React on Rails Pro v4.0.0.rc.5 or higher
 
 ## Benefits of Streaming Server Rendering
 
@@ -29,23 +30,32 @@ First, ensure you're using React 18's experimental version in your package.json:
 }
 ```
 
+> Note: Check the React documentation for the latest release that supports streaming.
+
 2. **Prepare Your React Components**
 
 You can create async React components that return a promise. Then, you can use the `Suspense` component to render a fallback UI while the component is loading.
 
 ```jsx
 // app/javascript/components/MyStreamingComponent.jsx
-
 import React, { Suspense } from 'react';
+
+const fetchData = async () => {
+  // Simulate API call
+  const response = await fetch('api/endpoint');
+  return response.json();
+};
 
 const MyStreamingComponent = () => {
   return (
-    <header>
-      <h1>Streaming Server Rendering</h1>
-    </header>
-    <Suspense fallback={<div>Loading...</div>}>
-      <SlowDataComponent />
-    </Suspense>
+    <>
+      <header>
+        <h1>Streaming Server Rendering</h1>
+      </header>
+      <Suspense fallback={<div>Loading...</div>}>
+        <SlowDataComponent />
+      </Suspense>
+    </>
   );
 };
 
@@ -55,9 +65,15 @@ const SlowDataComponent = async () => {
 };
 
 export default MyStreamingComponent;
+```
+
+```jsx
+// app/javascript/packs/registration.jsx
+import MyStreamingComponent from '../components/MyStreamingComponent';
 
 ReactOnRails.register({ MyStreamingComponent });
 ```
+
 3. **Add The Component To Your Rails View**
 
 ```erb
