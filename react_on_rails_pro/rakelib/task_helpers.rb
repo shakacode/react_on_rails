@@ -25,7 +25,7 @@ module ReactOnRailsPro
     end
 
     def bundle_install_in(dir)
-      sh_in_dir(dir, "bundle install")
+      sh_in_dir(dir, "BUNDLE_FROZEN=true bundle install")
     end
 
     # Runs bundle exec using that directory's Gemfile
