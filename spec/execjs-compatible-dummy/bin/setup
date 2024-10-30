@@ -17,10 +17,10 @@ FileUtils.chdir APP_ROOT do
 
   puts "== Installing dependencies =="
   system! "gem install bundler --conservative"
-  system("bundle check") || system!("bundle install")
+  system("bundle check") || system!("BUNDLE_FROZEN=true bundle install")
 
   # Install JavaScript dependencies
-  system!("yarn install")
+  system!("yarn install --frozen-lockfile")
 
   # puts "\n== Copying sample files =="
   # unless File.exist?("config/database.yml")

@@ -10,7 +10,7 @@ Dir.chdir APP_ROOT do
 
   puts "== Installing dependencies =="
   system "gem install bundler --conservative"
-  system "bundle check || bundle install"
+  system "bundle check || BUNDLE_FROZEN=true bundle install"
 
   # puts "\n== Copying sample files =="
   # unless File.exist?("config/database.yml")

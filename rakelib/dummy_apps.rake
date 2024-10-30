@@ -8,7 +8,7 @@ include ReactOnRailsPro::TaskHelpers
 
 namespace :dummy_app do
   task :yarn_install do
-    yarn_install_cmd = "yarn install --mutex network"
+    yarn_install_cmd = "yarn install --frozen-lockfile --mutex network"
     sh_in_dir(dummy_app_dir, yarn_install_cmd)
   end
 
