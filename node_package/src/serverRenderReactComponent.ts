@@ -1,4 +1,4 @@
-import ReactDOMServer from 'react-dom/server';
+import ReactDOMServer, { type PipeableStream } from 'react-dom/server';
 import { PassThrough, Readable } from 'stream';
 import type { ReactElement } from 'react';
 
@@ -13,6 +13,11 @@ type RenderState = {
   result: null | string | Promise<string>;
   hasErrors: boolean;
   error?: RenderingError;
+};
+
+type StreamRenderState = Omit<RenderState, 'result'> & {
+  result: null | Readable;
+  isShellReady: boolean;
 };
 
 type RenderOptions = {
@@ -95,12 +100,13 @@ function handleRenderingError(e: unknown, options: { componentName: string, thro
   };
 }
 
-function createResultObject(html: string | null, consoleReplayScript: string, renderState: RenderState): RenderResult {
+function createResultObject(html: string | null, consoleReplayScript: string, renderState: RenderState | StreamRenderState): RenderResult {
   return {
     html,
     consoleReplayScript,
     hasErrors: renderState.hasErrors,
     renderingError: renderState.error && { message: renderState.error.message, stack: renderState.error.stack },
+    isShellReady: 'isShellReady' in renderState ? renderState.isShellReady : undefined,
   };
 }
 
@@ -200,14 +206,100 @@ const stringToStream = (str: string): Readable => {
   return stream;
 };
 
+const transformRenderStreamChunksToResultObject = (renderState: StreamRenderState) => {
+  const consoleHistory = console.history;
+  let previouslyReplayedConsoleMessages = 0;
+
+  const transformStream = new PassThrough({
+    transform(chunk, _, callback) {
+      const htmlChunk = chunk.toString();
+      const consoleReplayScript = buildConsoleReplay(consoleHistory, previouslyReplayedConsoleMessages);
+      previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
+
+      const jsonChunk = JSON.stringify(createResultObject(htmlChunk, consoleReplayScript, renderState));
+
+      this.push(jsonChunk);
+      callback();
+    }
+  });
+
+  let pipedStream: PipeableStream | null = null;
+  const pipeToTransform = (pipeableStream: PipeableStream) => {
+    pipeableStream.pipe(transformStream);
+    pipedStream = pipeableStream;
+  };
+  // We need to wrap the transformStream in a Readable stream to properly handle errors:
+  // 1. If we returned transformStream directly, we couldn't emit errors into it externally
+  // 2. If an error is emitted into the transformStream, it would cause the render to fail
+  // 3. By wrapping in Readable.from(), we can explicitly emit errors into the readableStream without affecting the transformStream
+  // Also, can't use Readable.from(transformStream) because if transformStream has multiple chunks, they will be merged into a single chunk in the readableStream
+  const readableStream = new PassThrough();
+  transformStream.on('data', (chunk) => readableStream.push(chunk));
+  transformStream.on('end', () => readableStream.push(null));
+  transformStream.on('error', (error) => readableStream.emit('error', error));
+
+  const writeChunk = (chunk: string) => transformStream.write(chunk);
+  const emitError = (error: unknown) => readableStream.emit('error', error);
+  const endStream = () => {
+    readableStream.end();
+    transformStream.end();
+    pipedStream?.abort();
+  }
+  return { readableStream: readableStream as Readable, pipeToTransform, writeChunk, emitError, endStream };
+}
+
+const streamRenderReactComponen = (reactRenderingResult: ReactElement, options: RenderParams) => {
+  const { name: componentName, throwJsErrors } = options;
+  const renderState: StreamRenderState = {
+    result: null,
+    hasErrors: false,
+    isShellReady: false
+  };
+
+  const {
+    readableStream,
+    pipeToTransform,
+    writeChunk,
+    emitError,
+    endStream
+  } = transformRenderStreamChunksToResultObject(renderState);
+
+  const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderingResult, {
+    onShellError(e) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      renderState.hasErrors = true;
+      renderState.error = error;
+
+      if (throwJsErrors) {
+        emitError(error);
+      }
+
+      const errorHtml = handleError({ e: error, name: componentName, serverSide: true });
+      writeChunk(errorHtml);
+      endStream();
+    },
+    onShellReady() {
+      renderState.isShellReady = true;
+      pipeToTransform(renderingStream);
+    },
+    onError(e) {
+      if (!renderState.isShellReady) {
+        return;
+      }
+      const error = e instanceof Error ? e : new Error(String(e));
+      if (throwJsErrors) {
+        emitError(error);
+      }
+      renderState.hasErrors = true;
+      renderState.error = error;
+    },
+  });
+
+  return readableStream;
+}
+
 export const streamServerRenderedReactComponent = (options: RenderParams): Readable => {
   const { name: componentName, domNodeId, trace, props, railsContext, throwJsErrors } = options;
-
-  let renderResult: null | Readable = null;
-  let hasErrors = false;
-  let isShellReady = false;
-  let previouslyReplayedConsoleMessages: number = 0;
-  let consoleHistory: typeof console['history'] | undefined;
 
   try {
     const componentObj = ComponentRegistry.get(componentName);
@@ -225,69 +317,17 @@ export const streamServerRenderedReactComponent = (options: RenderParams): Reada
       throw new Error('Server rendering of streams is not supported for server render hashes or promises.');
     }
 
-    consoleHistory = console.history;
-    const transformStream = new PassThrough({
-      transform(chunk, _, callback) {
-        const htmlChunk = chunk.toString();
-        const consoleReplayScript = buildConsoleReplay(consoleHistory, previouslyReplayedConsoleMessages);
-        previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
-
-        const jsonChunk = JSON.stringify({
-          html: htmlChunk,
-          consoleReplayScript,
-          hasErrors,
-          isShellReady,
-        });
-
-        this.push(jsonChunk);
-        callback();
-      }
-    });
-
-    const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderingResult, {
-      onShellError(e) {
-        // Can't through error here if throwJsErrors is true because the error will happen inside the stream
-        // And will not be handled by any catch clause
-        hasErrors = true;
-        const error = e instanceof Error ? e : new Error(String(e));
-        transformStream.write(handleError({
-          e: error,
-          name: componentName,
-          serverSide: true,
-        }));
-        transformStream.end();
-      },
-      onShellReady() {
-        isShellReady = true;
-        renderingStream.pipe(transformStream);
-      },
-      onError() {
-        // Can't through error here if throwJsErrors is true because the error will happen inside the stream
-        // And will not be handled by any catch clause
-        hasErrors = true;
-      },
-    });
-
-    renderResult = transformStream;
+    return streamRenderReactComponen(reactRenderingResult, options);
   } catch (e) {
     if (throwJsErrors) {
       throw e;
     }
 
     const error = e instanceof Error ? e : new Error(String(e));
-    renderResult = stringToStream(JSON.stringify({
-      html: handleError({
-        e: error,
-        name: componentName,
-        serverSide: true,
-      }),
-      consoleReplayScript: buildConsoleReplay(consoleHistory, previouslyReplayedConsoleMessages),
-      hasErrors: true,
-      isShellReady,
-    }));
+    const htmlResult = handleError({ e: error, name: componentName, serverSide: true });
+    const jsonResult = JSON.stringify(createResultObject(htmlResult, buildConsoleReplay(), { hasErrors: true, error, result: null }));
+    return stringToStream(jsonResult);
   }
-
-  return renderResult;
 };
 
 export default serverRenderReactComponent;

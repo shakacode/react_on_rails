@@ -138,6 +138,7 @@ export interface RenderResult {
   consoleReplayScript: string;
   hasErrors: boolean;
   renderingError?: RenderingError;
+  isShellReady?: boolean;
 }
 
 // from react-dom 18
