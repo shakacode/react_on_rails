@@ -244,7 +244,7 @@ const transformRenderStreamChunksToResultObject = (renderState: StreamRenderStat
   return { readableStream: readableStream as Readable, pipeToTransform, writeChunk, emitError, endStream };
 }
 
-const streamRenderReactComponen = (reactRenderingResult: ReactElement, options: RenderParams) => {
+const streamRenderReactComponent = (reactRenderingResult: ReactElement, options: RenderParams) => {
   const { name: componentName, throwJsErrors } = options;
   const renderState: StreamRenderState = {
     result: null,
