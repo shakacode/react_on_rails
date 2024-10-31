@@ -27,7 +27,7 @@ type RenderOptions = {
   renderingReturnsPromises: boolean;
 };
 
-function ensureError(e: unknown): Error {
+function convertToError(e: unknown): Error {
   return e instanceof Error ? e : new Error(String(e));
 }
 
@@ -96,7 +96,7 @@ function handleRenderingError(e: unknown, options: { componentName: string, thro
   if (options.throwJsErrors) {
     throw e;
   }
-  const error = ensureError(e);
+  const error = convertToError(e);
   return {
     hasErrors: true,
     result: handleError({ e: error, name: options.componentName, serverSide: true }),
@@ -266,7 +266,7 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement, options:
 
   const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderingResult, {
     onShellError(e) {
-      const error = ensureError(e);
+      const error = convertToError(e);
       renderState.hasErrors = true;
       renderState.error = error;
 
@@ -286,7 +286,7 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement, options:
       if (!renderState.isShellReady) {
         return;
       }
-      const error = ensureError(e);
+      const error = convertToError(e);
       if (throwJsErrors) {
         emitError(error);
       }
@@ -323,7 +323,7 @@ export const streamServerRenderedReactComponent = (options: RenderParams): Reada
       throw e;
     }
 
-    const error = ensureError(e);
+    const error = convertToError(e);
     const htmlResult = handleError({ e: error, name: componentName, serverSide: true });
     const jsonResult = JSON.stringify(createResultObject(htmlResult, buildConsoleReplay(), { hasErrors: true, error, result: null }));
     return stringToStream(jsonResult);
