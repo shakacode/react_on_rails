@@ -582,7 +582,11 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
 
     def should_raise_streaming_prerender_error?(chunk_json_result, render_options)
       chunk_json_result["hasErrors"] &&
-        (chunk_json_result["isShellReady"] ? render_options.raise_non_shell_server_rendering_errors : render_options.raise_on_prerender_error)
+        (if chunk_json_result["isShellReady"]
+           render_options.raise_non_shell_server_rendering_errors
+         else
+           render_options.raise_on_prerender_error
+         end)
     end
 
     # Returns object with values that are NOT html_safe!
