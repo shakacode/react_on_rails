@@ -27,6 +27,10 @@ type RenderOptions = {
   renderingReturnsPromises: boolean;
 };
 
+function ensureError(e: unknown): Error {
+  return e instanceof Error ? e : new Error(String(e));
+}
+
 function validateComponent(componentObj: RegisteredComponent, componentName: string) {
   if (componentObj.isRenderer) {
     throw new Error(`Detected a renderer while server rendering component '${componentName}'. See https://github.com/shakacode/react_on_rails#renderer-functions`);
@@ -92,7 +96,7 @@ function handleRenderingError(e: unknown, options: { componentName: string, thro
   if (options.throwJsErrors) {
     throw e;
   }
-  const error = e instanceof Error ? e : new Error(String(e));
+  const error = ensureError(e);
   return {
     hasErrors: true,
     result: handleError({ e: error, name: options.componentName, serverSide: true }),
@@ -241,7 +245,7 @@ const transformRenderStreamChunksToResultObject = (renderState: StreamRenderStat
     transformStream.end();
     pipedStream?.abort();
   }
-  return { readableStream: readableStream as Readable, pipeToTransform, writeChunk, emitError, endStream };
+  return { readableStream, pipeToTransform, writeChunk, emitError, endStream };
 }
 
 const streamRenderReactComponent = (reactRenderingResult: ReactElement, options: RenderParams) => {
@@ -262,7 +266,7 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement, options:
 
   const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderingResult, {
     onShellError(e) {
-      const error = e instanceof Error ? e : new Error(String(e));
+      const error = ensureError(e);
       renderState.hasErrors = true;
       renderState.error = error;
 
@@ -282,7 +286,7 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement, options:
       if (!renderState.isShellReady) {
         return;
       }
-      const error = e instanceof Error ? e : new Error(String(e));
+      const error = ensureError(e);
       if (throwJsErrors) {
         emitError(error);
       }
@@ -313,13 +317,13 @@ export const streamServerRenderedReactComponent = (options: RenderParams): Reada
       throw new Error('Server rendering of streams is not supported for server render hashes or promises.');
     }
 
-    return streamRenderReactComponen(reactRenderingResult, options);
+    return streamRenderReactComponent(reactRenderingResult, options);
   } catch (e) {
     if (throwJsErrors) {
       throw e;
     }
 
-    const error = e instanceof Error ? e : new Error(String(e));
+    const error = ensureError(e);
     const htmlResult = handleError({ e: error, name: componentName, serverSide: true });
     const jsonResult = JSON.stringify(createResultObject(htmlResult, buildConsoleReplay(), { hasErrors: true, error, result: null }));
     return stringToStream(jsonResult);
