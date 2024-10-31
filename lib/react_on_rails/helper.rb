@@ -638,7 +638,7 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
           if should_raise_streaming_prerender_error?(chunk_json_result, render_options)
             raise_prerender_error(chunk_json_result, react_component_name, props, js_code)
           end
-          # It doesn't make any transformation, it listens to the streamed chunks and raise error if it has errors
+          # It doesn't make any transformation, it listens and raises error if a chunk has errors
           chunk_json_result
         end
       elsif result["hasErrors"] && render_options.raise_on_prerender_error
