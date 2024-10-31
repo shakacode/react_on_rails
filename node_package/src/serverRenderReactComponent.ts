@@ -218,7 +218,7 @@ const transformRenderStreamChunksToResultObject = (renderState: StreamRenderStat
 
       const jsonChunk = JSON.stringify(createResultObject(htmlChunk, consoleReplayScript, renderState));
 
-      this.push(jsonChunk);
+      this.push(`${jsonChunk}\n`);
       callback();
     }
   });
@@ -232,16 +232,12 @@ const transformRenderStreamChunksToResultObject = (renderState: StreamRenderStat
   // 1. If we returned transformStream directly, we couldn't emit errors into it externally
   // 2. If an error is emitted into the transformStream, it would cause the render to fail
   // 3. By wrapping in Readable.from(), we can explicitly emit errors into the readableStream without affecting the transformStream
-  // Also, can't use Readable.from(transformStream) because if transformStream has multiple chunks, they will be merged into a single chunk in the readableStream
-  const readableStream = new PassThrough();
-  transformStream.on('data', (chunk) => readableStream.push(chunk));
-  transformStream.on('end', () => readableStream.push(null));
-  transformStream.on('error', (error) => readableStream.emit('error', error));
+  // Note: Readable.from can merge multiple chunks into a single chunk, so we need to ensure that we can separate them later
+  const readableStream = Readable.from(transformStream);
 
   const writeChunk = (chunk: string) => transformStream.write(chunk);
   const emitError = (error: unknown) => readableStream.emit('error', error);
   const endStream = () => {
-    readableStream.end();
     transformStream.end();
     pipedStream?.abort();
   }
