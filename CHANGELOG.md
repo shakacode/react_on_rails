@@ -19,8 +19,8 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since the last non-beta release.
 
 #### Added
- - Added support for handling errors happening during server rendering of streamed React components. It handles errors that happen during the initial render and errors that happen inside suspense boundaries. [PR #1648](https://github.com/shakacode/react_on_rails/pull/1648) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
- - Added support for replaying console logs that occur during server rendering of streamed React components. This enables debugging of server-side rendering issues by capturing and displaying console output on the client and on the server output. [PR #1647](https://github.com/shakacode/react_on_rails/pull/1647) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- Added support for handling errors happening during server rendering of streamed React components. It handles errors that happen during the initial render and errors that happen inside suspense boundaries. [PR #1648](https://github.com/shakacode/react_on_rails/pull/1648) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- Added support for replaying console logs that occur during server rendering of streamed React components. This enables debugging of server-side rendering issues by capturing and displaying console output on the client and on the server output. [PR #1647](https://github.com/shakacode/react_on_rails/pull/1647) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - Added streaming server rendering support:
   - New `stream_react_component` helper for adding streamed components to views
   - New `streamServerRenderedReactComponent` function in the react-on-rails package that uses React 18's `renderToPipeableStream` API
