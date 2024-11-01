@@ -18,6 +18,11 @@ See the README.md in those sample apps for more details.
 
 ## Features
 
+### 🚀 Next-Gen Server Rendering: Streaming with React 18's Latest APIs
+React on Rails Pro supports React 18's Streaming Server-Side Rendering, allowing you to progressively render and stream HTML content to the client. This enables faster page loads and better user experience.
+
+See [docs/streaming-server-rendering](./streaming-server-rendering.md) for more details.
+
 ### Caching
 Caching of SSR is critical for achieving optimum performance.
 
@@ -44,6 +49,7 @@ See the [Ruby API](docs/ruby-api.md).
 ## References
 
 * [Installation](./installation.md)
+* [Streaming Server Rendering](./streaming-server-rendering.md)
 * [Caching](./caching.md)
 * [Rails Configuration](./configuration.md)
 * [Node Renderer Docs](./node-renderer/basics.md)

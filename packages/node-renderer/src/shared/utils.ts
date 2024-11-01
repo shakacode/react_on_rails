@@ -2,11 +2,12 @@ import cluster from 'cluster';
 import path from 'path';
 import { MultipartFile } from '@fastify/multipart';
 import { createWriteStream, ensureDir, move, MoveOptions } from 'fs-extra';
-import { pipeline } from 'stream';
+import { Readable, pipeline } from 'stream';
 import { promisify } from 'util';
 import errorReporter from './errorReporter';
 import { getConfig } from './configBuilder';
 import log from './log';
+import type { RenderResult } from '../worker/vm';
 
 export const TRUNCATION_FILLER = '\n... TRUNCATED ...\n';
 
@@ -43,6 +44,7 @@ export interface ResponseResult {
   headers: { 'Cache-Control'?: string };
   status: number;
   data?: unknown;
+  stream?: Readable;
 }
 
 export function errorResponseResult(msg: string): ResponseResult {
@@ -110,3 +112,12 @@ export async function moveUploadedAssets(uploadedAssets: Asset[]): Promise<void>
 export function isPromise<T>(value: T | Promise<T>): value is Promise<T> {
   return value && typeof (value as Promise<T>).then === 'function';
 }
+
+export const isReadableStream = (stream: unknown): stream is Readable =>
+  typeof stream === 'object' &&
+  stream !== null &&
+  typeof (stream as Readable).pipe === 'function' &&
+  typeof (stream as Readable).read === 'function';
+
+export const isErrorRenderResult = (result: RenderResult): result is { exceptionMessage: string } =>
+  typeof result === 'object' && !isReadableStream(result) && 'exceptionMessage' in result;

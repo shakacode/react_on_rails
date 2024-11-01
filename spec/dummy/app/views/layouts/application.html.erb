@@ -23,7 +23,11 @@
                           'data-turbolinks-track': true) %>
 
   <!--  NOTE: Must use defer and not async to keep async scripts loading in correct order  -->
-  <%= javascript_pack_tag('client-bundle', 'data-turbolinks-track': true, defer: true) %>
+  <!-- TODO: Investigate and resolve potential issues with async loading when components are split into multiple chunks -->
+  <% unless params[:skip_js_packs] == 'true' %>
+    <%# Used for testing purposes to simulate hydration failure %>
+    <%= javascript_pack_tag('client-bundle', 'data-turbolinks-track': true, defer: false) %>
+  <% end %>
   <%= csrf_meta_tags %>
 </head>
 <body class="bg-white">

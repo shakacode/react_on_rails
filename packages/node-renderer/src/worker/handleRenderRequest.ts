@@ -19,6 +19,8 @@ import {
   moveUploadedAssets,
   ResponseResult,
   moveUploadedAsset,
+  isReadableStream,
+  isErrorRenderResult,
 } from '../shared/utils';
 import { getConfig } from '../shared/configBuilder';
 import errorReporter from '../shared/errorReporter';
@@ -32,12 +34,20 @@ async function prepareResult(renderingRequest: string): Promise<ResponseResult> 
     if (!result) {
       const error = new Error('INVALID NIL or NULL result for rendering');
       exceptionMessage = formatExceptionMessage(renderingRequest, error, 'INVALID result for prepareResult');
-    } else if (typeof result === 'object' && result.exceptionMessage) {
+    } else if (isErrorRenderResult(result)) {
       ({ exceptionMessage } = result);
     }
 
     if (exceptionMessage) {
       return Promise.resolve(errorResponseResult(exceptionMessage));
+    }
+
+    if (isReadableStream(result)) {
+      return Promise.resolve({
+        headers: { 'Cache-Control': 'public, max-age=31536000' },
+        status: 200,
+        stream: result,
+      });
     }
 
     return Promise.resolve({

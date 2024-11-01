@@ -1,7 +1,8 @@
 import { AsyncLocalStorage } from 'async_hooks';
 import { getConfig } from './configBuilder';
 import log from './log';
-import { isPromise } from './utils';
+import { isPromise, isReadableStream } from './utils';
+import type { RenderCodeResult } from '../worker/vm';
 
 type ConsoleMessage = { level: 'error' | 'log' | 'info' | 'warn'; arguments: unknown[] };
 
@@ -59,23 +60,28 @@ class SharedConsoleHistory {
   }
 
   replayConsoleLogsAfterRender(
-    result: string | Promise<string>,
+    result: RenderCodeResult,
     customConsoleHistory?: ConsoleMessage[],
-  ): string | Promise<string> {
+  ): RenderCodeResult {
     const replayLogs = (value: string) => {
       const consoleHistory = customConsoleHistory ?? this.syncHistory;
       replayConsoleOnRenderer(consoleHistory);
       return value;
     };
 
-    return isPromise(result) ? result.then(replayLogs) : replayLogs(result);
+    // TODO: replay console logs for readable streams
+    if (isReadableStream(result)) {
+      return result;
+    }
+    if (isPromise(result)) {
+      return result.then(replayLogs);
+    }
+    return replayLogs(result);
   }
 
-  trackConsoleHistoryInRenderRequest(
-    renderRequestFunction: () => string | Promise<string>,
-  ): string | Promise<string> {
+  trackConsoleHistoryInRenderRequest(renderRequestFunction: () => RenderCodeResult): RenderCodeResult {
     this.isRunningSyncOperation = true;
-    let result: string | Promise<string>;
+    let result: RenderCodeResult;
 
     try {
       if (this.asyncLocalStorageIfEnabled) {

@@ -8,13 +8,14 @@ import path from 'path';
 import vm from 'vm';
 import m from 'module';
 import cluster from 'cluster';
+import type { Readable } from 'stream';
 import { promisify } from 'util';
 import type { ReactOnRails as ROR } from 'react-on-rails';
 
 import SharedConsoleHistory from '../shared/sharedConsoleHistory';
 import log from '../shared/log';
 import { getConfig } from '../shared/configBuilder';
-import { formatExceptionMessage, smartTrim } from '../shared/utils';
+import { formatExceptionMessage, smartTrim, isReadableStream } from '../shared/utils';
 import errorReporter from '../shared/errorReporter';
 
 const readFileAsync = promisify(fs.readFile);
@@ -36,6 +37,19 @@ export function getVmBundleFilePath() {
   return vmBundleFilePath;
 }
 
+/**
+ * The type of the result returned by executing the code payload sent in the rendering request.
+ */
+export type RenderCodeResult = string | Promise<string> | Readable;
+
+/**
+ * The type of the result returned by the `runInVM` function.
+ *
+ * Similar to {@link RenderCodeResult} returned by executing the code payload sent in the rendering request,
+ * but after awaiting the promise if present and handling exceptions if any.
+ */
+export type RenderResult = string | Readable | { exceptionMessage: string };
+
 declare global {
   // This works on node 16+
   // https://stackoverflow.com/questions/35074713/extending-typescript-global-object-in-node-js/68328575#68328575
@@ -56,10 +70,20 @@ export async function buildVM(filePath: string) {
     const contextObject = { sharedConsoleHistory };
     if (supportModules) {
       log.debug(
-        'Adding Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval to context object.',
+        'Adding Buffer, process, setTimeout, setInterval, setImmediate, clearTimeout, clearInterval, clearImmediate to context object.',
       );
-      Object.assign(contextObject, { Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval });
+      Object.assign(contextObject, {
+        Buffer,
+        process,
+        setTimeout,
+        setInterval,
+        setImmediate,
+        clearTimeout,
+        clearInterval,
+        clearImmediate,
+      });
     }
+
     if (additionalContextIsObject) {
       const keysString = Object.keys(additionalContext).join(', ');
       log.debug(`Adding ${keysString} to context object.`);
@@ -114,8 +138,10 @@ export async function buildVM(filePath: string) {
       // Define timer polyfills:
       vm.runInContext(`function setInterval() {}`, context);
       vm.runInContext(`function setTimeout() {}`, context);
+      vm.runInContext(`function setImmediate() {}`, context);
       vm.runInContext(`function clearTimeout() {}`, context);
       vm.runInContext(`function clearInterval() {}`, context);
+      vm.runInContext(`function clearImmediate() {}`, context);
     }
 
     // Run bundle code in created context:
@@ -167,10 +193,7 @@ export async function buildVM(filePath: string) {
  * @param renderingRequest JS Code to execute for SSR
  * @param vmCluster
  */
-export async function runInVM(
-  renderingRequest: string,
-  vmCluster?: typeof cluster,
-): Promise<string | { exceptionMessage: string }> {
+export async function runInVM(renderingRequest: string, vmCluster?: typeof cluster): Promise<RenderResult> {
   const { bundlePath } = getConfig();
 
   try {
@@ -191,9 +214,12 @@ ${smartTrim(renderingRequest)}`);
     // Capture context to ensure TypeScript sees it as defined within the callback
     const localContext = context;
     let result = sharedConsoleHistory.trackConsoleHistoryInRenderRequest(
-      () => vm.runInContext(renderingRequest, localContext) as string | Promise<string>,
+      () => vm.runInContext(renderingRequest, localContext) as RenderCodeResult,
     );
 
+    if (isReadableStream(result)) {
+      return result;
+    }
     if (typeof result !== 'string') {
       const objectResult = await result;
       result = JSON.stringify(objectResult);

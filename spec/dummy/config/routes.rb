@@ -10,6 +10,8 @@ Rails.application.routes.draw do
   # You can have the root of your site routed with "root"
   root "pages#index"
 
+  get "empty" => "pages#empty"
+
   # react on rails pro specific routes
   get "server_side_redux_app_cached" => "pages#server_side_redux_app_cached"
   get "cached_react_helmet" => "pages#cached_react_helmet"
@@ -18,6 +20,9 @@ Rails.application.routes.draw do
   get "apollo_graphql" => "pages#apollo_graphql", as: :apollo_graphql
   get "lazy_apollo_graphql" => "pages#lazy_apollo_graphql", as: :lazy_apollo_graphql
   get "console_logs_in_async_server" => "pages#console_logs_in_async_server", as: :console_logs_in_async_server
+  get "stream_async_components" => "pages#stream_async_components", as: :stream_async_components
+  get "stream_async_components_for_testing" => "pages#stream_async_components_for_testing",
+      as: :stream_async_components_for_testing
 
   # routes copied over from react on rails
   get "client_side_hello_world" => "pages#client_side_hello_world"

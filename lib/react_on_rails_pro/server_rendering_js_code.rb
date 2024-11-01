@@ -8,13 +8,18 @@ module ReactOnRailsPro
       end
 
       def render(props_string, rails_context, redux_stores, react_component_name, render_options)
+        render_function_name = if render_options.stream?
+                                 "streamServerRenderedReactComponent"
+                               else
+                                 "serverRenderReactComponent"
+                               end
         <<-JS
         (function() {
           var railsContext = #{rails_context};
         #{ssr_pre_hook_js}
         #{redux_stores}
           var props = #{props_string};
-          return ReactOnRails.serverRenderReactComponent({
+          return ReactOnRails.#{render_function_name}({
             name: '#{react_component_name}',
             domNodeId: '#{render_options.dom_id}',
             props: props,

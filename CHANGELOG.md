@@ -15,6 +15,9 @@ You can find the **package** version numbers from this repo's tags and below in 
 *Add changes in master not yet tagged.*
 
 ### Added
+- Added streaming server rendering support: [PR 407](https://github.com/shakacode/react_on_rails_pro/pull/407) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+  - New `stream_view_containing_react_components` helper method that can be used with `stream_react_component` helper method in react_on_rails gem.
+  - Enables progressive page loading and improved performance for server-rendered React components.
 - Added support for replaying console logs from asynchronous operations:
   - New `replayServerAsyncOperationLogs` configuration option to enable/disable this feature
   - When enabled, captures and replays console output from async operations during server-side rendering
