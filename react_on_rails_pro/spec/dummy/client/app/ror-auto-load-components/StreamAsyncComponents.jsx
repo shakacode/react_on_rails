@@ -1,0 +1,60 @@
+import React, { useState, Suspense } from 'react';
+import css from '../components/HelloWorld.module.scss';
+
+const delayPromise = (promise, ms) => new Promise((resolve) => setTimeout(() => resolve(promise), ms));
+
+const cachedFetches = {};
+
+const AsyncPost = async () => {
+  const post = (cachedFetches['post'] ??= await delayPromise(
+    fetch('https://jsonplaceholder.org/posts/1'),
+    2000,
+  ).then((response) => response.json()));
+  return (
+    <div>
+      <h1 style={{ fontSize: '30px', fontWeight: 'bold' }}>Post Fetched Asynchronously on Server</h1>
+      {post.content}
+    </div>
+  );
+};
+
+const AsyncComment = async ({ commentId }) => {
+  const comment = (cachedFetches[commentId] ??= await delayPromise(
+    fetch(`https://jsonplaceholder.org/comments/${commentId}`),
+    2000 + commentId * 1000,
+  ).then((response) => response.json()));
+  return (
+    <div>
+      <h1 style={{ fontSize: '22px', fontWeight: 'bold' }}>Comment {commentId}</h1>
+      {comment.comment}
+    </div>
+  );
+};
+
+function StreamAsyncComponents(props) {
+  const [name, setName] = useState(props.helloWorldData.name);
+  return (
+    <div>
+      <h2>Stream React Server Components</h2>
+      <h3 className={css.brightColor}>Hello, {name}!!</h3>
+      <p>
+        Say hello to:
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
+      </p>
+      <br />
+      <br />
+      <Suspense fallback={<div>Loading...</div>}>
+        <AsyncPost />
+      </Suspense>
+      <br />
+      <h1 style={{ fontSize: '30px', fontWeight: 'bold' }}>Comments Fetched Asynchronously on Server</h1>
+      {[1, 2, 3, 4].map((commentId) => (
+        <Suspense key={commentId} fallback={<div>Loading Comment {commentId}...</div>}>
+          <AsyncComment commentId={commentId} />
+        </Suspense>
+      ))}
+    </div>
+  );
+}
+
+export default StreamAsyncComponents;

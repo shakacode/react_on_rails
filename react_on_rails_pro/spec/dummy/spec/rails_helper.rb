@@ -76,6 +76,7 @@ RSpec.configure do |config|
 
   # Capybara config
   config.include Capybara::DSL
+  config.include CustomNavigation
   #
   # selenium_firefox webdriver only works for Travis-CI builds.
   default_driver = :selenium_chrome_headless
@@ -132,4 +133,6 @@ RSpec.configure do |config|
   # save_and_open_page, meaning that relative links will be loaded from the
   # development server if it is running.
   Capybara.asset_host = "http://localhost:3000"
+  Capybara.app_host = "http://localhost:3000"
+  Capybara.run_server = false
 end

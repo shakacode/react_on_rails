@@ -266,6 +266,14 @@ jobs:
           command: cd spec/dummy && yarn run node-renderer
           background: true
       - run:
+          name: run rails server in background
+          command: cd spec/dummy && RAILS_ENV=test rails server
+          background: true
+      - run:
+          name: wait for rails server to start
+          command: |
+            while ! curl -s http://localhost:3000 > /dev/null; do sleep 1; done
+      - run:
           name: Run rspec tests
           command: |
             cd spec/dummy && RAILS_ENV=test bundle exec rspec \

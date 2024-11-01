@@ -50,14 +50,18 @@ function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
   Object.entries(headers).forEach(([key, header]) => res.header(key, header));
 }
 
-const setResponse = (result: ResponseResult, res: FastifyReply) => {
-  const { status, data, headers } = result;
+const setResponse = async (result: ResponseResult, res: FastifyReply) => {
+  const { status, data, headers, stream } = result;
   if (status !== 200 && status !== 410) {
     log.info(`Sending non-200, non-410 data back: ${typeof data === 'string' ? data : JSON.stringify(data)}`);
   }
   setHeaders(headers, res);
   res.status(status);
-  res.send(data);
+  if (stream) {
+    await res.send(stream);
+  } else {
+    res.send(data);
+  }
 };
 
 const isAsset = (value: unknown): value is Asset => (value as { type?: string }).type === 'asset';
@@ -93,36 +97,36 @@ export = function run(config: Partial<Config>) {
     },
   });
 
-  const isProtocolVersionMatch = (req: FastifyRequest, res: FastifyReply) => {
+  const isProtocolVersionMatch = async (req: FastifyRequest, res: FastifyReply) => {
     // Check protocol version
     const protocolVersionCheckingResult = checkProtocolVersion(req);
 
     if (typeof protocolVersionCheckingResult === 'object') {
-      setResponse(protocolVersionCheckingResult, res);
+      await setResponse(protocolVersionCheckingResult, res);
       return false;
     }
 
     return true;
   };
 
-  const isAuthenticated = (req: FastifyRequest, res: FastifyReply) => {
+  const isAuthenticated = async (req: FastifyRequest, res: FastifyReply) => {
     // Authenticate Ruby client
     const authResult = authenticate(req);
 
     if (typeof authResult === 'object') {
-      setResponse(authResult, res);
+      await setResponse(authResult, res);
       return false;
     }
 
     return true;
   };
 
-  const requestPrechecks = (req: FastifyRequest, res: FastifyReply) => {
-    if (!isProtocolVersionMatch(req, res)) {
+  const requestPrechecks = async (req: FastifyRequest, res: FastifyReply) => {
+    if (!(await isProtocolVersionMatch(req, res))) {
       return false;
     }
 
-    if (!isAuthenticated(req, res)) {
+    if (!(await isAuthenticated(req, res))) {
       return false;
     }
 
@@ -137,7 +141,7 @@ export = function run(config: Partial<Config>) {
     // Can't infer from the route like Express can
     Params: { bundleTimestamp: string; renderRequestDigest: string };
   }>('/bundles/:bundleTimestamp/render/:renderRequestDigest', async (req, res) => {
-    if (!requestPrechecks(req, res)) {
+    if (!(await requestPrechecks(req, res))) {
       return;
     }
 
@@ -174,7 +178,7 @@ export = function run(config: Partial<Config>) {
               providedNewBundle,
               assetsToCopy,
             });
-            setResponse(result, res);
+            await setResponse(result, res);
           } catch (err) {
             const exceptionMessage = formatExceptionMessage(
               renderingRequest,
@@ -188,7 +192,7 @@ export = function run(config: Partial<Config>) {
               }
               return scope;
             });
-            setResponse(errorResponseResult(exceptionMessage), res);
+            await setResponse(errorResponseResult(exceptionMessage), res);
           }
         },
         'handleRenderRequest',
@@ -198,7 +202,7 @@ export = function run(config: Partial<Config>) {
       const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
       log.error(`UNHANDLED TOP LEVEL error ${exceptionMessage}`);
       errorReporter.notify(exceptionMessage);
-      setResponse(errorResponseResult(exceptionMessage), res);
+      await setResponse(errorResponseResult(exceptionMessage), res);
     }
   });
 
@@ -207,7 +211,7 @@ export = function run(config: Partial<Config>) {
   app.post<{
     Body: Record<string, Asset>;
   }>('/upload-assets', async (req, res) => {
-    if (!requestPrechecks(req, res)) {
+    if (!(await requestPrechecks(req, res))) {
       return;
     }
     let lockAcquired = false;
@@ -226,12 +230,12 @@ export = function run(config: Partial<Config>) {
           errorMessage,
           `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
         );
-        setResponse(errorResponseResult(msg), res);
+        await setResponse(errorResponseResult(msg), res);
       } else {
         log.info(taskDescription);
         try {
           await moveUploadedAssets(assets);
-          setResponse(
+          await setResponse(
             {
               status: 200,
               headers: {},
@@ -241,7 +245,7 @@ export = function run(config: Partial<Config>) {
         } catch (err) {
           const message = `ERROR when trying to copy assets. ${err}. Task: ${taskDescription}`;
           log.info(message);
-          setResponse(errorResponseResult(message), res);
+          await setResponse(errorResponseResult(message), res);
         }
       }
     } finally {
@@ -266,7 +270,7 @@ export = function run(config: Partial<Config>) {
   app.post<{
     Querystring: { filename: string };
   }>('/asset-exists', async (req, res) => {
-    if (!isAuthenticated(req, res)) {
+    if (!(await isAuthenticated(req, res))) {
       return;
     }
 
@@ -275,7 +279,7 @@ export = function run(config: Partial<Config>) {
     if (!filename) {
       const message = `ERROR: filename param not provided to GET /asset-exists`;
       log.info(message);
-      setResponse(errorResponseResult(message), res);
+      await setResponse(errorResponseResult(message), res);
       return;
     }
 
@@ -285,10 +289,10 @@ export = function run(config: Partial<Config>) {
 
     if (fileExists) {
       log.info(`/asset-exists Uploaded asset DOES exist: ${assetPath}`);
-      setResponse({ status: 200, data: { exists: true }, headers: {} }, res);
+      await setResponse({ status: 200, data: { exists: true }, headers: {} }, res);
     } else {
       log.info(`/asset-exists Uploaded asset DOES NOT exist: ${assetPath}`);
-      setResponse({ status: 200, data: { exists: false }, headers: {} }, res);
+      await setResponse({ status: 200, data: { exists: false }, headers: {} }, res);
     }
   });
 

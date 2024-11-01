@@ -13,19 +13,18 @@ shared_examples "railsContext" do |pathname, id_base|
 
   context pathname, :js do
     it "check rails context" do
+      app_url = Capybara.app_host || Capybara.current_session.server.base_url
+      app_uri = URI.parse(app_url)
       expect(page).to have_current_path("/#{pathname}", ignore_query: true)
-      host = Capybara.current_session.server.host
-      port = Capybara.current_session.server.port
-      host_port = "#{host}:#{port}"
       keys_to_vals = {
         railsEnv: Rails.env,
         rorVersion: ReactOnRails::VERSION,
         rorPro: ReactOnRails::Utils.react_on_rails_pro?,
-        href: "http://#{host_port}/#{pathname}?ab=cd",
+        href: "#{app_url}/#{pathname}?ab=cd",
         location: "/#{pathname}?ab=cd",
-        port: port,
-        scheme: "http",
-        host: host,
+        port: app_uri.port,
+        scheme: app_uri.scheme,
+        host: app_uri.host,
         pathname: "/#{pathname}",
         search: "ab=cd",
         i18nLocale: "en",

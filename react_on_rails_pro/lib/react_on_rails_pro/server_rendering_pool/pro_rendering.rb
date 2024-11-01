@@ -22,8 +22,10 @@ module ReactOnRailsPro
             # the digest is on the render options.
             # TODO: the request digest should be removed unless prerender caching is used
             set_request_digest_on_render_options(js_code, render_options)
+            # TODO: support caching for streams
             if ReactOnRailsPro.configuration.prerender_caching &&
-               render_options.internal_option(:skip_prerender_cache).nil?
+               render_options.internal_option(:skip_prerender_cache).nil? &&
+               !render_options.stream?
               prerender_cache_key = cache_key(js_code, render_options)
               prerender_cache_hit = true
               result = Rails.cache.fetch(prerender_cache_key) do
@@ -79,6 +81,8 @@ module ReactOnRailsPro
         end
 
         def render_on_pool(js_code, render_options)
+          return pool.exec_server_render_streaming_js(js_code, render_options) if render_options.stream?
+
           pool.exec_server_render_js(js_code, render_options)
         end
       end
