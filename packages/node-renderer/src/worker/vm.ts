@@ -10,6 +10,8 @@ import m from 'module';
 import cluster from 'cluster';
 import { promisify } from 'util';
 import type { ReactOnRails as ROR } from 'react-on-rails';
+
+import SharedConsoleHistory from '../shared/sharedConsoleHistory';
 import log from '../shared/log';
 import { getConfig } from '../shared/configBuilder';
 import { formatExceptionMessage, smartTrim } from '../shared/utils';
@@ -20,6 +22,7 @@ const writeFileAsync = promisify(fs.writeFile);
 
 // Both context and vmBundleFilePath are set when the VM is ready.
 let context: vm.Context | undefined;
+let sharedConsoleHistory: SharedConsoleHistory | undefined;
 
 // vmBundleFilePath is cleared at the beginning of creating the context and set only when the
 // context is properly created.
@@ -31,26 +34,6 @@ let vmBundleFilePath: string | undefined;
  */
 export function getVmBundleFilePath() {
   return vmBundleFilePath;
-}
-
-function replayVmConsole() {
-  if (log.level !== 'debug' || !context) return;
-  const consoleHistoryFromVM = vm.runInContext('console.history', context) as { arguments: unknown[] }[];
-
-  consoleHistoryFromVM.forEach((msg) => {
-    const stringifiedList = msg.arguments.map((arg) => {
-      let val;
-      try {
-        val = typeof arg === 'string' || arg instanceof String ? arg : JSON.stringify(arg);
-      } catch (e) {
-        val = `${(e as Error).message}: ${arg}`;
-      }
-
-      return val;
-    });
-
-    log.debug(stringifiedList.join(' '));
-  });
 }
 
 declare global {
@@ -69,7 +52,8 @@ export async function buildVM(filePath: string) {
     const { supportModules, includeTimerPolyfills, additionalContext } = getConfig();
     const additionalContextIsObject = additionalContext !== null && additionalContext.constructor === Object;
     vmBundleFilePath = undefined;
-    const contextObject = {};
+    sharedConsoleHistory = new SharedConsoleHistory();
+    const contextObject = { sharedConsoleHistory };
     if (supportModules) {
       log.debug(
         'Adding Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval to context object.',
@@ -89,14 +73,21 @@ export async function buildVM(filePath: string) {
     // Reimplement console methods for replaying on the client:
     vm.runInContext(
       `
-    console = { history: [] };
+    console = {
+      get history() {
+        return sharedConsoleHistory.getConsoleHistory();
+      },
+      set history(value) {
+        // Do nothing. It's just for the backward compatibility.
+      },
+    };
     ['error', 'log', 'info', 'warn'].forEach(function (level) {
       console[level] = function () {
         var argArray = Array.prototype.slice.call(arguments);
         if (argArray.length > 0) {
           argArray[0] = '[SERVER] ' + argArray[0];
         }
-        console.history.push({level: level, arguments: argArray});
+        sharedConsoleHistory.addToConsoleHistory({level: level, arguments: argArray});
       };
     });`,
       context,
@@ -183,7 +174,7 @@ export async function runInVM(
   const { bundlePath } = getConfig();
 
   try {
-    if (context == null) {
+    if (context == null || sharedConsoleHistory == null) {
       throw new Error('runInVM called before buildVM');
     }
 
@@ -197,9 +188,12 @@ ${smartTrim(renderingRequest)}`);
       await writeFileAsync(debugOutputPathCode, renderingRequest);
     }
 
-    vm.runInContext('console.history = []', context);
+    // Capture context to ensure TypeScript sees it as defined within the callback
+    const localContext = context;
+    let result = sharedConsoleHistory.trackConsoleHistoryInRenderRequest(
+      () => vm.runInContext(renderingRequest, localContext) as string | Promise<string>,
+    );
 
-    let result = vm.runInContext(renderingRequest, context) as string | Promise<string>;
     if (typeof result !== 'string') {
       const objectResult = await result;
       result = JSON.stringify(objectResult);
@@ -212,7 +206,6 @@ ${smartTrim(result)}`);
       await writeFileAsync(debugOutputPathResult, result);
     }
 
-    replayVmConsole();
     return Promise.resolve(result);
   } catch (exception) {
     const exceptionMessage = formatExceptionMessage(renderingRequest, exception);

@@ -106,3 +106,7 @@ export async function moveUploadedAssets(uploadedAssets: Asset[]): Promise<void>
   await Promise.all(moveMultipleAssets);
   log.info(`Moved assets ${JSON.stringify(uploadedAssets.map((fileDescriptor) => fileDescriptor.filename))}`);
 }
+
+export function isPromise<T>(value: T | Promise<T>): value is Promise<T> {
+  return value && typeof (value as Promise<T>).then === 'function';
+}

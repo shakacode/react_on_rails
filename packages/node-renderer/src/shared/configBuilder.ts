@@ -21,6 +21,7 @@ const DEFAULT_LOG_LEVEL = 'info';
 const { env } = process;
 const MAX_DEBUG_SNIPPET_LENGTH = 1000;
 const DEFAULT_SAMPLE_RATE = 0.1;
+const NODE_ENV = env.NODE_ENV || 'production';
 
 export interface Config {
   port: number;
@@ -51,6 +52,10 @@ export interface Config {
   sentryTracing: boolean;
   sentryTracesSampleRate: string | number;
   includeTimerPolyfills: boolean;
+  // If set to true, this option enables the replay of console logs from asynchronous server operations.
+  // If set to false, only logs that occur on the server prior to any awaited asynchronous operations will be replayed.
+  // The default value is true in development, otherwise it is set to false.
+  replayServerAsyncOperationLogs: boolean;
 }
 
 let config: Config | undefined;
@@ -128,6 +133,11 @@ const defaultConfig: Config = {
 
   // default to true if empty, otherwise it is set to false
   includeTimerPolyfills: env.INCLUDE_TIMER_POLYFILLS === 'true' || !env.INCLUDE_TIMER_POLYFILLS,
+
+  // default to true in development, otherwise it is set to false
+  replayServerAsyncOperationLogs: truthy(
+    env.REPLAY_SERVER_ASYNC_OPERATION_LOGS ?? NODE_ENV === 'development',
+  ),
 };
 
 function envValuesUsed() {

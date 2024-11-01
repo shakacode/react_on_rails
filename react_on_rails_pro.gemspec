@@ -33,7 +33,7 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "multipart-post", "~> 2.3"
   s.add_runtime_dependency "persistent_http", "~> 2"
   s.add_runtime_dependency "rainbow"
-  s.add_runtime_dependency "react_on_rails", ">= 14.0.4"
+  s.add_runtime_dependency "react_on_rails", ">= 15.0.0.alpha.1"
   s.add_development_dependency "bundler"
   s.add_development_dependency "commonmarker"
   s.add_development_dependency "gem-release"

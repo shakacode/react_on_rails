@@ -17,6 +17,7 @@ Rails.application.routes.draw do
   get "cached_redux_component" => "pages#cached_redux_component"
   get "apollo_graphql" => "pages#apollo_graphql", as: :apollo_graphql
   get "lazy_apollo_graphql" => "pages#lazy_apollo_graphql", as: :lazy_apollo_graphql
+  get "console_logs_in_async_server" => "pages#console_logs_in_async_server", as: :console_logs_in_async_server
 
   # routes copied over from react on rails
   get "client_side_hello_world" => "pages#client_side_hello_world"
