@@ -2,7 +2,7 @@ import cluster from 'cluster';
 import path from 'path';
 import { MultipartFile } from '@fastify/multipart';
 import { createWriteStream, ensureDir, move, MoveOptions } from 'fs-extra';
-import { Readable, pipeline } from 'stream';
+import { Readable, pipeline, PassThrough } from 'stream';
 import { promisify } from 'util';
 import errorReporter from './errorReporter';
 import { getConfig } from './configBuilder';
@@ -118,6 +118,13 @@ export const isReadableStream = (stream: unknown): stream is Readable =>
   stream !== null &&
   typeof (stream as Readable).pipe === 'function' &&
   typeof (stream as Readable).read === 'function';
+
+export const handleStreamError = (stream: Readable, onError: (error: Error) => void) => {
+  stream.on('error', onError);
+  const newStreamAfterHandlingError = new PassThrough();
+  stream.pipe(newStreamAfterHandlingError);
+  return newStreamAfterHandlingError;
+};
 
 export const isErrorRenderResult = (result: RenderResult): result is { exceptionMessage: string } =>
   typeof result === 'object' && !isReadableStream(result) && 'exceptionMessage' in result;

@@ -7,7 +7,6 @@
 
 import cluster from 'cluster';
 import path from 'path';
-
 import { lock, unlock } from '../shared/locks';
 import fileExistsAsync from '../shared/fileExistsAsync';
 import log from '../shared/log';
@@ -21,6 +20,7 @@ import {
   moveUploadedAsset,
   isReadableStream,
   isErrorRenderResult,
+  handleStreamError,
 } from '../shared/utils';
 import { getConfig } from '../shared/configBuilder';
 import errorReporter from '../shared/errorReporter';
@@ -43,10 +43,14 @@ async function prepareResult(renderingRequest: string): Promise<ResponseResult> 
     }
 
     if (isReadableStream(result)) {
+      const newStreamAfterHandlingError = handleStreamError(result, (error) => {
+        const msg = formatExceptionMessage(renderingRequest, error, 'Error in a rendering stream');
+        errorReporter.notify(msg);
+      });
       return Promise.resolve({
         headers: { 'Cache-Control': 'public, max-age=31536000' },
         status: 200,
-        stream: result,
+        stream: newStreamAfterHandlingError,
       });
     }
 

@@ -84,6 +84,11 @@ aliases:
     keys:
       - v4-package-app-gem-cache-{{ checksum "react_on_rails_pro.gemspec" }}
 
+  # Restore webpack bundles for dummy app from cache
+  - &restore-dummy-app-webpack-bundle-cache
+    name: Restore cached webpack bundles for dummy app
+    key: v4-dummy-app-webpack-bundle-{{ .Revision }}
+
     # NOTE: Sometimes CI generated docker images are not updated in time to keep up with the minimum required
     # by chromedriver versions of Chrome. Just bump here Chrome version if chromedriver raises errors
   - &install-latest-chrome
@@ -213,6 +218,8 @@ jobs:
       - checkout
       - run: *print-system-info
       - restore_cache: *restore-package-node-modules-cache
+      - run: rm -rf spec/dummy/public/webpack
+      - restore_cache: *restore-dummy-app-webpack-bundle-cache
       - run: *install-package-node-modules
       - run:
           name: Run JS unit tests for Renderer package
@@ -251,9 +258,7 @@ jobs:
       - restore_cache: *restore-dummy-app-node-modules-cache
       - restore_cache: *restore-dummy-app-gem-cache
       - run: rm -rf spec/dummy/public/webpack
-      - restore_cache:
-          name: Restore cached webpack bundles for dummy app
-          key: v4-dummy-app-webpack-bundle-{{ .Revision }}
+      - restore_cache: *restore-dummy-app-webpack-bundle-cache
       - run: *install-dummy-app-ruby-gems
       - run: *install-package-node-modules
       - run: *install-latest-chrome
@@ -312,6 +317,7 @@ workflows:
       - package-js-tests:
           requires:
             - install-package-node-packages
+            - build-dummy-app-webpack-test-bundles
       - rspec-package-specs:
           requires:
             - install-package-ruby-gems

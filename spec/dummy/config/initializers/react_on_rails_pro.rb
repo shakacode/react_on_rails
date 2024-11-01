@@ -21,6 +21,8 @@ ReactOnRailsPro.configure do |config|
 
   config.ssr_timeout = 10
 
+  config.raise_non_shell_server_rendering_errors = false
+
   # If true, then cache the evaluation of JS for prerendering using the standard Rails cache.
   # Applies to all rendering engines.
   # Default for `prerender_caching` is false.
