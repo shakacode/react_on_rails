@@ -20,7 +20,16 @@ module ReactOnRailsPro
 
     # Add a transformation action
     def transform
-      @actions << ->(chunk, _position) { yield(chunk) }
+      @actions << lambda { |chunk, position|
+        if position == :last && chunk.empty?
+          # Return the empty chunk without modification for the last chunk
+          # This is related to the `handleChunk(:last, "")` call which gets all the appended content
+          # We don't want to make an extra call to the transformer block if there is no content appended
+          chunk
+        else
+          yield(chunk)
+        end
+      }
       self # Return self to allow chaining
     end
 

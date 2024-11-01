@@ -6,6 +6,7 @@ const delayPromise = (promise, ms) => new Promise((resolve) => setTimeout(() => 
 const cachedFetches = {};
 
 const AsyncPost = async () => {
+  console.log('Hello from AsyncPost');
   const post = (cachedFetches['post'] ??= await delayPromise(
     fetch('https://jsonplaceholder.org/posts/1'),
     2000,
@@ -23,6 +24,7 @@ const AsyncComment = async ({ commentId }) => {
     fetch(`https://jsonplaceholder.org/comments/${commentId}`),
     2000 + commentId * 1000,
   ).then((response) => response.json()));
+  console.log('Hello from AsyncComment', commentId);
   return (
     <div>
       <h1 style={{ fontSize: '22px', fontWeight: 'bold' }}>Comment {commentId}</h1>
