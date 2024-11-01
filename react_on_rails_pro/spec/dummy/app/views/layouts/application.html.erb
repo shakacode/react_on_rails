@@ -51,7 +51,9 @@
       <% flash.each do |key, value| %>
         <%= content_tag :div, value, class: "flash #{key}" %>
       <% end %>
-      <%= yield %>
+      <div id="page-container">
+        <%= yield %>
+      </div>
       <!-- This is a placeholder for ReactOnRails to know where to render the store props for
        client side hydration -->
       <%= redux_store_hydration_data %>

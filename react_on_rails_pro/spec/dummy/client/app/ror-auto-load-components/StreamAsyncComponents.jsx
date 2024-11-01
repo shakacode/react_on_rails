@@ -11,6 +11,13 @@ const AsyncPost = async () => {
     fetch('https://jsonplaceholder.org/posts/1'),
     2000,
   ).then((response) => response.json()));
+
+  // Uncomment to test handling of errors occuring outside of the shell
+  // The error occur on the server side only, so the error can be handled on server or fallback to client side rendering
+  // if (typeof window === 'undefined') {
+  //   throw new Error('Error from AsyncPost');
+  // }
+
   return (
     <div>
       <h1 style={{ fontSize: '30px', fontWeight: 'bold' }}>Post Fetched Asynchronously on Server</h1>
@@ -35,6 +42,10 @@ const AsyncComment = async ({ commentId }) => {
 
 function StreamAsyncComponents(props) {
   const [name, setName] = useState(props.helloWorldData.name);
+
+  // Uncomment to test error handling during rendering the shell
+  // throw new Error('Hello from StreamAsyncComponents');
+
   return (
     <div>
       <h2>Stream React Server Components</h2>

@@ -38,11 +38,18 @@ const AsyncHelloWorldHooks = (props) => {
   if (typeof window !== 'undefined') {
     return <HelloWorldHooks {...props} />;
   }
+  if (props.throwAsyncError) {
+    return Promise.reject(new Error('Async error from AsyncHelloWorldHooks'));
+  }
   return new Promise((resolve) => setTimeout(() => resolve(<HelloWorldHooks {...props} />), 1000));
 };
 
 const AsyncComponentsTreeForTesting = (props) => {
   console.log('Sync console log from AsyncComponentsTreeForTesting');
+  if (props.throwSyncError) {
+    throw new Error('Sync error from AsyncComponentsTreeForTesting');
+  }
+
   return (
     <div>
       <div>
