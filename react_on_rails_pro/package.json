@@ -79,7 +79,7 @@
     "ndb": "^1.1.5",
     "nps": "^5.9.12",
     "prettier": "^3.2.5",
-    "react-on-rails": "14.0.4",
+    "react-on-rails": "15.0.0-alpha.1",
     "release-it": "^17.6.0",
     "tap-diff": "git+https://github.com/vaguilera/tap-diff.git",
     "tap-spec": "^5.0.0",

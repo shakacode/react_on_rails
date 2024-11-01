@@ -50,6 +50,10 @@ const config = {
 
   // Required to use setTimeout, setInterval, & clearTimeout during server rendering
   includeTimerPolyfills: false,
+
+  // If set to true, replayServerAsyncOperationLogs will replay console logs from async server operations.
+  // If set to false, replayServerAsyncOperationLogs will replay console logs from sync server operations only.
+  replayServerAsyncOperationLogs: true,
 };
 
 // Renderer detects a total number of CPUs on virtual hostings like Heroky or CircleCI instead

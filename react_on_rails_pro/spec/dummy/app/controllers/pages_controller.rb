@@ -44,6 +44,10 @@ class PagesController < ApplicationController
     render "/pages/pro/lazy_apollo_graphql"
   end
 
+  def console_logs_in_async_server
+    render "/pages/pro/console_logs_in_async_server"
+  end
+
   # See files in spec/dummy/app/views/pages
 
   helper_method :calc_slow_app_props_server_render
