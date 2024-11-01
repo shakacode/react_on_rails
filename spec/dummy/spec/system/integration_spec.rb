@@ -153,9 +153,9 @@ describe "Pages/stream_async_components_for_testing", :js do
   shared_examples "shows loading fallback while rendering async components" do |skip_js_packs|
     it "shows the loading fallback while rendering async components" \
        "#{skip_js_packs ? ' when the page is not hydrated' : ''}" do
-      url = "/stream_async_components_for_testing#{skip_js_packs ? '?skip_js_packs=true' : ''}"
+      path = "/stream_async_components_for_testing#{skip_js_packs ? '?skip_js_packs=true' : ''}"
       chunks_count = 0
-      navigate_with_streaming(url) do |_content|
+      navigate_with_streaming(path) do |_content|
         chunks_count += 1
         expect(page).to have_text(/Loading branch1 at level \d+/, count: 1) if chunks_count < 5
         expect(page).to have_text(/Loading branch2 at level \d+/, count: 1) if chunks_count == 1
@@ -173,6 +173,49 @@ describe "Pages/stream_async_components_for_testing", :js do
 
   it_behaves_like "shows loading fallback while rendering async components", false
   it_behaves_like "shows loading fallback while rendering async components", true
+
+  it "replays console logs" do
+    visit "/stream_async_components_for_testing"
+    logs = page.driver.browser.logs.get(:browser)
+    info = logs.select { |log| log.level == "INFO" }
+    info_messages = info.map(&:message)
+    errors = logs.select { |log| log.level == "SEVERE" }
+    errors_messages = errors.map(&:message)
+
+    expect(info_messages).to include(/\[SERVER\] Sync console log from AsyncComponentsTreeForTesting/)
+    5.times do |i|
+      expect(info_messages).to include(/\[SERVER\] branch1 \(level #{i}\)/)
+      expect(errors_messages).to include(
+        /"\[SERVER\] Error message" "{\\"branchName\\":\\"branch1\\",\\"level\\":#{i}}"/
+      )
+    end
+    2.times do |i|
+      expect(info_messages).to include(/\[SERVER\] branch2 \(level #{i}\)/)
+      expect(errors_messages).to include(
+        /"\[SERVER\] Error message" "{\\"branchName\\":\\"branch2\\",\\"level\\":#{i}}"/
+      )
+    end
+  end
+
+  it "replays console logs with each chunk" do
+    chunks_count = 0
+    navigate_with_streaming("/stream_async_components_for_testing") do |content|
+      chunks_count += 1
+      logs = page.driver.browser.logs.get(:browser)
+      info = logs.select { |log| log.level == "INFO" }
+      info_messages = info.map(&:message)
+      errors = logs.select { |log| log.level == "SEVERE" }
+      errors_messages = errors.map(&:message)
+
+      next if content.empty? || chunks_count == 1
+
+      expect(info_messages).to include(/\[SERVER\] branch1 \(level \d+\)/)
+      expect(errors_messages).to include(
+        /"\[SERVER\] Error message" "{\\"branchName\\":\\"branch1\\",\\"level\\":\d+}/
+      )
+    end
+    expect(chunks_count).to be >= 5
+  end
 end
 
 describe "Pages/Pure Component", :js do

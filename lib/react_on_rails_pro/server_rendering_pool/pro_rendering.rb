@@ -81,8 +81,6 @@ module ReactOnRailsPro
         end
 
         def render_on_pool(js_code, render_options)
-          return pool.exec_server_render_streaming_js(js_code, render_options) if render_options.stream?
-
           pool.exec_server_render_js(js_code, render_options)
         end
       end
