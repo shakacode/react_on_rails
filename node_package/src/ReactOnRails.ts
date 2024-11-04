@@ -1,5 +1,4 @@
 import type { ReactElement } from 'react';
-
 import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
 import ComponentRegistry from './ComponentRegistry';
@@ -259,8 +258,7 @@ ctx.ReactOnRails = {
    * Used by server rendering by Rails
    * @param options
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  serverRenderRSCReactComponent(options: RenderParams): PassThrough {
+  serverRenderRSCReactComponent() {
     throw new Error('serverRenderRSCReactComponent is supported in RSC bundle only.');
   },
 
