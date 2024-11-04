@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import type { Readable } from 'stream';
+import type { Readable, PassThrough } from 'stream';
 
 import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
