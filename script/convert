@@ -15,6 +15,9 @@ File.rename(old_config, new_config)
 
 gsub_file_content("../Gemfile.development_dependencies", 'gem "shakapacker", "8.0.0"', 'gem "shakapacker", "6.6.0"')
 
+# Knip doesn't work on the oldest supported Node version and isn't needed there anyway
+gsub_file_content("../package.json", /"knip": "[^"]*",/, "")
+
 gsub_file_content("../spec/dummy/package.json", '"shakapacker": "8.0.0",', '"shakapacker": "6.6.0",')
 
 gsub_file_content("../spec/dummy/config/webpack/commonWebpackConfig.js", /generateWebpackConfig(\(\))?/,

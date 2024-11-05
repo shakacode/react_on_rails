@@ -4,6 +4,7 @@ extends:
   - prettier/react
 
 plugins:
+  - import
   - prettier
 
 globals:
