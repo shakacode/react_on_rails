@@ -7,6 +7,7 @@ import type {
   RenderFunction,
   Root,
 } from './types';
+import type { Context } from './context';
 
 import createReactOutput from './createReactOutput';
 import { isServerRenderHash } from './isServerRenderResult';
@@ -22,12 +23,11 @@ declare global {
     roots: Root[];
   }
 
-  namespace NodeJS {
-    interface Global {
-      ReactOnRails: ReactOnRailsType;
-      roots: Root[];
-    }
+  namespace globalThis {
+    var ReactOnRails: ReactOnRailsType;
+    var roots: Root[];
   }
+
   namespace Turbolinks {
     interface TurbolinksStatic {
       controller?: unknown;
@@ -38,8 +38,6 @@ declare global {
 declare const ReactOnRails: ReactOnRailsType;
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
-
-type Context = Window | NodeJS.Global;
 
 function findContext(): Context {
   if (typeof window.ReactOnRails !== 'undefined') {
