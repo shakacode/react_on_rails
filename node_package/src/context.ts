@@ -1,8 +1,9 @@
+export type Context = Window | typeof globalThis;
+
 /**
  * Get the context, be it window or global
- * @returns {boolean|Window|*|context}
  */
-export default function context(this: void): Window | NodeJS.Global | void {
+export default function context(this: void): Context | void {
   return ((typeof window !== 'undefined') && window) ||
     ((typeof global !== 'undefined') && global) ||
     this;
