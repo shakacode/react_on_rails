@@ -56,7 +56,7 @@ module ReactOnRails
             @file_index += 1
           end
           begin
-            result = if render_options.stream?
+            result = if render_options.stream? || render_options.rsc?
                        js_evaluator.eval_streaming_js(js_code, render_options)
                      else
                        js_evaluator.eval_js(js_code, render_options)
@@ -76,7 +76,7 @@ module ReactOnRails
             raise ReactOnRails::Error, msg, err.backtrace
           end
 
-          return parse_result_and_replay_console_messages(result, render_options) unless render_options.stream?
+          return parse_result_and_replay_console_messages(result, render_options) unless render_options.stream? || render_options.rsc?
 
           # Streamed component is returned as stream of strings.
           # We need to parse each chunk and replay the console messages.
@@ -230,7 +230,9 @@ module ReactOnRails
           result = nil
           begin
             result = JSON.parse(result_string)
+            binding.pry
           rescue JSON::ParserError => e
+            return { html: result_string }
             raise ReactOnRails::JsonParseError.new(parse_error: e, json: result_string)
           end
 
