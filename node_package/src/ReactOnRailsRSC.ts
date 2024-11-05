@@ -62,14 +62,19 @@ See https://github.com/shakacode/react_on_rails#renderer-functions`);
     }
 
     renderResult = new PassThrough();
+    let finalValue = "";
     const streamReader = renderToReadableStream(reactRenderingResult, getBundleConfig()).getReader();
+    const decoder = new TextDecoder();
     const processStream = async () => {
       const { done, value } = await streamReader.read();
       if (done) {
         renderResult?.push(null);
+        // @ts-expect-error value is not typed
+        debugConsole.log('value', finalValue);
         return;
       }
 
+      finalValue += decoder.decode(value);
       renderResult?.push(value);
       processStream();
     }
