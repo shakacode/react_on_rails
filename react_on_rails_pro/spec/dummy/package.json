@@ -82,7 +82,6 @@
     "@tailwindcss/typography": "^0.5.9",
     "@tsconfig/create-react-app": "^2.0.1",
     "@types/react-dom": "^18.2.14",
-    "body-parser": "^1.19.0",
     "jsdom": "^16.4.0",
     "preload-webpack-plugin": "^3.0.0-alpha.1",
     "tape": "^4.7.0",

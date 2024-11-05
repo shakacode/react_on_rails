@@ -12,8 +12,8 @@ gem "react_on_rails", "15.0.0.alpha.1" # keep in sync with package.json files
 
 gem "shakapacker", "8.0.0"
 gem "bootsnap", require: false
-gem "rails", ">= 7.1"
-gem "puma", ">= 6"
+gem "rails", "~> 7.1"
+gem "puma", "~> 6"
 
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
 gem "jbuilder"
