@@ -138,6 +138,9 @@ RSpec.configure do |config|
 
   Capybara.save_path = Rails.root.join("tmp", "capybara")
   Capybara::Screenshot.prune_strategy = { keep: 10 }
+  Capybara::Screenshot.register_driver(:selenium_chrome_headless_with_logging) do |capybara_driver, path|
+    capybara_driver.browser.save_screenshot(path)
+  end
 
   # https://github.com/mattheworiordan/capybara-screenshot/issues/243#issuecomment-620423225
   config.retry_callback = proc do |ex|
