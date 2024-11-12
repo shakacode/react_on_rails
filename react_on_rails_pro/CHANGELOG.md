@@ -14,6 +14,9 @@ You can find the **package** version numbers from this repo's tags and below in 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [4.0.0.rc.6] - 2024-11-12
+
+
 ### Added
 - Added streaming server rendering support:
   - [PR 407](https://github.com/shakacode/react_on_rails_pro/pull/407) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
@@ -321,8 +324,9 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.2...HEAD
-[3.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.2.1...3.1.0
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc-6...HEAD
+[4.0.0.rc.6]: https://github.com/shakacode/react_on_rails_pro/compare/3.2.1...4.0.0-rc.6
+[3.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.10...3.2.1
 [3.1.2]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.0...3.1.2
 [3.1.0]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.1...3.1.0
 [3.0.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0...3.0.1
