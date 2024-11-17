@@ -67,7 +67,7 @@ module ReactOnRailsPro
     end
 
     # Returns the hashed file name of the server bundle when using webpacker.
-    # Nececessary fragment-caching keys.
+    # Necessary fragment-caching keys.
     def self.server_bundle_file_name
       return @server_bundle_hash if @server_bundle_hash && !Rails.env.development?
 

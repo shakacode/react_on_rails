@@ -14,7 +14,7 @@ module ReactOnRailsPro
       renderer_use_fallback_exec_js: Configuration::DEFAULT_RENDERER_FALLBACK_EXEC_JS,
       renderer_http_pool_size: Configuration::DEFAULT_RENDERER_HTTP_POOL_SIZE,
       renderer_http_pool_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_TIMEOUT,
-      renderer_http_pool_warn_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_TIMEOUT,
+      renderer_http_pool_warn_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT,
       renderer_password: nil,
       tracing: Configuration::DEFAULT_TRACING,
       dependency_globs: Configuration::DEFAULT_DEPENDENCY_GLOBS,

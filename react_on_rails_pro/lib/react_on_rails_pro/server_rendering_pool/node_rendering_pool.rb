@@ -7,7 +7,7 @@ module ReactOnRailsPro
       RENDERED_HTML_KEY = "renderedHtml"
 
       class << self
-        attr_accessor :bundle_hash
+        attr_reader :bundle_hash
 
         def reset_pool
           ReactOnRailsPro::Request.reset_connection
@@ -39,13 +39,6 @@ module ReactOnRailsPro
           render_options.set_option(:throw_js_errors, ReactOnRailsPro.configuration.throw_js_errors)
           ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript
             .exec_server_render_js(js_code, render_options, self)
-        end
-
-        def exec_server_render_streaming_js(js_code, render_options)
-          render_options.set_option(:throw_js_errors, ReactOnRailsPro.configuration.throw_js_errors)
-          # The secret sauce is passing self as the 3rd param, the js_evaluator
-          ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript
-            .exec_server_render_streaming_js(js_code, render_options, self)
         end
 
         def eval_streaming_js(js_code, render_options)
