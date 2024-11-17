@@ -193,15 +193,5 @@ module ReactOnRailsPro
 
       it { expect(printable_cache_key).to eq("1_2_3_4_5") }
     end
-
-    def mock_response(status)
-      # http.rb uses a string for status
-      raise "Use a string for status #{status}" unless status.is_a?(String)
-
-      resp = instance_double(response)
-      allow(resp).to receive(:code).and_return(status)
-      allow(resp).to receive(:body).and_return(status == "200" ? "Ok" : "Server error")
-      resp
-    end
   end
 end
