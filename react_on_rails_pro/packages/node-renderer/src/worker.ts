@@ -6,6 +6,7 @@
 import path from 'path';
 import cluster from 'cluster';
 import fastify, { FastifyReply, FastifyRequest } from 'fastify';
+import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart from '@fastify/multipart';
 import log from './shared/log';
 import packageJson from './shared/packageJson';
@@ -78,6 +79,9 @@ export = function run(config: Partial<Config>) {
   // 10 MB limit for code including props
   const fieldSizeLimit = 1024 * 1024 * 10;
 
+  // Supports application/x-www-form-urlencoded
+  void app.register(fastifyFormbody);
+  // Supports multipart/form-data
   void app.register(fastifyMultipart, {
     attachFieldsToBody: 'keyValues',
     limits: {

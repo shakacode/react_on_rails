@@ -51,17 +51,17 @@ module ReactOnRailsPro
 
           response = ReactOnRailsPro::Request.render_code(path, js_code, send_bundle)
 
-          case response.code
-          when "200"
+          case response.status
+          when 200
             response.body
-          when "410"
-            # 410 is a special value meaning send the updated bundle with the next request.
+          when ReactOnRailsPro::STATUS_SEND_BUNDLE
             eval_js(js_code, render_options, send_bundle: true)
-          when "400"
+          when 400
             raise ReactOnRailsPro::Error,
-                  "Renderer unhandled error at the VM level: #{response.code}:\n#{response.body}"
+                  "Renderer unhandled error at the VM level: #{response.status}:\n#{response.body}"
           else
-            raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{response.code}:\n#{response.body}"
+            raise ReactOnRailsPro::Error,
+                  "Unexpected response code from renderer: #{response.status}:\n#{response.body}"
           end
         rescue StandardError => e
           raise e unless ReactOnRailsPro.configuration.renderer_use_fallback_exec_js

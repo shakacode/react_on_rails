@@ -5,8 +5,7 @@ PATH
       addressable
       connection_pool
       execjs (~> 2.9)
-      multipart-post (~> 2.3)
-      persistent_http (~> 2)
+      httpx (~> 1.3, >= 1.3.3)
       rainbow
       react_on_rails (>= 15.0.0.alpha.1)
 
@@ -113,10 +112,11 @@ GEM
     drb (2.2.1)
     erubi (1.13.0)
     execjs (2.9.1)
-    gene_pool (1.5.0)
-      concurrent-ruby (>= 1.0)
     globalid (1.2.1)
       activesupport (>= 6.1)
+    http-2 (1.0.2)
+    httpx (1.3.3)
+      http-2 (>= 1.0.0)
     i18n (1.14.6)
       concurrent-ruby (~> 1.0)
     io-console (0.7.2)
@@ -141,7 +141,6 @@ GEM
     mini_mime (1.1.5)
     minitest (5.25.1)
     msgpack (1.7.2)
-    multipart-post (2.3.0)
     net-imap (0.5.0)
       date
       net-protocol
@@ -165,8 +164,6 @@ GEM
     nokogiri (1.16.7-x86_64-linux)
       racc (~> 1.4)
     package_json (0.1.0)
-    persistent_http (2.0.3)
-      gene_pool (>= 1.3)
     pry (0.14.2)
       coderay (~> 1.1)
       method_source (~> 1.0)
