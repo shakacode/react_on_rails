@@ -2,7 +2,7 @@
  * Logic for checking protocol version.
  * @module worker/checkProtocVersionHandler
  */
-import type { FastifyRequest } from 'fastify';
+import type { FastifyRequest } from './types';
 import packageJson from '../shared/packageJson';
 
 export = function checkProtocolVersion(req: FastifyRequest) {
