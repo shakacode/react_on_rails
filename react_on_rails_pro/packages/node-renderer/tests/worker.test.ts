@@ -2,7 +2,7 @@ import formAutoContent from 'form-auto-content';
 import fs from 'fs';
 import querystring from 'querystring';
 import { createReadStream } from 'fs-extra';
-import worker from '../src/worker';
+import worker, { disableHttp2 } from '../src/worker';
 import packageJson from '../../../package.json';
 import {
   BUNDLE_TIMESTAMP,
@@ -24,6 +24,8 @@ const bundlePathForTest = () => bundlePath(testName);
 
 const gemVersion = packageJson.version;
 const { protocolVersion } = packageJson;
+
+disableHttp2();
 
 describe('worker', () => {
   beforeEach(async () => {

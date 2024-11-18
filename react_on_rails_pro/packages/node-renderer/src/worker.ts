@@ -5,13 +5,14 @@
 
 import path from 'path';
 import cluster from 'cluster';
-import fastify, { FastifyReply, FastifyRequest } from 'fastify';
+import fastify from 'fastify';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart from '@fastify/multipart';
 import log from './shared/log';
 import packageJson from './shared/packageJson';
 import { buildConfig, Config, getConfig } from './shared/configBuilder';
 import fileExistsAsync from './shared/fileExistsAsync';
+import type { FastifyReply, FastifyRequest } from './worker/types';
 import checkProtocolVersion from './worker/checkProtocolVersionHandler';
 import authenticate from './worker/authHandler';
 import handleRenderRequest from './worker/handleRenderRequest';
@@ -67,14 +68,25 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
 
 const isAsset = (value: unknown): value is Asset => (value as { type?: string }).type === 'asset';
 
-export = function run(config: Partial<Config>) {
+// Remove after this issue is resolved: https://github.com/fastify/light-my-request/issues/315
+let useHttp2 = true;
+
+// Call before any test using `app.inject()`
+export const disableHttp2 = () => {
+  useHttp2 = false;
+};
+
+export default function run(config: Partial<Config>) {
   // Store config in app state. From now it can be loaded by any module using
   // getConfig():
   buildConfig(config);
 
   const { bundlePath, logLevel, port } = getConfig();
 
-  const app = fastify({ logger: logLevel === 'debug' });
+  const app = fastify({
+    http2: useHttp2 as true,
+    logger: logLevel === 'debug',
+  });
 
   // 10 MB limit for code including props
   const fieldSizeLimit = 1024 * 1024 * 10;
@@ -318,4 +330,4 @@ export = function run(config: Partial<Config>) {
   }
 
   return app;
-};
+}
