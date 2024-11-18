@@ -25,7 +25,7 @@ module ReactOnRailsPro
     end
 
     def bundle_install_in(dir, frozen: true)
-      cmd = "#{frozen ? "BUNDLE_FROZEN=true " : ""}bundle install"
+      cmd = "#{frozen ? 'BUNDLE_FROZEN=true ' : ''}bundle install"
       sh_in_dir(dir, cmd)
     end
 
