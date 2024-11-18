@@ -37,6 +37,7 @@
     "y18n": "^3.2.2 || ^4.0.1"
   },
   "dependencies": {
+    "@fastify/formbody": "^7.4.0",
     "@fastify/multipart": "^8.3.0",
     "console.history": "^1.5.0",
     "fastify": "^4.28.1",

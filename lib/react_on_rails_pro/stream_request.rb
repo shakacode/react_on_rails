@@ -75,28 +75,23 @@ module ReactOnRailsPro
 
       send_bundle = false
       loop do
-        response = @request_executor.call(send_bundle) do |request_response|
-          next unless request_response.code == "200"
-
-          request_response.read_body do |chunk_or_more|
-            # Split chunks if multiple chunks are merged together
-            chunk_or_more.split("\n").each do |chunk|
-              stripped_chunk = chunk.strip
-              next if stripped_chunk.empty?
-
-              yield stripped_chunk
-            end
-          end
+        stream_response = @request_executor.call(send_bundle)
+        # stream_response.each may yield merged chunks, but the real chunks are separated by newlines.
+        stream_response.each_line do |chunk|
+          stripped_chunk = chunk.strip
+          yield stripped_chunk unless stripped_chunk.empty?
         end
-
-        case response.code
-        when "410"
+        break
+      rescue HTTPX::HTTPError => e
+        response = e.response
+        case response.status
+        when ReactOnRailsPro::STATUS_SEND_BUNDLE
           send_bundle = true
           next
-        when "200"
-          break
+        when ReactOnRailsPro::STATUS_INCOMPATIBLE
+          raise ReactOnRailsPro::Error, response.body
         else
-          raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{response.code}:\n#{response.body}"
+          raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{response.status}:\n#{response.body}"
         end
       end
     end

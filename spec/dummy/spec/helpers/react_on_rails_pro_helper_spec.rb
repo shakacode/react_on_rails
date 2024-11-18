@@ -217,16 +217,15 @@ describe ReactOnRailsProHelper, type: :helper do
 
     def mock_request_and_response
       chunks_read.clear
-      allow(ReactOnRailsPro::Request).to receive(:perform_request) do |_path, _form_data, &block|
-        response = instance_double(Net::HTTPResponse, code: "200")
-        allow(response).to receive(:read_body) do |&read_body_block|
+      allow(ReactOnRailsPro::Request).to receive(:perform_request) do |_path, _form_data|
+        stream_response = instance_double(HTTPX::StreamResponse)
+        allow(stream_response).to receive(:each_line) do |&chunk_block|
           chunks.each do |chunk|
             chunks_read << chunk
-            read_body_block.call(chunk.to_json)
+            chunk_block.call(chunk.to_json)
           end
         end
-        block.call(response)
-        response
+        stream_response
       end
     end
 
