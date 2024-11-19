@@ -73,6 +73,8 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
 
   # Update the child spec apps with the new gem
   bundle_install_in(dummy_app_dir, frozen: false)
+  # Update top level Gemfile.lock
+  bundle_install_in(gem_root, frozen: false)
 
   # Will bump the yarn version, commit, tag the commit, push to repo, and release on yarn
   release_it_command = +"$(yarn bin)/release-it"
