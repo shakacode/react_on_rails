@@ -98,7 +98,8 @@ export default function run(config: Partial<Config>) {
     attachFieldsToBody: 'keyValues',
     limits: {
       fieldSize: fieldSizeLimit,
-      fileSize: fieldSizeLimit,
+      // For bundles and assets
+      fileSize: Infinity,
     },
     onFile: async (part) => {
       const destinationPath = path.join(bundlePath, 'uploads', part.filename);
