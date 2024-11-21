@@ -74,7 +74,7 @@ module ReactOnRails
       end
 
       def self.package_json_path
-        Rails.root.join("client", "package.json")
+        Rails.root.join("package.json")
       end
 
       def initialize(package_json)
