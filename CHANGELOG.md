@@ -18,7 +18,11 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
-#### Added(https://github.com/AbanoubGhadban).
+#### Fixed
+
+- Changed the path of the package.json that the ReactOnRails' version checker attempts to use to be `/` instead of `/client`. [PR 1657](https://github.com/shakacode/react_on_rails/pull/1657) by [judahmeek](https://github.com/judahmeek).
+
+#### Added
 - Added streaming server rendering support:
   - [PR #1633](https://github.com/shakacode/react_on_rails/pull/1633) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
     - New `stream_react_component` helper for adding streamed components to views
