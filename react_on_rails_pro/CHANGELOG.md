@@ -46,6 +46,7 @@ You can find the **package** version numbers from this repo's tags and below in 
 - Converted the node-renderer worker from Express to Fastify [PR 398](https://github.com/shakacode/react_on_rails_pro/pull/398) by [alexeyr-ci](https://github.com/alexeyr-ci).
 - Converted from `Net::HTTP` to HTTPX for requests to the Node renderer [PR 452](https://github.com/shakacode/react_on_rails_pro/pull/452) by [alexeyr-ci](https://github.com/alexeyr-ci).
 - Communication with Node Renderer now uses HTTP/2 Cleartext [PR 392](https://github.com/shakacode/react_on_rails_pro/pull/392) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- Error reporting and tracing integrations are completely redone. See [the docs](./docs/node-renderer/error-reporting-and-tracing.md) for details. [PR 471](https://github.com/shakacode/react_on_rails_pro/pull/471) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
 ## [3.2.1] - 2023-06-07
 Fixed release, supports Ruby 2.7.5.

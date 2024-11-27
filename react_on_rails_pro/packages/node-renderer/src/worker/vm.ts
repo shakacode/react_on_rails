@@ -16,7 +16,7 @@ import SharedConsoleHistory from '../shared/sharedConsoleHistory';
 import log from '../shared/log';
 import { getConfig } from '../shared/configBuilder';
 import { formatExceptionMessage, smartTrim, isReadableStream } from '../shared/utils';
-import errorReporter from '../shared/errorReporter';
+import * as errorReporter from '../shared/errorReporter';
 
 const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
@@ -183,7 +183,7 @@ export async function buildVM(filePath: string) {
     return Promise.resolve(true);
   } catch (error) {
     log.error('Caught Error when creating context in buildVM, %O', error);
-    errorReporter.notify(error as Error);
+    errorReporter.error(error as Error);
     return Promise.reject(error as Error);
   }
 }

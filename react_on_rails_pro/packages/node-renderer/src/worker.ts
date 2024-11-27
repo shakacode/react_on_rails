@@ -25,9 +25,9 @@ import {
   saveMultipartFile,
   Asset,
 } from './shared/utils';
-import errorReporter from './shared/errorReporter';
-import tracing from './shared/tracing';
+import * as errorReporter from './shared/errorReporter';
 import { lock, unlock } from './shared/locks';
+import { startSsrRequestOptions, trace } from './shared/tracing';
 
 // Uncomment next 2 functions for testing timeouts
 // function sleep(ms) {
@@ -186,39 +186,29 @@ export default function run(config: Partial<Config>) {
     });
 
     try {
-      await tracing.withinTransaction(
-        async (transaction) => {
-          try {
-            const result = await handleRenderRequest({
-              renderingRequest,
-              bundleTimestamp,
-              providedNewBundle,
-              assetsToCopy,
-            });
-            await setResponse(result, res);
-          } catch (err) {
-            const exceptionMessage = formatExceptionMessage(
-              renderingRequest,
-              err,
-              'UNHANDLED error in handleRenderRequest',
-            );
-            log.error(exceptionMessage);
-            errorReporter.notify(exceptionMessage, {}, (scope) => {
-              if (transaction) {
-                scope.setSpan(transaction);
-              }
-              return scope;
-            });
-            await setResponse(errorResponseResult(exceptionMessage), res);
-          }
-        },
-        'handleRenderRequest',
-        'SSR Request',
-      );
+      await trace(async (context) => {
+        try {
+          const result = await handleRenderRequest({
+            renderingRequest,
+            bundleTimestamp,
+            providedNewBundle,
+            assetsToCopy,
+          });
+          await setResponse(result, res);
+        } catch (err) {
+          const exceptionMessage = formatExceptionMessage(
+            renderingRequest,
+            err,
+            'UNHANDLED error in handleRenderRequest',
+          );
+          errorReporter.message(exceptionMessage, context);
+          await setResponse(errorResponseResult(exceptionMessage), res);
+        }
+      }, startSsrRequestOptions({ renderingRequest }));
     } catch (theErr) {
       const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
       log.error(`UNHANDLED TOP LEVEL error ${exceptionMessage}`);
-      errorReporter.notify(exceptionMessage);
+      errorReporter.message(exceptionMessage);
       await setResponse(errorResponseResult(exceptionMessage), res);
     }
   });

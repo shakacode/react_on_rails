@@ -4,7 +4,7 @@ import { MultipartFile } from '@fastify/multipart';
 import { createWriteStream, ensureDir, move, MoveOptions } from 'fs-extra';
 import { Readable, pipeline, PassThrough } from 'stream';
 import { promisify } from 'util';
-import errorReporter from './errorReporter';
+import * as errorReporter from './errorReporter';
 import { getConfig } from './configBuilder';
 import log from './log';
 import type { RenderResult } from '../worker/vm';
@@ -48,7 +48,7 @@ export interface ResponseResult {
 }
 
 export function errorResponseResult(msg: string): ResponseResult {
-  errorReporter.notify(msg);
+  errorReporter.message(msg);
   return {
     headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
     status: 400,

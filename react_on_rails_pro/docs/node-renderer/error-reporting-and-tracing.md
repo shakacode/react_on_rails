@@ -1,22 +1,121 @@
-# Error Reporting and Tracing for Sentry and HoneyBadger
+# Error Reporting and Tracing
+
+[Please see this documentation for versions before 4.0.0](https://github.com/shakacode/react_on_rails_pro/blob/ac2afba93c672f49f16bf967d6accbed0fda386e/docs/node-renderer/error-reporting-and-tracing.md).
+
+To integrate with error reporting and tracing services,
+you need a custom configuration script as described in [Node Renderer JavaScript Configuration](./js-configuration.md).
+
+It should initialize the services according to your requirements and then enable integrations.
 
 ## Sentry
-1. Create a new Sentry Node project. After creating it, you will get directed to a [page like this](https://sentry.io/react-on-rails-pro/nodejs/getting-started/node/). You need to know your
-1. Install these 2 packages: `@sentry/node` and `@sentry/tracing`.
-2. Set the `sentryDsn` config value. To find your DSN, click on the gear icon next to your project
-   name to get to the settings screen. Then click on the left side menu **Client Keys (DSN)**.
+1. [Set up Sentry](https://docs.sentry.io/platforms/javascript/guides/fastify/). You may create an `instrument.js` file as described there and require it in your configuration script, but it is simpler to call `Sentry.init` directly in your configuration script.
+2. Call `Sentry.init` with the desired options according to [the documentation](https://docs.sentry.io/platforms/javascript/guides/fastify/configuration/).
+3. Then load the integration:
+
+    ```js
+    require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/sentry').init();
+   ```
+
+   Use `@shakacode-tools/react-on-rails-pro-node-renderer/integrations/sentry6` instead for versions of Sentry SDK older than 7.63.0.
 
 ### Sentry Tracing
-To use this feature, you need to add `config.sentryTracing = true` (or ENV `SENTRY_TRACING=true`)
-and optionally the `config.sentryTracesSampleRate = 0.1` (or ENV `SENTRY_TRACES_SAMPLE_RATE=0.1`).
-The value of the sample rate is the percentage of requests to trace. The default
-**config.sentryTracesSampleRate** is **0.1**, meaning 10% of requests are traced.
+To enable Sentry Tracing: 
+1. Include `enableTracing`, `tracesSampleRate`, or `tracesSampler` in your `Sentry.init` call. See [the Sentry documentation](https://docs.sentry.io/platforms/javascript/tracing/) for details, but ignore `Sentry.browserTracingIntegration()`.
+2. Depending on your Sentry SDK version: 
+    - if it is older than 7.63.0, install `@sentry/tracing` as well as `@sentry/node` (with the same exact version) and pass `integrations: [new Sentry.Integrations.Http({ tracing: true })]` to `Sentry.init`.
+    - for newer v7.x.y, pass `integrations: Sentry.autoDiscoverNodePerformanceMonitoringIntegrations()`.
+    - for v8.x.y, Node HTTP tracing is included by default.
+3. Pass `{ tracing: true }` to the `init` function of the integration.
 
-For documentation of Sentry Tracing, see the
-* [Sentry Performance Monitoring Docs](https://docs.sentry.io/platforms/ruby/performance/)
-* [Sentry Distributed Tracing Docs](https://docs.sentry.io/product/performance/distributed-tracing/)
-* [Sentry Sampling Transactions Docs](https://docs.sentry.io/platforms/ruby/performance/sampling/).
+### Sentry Profiling
+[Follow this documentation](https://docs.sentry.io/platforms/javascript/guides/fastify/profiling/).
 
 ## Honeybadger
-1. Install package: `@honeybadger-io/js`
-2. Set the `honeybadgerApiKey` config value.
+1. [Set up Honeybadger](https://docs.honeybadger.io/lib/javascript/integration/node/). Call `Honeybadger.configure` with the desired options in the configuration script.
+2. Then load the integration:
+
+    ```js
+    require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/honeybadger').init();
+    ```
+
+## Other services
+You can create your own integrations in the same way as the provided ones.
+If you have access to the React on Rails Pro repository,
+you can use [their implementations](https://github.com/shakacode/react_on_rails_pro/tree/master/packages/node-renderer/src/integrations) as examples.
+Import these functions from `@shakacode-tools/react-on-rails-pro-node-renderer/integrations/api`:
+
+### Error reporting services
+- `addErrorNotifier` and `addMessageNotifier` tell React on Rails Pro how to report errors to your chosen service.
+- Use `addNotifier` if the service uses the same reporting function for both JavaScript `Error`s and string messages.
+
+For example, integrating with BugSnag can be as simple as
+```js
+const Bugsnag = require('@bugsnag/js');
+const { addNotifier } = require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/api');
+
+Bugsnag.start({ /* your options */ });
+
+addNotifier((msg) => { Bugsnag.notify(msg); });
+```
+
+### Tracing services
+- `setupTracing` takes an object with two properties:
+  - `executor` should wrap an async function in the service's unit of work.
+  - Since the only units of work we currently track are rendering requests, the options to start them are specified in `startSsrRequestOptions`.
+
+To track requests as [sessions](https://docs.bugsnag.com/platforms/javascript/capturing-sessions/#startsession) in BugSnag 8.x+, the above example becomes
+```js
+const Bugsnag = require('@bugsnag/js');
+const { addNotifier, setupTracing } = require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/api');
+
+Bugsnag.start({ /* your options */ });
+
+addNotifier((msg) => { Bugsnag.notify(msg); });
+setupTracing({
+  executor: async (fn) => {
+    Bugsnag.startSession();
+    try {
+      return await fn();
+    } finally {
+      Bugsnag.pauseSession();
+    }
+  },
+});
+```
+
+You can optionally add `startSsrRequestOptions` property to capture the request data:
+```js
+setupTracing({
+  startSsrRequestOptions: ({ renderingRequest }) => ({ bugsnag: { renderingRequest } }),
+  executor: async (fn, { bugsnag }) => {
+    Bugsnag.startSession();
+    // bugsnag will look like { renderingRequest }
+    Bugsnag.leaveBreadcrumb('SSR request', bugsnag, 'request');
+    try {
+      return await fn();
+    } finally {
+      Bugsnag.pauseSession();
+    }
+  },
+});
+```
+
+Bugsnag v7 is a bit more complicated:
+```js
+const Bugsnag = require('@bugsnag/js');
+const { addNotifier, setupTracing } = require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/api');
+
+Bugsnag.start({ /* your options */ });
+
+addNotifier((msg, { bugsnag = Bugsnag }) => { bugsnag.notify(msg); });
+setupTracing({
+  executor: async (fn) => {
+    const bugsnag = Bugsnag.startSession();
+    try {
+      return await fn({ bugsnag });
+    } finally {
+      bugsnag.pauseSession();
+    }
+  },
+});
+```
