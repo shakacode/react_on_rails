@@ -3,8 +3,17 @@
   "version": "4.0.0-rc.8",
   "protocolVersion": "1.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
-  "main": "packages/node-renderer/dist/ReactOnRailsProNodeRenderer.js",
-  "types": "packages/node-renderer/dist/ReactOnRailsProNodeRenderer.d.ts",
+  "exports": {
+    ".": {
+      "types": "./packages/node-renderer/dist/ReactOnRailsProNodeRenderer.d.ts",
+      "default": "./packages/node-renderer/dist/ReactOnRailsProNodeRenderer.js"
+    },
+    "./integrations/*": {
+      "types": "./packages/node-renderer/dist/integrations/*.d.ts",
+      "default": "./packages/node-renderer/dist/integrations/*.js"
+    },
+    "./package.json": "./package.json"
+  },
   "bin": {
     "react-on-rails-pro-node-renderer": "packages/node-renderer/dist/default-node-renderer.js"
   },
@@ -34,7 +43,9 @@
     "node-notifier": "^8.0.1",
     "sockjs": "^0.3.20",
     "url-parse": "^1.5.0",
-    "y18n": "^3.2.2 || ^4.0.1"
+    "y18n": "^3.2.2 || ^4.0.1",
+    "sentry-testkit/body-parser": "npm:empty-npm-package@1.0.0",
+    "sentry-testkit/express": "npm:empty-npm-package@1.0.0"
   },
   "dependencies": {
     "@fastify/formbody": "^7.4.0",
@@ -54,8 +65,7 @@
     "@babel/preset-env": "^7.12.1",
     "@babel/preset-typescript": "^7.24.1",
     "@honeybadger-io/js": "^4.3.1",
-    "@sentry/node": "^6.2.3",
-    "@sentry/tracing": "^6.2.3",
+    "@sentry/node": "^7.120.0",
     "@tsconfig/node14": "^14.1.2",
     "@types/fs-extra": "~8.0.1",
     "@types/jest": "^29.5.12",
@@ -83,6 +93,7 @@
     "prettier": "^3.2.5",
     "react-on-rails": "15.0.0-alpha.1",
     "release-it": "^17.6.0",
+    "sentry-testkit": "^5.0.6",
     "tap-diff": "git+https://github.com/vaguilera/tap-diff.git",
     "tap-spec": "^5.0.0",
     "tape-async": "^2.3.0",
@@ -92,9 +103,20 @@
     "yalc": "^1.0.0-pre.53"
   },
   "peerDependencies": {
-    "@honeybadger-io/js": "^4.3.1",
-    "@sentry/node": "^5.17.0",
-    "@sentry/tracing": "^5.27.3"
+    "@honeybadger-io/js": ">=4.0.0",
+    "@sentry/node": ">=5.0.0 <9.0.0",
+    "@sentry/tracing": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@honeybadger-io/js": {
+      "optional": true
+    },
+    "@sentry/node": {
+      "optional": true
+    },
+    "@sentry/tracing": {
+      "optional": true
+    }
   },
   "files": [
     "packages/node-renderer/dist"

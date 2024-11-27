@@ -23,7 +23,7 @@ import {
   handleStreamError,
 } from '../shared/utils';
 import { getConfig } from '../shared/configBuilder';
-import errorReporter from '../shared/errorReporter';
+import * as errorReporter from '../shared/errorReporter';
 import { buildVM, getVmBundleFilePath, runInVM } from './vm';
 
 async function prepareResult(renderingRequest: string): Promise<ResponseResult> {
@@ -45,7 +45,7 @@ async function prepareResult(renderingRequest: string): Promise<ResponseResult> 
     if (isReadableStream(result)) {
       const newStreamAfterHandlingError = handleStreamError(result, (error) => {
         const msg = formatExceptionMessage(renderingRequest, error, 'Error in a rendering stream');
-        errorReporter.notify(msg);
+        errorReporter.message(msg);
       });
       return Promise.resolve({
         headers: { 'Cache-Control': 'public, max-age=31536000' },
@@ -218,7 +218,7 @@ export = async function handleRenderRequest({
       error,
       'Caught top level error in handleRenderRequest',
     );
-    errorReporter.notify(msg);
+    errorReporter.message(msg);
     return Promise.reject(error as Error);
   }
 };

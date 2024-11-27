@@ -1,9 +1,30 @@
 const path = require('path');
+const Honeybadger = require('@honeybadger-io/js');
+const Sentry = require('@sentry/node');
 
 const env = process.env;
 
 // Use this for package installation test:
 const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
+
+Honeybadger.configure({
+  // This is a test account for React on Rails Pro. Substitute your own.
+  apiKey: 'a602365c',
+});
+require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/honeybadger').init();
+
+// This is a test account for React on Rails Pro.
+// Substitute your own DSN.
+// https://sentry.io/organizations/react-on-rails-pro/issues/?project=5591817
+// Only project contributors have access to see the test errors.
+Sentry.init({
+  dsn: 'https://35ae284fec944acd89915dee2b9f3bc8@o504646.ingest.sentry.io/5591817',
+  // Remove for Sentry SDK v8
+  integrations: Sentry.autoDiscoverNodePerformanceMonitoringIntegrations(),
+  // Sentry recommends adjusting this value in production, or using tracesSampler for finer control
+  tracesSampleRate: 1.0,
+});
+require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/sentry').init({ tracing: true });
 
 const config = {
   // This is the default but avoids searching for the Rails root
@@ -24,19 +45,6 @@ const config = {
 
   // time in minutes between each worker restarting when restarting all workers
   delayBetweenIndividualWorkerRestarts: env.CI ? 0.01 : 1,
-
-  // This is a test account for React on Rails Pro. Substitute your own.
-  honeybadgerApiKey: 'a602365c',
-
-  // This is a test account for React on Rails Pro.
-  // Substitute your own DSN.
-  // https://sentry.io/organizations/react-on-rails-pro/issues/?project=5591817
-  // Only project contributors have access to see the test errors.
-  sentryDsn: 'https://35ae284fec944acd89915dee2b9f3bc8@o504646.ingest.sentry.io/5591817',
-
-  sentryTracing: true,
-
-  sentryTracesSampleRate: 1,
 
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS modules
   // that get added to the VM context: { Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval }.

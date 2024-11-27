@@ -1,51 +1,87 @@
-import type { Transaction } from '@sentry/types';
-import requireOptional from './requireOptional';
-import log from './log';
+import { message } from './errorReporter';
 
-type SentryModule = typeof import('@sentry/node');
-const sentryTracing = requireOptional('@sentry/tracing');
+/**
+ * This contains the options necessary to start a unit of work (transaction/span/etc.).
+ * Integrations should augment it using their name as the property.
+ *
+ * For example, in Sentry SDK v7+ the unit of work is a `Span`, and `Sentry.startSpan` takes `StartSpanOptions`,
+ * so that integration adds `{ sentry?: StartSpanOptions }`.
+ * In v6, the unit of work is a `Transaction`, and `Sentry.startTransaction` takes `TransactionContext`,
+ * so that integration adds `{ sentry6?: TransactionContext }`.
+ */
+export interface UnitOfWorkOptions {}
 
-class Tracing {
-  Sentry: null | SentryModule;
+/**
+ * Passed to the callback function executed by {@link trace}.
+ * This is only used (and augmented) by integrations that need to associate error reports with units of work manually.
+ *
+ * For example, Sentry SDK v7+ stores the active span in an {@link AsyncLocalStorage} and
+ * it's automatically provided to `Sentry.capture...` methods, so it doesn't use this.
+ * But v6 needs to include the active transaction in those methods'
+ * {@link import('@sentry/types').CaptureContext} parameter, and so it adds `{ sentry6: CaptureContext }`.
+ */
+export interface TracingContext {}
 
-  constructor() {
-    this.Sentry = null;
-  }
+let setupRun = false;
 
-  tracingServices() {
-    if (this.Sentry) {
-      return ['sentry'];
-    }
+type UnitOfWork<T> = (tracingContext?: TracingContext) => Promise<T>;
 
-    return null;
-  }
+type Executor = <T>(fn: UnitOfWork<T>, unitOfWorkOptions: UnitOfWorkOptions) => Promise<T>;
 
-  setSentry(Sentry: SentryModule) {
-    if (sentryTracing === null) {
-      log.error(
-        '@sentry/tracing package is not installed. Either install it in order to use tracing with Sentry or set sentryTracing to false in your config.',
-      );
-    } else {
-      this.Sentry = Sentry;
-    }
-  }
+let executor: Executor = (fn) => fn();
 
-  async withinTransaction<T>(fn: (transaction?: Transaction) => Promise<T>, op: string, name: string) {
-    if (this.Sentry === null) {
-      return fn();
-    }
-    const transaction = this.Sentry.startTransaction({
-      op,
-      name,
-    });
-    try {
-      return await fn(transaction);
-    } finally {
-      transaction.finish();
-    }
-  }
+// TODO: determine what else to pass here. Maybe Ruby could send the component name.
+// It will also be augmentable by integrations, to support distributed tracing
+// https://github.com/shakacode/react_on_rails_pro/issues/473
+/**
+ * Data describing an SSR request.
+ */
+interface SsrRequestData {
+  renderingRequest: string;
 }
 
-const tracing = new Tracing();
+type StartSsrRequestOptions = (request: SsrRequestData) => UnitOfWorkOptions;
 
-export = tracing;
+let mutableStartSsrRequestOptions: StartSsrRequestOptions = () => ({});
+
+export const startSsrRequestOptions: StartSsrRequestOptions = (request) =>
+  mutableStartSsrRequestOptions(request);
+
+// TODO: maybe make UnitOfWorkOptions a generic parameter for this and for setupTracing
+//  instead of sharing between all integrations.
+/**
+ * Options for {@link trace}.
+ */
+export interface TracingIntegrationOptions {
+  executor: Executor;
+  startSsrRequestOptions?: StartSsrRequestOptions;
+}
+
+// TODO: this supports only one tracing plugin.
+//  Replace by a function which extends the executor and transaction context instead of replacing them.
+/**
+ * Sets up tracing for the given integration.
+ * @param options.executor - A function that wraps an async callback in the tracing service's unit of work.
+ * @param options.startSsrRequestOptions - Options used to start a new unit of work for an SSR request.
+ *   Should be an object with your integration name as the only property.
+ *   It will be passed to the executor.
+ */
+export function setupTracing(options: TracingIntegrationOptions) {
+  if (setupRun) {
+    message('setupTracing called more than once. Currently only one tracing integration can be enabled.');
+    return;
+  }
+
+  executor = options.executor;
+  if (options.startSsrRequestOptions) {
+    mutableStartSsrRequestOptions = options.startSsrRequestOptions;
+  }
+  setupRun = true;
+}
+
+/**
+ * Reports a unit of work to the tracing service, if any.
+ */
+export function trace<T>(fn: UnitOfWork<T>, unitOfWorkOptions: UnitOfWorkOptions): Promise<T> {
+  return executor(fn, unitOfWorkOptions);
+}

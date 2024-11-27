@@ -6,21 +6,15 @@
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
-import requireOptional from './requireOptional';
 import log, { configureLogger } from './log';
-import errorReporter from './errorReporter';
-import tracing from './tracing';
 import packageJson from './packageJson';
 import truthy from './truthy';
-
-const Sentry = requireOptional('@sentry/node') as typeof import('@sentry/node') | null;
 
 // usually remote renderers are on staging or production, so, use production folder always
 const DEFAULT_PORT = 3800;
 const DEFAULT_LOG_LEVEL = 'info';
 const { env } = process;
 const MAX_DEBUG_SNIPPET_LENGTH = 1000;
-const DEFAULT_SAMPLE_RATE = 0.1;
 const NODE_ENV = env.NODE_ENV || 'production';
 
 export interface Config {
@@ -47,10 +41,14 @@ export interface Config {
   // time in minutes between each worker restarting when restarting all workers
   delayBetweenIndividualWorkerRestarts: number | undefined;
   maxDebugSnippetLength: number;
-  honeybadgerApiKey: string | null;
-  sentryDsn: string | null;
-  sentryTracing: boolean;
-  sentryTracesSampleRate: string | number;
+  // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
+  honeybadgerApiKey?: string | null;
+  // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
+  sentryDsn?: string | null;
+  // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
+  sentryTracing?: boolean;
+  // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
+  sentryTracesSampleRate?: string | number;
   includeTimerPolyfills: boolean;
   // If set to true, this option enables the replay of console logs from asynchronous server operations.
   // If set to false, only logs that occur on the server prior to any awaited asynchronous operations will be replayed.
@@ -123,14 +121,6 @@ const defaultConfig: Config = {
 
   maxDebugSnippetLength: MAX_DEBUG_SNIPPET_LENGTH,
 
-  honeybadgerApiKey: env.HONEYBADGER_API_KEY || null,
-
-  sentryDsn: env.SENTRY_DSN || null,
-
-  sentryTracing: truthy(env.SENTRY_TRACING),
-
-  sentryTracesSampleRate: env.SENTRY_TRACES_SAMPLE_RATE || DEFAULT_SAMPLE_RATE,
-
   // default to true if empty, otherwise it is set to false
   includeTimerPolyfills: env.INCLUDE_TIMER_POLYFILLS === 'true' || !env.INCLUDE_TIMER_POLYFILLS,
 
@@ -187,7 +177,6 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   config = { ...defaultConfig, ...userConfig };
 
   config.supportModules = truthy(config.supportModules);
-  config.sentryTracing = truthy(config.sentryTracing);
 
   let currentArg: string | undefined;
 
@@ -203,35 +192,16 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     }
   });
 
-  if (config.honeybadgerApiKey) {
-    errorReporter.addHoneybadgerApiKey(config.honeybadgerApiKey);
-  }
-
-  if (config.sentryDsn) {
-    if (config.sentryTracing) {
-      let sampleRate =
-        typeof config.sentryTracesSampleRate === 'number'
-          ? config.sentryTracesSampleRate
-          : parseFloat(config.sentryTracesSampleRate);
-
-      if (Number.isNaN(sampleRate)) {
-        log.warn(
-          `SENTRY_TRACES_SAMPLE_RATE "${config.sentryTracesSampleRate}" is not a number. Using default of ${DEFAULT_SAMPLE_RATE}`,
-        );
-        sampleRate = DEFAULT_SAMPLE_RATE;
-      }
-
-      errorReporter.addSentryDsn(config.sentryDsn, {
-        tracing: config.sentryTracing,
-        tracesSampleRate: sampleRate,
-      });
-
-      if (Sentry) {
-        tracing.setSentry(Sentry);
-      }
-    } else {
-      errorReporter.addSentryDsn(config.sentryDsn);
-    }
+  if (
+    'honeybadgerApiKey' in config ||
+    'sentryDsn' in config ||
+    'sentryTracing' in config ||
+    'sentryTracesSampleRate' in config
+  ) {
+    log.error(
+      'honeybadgerApiKey, sentryDsn, sentryTracing, and sentryTracesSampleRate are not used since RORP 4.0. ' +
+        'See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.',
+    );
   }
 
   configureLogger(log, config.logLevel);

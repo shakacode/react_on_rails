@@ -6,7 +6,7 @@ import cluster from 'cluster';
 import log from './shared/log';
 import { buildConfig, Config, logSanitizedConfig } from './shared/configBuilder';
 import restartWorkers from './master/restartWorkers';
-import errorReporter from './shared/errorReporter';
+import * as errorReporter from './shared/errorReporter';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 
@@ -29,7 +29,7 @@ export = function masterRun(runningConfig?: Partial<Config>) {
       // TODO: Track last rendering request per worker.id
       // TODO: Consider blocking a given rendering request if it kills a worker more than X times
       const msg = `Worker ${worker.id} died UNEXPECTEDLY :(, restarting`;
-      errorReporter.notify(msg);
+      errorReporter.message(msg);
     }
     // Replace the dead worker:
     cluster.fork();

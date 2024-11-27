@@ -5,7 +5,7 @@ import FormData from 'form-data';
 import buildApp from '../src/worker';
 import config from './testingNodeRendererConfigs';
 import { readRenderingRequest } from './helper';
-import errorReporter from '../src/shared/errorReporter';
+import * as errorReporter from '../src/shared/errorReporter';
 
 const app = buildApp(config);
 
@@ -18,7 +18,7 @@ afterAll(async () => {
   await app.close();
 });
 
-jest.spyOn(errorReporter, 'notify').mockImplementation(jest.fn());
+jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
 
 const createForm = ({
   project = 'spec-dummy',
@@ -200,7 +200,7 @@ describe('html streaming', () => {
       useTestBundle: true,
       // throwJsErrors is false by default
     });
-    expect(errorReporter.notify).not.toHaveBeenCalled();
+    expect(errorReporter.message).not.toHaveBeenCalled();
   }, 10000);
 
   it('should notify error reporter when throwJsErrors is true and shell error happens', async () => {
@@ -209,8 +209,8 @@ describe('html streaming', () => {
       useTestBundle: true,
       throwJsErrors: true,
     });
-    expect(errorReporter.notify).toHaveBeenCalledTimes(1);
-    expect(errorReporter.notify).toHaveBeenCalledWith(
+    expect(errorReporter.message).toHaveBeenCalledTimes(1);
+    expect(errorReporter.message).toHaveBeenCalledWith(
       expect.stringMatching(
         /Error in a rendering stream[\s\S.]*Sync error from AsyncComponentsTreeForTesting/,
       ),
@@ -250,7 +250,7 @@ describe('html streaming', () => {
       useTestBundle: true,
       throwJsErrors: false,
     });
-    expect(errorReporter.notify).not.toHaveBeenCalled();
+    expect(errorReporter.message).not.toHaveBeenCalled();
   }, 10000);
 
   it('should notify error reporter when throwJsErrors is true and async error happens', async () => {
@@ -259,8 +259,8 @@ describe('html streaming', () => {
       useTestBundle: true,
       throwJsErrors: true,
     });
-    expect(errorReporter.notify).toHaveBeenCalledTimes(1);
-    expect(errorReporter.notify).toHaveBeenCalledWith(
+    expect(errorReporter.message).toHaveBeenCalledTimes(1);
+    expect(errorReporter.message).toHaveBeenCalledWith(
       expect.stringMatching(/Error in a rendering stream[\s\S.]*Async error from AsyncHelloWorldHooks/),
     );
   }, 10000);
