@@ -35,9 +35,11 @@ module ReactOnRails
 
         before { stub_gem_version("2.2.5") }
 
-        it "does raise" do
-          error = /ReactOnRails: Your node package version for react-on-rails contains a \^ or ~/
-          expect { check_version(node_package_version) }.to raise_error(error)
+        it "logs" do
+          allow(Rails.logger).to receive(:warn)
+          message = /ReactOnRails: Your node package version for react-on-rails contains a \^ or ~/
+          # expect { check_version(node_package_version) }.to raise_error(message)
+          expect(Rails.logger).to have_received(:warn).with(message)
         end
       end
 
@@ -48,9 +50,11 @@ module ReactOnRails
 
         before { stub_gem_version("12.0.0.beta.1") }
 
-        it "raises" do
-          error = /ReactOnRails: ReactOnRails gem and node package versions do not match/
-          expect { check_version(node_package_version) }.to raise_error(error)
+        it "logs" do
+          allow(Rails.logger).to receive(:warn)
+          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          # expect { check_version(node_package_version) }.to raise_error(message)
+          expect(Rails.logger).to have_received(:warn).with(message)
         end
       end
 
@@ -61,9 +65,11 @@ module ReactOnRails
 
         before { stub_gem_version("13.1.0") }
 
-        it "raises" do
-          error = /ReactOnRails: ReactOnRails gem and node package versions do not match/
-          expect { check_version(node_package_version) }.to raise_error(error)
+        it "logs" do
+          allow(Rails.logger).to receive(:warn)
+          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          # expect { check_version(node_package_version) }.to raise_error(message)
+          expect(Rails.logger).to have_received(:warn).with(message)
         end
       end
 
@@ -74,9 +80,11 @@ module ReactOnRails
 
         before { stub_gem_version("13.0.0") }
 
-        it "raises" do
-          error = /ReactOnRails: ReactOnRails gem and node package versions do not match/
-          expect { check_version(node_package_version) }.to raise_error(error)
+        it "logs" do
+          allow(Rails.logger).to receive(:warn)
+          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          # expect { check_version(node_package_version) }.to raise_error(message)
+          expect(Rails.logger).to have_received(:warn).with(message)
         end
       end
 
@@ -183,6 +191,22 @@ module ReactOnRails
 
         describe "#raw" do
           specify { expect(node_package_version.raw).to eq("file:///Users/justin/shakacode/react_on_rails") }
+        end
+
+        describe "#relative_path?" do
+          specify { expect(node_package_version.relative_path?).to be true }
+        end
+
+        describe "#major" do
+          specify { expect(node_package_version.major_minor_patch).to be_nil }
+        end
+      end
+
+      context "with node version of 'file:.yalc/react-on-rails'" do
+        let(:package_json) { File.expand_path("fixtures/yalc_package.json", __dir__) }
+
+        describe "#raw" do
+          specify { expect(node_package_version.raw).to eq("file:.yalc/react-on-rails") }
         end
 
         describe "#relative_path?" do
