@@ -6,7 +6,8 @@
     ".": {
       "rsc-server": "./node_package/lib/ReactOnRailsRSC.js",
       "default": "./node_package/lib/ReactOnRails.js"
-    }
+    },
+    "./RSCClientRoot": "./node_package/lib/RSCClientRoot.js"
   },
   "directories": {
     "doc": "docs"
@@ -58,7 +59,8 @@
   "peerDependencies": {
     "js-yaml": ">= 3.0.0",
     "react": ">= 16",
-    "react-dom": ">= 16"
+    "react-dom": ">= 16",
+    "react-server-dom-webpack": ">= 18.3.0-canary-670811593-20240322"
   },
   "files": [
     "node_package/lib"
