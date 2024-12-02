@@ -39,6 +39,7 @@ module ReactOnRails
           allow(Rails.logger).to receive(:warn)
           message = /ReactOnRails: Your node package version for react-on-rails contains a \^ or ~/
           # expect { check_version(node_package_version) }.to raise_error(message)
+          check_version(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
         end
       end
@@ -54,6 +55,7 @@ module ReactOnRails
           allow(Rails.logger).to receive(:warn)
           message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
           # expect { check_version(node_package_version) }.to raise_error(message)
+          check_version(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
         end
       end
@@ -69,6 +71,7 @@ module ReactOnRails
           allow(Rails.logger).to receive(:warn)
           message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
           # expect { check_version(node_package_version) }.to raise_error(message)
+          check_version(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
         end
       end
@@ -84,6 +87,7 @@ module ReactOnRails
           allow(Rails.logger).to receive(:warn)
           message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
           # expect { check_version(node_package_version) }.to raise_error(message)
+          check_version(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
         end
       end
