@@ -16,6 +16,7 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ### Changed
 - Error reporting and tracing integrations are completely redone. See [the docs](./docs/node-renderer/error-reporting-and-tracing.md) for details. [PR 471](https://github.com/shakacode/react_on_rails_pro/pull/471) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- Upgraded to Fastify 5 by default, with an option to fall back to Fastify 4 on older Node versions. [PR 478](https://github.com/shakacode/react_on_rails_pro/pull/478) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
 ## [4.0.0.rc.8] - 2024-11-20
 

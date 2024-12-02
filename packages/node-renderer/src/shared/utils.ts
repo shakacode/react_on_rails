@@ -128,3 +128,6 @@ export const handleStreamError = (stream: Readable, onError: (error: Error) => v
 
 export const isErrorRenderResult = (result: RenderResult): result is { exceptionMessage: string } =>
   typeof result === 'object' && !isReadableStream(result) && 'exceptionMessage' in result;
+
+// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+export const majorVersion = (version: string) => Number.parseInt(version.split('.', 2)[0]!, 10);
