@@ -131,3 +131,9 @@ export const isErrorRenderResult = (result: RenderResult): result is { exception
 
 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 export const majorVersion = (version: string) => Number.parseInt(version.split('.', 2)[0]!, 10);
+
+// Can be replaced by `import { setTimeout } from 'timers/promises'` when Node 16 is the minimum supported version
+export const delay = (milliseconds: number) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });

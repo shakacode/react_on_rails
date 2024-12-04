@@ -149,7 +149,7 @@ yarn run build:dev
 This is a possible update to package.json to debug the lockfile. Notice the `NODE_DEBUG=LOCKFILE`
 
 ```json
-    "developing": "rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=LOCKFILE,ROR node  -r source-map-support/register --experimental-modules packages/node-renderer/lib/default-node-renderer.js",
+    "developing": "rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=LOCKFILE,ROR node --enable-source-maps --experimental-modules packages/node-renderer/lib/default-node-renderer.js",
 ```
 
 Notice the 2 "debug" settings of LOCKFILE and ROR.

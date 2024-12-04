@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-
-
-NODE_ENV=test yarn run babel-tape-runner "$@" | yarn tap-spec

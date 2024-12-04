@@ -19,9 +19,9 @@ directory.
 ## Debugging using the Node debugger
 1. See [this article](https://github.com/shakacode/react_on_rails/issues/1196) on setting up the debugger.
 
-# Debugging Tape Tests
-## Using Webstorm
-See [this article](https://medium.com/nmc-techblog/how-to-debug-tape-tests-in-jetbrains-ide-webstorm-idea-etc-1979aa99c490). Be sure to notice the 4th tab for the Debugger Console.
+## Debugging Jest tests
+1. See [the Jest documentation](https://jestjs.io/docs/troubleshooting) for overall guidance.
+2. For RubyMine, see [the RubyMine documentation](https://www.jetbrains.com/help/ruby/running-unit-tests-on-jest.html) for the current information. The original [Testing With Jest in WebStorm](https://blog.jetbrains.com/webstorm/2018/10/testing-with-jest-in-webstorm/) post can be useful as well.
 
 # Debugging the Ruby gem
 

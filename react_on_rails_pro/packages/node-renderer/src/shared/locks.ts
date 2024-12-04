@@ -1,10 +1,9 @@
-import sleep from 'sleep-promise';
 import lockfile, { Options } from 'lockfile';
 import { promisify } from 'util';
 
 import debug from './debug';
 import log from './log';
-import { workerIdLabel } from './utils';
+import { delay, workerIdLabel } from './utils';
 
 const lockfileLockAsync = promisify<string, Options>(lockfile.lock);
 const lockfileUnlockAsync = promisify(lockfile.unlock);
@@ -80,7 +79,7 @@ export async function lock(filename: string): Promise<LockResult> {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the const may be changed to test threading
     if (TEST_LOCKFILE_THREADING) {
       debug('Worker %i: handleNewBundleProvided sleeping 5s', workerId);
-      await sleep(5000);
+      await delay(5000);
       debug('Worker %i: handleNewBundleProvided done sleeping 5s', workerId);
     }
     debug('After acquired lock in pid', lockfileName);
