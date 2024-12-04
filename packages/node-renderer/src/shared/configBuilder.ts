@@ -143,6 +143,9 @@ function envValuesUsed() {
     RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS:
       !userConfig.delayBetweenIndividualWorkerRestarts &&
       env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS,
+    INCLUDE_TIMER_POLYFILLS: !userConfig.includeTimerPolyfills && env.INCLUDE_TIMER_POLYFILLS,
+    REPLAY_SERVER_ASYNC_OPERATION_LOGS:
+      !userConfig.replayServerAsyncOperationLogs && env.REPLAY_SERVER_ASYNC_OPERATION_LOGS,
   };
 }
 
