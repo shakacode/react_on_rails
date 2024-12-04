@@ -29,12 +29,8 @@ import * as errorReporter from './shared/errorReporter';
 import { lock, unlock } from './shared/locks';
 import { startSsrRequestOptions, trace } from './shared/tracing';
 
-// Uncomment next 2 functions for testing timeouts
-// function sleep(ms) {
-//   return new Promise((resolve) => {
-//     setTimeout(resolve, ms);
-//   });
-// }
+// Uncomment the below for testing timeouts:
+// import { delay } from './shared/utils';
 //
 // function getRandomInt(max) {
 //   return Math.floor(Math.random() * Math.floor(max));
@@ -170,7 +166,7 @@ export default function run(config: Partial<Config>) {
     //   console.log(
     //     'ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ');
     //
-    //   await sleep(100000);
+    //   await delay(100000);
     // }
 
     const { renderingRequest } = req.body;

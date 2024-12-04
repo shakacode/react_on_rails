@@ -1,7 +1,6 @@
 import path from 'path';
 import touch from 'touch';
 import lockfile from 'lockfile';
-import sleep from 'sleep-promise';
 import {
   createVmBundle,
   uploadedBundlePath,
@@ -12,7 +11,7 @@ import {
 } from './helper';
 import { getVmBundleFilePath } from '../src/worker/vm';
 import handleRenderRequest from '../src/worker/handleRenderRequest';
-import { Asset } from '../src/shared/utils';
+import { delay, Asset } from '../src/shared/utils';
 
 const testName = 'handleRenderRequest';
 const uploadedBundleForTest = (): Asset => ({
@@ -107,7 +106,7 @@ describe(testName, () => {
     const lockfileOptions = { pollPeriod: 100, stale: 10000 };
     lockfile.lockSync(lockfilePathForTest(), lockfileOptions);
 
-    await sleep(5);
+    await delay(5);
     console.log('TEST building VM from sleep');
     await createVmBundleForTest();
     console.log('TEST DONE building VM from sleep');

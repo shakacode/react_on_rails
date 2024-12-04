@@ -57,7 +57,6 @@
     "react-select": "^2.0.0-beta.7",
     "redux": "^4.0.1",
     "redux-thunk": "^2.2.0",
-    "resolve-url-loader": "^3.1.0",
     "sass": "^1.43.4",
     "sass-loader": "^12.3.0",
     "sass-resources-loader": "^2.0.0",
@@ -83,7 +82,6 @@
     "@types/react-dom": "^18.2.14",
     "jsdom": "^16.4.0",
     "preload-webpack-plugin": "^3.0.0-alpha.1",
-    "tape": "^4.7.0",
     "typescript": "^5.2.2",
     "webpack-dev-server": "^4.7.3"
   },

@@ -21,7 +21,7 @@ scripts:
       script: jest packages/node-renderer/**/*.test.[jt]s packages/node-renderer/**/**/*.test.[jt]s
     debug:
       description: Debug Node Renderer
-      script: rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && nps build && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node -r source-map-support/register packages/node-renderer/dist/default-node-renderer.js
+      script: rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && nps build && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node --enable-source-maps packages/node-renderer/dist/default-node-renderer.js
   lint:
     description: Run all linters
     script: concurrently --prefix "[{name}]" --names "ESLINT, RUBOCOP, PRETTIER" -c "blue,yellow,magenta,orange" "nps eslint" "bundle exec rubocop" "nps format.listDifferent"
