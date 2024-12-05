@@ -17,6 +17,8 @@ You can find the **package** version numbers from this repo's tags and below in 
 ### Changed
 - Error reporting and tracing integrations are completely redone. See [the docs](./docs/node-renderer/error-reporting-and-tracing.md) for details. [PR 471](https://github.com/shakacode/react_on_rails_pro/pull/471) by [alexeyr-ci](https://github.com/alexeyr-ci).
 - Upgraded to Fastify 5 by default, with an option to fall back to Fastify 4 on older Node versions. [PR 478](https://github.com/shakacode/react_on_rails_pro/pull/478) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- Logging now uses Pino instead of Winston, aligning with Fastify. [PR 479](https://github.com/shakacode/react_on_rails_pro/pull/479) by [alexeyr-ci](https://github.com/alexeyr-ci).
+  - In particular, this can make a difference on uncaught exceptions and unhandled rejections; now the process should always exit if they happen, as recommended.
 
 ## [4.0.0.rc.8] - 2024-11-20
 

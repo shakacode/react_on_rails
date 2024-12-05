@@ -33,5 +33,7 @@ export = function restartWorkers(delayBetweenIndividualWorkerRestarts: number) {
     delay += delayBetweenIndividualWorkerRestarts * MILLISECONDS_IN_MINUTE;
   });
 
-  setTimeout(() => log.info('Finished scheduled restart of workers'), delay);
+  setTimeout(() => {
+    log.info('Finished scheduled restart of workers');
+  }, delay);
 };
