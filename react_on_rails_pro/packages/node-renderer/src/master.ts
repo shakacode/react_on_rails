@@ -50,7 +50,7 @@ export = function masterRun(runningConfig?: Partial<Config>) {
       "Misconfiguration, please provide both 'allWorkersRestartInterval' and " +
         "'delayBetweenIndividualWorkerRestarts' to enable scheduled worker restarts",
     );
-    process.exit();
+    process.exit(1);
   } else {
     log.info('No schedule for workers restarts');
   }

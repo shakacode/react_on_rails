@@ -8,7 +8,7 @@ import cluster from 'cluster';
 import fastify from 'fastify';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart from '@fastify/multipart';
-import log from './shared/log';
+import log, { sharedLoggerOptions } from './shared/log';
 import packageJson from './shared/packageJson';
 import { buildConfig, Config, getConfig } from './shared/configBuilder';
 import fileExistsAsync from './shared/fileExistsAsync';
@@ -51,7 +51,7 @@ function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
 const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   const { status, data, headers, stream } = result;
   if (status !== 200 && status !== 410) {
-    log.info(`Sending non-200, non-410 data back: ${typeof data === 'string' ? data : JSON.stringify(data)}`);
+    log.info({ msg: 'Sending non-200, non-410 data back', data });
   }
   setHeaders(headers, res);
   res.status(status);
@@ -77,11 +77,12 @@ export default function run(config: Partial<Config>) {
   // getConfig():
   buildConfig(config);
 
-  const { bundlePath, logLevel, port } = getConfig();
+  const { bundlePath, logHttpLevel, port } = getConfig();
 
   const app = fastify({
     http2: useHttp2 as true,
-    logger: logLevel === 'debug',
+    logger:
+      logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
   });
 
   // 10 MB limit for code including props
@@ -203,8 +204,7 @@ export default function run(config: Partial<Config>) {
       }, startSsrRequestOptions({ renderingRequest }));
     } catch (theErr) {
       const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
-      log.error(`UNHANDLED TOP LEVEL error ${exceptionMessage}`);
-      errorReporter.message(exceptionMessage);
+      errorReporter.message(`Unhandled top level error: ${exceptionMessage}`);
       await setResponse(errorResponseResult(exceptionMessage), res);
     }
   });
@@ -246,8 +246,13 @@ export default function run(config: Partial<Config>) {
             res,
           );
         } catch (err) {
-          const message = `ERROR when trying to copy assets. ${err}. Task: ${taskDescription}`;
-          log.info(message);
+          const msg = 'ERROR when trying to copy assets';
+          const message = `${msg}. ${err}. Task: ${taskDescription}`;
+          log.error({
+            msg,
+            err,
+            task: taskDescription,
+          });
           await setResponse(errorResponseResult(message), res);
         }
       }
@@ -258,12 +263,11 @@ export default function run(config: Partial<Config>) {
             await unlock(lockfileName);
           }
         } catch (error) {
-          const msg = formatExceptionMessage(
-            taskDescription,
-            error,
-            `Error unlocking ${lockfileName} from worker ${workerIdLabel()}.`,
-          );
-          log.warn(msg);
+          log.warn({
+            msg: `Error unlocking ${lockfileName} from worker ${workerIdLabel()}`,
+            err: error,
+            task: taskDescription,
+          });
         }
       }
     }
