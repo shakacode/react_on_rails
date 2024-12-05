@@ -29,17 +29,31 @@ module ReactOnRails
 
       raise_node_semver_version_warning if node_package_version.semver_wildcard?
 
-      node_major_minor_patch = node_package_version.major_minor_patch
-      gem_major_minor_patch = gem_major_minor_patch_version
-      versions_match = node_major_minor_patch[0] == gem_major_minor_patch[0] &&
-                       node_major_minor_patch[1] == gem_major_minor_patch[1] &&
-                       node_major_minor_patch[2] == gem_major_minor_patch[2]
+      versions_match = compare_versions(node_package_version.major_minor_patch, gem_major_minor_patch_version)
 
       raise_differing_versions_warning unless versions_match
       false
     end
 
+    def log_if_gem_and_node_package_versions_differ
+      return true unless node_package_version.raw
+      return if node_package_version.relative_path?
+
+      log_node_semver_version_warning if node_package_version.semver_wildcard?
+
+      versions_match = compare_versions(node_package_version.major_minor_patch, gem_major_minor_patch_version)
+
+      log_differing_versions_warning unless versions_match
+      false
+    end
+
     private
+
+    def compare_versions(node_major_minor_patch, gem_major_minor_patch)
+      node_major_minor_patch[0] == gem_major_minor_patch[0] &&
+        node_major_minor_patch[1] == gem_major_minor_patch[1] &&
+        node_major_minor_patch[2] == gem_major_minor_patch[2]
+    end
 
     def common_error_msg
       <<-MSG.strip_heredoc
@@ -55,10 +69,21 @@ module ReactOnRails
 
     def raise_differing_versions_warning
       msg = "**WARNING** ReactOnRails: ReactOnRails gem and node package versions do not match\n#{common_error_msg}"
-      Rails.logger.warn(msg)
+      raise ReactOnRails::Error, msg
     end
 
     def raise_node_semver_version_warning
+      msg = "**WARNING** ReactOnRails: Your node package version for react-on-rails contains a " \
+            "^ or ~\n#{common_error_msg}"
+      raise ReactOnRails::Error, msg
+    end
+
+    def log_differing_versions_warning
+      msg = "**WARNING** ReactOnRails: ReactOnRails gem and node package versions do not match\n#{common_error_msg}"
+      Rails.logger.warn(msg)
+    end
+
+    def log_node_semver_version_warning
       msg = "**WARNING** ReactOnRails: Your node package version for react-on-rails contains a " \
             "^ or ~\n#{common_error_msg}"
       Rails.logger.warn(msg)

@@ -11,7 +11,7 @@ class FakeLogger
   end
 end
 
-module ReactOnRails
+module ReactOnRails # rubocop:disable Metrics/ModuleLength
   describe VersionChecker do
     describe "#warn_if_gem_and_node_package_versions_differ" do
       let(:logger) { FakeLogger.new }
@@ -24,7 +24,13 @@ module ReactOnRails
         before { stub_gem_version("2.2.5.beta.2") }
 
         it "does not raise" do
-          expect { check_version(node_package_version) }.not_to raise_error
+          expect { check_version_and_raise(node_package_version) }.not_to raise_error
+        end
+
+        it "does not log" do
+          allow(Rails.logger).to receive(:warn)
+          check_version_and_log(node_package_version)
+          expect(Rails.logger).not_to have_received(:warn)
         end
       end
 
@@ -38,9 +44,14 @@ module ReactOnRails
         it "logs" do
           allow(Rails.logger).to receive(:warn)
           message = /ReactOnRails: Your node package version for react-on-rails contains a \^ or ~/
-          # expect { check_version(node_package_version) }.to raise_error(message)
-          check_version(node_package_version)
+          check_version_and_log(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
+        end
+
+        it "raises" do
+          allow(Rails.logger).to receive(:warn)
+          message = /ReactOnRails: Your node package version for react-on-rails contains a \^ or ~/
+          expect { check_version_and_raise(node_package_version) }.to raise_error(message)
         end
       end
 
@@ -54,9 +65,14 @@ module ReactOnRails
         it "logs" do
           allow(Rails.logger).to receive(:warn)
           message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
-          # expect { check_version(node_package_version) }.to raise_error(message)
-          check_version(node_package_version)
+          check_version_and_log(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
+        end
+
+        it "raises" do
+          allow(Rails.logger).to receive(:warn)
+          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          expect { check_version_and_raise(node_package_version) }.to raise_error(message)
         end
       end
 
@@ -70,9 +86,14 @@ module ReactOnRails
         it "logs" do
           allow(Rails.logger).to receive(:warn)
           message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
-          # expect { check_version(node_package_version) }.to raise_error(message)
-          check_version(node_package_version)
+          check_version_and_log(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
+        end
+
+        it "raises" do
+          allow(Rails.logger).to receive(:warn)
+          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          expect { check_version_and_raise(node_package_version) }.to raise_error(message)
         end
       end
 
@@ -86,9 +107,14 @@ module ReactOnRails
         it "logs" do
           allow(Rails.logger).to receive(:warn)
           message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
-          # expect { check_version(node_package_version) }.to raise_error(message)
-          check_version(node_package_version)
+          check_version_and_log(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
+        end
+
+        it "raises" do
+          allow(Rails.logger).to receive(:warn)
+          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          expect { check_version_and_raise(node_package_version) }.to raise_error(message)
         end
       end
 
@@ -100,7 +126,27 @@ module ReactOnRails
         before { stub_gem_version("2.0.0.beta.1") }
 
         it "does not raise" do
-          expect { check_version(node_package_version) }.not_to raise_error
+          expect { check_version_and_raise(node_package_version) }.not_to raise_error
+        end
+
+        it "does not log" do
+          allow(Rails.logger).to receive(:warn)
+          check_version_and_log(node_package_version)
+          expect(Rails.logger).not_to have_received(:warn)
+        end
+      end
+
+      context "when package json doesn't exist" do
+        let(:node_package_version) do
+          double_package_version(raw: nil)
+        end
+
+        it "raise method returns true" do
+          expect(check_version_and_raise(node_package_version)).to be(true)
+        end
+
+        it "log method returns true" do
+          expect(check_version_and_log(node_package_version)).to be(true)
         end
       end
     end
@@ -114,9 +160,14 @@ module ReactOnRails
                       relative_path?: relative_path)
     end
 
-    def check_version(node_package_version)
+    def check_version_and_raise(node_package_version)
       version_checker = VersionChecker.new(node_package_version)
       version_checker.raise_if_gem_and_node_package_versions_differ
+    end
+
+    def check_version_and_log(node_package_version)
+      version_checker = VersionChecker.new(node_package_version)
+      version_checker.log_if_gem_and_node_package_versions_differ
     end
 
     describe VersionChecker::NodePackageVersion do
@@ -219,6 +270,14 @@ module ReactOnRails
 
         describe "#major" do
           specify { expect(node_package_version.major_minor_patch).to be_nil }
+        end
+      end
+
+      context "with non-existing package.json" do
+        let(:package_json) { File.expand_path("fixtures/nonexistent_package.json", __dir__) }
+
+        describe "#raw" do
+          specify { expect(node_package_version.raw).to be_nil }
         end
       end
     end
