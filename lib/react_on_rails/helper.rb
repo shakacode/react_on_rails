@@ -539,13 +539,6 @@ module ReactOnRails
       "#{rails_context_if_not_already_rendered}\n#{render_value}".strip.html_safe
     end
 
-    def internal_rsc_react_component(react_component_name, options = {})
-      options = options.merge(rsc?: true)
-      render_options = ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: react_component_name,
-                                                                       options: options)
-      server_rendered_react_component(render_options)
-    end
-
     def internal_react_component(react_component_name, options = {})
       # Create the JavaScript and HTML to allow either client or server rendering of the
       # react_component.
