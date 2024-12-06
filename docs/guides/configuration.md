@@ -2,7 +2,7 @@ Here is the full set of config options. This file is `/config/initializers/react
 
 First, you should have a `/config/shakapacker.yml` setup.
 
-Here is the setup when using the recommended `/client` directory for your `node_modules` and source files:
+Here is the setup when using the recommended `/` directory for your `node_modules` and source files:
 
 ```yaml
 # Note: Base output directory of /public is assumed for static files
@@ -69,7 +69,7 @@ ReactOnRails.configure do |config|
   config.random_dom_id = true # default
 
   # defaults to "" (top level)
-  config.node_modules_location = "client" # If using Shakapacker you should use "".
+  config.node_modules_location = "" # If using Shakapacker you should use "".
 
   # If you're using the standard Shakapacker configuration of webpack, then Shakapacker
   # will automatically modify or create an assets:precompile task to build your assets. If so,
