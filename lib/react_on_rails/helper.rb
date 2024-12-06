@@ -361,14 +361,13 @@ module ReactOnRails
       return unless render_options.auto_load_bundle
 
       ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
-      append_javascript_pack_tag("client-bundle")
-      # if Rails.env.development?
-      #   is_component_pack_present = File.exist?(generated_components_pack_path(react_component_name))
-      #   raise_missing_autoloaded_bundle(react_component_name) unless is_component_pack_present
-      # end
-      # append_javascript_pack_tag("generated/#{react_component_name}",
-      #                            defer: ReactOnRails.configuration.defer_generated_component_packs)
-      # append_stylesheet_pack_tag("generated/#{react_component_name}")
+      if Rails.env.development?
+        is_component_pack_present = File.exist?(generated_components_pack_path(react_component_name))
+        raise_missing_autoloaded_bundle(react_component_name) unless is_component_pack_present
+      end
+      append_javascript_pack_tag("generated/#{react_component_name}",
+                                 defer: ReactOnRails.configuration.defer_generated_component_packs)
+      append_stylesheet_pack_tag("generated/#{react_component_name}")
     end
 
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
