@@ -23,10 +23,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
 
         before { stub_gem_version("2.2.5.beta.2") }
 
-        it "does not raise" do
-          expect { check_version_and_raise(node_package_version) }.not_to raise_error
-        end
-
         it "does not log" do
           allow(Rails.logger).to receive(:warn)
           check_version_and_log(node_package_version)
@@ -47,12 +43,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           check_version_and_log(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
         end
-
-        it "raises" do
-          allow(Rails.logger).to receive(:warn)
-          message = /ReactOnRails: Your node package version for react-on-rails contains a \^ or ~/
-          expect { check_version_and_raise(node_package_version) }.to raise_error(message)
-        end
       end
 
       context "when gem and node package major versions differ" do
@@ -67,12 +57,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
           check_version_and_log(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
-        end
-
-        it "raises" do
-          allow(Rails.logger).to receive(:warn)
-          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
-          expect { check_version_and_raise(node_package_version) }.to raise_error(message)
         end
       end
 
@@ -89,12 +73,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           check_version_and_log(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
         end
-
-        it "raises" do
-          allow(Rails.logger).to receive(:warn)
-          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
-          expect { check_version_and_raise(node_package_version) }.to raise_error(message)
-        end
       end
 
       context "when gem and node package major, minor versions match and patch differs" do
@@ -110,12 +88,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           check_version_and_log(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
         end
-
-        it "raises" do
-          allow(Rails.logger).to receive(:warn)
-          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
-          expect { check_version_and_raise(node_package_version) }.to raise_error(message)
-        end
       end
 
       context "when package json uses a relative path with dots" do
@@ -124,10 +96,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         end
 
         before { stub_gem_version("2.0.0.beta.1") }
-
-        it "does not raise" do
-          expect { check_version_and_raise(node_package_version) }.not_to raise_error
-        end
 
         it "does not log" do
           allow(Rails.logger).to receive(:warn)
@@ -141,12 +109,8 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           double_package_version(raw: nil)
         end
 
-        it "raise method returns true" do
-          expect(check_version_and_raise(node_package_version)).to be(true)
-        end
-
-        it "log method returns true" do
-          expect(check_version_and_log(node_package_version)).to be(true)
+        it "log method returns nil" do
+          expect(check_version_and_log(node_package_version)).to be_nil
         end
       end
     end
@@ -172,6 +136,19 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
 
     describe VersionChecker::NodePackageVersion do
       subject(:node_package_version) { described_class.new(package_json) }
+
+      describe "#build" do
+        it "initializes NodePackageVersion with ReactOnRails.configuration.node_modules_location" do
+          allow(ReactOnRails).to receive_message_chain(:configuration, :node_modules_location).and_return("spec/dummy")
+          root_package_json_path = File.expand_path("../../package.json", __dir__)
+          allow(Rails).to receive_message_chain(:root, :join).and_return(root_package_json_path)
+          message = "No 'react-on-rails' entry in the dependencies of #{root_package_json_path}, which is " \
+                    "the expected location according to ReactOnRails.configuration.node_modules_location"
+          allow(Rails.logger).to receive(:warn)
+          described_class.build.raw
+          expect(Rails.logger).to have_received(:warn).with(message)
+        end
+      end
 
       describe "#semver_wildcard?" do
         context "when package json lists an exact version of '0.0.2'" do
