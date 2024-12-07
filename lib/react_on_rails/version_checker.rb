@@ -85,17 +85,17 @@ module ReactOnRails
       end
 
       def raw
-        return nil unless File.exist?(package_json)
-
-        parsed_package_contents = JSON.parse(package_json_contents)
-        if parsed_package_contents.key?("dependencies") &&
-           parsed_package_contents["dependencies"].key?("react-on-rails")
-          parsed_package_contents["dependencies"]["react-on-rails"]
-        else
-          msg = "No 'react-on-rails' entry in the dependencies of #{NodePackageVersion.package_json_path}, " \
-                "which is the expected location according to ReactOnRails.configuration.node_modules_location"
-          Rails.logger.warn(msg)
+        if File.exist?(package_json)
+          parsed_package_contents = JSON.parse(package_json_contents)
+          if parsed_package_contents.key?("dependencies") &&
+             parsed_package_contents["dependencies"].key?("react-on-rails")
+            return parsed_package_contents["dependencies"]["react-on-rails"]
+          end
         end
+        msg = "No 'react-on-rails' entry in the dependencies of #{NodePackageVersion.package_json_path}, " \
+              "which is the expected location according to ReactOnRails.configuration.node_modules_location"
+        Rails.logger.warn(msg)
+        nil
       end
 
       def semver_wildcard?

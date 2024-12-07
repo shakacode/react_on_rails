@@ -250,11 +250,27 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         end
       end
 
+      context "with package.json without react-on-rails dependency" do
+        let(:package_json) { File.expand_path("../../package.json", __dir__) }
+
+        describe "#raw" do
+          it "returns nil" do
+            root_package_json_path = File.expand_path("fixtures/nonexistent_package.json", __dir__)
+            allow(Rails).to receive_message_chain(:root, :join).and_return(root_package_json_path)
+            expect(node_package_version.raw).to be_nil
+          end
+        end
+      end
+
       context "with non-existing package.json" do
         let(:package_json) { File.expand_path("fixtures/nonexistent_package.json", __dir__) }
 
         describe "#raw" do
-          specify { expect(node_package_version.raw).to be_nil }
+          it "returns nil" do
+            root_package_json_path = File.expand_path("fixtures/nonexistent_package.json", __dir__)
+            allow(Rails).to receive_message_chain(:root, :join).and_return(root_package_json_path)
+            expect(node_package_version.raw).to be_nil
+          end
         end
       end
     end
