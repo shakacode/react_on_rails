@@ -81,3 +81,11 @@ overrides:
       import/first: off
       # Simplifies test code
       "@typescript-eslint/no-non-null-assertion": off
+  - files: "packages/node-renderer/src/integrations/**"
+    excludedFiles: "packages/node-renderer/src/integrations/api.ts"
+    rules:
+      # Integrations should only use the public integration API
+      no-restricted-imports:
+        - error
+        - patterns:
+          - "../*"

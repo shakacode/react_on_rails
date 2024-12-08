@@ -1,7 +1,6 @@
 import { captureException, captureMessage, startTransaction } from '@sentry/node';
 import { CaptureContext, TransactionContext } from '@sentry/types';
-import { addErrorNotifier, addMessageNotifier, message } from '../shared/errorReporter';
-import { setupTracing } from '../shared/tracing';
+import { addErrorNotifier, addMessageNotifier, message, setupTracing } from './api';
 
 declare module '../shared/tracing' {
   interface TracingContext {
