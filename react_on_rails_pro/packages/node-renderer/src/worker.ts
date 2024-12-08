@@ -12,7 +12,7 @@ import log, { sharedLoggerOptions } from './shared/log';
 import packageJson from './shared/packageJson';
 import { buildConfig, Config, getConfig } from './shared/configBuilder';
 import fileExistsAsync from './shared/fileExistsAsync';
-import type { FastifyReply, FastifyRequest } from './worker/types';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from './worker/types';
 import checkProtocolVersion from './worker/checkProtocolVersionHandler';
 import authenticate from './worker/authHandler';
 import handleRenderRequest from './worker/handleRenderRequest';
@@ -41,6 +41,20 @@ declare module '@fastify/multipart' {
     // We save all uploaded files and store this value
     value: Asset;
   }
+}
+
+export type FastifyConfigFunction = (app: FastifyInstance) => void;
+
+const fastifyConfigFunctions: FastifyConfigFunction[] = [];
+
+/**
+ * Configures Fastify instance before starting the server.
+ * @param configFunction The configuring function. Normally it will be something like `(app) => { app.register(...); }`
+ *  or `(app) => { app.addHook(...); }` to report data from Fastify to an external service.
+ *  Note that we call `await app.ready()` in our code, so you don't need to `await` the results.
+ */
+export function configureFastify(configFunction: FastifyConfigFunction) {
+  fastifyConfigFunctions.push(configFunction);
 }
 
 function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
@@ -83,6 +97,13 @@ export default function run(config: Partial<Config>) {
     http2: useHttp2 as true,
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
+  });
+
+  // We shouldn't have unhandled errors here, but just in case
+  app.addHook('onError', (req, res, err, done) => {
+    // Not errorReporter.error so that integrations can decide how to log the errors.
+    app.log.error({ msg: 'Unhandled Fastify error', err, req, res });
+    done();
   });
 
   // 10 MB limit for code including props
@@ -319,6 +340,10 @@ export default function run(config: Partial<Config>) {
       log.info(`Node renderer worker #${worker.id} listening on port ${port}!`);
     });
   }
+
+  fastifyConfigFunctions.forEach((configFunction) => {
+    configFunction(app);
+  });
 
   return app;
 }

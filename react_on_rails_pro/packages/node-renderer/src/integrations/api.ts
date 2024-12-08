@@ -23,10 +23,12 @@
  * @module
  */
 
-export { addErrorNotifier, addMessageNotifier, addNotifier } from '../shared/errorReporter';
+export { default as log } from '../shared/log';
+export { addErrorNotifier, addMessageNotifier, addNotifier, error, message } from '../shared/errorReporter';
 export {
   setupTracing,
   TracingContext,
   TracingIntegrationOptions,
   UnitOfWorkOptions,
 } from '../shared/tracing';
+export { configureFastify, FastifyConfigFunction } from '../worker';

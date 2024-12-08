@@ -1111,19 +1111,20 @@
     fastify-plugin "^5.0.0"
     secure-json-parse "^3.0.0"
 
-"@honeybadger-io/core@^4.9.2":
-  version "4.10.0"
-  resolved "https://registry.yarnpkg.com/@honeybadger-io/core/-/core-4.10.0.tgz#413f6fd00474d979a70373232349c75d416f075e"
-  integrity sha512-LJcFtzUlWFSdlcJtx+Tc9s5e90S9kKQFk42D4EEI4hSJw5eaV8VUhP6LWeKI3tsyiYvtwGpgLIYNgWjVJvqhGQ==
+"@honeybadger-io/core@^6.6.0":
+  version "6.6.0"
+  resolved "https://registry.yarnpkg.com/@honeybadger-io/core/-/core-6.6.0.tgz#a18782ffdb4b8bdc0c36076bd330fb6c6ada1060"
+  integrity sha512-B5X05huAsDs7NJOYm4bwHf2v0tMuTjBWLfumHH9DCblq8E1XrujlbbNkIdEHlzc01K9oAXuvsaBwVkE7G5+aLQ==
   dependencies:
+    json-nd "^1.0.0"
     stacktrace-parser "^0.1.10"
 
-"@honeybadger-io/js@^4.3.1":
-  version "4.9.3"
-  resolved "https://registry.yarnpkg.com/@honeybadger-io/js/-/js-4.9.3.tgz#22a63c5cb5e873976bb22cf3cf273dd40f969e87"
-  integrity sha512-pk76zGxEWLj0I3h/ujzrWAkJJ5rq3YMJwjk4Bs+5ToJMD5Lwpb7B5dW56ivVCfffDPkFXDpXvhVJ8BcycrwRcA==
+"@honeybadger-io/js@^6.10.1":
+  version "6.10.1"
+  resolved "https://registry.yarnpkg.com/@honeybadger-io/js/-/js-6.10.1.tgz#20b88e9ced48e2a50211415a4ea08f5df047e1c5"
+  integrity sha512-T5WAhYHWHXFMxjY4NSawSY945i8ISIL5/gsjN3m0xO+oXrBAFaul3wY5p/FGH6r6RfCrjHoHl9Iu7Ed9aO9Ehg==
   dependencies:
-    "@honeybadger-io/core" "^4.9.2"
+    "@honeybadger-io/core" "^6.6.0"
     "@types/aws-lambda" "^8.10.89"
     "@types/express" "^4.17.13"
 
@@ -5635,6 +5636,11 @@ json-buffer@3.0.1:
   version "3.0.1"
   resolved "https://registry.yarnpkg.com/json-buffer/-/json-buffer-3.0.1.tgz#9338802a30d3b6605fbe0613e094008ca8c05a13"
   integrity sha512-4bV5BfR2mqfQTJm+V5tPPdf+ZpuhiIvTuAB5g8kcrXOZpTT/QwwVRWBywX1ozr6lEuPdbHxwaJlm9G6mI2sfSQ==
+
+json-nd@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/json-nd/-/json-nd-1.0.0.tgz#e52283b7ee3f5e6f9920f668c94044bda912120c"
+  integrity sha512-8TIp0HZAY0VVrwRQJJPb4+nOTSPoOWZeEKBTLizUfQO4oym5Fc/MKqN8vEbLCxcyxDf2vwNxOQ1q84O49GWPyQ==
 
 json-parse-even-better-errors@^2.3.0:
   version "2.3.1"
