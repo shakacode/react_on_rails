@@ -12,10 +12,6 @@ module ReactOnRails
       new(NodePackageVersion.build)
     end
 
-    def self.instance(package_json_path)
-      new(NodePackageVersion.new(package_json_path))
-    end
-
     def initialize(node_package_version)
       @node_package_version = node_package_version
     end
