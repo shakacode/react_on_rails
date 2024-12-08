@@ -11,7 +11,7 @@ class FakeLogger
   end
 end
 
-module ReactOnRails
+module ReactOnRails # rubocop:disable Metrics/ModuleLength
   describe VersionChecker do
     describe "#warn_if_gem_and_node_package_versions_differ" do
       let(:logger) { FakeLogger.new }
@@ -23,8 +23,10 @@ module ReactOnRails
 
         before { stub_gem_version("2.2.5.beta.2") }
 
-        it "does not raise" do
-          expect { check_version(node_package_version) }.not_to raise_error
+        it "does not log" do
+          allow(Rails.logger).to receive(:warn)
+          check_version_and_log(node_package_version)
+          expect(Rails.logger).not_to have_received(:warn)
         end
       end
 
@@ -35,9 +37,11 @@ module ReactOnRails
 
         before { stub_gem_version("2.2.5") }
 
-        it "does raise" do
-          error = /ReactOnRails: Your node package version for react-on-rails contains a \^ or ~/
-          expect { check_version(node_package_version) }.to raise_error(error)
+        it "logs" do
+          allow(Rails.logger).to receive(:warn)
+          message = /ReactOnRails: Your node package version for react-on-rails contains a \^ or ~/
+          check_version_and_log(node_package_version)
+          expect(Rails.logger).to have_received(:warn).with(message)
         end
       end
 
@@ -48,9 +52,11 @@ module ReactOnRails
 
         before { stub_gem_version("12.0.0.beta.1") }
 
-        it "raises" do
-          error = /ReactOnRails: ReactOnRails gem and node package versions do not match/
-          expect { check_version(node_package_version) }.to raise_error(error)
+        it "logs" do
+          allow(Rails.logger).to receive(:warn)
+          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          check_version_and_log(node_package_version)
+          expect(Rails.logger).to have_received(:warn).with(message)
         end
       end
 
@@ -61,9 +67,11 @@ module ReactOnRails
 
         before { stub_gem_version("13.1.0") }
 
-        it "raises" do
-          error = /ReactOnRails: ReactOnRails gem and node package versions do not match/
-          expect { check_version(node_package_version) }.to raise_error(error)
+        it "logs" do
+          allow(Rails.logger).to receive(:warn)
+          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          check_version_and_log(node_package_version)
+          expect(Rails.logger).to have_received(:warn).with(message)
         end
       end
 
@@ -74,9 +82,11 @@ module ReactOnRails
 
         before { stub_gem_version("13.0.0") }
 
-        it "raises" do
-          error = /ReactOnRails: ReactOnRails gem and node package versions do not match/
-          expect { check_version(node_package_version) }.to raise_error(error)
+        it "logs" do
+          allow(Rails.logger).to receive(:warn)
+          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          check_version_and_log(node_package_version)
+          expect(Rails.logger).to have_received(:warn).with(message)
         end
       end
 
@@ -87,8 +97,20 @@ module ReactOnRails
 
         before { stub_gem_version("2.0.0.beta.1") }
 
-        it "does not raise" do
-          expect { check_version(node_package_version) }.not_to raise_error
+        it "does not log" do
+          allow(Rails.logger).to receive(:warn)
+          check_version_and_log(node_package_version)
+          expect(Rails.logger).not_to have_received(:warn)
+        end
+      end
+
+      context "when package json doesn't exist" do
+        let(:node_package_version) do
+          double_package_version(raw: nil)
+        end
+
+        it "log method returns nil" do
+          expect(check_version_and_log(node_package_version)).to be_nil
         end
       end
     end
@@ -102,13 +124,31 @@ module ReactOnRails
                       relative_path?: relative_path)
     end
 
-    def check_version(node_package_version)
+    def check_version_and_raise(node_package_version)
       version_checker = VersionChecker.new(node_package_version)
       version_checker.raise_if_gem_and_node_package_versions_differ
     end
 
+    def check_version_and_log(node_package_version)
+      version_checker = VersionChecker.new(node_package_version)
+      version_checker.log_if_gem_and_node_package_versions_differ
+    end
+
     describe VersionChecker::NodePackageVersion do
       subject(:node_package_version) { described_class.new(package_json) }
+
+      describe "#build" do
+        it "initializes NodePackageVersion with ReactOnRails.configuration.node_modules_location" do
+          allow(ReactOnRails).to receive_message_chain(:configuration, :node_modules_location).and_return("spec/dummy")
+          root_package_json_path = File.expand_path("../../package.json", __dir__)
+          allow(Rails).to receive_message_chain(:root, :join).and_return(root_package_json_path)
+          message = "No 'react-on-rails' entry in the dependencies of #{root_package_json_path}, which is " \
+                    "the expected location according to ReactOnRails.configuration.node_modules_location"
+          allow(Rails.logger).to receive(:warn)
+          described_class.build.raw
+          expect(Rails.logger).to have_received(:warn).with(message)
+        end
+      end
 
       describe "#semver_wildcard?" do
         context "when package json lists an exact version of '0.0.2'" do
@@ -191,6 +231,46 @@ module ReactOnRails
 
         describe "#major" do
           specify { expect(node_package_version.major_minor_patch).to be_nil }
+        end
+      end
+
+      context "with node version of 'file:.yalc/react-on-rails'" do
+        let(:package_json) { File.expand_path("fixtures/yalc_package.json", __dir__) }
+
+        describe "#raw" do
+          specify { expect(node_package_version.raw).to eq("file:.yalc/react-on-rails") }
+        end
+
+        describe "#relative_path?" do
+          specify { expect(node_package_version.relative_path?).to be true }
+        end
+
+        describe "#major" do
+          specify { expect(node_package_version.major_minor_patch).to be_nil }
+        end
+      end
+
+      context "with package.json without react-on-rails dependency" do
+        let(:package_json) { File.expand_path("../../package.json", __dir__) }
+
+        describe "#raw" do
+          it "returns nil" do
+            root_package_json_path = File.expand_path("fixtures/nonexistent_package.json", __dir__)
+            allow(Rails).to receive_message_chain(:root, :join).and_return(root_package_json_path)
+            expect(node_package_version.raw).to be_nil
+          end
+        end
+      end
+
+      context "with non-existing package.json" do
+        let(:package_json) { File.expand_path("fixtures/nonexistent_package.json", __dir__) }
+
+        describe "#raw" do
+          it "returns nil" do
+            root_package_json_path = File.expand_path("fixtures/nonexistent_package.json", __dir__)
+            allow(Rails).to receive_message_chain(:root, :join).and_return(root_package_json_path)
+            expect(node_package_version.raw).to be_nil
+          end
         end
       end
     end

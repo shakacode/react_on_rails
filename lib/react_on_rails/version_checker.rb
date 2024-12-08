@@ -19,8 +19,9 @@ module ReactOnRails
     # For compatibility, the gem and the node package versions should always match,
     # unless the user really knows what they're doing. So we will give a
     # warning if they do not.
-    def raise_if_gem_and_node_package_versions_differ
-      return if node_package_version.relative_path?
+    def log_if_gem_and_node_package_versions_differ
+      return if node_package_version.raw.nil? || node_package_version.relative_path?
+      return log_node_semver_version_warning if node_package_version.semver_wildcard?
 
       node_major_minor_patch = node_package_version.major_minor_patch
       gem_major_minor_patch = gem_major_minor_patch_version
@@ -28,9 +29,7 @@ module ReactOnRails
                        node_major_minor_patch[1] == gem_major_minor_patch[1] &&
                        node_major_minor_patch[2] == gem_major_minor_patch[2]
 
-      raise_differing_versions_warning unless versions_match
-
-      raise_node_semver_version_warning if node_package_version.semver_wildcard?
+      log_differing_versions_warning unless versions_match
     end
 
     private
@@ -46,15 +45,15 @@ module ReactOnRails
       MSG
     end
 
-    def raise_differing_versions_warning
-      msg = "**ERROR** ReactOnRails: ReactOnRails gem and node package versions do not match\n#{common_error_msg}"
-      raise ReactOnRails::Error, msg
+    def log_differing_versions_warning
+      msg = "**WARNING** ReactOnRails: ReactOnRails gem and node package versions do not match\n#{common_error_msg}"
+      Rails.logger.warn(msg)
     end
 
-    def raise_node_semver_version_warning
-      msg = "**ERROR** ReactOnRails: Your node package version for react-on-rails contains a " \
+    def log_node_semver_version_warning
+      msg = "**WARNING** ReactOnRails: Your node package version for react-on-rails contains a " \
             "^ or ~\n#{common_error_msg}"
-      raise ReactOnRails::Error, msg
+      Rails.logger.warn(msg)
     end
 
     def gem_version
@@ -74,7 +73,7 @@ module ReactOnRails
       end
 
       def self.package_json_path
-        Rails.root.join("client", "package.json")
+        Rails.root.join(ReactOnRails.configuration.node_modules_location, "package.json")
       end
 
       def initialize(package_json)
@@ -82,13 +81,17 @@ module ReactOnRails
       end
 
       def raw
-        parsed_package_contents = JSON.parse(package_json_contents)
-        if parsed_package_contents.key?("dependencies") &&
-           parsed_package_contents["dependencies"].key?("react-on-rails")
-          parsed_package_contents["dependencies"]["react-on-rails"]
-        else
-          raise ReactOnRails::Error, "No 'react-on-rails' entry in package.json dependencies"
+        if File.exist?(package_json)
+          parsed_package_contents = JSON.parse(package_json_contents)
+          if parsed_package_contents.key?("dependencies") &&
+             parsed_package_contents["dependencies"].key?("react-on-rails")
+            return parsed_package_contents["dependencies"]["react-on-rails"]
+          end
         end
+        msg = "No 'react-on-rails' entry in the dependencies of #{NodePackageVersion.package_json_path}, " \
+              "which is the expected location according to ReactOnRails.configuration.node_modules_location"
+        Rails.logger.warn(msg)
+        nil
       end
 
       def semver_wildcard?
@@ -96,7 +99,7 @@ module ReactOnRails
       end
 
       def relative_path?
-        raw.match(%r{(\.\.|\Afile:///)}).present?
+        raw.match(/(\.\.|\Afile:)/).present?
       end
 
       def major_minor_patch
