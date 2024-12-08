@@ -14,6 +14,8 @@ if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
 }
 
 export const sharedLoggerOptions: pino.LoggerOptions = {
+  // Omit pid and hostname
+  base: undefined,
   formatters: {
     level: (label) => ({ level: label }),
   },
@@ -40,8 +42,6 @@ export const sharedLoggerOptions: pino.LoggerOptions = {
 const log = pino(
   {
     name: 'RORP',
-    // Omit pid and hostname
-    base: undefined,
     ...sharedLoggerOptions,
   },
   // https://getpino.io/#/docs/help?id=best-performance-for-logging-to-stdout doesn't recommend
