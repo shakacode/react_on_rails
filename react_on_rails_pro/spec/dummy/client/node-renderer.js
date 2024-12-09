@@ -10,6 +10,7 @@ const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails
 Honeybadger.configure({
   // This is a test account for React on Rails Pro. Substitute your own.
   apiKey: 'a602365c',
+  environment: process.env.NODE_ENV ?? 'development',
 });
 require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/honeybadger').init();
 
