@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import type { Readable, PassThrough } from 'stream';
+import type { Readable } from 'stream';
 
 import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
@@ -306,7 +306,7 @@ ctx.ReactOnRails = {
    * @param options
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  serverRenderRSCReactComponent(options: RenderParams): PassThrough {
+  serverRenderRSCReactComponent(_): Readable {
     throw new Error('serverRenderRSCReactComponent is supported in RSC bundle only.');
   },
 

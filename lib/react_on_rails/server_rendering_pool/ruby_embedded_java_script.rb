@@ -231,7 +231,6 @@ module ReactOnRails
           begin
             result = JSON.parse(result_string)
           rescue JSON::ParserError => e
-            return { html: result_string }
             raise ReactOnRails::JsonParseError.new(parse_error: e, json: result_string)
           end
 
