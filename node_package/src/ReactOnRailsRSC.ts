@@ -1,12 +1,8 @@
 import { renderToPipeableStream } from 'react-server-dom-webpack/server.node';
 import { PassThrough, Readable } from 'stream';
 import type { ReactElement } from 'react';
-import fs from 'fs';
 
-import {
-  RenderParams,
-  StreamRenderState,
-} from './types';
+import { RSCRenderParams, StreamRenderState } from './types';
 import ReactOnRails from './ReactOnRails';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
@@ -19,6 +15,7 @@ import {
   streamServerRenderedComponent,
   transformRenderStreamChunksToResultObject,
 } from './streamServerRenderedReactComponent';
+import loadReactClientManifest from './loadReactClientManifest';
 
 const stringToStream = (str: string) => {
   const stream = new PassThrough();
@@ -27,10 +24,8 @@ const stringToStream = (str: string) => {
   return stream;
 };
 
-const getBundleConfig = () => JSON.parse(fs.readFileSync('./public/webpack/development/react-client-manifest.json', 'utf8'))
-
-const streamRenderRSCComponent = (reactElement: ReactElement, options: RenderParams): Readable => {
-  const { throwJsErrors } = options;
+const streamRenderRSCComponent = (reactElement: ReactElement, options: RSCRenderParams): Readable => {
+  const { throwJsErrors, reactClientManifestFileName } = options;
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
@@ -41,7 +36,7 @@ const streamRenderRSCComponent = (reactElement: ReactElement, options: RenderPar
   try {
     const rscStream = renderToPipeableStream(
       reactElement,
-      getBundleConfig(),
+      loadReactClientManifest(reactClientManifestFileName),
       {
         onError: (err) => {
           const error = convertToError(err);
@@ -66,7 +61,7 @@ const streamRenderRSCComponent = (reactElement: ReactElement, options: RenderPar
   }
 };
 
-ReactOnRails.serverRenderRSCReactComponent = (options: RenderParams) => {
+ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
   try {
     return streamServerRenderedComponent(options, streamRenderRSCComponent);
   } finally {
