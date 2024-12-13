@@ -29,7 +29,7 @@ Caching of SSR is critical for achieving optimum performance.
 * **Fragment Caching**: for `react_component` and `react_component_hash`, including lazy evaluation of props.
 * **Prerender Caching**: Server rendering JavaScript evaluation is cached if `prerender_caching` is turned on in your Rails config. This applies to all JavaScript evaluation methods.
 
-See [docs/caching](./docs/caching.md) for more details.
+See [docs/caching](./caching.md) for more details.
 
 ### Clearing of Global State
 Suppose you detect that some library used in server-rendering is leaking state between calls to server render. In that case, you can set the `config.ssr_pre_hook_js` in your `config/initializers/react_on_rails_pro.rb` to run some JavaScript to clear the globally leaked state at the beginning of each call to server render.
@@ -44,7 +44,7 @@ See the [Node Renderer Docs](./node-renderer/basics.md).
 Don't wait for the same webpack bundles to be built over and over. See the [bundle-caching docs](./bundle-caching.md).
 
 ## Other Utility Methods
-See the [Ruby API](docs/ruby-api.md).
+See the [Ruby API](./ruby-api.md).
 
 ## References
 
