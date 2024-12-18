@@ -124,8 +124,9 @@ module ReactOnRails
       end
 
       before :each do
-        ReactOnRails::PackerUtils.remove_instance_variable(:@using_shakapacker_const) if ReactOnRails::PackerUtils.instance_variable_defined?(:@using_shakapacker_const)
-        ReactOnRails::PackerUtils.remove_instance_variable(:@using_webpacker_const) if ReactOnRails::PackerUtils.instance_variable_defined?(:@using_webpacker_const)
+        ReactOnRails::PackerUtils.instance_variables.each do |instance_variable|
+          ReactOnRails::PackerUtils.remove_instance_variable(instance_variable)
+        end
       end
 
       describe ".bundle_js_file_path" do
