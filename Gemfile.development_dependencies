@@ -52,4 +52,5 @@ group :test do
   gem "rspec-retry"
   gem "selenium-webdriver", "4.9.0"
   gem "webdrivers", "5.3.0"
+  gem "webpacker", "6.0.0.rc.6"
 end
