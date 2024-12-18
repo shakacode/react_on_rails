@@ -255,8 +255,7 @@ ctx.ReactOnRails = {
   },
 
   /**
-   * Used by server rendering by Rails
-   * @param options
+   * Used by rsc payload generation by Rails
    */
   serverRenderRSCReactComponent() {
     throw new Error('serverRenderRSCReactComponent is supported in RSC bundle only.');
