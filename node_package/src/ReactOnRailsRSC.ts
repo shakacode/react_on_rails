@@ -1,4 +1,3 @@
-import type { ReactElement } from 'react';
 // @ts-expect-error will define this module types later
 import { renderToReadableStream } from 'react-server-dom-webpack/server.edge';
 import { PassThrough } from 'stream';
@@ -29,7 +28,7 @@ const stringToStream = (str: string) => {
 const getBundleConfig = () => {
   const bundleConfig = JSON.parse(fs.readFileSync('./public/webpack/development/react-client-manifest.json', 'utf8'));
   // remove file:// from keys
-  const newBundleConfig: { [key: string]: any } = {};
+  const newBundleConfig: { [key: string]: unknown } = {};
   for (const [key, value] of Object.entries(bundleConfig)) {
     newBundleConfig[key.replace('file://', '')] = value;
   }
