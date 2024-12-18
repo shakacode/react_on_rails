@@ -22,6 +22,12 @@ module ReactOnRails
     end
 
     shared_context "with shakapacker enabled" do
+      before do
+        # Mock that shakapacker is not installed, so webpacker will be used instead
+        allow(ReactOnRails::Utils).to receive(:gem_available?).with("shakapacker").and_return(true)
+        allow(ReactOnRails::Utils).to receive(:gem_available?).with("webpacker").and_return(false)
+      end
+
       include_context "with packer enabled"
 
       # We don't need to mock anything here because the shakapacker gem is already installed and will be used by default
