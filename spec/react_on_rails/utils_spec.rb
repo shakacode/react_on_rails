@@ -81,6 +81,20 @@ module ReactOnRails
         )::Manifest::MissingEntryError)
     end
 
+    def random_bundle_name
+      "webpack-bundle-#{SecureRandom.hex(4)}.js"
+    end
+
+    # If bundle names are not provided, random unique names will be used for each bundle.
+    # This ensures that if server_bundle and rsc_bundle are accidentally swapped in the code,
+    # the tests will fail since each bundle has a distinct random name that won't match if used incorrectly.
+    def mock_bundle_configs(server_bundle_name: random_bundle_name, rsc_bundle_name: random_bundle_name)
+      allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+        .and_return(server_bundle_name)
+      allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
+        .and_return(rsc_bundle_name)
+    end
+
     def mock_dev_server_running
       allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("dev_server.running?")
         .and_return(true)
@@ -123,8 +137,7 @@ module ReactOnRails
             before do
               mock_bundle_in_manifest("webpack-bundle.js", "/webpack/dev/webpack-bundle-0123456789abcdef.js")
 
-              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                .and_return("server-bundle.js")
+              mock_bundle_configs(server_bundle_name: "server-bundle.js")
             end
 
             it { is_expected.to eq("#{packer_public_output_path}/webpack-bundle-0123456789abcdef.js") }
@@ -183,8 +196,7 @@ module ReactOnRails
           context "with server file not in manifest", packer_type.to_sym do
             it "returns the unhashed server path" do
               server_bundle_name = "server-bundle.js"
-              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                .and_return(server_bundle_name)
+              mock_bundle_configs(server_bundle_name: server_bundle_name)
               mock_missing_manifest_entry(server_bundle_name)
 
               path = described_class.server_bundle_js_file_path
@@ -196,8 +208,7 @@ module ReactOnRails
           context "with server file in the manifest, used for client", packer_type.to_sym do
             it "returns the correct path hashed server path" do
               Packer = ReactOnRails::PackerUtils.packer # rubocop:disable Lint/ConstantDefinitionInBlock, RSpec/LeakyConstantDeclaration
-              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                .and_return("webpack-bundle.js")
+              mock_bundle_configs(server_bundle_name: "webpack-bundle.js")
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(true)
               mock_bundle_in_manifest("webpack-bundle.js", "webpack/development/webpack-bundle-123456.js")
@@ -211,8 +222,7 @@ module ReactOnRails
 
             context "with webpack-dev-server running, and same file used for server and client" do
               it "returns the correct path hashed server path" do
-                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                  .and_return("webpack-bundle.js")
+                mock_bundle_configs(server_bundle_name: "webpack-bundle.js")
                 allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                   .and_return(true)
                 mock_dev_server_running
@@ -228,8 +238,7 @@ module ReactOnRails
           context "with dev-server running, and server file in the manifest, and separate client/server files",
                   packer_type.to_sym do
             it "returns the correct path hashed server path" do
-              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                .and_return("server-bundle.js")
+              mock_bundle_configs(server_bundle_name: "server-bundle.js")
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(false)
               mock_bundle_in_manifest("server-bundle.js", "webpack/development/server-bundle-123456.js")
@@ -248,29 +257,23 @@ module ReactOnRails
 
           context "with server file not in manifest", packer_type.to_sym do
             it "returns the unhashed server path" do
-              server_bundle_name = "rsc-server-bundle.js"
-              allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
-                .and_return(server_bundle_name)
-              # TODO: fix after adding rsc_bundle_js_file config
-              mock_missing_manifest_entry("rsc-bundle.js")
+              server_bundle_name = "rsc-bundle.js"
+              mock_bundle_configs(rsc_bundle_name: server_bundle_name)
+              mock_missing_manifest_entry(server_bundle_name)
 
               path = described_class.rsc_bundle_js_file_path
 
-              expect(path).to end_with("public/webpack/development/rsc-bundle.js")
+              expect(path).to end_with("public/webpack/development/#{server_bundle_name}")
             end
           end
 
           context "with server file in the manifest, used for client", packer_type.to_sym do
             it "returns the correct path hashed server path" do
               Packer = ReactOnRails::PackerUtils.packer # rubocop:disable Lint/ConstantDefinitionInBlock, RSpec/LeakyConstantDeclaration
-              allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
-                .and_return("webpack-bundle.js")
-              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                .and_return("webpack-server-bundle.js")
+              mock_bundle_configs(rsc_bundle_name: "webpack-bundle.js")
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(true)
-              # TODO: fix after adding rsc_bundle_js_file config
-              mock_bundle_in_manifest("rsc-bundle.js", "webpack/development/webpack-bundle-123456.js")
+              mock_bundle_in_manifest("webpack-bundle.js", "webpack/development/webpack-bundle-123456.js")
               allow(Packer).to receive_message_chain("dev_server.running?")
                 .and_return(false)
 
@@ -281,15 +284,11 @@ module ReactOnRails
 
             context "with webpack-dev-server running, and same file used for server and client" do
               it "returns the correct path hashed server path" do
-                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                  .and_return("webpack-bundle.js")
-                  allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                    .and_return("webpack-server-bundle.js")
+                mock_bundle_configs(rsc_bundle_name: "webpack-bundle.js")
                 allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                   .and_return(true)
                 mock_dev_server_running
-                # TODO: fix after adding rsc_bundle_js_file config
-                mock_bundle_in_manifest("rsc-bundle.js", "/webpack/development/webpack-bundle-123456.js")
+                mock_bundle_in_manifest("webpack-bundle.js", "/webpack/development/webpack-bundle-123456.js")
 
                 path = described_class.rsc_bundle_js_file_path
 
@@ -298,25 +297,20 @@ module ReactOnRails
             end
           end
 
-          # TODO: fix after adding rsc_bundle_js_file config
-          # context "with dev-server running, and server file in the manifest, and separate client/server files",
-          #         packer_type.to_sym do
-          #   it "returns the correct path hashed server path" do
-          #     # TODO: fix after adding rsc_bundle_js_file config
-          #     allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
-          #       .and_return("rsc-server-bundle.js")
-          #       allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-          #         .and_return("server-bundle.js")
-          #     allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
-          #       .and_return(false)
-          #     mock_bundle_in_manifest("rsc-bundle.js", "webpack/development/server-bundle-123456.js")
-          #     mock_dev_server_running
+          context "with dev-server running, and server file in the manifest, and separate client/server files",
+                  packer_type.to_sym do
+            it "returns the correct path hashed server path" do
+              mock_bundle_configs(rsc_bundle_name: "rsc-bundle.js")
+              allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
+                .and_return(false)
+              mock_bundle_in_manifest("rsc-bundle.js", "webpack/development/server-bundle-123456.js")
+              mock_dev_server_running
 
-          #     path = described_class.rsc_bundle_js_file_path
+              path = described_class.rsc_bundle_js_file_path
 
-          #     expect(path).to end_with("/public/webpack/development/server-bundle-123456.js")
-          #   end
-          # end
+              expect(path).to end_with("/public/webpack/development/server-bundle-123456.js")
+            end
+          end
         end
       end
 

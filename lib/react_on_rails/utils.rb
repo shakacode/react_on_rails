@@ -116,8 +116,7 @@ module ReactOnRails
     def self.rsc_bundle_js_file_path
       return @rsc_bundle_path if @rsc_bundle_path && !Rails.env.development?
 
-      # TODO: make it configurable
-      bundle_name = "rsc-bundle.js"
+      bundle_name = ReactOnRails.configuration.rsc_bundle_js_file
       @rsc_bundle_path = bundle_js_file_path(bundle_name)
     end
 
