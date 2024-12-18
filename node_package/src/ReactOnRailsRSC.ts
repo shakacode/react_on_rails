@@ -9,15 +9,6 @@ import createReactOutput from './createReactOutput';
 import { isPromise, isServerRenderHash } from './isServerRenderResult';
 import ReactOnRails from './ReactOnRails';
 
-(async () => {
-  try {
-    // @ts-expect-error AsyncLocalStorage is not in the node types
-    globalThis.AsyncLocalStorage = (await import('node:async_hooks')).AsyncLocalStorage;
-  } catch (e) {
-    console.log('AsyncLocalStorage not found');
-  }
-})();
-
 const stringToStream = (str: string) => {
   const stream = new PassThrough();
   stream.push(str);
