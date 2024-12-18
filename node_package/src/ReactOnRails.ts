@@ -257,8 +257,7 @@ ctx.ReactOnRails = {
   },
 
   /**
-   * Used by server rendering by Rails
-   * @param options
+   * Used by rsc payload generation by Rails
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   serverRenderRSCReactComponent(options: RenderParams): PassThrough {
