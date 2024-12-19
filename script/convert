@@ -14,7 +14,6 @@ new_config = File.expand_path("../spec/dummy/config/webpacker.yml", __dir__)
 File.rename(old_config, new_config)
 
 gsub_file_content("../Gemfile.development_dependencies", 'gem "shakapacker", "8.0.0"', 'gem "shakapacker", "6.6.0"')
-gsub_file_content("../Gemfile.development_dependencies", 'gem "webpacker", "6.0.0.rc.6"', "")
 
 # The below packages don't work on the oldest supported Node version and aren't needed there anyway
 gsub_file_content("../package.json", /"knip": "[^"]*",/, "")
