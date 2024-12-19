@@ -10,12 +10,12 @@ module ReactOnRails
     # If rspec tests are run locally, we want to test both packers.
     # If rspec tests are run in CI, we want to test the packer specified in the CI_PACKER_VERSION environment variable.
     # Check script/convert and .github/workflows/rspec-package-specs.yml for more details.
-    PACKERS_TO_TEST = if ENV["CI_PACKER_VERSION"] == "old"
+    packers_to_test = if ENV["CI_PACKER_VERSION"] == "old"
                         ["webpacker"]
                       elsif ENV["CI_PACKER_VERSION"] == "new"
                         ["shakapacker"]
                       else
-                        ["shakapacker", "webpacker"]
+                        %w[shakapacker webpacker]
                       end
 
     shared_context "with packer enabled" do
@@ -36,8 +36,8 @@ module ReactOnRails
     shared_context "with shakapacker enabled" do
       before do
         # Mock that shakapacker is not installed, so webpacker will be used instead
-        allow(ReactOnRails::Utils).to receive(:gem_available?).with("shakapacker").and_return(true)
-        allow(ReactOnRails::Utils).to receive(:gem_available?).with("webpacker").and_return(false)
+        allow(described_class).to receive(:gem_available?).with("shakapacker").and_return(true)
+        allow(described_class).to receive(:gem_available?).with("webpacker").and_return(false)
       end
 
       include_context "with packer enabled"
@@ -54,8 +54,8 @@ module ReactOnRails
     shared_context "with webpacker enabled" do
       before do
         # Mock that shakapacker is not installed, so webpacker will be used instead
-        allow(ReactOnRails::Utils).to receive(:gem_available?).with("shakapacker").and_return(false)
-        allow(ReactOnRails::Utils).to receive(:gem_available?).with("webpacker").and_return(true)
+        allow(described_class).to receive(:gem_available?).with("shakapacker").and_return(false)
+        allow(described_class).to receive(:gem_available?).with("webpacker").and_return(true)
       end
 
       include_context "with packer enabled"
@@ -72,8 +72,8 @@ module ReactOnRails
       before do
         allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
           .and_return("public/webpack/dev")
-        allow(ReactOnRails::Utils).to receive(:gem_available?).with("shakapacker").and_return(false)
-        allow(ReactOnRails::Utils).to receive(:gem_available?).with("webpacker").and_return(false)
+        allow(described_class).to receive(:gem_available?).with("shakapacker").and_return(false)
+        allow(described_class).to receive(:gem_available?).with("webpacker").and_return(false)
       end
 
       it "does not use packer" do
@@ -128,6 +128,9 @@ module ReactOnRails
         allow(Rails).to receive(:root).and_return(File.expand_path("."))
         described_class.instance_variable_set(:@server_bundle_path, nil)
         described_class.instance_variable_set(:@rsc_bundle_path, nil)
+        ReactOnRails::PackerUtils.instance_variables.each do |instance_variable|
+          ReactOnRails::PackerUtils.remove_instance_variable(instance_variable)
+        end
       end
 
       after do
@@ -135,18 +138,12 @@ module ReactOnRails
         described_class.instance_variable_set(:@rsc_bundle_path, nil)
       end
 
-      before :each do
-        ReactOnRails::PackerUtils.instance_variables.each do |instance_variable|
-          ReactOnRails::PackerUtils.remove_instance_variable(instance_variable)
-        end
-      end
-
       describe ".bundle_js_file_path" do
         subject do
           described_class.bundle_js_file_path("webpack-bundle.js")
         end
 
-        PACKERS_TO_TEST.each do |packer_type|
+        packers_to_test.each do |packer_type|
           context "with #{packer_type} enabled", packer_type.to_sym do
             include_context "with #{packer_type} enabled"
 
@@ -210,9 +207,10 @@ module ReactOnRails
         end
       end
 
-      PACKERS_TO_TEST.each do |packer_type|
+      packers_to_test.each do |packer_type|
         describe ".server_bundle_js_file_path with #{packer_type} enabled" do
           let(:packer_public_output_path) { Pathname.new("public/webpack/development") }
+
           include_context "with #{packer_type} enabled"
 
           context "with server file not in manifest", packer_type.to_sym do
@@ -275,6 +273,7 @@ module ReactOnRails
 
         describe ".rsc_bundle_js_file_path with #{packer_type} enabled" do
           let(:packer_public_output_path) { Pathname.new("public/webpack/development") }
+
           include_context "with #{packer_type} enabled"
 
           context "with server file not in manifest", packer_type.to_sym do
