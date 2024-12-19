@@ -14,6 +14,19 @@ scripts:
       description: Run eslint in debug mode.
       script: DEBUG=eslint:cli-engine nps eslint
 
+  build:
+    prepack:
+      description: Build the project in the prepack script.
+      # 1. If the project is already built, do nothing;
+      # 2. Build the project but ignore TypeScript errors from missing devDependencies;
+      # 3. Check if the project is built now;
+      # 4. If it failed, print an error message (still follow https://docs.npmjs.com/cli/v8/using-npm/scripts#best-practices).
+      script: >
+        [ -f node_package/lib/ReactOnRails.js ] ||
+          yarn run build &> /dev/null ||
+          [ -f node_package/lib/ReactOnRails.js ] ||
+          { echo 'Building react-on-rails seems to have failed!'; }
+
   format:
     default:
       description: Format files using prettier.

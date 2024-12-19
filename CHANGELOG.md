@@ -20,8 +20,10 @@ Changes since the last non-beta release.
 
 #### Fixed
 
+- Incorrect type and confusing name for `ReactOnRails.registerStore`, use `registerStoreGenerators` instead. [PR 1651](https://github.com/shakacode/react_on_rails/pull/1651) by [alexeyr-ci](https://github.com/alexeyr-ci).
 - Changed the ReactOnRails' version checker to use `ReactOnRails.configuration.node_modules_location` to determine the location of the package.json that the `react-on-rails` dependency is expected to be set by.
 - Also, all errors that would be raised by the version checking have been converted to `Rails.Logger` warnings to avoid any breaking changes. [PR 1657](https://github.com/shakacode/react_on_rails/pull/1657) by [judahmeek](https://github.com/judahmeek).
+- Enable use as a `git:` dependency. [PR 1664](https://github.com/shakacode/react_on_rails/pull/1664) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
 #### Added
 - Added streaming server rendering support:
@@ -34,9 +36,6 @@ Changes since the last non-beta release.
 
 #### Changed
 - Console replay script generation now awaits the render request promise before generating, allowing it to capture console logs from asynchronous operations. This requires using a version of the Node renderer that supports replaying async console logs. [PR #1649](https://github.com/shakacode/react_on_rails/pull/1649) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-#### Fixed
-- Incorrect type and confusing name for `ReactOnRails.registerStore`, use `registerStoreGenerators` instead. [PR 1651](https://github.com/shakacode/react_on_rails/pull/1651) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
 ### [14.0.5] - 2024-08-20
 #### Fixed
