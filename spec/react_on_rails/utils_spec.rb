@@ -6,6 +6,18 @@ require ReactOnRails::PackerUtils.packer_type
 # rubocop:disable Metrics/ModuleLength, Metrics/BlockLength
 module ReactOnRails
   RSpec.describe Utils do
+    # Github Actions already run rspec tests two times, once with shakapacker and once with webpacker.
+    # If rspec tests are run locally, we want to test both packers.
+    # If rspec tests are run in CI, we want to test the packer specified in the CI_PACKER_VERSION environment variable.
+    # Check script/convert and .github/workflows/rspec-package-specs.yml for more details.
+    PACKERS_TO_TEST = if ENV["CI_PACKER_VERSION"] == "old"
+                        ["webpacker"]
+                      elsif ENV["CI_PACKER_VERSION"] == "new"
+                        ["shakapacker"]
+                      else
+                        ["shakapacker", "webpacker"]
+                      end
+
     shared_context "with packer enabled" do
       before do
         allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
@@ -196,7 +208,7 @@ module ReactOnRails
         end
       end
 
-      ["shakapacker", "webpacker"].each do |packer_type|
+      PACKERS_TO_TEST.each do |packer_type|
         describe ".server_bundle_js_file_path with #{packer_type} enabled" do
           let(:packer_public_output_path) { Pathname.new("public/webpack/development") }
           include_context "with #{packer_type} enabled"
