@@ -146,29 +146,31 @@ module ReactOnRails
           described_class.bundle_js_file_path("webpack-bundle.js")
         end
 
-        context "with Shakapacker enabled", :shakapacker do
-          include_context "with shakapacker enabled"
+        PACKERS_TO_TEST.each do |packer_type|
+          context "with #{packer_type} enabled", packer_type.to_sym do
+            include_context "with #{packer_type} enabled"
 
-          let(:packer_public_output_path) do
-            File.expand_path(File.join(Rails.root, "public/webpack/dev"))
-          end
-
-          context "when file in manifest", :shakapacker do
-            before do
-              mock_bundle_in_manifest("webpack-bundle.js", "/webpack/dev/webpack-bundle-0123456789abcdef.js")
-
-              mock_bundle_configs(server_bundle_name: "server-bundle.js")
+            let(:packer_public_output_path) do
+              File.expand_path(File.join(Rails.root, "public/webpack/dev"))
             end
 
-            it { is_expected.to eq("#{packer_public_output_path}/webpack-bundle-0123456789abcdef.js") }
-          end
+            context "when file in manifest", :shakapacker do
+              before do
+                mock_bundle_in_manifest("webpack-bundle.js", "/webpack/dev/webpack-bundle-0123456789abcdef.js")
 
-          context "with manifest.json" do
-            subject do
-              described_class.bundle_js_file_path("manifest.json")
+                mock_bundle_configs(server_bundle_name: "server-bundle.js")
+              end
+
+              it { is_expected.to eq("#{packer_public_output_path}/webpack-bundle-0123456789abcdef.js") }
             end
 
-            it { is_expected.to eq("#{packer_public_output_path}/manifest.json") }
+            context "with manifest.json" do
+              subject do
+                described_class.bundle_js_file_path("manifest.json")
+              end
+
+              it { is_expected.to eq("#{packer_public_output_path}/manifest.json") }
+            end
           end
         end
 
