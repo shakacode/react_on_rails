@@ -611,7 +611,7 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
     end
 
     # Returns object with values that are NOT html_safe!
-    def server_rendered_react_component(render_options)
+    def server_rendered_react_component(render_options) # rubocop:disable Metrics/CyclomaticComplexity
       return { "html" => "", "consoleReplayScript" => "" } unless render_options.prerender
 
       react_component_name = render_options.react_component_name
