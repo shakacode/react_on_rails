@@ -92,7 +92,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
 
       context "when package json uses a relative path with dots" do
         let(:node_package_version) do
-          double_package_version(raw: "../../..", major_minor_patch: "", relative_path: true)
+          double_package_version(raw: "../../..", major_minor_patch: "", local_path_or_url: true)
         end
 
         before { stub_gem_version("2.0.0.beta.1") }
@@ -116,12 +116,12 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
     end
 
     def double_package_version(raw: nil, semver_wildcard: false,
-                               major_minor_patch: nil, relative_path: false)
+                               major_minor_patch: nil, local_path_or_url: false)
       instance_double(VersionChecker::NodePackageVersion,
                       raw: raw,
                       semver_wildcard?: semver_wildcard,
                       major_minor_patch: major_minor_patch,
-                      relative_path?: relative_path)
+                      local_path_or_url?: local_path_or_url)
     end
 
     def check_version_and_raise(node_package_version)
@@ -168,6 +168,12 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
 
           specify { expect(node_package_version.semver_wildcard?).to be true }
         end
+
+        context "when package json lists a version range of '>=1.2.3 <2.0.0'" do
+          let(:package_json) { File.expand_path("fixtures/semver_range_package.json", __dir__) }
+
+          specify { expect(node_package_version.semver_wildcard?).to be true }
+        end
       end
 
       context "when package json lists a version of '0.0.2'" do
@@ -177,8 +183,8 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           specify { expect(node_package_version.raw).to eq("0.0.2") }
         end
 
-        describe "#relative_path?" do
-          specify { expect(node_package_version.relative_path?).to be false }
+        describe "#local_path_or_url?" do
+          specify { expect(node_package_version.local_path_or_url?).to be false }
         end
 
         describe "#major" do
@@ -193,8 +199,8 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           specify { expect(node_package_version.raw).to eq("^14.0.0.beta-2") }
         end
 
-        describe "#relative_path?" do
-          specify { expect(node_package_version.relative_path?).to be false }
+        describe "#local_path_or_url?" do
+          specify { expect(node_package_version.local_path_or_url?).to be false }
         end
 
         describe "#major_minor_patch" do
@@ -209,8 +215,8 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           specify { expect(node_package_version.raw).to eq("../../..") }
         end
 
-        describe "#relative_path?" do
-          specify { expect(node_package_version.relative_path?).to be true }
+        describe "#local_path_or_url?" do
+          specify { expect(node_package_version.local_path_or_url?).to be true }
         end
 
         describe "#major" do
@@ -225,8 +231,8 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           specify { expect(node_package_version.raw).to eq("file:///Users/justin/shakacode/react_on_rails") }
         end
 
-        describe "#relative_path?" do
-          specify { expect(node_package_version.relative_path?).to be true }
+        describe "#local_path_or_url?" do
+          specify { expect(node_package_version.local_path_or_url?).to be true }
         end
 
         describe "#major" do
@@ -241,8 +247,24 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           specify { expect(node_package_version.raw).to eq("file:.yalc/react-on-rails") }
         end
 
-        describe "#relative_path?" do
-          specify { expect(node_package_version.relative_path?).to be true }
+        describe "#local_path_or_url?" do
+          specify { expect(node_package_version.local_path_or_url?).to be true }
+        end
+
+        describe "#major" do
+          specify { expect(node_package_version.major_minor_patch).to be_nil }
+        end
+      end
+
+      context "with node version of `git:` URL" do
+        let(:package_json) { File.expand_path("fixtures/git_package.json", __dir__) }
+
+        describe "#raw" do
+          specify { expect(node_package_version.raw).to eq("git://github.com/shakacode/react-on-rails.git") }
+        end
+
+        describe "#local_path_or_url?" do
+          specify { expect(node_package_version.local_path_or_url?).to be true }
         end
 
         describe "#major" do

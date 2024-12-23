@@ -20,7 +20,7 @@ module ReactOnRails
     # unless the user really knows what they're doing. So we will give a
     # warning if they do not.
     def log_if_gem_and_node_package_versions_differ
-      return if node_package_version.raw.nil? || node_package_version.relative_path?
+      return if node_package_version.raw.nil? || node_package_version.local_path_or_url?
       return log_node_semver_version_warning if node_package_version.semver_wildcard?
 
       node_major_minor_patch = node_package_version.major_minor_patch
@@ -81,33 +81,41 @@ module ReactOnRails
       end
 
       def raw
+        return @raw if defined?(@raw)
+
         if File.exist?(package_json)
           parsed_package_contents = JSON.parse(package_json_contents)
           if parsed_package_contents.key?("dependencies") &&
              parsed_package_contents["dependencies"].key?("react-on-rails")
-            return parsed_package_contents["dependencies"]["react-on-rails"]
+            return @raw = parsed_package_contents["dependencies"]["react-on-rails"]
           end
         end
         msg = "No 'react-on-rails' entry in the dependencies of #{NodePackageVersion.package_json_path}, " \
               "which is the expected location according to ReactOnRails.configuration.node_modules_location"
         Rails.logger.warn(msg)
-        nil
+        @raw = nil
       end
 
       def semver_wildcard?
-        raw.match(/[~^]/).present?
+        # See https://docs.npmjs.com/cli/v10/configuring-npm/package-json#dependencies
+        # We want to disallow all expressions other than exact versions
+        # and the ones allowed by local_path_or_url?
+        raw.blank? || raw.match(/[~^><|*-]/).present?
       end
 
-      def relative_path?
-        raw.match(/(\.\.|\Afile:)/).present?
+      def local_path_or_url?
+        # See https://docs.npmjs.com/cli/v10/configuring-npm/package-json#dependencies
+        # All path and protocol "version ranges" include / somewhere,
+        # but we want to make an exception for npm:@scope/pkg@version.
+        !raw.nil? && raw.include?("/") && !raw.start_with?("npm:")
       end
 
       def major_minor_patch
-        return if relative_path?
+        return if local_path_or_url?
 
         match = raw.match(MAJOR_MINOR_PATCH_VERSION_REGEX)
         unless match
-          raise ReactOnRails::Error, "Cannot parse version number '#{raw}' (wildcard versions are not supported)"
+          raise ReactOnRails::Error, "Cannot parse version number '#{raw}' (only exact versions are supported)"
         end
 
         [match[1], match[2], match[3]]
