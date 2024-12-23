@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import * as ClientStartup from './clientStartup';
+import { renderOrHydrateComponent, hydrateStore } from './ClientSideRenderer';
 import handleError from './handleError';
 import ComponentRegistry from './ComponentRegistry';
 import StoreRegistry from './StoreRegistry';
@@ -162,16 +163,12 @@ ctx.ReactOnRails = {
     ClientStartup.reactOnRailsPageLoaded();
   },
 
-  renderOrHydrateLoadedComponents(): void {
-    ClientStartup.renderOrHydrateLoadedComponents();
-  },
-
-  hydratePendingStores(): void {
-    ClientStartup.hydratePendingStores();
-  },
-
   reactOnRailsComponentLoaded(domId: string): void {
-    ClientStartup.reactOnRailsComponentLoaded(domId);
+    renderOrHydrateComponent(domId);
+  },
+
+  reactOnRailsStoreLoaded(storeName: string): void {
+    hydrateStore(storeName);
   },
 
   /**
