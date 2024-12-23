@@ -108,6 +108,8 @@
   ],
   "scripts": {
     "test": "nps test",
+    "prepack": "nps build.prepack",
+    "prepare": "nps build.prepack",
     "prepublishOnly": "nps build",
     "start": "nps",
     "developing": "nps node-renderer.debug",

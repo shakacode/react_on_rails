@@ -14,6 +14,8 @@ You can find the **package** version numbers from this repo's tags and below in 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+### Fixed
+- Enable use as a `git:` dependency. [PR 490](https://github.com/shakacode/react_on_rails_pro/pull/490) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
 ## [4.0.0.rc.9] - 2024-12-05
 
