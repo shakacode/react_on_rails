@@ -27,8 +27,23 @@ scripts:
     script: concurrently --prefix "[{name}]" --names "ESLINT, RUBOCOP, PRETTIER" -c "blue,yellow,magenta,orange" "nps eslint" "bundle exec rubocop" "nps format.listDifferent"
 
   build:
-    description: Build the project
-    script: echo "building the project" && rm -rf packages/node-renderer/dist && tsc --project packages/node-renderer/src
+    default:
+      description: Build the project
+      script: echo "building the project" && rm -rf packages/node-renderer/dist && tsc --project packages/node-renderer/src
+    prepack:
+      description: Build the project in the prepack/prepare scripts
+      # This is necessary when used as a Git dependency since we don't have the dist directory in the repo.
+      # Depending on the package manager, `prepack`, `prepare`, or both may be run.
+      # They may also be run when publishing or in other cases, so we want to cover all of them.
+      # 1. If the project is already built, do nothing;
+      # 2. Build the project but ignore TypeScript errors from missing devDependencies;
+      # 3. Check if the project is built now;
+      # 4. If it failed, print an error message (still follow https://docs.npmjs.com/cli/v8/using-npm/scripts#best-practices).
+      script: >
+        [ -f packages/node-renderer/dist/ReactOnRailsProNodeRenderer.js ] ||
+          (nps build >/dev/null 2>&1 || true) &&
+          [ -f packages/node-renderer/dist/ReactOnRailsProNodeRenderer.js ] ||
+          { echo 'Building @shakacode-tools/react-on-rails-pro-node-renderer seems to have failed!'; }
 
   clean:
     description: Clean the project
