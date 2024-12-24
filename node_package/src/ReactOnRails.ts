@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import type { Readable, PassThrough } from 'stream';
+import type { Readable } from 'stream';
 
 import * as ClientStartup from './clientStartup';
 import { renderOrHydrateComponent, hydrateStore } from './ClientSideRenderer';
@@ -301,8 +301,7 @@ ctx.ReactOnRails = {
   /**
    * Used by rsc payload generation by Rails
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  serverRenderRSCReactComponent(options: RenderParams): PassThrough {
+  serverRenderRSCReactComponent(): Readable {
     throw new Error('serverRenderRSCReactComponent is supported in RSC bundle only.');
   },
 
