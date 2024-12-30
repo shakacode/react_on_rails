@@ -115,7 +115,8 @@ module ReactOnRails
         translations = {}
         defaults = {}
         locale_files.each do |f|
-          translation = YAML.safe_load(File.open(f))
+          safe_load_options = ReactOnRails.configuration.i18n_yml_safe_load_options || {}
+          translation = YAML.safe_load(File.open(f), **safe_load_options)
           key = translation.keys[0]
           val = flatten(translation[key])
           translations = translations.deep_merge(key => val)

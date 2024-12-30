@@ -96,5 +96,25 @@ module ReactOnRails
 
       it_behaves_like "locale to js"
     end
+
+    describe "with symbols in yaml" do
+      before do
+        ReactOnRails.configure do |config|
+          config.i18n_yml_dir = File.expand_path("fixtures/i18n/locales_symbols", __dir__)
+          config.i18n_yml_safe_load_options = { permitted_classes: [Symbol] }
+        end
+      end
+
+      after do
+        ReactOnRails.configure do |config|
+          config.i18n_yml_dir = nil
+          config.i18n_yml_safe_load_options = nil
+        end
+      end
+
+      it "handles locale loading" do
+        expect { described_class.new }.not_to raise_error
+      end
+    end
   end
 end
