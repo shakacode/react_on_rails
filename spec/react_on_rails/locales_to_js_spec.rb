@@ -124,10 +124,10 @@ module ReactOnRails
       end
 
       it "raises error with filename when not permitted" do
-        expect { described_class.new }.to raise_error(
-          ReactOnRails::Error,
-          "Error parsing #{locale_dir}/de.yml: Tried to load unspecified class: Symbol"
-        )
+        expect { described_class.new }.to raise_error(ReactOnRails::Error, <<~MSG)
+          Error parsing #{locale_dir}/de.yml: Tried to load unspecified class: Symbol
+          Consider fixing unsafe YAML or permitting with config.i18n_yml_safe_load_options
+        MSG
       end
     end
   end
