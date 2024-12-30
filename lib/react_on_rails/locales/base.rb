@@ -121,6 +121,8 @@ module ReactOnRails
           val = flatten(translation[key])
           translations = translations.deep_merge(key => val)
           defaults = defaults.deep_merge(flatten_defaults(val)) if key == default_locale
+        rescue Psych::Exception => e
+          raise ReactOnRails::Error, "Error parsing #{f}: #{e.message}"
         end
         [translations.to_json, defaults.to_json]
       end

@@ -98,22 +98,36 @@ module ReactOnRails
     end
 
     describe "with symbols in yaml" do
+      let(:locale_dir) { File.expand_path("fixtures/i18n/locales_symbols", __dir__) }
+
       before do
         ReactOnRails.configure do |config|
-          config.i18n_yml_dir = File.expand_path("fixtures/i18n/locales_symbols", __dir__)
-          config.i18n_yml_safe_load_options = { permitted_classes: [Symbol] }
+          config.i18n_dir = i18n_dir
+          config.i18n_yml_dir = locale_dir
         end
       end
 
       after do
         ReactOnRails.configure do |config|
+          config.i18n_dir = nil
           config.i18n_yml_dir = nil
           config.i18n_yml_safe_load_options = nil
         end
       end
 
-      it "handles locale loading" do
+      it "handles unsafe locale loading" do
+        ReactOnRails.configure do |config|
+          config.i18n_yml_safe_load_options = { permitted_classes: [Symbol] }
+        end
+
         expect { described_class.new }.not_to raise_error
+      end
+
+      it "raises error with filename when not permitted" do
+        expect { described_class.new }.to raise_error(
+          ReactOnRails::Error,
+          "Error parsing #{locale_dir}/de.yml: Tried to load unspecified class: Symbol"
+        )
       end
     end
   end
