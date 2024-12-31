@@ -52,6 +52,7 @@ module ReactOnRails
                   :generated_assets_dirs, :generated_assets_dir, :components_subdirectory,
                   :webpack_generated_files, :rendering_extension, :build_test_command,
                   :build_production_command, :i18n_dir, :i18n_yml_dir, :i18n_output_format,
+                  :i18n_yml_safe_load_options,
                   :server_render_method, :random_dom_id, :auto_load_bundle,
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
@@ -69,7 +70,7 @@ module ReactOnRails
                    rendering_extension: nil, build_test_command: nil,
                    build_production_command: nil, defer_generated_component_packs: nil,
                    same_bundle_for_client_and_server: nil,
-                   i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil,
+                   i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil, i18n_yml_safe_load_options: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
                    components_subdirectory: nil, auto_load_bundle: nil, force_load: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
@@ -80,6 +81,7 @@ module ReactOnRails
       self.i18n_dir = i18n_dir
       self.i18n_yml_dir = i18n_yml_dir
       self.i18n_output_format = i18n_output_format
+      self.i18n_yml_safe_load_options = i18n_yml_safe_load_options
 
       self.random_dom_id = random_dom_id
       self.prerender = prerender

@@ -33,6 +33,7 @@ Changes since the last non-beta release.
     - Enables progressive page loading and improved performance for server-rendered React components
   - Added support for replaying console logs that occur during server rendering of streamed React components. This enables debugging of server-side rendering issues by capturing and displaying console output on the client and on the server output. [PR #1647](https://github.com/shakacode/react_on_rails/pull/1647) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
   - Added support for handling errors happening during server rendering of streamed React components. It handles errors that happen during the initial render and errors that happen inside suspense boundaries. [PR #1648](https://github.com/shakacode/react_on_rails/pull/1648) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+  - Added support for passing options to `YAML.safe_load` when loading locale files with `config.i18n_yml_safe_load_options`. [PR #1668](https://github.com/shakacode/react_on_rails/pull/1668) by [dzirtusss](https://github.com/dzirtusss).
 
 #### Changed
 - Console replay script generation now awaits the render request promise before generating, allowing it to capture console logs from asynchronous operations. This requires using a version of the Node renderer that supports replaying async console logs. [PR #1649](https://github.com/shakacode/react_on_rails/pull/1649) by [AbanoubGhadban](https://github.com/AbanoubGhadban).

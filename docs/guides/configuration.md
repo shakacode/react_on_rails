@@ -213,6 +213,9 @@ ReactOnRails.configure do |config|
   # The default format is json
   config.i18n_output_format = 'json'
 
+  # Possible YAML.safe_load options pass-through for locales
+  # config.i18n_yml_safe_load_options = { permitted_classes: [Symbol] }
+
   ################################################################################
   ################################################################################
   # TEST CONFIGURATION OPTIONS
