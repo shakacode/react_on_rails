@@ -14,7 +14,7 @@ After finishing this tutorial you will get an application that can do the follow
 
 You can find it here:
 * [Source code for this app in PR, using the --redux option](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/17) and [for Heroku](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/18).
-* [Live on Heroku](https://react-on-rails-redux-gen-8-0-0.herokuapp.com/)
+* [Live on Heroku](https://reactrails.com/)
 
 By the time you read this, the latest may have changed. Be sure to check the versions here:
 
