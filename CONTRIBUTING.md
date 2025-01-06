@@ -2,6 +2,9 @@
 
 ## Installation
 
+Install [yalc](https://github.com/wclr/yalc).
+
+
 ```sh
 cd react_on_rails_pro
 bundle && yarn && cd spec/dummy && bundle && yarn
