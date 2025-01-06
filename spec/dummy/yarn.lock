@@ -5685,10 +5685,10 @@ react-lifecycles-compat@^3.0.0, react-lifecycles-compat@^3.0.4:
   resolved "https://registry.yarnpkg.com/react-lifecycles-compat/-/react-lifecycles-compat-3.0.4.tgz#4f1a273afdfc8f3488a8c516bfda78f872352362"
   integrity sha512-fBASbA6LnOU9dOU2eW7aQ8xmYBSXUIWr+UmF9b1efZBazGNO+rcXT/icdKnYm2pTwcRylVUYwW7H1PHfLekVzA==
 
-react-on-rails@15.0.0-alpha.1:
-  version "15.0.0-alpha.1"
-  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-15.0.0-alpha.1.tgz#a470a896b3643cf0b6bf19edbdc496bf7ba63e40"
-  integrity sha512-hqD3dhUbhRCM9LE3ojjNCLlsu//7+/bUb1mKFagpSVJlWyoGMafzOLZPh3CQNOeGqyx2q071sac/KFCfpZbnjw==
+react-on-rails@14.1.0:
+  version "14.1.0"
+  resolved "https://registry.npmjs.org/react-on-rails/-/react-on-rails-14.1.0.tgz#ed83662c6f9511acb06229500af57003d47c1044"
+  integrity sha512-B7Bn6Hpld6Sz7VnsUbfz6g9AkguNfJq+TUfLGkB1O3+GkK6RdAMSWPnnzPTBVEzJL2IyIPEqxj0OVtkeQkL7qQ==
   dependencies:
     "@babel/runtime-corejs3" "^7.12.5"
 
