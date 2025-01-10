@@ -45,37 +45,24 @@ From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/
 
 ## Doc Changes
 
-When making doc changes, we want the change to work on both the gitbook and the regular github site. The issue is that non-doc files will not go to the gitbook site, so doc references to non doc files must use the github URL.
+When making doc changes, we want the change to work on both https://www.shakacode.com/react-on-rails-pro/docs/ and when browsing the GitHub repo. 
+The issue is that the Shakacode site is generated only from files in [`docs`](./docs), so any references from them to non-doc files must use the full GitHub URL.
 
 ### Links to other docs:
 * When making references to doc files, use a relative URL path like:
 `[Installation Overview](docs/basics/installation-overview.md)`
 
 * When making references to source code files, use a full url path like:
-`[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb)`
+`[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails_pro/tree/master/spec/dummy/config/initializers/react_on_rails.rb)`
 
 
 ## To run tests:
-* After updating code via git, to run all **JS** tests for Node package:
-```sh
-cd react_on_rails_pro
-yarn run test
-```
+See [Run NPM JS tests](#run-npm-js-tests) for the JS tests and [RSpec Testing](#rspec-testing) for the Ruby tests.
 
-* To run **RSpec** tests on dummy app, first launch renderer server:
-```sh
-  cd react_on_rails_pro/spec/dummy
-  yarn run node-renderer
-```
-and then run **RSpec** in another console  window/tab:
-```sh
-  cd react_on_rails_pro/spec/dummy
-  rspec
-```
+See [Dev Initial Setup](#dev-initial-setup) below for, well... initial setup.
 
-See Dev Initial Setup, below for, well... initial setup.
 
-# IDE/IDE SETUP
+# IDE/Editor Setup
 It's critical to configure your IDE/editor to ignore certain directories. Otherwise your IDE might slow to a crawl!
 
 * /coverage
@@ -109,9 +96,12 @@ gem "react_on_rails"
 ```
 ================================================================================
 
-Set `config.server_renderer = "NodeRenderer"` in your  `ReactOnRailsPro.configure` block.
+Set `config.server_renderer = "NodeRenderer"` in your  `ReactOnRailsPro.configure` block in the initializer.
 
-Note that you will need to bundle install after making this change, but also that **you will need to restart your Rails application if you make any changes to the gem**.
+After making this change, run `bundle install`.
+
+> [!NOTE]
+> You will need to restart your Rails application if you make any changes to the gem.
 
 ## Testing the Node package for react_on_rails_pro
 In addition to testing the Ruby parts out, you can also test the node package parts of the gem with an external application.
@@ -119,13 +109,17 @@ In addition to testing the Ruby parts out, you can also test the node package pa
 To do this, follow the instructions in the
 [Local Node Package](#local-node-package).
 
-#### Example: Testing NPM changes with the dummy app
+### Example: Testing NPM changes with the dummy app
 
-1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails_pro/blob/more_test_and_docs/packages/node-renderer/src/ReactOnRailsProNodeRenderer.js#L6) in `react_on_rails/packages/node-renderer/src/ReactOnRailsProNodeRenderer.js` to confirm we're getting an update to the node package.
-2. The `preinstall` script of `spec/dummy` sets up `yalc` to use `react-on-rails-pro` for the renderer.
-3. Refresh the browser if the server is already running or start the server using `foreman start -f Procfile.dev` from `react_on_rails/spec/dummy` and navigate to `http://localhost:3000/`. You will now see the `Hello!` message printed in the browser's console.
+1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails_pro/blob/more_test_and_docs/packages/node-renderer/src/ReactOnRailsProNodeRenderer.js#L6) in `packages/node-renderer/src/ReactOnRailsProNodeRenderer.js` to confirm we're getting an update to the node package.
+2. The `preinstall` script of `spec/dummy` builds the NPM package and sets up `yalc` to use it for the renderer. 
+   It's run automatically when you run `yarn install`. 
+3. Refresh the browser if the server is already running or start the server using `foreman start -f Procfile.dev` from `spec/dummy` and navigate to `http://localhost:3000/`. You will now see the `Hello!` message printed in the browser's console.
 
-_Note: you don't have to build the NPM package since it is used only with node runtime and its source code is exactly what is executed when you run it._
+> [!NOTE]
+> `yalc` makes the NPM package available globally on the machine.
+> So, if you have the repo checked out more than once to compare behavior between branches,
+> make sure to run `yarn install` every time you switch to a new copy.
 
 # Development Setup for Gem and Node Package Contributors
 
@@ -142,20 +136,18 @@ After checking out the repo, making sure you have rvm and nvm setup (setup ruby 
 
 ### Building the Node Package for Development
 
+At the root:
 ```
-yarn run build:dev
+nps build
 ```
 
 ### Modifying the startup for testing
 
-
-This is a possible update to package.json to debug the lockfile. Notice the `NODE_DEBUG=LOCKFILE`
+This is a possible update to package.json to debug the lockfile. Notice the `NODE_DEBUG=LOCKFILE,ROR`
 
 ```json
     "developing": "rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && RENDERER_LOG_LEVEL=info NODE_DEBUG=LOCKFILE,ROR node --enable-source-maps --experimental-modules packages/node-renderer/lib/default-node-renderer.js",
 ```
-
-Notice the 2 "debug" settings of LOCKFILE and ROR.
 
 See https://nodejs.org/api/util.html#util_util_debuglog_section for details on `debuglog`.
 
@@ -164,15 +156,15 @@ Because the example and dummy apps rely on the `react_on_rails_pro` node package
 To achieve this, you can use `yalc`.
 The easy way to do this is to run the command below in the dummy app root directory.
 For more information check the script section of the
-[package.json](spec/dummy/package.json)
-in `spec/dummy` app directory.
+[spec/dummy/package.json](spec/dummy/package.json) file.
 
 ```sh
 cd spec/dummy
-yarn run preinstall
+yarn install
 ```
 
-_Note: this runs npm under the hood as explained in **Test NPM for react_on_rails_pro** section above_
+> [!NOTE]
+> This runs npm under the hood as explained in the **Test NPM for react_on_rails_pro** section above.
 
 From now on, the example and dummy apps will use your local packages/node-renderer folder as the `react_on_rails_pro` node package.
 
@@ -183,13 +175,13 @@ cd react_on_rails_pro
 yarn install
 ```
 
-Or run this which builds the yarn package, then the webpack files for spec/dummy, and runs tests in
+Or run this, which builds the yarn package, then the webpack files for spec/dummy, and finally runs tests in
 spec/dummy.
 
 
 ```sh
 # Optionally change default selenium_firefox driver
-export DRIVER=poltergeist
+# export DRIVER=poltergeist
 cd react_on_rails_pro
 yarn run dummy:spec
 ```
@@ -213,24 +205,9 @@ Hit F8 and then a debugger statement within the test will get hit.
 1. copy a server bundle to `packages/node-renderer/tests/fixtures/projects/<project-name>/<commit>`
 2. create a directory with a hash representing the commit of the project
 
-### Asynch issues with Jest
-Beware that Jest runs multiple test files synchronously, so you can't use the same tmp directory
-between tests. See the file `packages/node-renderer/tests/helper.js` for how this was handled.
-
-### Run spec/dummy tests
-
-TODO: Figure out how to run the tests on CI.
-
-```sh
-cd react_on_rails_pro/spec/dummy
-yarn run node-renderer
-```
-and in another console window/tab:
-
-```sh
-cd react_on_rails_pro/spec/dummy
-rspec
-```
+### Async issues with Jest
+Beware that Jest runs multiple test files synchronously, so you can't use the same temporary directory
+between tests. See the file [`packages/node-renderer/tests/helper.ts`](packages/node-renderer/tests/helper.ts) for how we handle this.
 
 ### Run most tests and linting
 
@@ -249,12 +226,12 @@ go to `spec/dummy` directory and run the following rake task:
 bundle exec rake react_on_rails:generate_packs
 ```
 
-Since the dummy app requires several process to run in the background, don't run `rails s` directly.
+Since the dummy app requires several processes to run in the background, don't run `rails s` directly.
 Instead, run `foreman start -f Procfile.dev`.
-This requires `foreman` gem to be already installed (`gem install foreman`).
-Alternatively, you can use `overmind`.
+This requires [the `foreman` gem](https://github.com/ddollar/foreman) to be installed (`gem install foreman`).
+Alternatively, you can use [`overmind`](https://github.com/DarthSim/overmind).
 
-Doing this, ensures the asset generation by webpack
+Doing this ensures the asset generation by webpack
 and node renderer run in the background,
 which is essential for the dummy app to work.
 
@@ -262,7 +239,7 @@ If you change the webpack configs, then you need to restart `foreman`.
 
 ### RSpec Testing
 
-Before running ruby tests ensure you have done the following steps in `spec/dummy` directory:
+Before running Ruby tests ensure you have done the following steps in `spec/dummy` directory:
 
 ```sh
 # in the root directory
@@ -271,25 +248,26 @@ yarn install
 
 cd spec/dummy
 
+bundle install
 bundle exec rake react_on_rails:generate_packs
 
-yarn run preinstall
 yarn install
 
 RAILS_ENV=test bin/shakapacker # to generate assets for test environment
 ```
 
-Then in a separate terminal, run the following to get node rendered run in background:
+Then in a separate terminal, run the following to run the Node renderer and the test Rails server (only needed for the streaming tests) in the background:
 
 ```sh
 # in spec/dummy directory
 yarn run node-renderer
+RAILS_ENV=test bin/dev&
 ```
 
 Get back to your main terminal and run:
 
 ```sh
-bundle exec rspec`
+bundle exec rspec
 ```
 
 If you run `rspec` at the top level, you'll see this message: `require': cannot load such file -- rails_helper (LoadError)`
@@ -304,11 +282,12 @@ TRACE_REACT_ON_RAILS=true && foreman start -f Procfile.dev
 ```
 
 # Releasing
-Contact Justin Gordon, justin@shakacode.com
+Contact Justin Gordon, [justin@shakacode.com](mailto:justin@shakacode.com).
 
-Notes, these 2 files need auth tokens to [publish to Github Packages](https://docs.github.com/en/enterprise-server%403.10/packages/working-with-a-github-packages-registry/working-with-the-rubygems-registry):
-1. `~/.npmrc`
-2. `~/.gem/credentials`
+> [!NOTE]
+> These files need to include auth tokens to [publish to Github Packages](https://docs.github.com/en/enterprise-server%403.10/packages/working-with-a-github-packages-registry/working-with-the-rubygems-registry):
+> 1. `~/.npmrc`
+> 2. `~/.gem/credentials`
 
 Then run a command like:
 ```bash

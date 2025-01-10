@@ -4,21 +4,21 @@ _See the [CHANGELOG](./CHANGELOG.md) for release updates and **upgrade** details
 
 # React on Rails Pro
 
-Node rendering and caching performance enhancements for [React on Rails](https://github.com/shakacode/react_on_rails). Now supports React 18 with updates to React on Rails! Check the [React on Rails CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details and the updates to the [loadable-components instructions](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/code-splitting-loadable-components.md).
+Node rendering and caching performance enhancements for [React on Rails](https://github.com/shakacode/react_on_rails) ([Documentation](https://www.shakacode.com/react-on-rails/docs/)).
 
 ## Getting Started
 The best way to see how React on Rails Pro works is to install this repo locally and take a look at
 the example application:
 
-[spec/dummy](./spec/dummy/README.md)
-1. Uses a @rails/webpacker standard configuration.
+[spec/dummy](./spec/dummy)
+1. Uses a standard [Shakapacker](https://github.com/shakacode/shakapacker) configuration.
 1. Has pages that demonstrate:
    1. caching
    2. loadable-components
 1. Has all the basic react_on_rails specs that run against the Node Renderer 
-1. Demonstrates using HMR and loadable-components with almost same the example that is present in [loadable-components for SSR](https://github.com/gregberge/loadable-components/tree/main/examples/server-side-rendering)
+1. Demonstrates using HMR and loadable-components with almost the same example that is present in [loadable-components for SSR](https://github.com/gregberge/loadable-components/tree/main/examples/server-side-rendering)
    
-See the README.md in those sample apps for more details.
+See [the README.md](./spec/dummy/README.md) in those sample apps for more details.
 
 ## Features
 

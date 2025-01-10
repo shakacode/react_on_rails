@@ -1,4 +1,4 @@
-# Example of React on Rails Pro Using Default @rails/webpacker Configuration
+# Example of React on Rails Pro Using Default Shakapacker Configuration
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -31,7 +31,7 @@ Run one of these Procfiles:
 2. [Procfile.static](./Procfile.static): Development setup using `webpack --watch`. No HMR, but loadable-components is used.
 
 ## Webpack Configuration
-This example builds on the standard @rails/webpacker configuration, as demonstrated
+This example builds on the standard Shakapacker configuration, as demonstrated
 by repo (shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) 
 
 * [config/shakapacker.yml](./config/shakapacker.yml)
@@ -40,7 +40,7 @@ by repo (shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https:
 ## Loadable Components
 See more details in [docs/code-splitting-loadable-components](../../docs/code-splitting-loadable-components.md).
 
-Note that the webpack configuration substitutes files with the extension `imports-loadable.js` with `imports-hmr.js`. See the file `config/webpack/environment.js` code where the NormalModuleReplacementPlugin is used to make this substitution.
+Note that the webpack configuration substitutes files with the extension `imports-loadable.js` with `imports-hmr.js`. See the use of `NormalModuleReplacementPlugin` in [`config/webpack/commonWebpackConfig.js`](./config/webpack/commonWebpackConfig.js).
 
 ## Caching
 
@@ -51,12 +51,12 @@ To toggle caching in development, as explained in [this article](http://guides.r
 
 This sample app includes both Honeybadger and Sentry integration, including Sentry tracing integration.
 
-## Other needed steps
+## Other necessary steps
 
-please check [CONTRIBUTING.md](../../CONTRIBUTING.md) it has other needed steps before you are able to run the demo app.
+Please check [CONTRIBUTING.md](../../CONTRIBUTING.md), it has the other necessary steps before you are able to run the demo app.
 
 ## Starting the Sample App
-                             
+
 ### Using HMR and no loadable-components
 ```sh
 overmind start -f Procfile.dev
