@@ -115,8 +115,8 @@ const defaultConfig: Config = {
   // Show only important messages by default
   logLevel: logLevel(env.RENDERER_LOG_LEVEL || DEFAULT_LOG_LEVEL),
 
-  // Do not log HTTP messages by default
-  logHttpLevel: logLevel(env.RENDERER_LOG_HTTP_LEVEL || 'silent'),
+  // Log only errors from Fastify by default
+  logHttpLevel: logLevel(env.RENDERER_LOG_HTTP_LEVEL || 'error'),
 
   bundlePath: env.RENDERER_BUNDLE_PATH || defaultBundlePath(),
 
