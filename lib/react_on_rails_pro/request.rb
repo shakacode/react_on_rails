@@ -103,7 +103,7 @@ module ReactOnRailsPro
 
         renderer_bundle_file_name = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.renderer_bundle_file_name
         form["bundle"] = {
-          body: Pathname.new(server_bundle_path),
+          body: get_form_body_for_file(server_bundle_path),
           content_type: "text/javascript",
           filename: renderer_bundle_file_name
         }
@@ -111,18 +111,22 @@ module ReactOnRailsPro
         if ReactOnRailsPro.configuration.assets_to_copy.present?
           ReactOnRailsPro.configuration.assets_to_copy.each_with_index do |asset_path, idx|
             Rails.logger.info { "[ReactOnRailsPro] Uploading asset #{asset_path}" }
-            unless File.exist?(asset_path)
+            unless http_url?(asset_path) || File.exist?(asset_path)
               warn "Asset not found #{asset_path}"
               next
             end
 
             content_type = ReactOnRailsPro::Utils.mine_type_from_file_name(asset_path)
 
-            form["assetsToCopy#{idx}"] = {
-              body: Pathname.new(asset_path),
-              content_type: content_type,
-              filename: File.basename(asset_path)
-            }
+            begin
+              form["assetsToCopy#{idx}"] = {
+                body: get_form_body_for_file(asset_path),
+                content_type: content_type,
+                filename: File.basename(asset_path)
+              }
+            rescue e
+              warn "[ReactOnRailsPro] Error uploading asset #{asset_path}: #{e}"
+            end
           end
         end
         form
@@ -182,6 +186,25 @@ module ReactOnRailsPro
           #{e}
         MSG
         raise ReactOnRailsPro::Error, message
+      end
+
+      def get_form_body_for_file(path)
+        # Handles the case when the file is served from the dev server
+        if http_url?(path)
+          unless Rails.env.development?
+            raise ReactOnRailsPro::Error,
+                  "Not expected to get HTTP url for bundle or assets in production mode"
+          end
+
+          response = HTTPX.get(path)
+          response.body
+        else
+          Pathname.new(path)
+        end
+      end
+
+      def http_url?(path)
+        path.to_s.match?(%r{https?://})
       end
     end
   end

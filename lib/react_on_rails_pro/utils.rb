@@ -61,6 +61,8 @@ module ReactOnRailsPro
         raise ReactOnRailsPro::Error, "Only call bundle_file_name if using webpacker"
       end
 
+      # bundle_js_uri_from_packer can return a file path or a HTTP URL (for files served from the dev server)
+      # Pathname can handle both cases
       full_path = ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
       pathname = Pathname.new(full_path)
       pathname.basename.to_s
