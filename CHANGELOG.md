@@ -18,6 +18,8 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+### [14.1.0] - 2025-01-06
+
 #### Fixed
 
 - Incorrect type and confusing name for `ReactOnRails.registerStore`, use `registerStoreGenerators` instead. [PR 1651](https://github.com/shakacode/react_on_rails/pull/1651) by [alexeyr-ci](https://github.com/alexeyr-ci).
@@ -1172,7 +1174,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.0.5...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.1.0...master
+[14.1.0]: https://github.com/shakacode/react_on_rails/compare/14.0.5...14.1.0
 [14.0.5]: https://github.com/shakacode/react_on_rails/compare/14.0.4...14.0.5
 [14.0.4]: https://github.com/shakacode/react_on_rails/compare/14.0.3...14.0.4
 [14.0.3]: https://github.com/shakacode/react_on_rails/compare/14.0.2...14.0.3
