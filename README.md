@@ -23,7 +23,7 @@
 
 -----
 
-*These are the docs for React on Rails 13. To see the older docs: [v12](https://github.com/shakacode/react_on_rails/tree/12.6.0) and [v11](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
+*These are the docs for React on Rails 14. To see the older docs and code: [v13](https://github.com/shakacode/react_on_rails/tree/13.4.0), [v12](https://github.com/shakacode/react_on_rails/tree/12.6.0), and [v11](https://github.com/shakacode/react_on_rails/tree/11.3.0).*
 
 # About
 React on Rails integrates Rails with (server rendering of) [React](https://github.com/facebook/react).
