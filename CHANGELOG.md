@@ -867,7 +867,7 @@ No changes.
 - See [shakacode/react-webpack-rails-tutorial #287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287/files) for an upgrade example. The PR has a few comments on the upgrade.
 
 Here is the addition to the generated config file:
-```
+```ruby
   # This configures the script to run to build the production assets by webpack. Set this to nil
   # if you don't want react_on_rails building this file for you.
   config.build_production_command = "npm run build:production"
