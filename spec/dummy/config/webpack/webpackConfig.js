@@ -4,6 +4,8 @@ const serverWebpackConfig = require('./serverWebpackConfig');
 const webpackConfig = (envSpecific) => {
   const clientConfig = clientWebpackConfig();
   const serverConfig = serverWebpackConfig();
+  // The stream module is used on the server side for streaming server side rendering.
+  // It's not needed on the client side, so we can remove it.
   clientConfig.resolve.fallback = { stream: false };
   // If you are using "node" target in serverWebpackConfig.js, you can remove the fallback configuration below
   // since Node.js has built-in stream support.
