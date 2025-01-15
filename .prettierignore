@@ -11,4 +11,4 @@ spec/dummy/lib/bs/**
 spec/dummy/public
 **/.yalc/**
 **/generated/**
-*.bs.js
+*.res.js
