@@ -6,13 +6,11 @@
       "subdirs": true
     }
   ],
-  "reason": {
-    "react-jsx": 3
-  },
+  "jsx": { "version": 4 },
   "suffix": ".bs.js",
   "package-specs": [
     {
-      "module": "es6",
+      "module": "esmodule",
       "in-source": true
     }
   ],
