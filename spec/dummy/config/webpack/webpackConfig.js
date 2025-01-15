@@ -5,7 +5,13 @@ const webpackConfig = (envSpecific) => {
   const clientConfig = clientWebpackConfig();
   const serverConfig = serverWebpackConfig();
   clientConfig.resolve.fallback = { stream: false };
-  // Remove the next line if you used "node" target in serverWebpackConfig.js
+  // If you are using "node" target in serverWebpackConfig.js, you can remove the fallback configuration below
+  // since Node.js has built-in stream support.
+  //
+  // If you are using "web" target in serverWebpackConfig.js and need server-side rendering streaming using RORP:
+  // 1. Install the stream-browserify package: npm install stream-browserify
+  // 2. Replace the line below with:
+  //    serverConfig.resolve.fallback = { stream: require.resolve('stream-browserify') };
   serverConfig.resolve.fallback = { stream: false };
 
   if (envSpecific) {
