@@ -36,7 +36,7 @@ You can access values in the `config/shakapacker.yml`
 const { config, devServer } = require('shakapacker');
 ```
 
-You will want consider using some of the same values set in these files:
+You will want to consider using some of the same values set in these files:
 
 * https://github.com/shakacode/shakapacker/blob/master/package/environments/base.js
 * https://github.com/shakacode/shakapacker/blob/master/package/environments/development.js

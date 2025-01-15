@@ -18,6 +18,9 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+#### Fixed
+- Removed obsolete `js-yaml` peer dependency. [PR 1678](https://github.com/shakacode/react_on_rails/pull/1678) by [alexeyr-ci](https://github.com/alexeyr-ci).
+
 ### [14.1.0] - 2025-01-06
 
 #### Fixed
