@@ -77,7 +77,7 @@
     "format": "cd ../.. && yarn start format",
     "test": "yarn run build:test && yarn run lint && rspec",
     "build:test": "rm -rf public/webpack/test && yarn build:rescript && RAILS_ENV=test NODE_ENV=test bin/shakapacker",
-    "build:dev": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/shakapacker --watch",
+    "build:dev": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/shakapacker",
     "build:dev:server": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/shakapacker --watch",
     "build:dev:watch": "rescript build -w && RAILS_ENV=development NODE_ENV=development bin/shakapacker --watch",
     "build:clean": "yarn build:rescript && rm -rf public/webpack || true",

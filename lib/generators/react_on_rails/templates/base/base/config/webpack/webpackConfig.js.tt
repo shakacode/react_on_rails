@@ -6,6 +6,9 @@ const serverWebpackConfig = require('./serverWebpackConfig');
 const webpackConfig = (envSpecific) => {
   const clientConfig = clientWebpackConfig();
   const serverConfig = serverWebpackConfig();
+  clientConfig.resolve.fallback = { stream: false };
+  // Remove the next line if you used "node" target in serverWebpackConfig.js
+  serverConfig.resolve.fallback = { stream: false };
 
   if (envSpecific) {
     envSpecific(clientConfig, serverConfig);
