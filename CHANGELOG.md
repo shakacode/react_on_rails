@@ -18,6 +18,9 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+#### Fixed
+- Updated webpack configuration template to set `stream: false` in fallback configuration for both client and server webpack configs. [PR 1676](https://github.com/shakacode/react_on_rails/pull/1676) by [abanoubghadban](https://github.com/abanoubghadban).
+
 ### [14.1.0] - 2025-01-06
 
 #### Fixed
@@ -864,7 +867,7 @@ No changes.
 - See [shakacode/react-webpack-rails-tutorial #287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287/files) for an upgrade example. The PR has a few comments on the upgrade.
 
 Here is the addition to the generated config file:
-```ruby
+```
   # This configures the script to run to build the production assets by webpack. Set this to nil
   # if you don't want react_on_rails building this file for you.
   config.build_production_command = "npm run build:production"
