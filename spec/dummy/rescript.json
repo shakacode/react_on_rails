@@ -7,7 +7,7 @@
     }
   ],
   "jsx": { "version": 4 },
-  "suffix": ".bs.js",
+  "suffix": ".res.js",
   "package-specs": [
     {
       "module": "esmodule",
