@@ -6,20 +6,14 @@
 
 ## To run tests:
 * [Yalc](https://github.com/whitecolor/yalc) must be installed globally for most local development.
-* After updating code via git, to prepare all examples and run all tests:
-
+* After updating code via Git, to prepare all examples:
 ```sh
 cd react_on_rails/
 bundle && yarn && rake examples:gen_all && rake node_package && rake
 ```
 
-In order to run tests in browser
-```
-yarn global add  browserify babelify tape-run faucet
-browserify -t babelify node_package/tests/*.js | tape-run | faucet
-```
-
-See Dev Initial Setup, below for, well... initial setup.
+See [Dev Initial Setup](#dev-initial-setup) below for, well... initial setup,
+and [Running tests](#running-tests) for more details on running tests.
 
 # IDE/IDE SETUP
 It's critical to configure your IDE/editor to ignore certain directories. Otherwise your IDE might slow to a crawl!
@@ -153,21 +147,23 @@ script/convert
 yarn run dummy:spec
 ```
 
-### Run NPM JS tests
+## Running tests
+
+### JS tests
 
 ```sh
 cd react_on_rails/
-yarn test
+yarn run test
 ```
 
-### Run spec/dummy tests
+### spec/dummy tests
 
 ```sh
 cd react_on_rails/spec/dummy
 rspec
 ```
 
-### Run most tests and linting
+### Linting, type checking and JS tests together
 
 ```sh
 cd react_on_rails/
