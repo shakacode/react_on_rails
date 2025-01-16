@@ -4,3 +4,4 @@ import streamServerRenderedReactComponent from './streamServerRenderedReactCompo
 ReactOnRails.streamServerRenderedReactComponent = streamServerRenderedReactComponent;
 
 export * from './ReactOnRails';
+export { default } from './ReactOnRails';
