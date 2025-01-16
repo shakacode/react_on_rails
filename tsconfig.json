@@ -2,7 +2,7 @@
   "compilerOptions": {
     "allowJs": true,
     "esModuleInterop": true,
-    "jsx": "react",
+    "jsx": "react-jsx",
     "lib": ["dom", "es2015"],
     "module": "CommonJS",
     "noImplicitAny": true,
