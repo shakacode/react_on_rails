@@ -170,6 +170,7 @@ export interface ReactOnRails {
   ): RenderReturnType;
   getComponent(name: string): RegisteredComponent;
   serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;
+  streamServerRenderedReactComponent(options: RenderParams): Readable;
   handleError(options: ErrorOptions): string | undefined;
   buildConsoleReplay(): string;
   registeredComponents(): Map<string, RegisteredComponent>;
