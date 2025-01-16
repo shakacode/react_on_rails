@@ -248,6 +248,14 @@ ctx.ReactOnRails = {
   },
 
   /**
+   * Used by server rendering by Rails
+   * @param options
+   */
+  streamServerRenderedReactComponent() {
+    throw new Error('streamServerRenderedReactComponent is only supported when using a bundle built for Node.js environments');
+  },
+
+  /**
    * Used by Rails to catch errors in rendering
    * @param options
    */
