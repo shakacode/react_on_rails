@@ -1,5 +1,4 @@
-import ReactDOMServer, { type PipeableStream } from 'react-dom/server';
-import { PassThrough, Readable } from 'stream';
+import ReactDOMServer from 'react-dom/server';
 import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
@@ -7,35 +6,8 @@ import createReactOutput from './createReactOutput';
 import { isPromise, isServerRenderHash } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
-import type { CreateReactOutputResult, RegisteredComponent, RenderParams, RenderResult, RenderingError, ServerRenderResult } from './types';
-
-type RenderState = {
-  result: null | string | Promise<string>;
-  hasErrors: boolean;
-  error?: RenderingError;
-};
-
-type StreamRenderState = Omit<RenderState, 'result'> & {
-  result: null | Readable;
-  isShellReady: boolean;
-};
-
-type RenderOptions = {
-  componentName: string;
-  domNodeId?: string;
-  trace?: boolean;
-  renderingReturnsPromises: boolean;
-};
-
-function convertToError(e: unknown): Error {
-  return e instanceof Error ? e : new Error(String(e));
-}
-
-function validateComponent(componentObj: RegisteredComponent, componentName: string) {
-  if (componentObj.isRenderer) {
-    throw new Error(`Detected a renderer while server rendering component '${componentName}'. See https://github.com/shakacode/react_on_rails#renderer-functions`);
-  }
-}
+import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
+import type { CreateReactOutputResult, RenderParams, RenderResult, RenderState, RenderOptions, ServerRenderResult } from './types';
 
 function processServerRenderHash(result: ServerRenderResult, options: RenderOptions): RenderState {
   const { redirectLocation, routeError } = result;
@@ -101,16 +73,6 @@ function handleRenderingError(e: unknown, options: { componentName: string, thro
     hasErrors: true,
     result: handleError({ e: error, name: options.componentName, serverSide: true }),
     error,
-  };
-}
-
-function createResultObject(html: string | null, consoleReplayScript: string, renderState: RenderState | StreamRenderState): RenderResult {
-  return {
-    html,
-    consoleReplayScript,
-    hasErrors: renderState.hasErrors,
-    renderingError: renderState.error && { message: renderState.error.message, stack: renderState.error.stack },
-    isShellReady: 'isShellReady' in renderState ? renderState.isShellReady : undefined,
   };
 }
 
@@ -200,133 +162,6 @@ const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (o
     // This is necessary when ExecJS and old versions of node renderer are used.
     // New versions of node renderer reset the console history automatically.
     console.history = [];
-  }
-};
-
-const stringToStream = (str: string): Readable => {
-  const stream = new PassThrough();
-  stream.write(str);
-  stream.end();
-  return stream;
-};
-
-const transformRenderStreamChunksToResultObject = (renderState: StreamRenderState) => {
-  const consoleHistory = console.history;
-  let previouslyReplayedConsoleMessages = 0;
-
-  const transformStream = new PassThrough({
-    transform(chunk, _, callback) {
-      const htmlChunk = chunk.toString();
-      const consoleReplayScript = buildConsoleReplay(consoleHistory, previouslyReplayedConsoleMessages);
-      previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
-
-      const jsonChunk = JSON.stringify(createResultObject(htmlChunk, consoleReplayScript, renderState));
-
-      this.push(`${jsonChunk}\n`);
-      callback();
-    }
-  });
-
-  let pipedStream: PipeableStream | null = null;
-  const pipeToTransform = (pipeableStream: PipeableStream) => {
-    pipeableStream.pipe(transformStream);
-    pipedStream = pipeableStream;
-  };
-  // We need to wrap the transformStream in a Readable stream to properly handle errors:
-  // 1. If we returned transformStream directly, we couldn't emit errors into it externally
-  // 2. If an error is emitted into the transformStream, it would cause the render to fail
-  // 3. By wrapping in Readable.from(), we can explicitly emit errors into the readableStream without affecting the transformStream
-  // Note: Readable.from can merge multiple chunks into a single chunk, so we need to ensure that we can separate them later
-  const readableStream = Readable.from(transformStream);
-
-  const writeChunk = (chunk: string) => transformStream.write(chunk);
-  const emitError = (error: unknown) => readableStream.emit('error', error);
-  const endStream = () => {
-    transformStream.end();
-    pipedStream?.abort();
-  }
-  return { readableStream, pipeToTransform, writeChunk, emitError, endStream };
-}
-
-const streamRenderReactComponent = (reactRenderingResult: ReactElement, options: RenderParams) => {
-  const { name: componentName, throwJsErrors } = options;
-  const renderState: StreamRenderState = {
-    result: null,
-    hasErrors: false,
-    isShellReady: false
-  };
-
-  const {
-    readableStream,
-    pipeToTransform,
-    writeChunk,
-    emitError,
-    endStream
-  } = transformRenderStreamChunksToResultObject(renderState);
-
-  const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderingResult, {
-    onShellError(e) {
-      const error = convertToError(e);
-      renderState.hasErrors = true;
-      renderState.error = error;
-
-      if (throwJsErrors) {
-        emitError(error);
-      }
-
-      const errorHtml = handleError({ e: error, name: componentName, serverSide: true });
-      writeChunk(errorHtml);
-      endStream();
-    },
-    onShellReady() {
-      renderState.isShellReady = true;
-      pipeToTransform(renderingStream);
-    },
-    onError(e) {
-      if (!renderState.isShellReady) {
-        return;
-      }
-      const error = convertToError(e);
-      if (throwJsErrors) {
-        emitError(error);
-      }
-      renderState.hasErrors = true;
-      renderState.error = error;
-    },
-  });
-
-  return readableStream;
-}
-
-export const streamServerRenderedReactComponent = (options: RenderParams): Readable => {
-  const { name: componentName, domNodeId, trace, props, railsContext, throwJsErrors } = options;
-
-  try {
-    const componentObj = ComponentRegistry.get(componentName);
-    validateComponent(componentObj, componentName);
-
-    const reactRenderingResult = createReactOutput({
-      componentObj,
-      domNodeId,
-      trace,
-      props,
-      railsContext,
-    });
-
-    if (isServerRenderHash(reactRenderingResult) || isPromise(reactRenderingResult)) {
-      throw new Error('Server rendering of streams is not supported for server render hashes or promises.');
-    }
-
-    return streamRenderReactComponent(reactRenderingResult, options);
-  } catch (e) {
-    if (throwJsErrors) {
-      throw e;
-    }
-
-    const error = convertToError(e);
-    const htmlResult = handleError({ e: error, name: componentName, serverSide: true });
-    const jsonResult = JSON.stringify(createResultObject(htmlResult, buildConsoleReplay(), { hasErrors: true, error, result: null }));
-    return stringToStream(jsonResult);
   }
 };
 

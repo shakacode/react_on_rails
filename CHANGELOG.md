@@ -18,6 +18,12 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+### [14.1.1] - 2025-01-15
+
+#### Fixed
+
+- Separated streamServerRenderedReactComponent from the ReactOnRails object in order to stop users from getting errors during webpack compilation about needing the `stream-browserify` package. [PR 1680](https://github.com/shakacode/react_on_rails/pull/1680) by [judahmeek](https://github.com/judahmeek).
+
 ### [14.1.0] - 2025-01-06
 
 #### Fixed
