@@ -184,7 +184,7 @@ For server rendering, if you wish to return multiple HTML strings from a Render-
 { renderedHtml: { componentHtml, customKey1, customKey2} }
 ```
 
-For details on using react_component_hash with react-helmet, see [our react-helmet documentation](https://www.shakacode.com/react-on-rails/docs/additional-reading/react-helmet/).
+For details on using react_component_hash with react-helmet, see [our react-helmet documentation](https://www.shakacode.com/react-on-rails/docs/javascript/react-helmet/).
 
 ## Error Handling
 
