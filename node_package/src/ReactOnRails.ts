@@ -1,11 +1,10 @@
 import type { ReactElement } from 'react';
-import type { Readable } from 'stream';
 
 import * as ClientStartup from './clientStartup';
 import handleError from './handleError';
 import ComponentRegistry from './ComponentRegistry';
 import StoreRegistry from './StoreRegistry';
-import serverRenderReactComponent, { streamServerRenderedReactComponent } from './serverRenderReactComponent';
+import serverRenderReactComponent from './serverRenderReactComponent';
 import buildConsoleReplay from './buildConsoleReplay';
 import createReactOutput from './createReactOutput';
 import Authenticity from './Authenticity';
@@ -246,14 +245,6 @@ ctx.ReactOnRails = {
    */
   serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult> {
     return serverRenderReactComponent(options);
-  },
-
-  /**
-   * Used by server rendering by Rails
-   * @param options
-   */
-  streamServerRenderedReactComponent(options: RenderParams): Readable {
-    return streamServerRenderedReactComponent(options);
   },
 
   /**

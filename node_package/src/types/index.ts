@@ -170,7 +170,6 @@ export interface ReactOnRails {
   ): RenderReturnType;
   getComponent(name: string): RegisteredComponent;
   serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;
-  streamServerRenderedReactComponent(options: RenderParams): Readable;
   handleError(options: ErrorOptions): string | undefined;
   buildConsoleReplay(): string;
   registeredComponents(): Map<string, RegisteredComponent>;
@@ -179,3 +178,21 @@ export interface ReactOnRails {
   resetOptions(): void;
   options: Record<string, string | number | boolean>;
 }
+
+export type RenderState = {
+  result: null | string | Promise<string>;
+  hasErrors: boolean;
+  error?: RenderingError;
+};
+
+export type StreamRenderState = Omit<RenderState, 'result'> & {
+  result: null | Readable;
+  isShellReady: boolean;
+};
+
+export type RenderOptions = {
+  componentName: string;
+  domNodeId?: string;
+  trace?: boolean;
+  renderingReturnsPromises: boolean;
+};

@@ -4,7 +4,7 @@
 
 import React, { Suspense } from 'react';
 import PropTypes from 'prop-types';
-import { streamServerRenderedReactComponent } from '../src/serverRenderReactComponent';
+import streamServerRenderedReactComponent from '../src/streamServerRenderedReactComponent';
 import ComponentRegistry from '../src/ComponentRegistry';
 
 const AsyncContent = async ({ throwAsyncError }) => {

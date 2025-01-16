@@ -4,7 +4,6 @@ const serverWebpackConfig = require('./serverWebpackConfig');
 const webpackConfig = (envSpecific) => {
   const clientConfig = clientWebpackConfig();
   const serverConfig = serverWebpackConfig();
-  clientConfig.resolve.fallback = { stream: require.resolve('stream-browserify') };
 
   if (envSpecific) {
     envSpecific(clientConfig, serverConfig);
