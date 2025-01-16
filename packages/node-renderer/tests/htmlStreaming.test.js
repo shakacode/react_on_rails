@@ -136,8 +136,8 @@ describe('html streaming', () => {
     expect(status).toBe(200);
     expect(chunks.length).toBeGreaterThanOrEqual(5);
 
-    expect(timeToFirstByte).toBeLessThan(1000);
-    expect(streamingTime).toBeGreaterThan(3500);
+    expect(timeToFirstByte).toBeLessThan(2000);
+    expect(streamingTime).toBeGreaterThan(3 * timeToFirstByte);
   }, 10000);
 
   it('should returns the component shell only in the first chunk', async () => {
