@@ -13,5 +13,6 @@
     "incremental": true,
     "target": "es2020"
   },
-  "include": ["node_package/src/**/*"]
+  "include": ["node_package/src/**/*"],
+  "exclude": ["node_package/src/RSCWebpackLoader.js"]
 }

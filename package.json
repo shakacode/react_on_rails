@@ -9,7 +9,8 @@
       "rsc-server": "./node_package/lib/ReactOnRailsRSC.js",
       "default": "./node_package/lib/ReactOnRails.full.js"
     },
-    "./client": "./node_package/lib/ReactOnRails.client.js"
+    "./client": "./node_package/lib/ReactOnRails.client.js",
+    "./RSCWebpackLoader": "./node_package/lib/RSCWebpackLoader.js"
   },
   "directories": {
     "doc": "docs"
@@ -64,7 +65,7 @@
     "prepack": "nps build.prepack",
     "prepare": "nps build.prepack",
     "prepublishOnly": "yarn run build",
-    "build": "yarn run clean && yarn run tsc --declaration",
+    "build": "yarn run clean && yarn run tsc --declaration && cp node_package/src/RSCWebpackLoader.js node_package/lib",
     "build-watch": "yarn run clean && yarn run tsc --watch",
     "lint": "nps eslint",
     "check": "yarn run lint && yarn run test && yarn run type-check",
