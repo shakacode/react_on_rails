@@ -11,6 +11,8 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ----
 
+[HEAD compared to 3.2.1]: Click to see all changes compared to the last 3.x version.
+
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
@@ -336,6 +338,7 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
+[HEAD compared to 3.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.2.1...HEAD
 [Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc-9...HEAD
 [4.0.0.rc.9]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.6...4.0.0-rc.9
 [4.0.0.rc.6]: https://github.com/shakacode/react_on_rails_pro/compare/3.2.1...4.0.0-rc.6
