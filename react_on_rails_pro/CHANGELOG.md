@@ -11,7 +11,7 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ----
 
-[HEAD compared to 3.2.1]: Click to see all changes compared to the last 3.x version.
+[HEAD compared to 3.2.1]: Click to see all changes compared to the last 3.x version. See the [4.0 Release Notes](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/release-notes/4.0.md).
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
