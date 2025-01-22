@@ -19,6 +19,10 @@ You can find the **package** version numbers from this repo's tags and below in 
 ### Fixed
 - Enabled `queueMicrotask` use in server bundle to support React 19. [PR 505](https://github.com/shakacode/react_on_rails_pro/pull/505) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
+### Changed
+- Renamed `includeTimerPolyfills` configuration option to `stubTimers`. [PR 506](https://github.com/shakacode/react_on_rails_pro/pull/506) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- Fail immediately on detecting obsolete config options to prevent unexpected misconfigurations. [PR 506](https://github.com/shakacode/react_on_rails_pro/pull/506) by [alexeyr-ci](https://github.com/alexeyr-ci).
+
 ## [4.0.0.rc.10] - 2025-01-06
 
 ### Fixed

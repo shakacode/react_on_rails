@@ -20,12 +20,21 @@ Here are the options available for the JavaScript renderer configuration object,
 `{ Buffer, process, setTimeout, setInterval, setImmediate, clearTimeout, clearInterval, clearImmediate, queueMicrotask }`.
 This option is required to equal `true` if you want to use loadable components.
 Setting this value to false causes the NodeRenderer to behave like ExecJS.
+See also `stubTimers`.
 1. **additionalContext** - (default: `null`) - additionalContext enables you to specify additional NodeJS objects (usually from https://nodejs.org/api/globals.html) to add to the VM context in addition to our `supportModules` defaults. 
 Object shorthand notation may be used, but is not required.
 Example: `{ URL, URLSearchParams, Crypto }`
-1. **includeTimerPolyfills** - (default: `env.INCLUDE_TIMER_POLYFILLS || false`) - With this option set, use of `setTimeout`, `setInterval`, `clearTimeout`, &`clearInterval` functions will do nothing during server-rendering. This is useful when using dependancies like [react-virtuoso](https://github.com/petyosi/react-virtuoso) that use these functions during hydration. In RORP, hydration typically is synchronous and single-task, and thus callbacks passed to `setTimeout` should never run during server-side rendering. Because `setTimeout` is valid client-side, the functions are ignored on server-side rendering without errors or warnings.
+1. **stubTimers** - (default: `env.RENDERER_STUB_TIMERS` if that environment variable is set, `true` otherwise) - With this option set, use of functions `setTimeout`, `setInterval`, `setImmediate`, `clearTimeout`, `clearInterval`, `clearImmediate`, and `queueMicrotask` will do nothing during server-rendering. 
+This is useful when using dependencies like [react-virtuoso](https://github.com/petyosi/react-virtuoso) that use these functions during hydration.
+In RORP, hydration typically is synchronous and single-task (unless you use streaming) and thus callbacks passed to  task-scheduling functions should never run during server-side rendering.
+Because these functions are valid client-side, they are ignored on server-side rendering without errors or warnings.
+See also `supportModules`.
+
+Deprecated options:
+
 1. **honeybadgerApiKey**, **sentryDsn**, **sentryTracing**, **sentryTracesSampleRate** - Deprecated and have no effect. 
 If you have any of them set, see [Error Reporting and Tracing](./error-reporting-and-tracing.md) for the new way to set up error reporting and tracing.
+1. **includeTimerPolyfills** - Renamed to `stubTimers`.
 
 ## Example Launch Files
 

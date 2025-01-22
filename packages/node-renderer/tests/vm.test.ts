@@ -378,7 +378,7 @@ describe('buildVM and runInVM', () => {
     const prepareVM = async (replayServerAsyncOperationLogs: boolean) => {
       const config = getConfig();
       config.supportModules = true;
-      config.includeTimerPolyfills = false;
+      config.stubTimers = false;
       config.replayServerAsyncOperationLogs = replayServerAsyncOperationLogs;
 
       await buildVM(

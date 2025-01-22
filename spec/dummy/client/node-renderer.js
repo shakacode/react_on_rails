@@ -58,7 +58,7 @@ const config = {
   additionalContext: { URL, AbortController },
 
   // Required to use setTimeout, setInterval, & clearTimeout during server rendering
-  includeTimerPolyfills: false,
+  stubTimers: false,
 
   // If set to true, replayServerAsyncOperationLogs will replay console logs from async server operations.
   // If set to false, replayServerAsyncOperationLogs will replay console logs from sync server operations only.
