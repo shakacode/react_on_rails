@@ -17,6 +17,11 @@ You can find the **package** version numbers from this repo's tags and below in 
 *Add changes in master not yet tagged.*
 
 ### Fixed
+- Enabled `queueMicrotask` use in server bundle to support React 19. [PR 505](https://github.com/shakacode/react_on_rails_pro/pull/505) by [alexeyr-ci](https://github.com/alexeyr-ci).
+
+## [4.0.0.rc.10] - 2025-01-06
+
+### Fixed
 - Enable use as a `git:` dependency. [PR 490](https://github.com/shakacode/react_on_rails_pro/pull/490) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
 ## [4.0.0.rc.9] - 2024-12-05

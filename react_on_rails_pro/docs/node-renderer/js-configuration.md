@@ -16,16 +16,16 @@ Here are the options available for the JavaScript renderer configuration object,
 1. **password** (default: `env.RENDERER_PASSWORD`) - Password expected to receive form **Rails client** to authenticate rendering requests. If no password set, no authentication will be required.
 1. **allWorkersRestartInterval** (default: `env.RENDERER_ALL_WORKERS_RESTART_INTERVAL`) - Interval in minutes between scheduled restarts of all cluster of workers. By default restarts are not enabled. If restarts are enabled, `delayBetweenIndividualWorkerRestarts` should also be set.
 1. **delayBetweenIndividualWorkerRestarts** (default: `env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`) - Interval in minutes between individual worker restarts (when cluster restart is triggered). By default restarts are not enabled. If restarts are enabled, `allWorkersRestartInterval` should also be set.
-1. **supportModules** - (default: `env.RENDERER_SUPPORT_MODULES || null`) - If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS modules that get added to the VM context: `{ Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval }`.
-This option is required to equal `true` if you want to use loadable components
-Setting this value to false causes the NodeRenderer to behave like ExecJS
-1. **additionalContext** - (default: `null`) - additionalContext enables you to specify additional NodeJS modules to add to the VM context in addition to our supportModules defaults. Object shorthand notation may be used, but is not required.
+1. **supportModules** - (default: `env.RENDERER_SUPPORT_MODULES || null`) - If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS global objects and functions that get added to the VM context: 
+`{ Buffer, process, setTimeout, setInterval, setImmediate, clearTimeout, clearInterval, clearImmediate, queueMicrotask }`.
+This option is required to equal `true` if you want to use loadable components.
+Setting this value to false causes the NodeRenderer to behave like ExecJS.
+1. **additionalContext** - (default: `null`) - additionalContext enables you to specify additional NodeJS objects (usually from https://nodejs.org/api/globals.html) to add to the VM context in addition to our `supportModules` defaults. 
+Object shorthand notation may be used, but is not required.
 Example: `{ URL, URLSearchParams, Crypto }`
-1. **honeybadgerApiKey** - (default: `env.HONEYBADGER_API_KEY`) - If you want errors on the Node Renderer to be sent to Honeybadger, set this value and add package `@honeybadger-io/js`.
-1. **sentryDsn**: - (default: `env.SENTRY_DSN || null`) - Enables server rendering errors catching with Sentry if the options is set. Add package `@sentry/node`.
-1. **sentryTracing** - (default: `env.SENTRY_TRACING || null`) - Should be set to `true` to enable adding trace context to the error. Requires **sentryDsn** to be set.
-1. **sentryTracesSampleRate** - (default: `env.SENTRY_TRACES_SAMPLE_RATE || 0.1`) - With this option set, every transaction created will have that percentage chance of being sent to Sentry. So, for example, if you set sentryTracesSampleRate to 0.2, approximately 20% of your transactions will get recorded and sent. See below for more details on Sentry Tracing. See [additional docs](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing/).
 1. **includeTimerPolyfills** - (default: `env.INCLUDE_TIMER_POLYFILLS || false`) - With this option set, use of `setTimeout`, `setInterval`, `clearTimeout`, &`clearInterval` functions will do nothing during server-rendering. This is useful when using dependancies like [react-virtuoso](https://github.com/petyosi/react-virtuoso) that use these functions during hydration. In RORP, hydration typically is synchronous and single-task, and thus callbacks passed to `setTimeout` should never run during server-side rendering. Because `setTimeout` is valid client-side, the functions are ignored on server-side rendering without errors or warnings.
+1. **honeybadgerApiKey**, **sentryDsn**, **sentryTracing**, **sentryTracesSampleRate** - Deprecated and have no effect. 
+If you have any of them set, see [Error Reporting and Tracing](./error-reporting-and-tracing.md) for the new way to set up error reporting and tracing.
 
 ## Example Launch Files
 
