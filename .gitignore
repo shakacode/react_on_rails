@@ -39,6 +39,9 @@ tmp
 dist/
 *.tsbuildinfo
 
+# Jest
+junit.xml
+
 node_modules
 
 /packages/node-renderer/tests/tmp
