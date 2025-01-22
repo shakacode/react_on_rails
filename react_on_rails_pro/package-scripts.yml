@@ -2,10 +2,14 @@ scripts:
   test:
     default:
       description: Run all JS tests
-      script: jest packages/node-renderer/**/*.test.[jt]s jest packages/node-renderer/**/**/*.test.[jt]s
+      script: jest packages/node-renderer
+    ci:
+      description: Run all JS tests in CI mode
+      # https://circleci.com/docs/collect-test-data/#jest
+      script: jest --ci --runInBand --reporters=default --reporters=jest-junit -- packages/node-renderer
     debug:
       description: Debug all JS tests
-      script: ndb jest --runInBand packages/node-renderer/**/*.test.[jt]s packages/node-renderer/**/**/*.test.[jt]s
+      script: ndb jest --runInBand packages/node-renderer
   check:
     description: Run all checks
     script: nps lint && nps format.listDifferent && nps test && nps check-typescript
@@ -18,7 +22,7 @@ scripts:
   node-renderer:
     default:
       description:
-      script: jest packages/node-renderer/**/*.test.[jt]s packages/node-renderer/**/**/*.test.[jt]s
+      script: nps build && node --enable-source-maps packages/node-renderer/dist/default-node-renderer.js
     debug:
       description: Debug Node Renderer
       script: rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && nps build && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node --enable-source-maps packages/node-renderer/dist/default-node-renderer.js
