@@ -23,13 +23,14 @@ export interface Config {
   logLevel: LevelWithSilent;
   logHttpLevel: LevelWithSilent;
   bundlePath: string;
-  // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS modules
-  // that get added to the VM context: `{ Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval }`.
+  // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS
+  // global objects and functions that get added to the VM context:
+  // `{ Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval, setImmediate, clearImmediate, queueMicrotask }`.
   // This option is required to equal `true` if you want to use loadable components.
   // Setting this value to false causes the NodeRenderer to behave like ExecJS.
   supportModules: boolean;
-  // additionalContext enables you to specify additional NodeJS modules to add to the VM context in
-  // addition to our supportModules defaults.
+  // additionalContext enables you to specify additional NodeJS objects (usually from
+  // https://nodejs.org/api/globals.html) to add to the VM context in addition to our supportModules defaults.
   // Object shorthand notation may be used, but is not required.
   // Example: { URL, URLSearchParams, Crypto }
   additionalContext: Record<string, unknown> | null;
