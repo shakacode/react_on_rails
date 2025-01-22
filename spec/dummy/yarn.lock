@@ -5685,9 +5685,10 @@ react-lifecycles-compat@^3.0.0, react-lifecycles-compat@^3.0.4:
   resolved "https://registry.yarnpkg.com/react-lifecycles-compat/-/react-lifecycles-compat-3.0.4.tgz#4f1a273afdfc8f3488a8c516bfda78f872352362"
   integrity sha512-fBASbA6LnOU9dOU2eW7aQ8xmYBSXUIWr+UmF9b1efZBazGNO+rcXT/icdKnYm2pTwcRylVUYwW7H1PHfLekVzA==
 
-"react-on-rails@git+https://github.com/shakacode/react_on_rails.git":
-  version "14.1.0"
-  resolved "git+https://github.com/shakacode/react_on_rails.git#a2ecdd267eba252b206da58323c81b6861715063"
+react-on-rails@14.1.1:
+  version "14.1.1"
+  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-14.1.1.tgz#8df9b8931fbceb536e9fbbe6d0b924358c9cce8e"
+  integrity sha512-gvlyZJVCShBXZuPeTlQ+L4qG10IKB7/3NZEB3cp+PxcKVKLZnCrlTZQfMi7HFXY2sKDpGh4NznNNbms5bhSemA==
   dependencies:
     "@babel/runtime-corejs3" "^7.12.5"
 
