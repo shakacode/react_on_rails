@@ -70,7 +70,7 @@ export async function buildVM(filePath: string) {
   }
 
   try {
-    const { supportModules, includeTimerPolyfills, additionalContext } = getConfig();
+    const { supportModules, stubTimers, additionalContext } = getConfig();
     const additionalContextIsObject = additionalContext !== null && additionalContext.constructor === Object;
     vmBundleFilePath = undefined;
     sharedConsoleHistory = new SharedConsoleHistory();
@@ -137,7 +137,7 @@ export async function buildVM(filePath: string) {
       context,
     );
 
-    if (includeTimerPolyfills) {
+    if (stubTimers) {
       // Define timer polyfills:
       vm.runInContext(`function setInterval() {}`, context);
       vm.runInContext(`function setTimeout() {}`, context);

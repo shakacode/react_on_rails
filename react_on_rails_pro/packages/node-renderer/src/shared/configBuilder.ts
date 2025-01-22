@@ -51,7 +51,10 @@ export interface Config {
   sentryTracing?: boolean;
   // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
   sentryTracesSampleRate?: string | number;
-  includeTimerPolyfills: boolean;
+  // If true, `{set/clear}{Timeout/Interval/Immediate}` and `queueMicrotask` are stubbed out to do nothing.
+  stubTimers: boolean;
+  // @deprecated Use stubTimers instead.
+  includeTimerPolyfills?: boolean;
   // If set to true, this option enables the replay of console logs from asynchronous server operations.
   // If set to false, only logs that occur on the server prior to any awaited asynchronous operations will be replayed.
   // The default value is true in development, otherwise it is set to false.
@@ -143,7 +146,7 @@ const defaultConfig: Config = {
   maxDebugSnippetLength: MAX_DEBUG_SNIPPET_LENGTH,
 
   // default to true if empty, otherwise it is set to false
-  includeTimerPolyfills: env.INCLUDE_TIMER_POLYFILLS === 'true' || !env.INCLUDE_TIMER_POLYFILLS,
+  stubTimers: env.RENDERER_STUB_TIMERS === 'true' || !env.RENDERER_STUB_TIMERS,
 
   // default to true in development, otherwise it is set to false
   replayServerAsyncOperationLogs: truthy(
@@ -159,13 +162,14 @@ function envValuesUsed() {
     RENDERER_BUNDLE_PATH: !userConfig.bundlePath && env.RENDERER_BUNDLE_PATH,
     RENDERER_WORKERS_COUNT: !userConfig.workersCount && env.RENDERER_WORKERS_COUNT,
     RENDERER_PASSWORD: !userConfig.password && env.RENDERER_PASSWORD && '<MASKED>',
-    RENDERER_SUPPORT_MODULES: !userConfig.supportModules && env.RENDERER_SUPPORT_MODULES,
+    RENDERER_SUPPORT_MODULES: !('supportModules' in userConfig) && env.RENDERER_SUPPORT_MODULES,
+    RENDERER_STUB_TIMERS: !('stubTimers' in userConfig) && env.RENDERER_STUB_TIMERS,
     RENDERER_ALL_WORKERS_RESTART_INTERVAL:
       !userConfig.allWorkersRestartInterval && env.RENDERER_ALL_WORKERS_RESTART_INTERVAL,
     RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS:
       !userConfig.delayBetweenIndividualWorkerRestarts &&
       env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS,
-    INCLUDE_TIMER_POLYFILLS: !userConfig.includeTimerPolyfills && env.INCLUDE_TIMER_POLYFILLS,
+    INCLUDE_TIMER_POLYFILLS: !('includeTimerPolyfills' in userConfig) && env.INCLUDE_TIMER_POLYFILLS,
     REPLAY_SERVER_ASYNC_OPERATION_LOGS:
       !userConfig.replayServerAsyncOperationLogs && env.REPLAY_SERVER_ASYNC_OPERATION_LOGS,
   };
@@ -223,9 +227,19 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     'sentryTracesSampleRate' in config
   ) {
     log.error(
-      'honeybadgerApiKey, sentryDsn, sentryTracing, and sentryTracesSampleRate are not used since RORP 4.0. ' +
+      'honeybadgerApiKey, sentryDsn, sentryTracing, and sentryTracesSampleRate are not used since RoRP 4.0. ' +
         'See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.',
     );
+    process.exit(1);
+  }
+
+  if (env.INCLUDE_TIMER_POLYFILLS) {
+    log.error('INCLUDE_TIMER_POLYFILLS environment variable is renamed to RENDERER_STUB_TIMERS in RoRP 4.0');
+    process.exit(1);
+  }
+  if ('includeTimerPolyfills' in config) {
+    log.error('includeTimerPolyfills is renamed to stubTimers in RoRP 4.0');
+    process.exit(1);
   }
 
   log.level = config.logLevel;
