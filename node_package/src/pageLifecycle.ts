@@ -35,23 +35,22 @@ function setupTurbolinksEventListeners(): void {
   }
 
   if (turboInstalled()) {
-    debugTurbolinks(
-      'USING TURBO: document added event listeners ' +
-      'turbo:before-render and turbo:render.');
+    debugTurbolinks('USING TURBO: document added event listeners ' + 'turbo:before-render and turbo:render.');
     document.addEventListener('turbo:before-render', runPageUnloadedCallbacks);
     document.addEventListener('turbo:render', runPageLoadedCallbacks);
     runPageLoadedCallbacks();
   } else if (turbolinksVersion5()) {
     debugTurbolinks(
       'USING TURBOLINKS 5: document added event listeners ' +
-      'turbolinks:before-render and turbolinks:render.');
+        'turbolinks:before-render and turbolinks:render.',
+    );
     document.addEventListener('turbolinks:before-render', runPageUnloadedCallbacks);
     document.addEventListener('turbolinks:render', runPageLoadedCallbacks);
     runPageLoadedCallbacks();
   } else {
     debugTurbolinks(
-      'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +
-      'page:change.');
+      'USING TURBOLINKS 2: document added event listeners page:before-unload and ' + 'page:change.',
+    );
     document.addEventListener('page:before-unload', runPageUnloadedCallbacks);
     document.addEventListener('page:change', runPageLoadedCallbacks);
   }

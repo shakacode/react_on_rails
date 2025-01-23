@@ -1,11 +1,6 @@
 import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
-import type {
-  RailsContext,
-  RegisteredComponent,
-  RenderFunction,
-  Root,
-} from './types';
+import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './types';
 
 import { getContextAndRailsContext, resetContextAndRailsContext, type Context } from './context';
 import createReactOutput from './createReactOutput';
@@ -27,9 +22,12 @@ function delegateToRenderer(
 
   if (isRenderer) {
     if (trace) {
-      console.log(`\
+      console.log(
+        `\
 DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, railsContext:`,
-        props, railsContext);
+        props,
+        railsContext,
+      );
     }
 
     (component as RenderFunction)(props, railsContext, domNodeId);
@@ -39,7 +37,8 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
   return false;
 }
 
-const getDomId = (domIdOrElement: string | Element): string => typeof domIdOrElement === 'string' ? domIdOrElement : domIdOrElement.getAttribute('data-dom-id') || '';
+const getDomId = (domIdOrElement: string | Element): string =>
+  typeof domIdOrElement === 'string' ? domIdOrElement : domIdOrElement.getAttribute('data-dom-id') || '';
 class ComponentRenderer {
   private domNodeId: string;
   private state: 'unmounted' | 'rendering' | 'rendered';
@@ -50,22 +49,23 @@ class ComponentRenderer {
     const domId = getDomId(domIdOrElement);
     this.domNodeId = domId;
     this.state = 'rendering';
-    const el = typeof domIdOrElement === 'string' ? document.querySelector(`[data-dom-id=${domId}]`) : domIdOrElement;
+    const el =
+      typeof domIdOrElement === 'string' ? document.querySelector(`[data-dom-id=${domId}]`) : domIdOrElement;
     if (!el) return;
 
     const storeDependencies = el.getAttribute('data-store-dependencies');
-    const storeDependenciesArray = storeDependencies ? JSON.parse(storeDependencies) as string[] : [];
+    const storeDependenciesArray = storeDependencies ? (JSON.parse(storeDependencies) as string[]) : [];
 
     const { context, railsContext } = getContextAndRailsContext();
     if (!context || !railsContext) return;
 
     // Wait for all store dependencies to be loaded
     this.renderPromise = Promise.all(
-      storeDependenciesArray.map(storeName => context.ReactOnRails.getOrWaitForStore(storeName)),
+      storeDependenciesArray.map((storeName) => context.ReactOnRails.getOrWaitForStore(storeName)),
     ).then(() => {
-        if (this.state === 'unmounted') return Promise.resolve();
-        return this.render(el, context, railsContext);
-      });
+      if (this.state === 'unmounted') return Promise.resolve();
+      return this.render(el, context, railsContext);
+    });
   }
 
   /**
@@ -76,7 +76,7 @@ class ComponentRenderer {
     // This must match lib/react_on_rails/helper.rb
     const name = el.getAttribute('data-component-name') || '';
     const { domNodeId } = this;
-    const props = (el.textContent !== null) ? JSON.parse(el.textContent) : {};
+    const props = el.textContent !== null ? JSON.parse(el.textContent) : {};
     const trace = el.getAttribute('data-trace') === 'true';
 
     try {
@@ -109,7 +109,11 @@ class ComponentRenderer {
   You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
   You should return a React.Component always for the client side entry point.`);
         } else {
-          const rootOrElement = reactHydrateOrRender(domNode, reactElementOrRouterResult as ReactElement, shouldHydrate);
+          const rootOrElement = reactHydrateOrRender(
+            domNode,
+            reactElementOrRouterResult as ReactElement,
+            shouldHydrate,
+          );
           this.state = 'rendered';
           if (supportsRootApi) {
             this.root = rootOrElement as Root;
@@ -119,7 +123,7 @@ class ComponentRenderer {
     } catch (e: unknown) {
       const error = e instanceof Error ? e : new Error(e?.toString() ?? 'Unknown error');
       console.error(error.message);
-      error.message = `ReactOnRails encountered an error while rendering component: ${name}. See above error message.`
+      error.message = `ReactOnRails encountered an error while rendering component: ${name}. See above error message.`;
       throw error;
     }
   }
@@ -144,8 +148,11 @@ class ComponentRenderer {
         ReactDOM.unmountComponentAtNode(domNode);
       } catch (e: unknown) {
         const error = e instanceof Error ? e : new Error('Unknown error');
-        console.info(`Caught error calling unmountComponentAtNode: ${error.message} for domNode`,
-          domNode, error);
+        console.info(
+          `Caught error calling unmountComponentAtNode: ${error.message} for domNode`,
+          domNode,
+          error,
+        );
       }
     }
   }
@@ -170,11 +177,16 @@ class StoreRenderer {
     }
 
     const name = storeDataElement.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
-    const props = (storeDataElement.textContent !== null) ? JSON.parse(storeDataElement.textContent) : {};
+    const props = storeDataElement.textContent !== null ? JSON.parse(storeDataElement.textContent) : {};
     this.hydratePromise = this.hydrate(context, railsContext, name, props);
   }
 
-  private async hydrate(context: Context, railsContext: RailsContext, name: string, props: Record<string, string>) {
+  private async hydrate(
+    context: Context,
+    railsContext: RailsContext,
+    name: string,
+    props: Record<string, string>,
+  ) {
     const storeGenerator = await context.ReactOnRails.getOrWaitForStoreGenerator(name);
     if (this.state === 'unmounted') {
       return;
@@ -229,10 +241,16 @@ function unmountAllComponents(): void {
 const storeRenderers = new Map<string, StoreRenderer>();
 
 export async function hydrateStore(storeNameOrElement: string | Element) {
-  const storeName = typeof storeNameOrElement === 'string' ? storeNameOrElement : storeNameOrElement.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
+  const storeName =
+    typeof storeNameOrElement === 'string'
+      ? storeNameOrElement
+      : storeNameOrElement.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
   let storeRenderer = storeRenderers.get(storeName);
   if (!storeRenderer) {
-    const storeDataElement = typeof storeNameOrElement === 'string' ? document.querySelector(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}="${storeNameOrElement}"]`) : storeNameOrElement;
+    const storeDataElement =
+      typeof storeNameOrElement === 'string'
+        ? document.querySelector(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}="${storeNameOrElement}"]`)
+        : storeNameOrElement;
     if (!storeDataElement) {
       return;
     }

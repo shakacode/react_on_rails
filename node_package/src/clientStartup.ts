@@ -11,10 +11,7 @@ import { debugTurbolinks } from './turbolinksUtils';
 
 export async function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded');
-  await Promise.all([
-    hydrateAllStores(),
-    renderOrHydrateAllComponents(),
-  ]);
+  await Promise.all([hydrateAllStores(), renderOrHydrateAllComponents()]);
 }
 
 function reactOnRailsPageUnloaded(): void {
