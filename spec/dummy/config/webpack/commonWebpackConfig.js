@@ -24,7 +24,7 @@ const sassLoaderConfig = {
 const scssConfigIndex = baseClientWebpackConfig.module.rules.findIndex((config) =>
   '.scss'.match(config.test),
 );
-baseClientWebpackConfig.module.rules[scssConfigIndex].use.push(sassLoaderConfig);
+baseClientWebpackConfig.module.rules[scssConfigIndex]?.use.push(sassLoaderConfig);
 
 // add jquery
 const exposeJQuery = {

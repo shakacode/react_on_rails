@@ -52,8 +52,22 @@ const config: KnipConfig = {
         '@rescript/react',
         // The Babel plugin fails to detect it
         'babel-plugin-transform-react-remove-prop-types',
-        // Temporary!
-        '.*',
+        // This one is weird. It's long-deprecated and shouldn't be necessary.
+        // Probably need to update the Webpack config.
+        'node-libs-browser',
+        // The below dependencies are not detected by the Webpack plugin
+        // due to the config issue.
+        'css-loader',
+        'expose-loader',
+        'file-loader',
+        'imports-loader',
+        'mini-css-extract-plugin',
+        'null-loader',
+        'sass',
+        'sass-loader',
+        'sass-resources-loader',
+        'style-loader',
+        'url-loader',
       ],
     },
   },
