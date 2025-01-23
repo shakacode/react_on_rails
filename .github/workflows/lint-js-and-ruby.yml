@@ -47,9 +47,13 @@ jobs:
         yarn install --no-progress --no-emoji
     - name: Install Ruby Gems for package
       run: bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
-    - name: Linting of Ruby
+    - name: Lint Ruby
       run: bundle exec rubocop
-    - name: Linting of JS
+    - name: Detect dead code
+      run: |
+        yarn run knip
+        yarn run knip --production
+    - name: Lint JS
       run: yarn start lint
     - name: Check formatting
       run: yarn start format.listDifferent
