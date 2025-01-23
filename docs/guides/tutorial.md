@@ -1,10 +1,10 @@
 # React on Rails Basic Tutorial
 
-_Also see the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_demo_ssr_hmr)_ 
+_Also see the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_demo_ssr_hmr)_
 
------
+---
 
-*Updated for Ruby 2.7, Rails 7, React on Rails v13, and Shakapacker v7*
+_Updated for Ruby 2.7, Rails 7, React on Rails v13, and Shakapacker v7_
 
 This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
@@ -13,15 +13,17 @@ After finishing this tutorial you will get an application that can do the follow
 ![example](https://cloud.githubusercontent.com/assets/371302/17368567/111cc722-596b-11e6-9b72-ac5967a60e42.gif)
 
 You can find it here:
-* [Source code for this app in PR, using the --redux option](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/17) and [for Heroku](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/18).
-* [Live on Heroku](https://reactrails.com/)
+
+- [Source code for this app in PR, using the --redux option](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/17) and [for Heroku](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/18).
+- [Live on Heroku](https://reactrails.com/)
 
 By the time you read this, the latest may have changed. Be sure to check the versions here:
 
-* https://rubygems.org/gems/react_on_rails
-* https://www.npmjs.com/package/react-on-rails
+- <https://rubygems.org/gems/react_on_rails>
+- <https://www.npmjs.com/package/react-on-rails>
 
 # Table of Content:
+
 - [Installation](#installation)
   - [Setting up your environment](#setting-up-your-environment)
   - [Create a new Ruby on Rails App](#create-a-new-ruby-on-rails-app)
@@ -41,7 +43,9 @@ By the time you read this, the latest may have changed. Be sure to check the ver
   - [Custom IP & PORT setup (Cloud9 example)](#custom-ip--port-setup-cloud9-example)
   - [RubyMine performance tip](#rubymine-performance-tip)
 - [Conclusion](#conclusion)
+
 # Installation
+
 ## Setting up your environment
 
 Trying out **React on Rails** is super easy, so long as you have the basic prerequisites.
@@ -53,6 +57,7 @@ Trying out **React on Rails** is super easy, so long as you have the basic prere
 - You need to have either [Overmind](https://github.com/DarthSim/overmind) or [Foreman](https://rubygems.org/gems/foreman) as a process manager.
 
 ## Create a new Ruby on Rails App
+
 Then we need to create a fresh Rails application as follows.
 
 First, be sure to run `rails -v` and check you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with react per the instructions [here](https://github.com/rails/webpacker).
@@ -66,9 +71,11 @@ rails new test-react-on-rails --skip-javascript
 
 cd test-react-on-rails
 ```
+
 Note: You can use `--database=postgresql` option to use Postgresql for the database.
 
 ## Add the Shakapacker and react_on_rails gems
+
 We recommend using the latest version of these gems. Otherwise, specify the
 exact versions of both the gem and npm packages. In other words, don't use
 the `^` or `~` in the version specifications.
@@ -143,7 +150,8 @@ React setup, will cause a full page refresh each time you save a file.
 # Deploying to Heroku
 
 ## Create Your Heroku App
-*Assuming you can log in to heroku.com and have logged into your shell for Heroku.*
+
+_Assuming you can log in to heroku.com and have logged into your shell for Heroku._
 
 1. Visit [https://dashboard.heroku.com/new](https://dashboard.heroku.com/new) and create an app, say named `my-name-react-on-rails`:
 
@@ -163,6 +171,7 @@ heroku buildpacks:add --index 1 heroku/nodejs
 ```
 
 ## Swap out sqlite for postgres:
+
 Heroku requires your app to use Postgresql. If you have not setup your app
 with Postgresql, you need to change your app settings to use this database.
 
@@ -234,6 +243,7 @@ web: bundle exec puma -C config/puma.rb
 Note, newer versions of Rails create this file automatically. However, the [docs on Heroku](https://devcenter.heroku.com/articles/deploying-rails-applications-with-the-puma-web-server#config) have something a bit different, so please make it conform to those docs. As of 2020-06-04, the docs looked like this:
 
 `config/puma.rb`
+
 ```rb
 workers Integer(ENV['WEB_CONCURRENCY'] || 2)
 threads_count = Integer(ENV['RAILS_MAX_THREADS'] || 5)
@@ -278,6 +288,7 @@ heroku open
 and you will see your live app and you can share this URL with your friends. Congrats!
 
 # Other features
+
 ## Turning on Server Rendering
 
 You can turn on server rendering by simply changing the `prerender` option to `true`:
@@ -305,18 +316,26 @@ When you look at the source code for the page (right click, view source in Chrom
 versus with server rendering:
 
 ```html
-<div id="HelloWorld-react-component-d846ce53-3b82-4c4a-8f32-ffc347c8444a"><div data-reactroot=""><h3>Hello, <!-- -->Stranger<!-- -->!</h3><hr/><form><label for="name">Say hello to:</label><input type="text" id="name" value="Stranger"/></form></div></div>
+<div id="HelloWorld-react-component-d846ce53-3b82-4c4a-8f32-ffc347c8444a">
+  <div data-reactroot="">
+    <h3>
+      Hello,
+      <!-- -->Stranger<!-- -->!
+    </h3>
+    <hr />
+    <form><label for="name">Say hello to:</label><input type="text" id="name" value="Stranger" /></form>
+  </div>
+</div>
 ```
 
 For more details on server rendering, see:
 
-  + [Client vs. Server Rendering](https://www.shakacode.com/react-on-rails/docs/guides/client-vs-server-rendering/)
-  + [React Server Rendering](https://www.shakacode.com/react-on-rails/docs/guides/react-server-rendering/)
+- [Client vs. Server Rendering](https://www.shakacode.com/react-on-rails/docs/guides/client-vs-server-rendering/)
+- [React Server Rendering](https://www.shakacode.com/react-on-rails/docs/guides/react-server-rendering/)
 
 ## Moving from the Rails default `/app/javascript` to the recommended `/client` structure
 
 ShakaCode recommends that you use `/client` for your client side app. This way a non-Rails, front-end developer can be at home just by opening up the `/client` directory.
-
 
 1. Move the directory:
 
@@ -338,18 +357,17 @@ When you change and save a JSX file, the browser will automatically refresh!
 
 So you get some basics from HMR with no code changes. If you want to go further, take a look at these links:
 
-* [webpack-dev-server](https://github.com/rails/webpacker/blob/5-x-stable/docs/webpack-dev-server.md)
-* [DevServer](https://webpack.js.org/configuration/dev-server/)
-* [Hot Module Replacement](https://webpack.js.org/concepts/hot-module-replacement/)
+- [webpack-dev-server](https://github.com/rails/webpacker/blob/5-x-stable/docs/webpack-dev-server.md)
+- [DevServer](https://webpack.js.org/configuration/dev-server/)
+- [Hot Module Replacement](https://webpack.js.org/concepts/hot-module-replacement/)
 
 React on Rails will automatically handle disabling server rendering if there is only one bundle file created by the Webpack development server by `shakapcker`.
-
 
 ## Custom IP & PORT setup (Cloud9 example)
 
 In case you are running some custom setup with different IP or PORT you should also edit Procfile.dev. For example, to be able to run on free Cloud9 IDE we are putting IP 0.0.0.0 and PORT 8080. The default generated file `Procfile.dev` uses `-p 3000`.
 
-``` Procfile.dev
+```Procfile.dev
 web: rails s -p 8080 -b 0.0.0.0
 ```
 
@@ -359,12 +377,12 @@ Then visit https://your-shared-addr.c9users.io:8080/hello_world
 
 It's super important to exclude certain directories from RubyMine or else it will slow to a crawl as it tries to parse all the npm files.
 
-* Generated files, per the settings in your `config/shakapacker.yml`, which default to `public/packs` and `public/packs-test`
-* `node_modules`
+- Generated files, per the settings in your `config/shakapacker.yml`, which default to `public/packs` and `public/packs-test`
+- `node_modules`
 
 # Conclusion
 
-* Browse the docs on [our documentation website](https://www.shakacode.com/react-on-rails/docs/)
+- Browse the docs on [our documentation website](https://www.shakacode.com/react-on-rails/docs/)
 
 Feedback is greatly appreciated! As are stars on github!
 

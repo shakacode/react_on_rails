@@ -10,7 +10,6 @@ bracketSameLine: false
 overrides:
   - files: '*.@(css|scss)'
     options:
-      parser: css
       singleQuote: false
       printWidth: 120
   - files: '*.@(json)'

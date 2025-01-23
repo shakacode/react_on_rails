@@ -105,8 +105,8 @@ class ComponentRenderer {
 
         if (isServerRenderHash(reactElementOrRouterResult)) {
           throw new Error(`\
-  You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
-  You should return a React.Component always for the client side entry point.`);
+You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
+You should return a React.Component always for the client side entry point.`);
         } else {
           const rootOrElement = reactHydrateOrRender(
             domNode,

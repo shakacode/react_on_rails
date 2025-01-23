@@ -18,7 +18,7 @@ In this guide, it is assumed that you have upgraded the `react-rails` project to
 
       1. `react_on_rails` by default uses `bundles` directory for the React components. You may choose to rename `components` into `bundles` to follow the convention.
 
-      2. `react_on_rails` uses `client-bundle.js` and  `server-bundle.js` instead of `application.js` and `server_rendering.js`. There is nothing special about these names. It can be set to use any other name (as mentioned above). If you too choose to follow the new names, consider updating the relevant `javascript_pack_tag` in your Rails views.
+      2. `react_on_rails` uses `client-bundle.js` and `server-bundle.js` instead of `application.js` and `server_rendering.js`. There is nothing special about these names. It can be set to use any other name (as mentioned above). If you too choose to follow the new names, consider updating the relevant `javascript_pack_tag` in your Rails views.
 
       3. Update the content of these files to register your React components for client or server-side rendering. Checking the generated files by `react_on_rails` installation process should give enough hints.
 

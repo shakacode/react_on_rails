@@ -1,4 +1,4 @@
-# Render-Functions and the Rails Context 
+# Render-Functions and the Rails Context
 
 ## Render-Functions
 
@@ -21,46 +21,46 @@ For example, suppose you create a "render-function" called MyAppComponent.
 
 ```js
 import React from 'react';
-const MyAppComponent = (props, railsContext) => (
+const MyAppComponent =
+  (props, railsContext) =>
   // NOTE: need to wrap in a function so this is proper React function component that can use
   // hooks
- 
+
   // the props get passed again, but we ignore since we use a closure
   // or should we
-  () =>
-      <div>
-        <p>props are: {JSON.stringify(props)}</p>
-        <p>railsContext is: {JSON.stringify(railsContext)}
-        </p>
-      </div>
-);
+  () => (
+    <div>
+      <p>props are: {JSON.stringify(props)}</p>
+      <p>railsContext is: {JSON.stringify(railsContext)}</p>
+    </div>
+  );
 export default MyAppComponent;
 ```
 
-------------------------------
+---
 
 _This would be alternate API where you have to call React.createElement and the React on Rails code doesn't do that._
 
 ```js
 import React from 'react';
-const MyAppComponent = (props, railsContext) => (
+const MyAppComponent = (props, railsContext) =>
   // NOTE: need to wrap in a function so this is proper React function component that can use
   // hooks
   React.createElement(
-    () =>
+    () => (
       <div>
         <p>props are: {JSON.stringify(props)}</p>
-        <p>railsContext is: {JSON.stringify(railsContext)}
-        </p>
-      </div>,
-  props)
-);
+        <p>railsContext is: {JSON.stringify(railsContext)}</p>
+      </div>
+    ),
+    props,
+  );
 export default MyAppComponent;
 ```
 
-------------------------------------
+---
 
-*Note: you will get a React browser console warning if you try to serverRender this since the value of `serverSide` will be different for server rendering.*
+_Note: you will get a React browser console warning if you try to serverRender this since the value of `serverSide` will be different for server rendering._
 
 So if you register your render-function `MyAppComponent`, it will get called like:
 
@@ -89,7 +89,7 @@ The `railsContext` has: (see implementation in file [ReactOnRails::Helper](https
     i18nDefaultLocale: I18n.default_locale,
     rorVersion: ReactOnRails::VERSION,
     rorPro: ReactOnRails::Utils.react_on_rails_pro?
-    
+
     # URL settings
     href: request.original_url,
     location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}": ""}",
@@ -113,7 +113,7 @@ Plus, you can add your customizations to this. See "rendering extension" below.
 
 The `railsContext` is a second param passed to your render-functions for React components. This is in addition to the props that are passed from the `react_component` Rails helper. For example:
 
-ERB view file: 
+ERB view file:
 
 ```ruby
   # Rails View
@@ -129,12 +129,12 @@ export default (props, railsContext) => {
   // Note, wrap in a function so this is React function component
   return () => (
     <div>
-      Your locale is {railsContext.i18nLocale}.<br/>
+      Your locale is {railsContext.i18nLocale}.<br />
       Hello, {props.name}!
     </div>
   );
 };
-``` 
+```
 
 ## Why is the railsContext only passed to render-functions?
 
@@ -143,18 +143,18 @@ There's no reason that the railsContext would ever get passed to your React comp
 ```js
 import React from 'react';
 import AppComponent from './AppComponent';
-const AppComponentWithRailsContext = (props, railsContext) => (
+const AppComponentWithRailsContext =
+  (props, railsContext) =>
   // Create a React Function Component so you can
   // use the React Hooks API in this React Function Component
-  () => <AppComponent {...{...props, railsContext}}/>
-)
+  () => <AppComponent {...{ ...props, railsContext }} />;
 export default AppComponentWithRailsContext;
 ```
 
 Consider this line in depth:
 
 ```js
-  <AppComponent {...{ ...props, railsContext }}/>
+<AppComponent {...{ ...props, railsContext }} />
 ```
 
 The outer `{...` is for the [JSX spread operator for attributes](https://facebook.github.io/react/docs/jsx-in-depth.html#spread-attributes) and the inner `{...` is for the [Spread in object literals](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_operator#Spread_in_object_literals).

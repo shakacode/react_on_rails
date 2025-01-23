@@ -4,7 +4,7 @@ _Note: This document is outdated._ Please email [justin@shakacode.com](mailto:ju
 if you would be interested in help with code splitting using
 [loadable-components.com](https://loadable-components.com/docs) with React on Rails.
 
------
+---
 
 What is code splitting? From the webpack documentation:
 
@@ -29,6 +29,7 @@ To prevent this, you have to wait until the code chunk is fetched before doing t
 Here's an example of how you might use this in practice:
 
 #### page.html.erb
+
 ```erb
 <%= react_component("NavigationApp", prerender: true) %>
 <%= react_component("RouterApp", prerender: true) %>
@@ -36,6 +37,7 @@ Here's an example of how you might use this in practice:
 ```
 
 #### clientRegistration.js
+
 ```js
 import ReactOnRails from 'node_package/lib/ReactOnRails';
 import NavigationApp from './NavigationApp';
@@ -45,7 +47,7 @@ import NavigationApp from './NavigationApp';
 import RouterApp from './RouterAppRenderer';
 import applicationStore from '../store/applicationStore';
 
-ReactOnRails.registerStore({applicationStore});
+ReactOnRails.registerStore({ applicationStore });
 ReactOnRails.register({
   NavigationApp,
   RouterApp,
@@ -53,6 +55,7 @@ ReactOnRails.register({
 ```
 
 #### serverRegistration.js
+
 ```js
 import ReactOnRails from 'react-on-rails';
 import NavigationApp from './NavigationApp';
@@ -61,15 +64,17 @@ import NavigationApp from './NavigationApp';
 import RouterApp from './RouterAppServer';
 import applicationStore from '../store/applicationStore';
 
-ReactOnRails.registerStore({applicationStore});
+ReactOnRails.registerStore({ applicationStore });
 ReactOnRails.register({
   NavigationApp,
   RouterApp,
 });
 ```
+
 Note that you should not register a renderer on the server, since there won't be a domNodeId when we're server rendering. Note that the `RouterApp` imported by `serverRegistration.js` is from a different file. For an example of how to set up an app for server rendering, see the [react router docs](https://www.shakacode.com/react-on-rails/docs/javascript/react-router/).
 
 #### RouterAppRenderer.jsx
+
 ```jsx
 import ReactOnRails from 'react-on-rails';
 import React from 'react';
@@ -143,7 +148,7 @@ Add the following to the output key of your webpack config:
 config = {
   output: {
     publicPath: '/assets/',
-  }
+  },
 };
 ```
 

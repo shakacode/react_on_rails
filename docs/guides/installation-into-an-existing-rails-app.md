@@ -37,6 +37,7 @@
    ```bash
    rails generate react_on_rails:install --help
    ```
+
 5. Ensure that you have `overmind` or `foreman` installed.
 
    Note: `foreman` should be installed on the system not on your project. [Read more](https://github.com/ddollar/foreman/wiki/Don't-Bundle-Foreman)
@@ -46,6 +47,7 @@
    ```bash
    ./bin/dev
    ```
+
    Note: `foreman` defaults to PORT 5000 unless you set the value of PORT in your environment. For example, you can `export PORT=3000` to use the Rails default port of 3000. For the hello_world example, this is already set.
 
 7. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world).
@@ -53,7 +55,6 @@
 ## Installation
 
 See the [Installation Overview](https://www.shakacode.com/react-on-rails/docs/additional-details/manual-installation-overview/) for a concise set summary of what's in a React on Rails installation.
-
 
 ## NPM
 
