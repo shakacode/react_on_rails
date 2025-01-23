@@ -57,7 +57,7 @@ scripts:
         script: prettier "**/*.@(ts|tsx)" --write
       listDifferent:
         description: Check if any TS files would change by running prettier.
-        script: prettier "**/*.@(ts|tsx)" --list-different
+        script: prettier "**/*.@(ts|tsx)" --check
     js:
       default:
         description: Run prettier on JS.
@@ -65,15 +65,15 @@ scripts:
         script: prettier "**/*.@(js|jsx)" --write
       listDifferent:
         description: Check if any JS files would change by running prettier.
-        # script: prettier "**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --list-different
-        script: prettier "**/*.@(js|jsx)" --list-different
+        # script: prettier "**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --check
+        script: prettier "**/*.@(js|jsx)" --check
     json:
       default:
         description: Run prettier on JSON files.
         script: rm -rf packages/vm-renderer/tests/tmp && prettier "**/*.json" --write
       listDifferent:
         description: Check if any JSON files would change by running prettier.
-        script: prettier "**/*.json" --list-different
+        script: prettier "**/*.json" --check
 
   renderer:
     description: Starts the node renderer.
