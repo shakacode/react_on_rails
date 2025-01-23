@@ -42,9 +42,9 @@ files:
       chmod 700 /home/webapp
 ```
 
-This script installs `yarn` and all `node.js` dependencies before the rails do `assets:precompile`. Also, it creates `/home/webapp` directory allowing the precompile task to create temp files. 
+This script installs `yarn` and all `node.js` dependencies before the rails do `assets:precompile`. Also, it creates `/home/webapp` directory allowing the precompile task to create temp files.
 
-Your app can be deployed to elastic beanstalk successfully. However, the react app javascript files are under `public/packs`. If you are using nginx, you need to let it know the location of `https://yourhost/packs`. 
+Your app can be deployed to elastic beanstalk successfully. However, the react app javascript files are under `public/packs`. If you are using nginx, you need to let it know the location of `https://yourhost/packs`.
 
 In your `proxy.conf` setting, please add the following code.
 
