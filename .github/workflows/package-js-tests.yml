@@ -1,6 +1,5 @@
 name: JS unit tests for Renderer package
 
-
 on:
   push:
     branches:
@@ -14,32 +13,32 @@ jobs:
         versions: ['oldest', 'newest']
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-    - name: Setup Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
-    - name: Print system information
-      run: |
-        echo "Linux release: "; cat /etc/issue
-        echo "Current user: "; whoami
-        echo "Current directory: "; pwd
-        echo "Node version: "; node -v
-        echo "Yarn version: "; yarn --version
-    - name: Save root node_modules to cache
-      uses: actions/cache@v4
-      with:
-        path: node_modules
-        key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
-    - name: run conversion script
-      if: matrix.versions == 'oldest'
-      run: script/convert
-    - name: Install Node modules with Yarn for renderer package
-      run: |
-        yarn install --no-progress --no-emoji
-        yarn run eslint -v
-        sudo yarn global add yalc
-    - name: Run JS unit tests for Renderer package
-      run: yarn test
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Node version: "; node -v
+          echo "Yarn version: "; yarn --version
+      - name: Save root node_modules to cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+      - name: run conversion script
+        if: matrix.versions == 'oldest'
+        run: script/convert
+      - name: Install Node modules with Yarn for renderer package
+        run: |
+          yarn install --no-progress --no-emoji
+          yarn run eslint -v
+          sudo yarn global add yalc
+      - name: Run JS unit tests for Renderer package
+        run: yarn test
