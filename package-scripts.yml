@@ -1,7 +1,7 @@
 scripts:
   lint:
     description: Run all linters (eslint, tsc)
-    script: concurrently --prefix "[{name}]" --names "ESLINT" -c "blue,yellow,magenta,orange" "nps eslint"
+    script: nps eslint
 
   eslint:
     default:
@@ -33,47 +33,10 @@ scripts:
   format:
     default:
       description: Format files using prettier.
-      script: |
-        concurrently \
-          --prefix "[{name}]" \
-          --names "ts,js,json" \
-          -c "yellow,magenta" \
-          "nps format.ts" \
-          "nps format.js" \
-          "nps format.json"
+      script: prettier --write .
     listDifferent:
       description: Check that all files were formatted using prettier.
-      script: |
-        concurrently \
-          --prefix "[{name}]" \
-          --names "ts,js,json" \
-          -c "yellow,magenta" \
-          "nps format.ts.listDifferent" \
-          "nps format.js.listDifferent" \
-          "nps format.json.listDifferent"
-    ts:
-      default:
-        description: Run prettier on TS.
-        script: prettier "**/*.@(ts|tsx)" --write
-      listDifferent:
-        description: Check if any TS files would change by running prettier.
-        script: prettier "**/*.@(ts|tsx)" --check
-    js:
-      default:
-        description: Run prettier on JS.
-        #script: prettier "packages/**/*.@(js|jsx)" "spec/dummy/client/app/**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --write
-        script: prettier "**/*.@(js|jsx)" --write
-      listDifferent:
-        description: Check if any JS files would change by running prettier.
-        # script: prettier "**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --check
-        script: prettier "**/*.@(js|jsx)" --check
-    json:
-      default:
-        description: Run prettier on JSON and YAML files.
-        script: rm -rf packages/vm-renderer/tests/tmp && prettier "**/*.@(json|yaml)" "**/.*rc" --write
-      listDifferent:
-        description: Check if any JSON or YAML files would change by running prettier.
-        script: prettier "**/*.@(json|yaml)" "**/.*rc" --check
+      script: prettier --check .
 
   renderer:
     description: Starts the node renderer.

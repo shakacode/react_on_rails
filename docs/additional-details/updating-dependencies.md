@@ -14,7 +14,7 @@ bundle update
 
 1. Install [npm-check-updates](https://www.npmjs.com/package/npm-check-updates)
 1. Run `yarn outdated` and read CHANGELOGs of major updated packages before you update. You might not be ready for some updates.
-1. Run these commands. You may or may not need to `rm -rf` your `node_modules` directory. 
+1. Run these commands. You may or may not need to `rm -rf` your `node_modules` directory.
 
 ```
 cd client
@@ -25,7 +25,7 @@ yarn
 Some combinations that I often run:
 
 ### remove old installed `node_modules` so you only get what corresponds to package.json
+
 ```
 ncu -u -a && rm -rf node_modules && yarn
 ```
-

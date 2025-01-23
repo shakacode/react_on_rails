@@ -2,11 +2,11 @@
 @use "sass:math";
 
 // TODO: Figure out how to get this in a global spot
-$font-family-sans-serif: 'OpenSans-Light';  // apply custom font
-$fonts-url-path: '../assets/fonts';
+$font-family-sans-serif: "OpenSans-Light"; // apply custom font
+$fonts-url-path: "../assets/fonts";
 @font-face {
-  font-family: 'OpenSans-Light';
-  src: url('#{$fonts-url-path}/OpenSans-Light.ttf') format('truetype');
+  font-family: "OpenSans-Light";
+  src: url("#{$fonts-url-path}/OpenSans-Light.ttf") format("truetype");
 }
 
 .heading {
@@ -39,7 +39,7 @@ $hookipa-beach-height: 373px;
 }
 
 // This is an absolute path to the image, defined in app-variables.scss
-$images-url-path: '../assets/images';
+$images-url-path: "../assets/images";
 
 $rails-on-maui-width: 140px;
 $rails-on-maui-height: 40px;
