@@ -10,5 +10,10 @@ bundle/
 spec/dummy/lib/bs/**
 spec/dummy/public
 **/.yalc/**
-**/generated/**
+**/*generated*
 *.res.js
+
+# Prettier doesn't understand ERB syntax in YAML files
+.rubocop.yml
+# Intentionally invalid
+spec/react_on_rails/fixtures/i18n/locales_symbols/
