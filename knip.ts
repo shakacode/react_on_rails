@@ -48,6 +48,8 @@ const config: KnipConfig = {
         'bin/.*',
       ],
       ignoreDependencies: [
+        // Knip thinks it can be a devDependency, but it's supposed to be in dependencies.
+        '@babel/runtime',
         // There's no ReScript plugin for Knip
         '@rescript/react',
         // The Babel plugin fails to detect it
