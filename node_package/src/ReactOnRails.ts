@@ -66,8 +66,10 @@ ctx.ReactOnRails = {
    */
   registerStoreGenerators(storeGenerators: { [id: string]: StoreGenerator }): void {
     if (!storeGenerators) {
-      throw new Error('Called ReactOnRails.registerStoreGenerators with a null or undefined, rather than ' +
-        'an Object with keys being the store names and the values are the store generators.');
+      throw new Error(
+        'Called ReactOnRails.registerStoreGenerators with a null or undefined, rather than ' +
+          'an Object with keys being the store names and the values are the store generators.',
+      );
     }
 
     StoreRegistry.register(storeGenerators);
@@ -103,7 +105,7 @@ ctx.ReactOnRails = {
    * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
    * `turbo: true|false Turbo (the follower of Turbolinks) events will be registered, if set to true.
    */
-  setOptions(newOptions: {traceTurbolinks?: boolean, turbo?: boolean }): void {
+  setOptions(newOptions: { traceTurbolinks?: boolean; turbo?: boolean }): void {
     if (typeof newOptions.traceTurbolinks !== 'undefined') {
       this.options.traceTurbolinks = newOptions.traceTurbolinks;
 
@@ -119,9 +121,7 @@ ctx.ReactOnRails = {
     }
 
     if (Object.keys(newOptions).length > 0) {
-      throw new Error(
-        `Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`,
-      );
+      throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`);
     }
   },
 
@@ -227,7 +227,11 @@ ctx.ReactOnRails = {
     const componentObj = ComponentRegistry.get(name);
     const reactElement = createReactOutput({ componentObj, props, domNodeId });
 
-    return reactHydrateOrRender(document.getElementById(domNodeId) as Element, reactElement as ReactElement, hydrate);
+    return reactHydrateOrRender(
+      document.getElementById(domNodeId) as Element,
+      reactElement as ReactElement,
+      hydrate,
+    );
   },
 
   /**
@@ -252,7 +256,9 @@ ctx.ReactOnRails = {
    * @param options
    */
   streamServerRenderedReactComponent() {
-    throw new Error('streamServerRenderedReactComponent is only supported when using a bundle built for Node.js environments');
+    throw new Error(
+      'streamServerRenderedReactComponent is only supported when using a bundle built for Node.js environments',
+    );
   },
 
   /**
@@ -303,5 +309,5 @@ ctx.ReactOnRails.resetOptions();
 
 ClientStartup.clientStartup(ctx);
 
-export * from "./types";
+export * from './types';
 export default ctx.ReactOnRails;

@@ -33,7 +33,14 @@ scripts:
   format:
     default:
       description: Format files using prettier.
-      script: concurrently --prefix "[{name}]" --names "ts,js,json" -c "yellow,magenta,green" "nps format.js" "nps format.json"
+      script: |
+        concurrently \
+          --prefix "[{name}]" \
+          --names "ts,js,json" \
+          -c "yellow,magenta" \
+          "nps format.ts" \
+          "nps format.js" \
+          "nps format.json"
     listDifferent:
       description: Check that all files were formatted using prettier.
       script: |
@@ -41,15 +48,23 @@ scripts:
           --prefix "[{name}]" \
           --names "ts,js,json" \
           -c "yellow,magenta" \
+          "nps format.ts.listDifferent" \
           "nps format.js.listDifferent" \
           "nps format.json.listDifferent"
+    ts:
+      default:
+        description: Run prettier on TS.
+        script: prettier "**/*.@(ts|tsx)" --write
+      listDifferent:
+        description: Check if any TS files would change by running prettier.
+        script: prettier "**/*.@(ts|tsx)" --list-different
     js:
       default:
-        description: Run prettier-eslint on JS.
+        description: Run prettier on JS.
         #script: prettier "packages/**/*.@(js|jsx)" "spec/dummy/client/app/**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --write
         script: prettier "**/*.@(js|jsx)" --write
       listDifferent:
-        description: Check if any JS files would change by running prettier-eslint.
+        description: Check if any JS files would change by running prettier.
         # script: prettier "**/*.@(js|jsx)" "webpack.config.babel.js" "webpack/**/*.js" --list-different
         script: prettier "**/*.@(js|jsx)" --list-different
     json:
@@ -57,7 +72,7 @@ scripts:
         description: Run prettier on JSON files.
         script: rm -rf packages/vm-renderer/tests/tmp && prettier "**/*.json" --write
       listDifferent:
-        description: Check if any JSON files would change by running prettier-eslint.
+        description: Check if any JSON files would change by running prettier.
         script: prettier "**/*.json" --list-different
 
   renderer:

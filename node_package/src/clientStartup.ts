@@ -65,7 +65,7 @@ function debugTurbolinks(...msg: string[]): void {
 }
 
 function turbolinksInstalled(): boolean {
-  return (typeof Turbolinks !== 'undefined');
+  return typeof Turbolinks !== 'undefined';
 }
 
 function turboInstalled() {
@@ -82,7 +82,7 @@ function reactOnRailsHtmlElements(): HTMLCollectionOf<Element> {
 
 function initializeStore(el: Element, context: Context, railsContext: RailsContext): void {
   const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
-  const props = (el.textContent !== null) ? JSON.parse(el.textContent) : {};
+  const props = el.textContent !== null ? JSON.parse(el.textContent) : {};
   const storeGenerator = context.ReactOnRails.getStoreGenerator(name);
   const store = storeGenerator(props, railsContext);
   context.ReactOnRails.setStore(name, store);
@@ -96,7 +96,7 @@ function forEachStore(context: Context, railsContext: RailsContext): void {
 }
 
 function turbolinksVersion5(): boolean {
-  return (typeof Turbolinks.controller !== 'undefined');
+  return typeof Turbolinks.controller !== 'undefined';
 }
 
 function turbolinksSupported(): boolean {
@@ -114,9 +114,12 @@ function delegateToRenderer(
 
   if (isRenderer) {
     if (trace) {
-      console.log(`\
+      console.log(
+        `\
 DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, railsContext:`,
-        props, railsContext);
+        props,
+        railsContext,
+      );
     }
 
     (component as RenderFunction)(props, railsContext, domNodeId);
@@ -138,7 +141,7 @@ function render(el: Element, context: Context, railsContext: RailsContext): void
   // This must match lib/react_on_rails/helper.rb
   const name = el.getAttribute('data-component-name') || '';
   const domNodeId = domNodeIdForEl(el);
-  const props = (el.textContent !== null) ? JSON.parse(el.textContent) : {};
+  const props = el.textContent !== null ? JSON.parse(el.textContent) : {};
   const trace = el.getAttribute('data-trace') === 'true';
 
   try {
@@ -167,7 +170,11 @@ function render(el: Element, context: Context, railsContext: RailsContext): void
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);
       } else {
-        const rootOrElement = reactHydrateOrRender(domNode, reactElementOrRouterResult as ReactElement, shouldHydrate);
+        const rootOrElement = reactHydrateOrRender(
+          domNode,
+          reactElementOrRouterResult as ReactElement,
+          shouldHydrate,
+        );
         if (supportsRootApi) {
           context.roots.push(rootOrElement as Root);
         }
@@ -175,7 +182,7 @@ You should return a React.Component always for the client side entry point.`);
     }
   } catch (e: any) {
     console.error(e.message);
-    e.message = `ReactOnRails encountered an error while rendering component: ${name}. See above error message.`
+    e.message = `ReactOnRails encountered an error while rendering component: ${name}. See above error message.`;
     throw e;
   }
 }
@@ -196,7 +203,7 @@ function parseRailsContext(): RailsContext | null {
   }
 
   if (!el.textContent) {
-    throw new Error('The HTML element with ID \'js-react-on-rails-context\' has no textContent');
+    throw new Error("The HTML element with ID 'js-react-on-rails-context' has no textContent");
   }
 
   return JSON.parse(el.textContent);
@@ -246,8 +253,7 @@ function unmount(el: Element): void {
   try {
     ReactDOM.unmountComponentAtNode(domNode);
   } catch (e: any) {
-    console.info(`Caught error calling unmountComponentAtNode: ${e.message} for domNode`,
-      domNode, e);
+    console.info(`Caught error calling unmountComponentAtNode: ${e.message} for domNode`, domNode, e);
   }
 }
 
@@ -281,23 +287,19 @@ function renderInit(): void {
   }
 
   if (turboInstalled()) {
-    debugTurbolinks(
-      'USING TURBO: document added event listeners ' +
-      'turbo:before-render and turbo:render.');
+    debugTurbolinks('USING TURBO: document added event listeners turbo:before-render and turbo:render.');
     document.addEventListener('turbo:before-render', reactOnRailsPageUnloaded);
     document.addEventListener('turbo:render', reactOnRailsPageLoaded);
     reactOnRailsPageLoaded();
   } else if (turbolinksVersion5()) {
     debugTurbolinks(
-      'USING TURBOLINKS 5: document added event listeners ' +
-      'turbolinks:before-render and turbolinks:render.');
+      'USING TURBOLINKS 5: document added event listeners turbolinks:before-render and turbolinks:render.',
+    );
     document.addEventListener('turbolinks:before-render', reactOnRailsPageUnloaded);
     document.addEventListener('turbolinks:render', reactOnRailsPageLoaded);
     reactOnRailsPageLoaded();
   } else {
-    debugTurbolinks(
-      'USING TURBOLINKS 2: document added event listeners page:before-unload and ' +
-      'page:change.');
+    debugTurbolinks('USING TURBOLINKS 2: document added event listeners page:before-unload and page:change.');
     document.addEventListener('page:before-unload', reactOnRailsPageUnloaded);
     document.addEventListener('page:change', reactOnRailsPageLoaded);
   }
@@ -308,12 +310,12 @@ function isWindow(context: Context): context is Window {
 }
 
 function onPageReady(callback: () => void) {
-  if (document.readyState === "complete") {
+  if (document.readyState === 'complete') {
     callback();
   } else {
-    document.addEventListener("readystatechange", function onReadyStateChange() {
-        onPageReady(callback);
-        document.removeEventListener("readystatechange", onReadyStateChange);
+    document.addEventListener('readystatechange', function onReadyStateChange() {
+      onPageReady(callback);
+      document.removeEventListener('readystatechange', onReadyStateChange);
     });
   }
 }

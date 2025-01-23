@@ -9,7 +9,7 @@ export default {
     return null;
   },
 
-  authenticityHeaders(otherHeaders: {[id: string]: string} = {}): AuthenticityHeaders {
+  authenticityHeaders(otherHeaders: { [id: string]: string } = {}): AuthenticityHeaders {
     return Object.assign(otherHeaders, {
       'X-CSRF-Token': this.authenticityToken(),
       'X-Requested-With': 'XMLHttpRequest',
