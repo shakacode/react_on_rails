@@ -69,11 +69,11 @@ scripts:
         script: prettier "**/*.@(js|jsx)" --check
     json:
       default:
-        description: Run prettier on JSON files.
-        script: rm -rf packages/vm-renderer/tests/tmp && prettier "**/*.json" --write
+        description: Run prettier on JSON and YAML files.
+        script: rm -rf packages/vm-renderer/tests/tmp && prettier "**/*.@(json|yaml)" "**/.*rc" --write
       listDifferent:
-        description: Check if any JSON files would change by running prettier.
-        script: prettier "**/*.json" --check
+        description: Check if any JSON or YAML files would change by running prettier.
+        script: prettier "**/*.@(json|yaml)" "**/.*rc" --check
 
   renderer:
     description: Starts the node renderer.
