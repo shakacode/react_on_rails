@@ -1,5 +1,5 @@
 import { combineReducers, applyMiddleware, createStore } from 'redux';
-import middleware from 'redux-thunk';
+import { thunk } from 'redux-thunk';
 
 import reducers from '../reducers/reducersIndex';
 
@@ -12,5 +12,5 @@ export default (props, railsContext) => {
   delete props.prerender;
   const combinedReducer = combineReducers(reducers);
   const newProps = { ...props, railsContext };
-  return applyMiddleware(middleware)(createStore)(combinedReducer, newProps);
+  return applyMiddleware(thunk)(createStore)(combinedReducer, newProps);
 };
