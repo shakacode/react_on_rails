@@ -7,7 +7,14 @@ import { isPromise, isServerRenderHash } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
-import type { CreateReactOutputResult, RenderParams, RenderResult, RenderState, RenderOptions, ServerRenderResult } from './types';
+import type {
+  CreateReactOutputResult,
+  RenderParams,
+  RenderResult,
+  RenderState,
+  RenderOptions,
+  ServerRenderResult,
+} from './types';
 
 function processServerRenderHash(result: ServerRenderResult, options: RenderOptions): RenderState {
   const { redirectLocation, routeError } = result;
@@ -21,7 +28,9 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
   if (redirectLocation) {
     if (options.trace) {
       const redirectPath = redirectLocation.pathname + redirectLocation.search;
-      console.log(`ROUTER REDIRECT: ${options.componentName} to dom node with id: ${options.domNodeId}, redirect to ${redirectPath}`);
+      console.log(
+        `ROUTER REDIRECT: ${options.componentName} to dom node with id: ${options.domNodeId}, redirect to ${redirectPath}`,
+      );
     }
     // For redirects on server rendering, we can't stop Rails from returning the same result.
     // Possibly, someday, we could have the Rails server redirect.
@@ -33,9 +42,14 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
   return { result: htmlResult, hasErrors };
 }
 
-function processPromise(result: Promise<string>, renderingReturnsPromises: boolean): Promise<string> | string {
+function processPromise(
+  result: Promise<string>,
+  renderingReturnsPromises: boolean,
+): Promise<string> | string {
   if (!renderingReturnsPromises) {
-    console.error('Your render function returned a Promise, which is only supported by a node renderer, not ExecJS.');
+    console.error(
+      'Your render function returned a Promise, which is only supported by a node renderer, not ExecJS.',
+    );
     // If the app is using server rendering with ExecJS, then the promise will not be awaited.
     // And when a promise is passed to JSON.stringify, it will be converted to '{}'.
     return '{}';
@@ -64,7 +78,7 @@ function processRenderingResult(result: CreateReactOutputResult, options: Render
   return { result: processReactElement(result), hasErrors: false };
 }
 
-function handleRenderingError(e: unknown, options: { componentName: string, throwJsErrors: boolean }) {
+function handleRenderingError(e: unknown, options: { componentName: string; throwJsErrors: boolean }) {
   if (options.throwJsErrors) {
     throw e;
   }
@@ -79,7 +93,7 @@ function handleRenderingError(e: unknown, options: { componentName: string, thro
 async function createPromiseResult(
   renderState: RenderState & { result: Promise<string> },
   componentName: string,
-  throwJsErrors: boolean
+  throwJsErrors: boolean,
 ): Promise<RenderResult> {
   // Capture console history before awaiting the promise
   // Node renderer will reset the global console.history after executing the synchronous part of the request.
@@ -100,7 +114,7 @@ async function createPromiseResult(
 function createFinalResult(
   renderState: RenderState,
   componentName: string,
-  throwJsErrors: boolean
+  throwJsErrors: boolean,
 ): null | string | Promise<RenderResult> {
   const { result } = renderState;
   if (isPromise(result)) {
@@ -112,7 +126,15 @@ function createFinalResult(
 }
 
 function serverRenderReactComponentInternal(options: RenderParams): null | string | Promise<RenderResult> {
-  const { name: componentName, domNodeId, trace, props, railsContext, renderingReturnsPromises, throwJsErrors } = options;
+  const {
+    name: componentName,
+    domNodeId,
+    trace,
+    props,
+    railsContext,
+    renderingReturnsPromises,
+    throwJsErrors,
+  } = options;
 
   let renderState: RenderState = {
     result: null,
@@ -136,7 +158,12 @@ function serverRenderReactComponentInternal(options: RenderParams): null | strin
     // 1. Converts React elements to HTML strings
     // 2. Returns rendered HTML from serverRenderHash
     // 3. Handles promises for async rendering
-    renderState = processRenderingResult(reactRenderingResult, { componentName, domNodeId, trace, renderingReturnsPromises });
+    renderState = processRenderingResult(reactRenderingResult, {
+      componentName,
+      domNodeId,
+      trace,
+      renderingReturnsPromises,
+    });
   } catch (e: unknown) {
     renderState = handleRenderingError(e, { componentName, throwJsErrors });
   }

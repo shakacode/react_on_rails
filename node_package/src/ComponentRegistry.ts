@@ -8,7 +8,7 @@ export default {
    * @param components { component1: component1, component2: component2, etc. }
    */
   register(components: { [id: string]: ReactComponentOrRenderFunction }): void {
-    Object.keys(components).forEach(name => {
+    Object.keys(components).forEach((name) => {
       if (registeredComponents.has(name)) {
         console.warn('Called register for component that is already registered', name);
       }

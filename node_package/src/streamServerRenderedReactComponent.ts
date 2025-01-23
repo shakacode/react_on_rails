@@ -31,7 +31,7 @@ const transformRenderStreamChunksToResultObject = (renderState: StreamRenderStat
 
       this.push(`${jsonChunk}\n`);
       callback();
-    }
+    },
   });
 
   let pipedStream: PipeableStream | null = null;
@@ -51,25 +51,20 @@ const transformRenderStreamChunksToResultObject = (renderState: StreamRenderStat
   const endStream = () => {
     transformStream.end();
     pipedStream?.abort();
-  }
+  };
   return { readableStream, pipeToTransform, writeChunk, emitError, endStream };
-}
+};
 
 const streamRenderReactComponent = (reactRenderingResult: ReactElement, options: RenderParams) => {
   const { name: componentName, throwJsErrors } = options;
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
-    isShellReady: false
+    isShellReady: false,
   };
 
-  const {
-    readableStream,
-    pipeToTransform,
-    writeChunk,
-    emitError,
-    endStream
-  } = transformRenderStreamChunksToResultObject(renderState);
+  const { readableStream, pipeToTransform, writeChunk, emitError, endStream } =
+    transformRenderStreamChunksToResultObject(renderState);
 
   const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderingResult, {
     onShellError(e) {
@@ -103,7 +98,7 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement, options:
   });
 
   return readableStream;
-}
+};
 
 const streamServerRenderedReactComponent = (options: RenderParams): Readable => {
   const { name: componentName, domNodeId, trace, props, railsContext, throwJsErrors } = options;
@@ -132,7 +127,9 @@ const streamServerRenderedReactComponent = (options: RenderParams): Readable => 
 
     const error = convertToError(e);
     const htmlResult = handleError({ e: error, name: componentName, serverSide: true });
-    const jsonResult = JSON.stringify(createResultObject(htmlResult, buildConsoleReplay(), { hasErrors: true, error, result: null }));
+    const jsonResult = JSON.stringify(
+      createResultObject(htmlResult, buildConsoleReplay(), { hasErrors: true, error, result: null }),
+    );
     return stringToStream(jsonResult);
   }
 };

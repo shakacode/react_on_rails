@@ -23,9 +23,9 @@ if (supportsRootApi) {
   }
 }
 
-const reactHydrate: HydrateOrRenderType = supportsRootApi ?
-  reactDomClient.hydrateRoot :
-  (domNode, reactElement) => ReactDOM.hydrate(reactElement, domNode);
+const reactHydrate: HydrateOrRenderType = supportsRootApi
+  ? reactDomClient.hydrateRoot
+  : (domNode, reactElement) => ReactDOM.hydrate(reactElement, domNode);
 
 function reactRender(domNode: Element, reactElement: ReactElement): RenderReturnType {
   if (supportsRootApi) {
@@ -38,6 +38,10 @@ function reactRender(domNode: Element, reactElement: ReactElement): RenderReturn
   return ReactDOM.render(reactElement, domNode);
 }
 
-export default function reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType {
+export default function reactHydrateOrRender(
+  domNode: Element,
+  reactElement: ReactElement,
+  hydrate: boolean,
+): RenderReturnType {
   return hydrate ? reactHydrate(domNode, reactElement) : reactRender(domNode, reactElement);
 }
