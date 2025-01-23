@@ -6,7 +6,7 @@
 import React from 'react';
 import { combineReducers, applyMiddleware, createStore } from 'redux';
 import { Provider } from 'react-redux';
-import middleware from 'redux-thunk';
+import { thunk } from 'redux-thunk';
 
 // Uses the index
 import reducers from '../reducers/reducersIndex';
@@ -28,7 +28,7 @@ export default (props, railsContext) => {
 
   // This is where we'll put in the middleware for the async function. Placeholder.
   // store will have helloWorldData as a top level property
-  const store = applyMiddleware(middleware)(createStore)(combinedReducer, combinedProps);
+  const store = applyMiddleware(thunk)(createStore)(combinedReducer, combinedProps);
 
   // Provider uses the this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
