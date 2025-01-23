@@ -20,7 +20,7 @@ export function debugTurbolinks(...msg: string[]): void {
 }
 
 export function turbolinksInstalled(): boolean {
-  return (typeof Turbolinks !== 'undefined');
+  return typeof Turbolinks !== 'undefined';
 }
 
 export function turboInstalled() {
@@ -32,7 +32,7 @@ export function turboInstalled() {
 }
 
 export function turbolinksVersion5(): boolean {
-  return (typeof Turbolinks.controller !== 'undefined');
+  return typeof Turbolinks.controller !== 'undefined';
 }
 
 export function turbolinksSupported(): boolean {

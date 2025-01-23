@@ -12,18 +12,16 @@ function handleRenderFunctionIssue(options: ErrorOptions): string {
       'A Render-Function takes a single arg of props (and the location for react-router) ' +
       'and returns a ReactElement.';
 
-    let shouldBeRenderFunctionError =
-      `ERROR: ReactOnRails is incorrectly detecting Render-Function to be false. The React
-component '${name}' seems to be a Render-Function.\n${lastLine}`;
+    let shouldBeRenderFunctionError = `ERROR: ReactOnRails is incorrectly detecting Render-Function to be false. \
+The React component '${name}' seems to be a Render-Function.\n${lastLine}`;
     const reMatchShouldBeGeneratorError = /Can't add property context, object is not extensible/;
     if (reMatchShouldBeGeneratorError.test(e.message)) {
       msg += `${shouldBeRenderFunctionError}\n\n`;
       console.error(shouldBeRenderFunctionError);
     }
 
-    shouldBeRenderFunctionError =
-      `ERROR: ReactOnRails is incorrectly detecting renderFunction to be true, but the React
-component '${name}' is not a Render-Function.\n${lastLine}`;
+    shouldBeRenderFunctionError = `ERROR: ReactOnRails is incorrectly detecting renderFunction to be true, \
+but the React component '${name}' is not a Render-Function.\n${lastLine}`;
 
     const reMatchShouldNotBeGeneratorError = /Cannot call a class as a function/;
 
@@ -65,7 +63,7 @@ ${e.stack}`;
     return ReactDOMServer.renderToString(reactElement);
   }
 
-  return "undefined";
+  return 'undefined';
 };
 
 export default handleError;

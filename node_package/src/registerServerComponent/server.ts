@@ -17,7 +17,7 @@ import { ReactComponent } from '../types';
  * - Instead, a RSCServerRoot component is added to the ComponentRegistry
  * - This RSCServerRoot component will use the pre-generated RSC payloads from the RSC bundle to
  *   build the rendering tree of the server component instead of rendering it again
- * 
+ *
  * This functionality is added now without real implementation to avoid breaking changes in the future.
  *
  * @param components - Object mapping component names to their implementations
