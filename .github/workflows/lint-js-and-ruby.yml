@@ -49,6 +49,12 @@ jobs:
       run: bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Lint Ruby
       run: bundle exec rubocop
+    - name: Install Node modules with Yarn for dummy app
+      run: cd spec/dummy && yarn install --ignore-scripts --no-progress --no-emoji
+    - name: Install Ruby Gems for dummy app
+      run: cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+    - name: generate file system-based packs
+      run: cd spec/dummy && RAILS_ENV=test bundle exec rake react_on_rails:generate_packs
     - name: Detect dead code
       run: |
         yarn run knip
