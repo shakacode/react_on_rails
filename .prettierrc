@@ -6,7 +6,6 @@ singleQuote: true
 trailingComma: all
 bracketSpacing: true
 bracketSameLine: false
-parser: typescript
 
 overrides:
 - files: "*.@(css|scss)"
@@ -18,3 +17,6 @@ overrides:
   options:
     parser: json
     printWidth: 100
+- files: ".*rc"
+  options:
+    parser: yaml
