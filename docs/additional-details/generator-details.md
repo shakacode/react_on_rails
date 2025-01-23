@@ -40,17 +40,19 @@ Then you may run
 Another good option is to create a simple test app per the [Tutorial](https://www.shakacode.com/react-on-rails/docs/guides/tutorial/).
 
 # Understanding the Organization of the Generated Client Code
-The generated client code follows our organization scheme. Each unique set of functionality, is given its own folder inside of `app/javascript/app/bundles`. Note, the recommended for bigger projects is `client/app/bundles`. This encourages for modularity of *domains*.
+
+The generated client code follows our organization scheme. Each unique set of functionality, is given its own folder inside of `app/javascript/app/bundles`. Note, the recommended for bigger projects is `client/app/bundles`. This encourages for modularity of _domains_.
 
 Inside of the generated "HelloWorld" domain you will find the following folders:
 
-+  `startup`: This contains the entry point files for webpack. It defaults to a single file that is used for server and client compilation, but if these need to be different, then you can create two webpack configurations with separate endpoints.
-+ `containers`: "smart components" (components that have functionality and logic that is passed to child "dumb components").
-+ `components`: includes "dumb components", or components that simply render their properties and call functions given to them as properties by a parent component. Ultimately, at least one of these dumb components will have a parent container component.
+- `startup`: This contains the entry point files for webpack. It defaults to a single file that is used for server and client compilation, but if these need to be different, then you can create two webpack configurations with separate endpoints.
+- `containers`: "smart components" (components that have functionality and logic that is passed to child "dumb components").
+- `components`: includes "dumb components", or components that simply render their properties and call functions given to them as properties by a parent component. Ultimately, at least one of these dumb components will have a parent container component.
 
 You may also notice the `app/lib` folder. This is for any code that is common between bundles and therefore needs to be shared (for example, middleware).
 
 ## Redux
+
 If you have used the `--redux` generator option, you will notice the familiar additional redux folders in addition to the aforementioned folders. The Hello World example has also been modified to use Redux.
 
 Note the organizational paradigm of "bundles". These are like application domains and are used for grouping your code into webpack bundles, in case you decide to create different bundles for deployment. This is also useful for separating out logical parts of your application. The concept is that each bundle will have it's own Redux store. If you have code that you want to reuse across bundles, including components and reducers, place them under `/client/app/lib`.
