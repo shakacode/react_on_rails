@@ -37,7 +37,7 @@ development:
       #  port: 8080
     compress: true
     # Note that apps that do not check the host are vulnerable to DNS rebinding attacks
-    allowed_hosts: [ 'localhost' ]
+    allowed_hosts: ['localhost']
     pretty: true
     headers:
       'Access-Control-Allow-Origin': '*'

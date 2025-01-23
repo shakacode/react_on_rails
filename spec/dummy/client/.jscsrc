@@ -1,5 +1,1 @@
-{
-  "preset": "airbnb",
-  "fileExtensions": [".js", ".jsx"],
-  "excludeFiles": ["build/**", "node_modules/**"]
-}
+{ 'preset': 'airbnb', 'fileExtensions': ['.js', '.jsx'], 'excludeFiles': ['build/**', 'node_modules/**'] }

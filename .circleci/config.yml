@@ -145,7 +145,6 @@ jobs:
           paths:
             - node_modules
 
-
   # Install Node modules for dummy app with Yarn and save them to cache.
   install-dummy-app-node-packages:
     docker: *docker-image
