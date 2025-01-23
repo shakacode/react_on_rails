@@ -10,15 +10,17 @@ export default {
    * @param storeGenerators { name1: storeGenerator1, name2: storeGenerator2 }
    */
   register(storeGenerators: { [id: string]: StoreGenerator }): void {
-    Object.keys(storeGenerators).forEach(name => {
+    Object.keys(storeGenerators).forEach((name) => {
       if (storeGeneratorRegistry.has(name)) {
         console.warn('Called registerStore for store that is already registered', name);
       }
 
       const store = storeGenerators[name];
       if (!store) {
-        throw new Error('Called ReactOnRails.registerStores with a null or undefined as a value ' +
-          `for the store generator with key ${name}.`);
+        throw new Error(
+          'Called ReactOnRails.registerStores with a null or undefined as a value ' +
+            `for the store generator with key ${name}.`,
+        );
       }
 
       storeGeneratorRegistry.set(name, store);
@@ -37,8 +39,7 @@ export default {
       return hydratedStoreRegistry.get(name);
     } catch (error) {
       if (hydratedStoreRegistry.getAll().size === 0) {
-        const msg =
-`There are no stores hydrated and you are requesting the store ${name}.
+        const msg = `There are no stores hydrated and you are requesting the store ${name}.
 This can happen if you are server rendering and either:
 1. You do not call redux_store near the top of your controller action's view (not the layout)
    and before any call to react_component.

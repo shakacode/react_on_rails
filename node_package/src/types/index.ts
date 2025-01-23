@@ -33,13 +33,16 @@ export interface RailsContext {
   httpAcceptLanguage: string;
 }
 
-type AuthenticityHeaders = {[id: string]: string} & {'X-CSRF-Token': string | null; 'X-Requested-With': string};
+type AuthenticityHeaders = { [id: string]: string } & {
+  'X-CSRF-Token': string | null;
+  'X-Requested-With': string;
+};
 
-type StoreGenerator = (props: Record<string, unknown>, railsContext: RailsContext) => Store
+type StoreGenerator = (props: Record<string, unknown>, railsContext: RailsContext) => Store;
 
 interface ServerRenderResult {
   renderedHtml?: string | { componentHtml: string; [key: string]: string };
-  redirectLocation?: {pathname: string; search: string};
+  redirectLocation?: { pathname: string; search: string };
   routeError?: Error;
   error?: Error;
 }
@@ -51,23 +54,23 @@ type RenderFunctionResult = ReactComponent | ServerRenderResult | Promise<string
 /**
  * Render functions are used to create dynamic React components or server-rendered HTML with side effects.
  * They receive two arguments: props and railsContext.
- * 
+ *
  * @param props - The component props passed to the render function
  * @param railsContext - The Rails context object containing environment information
  * @returns A string, React component, React element, or a Promise resolving to a string
- * 
+ *
  * @remarks
  * To distinguish a render function from a React Function Component:
  * 1. Ensure it accepts two parameters (props and railsContext), even if railsContext is unused, or
  * 2. Set the `renderFunction` property to `true` on the function object.
- * 
+ *
  * If neither condition is met, it will be treated as a React Function Component,
  * and ReactDOMServer will attempt to render it.
- * 
+ *
  * @example
  * // Option 1: Two-parameter function
  * const renderFunction = (props, railsContext) => { ... };
- * 
+ *
  * // Option 2: Using renderFunction property
  * const anotherRenderFunction = (props) => { ... };
  * anotherRenderFunction.renderFunction = true;
@@ -81,7 +84,7 @@ interface RenderFunction {
 
 type ReactComponentOrRenderFunction = ReactComponent | RenderFunction;
 
-export type { // eslint-disable-line import/prefer-default-export
+export type {
   ReactComponentOrRenderFunction,
   ReactComponent,
   AuthenticityHeaders,
@@ -91,7 +94,7 @@ export type { // eslint-disable-line import/prefer-default-export
   StoreGenerator,
   CreateReactOutputResult,
   ServerRenderResult,
-}
+};
 
 export interface RegisteredComponent {
   name: string;
@@ -171,7 +174,7 @@ export interface ReactOnRails {
   getStore(name: string, throwIfMissing?: boolean): Store | undefined;
   getOrWaitForStore(name: string): Promise<Store>;
   getOrWaitForStoreGenerator(name: string): Promise<StoreGenerator>;
-  setOptions(newOptions: {traceTurbolinks: boolean}): void;
+  setOptions(newOptions: { traceTurbolinks: boolean }): void;
   reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType;
   reactOnRailsPageLoaded(): Promise<void>;
   reactOnRailsComponentLoaded(domId: string): void;
@@ -182,9 +185,7 @@ export interface ReactOnRails {
   getStoreGenerator(name: string): StoreGenerator;
   setStore(name: string, store: Store): void;
   clearHydratedStores(): void;
-  render(
-    name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean
-  ): RenderReturnType;
+  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): RenderReturnType;
   getComponent(name: string): RegisteredComponent;
   getOrWaitForComponent(name: string): Promise<RegisteredComponent>;
   serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;

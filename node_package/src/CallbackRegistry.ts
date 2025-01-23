@@ -1,6 +1,6 @@
-import { ItemRegistrationCallback } from "./types";
-import { onPageLoaded, onPageUnloaded } from "./pageLifecycle";
-import { getContextAndRailsContext } from "./context";
+import { ItemRegistrationCallback } from './types';
+import { onPageLoaded, onPageUnloaded } from './pageLifecycle';
+import { getContextAndRailsContext } from './context';
 
 /**
  * Represents information about a registered item including its value,
@@ -36,7 +36,9 @@ export default class CallbackRegistry<T> {
         waitingPromiseInfo.reject(this.createNotFoundError(itemName));
       });
       this.notUsedItems.forEach((itemName) => {
-        console.warn(`Warning: ${this.registryType} '${itemName}' was registered but never used. This may indicate unused code that can be removed.`);
+        console.warn(
+          `Warning: ${this.registryType} '${itemName}' was registered but never used. This may indicate unused code that can be removed.`,
+        );
       });
     };
 
@@ -94,7 +96,7 @@ export default class CallbackRegistry<T> {
     this.initializeTimeoutEvents();
     try {
       return this.get(name);
-    } catch(error) {
+    } catch (error) {
       if (this.timedout) {
         throw error;
       }
@@ -119,8 +121,8 @@ export default class CallbackRegistry<T> {
     const keys = Array.from(this.registeredItems.keys()).join(', ');
     return new Error(
       `Could not find ${this.registryType} registered with name ${itemName}. ` +
-      `Registered ${this.registryType} names include [ ${keys} ]. ` +
-      `Maybe you forgot to register the ${this.registryType}?`
+        `Registered ${this.registryType} names include [ ${keys} ]. ` +
+        `Maybe you forgot to register the ${this.registryType}?`,
     );
   }
 }
