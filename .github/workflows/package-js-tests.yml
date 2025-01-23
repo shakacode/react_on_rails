@@ -33,6 +33,9 @@ jobs:
       with:
         path: node_modules
         key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+    - name: run conversion script
+      if: matrix.versions == 'oldest'
+      run: script/convert
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji

@@ -23,11 +23,11 @@ if (supportsRootApi) {
   }
 }
 
-export const reactHydrate: HydrateOrRenderType = supportsRootApi ?
+const reactHydrate: HydrateOrRenderType = supportsRootApi ?
   reactDomClient.hydrateRoot :
   (domNode, reactElement) => ReactDOM.hydrate(reactElement, domNode);
 
-export function reactRender(domNode: Element, reactElement: ReactElement): RenderReturnType {
+function reactRender(domNode: Element, reactElement: ReactElement): RenderReturnType {
   if (supportsRootApi) {
     const root = reactDomClient.createRoot(domNode);
     root.render(reactElement);
