@@ -1,5 +1,4 @@
 ---
-
 extends:
   - eslint-config-shakacode
   - prettier

@@ -45,14 +45,13 @@ development:
     # Should we use gzip compression?
     compress: true
     # Note that apps that do not check the host are vulnerable to DNS rebinding attacks
-    allowed_hosts: "all"
+    allowed_hosts: 'all'
     pretty: true
     headers:
       'Access-Control-Allow-Origin': '*'
     static:
       watch:
         ignored: '**/node_modules/**'
-
 
 test:
   <<: *default

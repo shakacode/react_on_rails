@@ -17,3 +17,10 @@ spec/dummy/public
 .rubocop.yml
 # Intentionally invalid
 spec/react_on_rails/fixtures/i18n/locales_symbols/
+
+# Not a YAML file
+.envrc
+
+# Weirdly, fixing this file creates linting errors, even though it shouldn't make a difference.
+# Resolve later when upgrading ESLint.
+.eslintrc
