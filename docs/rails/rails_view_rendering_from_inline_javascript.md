@@ -1,4 +1,5 @@
 # Using ReactOnRails in JavaScript
+
 You can easily render React components in your JavaScript with `render` method that returns a [reference to the component](https://facebook.github.io/react/docs/more-about-refs.html) (virtual DOM element).
 
 ```js
@@ -15,10 +16,11 @@ You can easily render React components in your JavaScript with `render` method t
  * @param hydrate [optional] Pass truthy to update server rendered html. Default is falsy
  * @returns {virtualDomElement} Reference to your component's backing instance
  */
-ReactOnRails.render(componentName, props, domNodeId)
+ReactOnRails.render(componentName, props, domNodeId);
 ```
 
 ## Why do we need this?
+
 Imagine that we have some event with jQuery, it allows us to set component state manually.
 
 ```html
@@ -26,10 +28,10 @@ Imagine that we have some event with jQuery, it allows us to set component state
 <div id="root"></div>
 
 <script>
-  var input = $("#input");
-  var component = ReactOnRails.render("componentName", { value: input.val() }, "root");
+  var input = $('#input');
+  var component = ReactOnRails.render('componentName', { value: input.val() }, 'root');
 
-  input.on("change", function(e) {
+  input.on('change', function (e) {
     component.setState({ value: input.val() });
   });
 </script>

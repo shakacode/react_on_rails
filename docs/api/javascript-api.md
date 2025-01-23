@@ -1,4 +1,5 @@
 # ReactOnRails JavaScript API
+
 ## CSRF protection
 
 Rails has built-in protection for Cross-Site Request Forgery (CSRF), see [Rails Documentation](http://guides.rubyonrails.org/security.html#cross-site-request-forgery-csrf). To nicely utilize this feature in JavaScript requests, React on Rails provides two helpers that can be used as following for POST, PUT or DELETE requests:
@@ -15,85 +16,83 @@ header = ReactOnRails.authenticityHeaders(otherHeader);
 
 If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX calls, then these helpers are not needed because the [jquery-ujs](https://github.com/rails/jquery-ujs) library updates header automatically, see [jquery-ujs documentation](https://robots.thoughtbot.com/a-tour-of-rails-jquery-ujs#cross-site-request-forgery-protection).
 
-
-
 ## API
 
 The best source of docs is the main [ReactOnRails.ts](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/ReactOnRails.ts) file. Here's a quick summary. No guarantees that this won't be outdated!
 
 ```js
-  /**
-   * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
-   * find you components for rendering. Components get called with props, or you may use a
-   * "Render-Function" to return a React component or an object with the following shape:
-   * { renderedHtml, redirectLocation, error }.
-   * For server rendering, if you wish to return multiple HTML strings from a Render-Function,
-   * you may return an Object from your Render-Function with a single top level property of
-   * renderedHtml. Inside this Object, place a key called componentHtml, along with any other
-   * needed keys. This is useful when you using side effects libraries like react helmet.
-   * Your Ruby code with get this Object as a Hash containing keys componentHtml and any other
-   * custom keys that you added:
-   * { renderedHtml: { componentHtml, customKey1, customKey2 } }
-   * See the example in https://www.shakacode.com/react-on-rails/docs/javascript/react-helmet
-   * @param components (key is component name, value is component)
-   */
-  register(components)
+/**
+ * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
+ * find you components for rendering. Components get called with props, or you may use a
+ * "Render-Function" to return a React component or an object with the following shape:
+ * { renderedHtml, redirectLocation, error }.
+ * For server rendering, if you wish to return multiple HTML strings from a Render-Function,
+ * you may return an Object from your Render-Function with a single top level property of
+ * renderedHtml. Inside this Object, place a key called componentHtml, along with any other
+ * needed keys. This is useful when you using side effects libraries like react helmet.
+ * Your Ruby code with get this Object as a Hash containing keys componentHtml and any other
+ * custom keys that you added:
+ * { renderedHtml: { componentHtml, customKey1, customKey2 } }
+ * See the example in https://www.shakacode.com/react-on-rails/docs/javascript/react-helmet
+ * @param components (key is component name, value is component)
+ */
+register(components);
 
-  /**
-   * Allows registration of store generators to be used by multiple react components on one Rails
-   * view. store generators are functions that take one arg, props, and return a store. Note that
-   * the setStore API is different in tha it's the actual store hydrated with props.
-   * @param stores (key is store name, value is the store generator)
-   */
-  registerStore(stores)
+/**
+ * Allows registration of store generators to be used by multiple react components on one Rails
+ * view. store generators are functions that take one arg, props, and return a store. Note that
+ * the setStore API is different in tha it's the actual store hydrated with props.
+ * @param stores (key is store name, value is the store generator)
+ */
+registerStore(stores);
 
-  /**
-   * Allows retrieval of the store by name. This store will be hydrated by any Rails form props.
-   * Pass optional param throwIfMissing = false if you want to use this call to get back null if the
-   * store with name is not registered.
-   * @param name
-   * @param throwIfMissing Defaults to true. Set to false to have this call return undefined if
-   *        there is no store with the given name.
-   * @returns Redux Store, possibly hydrated
-   */
-  getStore(name, throwIfMissing = true )
+/**
+ * Allows retrieval of the store by name. This store will be hydrated by any Rails form props.
+ * Pass optional param throwIfMissing = false if you want to use this call to get back null if the
+ * store with name is not registered.
+ * @param name
+ * @param throwIfMissing Defaults to true. Set to false to have this call return undefined if
+ *        there is no store with the given name.
+ * @returns Redux Store, possibly hydrated
+ */
+getStore(name, (throwIfMissing = true));
 
-  /**
-   * Renders or hydrates the React element passed. In case React version is >=18 will use the root API.
-   * @param domNode
-   * @param reactElement
-   * @param hydrate if true will perform hydration, if false will render
-   * @returns {Root|ReactComponent|ReactElement|null}
-   */
-  reactHydrateOrRender(domNode, reactElement, hydrate)
+/**
+ * Renders or hydrates the React element passed. In case React version is >=18 will use the root API.
+ * @param domNode
+ * @param reactElement
+ * @param hydrate if true will perform hydration, if false will render
+ * @returns {Root|ReactComponent|ReactElement|null}
+ */
+reactHydrateOrRender(domNode, reactElement, hydrate);
 
-  /**
-   * Set options for ReactOnRails, typically before you call ReactOnRails.register
-   * Available Options:
-   * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
-   */
-  setOptions(options)
+/**
+ * Set options for ReactOnRails, typically before you call ReactOnRails.register
+ * Available Options:
+ * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
+ */
+setOptions(options);
 
-  /**
-   * Allow directly calling the page loaded script in case the default events that trigger react
-   * rendering are not sufficient, such as when loading JavaScript asynchronously with TurboLinks:
-   * More details can be found here:
-   * https://www.shakacode.com/react-on-rails/docs/rails/turbolinks
-   */
-  reactOnRailsPageLoaded()
+/**
+ * Allow directly calling the page loaded script in case the default events that trigger react
+ * rendering are not sufficient, such as when loading JavaScript asynchronously with TurboLinks:
+ * More details can be found here:
+ * https://www.shakacode.com/react-on-rails/docs/rails/turbolinks
+ */
+reactOnRailsPageLoaded();
 
-  /**
-   * Returns CSRF authenticity token inserted by Rails csrf_meta_tags
-   * @returns String or null
-   */
+/**
+ * Returns CSRF authenticity token inserted by Rails csrf_meta_tags
+ * @returns String or null
+ */
 
-  authenticityToken()
+authenticityToken();
 
-  /**
-   * Returns header with csrf authenticity token and XMLHttpRequest
-   * @param {*} other headers
-   * @returns {*} header
-   */
+/**
+ * Returns header with csrf authenticity token and XMLHttpRequest
+ * @param {*} other headers
+ * @returns {*} header
+ */
 
-  authenticityHeaders(otherHeaders = {})
+authenticityHeaders((otherHeaders = {}));
 ```

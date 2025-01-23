@@ -1,4 +1,5 @@
 # Linters
+
 These linters support the [ShakaCode Style Guidelines](https://www.shakacode.com/react-on-rails/docs/misc/style/)
 
 ## Autofix!
@@ -6,21 +7,23 @@ These linters support the [ShakaCode Style Guidelines](https://www.shakacode.com
 If you haven't tried the autofix options for `eslint` and `rubocop`, you're seriously missing out!
 
 1. Be **SURE** you have a clean git status, as you'll want to review what the autofix does to your code!
-2. **Rubocop:**  Be sure to be in the right directory where you have Ruby files, probably the top level of your Rails project.
-  ```
-  rubocop -a
-  ```
+2. **Rubocop:** Be sure to be in the right directory where you have Ruby files, probably the top level of your Rails project.
+
+```
+rubocop -a
+```
 
 3. **eslint:**: Be sure to be in the right directory where you have JS files.
-  ```
-  eslint --fix .
-  ```
 
-  or
+```
+eslint --fix .
+```
 
-  ```
-  npm run lint -- --fix
-  ```
+or
+
+```
+npm run lint -- --fix
+```
 
 Autofixing is a **HUGE** time saver!
 
@@ -62,7 +65,7 @@ You can disable all rules for a line or block, or only specific rules, as shown 
 
 ### Useful Reference Links
 
-* [Configuring ESLint](http://eslint.org/docs/user-guide/configuring.html#configuring-rules)
-* [ESLint quick start](http://untilfalse.com/eslint-quick-start/)
-* [RuboCop](https://github.com/bbatsov/rubocop)
-* [ESLint](http://eslint.org/)
+- [Configuring ESLint](http://eslint.org/docs/user-guide/configuring.html#configuring-rules)
+- [ESLint quick start](http://untilfalse.com/eslint-quick-start/)
+- [RuboCop](https://github.com/bbatsov/rubocop)
+- [ESLint](http://eslint.org/)

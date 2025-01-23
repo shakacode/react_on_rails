@@ -9,9 +9,8 @@ class ActiveSupport::TestCase
   setup do
     ReactOnRails::TestHelper.ensure_assets_compiled
   end
-end    
+end
 ```
-
 
 Or maybe something like this, from the [minitest docs](https://github.com/seattlerb/minitest/blob/master/lib/minitest/test.rb#L119):
 
@@ -27,5 +26,3 @@ class MiniTest::Test
   include MyMinitestPlugin
 end
 ```
-
- 

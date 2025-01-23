@@ -2,7 +2,6 @@
 
 TODO: Review this file
 
-
 This file summarizes what the React on Rails generator does.
 
 ## Configure the `/client` Directory
@@ -19,7 +18,8 @@ The only requirements within this directory for basic React on Rails integration
 1. You create scripts in `client/package.json` per the example apps. These are used for building your Webpack assets. Also do this for your top level `package.json`.
 
 ## Rails Steps (outside of /client)
-1. Add  `gem "webpacker"` to the Gemfile, run bundle. The gem provides the `stylesheet_pack_tag` and `javascript_pack_tag` helpers which is used to load the bundled assets to your layouts.[Dummy Example](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/layouts/application.html.erb)
+
+1. Add `gem "webpacker"` to the Gemfile, run bundle. The gem provides the `stylesheet_pack_tag` and `javascript_pack_tag` helpers which is used to load the bundled assets to your layouts.[Dummy Example](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/layouts/application.html.erb)
 1. Configure the `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb) for a detailed example of configuration, including comments on the different values to configure.
 1. Configure your Procfiles per the example apps. These are at the root of your Rails installation.
 1. Configure your top level JavaScript files for inclusion in your layout. You'll want a version that you use for static assets, and you want a file for any files in your setup that are not part of your webpack build. The reason for this is for use with hot-reloading. If you are not using hot reloading, then you only need to configure your `application.js` file to include your Webpack generated files.
