@@ -3,6 +3,7 @@
 There are 3 main ways to use different code for server vs. client rendering.
 
 ## A. Using different Entry Points
+
 Many projects will have different entry points for client and server rendering. This only works for a top-level entry point such as the entry point for a react-router app component.
 
 Your Client Entry can look like this:
@@ -10,7 +11,7 @@ Your Client Entry can look like this:
 ```js
 import ReactOnRails from 'react-on-rails';
 import App from './ClientApp';
-ReactOnRails.register({ App })
+ReactOnRails.register({ App });
 ```
 
 So your Server Entry can look like:
@@ -18,12 +19,13 @@ So your Server Entry can look like:
 ```js
 import ReactOnRails from 'react-on-rails';
 import App from './ServerApp';
-ReactOnRails.register({ App })
+ReactOnRails.register({ App });
 ```
 
 Note that the only difference is on the second line of each of these examples.
 
 ## B. Two Options for Using Webpack Resolve Alias in the Webpack Config
+
 Per [Webpack Docs](https://webpack.js.org/configuration/resolve/#resolve-alias).
 
 ### 1. Update `webpack/set-resolve.js` to have a different resolution for the exact file:
@@ -56,6 +58,7 @@ import SomeJsFile from 'SomeJsFile';
 ### 2. Use a different resolution for the right directory of client or server files:
 
 #### a. Update `webpack/set-resolve.js` to have something like:
+
 ```js
 function setResolve(builderConfig, webpackConfig) {
 
@@ -89,9 +92,10 @@ import AnotherJsFile from 'variant/AnotherJsFile';
 This is probably the ugliest and hackiest way to do this, but it's quick! Essentially you wrap code that cannot execute server side in a conditional:
 
 ```js
-if (window) { // window should be falsy on the server side
+if (window) {
+  // window should be falsy on the server side
   doSomethingClientOnly();
-  
+
   // or do an import
   const foobar = require('foobar').default;
 }

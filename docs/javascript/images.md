@@ -4,10 +4,6 @@
    a. Option name for the file-loader and url-loader (todo reference)
    b. Option publicPath for the output (todo reference)
 
-
-
-
-
 ```
 const assetLoaderRules = [
   {
@@ -34,10 +30,6 @@ const assetLoaderRules = [
 ];
 
 ```
-
-
-
-
 
 A full example can be found at [spec/dummy/client/app/components/ImageExample/ImageExample.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/components/ImageExample/ImageExample.jsx)
 
