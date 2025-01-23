@@ -10,6 +10,7 @@ declare global {
   }
 }
 
+// prettier-ignore Mismatch between Prettier locally and in CI
 export function consoleReplay(
   customConsoleHistory: typeof console['history'] | undefined = undefined,
   numberOfMessagesToSkip: number = 0,
@@ -48,6 +49,7 @@ export function consoleReplay(
   return lines.join('\n');
 }
 
+// prettier-ignore Mismatch between Prettier locally and in CI
 export default function buildConsoleReplay(
   customConsoleHistory: typeof console['history'] | undefined = undefined,
   numberOfMessagesToSkip: number = 0,
