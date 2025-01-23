@@ -15,3 +15,5 @@ node_package/webpack.config.js
 **/public/packs*/*
 gen-examples
 bundle/
+# Can't get it working in CI
+knip.ts
