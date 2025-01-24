@@ -61,7 +61,7 @@ jobs:
         path: vendor/bundle
         key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
     - id: get-sha
-      run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+      run: echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji

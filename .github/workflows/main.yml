@@ -73,7 +73,7 @@ jobs:
     - name: Build test bundles for dummy app
       run: cd spec/dummy && rm -rf public/webpack/test && yarn run build:rescript && RAILS_ENV=test NODE_ENV=test bin/${{ matrix.versions == 'oldest' && 'web' || 'shaka' }}packer
     - id: get-sha
-      run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+      run: echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
     - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
       uses: actions/cache/save@v4
       with:
@@ -133,7 +133,7 @@ jobs:
         path: spec/dummy/node_modules
         key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-${{ matrix.versions }}
     - id: get-sha
-      run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+      run: echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
     - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
       uses: actions/cache@v4
       with:
@@ -158,7 +158,7 @@ jobs:
         echo -e "Already installed $(google-chrome --version)\n"
         MINIMUM_REQUIRED_CHROME_VERSION=75
         INSTALLED_CHROME_MAJOR_VERSION="$(google-chrome --version | tr ' .' '\t' | cut -f3)"
-        if [[ $INSTALLED_CHROME_MAJOR_VERSION < $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
+        if [[ $INSTALLED_CHROME_MAJOR_VERSION -lt $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
           wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
           sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
           sudo apt-get update
