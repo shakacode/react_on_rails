@@ -61,7 +61,7 @@ jobs:
         path: vendor/bundle
         key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
     - id: get-sha
-      run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+      run: echo "sha=\"$(git rev-parse HEAD)\"" >> $GITHUB_OUTPUT
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji
@@ -69,7 +69,11 @@ jobs:
     - name: yalc publish for react-on-rails
       run: yalc publish
     - name: Install Ruby Gems for package
-      run:  bundle lock --add-platform 'x86_64-linux' && bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+      run: |
+        bundle lock --add-platform 'x86_64-linux'
+        if ! bundle check --path=vendor/bundle; then
+          bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+        fi
     - name: Ensure minimum required Chrome version
       run: |
         echo -e "Already installed $(google-chrome --version)\n"
