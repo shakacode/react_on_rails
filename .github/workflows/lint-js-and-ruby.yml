@@ -65,3 +65,14 @@ jobs:
       run: yarn start format.listDifferent
     - name: Type-check TypeScript
       run: yarn run type-check
+    - name: Lint GitHub Actions
+      # We only download and run Actionlint if there is any difference in GitHub Action workflows
+      # https://github.com/rhysd/actionlint/blob/main/docs/usage.md#on-github-actions
+      run: |
+        git fetch origin ${{ github.event.pull_request.base.sha }}
+        if git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep -q '^.github/workflows'; then
+          echo "::add-matcher::.github/actionlint-matcher.json"
+          bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+        fi
+      shell: bash
