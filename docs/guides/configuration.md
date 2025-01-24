@@ -40,7 +40,6 @@ production:
 Here's a representative `/config/initializers/react_on_rails.rb` setup when using this `/client` directory
 for all client files, including your sources and node_modules.
 
-
 ```ruby
 # frozen_string_literal: true
 
@@ -51,7 +50,7 @@ ReactOnRails.configure do |config|
   # every time a component renders.
   # See below for an example definition of RenderingExtension
   config.rendering_extension = RenderingExtension
-  
+
   # `trace`: General debugging flag.
   # The default is true for development, off otherwise.
   # With true, you get detailed logs of rendering and stack traces if you call setTimout,
@@ -80,7 +79,7 @@ ReactOnRails.configure do |config|
   config.build_production_command = "RAILS_ENV=production bin/shakapacker"
 
   # NOTE:
-  # When specifying `build_production_command`, you need to disable `rails/shakapacker` 
+  # When specifying `build_production_command`, you need to disable `rails/shakapacker`
   # configuration by setting `shakapacker_precompile: false` in your `config/shakapacker.yml` file.
 
   # See bottom for an example of the BuildProductionCommand module.
@@ -104,10 +103,10 @@ ReactOnRails.configure do |config|
   # If you are hashing this file (supposing you are using the same file for client rendering), then
   # you should include a name that matches your bundle name in your webpack config.
   config.server_bundle_js_file = "server-bundle.js"
-  
+
   # `prerender` means server-side rendering
   # default is false. This is an option for view helpers `render_component` and `render_component_hash`.
-  # Set to true to change the default value to true. 
+  # Set to true to change the default value to true.
   config.prerender = false
 
   # THE BELOW OPTIONS FOR SERVER-SIDE RENDERING RARELY NEED CHANGING
@@ -175,7 +174,7 @@ ReactOnRails.configure do |config|
   # components_subdirectory is the name of the subdirectory matched to detect and register components automatically
   # The default is nil. You can enable the feature by updating it in the next line.
   config.components_subdirectory = nil
-  # Change to a value like this example to enable this feature 
+  # Change to a value like this example to enable this feature
   # config.components_subdirectory = "ror_components"
 
   # Default is false.

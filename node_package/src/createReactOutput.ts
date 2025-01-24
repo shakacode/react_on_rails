@@ -1,9 +1,14 @@
 /* eslint-disable react/prop-types */
 
 import React from 'react';
-import type { ServerRenderResult,
-  CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index';
-import {isServerRenderHash, isPromise} from "./isServerRenderResult";
+import type {
+  ServerRenderResult,
+  CreateParams,
+  ReactComponent,
+  RenderFunction,
+  CreateReactOutputResult,
+} from './types/index';
+import { isServerRenderHash, isPromise } from './isServerRenderResult';
 
 /**
  * Logic to either call the renderFunction or call React.createElement to get the
@@ -30,11 +35,17 @@ export default function createReactOutput({
     if (railsContext && railsContext.serverSide) {
       console.log(`RENDERED ${name} to dom node with id: ${domNodeId}`);
     } else if (shouldHydrate) {
-      console.log(`HYDRATED ${name} in dom node with id: ${domNodeId} using props, railsContext:`,
-        props, railsContext);
+      console.log(
+        `HYDRATED ${name} in dom node with id: ${domNodeId} using props, railsContext:`,
+        props,
+        railsContext,
+      );
     } else {
-      console.log(`RENDERED ${name} to dom node with id: ${domNodeId} with props, railsContext:`,
-        props, railsContext);
+      console.log(
+        `RENDERED ${name} to dom node with id: ${domNodeId} with props, railsContext:`,
+        props,
+        railsContext,
+      );
     }
   }
 
@@ -47,22 +58,23 @@ export default function createReactOutput({
     if (isServerRenderHash(renderFunctionResult as CreateReactOutputResult)) {
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
-      return (renderFunctionResult as ServerRenderResult);
+      return renderFunctionResult as ServerRenderResult;
     }
 
     if (isPromise(renderFunctionResult as CreateReactOutputResult)) {
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
-      return (renderFunctionResult as Promise<string>);
+      return renderFunctionResult as Promise<string>;
     }
 
     if (React.isValidElement(renderFunctionResult)) {
       // If already a ReactElement, then just return it.
       console.error(
-`Warning: ReactOnRails: Your registered render-function (ReactOnRails.register) for ${name}
+        `Warning: ReactOnRails: Your registered render-function (ReactOnRails.register) for ${name}
 incorrectly returned a React Element (JSX). Instead, return a React Function Component by
 wrapping your JSX in a function. ReactOnRails v13 will throw error on this, as React Hooks do not
-work if you return JSX. Update by wrapping the result JSX of ${name} in a fat arrow function.`);
+work if you return JSX. Update by wrapping the result JSX of ${name} in a fat arrow function.`,
+      );
       return renderFunctionResult;
     }
 

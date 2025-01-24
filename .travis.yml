@@ -31,7 +31,7 @@ before_install:
   - sudo apt-get install -y xvfb libappindicator1 fonts-liberation
   - wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
   - sudo dpkg -i google-chrome*.deb
-  - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen scn 1600x1200x16"
+  - '/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen scn 1600x1200x16'
 
 install:
   - travis_retry gem install bundler -v '>2'
@@ -51,7 +51,7 @@ install:
   - bundle exec rake prepare_for_ci
 
 before_script:
-  - "export DISPLAY=:99"
+  - 'export DISPLAY=:99'
 
 script:
   - bundle exec rake
