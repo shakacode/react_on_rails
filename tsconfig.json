@@ -11,6 +11,9 @@
     "incremental": true,
     "target": "es5"
   },
-  "include": ["node_package/src/**/*"],
+  "include": [
+    "node_package/src/**/*",
+    "node_package/types/**/*"
+  ],
   "exclude": ["node_package/src/RSCWebpackLoader.js"]
 }
