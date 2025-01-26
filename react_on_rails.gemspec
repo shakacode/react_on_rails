@@ -36,8 +36,8 @@ Gem::Specification.new do |s|
   s.post_install_message = '
 --------------------------------------------------------------------------------
 Checkout https://www.shakacode.com/react-on-rails-pro for information about
-"React on Rails Pro" which includes one hour a month of support and a gem for
-better performance, via caching helpers, and our node rendering server.
+"React on Rails Pro" which includes a gem for better performance, via caching helpers, and our
+node rendering server, support for React 19, and much more.
 --------------------------------------------------------------------------------
 '
 end
