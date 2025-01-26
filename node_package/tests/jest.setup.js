@@ -25,15 +25,19 @@ if (typeof window !== 'undefined') {
   // Note: Node's Readable stream exists in node 'stream' built-in module, can be imported as `import { Readable } from 'stream'`
   jest.mock('../src/utils', () => ({
     ...jest.requireActual('../src/utils'),
-    fetch: (...args) => jest.requireActual('../src/utils').fetch(...args).then(res => {
-      const originalBody = res.body;
-      if (originalBody instanceof Readable) {
-        Object.defineProperty(res, 'body', {
-          value: Readable.toWeb(originalBody),
-        });
-      }
-      return res;
-    }),
+    fetch: (...args) =>
+      jest
+        .requireActual('../src/utils')
+        .fetch(...args)
+        .then((res) => {
+          const originalBody = res.body;
+          if (originalBody instanceof Readable) {
+            Object.defineProperty(res, 'body', {
+              value: Readable.toWeb(originalBody),
+            });
+          }
+          return res;
+        }),
   }));
 
   global.TextEncoder = TextEncoder;

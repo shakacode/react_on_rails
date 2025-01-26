@@ -19,14 +19,14 @@ import { createNodeReadableStream } from './testUtils';
 // const __filename = fileURLToPath(import.meta.url);
 // const __dirname = path.dirname(__filename);
 
-import RSCClientRoot, {resetRenderCache } from '../src/RSCClientRoot';
+import RSCClientRoot, { resetRenderCache } from '../src/RSCClientRoot';
 
 enableFetchMocks();
 
 describe('RSCClientRoot', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     jest.resetModules();
     resetRenderCache();
   });
@@ -34,7 +34,7 @@ describe('RSCClientRoot', () => {
   it('throws error when React.use is not defined', () => {
     jest.mock('react', () => ({
       ...jest.requireActual('react'),
-      use: undefined
+      use: undefined,
     }));
 
     expect(() => {
@@ -44,7 +44,12 @@ describe('RSCClientRoot', () => {
   });
 
   const mockRSCRequest = (rscRenderingUrlPath = 'rsc-render') => {
-    const chunksDirectory = path.join(__dirname, 'fixtures', 'rsc-payloads', 'simple-shell-with-async-component');
+    const chunksDirectory = path.join(
+      __dirname,
+      'fixtures',
+      'rsc-payloads',
+      'simple-shell-with-async-component',
+    );
     const chunk1 = JSON.parse(fs.readFileSync(path.join(chunksDirectory, 'chunk1.json'), 'utf8'));
     const chunk2 = JSON.parse(fs.readFileSync(path.join(chunksDirectory, 'chunk2.json'), 'utf8'));
 
@@ -53,7 +58,7 @@ describe('RSCClientRoot', () => {
 
     const props = {
       componentName: 'TestComponent',
-      rscRenderingUrlPath
+      rscRenderingUrlPath,
     };
 
     const { rerender } = render(<RSCClientRoot {...props} />);
@@ -64,8 +69,8 @@ describe('RSCClientRoot', () => {
       pushSecondChunk: () => push(JSON.stringify(chunk2)),
       pushCustomChunk: (chunk) => push(chunk),
       endStream: () => push(null),
-    }
-  }
+    };
+  };
 
   it('fetches and caches component data', async () => {
     const { rerender, pushFirstChunk, pushSecondChunk, endStream } = mockRSCRequest();
