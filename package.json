@@ -9,7 +9,7 @@
       "default": "./node_package/lib/ReactOnRails.js"
     },
     "./RSCWebpackLoader": "./node_package/lib/RSCWebpackLoader.js",
-    "./RSCClientRoot": "./node_package/lib/RSCClientRoot.js"
+    "./registerServerComponent": "./node_package/lib/registerServerComponent.js"
   },
   "directories": {
     "doc": "docs"

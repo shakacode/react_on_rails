@@ -1,10 +1,8 @@
-import React from 'react';
 import {
   type RegisteredComponent,
   type ReactComponentOrRenderFunction,
   type RenderFunction,
   type ItemRegistrationCallback,
-  type RegisterServerComponentOptions,
 } from './types';
 import isRenderFunction from './isRenderFunction';
 import CallbackRegistry from './CallbackRegistry';
@@ -48,23 +46,6 @@ export default {
         isRenderer,
       });
     });
-  },
-
-  registerServerComponent(options: RegisterServerComponentOptions, ...componentNames: string[]): void {
-    // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
-    const RSCClientRoot = (require('./RSCClientRoot') as typeof import('./RSCClientRoot')).default;
-
-    const componentsWrappedInRSCClientRoot = componentNames.reduce(
-      (acc, name) => ({
-        ...acc,
-        [name]: () => React.createElement(RSCClientRoot, {
-          componentName: name,
-          rscRenderingUrlPath: options.rscRenderingUrlPath
-        })
-      }),
-      {}
-    );
-    this.register(componentsWrappedInRSCClientRoot);
   },
 
   /**

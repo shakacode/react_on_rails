@@ -81,7 +81,7 @@ module ReactOnRails
       ""
     end
 
-    def is_client_entrypoint?(file_path)
+    def client_entrypoint?(file_path)
       content = File.read(file_path)
       # has "use client" directive. It can be "use client" or 'use client'
       first_js_statement_in_code(content).match?(/^["']use client["'](?:;|\s|$)/)
@@ -91,25 +91,25 @@ module ReactOnRails
       registered_component_name = component_name(file_path)
       load_server_components = ReactOnRails::Utils.react_on_rails_pro? && ReactOnRailsPro.configuration.enable_rsc_support
 
-      if load_server_components && !is_client_entrypoint?(file_path)
-        import_statement = ""
+      if load_server_components && !client_entrypoint?(file_path)
         rsc_rendering_url_path = ReactOnRailsPro.configuration.rsc_rendering_url_path
-        register_call = <<~REGISTER_CALL.strip
+
+        return <<~FILE_CONTENT.strip
+          import registerServerComponent from 'react-on-rails/registerServerComponent';
+
           registerServerComponent({
             rscRenderingUrlPath: "#{rsc_rendering_url_path}",
           }, "#{registered_component_name}")
-        REGISTER_CALL
-      else
-        relative_component_path = relative_component_path_from_generated_pack(file_path)
-        import_statement = "import #{registered_component_name} from '#{relative_component_path}';"
-        register_call = "register({#{registered_component_name}})"
+        FILE_CONTENT
       end
 
-      <<~FILE_CONTENT
-        import ReactOnRails from 'react-on-rails';
-        #{import_statement}
+      relative_component_path = relative_component_path_from_generated_pack(file_path)
 
-        ReactOnRails.#{register_call};
+      <<~FILE_CONTENT.strip
+        import ReactOnRails from 'react-on-rails';
+        import #{registered_component_name} from '#{relative_component_path}';
+
+        ReactOnRails.register({#{registered_component_name}});
       FILE_CONTENT
     end
 

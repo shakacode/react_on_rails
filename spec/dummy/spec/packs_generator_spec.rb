@@ -506,8 +506,8 @@ module ReactOnRails
       end
     end
 
-    describe "#is_client_entrypoint?" do
-      subject { described_class.instance.send(:is_client_entrypoint?, "dummy_path.js") }
+    describe "#client_entrypoint?" do
+      subject { described_class.instance.send(:client_entrypoint?, "dummy_path.js") }
 
       before do
         allow(File).to receive(:read).with("dummy_path.js").and_return(content)
