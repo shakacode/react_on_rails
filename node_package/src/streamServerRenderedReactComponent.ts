@@ -105,7 +105,7 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement, options:
   return readableStream;
 }
 
-export type StreamRenderer<T, P extends RenderParams> = (
+type StreamRenderer<T, P extends RenderParams> = (
   reactElement: ReactElement,
   options: P,
 ) => T;
