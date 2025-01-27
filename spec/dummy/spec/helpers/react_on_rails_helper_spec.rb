@@ -40,6 +40,12 @@ describe ReactOnRailsHelper do
     "{\"hello\":\"world\",\"free\":\"of charge\",\"x\":\"</script><script>alert('foo')</script>\"}"
   end
 
+  let(:rails_context_script) do
+    <<-SCRIPT.strip_heredoc
+      <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+    SCRIPT
+  end
+
   describe "#load_pack_for_generated_component" do
     let(:render_options) do
       ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: "component_name",
@@ -142,7 +148,7 @@ describe ReactOnRailsHelper do
 
     let(:react_definition_script) do
       <<-SCRIPT.strip_heredoc
-        <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+        #{rails_context_script}
         <div id="App-react-component"></div>
               <script type="application/json" class="js-react-on-rails-component" id="js-react-on-rails-component-App-react-component" data-component-name="App" data-dom-id="App-react-component" data-store-dependencies="[]">{"name":"My Test Name"}</script>
       SCRIPT
@@ -198,7 +204,7 @@ describe ReactOnRailsHelper do
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
-          <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+          #{rails_context_script}
           <div id="App-react-component"></div>
                 <script type="application/json" class="js-react-on-rails-component" id="js-react-on-rails-component-App-react-component" data-component-name="App" data-dom-id="App-react-component" data-store-dependencies="[]">{"name":"My Test Name"}</script>
         SCRIPT
@@ -213,7 +219,7 @@ describe ReactOnRailsHelper do
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
-          <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+          #{rails_context_script}
           <div id="App-react-component-0"></div>
                 <script type="application/json" class="js-react-on-rails-component" id="js-react-on-rails-component-App-react-component-0" data-component-name="App" data-dom-id="App-react-component-0" data-store-dependencies="[]">{"name":"My Test Name"}</script>
         SCRIPT
@@ -234,7 +240,7 @@ describe ReactOnRailsHelper do
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
-          <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+          #{rails_context_script}
           <div id="App-react-component"></div>
                 <script type="application/json" class="js-react-on-rails-component" id="js-react-on-rails-component-App-react-component" data-component-name="App" data-dom-id="App-react-component" data-store-dependencies="[]">{"name":"My Test Name"}</script>
         SCRIPT
@@ -251,7 +257,7 @@ describe ReactOnRailsHelper do
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
-          <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+          #{rails_context_script}
           <div id="shaka_div"></div>
                 <script type="application/json" class="js-react-on-rails-component" id="js-react-on-rails-component-shaka_div" data-component-name="App" data-dom-id="shaka_div" data-store-dependencies="[]">{"name":"My Test Name"}</script>
         SCRIPT
@@ -317,27 +323,36 @@ ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');
   end
 
   describe "#redux_store" do
-    subject(:store) { redux_store("reduxStore", props: props) }
+    let(:store) { redux_store("reduxStore", props: props) }
+    let(:second_store) { redux_store("secondStore", props: props) }
 
     let(:props) do
       { name: "My Test Name" }
     end
-
     let(:react_store_script) do
       '<script type="application/json" data-js-react-on-rails-store="reduxStore">' \
+        '{"name":"My Test Name"}' \
+        "</script>"
+    end
+    let(:second_react_store_script) do
+      '<script type="application/json" data-js-react-on-rails-store="secondStore">' \
         '{"name":"My Test Name"}' \
         "</script>"
     end
 
     it { expect(self).to respond_to :redux_store }
 
-    it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
-    it { is_expected.to start_with "<script" }
-    it { is_expected.to end_with "</script>" }
+    it { expect(store).to be_an_instance_of ActiveSupport::SafeBuffer }
+    it { expect(store).to start_with "<script" }
+    it { expect(store).to end_with "</script>" }
 
-    it {
-      expect(expect(store).target).to script_tag_be_included(react_store_script)
-    }
+    it "adds the rails context script to the first store only" do
+      expect(store).to script_tag_be_included(react_store_script)
+      expect(store).to script_tag_be_included(rails_context_script)
+
+      expect(second_store).to script_tag_be_included(second_react_store_script)
+      expect(second_store).not_to script_tag_be_included(rails_context_script)
+    end
   end
 
   describe "#server_render_js", :js, type: :system do
