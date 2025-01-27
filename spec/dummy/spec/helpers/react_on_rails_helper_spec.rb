@@ -142,7 +142,7 @@ describe ReactOnRailsHelper do
 
     let(:react_definition_script) do
       <<-SCRIPT.strip_heredoc
-        <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"14.1.0","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+        <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
         <div id="App-react-component"></div>
               <script type="application/json" class="js-react-on-rails-component" id="js-react-on-rails-component-App-react-component" data-component-name="App" data-dom-id="App-react-component" data-store-dependencies="[]">{"name":"My Test Name"}</script>
       SCRIPT
@@ -150,7 +150,7 @@ describe ReactOnRailsHelper do
 
     let(:react_definition_script_no_params) do
       <<-SCRIPT.strip_heredoc
-        <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"14.1.0","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+        <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
         <div id="App-react-component"></div>
               <script type="application/json" class="js-react-on-rails-component" id="js-react-on-rails-component-App-react-component" data-component-name="App" data-dom-id="App-react-component" data-store-dependencies="[]">{}</script>
       SCRIPT
@@ -198,7 +198,7 @@ describe ReactOnRailsHelper do
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
-          <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"14.1.0","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+          <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
           <div id="App-react-component"></div>
                 <script type="application/json" class="js-react-on-rails-component" id="js-react-on-rails-component-App-react-component" data-component-name="App" data-dom-id="App-react-component" data-store-dependencies="[]">{"name":"My Test Name"}</script>
         SCRIPT
@@ -213,7 +213,7 @@ describe ReactOnRailsHelper do
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
-          <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"14.1.0","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+          <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
           <div id="App-react-component-0"></div>
                 <script type="application/json" class="js-react-on-rails-component" id="js-react-on-rails-component-App-react-component-0" data-component-name="App" data-dom-id="App-react-component-0" data-store-dependencies="[]">{"name":"My Test Name"}</script>
         SCRIPT
@@ -234,7 +234,7 @@ describe ReactOnRailsHelper do
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
-          <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"14.1.0","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+          <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
           <div id="App-react-component"></div>
                 <script type="application/json" class="js-react-on-rails-component" id="js-react-on-rails-component-App-react-component" data-component-name="App" data-dom-id="App-react-component" data-store-dependencies="[]">{"name":"My Test Name"}</script>
         SCRIPT
@@ -251,7 +251,7 @@ describe ReactOnRailsHelper do
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
-          <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"14.1.0","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+          <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":false,"href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
           <div id="shaka_div"></div>
                 <script type="application/json" class="js-react-on-rails-component" id="js-react-on-rails-component-shaka_div" data-component-name="App" data-dom-id="shaka_div" data-store-dependencies="[]">{"name":"My Test Name"}</script>
         SCRIPT

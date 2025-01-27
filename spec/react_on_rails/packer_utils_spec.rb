@@ -44,7 +44,7 @@ module ReactOnRails
         before do
           allow(described_class.packer).to receive(:dev_server).and_return(
             instance_double(
-              (ReactOnRails::PackerUtils.packer)::DevServer,
+              ReactOnRails::PackerUtils.packer::DevServer,
               running?: true,
               protocol: "http",
               host_with_port: "localhost:3035"
