@@ -1,6 +1,5 @@
 import { enableFetchMocks } from 'jest-fetch-mock';
 
-import { Readable } from 'stream';
 import { fetch } from '../src/utils';
 import { createNodeReadableStream } from './testUtils';
 

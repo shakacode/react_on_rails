@@ -4,12 +4,6 @@
  * @jest-environment jsdom
  */
 
-// TODO: Remove this once we made these tests compatible with React 19
-if (process.env.USE_REACT_18 !== 'true') {
-  test.skip('Skipping RSC tests when not using React 18', () => {});
-  return;
-}
-
 // Mock webpack require system for RSC
 window.__webpack_require__ = jest.fn();
 window.__webpack_chunk_load__ = jest.fn();
@@ -26,7 +20,8 @@ import RSCClientRoot, { resetRenderCache } from '../src/RSCClientRoot';
 
 enableFetchMocks();
 
-describe('RSCClientRoot', () => {
+// TODO: Remove this once we made these tests compatible with React 19
+(process.env.USE_REACT_18 ? describe : describe.skip)('RSCClientRoot', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
