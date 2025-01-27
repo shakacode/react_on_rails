@@ -44,7 +44,7 @@ module ReactOnRails
       puts(Rainbow("Generated Packs: #{output_path}").yellow)
     end
 
-    def first_js_statement_in_code(content)
+    def first_js_statement_in_code(content) # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
       return "" if content.nil? || content.empty?
 
       start_index = 0
@@ -89,7 +89,8 @@ module ReactOnRails
 
     def pack_file_contents(file_path)
       registered_component_name = component_name(file_path)
-      load_server_components = ReactOnRails::Utils.react_on_rails_pro? && ReactOnRailsPro.configuration.enable_rsc_support
+      load_server_components = ReactOnRails::Utils.react_on_rails_pro? &&
+                               ReactOnRailsPro.configuration.enable_rsc_support
 
       if load_server_components && !client_entrypoint?(file_path)
         rsc_rendering_url_path = ReactOnRailsPro.configuration.rsc_rendering_url_path
