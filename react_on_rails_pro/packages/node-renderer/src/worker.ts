@@ -91,12 +91,14 @@ export default function run(config: Partial<Config>) {
   // getConfig():
   buildConfig(config);
 
-  const { bundlePath, logHttpLevel, port } = getConfig();
+  const { bundlePath, logHttpLevel, port, fastifyServerOptions } = getConfig();
 
   const app = fastify({
     http2: useHttp2 as true,
+    bodyLimit: 104857600, // 100 MB
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
+    ...fastifyServerOptions,
   });
 
   // We shouldn't have unhandled errors here, but just in case
