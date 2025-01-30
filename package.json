@@ -2,6 +2,7 @@
   "name": "react-on-rails",
   "version": "14.1.1",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
+  "main": "node_package/lib/ReactOnRails.js",
   "exports": {
     ".": {
       "node": "./node_package/lib/ReactOnRails.node.js",
