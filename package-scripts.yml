@@ -24,11 +24,7 @@ scripts:
       # 2. Build the project but ignore TypeScript errors from missing devDependencies;
       # 3. Check if the project is built now;
       # 4. If it failed, print an error message (still follow https://docs.npmjs.com/cli/v8/using-npm/scripts#best-practices).
-      script: >
-        [ -f node_package/lib/ReactOnRails.js ] ||
-          (npm run build >/dev/null 2>&1 || true) &&
-          [ -f node_package/lib/ReactOnRails.js ] ||
-          { echo 'Building react-on-rails seems to have failed!'; }
+      script: npm run build
 
   format:
     default:
