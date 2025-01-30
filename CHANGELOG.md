@@ -18,6 +18,10 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+#### Fixed
+
+- Resolved 14.1.1 incompatibility with eslint & made sure that spec/dummy is linted by eslint. [PR 1693](https://github.com/shakacode/react_on_rails/pull/1693) by [judahmeek](https://github.com/judahmeek).
+
 ### [14.1.1] - 2025-01-15
 
 #### Fixed
