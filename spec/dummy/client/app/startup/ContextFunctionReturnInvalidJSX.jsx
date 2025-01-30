@@ -1,5 +1,6 @@
 // Example of incorrectly taking two params and returning JSX
-import React, { useState } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import css from '../components/HelloWorld.module.scss';
 import RailsContext from '../components/RailsContext';
 
@@ -10,6 +11,12 @@ const ContextFunctionReturnInvalidJSX = (props, railsContext) => (
     <RailsContext {...{ railsContext }} />
   </>
 );
+
+ContextFunctionReturnInvalidJSX.propTypes = {
+  helloWorldData: PropTypes.shape({
+      name: PropTypes.string,
+    }).isRequired,
+}
 
 /* Wrapping in a function would be correct in this case, since two params
    are passed to the registered function:
