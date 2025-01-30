@@ -32,6 +32,10 @@ const config: KnipConfig = {
         'eslint-plugin-jsx-a11y',
         'eslint-plugin-react',
         'react-server-dom-webpack',
+        'cross-fetch',
+        'jsdom',
+        'react-18',
+        'react-dom-18',
       ],
     },
     'spec/dummy': {

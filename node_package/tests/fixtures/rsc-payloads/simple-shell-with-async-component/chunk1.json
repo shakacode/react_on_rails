@@ -1,0 +1,6 @@
+{
+  "html": "1:\"$Sreact.suspense\"\n0:D{\"name\":\"StaticServerComponent\",\"env\":\"Server\"}\n2:D{\"name\":\"AsyncComponent\",\"env\":\"Server\"}\n0:[\"$\",\"div\",null,{\"children\":[[\"$\",\"h1\",null,{\"children\":\"StaticServerComponent\"}],[\"$\",\"p\",null,{\"children\":\"This is a static server component\"}],[\"$\",\"$1\",null,{\"fallback\":[\"$\",\"div\",null,{\"children\":\"Loading AsyncComponent...\"}],\"children\":\"$L2\"}]]}]\n",
+  "consoleReplayScript": "\n\u003cscript id=\"consoleReplayLog\"\u003e\nconsole.log.apply(console, [\"[SERVER] Console log at first chunk\"]);\n\u003c/script\u003e",
+  "hasErrors": false,
+  "isShellReady": true
+}

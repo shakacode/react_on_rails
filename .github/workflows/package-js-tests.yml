@@ -43,3 +43,6 @@ jobs:
         sudo yarn global add yalc
     - name: Run JS unit tests for Renderer package
       run: yarn test
+    # TODO: Remove this once we made these tests compatible with React 19
+    - name: Run JS unit tests for Renderer package with React 18 (for tests not compatible with React 19)
+      run: yarn test:react-18
