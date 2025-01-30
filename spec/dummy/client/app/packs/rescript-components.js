@@ -4,4 +4,4 @@
 
 import HelloWorldReScript from '../components/HelloWorldReScript.res.js';
 
-export { HelloWorldReScript };
+export default HelloWorldReScript;

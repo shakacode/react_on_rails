@@ -1,4 +1,4 @@
-const { merge, config } = require('shakapacker');
+const { config } = require('shakapacker');
 const commonWebpackConfig = require('./commonWebpackConfig');
 
 const webpack = require('webpack');
@@ -28,7 +28,7 @@ const configureServer = () => {
   // replace file-loader with null-loader
   serverWebpackConfig.module.rules.forEach((loader) => {
     if (loader.use && loader.use.filter) {
-      loader.use = loader.use.filter(
+      loader.use = loader.use.filter( // eslint-disable-line no-param-reassign
         (item) => !(typeof item === 'string' && item.match(/mini-css-extract-plugin/)),
       );
     }
@@ -65,11 +65,11 @@ const configureServer = () => {
   // Remove the mini-css-extract-plugin from the style loaders because
   // the client build will handle exporting CSS.
   // replace file-loader with null-loader
-  const rules = serverWebpackConfig.module.rules;
+  const { rules } = serverWebpackConfig.module;
   rules.forEach((rule) => {
     if (Array.isArray(rule.use)) {
       // remove the mini-css-extract-plugin and style-loader
-      rule.use = rule.use.filter((item) => {
+      rule.use = rule.use.filter((item) => { // eslint-disable-line no-param-reassign
         let testValue;
         if (typeof item === 'string') {
           testValue = item;
@@ -95,7 +95,7 @@ const configureServer = () => {
 
       // Skip writing image files during SSR by setting emitFile to false
     } else if (rule.use && (rule.use.loader === 'url-loader' || rule.use.loader === 'file-loader')) {
-      rule.use.options.emitFile = false;
+      rule.use.options.emitFile = false; // eslint-disable-line no-param-reassign
     }
   });
 

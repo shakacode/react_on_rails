@@ -7,7 +7,7 @@ import css from '../components/HelloWorld.module.scss';
 const HelloTurboStream = ({ helloTurboStreamData, railsContext }) => {
   const [name, setName] = useState(helloTurboStreamData.name);
   const nameDomRef = useRef(null);
-
+  // eslint-disable-next-line no-unused-vars
   const handleChange = () => {
     setName(nameDomRef.current.value);
   };

@@ -5,7 +5,7 @@ const baseClientWebpackConfig = generateWebpackConfig();
 
 const webpack = require('webpack');
 
-const aliasConfig = require('./alias.js');
+const aliasConfig = require('./alias');
 
 const commonOptions = {
   resolve: {
@@ -23,7 +23,7 @@ const sassLoaderConfig = {
 
 const scssConfigIndex = baseClientWebpackConfig.module.rules.findIndex((config) =>
   '.scss'.match(config.test),
-);
+); // eslint-disable-next-line no-undef
 baseClientWebpackConfig.module.rules[scssConfigIndex]?.use.push(sassLoaderConfig);
 
 // add jquery
