@@ -20,7 +20,7 @@ jobs:
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
+        node-version: ${{ matrix.versions == 'oldest' && '18' || '20' }}
     - name: Print system information
       run: |
         echo "Linux release: "; cat /etc/issue
@@ -43,3 +43,6 @@ jobs:
         sudo yarn global add yalc
     - name: Run JS unit tests for Renderer package
       run: yarn test
+    # TODO: Remove this once we made these tests compatible with React 19
+    - name: Run JS unit tests for Renderer package with React 18 (for tests not compatible with React 19)
+      run: yarn test:react-18

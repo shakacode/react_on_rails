@@ -9,6 +9,8 @@ const config: KnipConfig = {
         'node_package/src/ReactOnRails.node.ts!',
         'node_package/src/ReactOnRailsRSC.ts!',
         'node_package/src/RSCWebpackLoader.js!',
+        'node_package/src/registerServerComponent.ts!',
+        'node_package/src/RSCClientRoot.ts!',
       ],
       project: ['node_package/src/**/*.[jt]s!', 'node_package/tests/**/*.[jt]s'],
       babel: {
@@ -30,6 +32,10 @@ const config: KnipConfig = {
         'eslint-plugin-jsx-a11y',
         'eslint-plugin-react',
         'react-server-dom-webpack',
+        'cross-fetch',
+        'jsdom',
+        'react-18',
+        'react-dom-18',
       ],
     },
     'spec/dummy': {

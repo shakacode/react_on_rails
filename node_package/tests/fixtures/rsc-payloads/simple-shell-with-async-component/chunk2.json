@@ -1,0 +1,6 @@
+{
+  "html": "2:[\"$\",\"div\",null,{\"children\":\"AsyncComponent\"}]\n",
+  "consoleReplayScript": "\n\u003cscript id=\"consoleReplayLog\"\u003e\nconsole.log.apply(console, [\"[SERVER] Console log at second chunk\"]);\n\u003c/script\u003e",
+  "hasErrors": false,
+  "isShellReady": true
+}

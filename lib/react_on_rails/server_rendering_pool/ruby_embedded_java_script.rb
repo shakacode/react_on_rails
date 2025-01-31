@@ -19,6 +19,10 @@ module ReactOnRails
         def reset_pool_if_server_bundle_was_modified
           return unless ReactOnRails.configuration.development_mode
 
+          # RSC (React Server Components) bundle changes are not monitored here since:
+          # 1. RSC is only supported in the Pro version of React on Rails
+          # 2. This RubyEmbeddedJavaScript pool is used exclusively in the non-Pro version
+          # 3. This pool uses ExecJS for JavaScript evaluation which does not support RSC
           if ReactOnRails::Utils.server_bundle_path_is_http?
             return if @server_bundle_url == ReactOnRails::Utils.server_bundle_js_file_path
 
@@ -230,8 +234,6 @@ module ReactOnRails
         end
 
         def parse_result_and_replay_console_messages(result_string, render_options)
-          return { html: result_string } if render_options.rsc?
-
           result = nil
           begin
             result = JSON.parse(result_string)
