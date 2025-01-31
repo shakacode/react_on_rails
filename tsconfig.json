@@ -11,7 +11,8 @@
     "outDir": "node_package/lib",
     "strict": true,
     "incremental": true,
-    "target": "es2020"
+    "target": "es2020",
+    "typeRoots": ["./node_modules/@types", "./node_package/types"]
   },
   "include": ["node_package/src/**/*", "node_package/types/**/*"],
   "exclude": ["node_package/src/RSCWebpackLoader.js"]

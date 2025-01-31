@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import * as ClientStartup from './clientStartup';
+import { renderOrHydrateComponent, hydrateStore } from './ClientSideRenderer';
 import ComponentRegistry from './ComponentRegistry';
 import StoreRegistry from './StoreRegistry';
 import buildConsoleReplay from './buildConsoleReplay';
@@ -82,6 +83,24 @@ ctx.ReactOnRails = {
   },
 
   /**
+   * Get a store by name, or wait for it to be registered.
+   * @param name
+   * @returns Promise<Store>
+   */
+  getOrWaitForStore(name: string): Promise<Store> {
+    return StoreRegistry.getOrWaitForStore(name);
+  },
+
+  /**
+   * Get a store generator by name, or wait for it to be registered.
+   * @param name
+   * @returns Promise<StoreGenerator>
+   */
+  getOrWaitForStoreGenerator(name: string): Promise<StoreGenerator> {
+    return StoreRegistry.getOrWaitForStoreGenerator(name);
+  },
+
+  /**
    * Renders or hydrates the react element passed. In case react version is >=18 will use the new api.
    * @param domNode
    * @param reactElement
@@ -131,7 +150,11 @@ ctx.ReactOnRails = {
   },
 
   reactOnRailsComponentLoaded(domId: string): void {
-    ClientStartup.reactOnRailsComponentLoaded(domId);
+    renderOrHydrateComponent(domId);
+  },
+
+  reactOnRailsStoreLoaded(storeName: string): void {
+    hydrateStore(storeName);
   },
 
   /**
@@ -232,6 +255,15 @@ ctx.ReactOnRails = {
    */
   getComponent(name: string): RegisteredComponent {
     return ComponentRegistry.get(name);
+  },
+
+  /**
+   * Get the component that you registered, or wait for it to be registered
+   * @param name
+   * @returns {name, component, renderFunction, isRenderer}
+   */
+  getOrWaitForComponent(name: string): Promise<RegisteredComponent> {
+    return ComponentRegistry.getOrWaitForComponent(name);
   },
 
   /**

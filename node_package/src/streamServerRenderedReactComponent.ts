@@ -17,7 +17,7 @@ const stringToStream = (str: string): Readable => {
   return stream;
 };
 
-const transformRenderStreamChunksToResultObject = (renderState: StreamRenderState) => {
+export const transformRenderStreamChunksToResultObject = (renderState: StreamRenderState) => {
   const consoleHistory = console.history;
   let previouslyReplayedConsoleMessages = 0;
 
@@ -105,7 +105,15 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement, options:
   return readableStream;
 }
 
-const streamServerRenderedReactComponent = (options: RenderParams): Readable => {
+type StreamRenderer<T, P extends RenderParams> = (
+  reactElement: ReactElement,
+  options: P,
+) => T;
+
+export const streamServerRenderedComponent = <T, P extends RenderParams>(
+  options: P,
+  renderStrategy: StreamRenderer<T, P>
+): T => {
   const { name: componentName, domNodeId, trace, props, railsContext, throwJsErrors } = options;
 
   try {
@@ -124,7 +132,7 @@ const streamServerRenderedReactComponent = (options: RenderParams): Readable => 
       throw new Error('Server rendering of streams is not supported for server render hashes or promises.');
     }
 
-    return streamRenderReactComponent(reactRenderingResult, options);
+    return renderStrategy(reactRenderingResult, options);
   } catch (e) {
     if (throwJsErrors) {
       throw e;
@@ -133,8 +141,10 @@ const streamServerRenderedReactComponent = (options: RenderParams): Readable => 
     const error = convertToError(e);
     const htmlResult = handleError({ e: error, name: componentName, serverSide: true });
     const jsonResult = JSON.stringify(createResultObject(htmlResult, buildConsoleReplay(), { hasErrors: true, error, result: null }));
-    return stringToStream(jsonResult);
+    return stringToStream(jsonResult) as T;
   }
 };
+
+const streamServerRenderedReactComponent = (options: RenderParams): Readable => streamServerRenderedComponent(options, streamRenderReactComponent);
 
 export default streamServerRenderedReactComponent;
