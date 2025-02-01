@@ -7,7 +7,7 @@ import type {
   Root,
 } from './types';
 
-import { reactOnRailsContext, type Context } from './context';
+import { getContextAndRailsContext, resetContextAndRailsContext, type Context } from './context';
 import createReactOutput from './createReactOutput';
 import { isServerRenderHash } from './isServerRenderResult';
 import reactHydrateOrRender from './reactHydrateOrRender';
@@ -39,35 +39,6 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
 }
 
 const getDomId = (domIdOrElement: string | Element): string => typeof domIdOrElement === 'string' ? domIdOrElement : domIdOrElement.getAttribute('data-dom-id') || '';
-
-let currentContext: Context | null = null;
-let currentRailsContext: RailsContext | null = null;
-
-// caches context and railsContext to avoid re-parsing rails-context each time a component is rendered
-// Cached values will be reset when unmountAll() is called
-function getContextAndRailsContext(): { context: Context | null; railsContext: RailsContext | null } {
-  // Return cached values if already set
-  if (currentContext && currentRailsContext) {
-    return { context: currentContext, railsContext: currentRailsContext };
-  }
-
-  currentContext = reactOnRailsContext();
-
-  const el = document.getElementById('js-react-on-rails-context');
-  if (!el || !el.textContent) {
-    return { context: null, railsContext: null };
-  }
-
-  try {
-    currentRailsContext = JSON.parse(el.textContent);
-  } catch (e) {
-    console.error('Error parsing rails context:', e);
-    return { context: null, railsContext: null };
-  }
-
-  return { context: currentContext, railsContext: currentRailsContext };
-}
-
 class ComponentRenderer {
   private domNodeId: string;
   private state: 'unmounted' | 'rendering' | 'rendered';
@@ -237,7 +208,6 @@ export function renderOrHydrateComponent(domIdOrElement: string | Element): Comp
   return root;
 }
 
-
 export function renderOrHydrateForceLoadedComponents(): void {
   const els = document.querySelectorAll(`.js-react-on-rails-component[data-force-load="true"]`);
   els.forEach((el) => renderOrHydrateComponent(el));
@@ -251,8 +221,7 @@ export function renderOrHydrateAllComponents(): void {
 function unmountAllComponents(): void {
   renderedRoots.forEach((root) => root.unmount());
   renderedRoots.clear();
-  currentContext = null;
-  currentRailsContext = null;
+  resetContextAndRailsContext();
 }
 
 const storeRenderers = new Map<string, StoreRenderer>();

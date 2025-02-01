@@ -1,4 +1,4 @@
-import type { ReactOnRails as ReactOnRailsType } from './types';
+import type { ReactOnRails as ReactOnRailsType, RailsContext } from './types';
 
 declare global {
   interface Window {
@@ -24,6 +24,9 @@ export default function context(this: void): Context | void {
     this;
 }
 
+export function isWindow(ctx: Context): ctx is Window {
+  return (ctx as Window).document !== undefined;
+}
 
 export function reactOnRailsContext(): Context {
   const ctx = context();
@@ -31,4 +34,37 @@ export function reactOnRailsContext(): Context {
     throw new Error('ReactOnRails is undefined in both global and window namespaces.');
   }
   return ctx;
+}
+
+let currentContext: Context | null = null;
+let currentRailsContext: RailsContext | null = null;
+
+// caches context and railsContext to avoid re-parsing rails-context each time a component is rendered
+// Cached values will be reset when resetContextAndRailsContext() is called
+export function getContextAndRailsContext(): { context: Context | null; railsContext: RailsContext | null } {
+  // Return cached values if already set
+  if (currentContext && currentRailsContext) {
+    return { context: currentContext, railsContext: currentRailsContext };
+  }
+
+  currentContext = reactOnRailsContext();
+
+  const el = document.getElementById('js-react-on-rails-context');
+  if (!el || !el.textContent) {
+    return { context: null, railsContext: null };
+  }
+
+  try {
+    currentRailsContext = JSON.parse(el.textContent);
+  } catch (e) {
+    console.error('Error parsing rails context:', e);
+    return { context: null, railsContext: null };
+  }
+
+  return { context: currentContext, railsContext: currentRailsContext };
+}
+
+export function resetContextAndRailsContext(): void {
+  currentContext = null;
+  currentRailsContext = null;
 }
