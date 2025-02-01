@@ -37,9 +37,9 @@ export default class CallbackRegistry<T> {
       return;
     }
 
-    const callbacks = this.callbacks.get(name) || [];
-    callbacks.push(callback);
-    this.callbacks.set(name, callbacks);
+    const itemCallbacks = this.callbacks.get(name) || [];
+    itemCallbacks.push(callback);
+    this.callbacks.set(name, itemCallbacks);
   }
 
   getOrWaitForItem(name: string): Promise<T> {

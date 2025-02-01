@@ -14,6 +14,7 @@ type ReactComponent = ComponentType<any> | string;
 
 // Keep these in sync with method lib/react_on_rails/helper.rb#rails_context
 export interface RailsContext {
+  componentRegistryTimeout: number;
   railsEnv: string;
   inMailer: boolean;
   i18nLocale: string;
