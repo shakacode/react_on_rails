@@ -119,5 +119,7 @@ export function clientStartup(context: Context): void {
 
     // Other components and stores are rendered and hydrated when the page is fully loaded
     document.addEventListener('DOMContentLoaded', renderInit);
+  } else {
+    renderInit();
   }
 }
