@@ -15,7 +15,6 @@ export default class CallbackRegistry<T> {
 
   constructor(registryType: string) {
     this.registryType = registryType;
-    this.initializeTimeoutEvents();
   }
 
   private initializeTimeoutEvents() {
@@ -75,6 +74,7 @@ export default class CallbackRegistry<T> {
   }
 
   getOrWaitForItem(name: string): Promise<T> {
+    this.initializeTimeoutEvents();
     return new Promise((resolve, reject) => {
       try {
         resolve(this.get(name));
