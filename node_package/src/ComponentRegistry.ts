@@ -2,26 +2,13 @@ import {
   type RegisteredComponent,
   type ReactComponentOrRenderFunction,
   type RenderFunction,
-  type ItemRegistrationCallback,
 } from './types';
 import isRenderFunction from './isRenderFunction';
 import CallbackRegistry from './CallbackRegistry';
 
-const componentRegistry = new CallbackRegistry<RegisteredComponent>();
+const componentRegistry = new CallbackRegistry<RegisteredComponent>('component');
 
 export default {
-  /**
-   * Register a callback to be called when a specific component is registered
-   * @param componentName Name of the component to watch for
-   * @param callback Function called with the component details when registered
-   */
-  onComponentRegistered(
-    componentName: string,
-    callback: ItemRegistrationCallback<RegisteredComponent>,
-  ): void {
-    componentRegistry.onItemRegistered(componentName, callback);
-  },
-
   /**
    * @param components { component1: component1, component2: component2, etc. }
    */
@@ -53,12 +40,7 @@ export default {
    * @returns { name, component, isRenderFunction, isRenderer }
    */
   get(name: string): RegisteredComponent {
-    const component = componentRegistry.get(name);
-    if (component !== undefined) return component;
-
-    const keys = Array.from(componentRegistry.getAll().keys()).join(', ');
-    throw new Error(`Could not find component registered with name ${name}. \
-Registered component names include [ ${keys} ]. Maybe you forgot to register the component?`);
+    return componentRegistry.get(name);
   },
 
   getOrWaitForComponent(name: string): Promise<RegisteredComponent> {

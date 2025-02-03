@@ -63,6 +63,8 @@ function setupTurbolinksEventListeners(): void {
 
 let isEventListenerInitialized = false;
 function initializePageEventListeners(): void {
+  if (typeof window === 'undefined') return;
+
   if (isEventListenerInitialized) {
     return;
   }

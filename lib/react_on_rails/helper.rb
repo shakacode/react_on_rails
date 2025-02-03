@@ -309,6 +309,7 @@ module ReactOnRails
       # ALERT: Keep in sync with node_package/src/types/index.ts for the properties of RailsContext
       @rails_context ||= begin
         result = {
+          componentRegistryTimeout: ReactOnRails.configuration.component_registry_timeout,
           railsEnv: Rails.env,
           inMailer: in_mailer?,
           # Locale settings

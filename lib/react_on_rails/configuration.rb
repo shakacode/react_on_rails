@@ -10,6 +10,7 @@ module ReactOnRails
 
   DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
   DEFAULT_REACT_CLIENT_MANIFEST_FILE = "react-client-manifest.json"
+  DEFAULT_COMPONENT_REGISTRY_TIMEOUT = 5000
 
   def self.configuration
     @configuration ||= Configuration.new(
@@ -44,7 +45,11 @@ module ReactOnRails
       make_generated_server_bundle_the_entrypoint: false,
       defer_generated_component_packs: true,
       # forces the loading of React components
-      force_load: false
+      force_load: false,
+      # Maximum time in milliseconds to wait for client-side component registration after page load.
+      # If exceeded, an error will be thrown for server-side rendered components not registered on the client.
+      # Set to 0 to disable the timeout and wait indefinitely for component registration.
+      component_registry_timeout: DEFAULT_COMPONENT_REGISTRY_TIMEOUT
     )
   end
 
@@ -60,7 +65,7 @@ module ReactOnRails
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
                   :defer_generated_component_packs, :force_load, :rsc_bundle_js_file,
-                  :react_client_manifest_file
+                  :react_client_manifest_file, :component_registry_timeout
 
     # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
@@ -76,7 +81,7 @@ module ReactOnRails
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil, i18n_yml_safe_load_options: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
                    components_subdirectory: nil, auto_load_bundle: nil, force_load: nil,
-                   rsc_bundle_js_file: nil, react_client_manifest_file: nil)
+                   rsc_bundle_js_file: nil, react_client_manifest_file: nil, component_registry_timeout: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir
@@ -100,6 +105,7 @@ module ReactOnRails
       self.raise_on_prerender_error = raise_on_prerender_error
       self.skip_display_none = skip_display_none
       self.rendering_props_extension = rendering_props_extension
+      self.component_registry_timeout = component_registry_timeout
 
       # Server rendering:
       self.server_bundle_js_file = server_bundle_js_file
@@ -132,9 +138,18 @@ module ReactOnRails
       error_if_using_packer_and_generated_assets_dir_not_match_public_output_path
       # check_deprecated_settings
       adjust_precompile_task
+      check_component_registry_timeout
     end
 
     private
+
+    def check_component_registry_timeout
+      self.component_registry_timeout = DEFAULT_COMPONENT_REGISTRY_TIMEOUT if component_registry_timeout.nil?
+
+      return if component_registry_timeout.is_a?(Integer) && component_registry_timeout >= 0
+
+      raise ReactOnRails::Error, "component_registry_timeout must be a positive integer"
+    end
 
     def check_autobundling_requirements
       raise_missing_components_subdirectory if auto_load_bundle && !components_subdirectory.present?
