@@ -21,7 +21,6 @@ function reactOnRailsPageUnloaded(): void {
 }
 
 export async function clientStartup(context: Context): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 4000));
   // Check if server rendering
   if (!isWindow(context)) {
     return;

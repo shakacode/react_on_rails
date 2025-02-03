@@ -9,10 +9,6 @@ const configureClient = () => {
   // client config is going to try to load chunks.
   delete clientConfig.entry['server-bundle'];
 
-  // clientConfig.resolve.fallback = {
-  //   ...clientConfig.resolve.fallback,
-  //   'process/browser': false,
-  // };
   return clientConfig;
 };
 
