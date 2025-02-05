@@ -310,30 +310,47 @@ module ReactOnRails
       end
 
       describe ".smart_trim" do
-        it "trims smartly" do
-          s = "1234567890"
+        let(:long_string) { "1234567890" }
 
-          expect(described_class.smart_trim(s, -1)).to eq("1234567890")
-          expect(described_class.smart_trim(s, 0)).to eq("1234567890")
-          expect(described_class.smart_trim(s, 1)).to eq("1#{Utils::TRUNCATION_FILLER}")
-          expect(described_class.smart_trim(s, 2)).to eq("1#{Utils::TRUNCATION_FILLER}0")
-          expect(described_class.smart_trim(s, 3)).to eq("1#{Utils::TRUNCATION_FILLER}90")
-          expect(described_class.smart_trim(s, 4)).to eq("12#{Utils::TRUNCATION_FILLER}90")
-          expect(described_class.smart_trim(s, 5)).to eq("12#{Utils::TRUNCATION_FILLER}890")
-          expect(described_class.smart_trim(s, 6)).to eq("123#{Utils::TRUNCATION_FILLER}890")
-          expect(described_class.smart_trim(s, 7)).to eq("123#{Utils::TRUNCATION_FILLER}7890")
-          expect(described_class.smart_trim(s, 8)).to eq("1234#{Utils::TRUNCATION_FILLER}7890")
-          expect(described_class.smart_trim(s, 9)).to eq("1234#{Utils::TRUNCATION_FILLER}67890")
-          expect(described_class.smart_trim(s, 10)).to eq("1234567890")
-          expect(described_class.smart_trim(s, 11)).to eq("1234567890")
+        context "when FULL_TEXT_ERRORS is true" do
+          before { ENV["FULL_TEXT_ERRORS"] = "true" }
+          after { ENV["FULL_TEXT_ERRORS"] = nil }
+
+          it "returns the full string regardless of length" do
+            expect(described_class.smart_trim(long_string, 5)).to eq(long_string)
+          end
+
+          it "handles a hash without trimming" do
+            hash = { a: long_string }
+            expect(described_class.smart_trim(hash, 5)).to eq(hash.to_s)
+          end
         end
 
-        it "trims handles a hash" do
-          s = { a: "1234567890" }
+        context "when FULL_TEXT_ERRORS is not set" do
+          before { ENV["FULL_TEXT_ERRORS"] = nil }
 
-          expect(described_class.smart_trim(s, 9)).to eq(
-            "{:a=#{Utils::TRUNCATION_FILLER}890\"}"
-          )
+          it "trims smartly" do
+            expect(described_class.smart_trim(long_string, -1)).to eq("1234567890")
+            expect(described_class.smart_trim(long_string, 0)).to eq("1234567890")
+            expect(described_class.smart_trim(long_string, 1)).to eq("1#{Utils::TRUNCATION_FILLER}")
+            expect(described_class.smart_trim(long_string, 2)).to eq("1#{Utils::TRUNCATION_FILLER}0")
+            expect(described_class.smart_trim(long_string, 3)).to eq("1#{Utils::TRUNCATION_FILLER}90")
+            expect(described_class.smart_trim(long_string, 4)).to eq("12#{Utils::TRUNCATION_FILLER}90")
+            expect(described_class.smart_trim(long_string, 5)).to eq("12#{Utils::TRUNCATION_FILLER}890")
+            expect(described_class.smart_trim(long_string, 6)).to eq("123#{Utils::TRUNCATION_FILLER}890")
+            expect(described_class.smart_trim(long_string, 7)).to eq("123#{Utils::TRUNCATION_FILLER}7890")
+            expect(described_class.smart_trim(long_string, 8)).to eq("1234#{Utils::TRUNCATION_FILLER}7890")
+            expect(described_class.smart_trim(long_string, 9)).to eq("1234#{Utils::TRUNCATION_FILLER}67890")
+            expect(described_class.smart_trim(long_string, 10)).to eq("1234567890")
+            expect(described_class.smart_trim(long_string, 11)).to eq("1234567890")
+          end
+
+          it "trims handles a hash" do
+            s = { a: "1234567890" }
+            expect(described_class.smart_trim(s, 9)).to eq(
+              "{:a=#{Utils::TRUNCATION_FILLER}890\"}"
+            )
+          end
         end
       end
 
