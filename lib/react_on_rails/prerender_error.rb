@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "rainbow"
+
 # rubocop:disable: Layout/IndentHeredoc
 module ReactOnRails
   class PrerenderError < ::ReactOnRails::Error
@@ -51,11 +53,17 @@ module ReactOnRails
         message << <<~MSG
           Encountered error:
 
-          #{err}
+          #{err.inspect}
 
         MSG
 
-        backtrace = err.backtrace.first(15).join("\n")
+        backtrace = if ENV["FULL_TEXT_ERRORS"] == "true"
+                      err.backtrace.join("\n")
+                    else
+                      "#{err.backtrace.first(15).join("\n")}\n" +
+                        Rainbow("The rest of the backtrace is hidden. " \
+                                "To see the full backtrace, set FULL_TEXT_ERRORS=true.").red
+                    end
       else
         backtrace = nil
       end
