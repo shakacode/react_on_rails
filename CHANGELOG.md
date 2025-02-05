@@ -390,7 +390,7 @@ Do not use. Unpublished. Caused by an issue with the release script.
 #### Fixed
 - Don't apply babel-plugin-transform-runtime inside react-on-rails to work with babel 7. [PR 1136](https://github.com/shakacode/react_on_rails/pull/1136) by [Ryunosuke Sato](https://github.com/tricknotes).
 - Add support for webpacker 4 prereleases. [PR 1134](https://github.com/shakacode/react_on_rails/pull/1134) by [Judahmeek](https://github.com/Judahmeek))
-CHANGELOG
+
 ### [11.1.2] - 2018-08-18
 
 #### Fixed
