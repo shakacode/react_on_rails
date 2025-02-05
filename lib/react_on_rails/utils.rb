@@ -185,10 +185,14 @@ module ReactOnRails
                                     end
     end
 
+    def self.full_text_errors_enabled?
+      ENV["FULL_TEXT_ERRORS"] == "true"
+    end
+
     def self.smart_trim(str, max_length = 1000)
       # From https://stackoverflow.com/a/831583/1009332
       str = str.to_s
-      return str if ENV["FULL_TEXT_ERRORS"] == "true"
+      return str if full_text_errors_enabled?
       return str unless str.present? && max_length >= 1
       return str if str.length <= max_length
 

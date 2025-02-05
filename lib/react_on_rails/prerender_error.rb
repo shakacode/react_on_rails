@@ -57,7 +57,7 @@ module ReactOnRails
 
         MSG
 
-        backtrace = if ENV["FULL_TEXT_ERRORS"] == "true"
+        backtrace = if Utils.full_text_errors_enabled?
                       err.backtrace.join("\n")
                     else
                       "#{err.backtrace.first(15).join("\n")}\n" +
