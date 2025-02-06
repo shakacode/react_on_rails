@@ -2,15 +2,25 @@ import { ItemRegistrationCallback } from "./types";
 import { onPageLoaded, onPageUnloaded } from "./pageLifecycle";
 import { getContextAndRailsContext } from "./context";
 
-export default class CallbackRegistry<T> {
-  private readonly registryType: string;
-  private registeredItems = new Map<string, T>();
-  private callbacks = new Map<string, Array<{
+/**
+ * Represents information about a registered item including its value,
+ * promise details for pending registrations, and usage status
+ */
+type ItemInfo<T> = {
+  item: T | null;
+  waitingPromiseInfo?: {
     resolve: ItemRegistrationCallback<T>;
     reject: (error: Error) => void;
-  }>>();
+    promise: Promise<T>;
+  },
+  isUsed: boolean;
+}
 
-  private timoutEventsInitialized = false;
+export default class CallbackRegistry<T> {
+  private readonly registryType: string;
+  private registeredItems = new Map<string, ItemInfo<T>>();
+
+  private timeoutEventsInitialized = false;
   private timedout = false;
 
   constructor(registryType: string) {
@@ -18,17 +28,21 @@ export default class CallbackRegistry<T> {
   }
 
   private initializeTimeoutEvents() {
-    if (!this.timoutEventsInitialized) {
-      this.timoutEventsInitialized = true;
+    if (!this.timeoutEventsInitialized) {
+      this.timeoutEventsInitialized = true;
     }
 
     let timeoutId: NodeJS.Timeout;
     const triggerTimeout = () => {
       this.timedout = true;
-      this.callbacks.forEach((itemCallbacks, itemName) => {
-        itemCallbacks.forEach((callback) => {
-          callback.reject(this.createNotFoundError(itemName));
-        });
+      this.registeredItems.forEach((itemInfo, itemName) => {
+        if (itemInfo.waitingPromiseInfo) {
+          itemInfo.waitingPromiseInfo.reject(this.createNotFoundError(itemName));
+          // eslint-disable-next-line no-param-reassign
+          itemInfo.waitingPromiseInfo = undefined;
+        } else if (!itemInfo.isUsed) {
+          console.warn(`Warning: ${this.registryType} '${itemName}' was registered but never used. This may indicate unused code that can be removed.`);
+        }
       });
     };
 
@@ -40,29 +54,35 @@ export default class CallbackRegistry<T> {
     });
 
     onPageUnloaded(() => {
-      this.callbacks.clear();
+      this.registeredItems.forEach((itemInfo) => {
+        // eslint-disable-next-line no-param-reassign
+        itemInfo.waitingPromiseInfo = undefined;
+      });
       this.timedout = false;
       clearTimeout(timeoutId);
     });
   }
 
   set(name: string, item: T): void {
-    this.registeredItems.set(name, item);
-    
-    const callbacks = this.callbacks.get(name) || [];
-    callbacks.forEach(callback => callback.resolve(item));
-    this.callbacks.delete(name);
+    const { waitingPromiseInfo } = this.registeredItems.get(name) ?? {};
+    this.registeredItems.set(name, { item, isUsed: !!waitingPromiseInfo });
+
+    if (waitingPromiseInfo) {
+      waitingPromiseInfo.resolve(item);
+    }
   }
 
   get(name: string): T {
-    const item = this.registeredItems.get(name);
-    if (item !== undefined) return item;
-
-    throw this.createNotFoundError(name);
+    const itemInfo = this.registeredItems.get(name);
+    if (!itemInfo?.item) {
+      throw this.createNotFoundError(name);
+    }
+    itemInfo.isUsed = true;
+    return itemInfo.item;
   }
 
   has(name: string): boolean {
-    return this.registeredItems.has(name);
+    return !!this.registeredItems.get(name)?.item;
   }
 
   clear(): void {
@@ -70,24 +90,50 @@ export default class CallbackRegistry<T> {
   }
 
   getAll(): Map<string, T> {
-    return this.registeredItems;
+    const components = new Map<string, T>();
+    this.registeredItems.forEach((itemInfo, name) => {
+      if (!itemInfo.item) return;
+      components.set(name, itemInfo.item);
+    });
+    return components;
   }
 
   getOrWaitForItem(name: string): Promise<T> {
     this.initializeTimeoutEvents();
-    return new Promise((resolve, reject) => {
+    const existingInfo = this.registeredItems.get(name);
+    
+    // Return existing promise if there's already a waiting promise
+    if (existingInfo?.waitingPromiseInfo) {
+      return existingInfo.waitingPromiseInfo.promise;
+    }
+
+    let waitingPromiseInfo: ItemInfo<T>['waitingPromiseInfo'];
+    const getItemPromise = new Promise<T>((resolve, reject) => {
       try {
-        resolve(this.get(name));
+        const item = this.get(name);
+        resolve(item);
       } catch(error) {
         if (this.timedout) {
-          throw error;
+          reject(error);
+          return;
         }
 
-        const itemCallbacks = this.callbacks.get(name) || [];
-        itemCallbacks.push({ resolve, reject });
-        this.callbacks.set(name, itemCallbacks);
+        this.registeredItems.set(name, {
+          item: null,
+          waitingPromiseInfo: waitingPromiseInfo = {
+            resolve,
+            reject,
+            promise: getItemPromise,
+          },
+          isUsed: true,
+        });
       }
     });
+    if (waitingPromiseInfo) {
+      waitingPromiseInfo.promise = getItemPromise;
+    }
+
+    return getItemPromise;
   }
 
   private createNotFoundError(itemName: string): Error {
