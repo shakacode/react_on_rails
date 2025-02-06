@@ -5,10 +5,18 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
       const decoder = new TextDecoder();
       const encoder = new TextEncoder();
 
+      let lastIncompleteChunk = '';
       let { value, done } = await reader.read();
       while (!done) {
-        const decodedValue = decoder.decode(value);
-        const jsonChunks = decodedValue.split('\n')
+        const decodedValue = lastIncompleteChunk + decoder.decode(value);
+        const chunks = decodedValue.split('\n');
+        if (!decodedValue.endsWith('\n')) {
+          lastIncompleteChunk = chunks.pop() ?? '';
+        } else {
+          lastIncompleteChunk = '';
+        }
+
+        const jsonChunks = chunks
           .filter(line => line.trim() !== '')
           .map((line) => {
             try {
