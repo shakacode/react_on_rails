@@ -79,7 +79,7 @@ describe('', () => {
 
   it('StoreRegistry clearHydratedStores', () => {
     expect.assertions(2);
-    StoreRegistry.stores().clear();
+    StoreRegistry.clearHydratedStores();
 
     const result = storeGenerator({});
     StoreRegistry.setStore('storeGenerator', result);
