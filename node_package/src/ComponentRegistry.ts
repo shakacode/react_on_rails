@@ -55,4 +55,8 @@ export default {
   components(): Map<string, RegisteredComponent> {
     return componentRegistry.getAll();
   },
+
+  clear(): void {
+    componentRegistry.clear();
+  },
 };
