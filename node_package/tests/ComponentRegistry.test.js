@@ -12,7 +12,7 @@ import ComponentRegistry from '../src/ComponentRegistry';
 
 describe('ComponentRegistry', () => {
   beforeEach(() => {
-    ComponentRegistry.components().clear();
+    ComponentRegistry.clear();
   });
 
   it('registers and retrieves React function components', () => {
