@@ -60,7 +60,7 @@ module ReactOnRails
         backtrace = if Utils.full_text_errors_enabled?
                       err.backtrace.join("\n")
                     else
-                      "#{err.backtrace.first(15).join("\n")}\n" +
+                      "#{Rails.backtrace_cleaner.clean(err.backtrace).join("\n")}\n" +
                         Rainbow("The rest of the backtrace is hidden. " \
                                 "To see the full backtrace, set FULL_TEXT_ERRORS=true.").red
                     end
