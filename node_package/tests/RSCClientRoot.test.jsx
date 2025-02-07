@@ -63,9 +63,9 @@ enableFetchMocks();
 
     return {
       rerender: () => rerender(<RSCClientRoot {...props} />),
-      pushFirstChunk: () => push(JSON.stringify(chunk1)),
-      pushSecondChunk: () => push(JSON.stringify(chunk2)),
-      pushCustomChunk: (chunk) => push(chunk),
+      pushFirstChunk: () => push(`${JSON.stringify(chunk1)}\n`),
+      pushSecondChunk: () => push(`${JSON.stringify(chunk2)}\n`),
+      pushCustomChunk: (chunk) => push(`${chunk}\n`),
       endStream: () => push(null),
     };
   };
