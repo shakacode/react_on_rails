@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from 'react';
 import * as RSDWClient from 'react-server-dom-webpack/client';
 import { fetch } from './utils';
