@@ -20,11 +20,21 @@ const { env } = process;
 const MAX_DEBUG_SNIPPET_LENGTH = 1000;
 const NODE_ENV = env.NODE_ENV || 'production';
 
+/* Update ./docs/node-renderer/js-configuration.md when something here changes */
+// Node renderer configuration
 export interface Config {
+  // The port the renderer should listen to. On Heroku you may want to use `process.env.PORT`:
+  // https://devcenter.heroku.com/articles/dyno-startup-behavior#port-binding-of-web-dynos
+  // Similarly on ControlPlane: https://docs.controlplane.com/reference/workload/containers#port-variable
   port: number;
+  // The renderer log level
   logLevel: LevelWithSilent;
+  // The HTTP server log level
   logHttpLevel: LevelWithSilent;
+  // Additional options to pass to the Fastify server factory.
+  // See https://fastify.dev/docs/latest/Reference/Server/#factory.
   fastifyServerOptions: FastifyServerOptions<http2.Http2Server>;
+  // Path to a temp directory where uploaded bundle files will be stored.
   bundlePath: string;
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS
   // global objects and functions that get added to the VM context:
@@ -37,14 +47,18 @@ export interface Config {
   // Object shorthand notation may be used, but is not required.
   // Example: { URL, URLSearchParams, Crypto }
   additionalContext: Record<string, unknown> | null;
+  // Number of workers that will be forked to serve rendering requests.
   workersCount: number;
+  // The password expected to receive from the **Rails client** to authenticate rendering requests.
+  // If no password is set, no authentication will be required.
   password: string | undefined;
   // Next 2 params, allWorkersRestartInterval and delayBetweenIndividualWorkerRestarts must both
   // be set if you wish to have automatic worker restarting, say to clear memory leaks.
-  // time in minutes between restarting all workers
+  // Time in minutes between restarting all workers
   allWorkersRestartInterval: number | undefined;
-  // time in minutes between each worker restarting when restarting all workers
+  // Time in minutes between each worker restarting when restarting all workers
   delayBetweenIndividualWorkerRestarts: number | undefined;
+  // If the rendering request is longer than this, it will be truncated in exception and logging messages
   maxDebugSnippetLength: number;
   // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
   honeybadgerApiKey?: string | null;
