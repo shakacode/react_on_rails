@@ -535,12 +535,10 @@ module ReactOnRails
     def compose_react_component_html_with_spec_and_console(component_specification_tag, rendered_output,
                                                            console_script)
       # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
-      html_content = <<~HTML
-        #{rendered_output}
-              #{component_specification_tag}
-              #{console_script}
-      HTML
-      html_content.strip.html_safe
+      added_html = "#{component_specification_tag}\n#{console_script}".strip
+      added_html = added_html.present? ? "\n#{added_html}" : ""
+
+      "#{rendered_output}#{added_html}".html_safe
     end
 
     def rails_context_if_not_already_rendered
