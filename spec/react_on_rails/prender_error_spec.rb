@@ -65,7 +65,9 @@ module ReactOnRails
         it "shows truncated backtrace with notice" do
           message = expected_error.message
           expect(message).to include(err.inspect)
-          expect(message).to include(err.backtrace.first(15).join("\n"))
+          expect(message).to include(
+            "spec/react_on_rails/prender_error_spec.rb:20:in `block (2 levels) in <module:ReactOnRails>'"
+          )
           expect(message).to include("The rest of the backtrace is hidden")
         end
       end
