@@ -57,7 +57,8 @@
     "react-server-dom-webpack": "18.3.0-canary-670811593-20240322",
     "redux": "^4.2.1",
     "ts-jest": "^29.2.5",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "webpack": "^5.97.1"
   },
   "dependencies": {},
   "peerDependencies": {
@@ -76,7 +77,7 @@
     "prepack": "nps build.prepack",
     "prepare": "nps build.prepack",
     "prepublishOnly": "yarn run build",
-    "build": "yarn run clean && yarn run tsc --declaration && cp node_package/src/RSCWebpackLoader.js node_package/lib",
+    "build": "yarn run clean && yarn run tsc --declaration",
     "build-watch": "yarn run clean && yarn run tsc --watch",
     "lint": "nps eslint",
     "check": "yarn run lint && yarn run test && yarn run type-check",
