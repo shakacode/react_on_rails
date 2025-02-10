@@ -45,5 +45,32 @@ module ReactOnRails
         expect(expected_error.raven_context).to eq(expected_error_info)
       end
     end
+
+    describe "error message formatting" do
+      context "when FULL_TEXT_ERRORS is true" do
+        before { ENV["FULL_TEXT_ERRORS"] = "true" }
+        after { ENV["FULL_TEXT_ERRORS"] = nil }
+
+        it "shows the full backtrace" do
+          message = expected_error.message
+          expect(message).to include(err.inspect)
+          expect(message).to include(err.backtrace.join("\n"))
+          expect(message).not_to include("The rest of the backtrace is hidden")
+        end
+      end
+
+      context "when FULL_TEXT_ERRORS is not set" do
+        before { ENV["FULL_TEXT_ERRORS"] = nil }
+
+        it "shows truncated backtrace with notice" do
+          message = expected_error.message
+          expect(message).to include(err.inspect)
+          expect(message).to include(
+            "spec/react_on_rails/prender_error_spec.rb:20:in `block (2 levels) in <module:ReactOnRails>'"
+          )
+          expect(message).to include("The rest of the backtrace is hidden")
+        end
+      end
+    end
   end
 end

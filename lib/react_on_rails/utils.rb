@@ -8,7 +8,9 @@ require "active_support/core_ext/string"
 
 module ReactOnRails
   module Utils
-    TRUNCATION_FILLER = "\n... TRUNCATED ...\n"
+    TRUNCATION_FILLER = "\n... TRUNCATED #{
+      Rainbow('To see the full output, set FULL_TEXT_ERRORS=true.').red
+    } ...\n".freeze
 
     # https://forum.shakacode.com/t/yak-of-the-week-ruby-2-4-pathname-empty-changed-to-look-at-file-size/901
     # return object if truthy, else return nil
@@ -183,9 +185,14 @@ module ReactOnRails
                                     end
     end
 
+    def self.full_text_errors_enabled?
+      ENV["FULL_TEXT_ERRORS"] == "true"
+    end
+
     def self.smart_trim(str, max_length = 1000)
       # From https://stackoverflow.com/a/831583/1009332
       str = str.to_s
+      return str if full_text_errors_enabled?
       return str unless str.present? && max_length >= 1
       return str if str.length <= max_length
 
