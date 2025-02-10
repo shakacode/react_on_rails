@@ -40,7 +40,7 @@ ReactOnRailsPro.configure do |config|
   # When using the Node Renderer, you may require some extra assets in addition to the bundle.
   # The assets_to_copy option allows the Node Renderer to have assets copied at the end of
   # the assets:precompile task or directly by the
-  # react_on_rails_pro:copy_assets_to_vm_renderer tasks.
+  # react_on_rails_pro:copy_assets_to_remote_vm_renderer task.
   # These assets are also transferred any time a new bundle is sent from Rails to the renderer.
   # The value should be a file_path or an Array of file_paths. The files should have extensions
   # to resolve the content types, such as "application/json".

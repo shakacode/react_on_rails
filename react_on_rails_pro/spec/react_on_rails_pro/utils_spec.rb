@@ -51,7 +51,7 @@ module ReactOnRailsPro
           end
 
           context "with server bundle without hash in webpack output filename" do
-            it "returns MD5 for server bundle file name" do
+            it "returns MD5 hash plus environment string for server bundle file name" do
               server_bundle_js_file = "webpack/production/webpack-bundle.js"
               server_bundle_js_file_path = File.expand_path("./public/#{server_bundle_js_file}")
               allow(Shakapacker).to receive_message_chain("manifest.lookup!")
@@ -67,7 +67,7 @@ module ReactOnRailsPro
 
               result = described_class.bundle_hash
 
-              expect(result).to eq("foobarfoobar")
+              expect(result).to eq("foobarfoobar-development")
             end
           end
         end

@@ -89,7 +89,7 @@ module ReactOnRailsPro
       if contains_hash?(server_bundle_basename)
         server_bundle_basename
       else
-        Digest::MD5.file(server_bundle_js_file_path)
+        "#{Digest::MD5.file(server_bundle_js_file_path)}-#{Rails.env}"
       end
     end
 
