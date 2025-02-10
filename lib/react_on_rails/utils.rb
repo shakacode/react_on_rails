@@ -95,6 +95,14 @@ module ReactOnRails
       end
     end
 
+    def self.asset_file_path(asset_name)
+      if ReactOnRails::PackerUtils.using_packer?
+        ReactOnRails::PackerUtils.asset_uri_from_packer(asset_name)
+      else
+        File.join(generated_assets_full_path, asset_name)
+      end
+    end
+
     def self.server_bundle_js_file_path
       return @server_bundle_path if @server_bundle_path && !Rails.env.development?
 
@@ -112,12 +120,15 @@ module ReactOnRails
     def self.react_client_manifest_file_path
       return @react_client_manifest_path if @react_client_manifest_path && !Rails.env.development?
 
-      file_name = ReactOnRails.configuration.react_client_manifest_file
-      @react_client_manifest_path = if ReactOnRails::PackerUtils.using_packer?
-                                      ReactOnRails::PackerUtils.asset_uri_from_packer(file_name)
-                                    else
-                                      File.join(generated_assets_full_path, file_name)
-                                    end
+      asset_name = ReactOnRails.configuration.react_client_manifest_file
+      @react_client_manifest_path = asset_file_path(asset_name)
+    end
+
+    def self.react_server_manifest_file_path
+      return @react_server_manifest_path if @react_server_manifest_path && !Rails.env.development?
+
+      asset_name = ReactOnRails.configuration.react_server_manifest_file
+      @react_server_manifest_path = File.join(generated_assets_full_path, asset_name)
     end
 
     def self.running_on_windows?

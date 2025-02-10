@@ -8,7 +8,7 @@ import { isPromise, isServerRenderHash } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
-import type { RenderParams, StreamRenderState } from './types';
+import type { RenderParams, StreamRenderParams, StreamRenderState } from './types';
 
 const stringToStream = (str: string): Readable => {
   const stream = new PassThrough();
@@ -55,7 +55,7 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   return { readableStream, pipeToTransform, writeChunk, emitError, endStream };
 }
 
-const streamRenderReactComponent = (reactRenderingResult: ReactElement, options: RenderParams) => {
+const streamRenderReactComponent = (reactRenderingResult: ReactElement, options: StreamRenderParams) => {
   const { name: componentName, throwJsErrors } = options;
   const renderState: StreamRenderState = {
     result: null,
@@ -145,6 +145,12 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
   }
 };
 
-const streamServerRenderedReactComponent = (options: RenderParams): Readable => streamServerRenderedComponent(options, streamRenderReactComponent);
+const streamServerRenderedReactComponent = (options: StreamRenderParams): Readable => {
+  const { rscResult, reactClientManifestFileName, reactServerManifestFileName } = options;
+  return streamServerRenderedComponent({
+    ...options,
+    props: { ...options.props, getRscPromise: rscResult, reactClientManifestFileName, reactServerManifestFileName }
+  }, streamRenderReactComponent);
+}
 
 export default streamServerRenderedReactComponent;
