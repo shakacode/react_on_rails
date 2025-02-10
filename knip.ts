@@ -8,7 +8,7 @@ const config: KnipConfig = {
         'node_package/src/ReactOnRails.ts!',
         'node_package/src/ReactOnRails.node.ts!',
         'node_package/src/ReactOnRailsRSC.ts!',
-        'node_package/src/RSCWebpackLoader.js!',
+        'node_package/src/RSCWebpackLoader.ts!',
         'node_package/src/registerServerComponent.ts!',
         'node_package/src/RSCClientRoot.ts!',
       ],
