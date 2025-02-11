@@ -16,19 +16,27 @@ You can find the **package** version numbers from this repo's tags and below in 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [4.0.0.rc.11] - 2025-02-09
+
 ### Changed
 - [PR 511](https://github.com/shakacode/react_on_rails_pro/pull/511) by [Romex91](https://github.com/Romex91)
   - Set `bodyLimit` to 100 MB by default to fix error 413.
   - Add `fastifyServerOptions` to the config
 
-### Fixed
-- Enabled `queueMicrotask` use in server bundle to support React 19. [PR 505](https://github.com/shakacode/react_on_rails_pro/pull/505) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- Specify exact httpx version until the bug there is fixed [PR #496](https://github.com/shakacode/react_on_rails_pro/pull/496) by  [alexeyr-ci](https://github.com/alexeyr-ci)
+
+- Make bundle hash environment aware. [PR 512](https://github.com/shakacode/react_on_rails_pro/pull/512) by [judahmeek](https://github.com/judahmeek).
 
 ### Changed
 - Renamed `includeTimerPolyfills` configuration option to `stubTimers`. [PR 506](https://github.com/shakacode/react_on_rails_pro/pull/506) by [alexeyr-ci](https://github.com/alexeyr-ci).
 - Fail immediately on detecting obsolete config options to prevent unexpected misconfigurations. [PR 506](https://github.com/shakacode/react_on_rails_pro/pull/506) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
-## [4.0.0.rc.10] - 2025-01-06
+### Fixed
+- Enabled `queueMicrotask` use in server bundle to support React 19. [PR 505](https://github.com/shakacode/react_on_rails_pro/pull/505) by [alexeyr-ci](https://github.com/alexeyr-ci).
+
+
+
+## 4.0.0.rc.10 - 2025-01-06
 
 ### Fixed
 - Enable use as a `git:` dependency. [PR 490](https://github.com/shakacode/react_on_rails_pro/pull/490) by [alexeyr-ci](https://github.com/alexeyr-ci).
@@ -353,7 +361,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - advanced error handling
 
 [HEAD compared to 3.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.2.1...HEAD
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc-9...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc-11...HEAD
+[4.0.0.rc.11]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.9...4.0.0-rc.11
 [4.0.0.rc.9]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.6...4.0.0-rc.9
 [4.0.0.rc.6]: https://github.com/shakacode/react_on_rails_pro/compare/3.2.1...4.0.0-rc.6
 [3.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.10...3.2.1
