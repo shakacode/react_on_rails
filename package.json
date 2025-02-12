@@ -4,9 +4,9 @@
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "node_package/lib/ReactOnRails.js",
   "exports": {
-    "./server": {
+    ".": {
       "node": "./node_package/lib/ReactOnRails.node.js",
-      "default": "./node_package/lib/ReactOnRails.server.js"
+      "default": "./node_package/lib/ReactOnRails.full.js"
     },
     "./client": "./node_package/lib/ReactOnRails.client.js"
   },
