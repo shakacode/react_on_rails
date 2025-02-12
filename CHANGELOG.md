@@ -19,6 +19,9 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 Changes since the last non-beta release.
 
 #### Fixed
+- Reduced bundle size [PR 1697](https://github.com/shakacode/react_on_rails/pull/1697) by [Romex91](https://github.com/Romex91)
+  - Migrated from CJS to ESM for more compact modules (~1KB improvement)
+  - Split exports to 'react-on-rails/server' and 'react-on-rails/client' to avoid shipping React server-rendering to browsers (~14KB improvement).
 - Fix obscure errors by introducing FULL_TEXT_ERRORS [PR 1695](https://github.com/shakacode/react_on_rails/pull/1695) by [Romex91](https://github.com/Romex91).
 
 ### [14.1.1] - 2025-01-15
