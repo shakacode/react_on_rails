@@ -35,6 +35,7 @@ yalc.lock
 
 # IDE
 .idea/
+.vscode/
 
 # TypeScript
 *.tsbuildinfo

@@ -9,7 +9,7 @@ import type {
 import Client from './ReactOnRails.client';
 
 if (typeof window !== 'undefined') {
-  throw new Error('"react-on-rails" is for server-side rendering only. Import "react-on-rails/client".');
+  console.warn('Optimization opportunity: "react-on-rails" includes server-rendering code. Browser may not need it. See https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352 (requires sign in)');
 }
 
 Client.handleError = (options: ErrorOptions): string | undefined => handleError(options);
