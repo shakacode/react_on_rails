@@ -4,12 +4,12 @@
     "esModuleInterop": true,
     "jsx": "react-jsx",
     "lib": ["dom", "es2015"],
-    "module": "CommonJS",
+    "module": "Preserve",
     "noImplicitAny": true,
     "outDir": "node_package/lib",
     "strict": true,
     "incremental": true,
-    "target": "es5"
+    "target": "es2015"
   },
   "include": ["node_package/src/**/*"]
 }
