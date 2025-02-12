@@ -1,20 +1,16 @@
 import type { ReactElement } from 'react';
 
 import * as ClientStartup from './clientStartup';
-import handleError from './handleError';
 import ComponentRegistry from './ComponentRegistry';
 import StoreRegistry from './StoreRegistry';
-import serverRenderReactComponent from './serverRenderReactComponent';
 import buildConsoleReplay from './buildConsoleReplay';
 import createReactOutput from './createReactOutput';
 import Authenticity from './Authenticity';
 import context from './context';
 import type {
   RegisteredComponent,
-  RenderParams,
   RenderResult,
   RenderReturnType,
-  ErrorOptions,
   ReactComponentOrRenderFunction,
   AuthenticityHeaders,
   Store,
@@ -243,8 +239,8 @@ ctx.ReactOnRails = {
    * Used by server rendering by Rails
    * @param options
    */
-  serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult> {
-    return serverRenderReactComponent(options);
+  serverRenderReactComponent(): null | string | Promise<RenderResult> {
+    throw new Error('serverRenderReactComponent is not available in "react-on-rails/client". Import "react-on-rails" server-side.');
   },
 
   /**
@@ -259,8 +255,8 @@ ctx.ReactOnRails = {
    * Used by Rails to catch errors in rendering
    * @param options
    */
-  handleError(options: ErrorOptions): string | undefined {
-    return handleError(options);
+  handleError(): string | undefined {
+    throw new Error('handleError is not available in "react-on-rails/client". Import "react-on-rails" server-side.');
   },
 
   /**
