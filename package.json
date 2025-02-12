@@ -3,10 +3,11 @@
   "version": "14.1.1",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "exports": {
-    ".": {
+    "./server": {
       "node": "./node_package/lib/ReactOnRails.node.js",
-      "default": "./node_package/lib/ReactOnRails.js"
-    }
+      "default": "./node_package/lib/ReactOnRails.server.js"
+    },
+    "./client": "./node_package/lib/ReactOnRails.client.js"
   },
   "directories": {
     "doc": "docs"
