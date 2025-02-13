@@ -60,7 +60,7 @@ module ReactOnRails
             @file_index += 1
           end
           begin
-            result = if render_options.stream? || render_options.rsc?
+            result = if render_options.streaming?
                        js_evaluator.eval_streaming_js(js_code, render_options)
                      else
                        js_evaluator.eval_js(js_code, render_options)
@@ -80,7 +80,7 @@ module ReactOnRails
             raise ReactOnRails::Error, msg, err.backtrace
           end
 
-          unless render_options.stream? || render_options.rsc?
+          unless render_options.streaming?
             return parse_result_and_replay_console_messages(result,
                                                             render_options)
           end

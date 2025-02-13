@@ -423,7 +423,7 @@ module ReactOnRails
     end
 
     def internal_stream_react_component(component_name, options = {})
-      options = options.merge(stream?: true)
+      options = options.merge(render_mode: :html_streaming)
       result = internal_react_component(component_name, options)
       build_react_component_result_for_server_streamed_content(
         rendered_html_stream: result[:result],
@@ -433,7 +433,7 @@ module ReactOnRails
     end
 
     def internal_rsc_react_component(react_component_name, options = {})
-      options = options.merge(rsc?: true)
+      options = options.merge(render_mode: :flight_payload_streaming)
       render_options = create_render_options(react_component_name, options)
       json_stream = server_rendered_react_component(render_options)
       json_stream.transform do |chunk|
@@ -690,7 +690,7 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
                                                js_code: js_code)
       end
 
-      if render_options.stream? || render_options.rsc?
+      if render_options.streaming?
         result.transform do |chunk_json_result|
           if should_raise_streaming_prerender_error?(chunk_json_result, render_options)
             raise_prerender_error(chunk_json_result, react_component_name, props, js_code)
