@@ -4,16 +4,13 @@ import RSCClientRoot from './RSCClientRoot';
 import { RegisterServerComponentOptions } from './types';
 
 const registerServerComponent = (options: RegisterServerComponentOptions, ...componentNames: string[]) => {
-  const componentsWrappedInRSCClientRoot = componentNames.reduce(
-    (acc, name) => ({
-      ...acc,
-      [name]: () => React.createElement(RSCClientRoot, {
-        componentName: name,
-        rscRenderingUrlPath: options.rscRenderingUrlPath
-      })
-    }),
-    {}
-  );
+  const componentsWrappedInRSCClientRoot: Record<string, () => React.ReactElement> = {};
+  for (const name of componentNames) {
+    componentsWrappedInRSCClientRoot[name] = () => React.createElement(RSCClientRoot, {
+      componentName: name,
+      rscRenderingUrlPath: options.rscRenderingUrlPath
+    });
+  }
   ReactOnRails.register(componentsWrappedInRSCClientRoot);
 };
 
