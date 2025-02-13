@@ -1,6 +1,7 @@
 import ReactDOMServer, { type PipeableStream } from 'react-dom/server';
 import { PassThrough, Readable } from 'stream';
 import type { ReactElement } from 'react';
+import injectRSCPayload from './injectRSCPayload';
 
 import ComponentRegistry from './ComponentRegistry';
 import createReactOutput from './createReactOutput';
@@ -34,8 +35,8 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
     }
   });
 
-  let pipedStream: PipeableStream | null = null;
-  const pipeToTransform = (pipeableStream: PipeableStream) => {
+  let pipedStream: PipeableStream | PassThrough | null = null;
+  const pipeToTransform = (pipeableStream: PipeableStream | PassThrough) => {
     pipeableStream.pipe(transformStream);
     pipedStream = pipeableStream;
   };
@@ -50,13 +51,17 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   const emitError = (error: unknown) => readableStream.emit('error', error);
   const endStream = () => {
     transformStream.end();
-    pipedStream?.abort();
+    if (pipedStream && 'end' in pipedStream) {
+      pipedStream.end();
+    } else if (pipedStream) {
+      pipedStream.abort();
+    }
   }
   return { readableStream, pipeToTransform, writeChunk, emitError, endStream };
 }
 
 const streamRenderReactComponent = (reactRenderingResult: ReactElement, options: StreamRenderParams) => {
-  const { name: componentName, throwJsErrors } = options;
+  const { name: componentName, throwJsErrors, rscResult } = options;
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
@@ -87,7 +92,11 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement, options:
     },
     onShellReady() {
       renderState.isShellReady = true;
-      pipeToTransform(renderingStream);
+      if (rscResult) {
+        pipeToTransform(injectRSCPayload(renderingStream, rscResult));
+      } else {
+        pipeToTransform(renderingStream);
+      }
     },
     onError(e) {
       if (!renderState.isShellReady) {
@@ -147,9 +156,18 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
 
 const streamServerRenderedReactComponent = (options: StreamRenderParams): Readable => {
   const { rscResult, reactClientManifestFileName, reactServerManifestFileName } = options;
+  let rscResult1;
+  let rscResult2;
+  if (typeof rscResult === 'object') {
+    rscResult1 = new PassThrough();
+    rscResult.pipe(rscResult1);
+    rscResult2 = new PassThrough();
+    rscResult.pipe(rscResult2);
+  }
   return streamServerRenderedComponent({
     ...options,
-    props: { ...options.props, getRscPromise: rscResult, reactClientManifestFileName, reactServerManifestFileName }
+    rscResult: rscResult1,
+    props: { ...options.props, getRscPromise: rscResult2, reactClientManifestFileName, reactServerManifestFileName }
   }, streamRenderReactComponent);
 }
 
