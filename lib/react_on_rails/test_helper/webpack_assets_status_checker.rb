@@ -52,6 +52,8 @@ module ReactOnRails
           webpack_generated_files = @webpack_generated_files.map do |bundle_name|
             if bundle_name == ReactOnRails.configuration.react_client_manifest_file
               ReactOnRails::Utils.react_client_manifest_file_path
+            elsif bundle_name == ReactOnRails.configuration.react_server_manifest_file
+              ReactOnRails::Utils.react_server_manifest_file_path
             else
               ReactOnRails::Utils.bundle_js_file_path(bundle_name)
             end

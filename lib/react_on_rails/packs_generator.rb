@@ -129,14 +129,24 @@ module ReactOnRails
         "import #{name} from '#{relative_path(generated_server_bundle_file_path, component_path)}';"
       end
 
-      components_to_register = component_for_server_registration_to_path.keys
+      load_server_components = ReactOnRails::Utils.react_on_rails_pro? &&
+                               ReactOnRailsPro.configuration.enable_rsc_support
+      server_components_to_register = component_for_server_registration_to_path.keys.delete_if do |name|
+        next true unless load_server_components
+
+        component_path = component_for_server_registration_to_path[name]
+        client_entrypoint?(component_path)
+      end
+      client_components_to_register = component_for_server_registration_to_path.keys - server_components_to_register
 
       <<~FILE_CONTENT
         import ReactOnRails from 'react-on-rails';
+        import registerServerComponent from 'react-on-rails/registerServerComponent';
 
         #{server_component_imports.join("\n")}
 
-        ReactOnRails.register({#{components_to_register.join(",\n")}});
+        ReactOnRails.register({#{client_components_to_register.join(",\n")}});
+        registerServerComponent({#{server_components_to_register.join(",\n")}});
       FILE_CONTENT
     end
 

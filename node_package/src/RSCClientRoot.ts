@@ -1,9 +1,7 @@
-"use client";
-
 import * as React from 'react';
 import RSDWClient from 'react-server-dom-webpack/client';
-import { fetch } from './utils';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs';
+import { rscStream } from './readRSCOnClient';
 
 if (!('use' in React && typeof React.use === 'function')) {
   throw new Error('React.use is not defined. Please ensure you are using React 18 with experimental features enabled or React 19+ to use server components.');
@@ -21,20 +19,10 @@ export type RSCClientRootProps = {
   rscRenderingUrlPath: string;
 }
 
-const createFromFetch = async (fetchPromise: Promise<Response>) => {
-  const response = await fetchPromise;
-  const stream = response.body;
-  if (!stream) {
-    throw new Error('No stream found in response');
-  }
-  const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream);
-  return RSDWClient.createFromReadableStream(transformedStream);
-}
-
-const fetchRSC = ({ componentName, rscRenderingUrlPath }: RSCClientRootProps) => {
+const fetchRSC = ({ componentName }: RSCClientRootProps) => {
   if (!renderCache[componentName]) {
-    const strippedUrlPath = rscRenderingUrlPath.replace(/^\/|\/$/g, '');
-    renderCache[componentName] = createFromFetch(fetch(`/${strippedUrlPath}/${componentName}`)) as Promise<React.ReactNode>;
+    const transformedStream = transformRSCStreamAndReplayConsoleLogs(rscStream);
+    renderCache[componentName] = RSDWClient.createFromReadableStream(transformedStream);
   }
   return renderCache[componentName];
 }

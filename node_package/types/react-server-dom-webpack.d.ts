@@ -39,7 +39,15 @@ declare module 'react-server-dom-webpack/server.node' {
 }
 
 declare module 'react-server-dom-webpack/client' {
-  export const createFromFetch: (promise: Promise<Response>) => Promise<unknown>;
+  import type { ReactElement } from 'react';
 
-  export const createFromReadableStream: (stream: ReadableStream) => Promise<unknown>;
+  export const createFromFetch: (promise: Promise<Response>) => Promise<ReactElement>;
+
+  export const createFromReadableStream: (stream: ReadableStream) => Promise<ReactElement>;
+}
+
+declare module 'react-server-dom-webpack/client.node' {
+  import type { ReactElement } from 'react';
+
+  export const createFromNodeStream: (stream: NodeJS.ReadableStream, manifest: Record<string, unknown>) => Promise<ReactElement>;
 }

@@ -131,6 +131,11 @@ export interface RSCRenderParams extends RenderParams {
   reactClientManifestFileName: string;
 }
 
+export interface StreamRenderParams extends RSCRenderParams {
+  reactServerManifestFileName?: string;
+  rscResult?: string | Readable;
+}
+
 export interface CreateParams extends Params {
   componentObj: RegisteredComponent;
   shouldHydrate?: boolean;
@@ -197,6 +202,7 @@ export interface ReactOnRails {
   stores(): Map<string, Store>;
   resetOptions(): void;
   options: Record<string, string | number | boolean>;
+  isRSCBundle: boolean;
 }
 
 export type RenderState = {

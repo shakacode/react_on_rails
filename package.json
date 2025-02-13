@@ -9,7 +9,11 @@
       "default": "./node_package/lib/ReactOnRails.js"
     },
     "./RSCWebpackLoader": "./node_package/lib/RSCWebpackLoader.js",
-    "./registerServerComponent": "./node_package/lib/registerServerComponent.js"
+    "./registerServerComponent": {
+      "rsc-server": "./node_package/lib/registerServerComponent.rsc.js",
+      "node": "./node_package/lib/registerServerComponent.node.js",
+      "default": "./node_package/lib/registerServerComponent.js"
+    }
   },
   "directories": {
     "doc": "docs"
