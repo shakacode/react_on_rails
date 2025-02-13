@@ -215,12 +215,12 @@ module ReactOnRails
 
           context "with server file in the manifest, used for client", packer_type.to_sym do
             it "returns the correct path hashed server path" do
-              Packer = ReactOnRails::PackerUtils.packer # rubocop:disable Lint/ConstantDefinitionInBlock, RSpec/LeakyConstantDeclaration
+              packer = ReactOnRails::PackerUtils.packer
               mock_bundle_configs(server_bundle_name: "webpack-bundle.js")
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(true)
               mock_bundle_in_manifest("webpack-bundle.js", "webpack/development/webpack-bundle-123456.js")
-              allow(Packer).to receive_message_chain("dev_server.running?")
+              allow(packer).to receive_message_chain("dev_server.running?")
                 .and_return(false)
 
               path = described_class.server_bundle_js_file_path
@@ -278,12 +278,12 @@ module ReactOnRails
 
           context "with server file in the manifest, used for client", packer_type.to_sym do
             it "returns the correct path hashed server path" do
-              Packer = ReactOnRails::PackerUtils.packer # rubocop:disable Lint/ConstantDefinitionInBlock, RSpec/LeakyConstantDeclaration
+              packer = ReactOnRails::PackerUtils.packer
               mock_bundle_configs(rsc_bundle_name: "webpack-bundle.js")
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(true)
               mock_bundle_in_manifest("webpack-bundle.js", "webpack/development/webpack-bundle-123456.js")
-              allow(Packer).to receive_message_chain("dev_server.running?")
+              allow(packer).to receive_message_chain("dev_server.running?")
                 .and_return(false)
 
               path = described_class.rsc_bundle_js_file_path

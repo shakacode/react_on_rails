@@ -10,11 +10,7 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
       while (!done) {
         const decodedValue = lastIncompleteChunk + decoder.decode(value);
         const chunks = decodedValue.split('\n');
-        if (!decodedValue.endsWith('\n')) {
-          lastIncompleteChunk = chunks.pop() ?? '';
-        } else {
-          lastIncompleteChunk = '';
-        }
+        lastIncompleteChunk = chunks.pop() ?? '';
 
         const jsonChunks = chunks
           .filter(line => line.trim() !== '')
