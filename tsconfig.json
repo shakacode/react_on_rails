@@ -5,14 +5,14 @@
     "esModuleInterop": false,
     // needed for Jest tests even though we don't use .tsx
     "jsx": "react-jsx",
-    "lib": ["dom", "ESNext"],
-    "module": "ESNext",
+    "lib": ["dom", "es2015"],
+    "module": "es2015",
     "moduleResolution": "bundler",
     "noImplicitAny": true,
     "outDir": "node_package/lib",
     "strict": true,
     "incremental": true,
-    "target": "ESNext"
+    "target": "es2015"
   },
   "include": ["node_package/src/**/*"]
 }
