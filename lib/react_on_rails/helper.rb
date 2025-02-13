@@ -433,7 +433,7 @@ module ReactOnRails
     end
 
     def internal_rsc_react_component(react_component_name, options = {})
-      options = options.merge(render_mode: :flight_payload_streaming)
+      options = options.merge(render_mode: :rsc_payload_streaming)
       render_options = create_render_options(react_component_name, options)
       json_stream = server_rendered_react_component(render_options)
       json_stream.transform do |chunk|

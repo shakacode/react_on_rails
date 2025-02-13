@@ -115,19 +115,19 @@ module ReactOnRails
         # Determines the React rendering strategy:
         # - :sync: Synchronous SSR using renderToString (blocking and rendering in one shot)
         # - :html_streaming: Progressive SSR using renderToPipeableStream (non-blocking and rendering incrementally)
-        # - :flight_payload_streaming: Server Components serialized in React flight format
+        # - :rsc_payload_streaming: Server Components serialized in React flight format
         #   (non-blocking and rendering incrementally).
         options.fetch(:render_mode, :sync)
       end
 
       def streaming?
         # Returns true if the component should be rendered incrementally
-        %i[html_streaming flight_payload_streaming].include?(render_mode)
+        %i[html_streaming rsc_payload_streaming].include?(render_mode)
       end
 
-      def flight_payload_streaming?
+      def rsc_payload_streaming?
         # Returns true if the component should be rendered as a React Server Component
-        render_mode == :flight_payload_streaming
+        render_mode == :rsc_payload_streaming
       end
 
       def html_streaming?
