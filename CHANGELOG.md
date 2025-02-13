@@ -20,7 +20,7 @@ Changes since the last non-beta release.
 
 #### Breaking
 - Reduced bundle size [PR 1697](https://github.com/shakacode/react_on_rails/pull/1697) by [Romex91](https://github.com/Romex91)
-  - Migrated from CJS to ESM for more compact modules (~1KB improvement). **Breaking change:** All dependencies running `require('react-on-rails')` will need to update to ESM `import ReactOnRails from 'react-on-rails'`.
+  - Migrated from CJS to ESM for more compact modules (~1KB improvement). **Breaking change:** Dropped CJS support. All projects running `require('react-on-rails')` will need to update to ESM `import ReactOnRails from 'react-on-rails'`.
   - Add export option 'react-on-rails/client' to avoid shipping server-rendering code to browsers (~14KB improvement).
 
 #### Fixed
