@@ -22,6 +22,11 @@ module ReactOnRails
     let(:old_auto_load_bundle) { ReactOnRails.configuration.auto_load_bundle }
 
     before do
+      stub_const("ReactOnRailsPro", Class.new do
+        def self.configuration
+          @configuration ||= Struct.new(:enable_rsc_support, :rsc_rendering_url_path).new(false, nil)
+        end
+      end)
       ReactOnRails.configuration.server_bundle_js_file = server_bundle_js_file
       ReactOnRails.configuration.components_subdirectory = "ror_components"
       ReactOnRails.configuration.webpack_generated_files = webpack_generated_files
@@ -206,6 +211,154 @@ module ReactOnRails
         expect(generated_server_bundle_content).not_to include("#{component_name}.jsx")
         expect(generated_server_bundle_content).not_to include("#{component_name}.client.jsx")
         expect(generated_server_bundle_content).not_to include("#{component_name}.server.jsx")
+      end
+    end
+
+    context "when RSC support is enabled" do
+      let(:components_directory) { "ReactServerComponents" }
+      let(:rsc_rendering_url_path) { "/rsc" }
+
+      before do
+        stub_packer_source_path(component_name: components_directory,
+                                packer_source_path: packer_source_path)
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        allow(ReactOnRailsPro.configuration).to receive_messages(
+          enable_rsc_support: true,
+          rsc_rendering_url_path: rsc_rendering_url_path
+        )
+      end
+
+      context "when common component is not a client entrypoint" do
+        before do
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "creates pack with server component registration" do
+          component_name = "ReactServerComponent"
+          component_pack = "#{generated_directory}/#{component_name}.js"
+          pack_content = File.read(component_pack)
+          expected_content = <<~CONTENT.strip
+            import registerServerComponent from 'react-on-rails/registerServerComponent';
+
+            registerServerComponent({
+              rscRenderingUrlPath: "#{rsc_rendering_url_path}",
+            }, "#{component_name}")
+          CONTENT
+
+          expect(pack_content).to eq(expected_content)
+        end
+      end
+
+      context "when client component is not a client entrypoint" do
+        before do
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "creates pack with client component registration" do
+          component_name = "ReactClientComponentWithClientAndServer"
+          component_pack = "#{generated_directory}/#{component_name}.js"
+          pack_content = File.read(component_pack)
+          expect(pack_content).to include("import ReactOnRails from 'react-on-rails';")
+          expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
+          expect(pack_content).not_to include("registerServerComponent")
+        end
+      end
+
+      context "when server component is a client entrypoint" do
+        before do
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "creates pack with server component registration" do
+          component_name = "ReactServerComponentWithClientAndServer"
+          component_pack = "#{generated_directory}/#{component_name}.js"
+          pack_content = File.read(component_pack)
+          expected_content = <<~CONTENT.strip
+            import registerServerComponent from 'react-on-rails/registerServerComponent';
+
+            registerServerComponent({
+              rscRenderingUrlPath: "#{rsc_rendering_url_path}",
+            }, "#{component_name}")
+          CONTENT
+
+          expect(pack_content).to eq(expected_content)
+        end
+      end
+
+      context "when common component is a client entrypoint" do
+        before do
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "creates pack with client component registration" do
+          component_name = "ReactClientComponent"
+          component_pack = "#{generated_directory}/#{component_name}.js"
+          pack_content = File.read(component_pack)
+          expect(pack_content).to include("import ReactOnRails from 'react-on-rails';")
+          expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
+          expect(pack_content).not_to include("registerServerComponent")
+        end
+      end
+
+      context "when RSC support is disabled" do
+        before do
+          allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "creates pack with client component registration" do
+          component_name = "ReactServerComponent"
+          component_pack = "#{generated_directory}/#{component_name}.js"
+          pack_content = File.read(component_pack)
+          expect(pack_content).to include("import ReactOnRails from 'react-on-rails';")
+          expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
+          expect(pack_content).not_to include("registerServerComponent")
+        end
+      end
+
+      context "when not using ReactOnRailsPro" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "creates pack with client component registration" do
+          component_name = "ReactServerComponent"
+          component_pack = "#{generated_directory}/#{component_name}.js"
+          pack_content = File.read(component_pack)
+          expect(pack_content).to include("import ReactOnRails from 'react-on-rails';")
+          expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
+          expect(pack_content).not_to include("registerServerComponent")
+        end
+      end
+
+      context "when registered on server bundle" do
+        before do
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "register all components using ReactOnRails.register" do
+          generated_server_bundle_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-bundle-generated.js"
+          )
+          generated_server_bundle_content = File.read(generated_server_bundle_path)
+          expected_content = <<~CONTENT.strip
+            import ReactOnRails from 'react-on-rails';
+
+            import ReactClientComponent from '../components/ReactServerComponents/ror_components/ReactClientComponent.jsx';
+            import ReactServerComponent from '../components/ReactServerComponents/ror_components/ReactServerComponent.jsx';
+            import ReactClientComponentWithClientAndServer from '../components/ReactServerComponents/ror_components/ReactClientComponentWithClientAndServer.server.jsx';
+            import ReactServerComponentWithClientAndServer from '../components/ReactServerComponents/ror_components/ReactServerComponentWithClientAndServer.server.jsx';
+
+            ReactOnRails.register({ReactClientComponent,
+            ReactServerComponent,
+            ReactClientComponentWithClientAndServer,
+            ReactServerComponentWithClientAndServer});
+          CONTENT
+
+          expect(generated_server_bundle_content.strip).to eq(expected_content.strip)
+        end
       end
     end
 

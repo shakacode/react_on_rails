@@ -14,28 +14,28 @@ const onPageLoadedCallbacks = [];
 const onPageUnloadedCallbacks = [];
 
 jest.mock('../src/pageLifecycle', () => ({
-  onPageLoaded: jest.fn(cb => {
+  onPageLoaded: jest.fn((cb) => {
     onPageLoadedCallbacks.push(cb);
     cb();
   }),
-  onPageUnloaded: jest.fn(cb => {
+  onPageUnloaded: jest.fn((cb) => {
     onPageUnloadedCallbacks.push(cb);
     cb();
-  })
+  }),
 }));
 
 jest.mock('../src/context', () => ({
-  getContextAndRailsContext: () => ({ railsContext: { componentRegistryTimeout: 100 } })
+  getContextAndRailsContext: () => ({ railsContext: { componentRegistryTimeout: 100 } }),
 }));
 
 describe('ComponentRegistry', () => {
   beforeEach(() => {
     ComponentRegistry.clear();
-    onPageLoadedCallbacks.forEach(cb => cb());
+    onPageLoadedCallbacks.forEach((cb) => cb());
   });
 
   afterEach(() => {
-    onPageUnloadedCallbacks.forEach(cb => cb());
+    onPageUnloadedCallbacks.forEach((cb) => cb());
   });
 
   it('registers and retrieves React function components', () => {
