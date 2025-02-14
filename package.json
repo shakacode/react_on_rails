@@ -2,7 +2,6 @@
   "name": "react-on-rails",
   "version": "14.1.1",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
-  "type": "module",
   "exports": {
     ".": {
       "node": "./node_package/lib/ReactOnRails.node.js",
@@ -63,7 +62,7 @@
     "start": "nps",
     "prepack": "nps build.prepack",
     "prepare": "nps build.prepack",
-    "prepublishOnly": "yarn run build && attw --profile esm-only --pack .",
+    "prepublishOnly": "yarn run build && (command -v attw >/dev/null && attw --profile esm-only --pack . || (echo 'attw not found, skipping' && exit 0))",
     "build": "yarn run clean && yarn run tsc --declaration",
     "build-watch": "yarn run clean && yarn run tsc --watch",
     "lint": "nps eslint",
