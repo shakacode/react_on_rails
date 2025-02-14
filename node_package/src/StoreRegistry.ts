@@ -1,4 +1,4 @@
-import type { Store, StoreGenerator } from './types';
+import type { Store, StoreGenerator } from './types/index.js';
 
 const registeredStoreGenerators = new Map<string, StoreGenerator>();
 const hydratedStores = new Map<string, Store>();

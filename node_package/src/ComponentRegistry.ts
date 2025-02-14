@@ -1,5 +1,5 @@
-import type { RegisteredComponent, ReactComponentOrRenderFunction, RenderFunction } from './types/index';
-import isRenderFunction from './isRenderFunction';
+import type { RegisteredComponent, ReactComponentOrRenderFunction, RenderFunction } from './types/index.js';
+import isRenderFunction from './isRenderFunction.js';
 
 const registeredComponents = new Map<string, RegisteredComponent>();
 

@@ -6,13 +6,13 @@ import type {
   RegisteredComponent,
   RenderFunction,
   Root,
-} from './types';
-import type { Context } from './context';
+} from './types/index.js';
+import type { Context } from './context.js';
 
-import createReactOutput from './createReactOutput';
-import { isServerRenderHash } from './isServerRenderResult';
-import reactHydrateOrRender from './reactHydrateOrRender';
-import { supportsRootApi } from './reactApis';
+import createReactOutput from './createReactOutput.js';
+import { isServerRenderHash } from './isServerRenderResult.js';
+import reactHydrateOrRender from './reactHydrateOrRender.js';
+import { supportsRootApi } from './reactApis.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

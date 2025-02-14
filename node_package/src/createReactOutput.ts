@@ -2,8 +2,8 @@
 
 import React from 'react';
 import type { ServerRenderResult,
-  CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index';
-import {isServerRenderHash, isPromise} from "./isServerRenderResult";
+  CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index.js';
+import {isServerRenderHash, isPromise} from "./isServerRenderResult.js";
 
 /**
  * Logic to either call the renderFunction or call React.createElement to get the

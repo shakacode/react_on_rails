@@ -1,12 +1,12 @@
 import type { ReactElement } from 'react';
 
-import * as ClientStartup from './clientStartup';
-import ComponentRegistry from './ComponentRegistry';
-import StoreRegistry from './StoreRegistry';
-import buildConsoleReplay from './buildConsoleReplay';
-import createReactOutput from './createReactOutput';
-import Authenticity from './Authenticity';
-import context from './context';
+import * as ClientStartup from './clientStartup.js';
+import ComponentRegistry from './ComponentRegistry.js';
+import StoreRegistry from './StoreRegistry.js';
+import buildConsoleReplay from './buildConsoleReplay.js';
+import createReactOutput from './createReactOutput.js';
+import Authenticity from './Authenticity.js';
+import context from './context.js';
 import type {
   RegisteredComponent,
   RenderResult,
@@ -15,8 +15,8 @@ import type {
   AuthenticityHeaders,
   Store,
   StoreGenerator,
-} from './types';
-import reactHydrateOrRender from './reactHydrateOrRender';
+} from './types/index.js';
+import reactHydrateOrRender from './reactHydrateOrRender.js';
 
 const ctx = context();
 
@@ -299,5 +299,5 @@ ctx.ReactOnRails.resetOptions();
 
 ClientStartup.clientStartup(ctx);
 
-export * from "./types";
+export * from "./types/index.js";
 export default ctx.ReactOnRails;

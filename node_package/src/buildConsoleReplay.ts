@@ -1,5 +1,5 @@
-import RenderUtils from './RenderUtils';
-import scriptSanitizedVal from './scriptSanitizedVal';
+import RenderUtils from './RenderUtils.js';
+import scriptSanitizedVal from './scriptSanitizedVal.js';
 
 declare global {
   interface Console {
