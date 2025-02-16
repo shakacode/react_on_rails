@@ -6,7 +6,7 @@
   "exports": {
     ".": {
       "node": "./node_package/lib/ReactOnRails.node.js",
-      "rsc-server": "./node_package/lib/ReactOnRailsRSC.js",
+      "react-server": "./node_package/lib/ReactOnRailsRSC.js",
       "default": "./node_package/lib/ReactOnRails.full.js"
     },
     "./client": "./node_package/lib/ReactOnRails.client.js",
