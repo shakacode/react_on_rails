@@ -131,6 +131,7 @@ module ReactOnRails
     end
 
     def rsc_react_component(component_name, options = {})
+      options[:prerender] = true
       run_stream_inside_fiber do
         internal_rsc_react_component(component_name, options)
       end
