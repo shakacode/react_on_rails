@@ -18,7 +18,7 @@ export const resetRenderCache = () => {
 
 export type RSCClientRootProps = {
   componentName: string;
-  rscRenderingUrlPath: string;
+  rscPayloadGenerationUrlPath: string;
 }
 
 const createFromFetch = async (fetchPromise: Promise<Response>) => {
@@ -31,17 +31,30 @@ const createFromFetch = async (fetchPromise: Promise<Response>) => {
   return RSDWClient.createFromReadableStream(transformedStream);
 }
 
-const fetchRSC = ({ componentName, rscRenderingUrlPath }: RSCClientRootProps) => {
+const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath }: RSCClientRootProps) => {
   if (!renderCache[componentName]) {
-    const strippedUrlPath = rscRenderingUrlPath.replace(/^\/|\/$/g, '');
+    const strippedUrlPath = rscPayloadGenerationUrlPath.replace(/^\/|\/$/g, '');
     renderCache[componentName] = createFromFetch(fetch(`/${strippedUrlPath}/${componentName}`)) as Promise<React.ReactNode>;
   }
   return renderCache[componentName];
 }
 
+/**
+ * RSCClientRoot is a React component that handles client-side rendering of React Server Components (RSC).
+ * It manages the fetching, caching, and rendering of RSC payloads from the server.
+ *
+ * This component:
+ * 1. Fetches RSC payloads from the server using the provided URL path
+ * 2. Caches the responses to prevent duplicate requests
+ * 3. Transforms the response stream to replay server-side console logs
+ * 4. Uses React.use() to handle the async data fetching
+ *
+ * @requires React 18+ with experimental features or React 19+
+ * @requires react-server-dom-webpack/client
+ */
 const RSCClientRoot = ({
   componentName,
-  rscRenderingUrlPath,
-}: RSCClientRootProps) => use(fetchRSC({ componentName, rscRenderingUrlPath }));
+  rscPayloadGenerationUrlPath,
+}: RSCClientRootProps) => use(fetchRSC({ componentName, rscPayloadGenerationUrlPath }));
 
 export default RSCClientRoot;

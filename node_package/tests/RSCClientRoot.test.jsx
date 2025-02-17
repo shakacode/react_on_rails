@@ -41,7 +41,7 @@ enableFetchMocks();
     }).toThrow('React.use is not defined');
   });
 
-  const mockRSCRequest = (rscRenderingUrlPath = 'rsc-render') => {
+  const mockRSCRequest = (rscPayloadGenerationUrlPath = 'rsc-render') => {
     const chunksDirectory = path.join(
       __dirname,
       'fixtures',
@@ -56,7 +56,7 @@ enableFetchMocks();
 
     const props = {
       componentName: 'TestComponent',
-      rscRenderingUrlPath,
+      rscPayloadGenerationUrlPath,
     };
 
     const { rerender } = render(<RSCClientRoot {...props} />);
@@ -112,7 +112,7 @@ enableFetchMocks();
     expect(consoleSpy).toHaveBeenCalledTimes(2);
   });
 
-  it('strips leading and trailing slashes from rscRenderingUrlPath', async () => {
+  it('strips leading and trailing slashes from rscPayloadGenerationUrlPath', async () => {
     const { pushFirstChunk, pushSecondChunk, endStream } = mockRSCRequest('/rsc-render/');
 
     pushFirstChunk();

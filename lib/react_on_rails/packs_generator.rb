@@ -99,7 +99,7 @@ module ReactOnRails
           import registerServerComponent from 'react-on-rails/registerServerComponent';
 
           registerServerComponent({
-            rscRenderingUrlPath: "#{rsc_payload_generation_url_path}",
+            rscPayloadGenerationUrlPath: "#{rsc_payload_generation_url_path}",
           }, "#{registered_component_name}")
         FILE_CONTENT
       end
