@@ -24,7 +24,7 @@ module ReactOnRails
     before do
       stub_const("ReactOnRailsPro", Class.new do
         def self.configuration
-          @configuration ||= Struct.new(:enable_rsc_support, :rsc_rendering_url_path).new(false, nil)
+          @configuration ||= Struct.new(:enable_rsc_support, :rsc_payload_generation_url_path).new(false, nil)
         end
       end)
       ReactOnRails.configuration.server_bundle_js_file = server_bundle_js_file
@@ -216,7 +216,7 @@ module ReactOnRails
 
     context "when RSC support is enabled" do
       let(:components_directory) { "ReactServerComponents" }
-      let(:rsc_rendering_url_path) { "/rsc" }
+      let(:rsc_payload_generation_url_path) { "/rsc" }
 
       before do
         stub_packer_source_path(component_name: components_directory,
@@ -224,7 +224,7 @@ module ReactOnRails
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
         allow(ReactOnRailsPro.configuration).to receive_messages(
           enable_rsc_support: true,
-          rsc_rendering_url_path: rsc_rendering_url_path
+          rsc_payload_generation_url_path: rsc_payload_generation_url_path
         )
       end
 
@@ -241,7 +241,7 @@ module ReactOnRails
             import registerServerComponent from 'react-on-rails/registerServerComponent';
 
             registerServerComponent({
-              rscRenderingUrlPath: "#{rsc_rendering_url_path}",
+              rscRenderingUrlPath: "#{rsc_payload_generation_url_path}",
             }, "#{component_name}")
           CONTENT
 
@@ -277,7 +277,7 @@ module ReactOnRails
             import registerServerComponent from 'react-on-rails/registerServerComponent';
 
             registerServerComponent({
-              rscRenderingUrlPath: "#{rsc_rendering_url_path}",
+              rscRenderingUrlPath: "#{rsc_payload_generation_url_path}",
             }, "#{component_name}")
           CONTENT
 
