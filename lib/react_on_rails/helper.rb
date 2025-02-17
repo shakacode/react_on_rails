@@ -131,7 +131,7 @@ module ReactOnRails
     end
 
     # Renders the React Server Component (RSC) payload for a given component. This helper generates
-    # a special format designed by React for serializing server components and transmitting them 
+    # a special format designed by React for serializing server components and transmitting them
     # to the client.
     #
     # @return [String] Returns a Newline Delimited JSON (NDJSON) stream where each line contains a JSON object with:
@@ -161,7 +161,7 @@ module ReactOnRails
     #   <%= rsc_payload_react_component("ReactServerComponentPage") %>
     #
     # @example With props and tracing enabled
-    #   <%= rsc_payload_react_component("RSCPostsPage", 
+    #   <%= rsc_payload_react_component("RSCPostsPage",
     #         props: { artificialDelay: 1000 },
     #         trace: true) %>
     #
