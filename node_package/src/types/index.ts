@@ -109,7 +109,7 @@ export interface RegisteredComponent {
 }
 
 export interface RegisterServerComponentOptions {
-  rscRenderingUrlPath: string;
+  rscPayloadGenerationUrlPath: string;
 }
 
 export type ItemRegistrationCallback<T> = (component: T) => void;

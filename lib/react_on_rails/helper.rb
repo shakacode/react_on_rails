@@ -130,6 +130,61 @@ module ReactOnRails
       end
     end
 
+    # Renders the React Server Component (RSC) payload for a given component. This helper generates
+    # a special format designed by React for serializing server components and transmitting them 
+    # to the client.
+    #
+    # @return [String] Returns a Newline Delimited JSON (NDJSON) stream where each line contains a JSON object with:
+    #   - html: The RSC payload containing the rendered server components and client component references
+    #   - consoleReplayScript: JavaScript to replay server-side console logs in the client
+    #   - hasErrors: Boolean indicating if any errors occurred during rendering
+    #   - isShellReady: Boolean indicating if the initial shell is ready for hydration
+    #
+    # Example NDJSON stream:
+    #   {"html":"<RSC Payload>","consoleReplayScript":"","hasErrors":false,"isShellReady":true}
+    #   {"html":"<RSC Payload>","consoleReplayScript":"console.log('Loading...')","hasErrors":false,"isShellReady":true}
+    #
+    # The RSC payload within the html field contains:
+    # - The component's rendered output from the server
+    # - References to client components that need hydration
+    # - Data props passed to client components
+    #
+    # @param component_name [String] The name of the React component to render. This component should
+    #   be a server component or a mixed component tree containing both server and client components.
+    #
+    # @param options [Hash] Options for rendering the component
+    # @option options [Hash] :props Props to pass to the component (default: {})
+    # @option options [Boolean] :trace Enable tracing for debugging (default: false)
+    # @option options [String] :id Custom DOM ID for the component container (optional)
+    #
+    # @example Basic usage with a server component
+    #   <%= rsc_payload_react_component("ReactServerComponentPage") %>
+    #
+    # @example With props and tracing enabled
+    #   <%= rsc_payload_react_component("RSCPostsPage", 
+    #         props: { artificialDelay: 1000 },
+    #         trace: true) %>
+    #
+    # @note This helper requires React Server Components support to be enabled in your configuration:
+    #   ReactOnRailsPro.configure do |config|
+    #     config.enable_rsc_support = true
+    #   end
+    #
+    # @note The NDJSON stream format enables:
+    #   - Progressive streaming of RSC payloads as components finish rendering
+    #   - Real-time console log replay for debugging
+    #   - Error handling and reporting during rendering
+    #   - Selective hydration of client components
+    #   - Efficient code splitting and bundle loading
+    #
+    # @raise [ReactOnRailsPro::Error] if RSC support is not enabled in configuration
+    #
+    # Note: You don't have to deal directly with this helper function - it's used internally by the
+    # `rsc_payload_route` helper function. The returned data from this function is used internally by
+    # components registered using the `registerServerComponent` function. Don't use it unless you need
+    # more control over the RSC payload generation. To know more about RSC payload, see the following link:
+    # @see https://www.shakacode.com/react-on-rails-pro/docs/how-react-server-components-works.md
+    #   for technical details about the RSC payload format
     def rsc_payload_react_component(component_name, options = {})
       options[:prerender] = true
       run_stream_inside_fiber do
