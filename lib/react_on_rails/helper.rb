@@ -130,10 +130,10 @@ module ReactOnRails
       end
     end
 
-    def rsc_react_component(component_name, options = {})
+    def rsc_payload_react_component(component_name, options = {})
       options[:prerender] = true
       run_stream_inside_fiber do
-        internal_rsc_react_component(component_name, options)
+        internal_rsc_payload_react_component(component_name, options)
       end
     end
 
@@ -433,7 +433,7 @@ module ReactOnRails
       )
     end
 
-    def internal_rsc_react_component(react_component_name, options = {})
+    def internal_rsc_payload_react_component(react_component_name, options = {})
       options = options.merge(render_mode: :rsc_payload_streaming)
       render_options = create_render_options(react_component_name, options)
       json_stream = server_rendered_react_component(render_options)
