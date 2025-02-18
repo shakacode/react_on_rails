@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 
-const loadedReactClientManifests = new Map<string, { [key: string]: unknown; }>();
+const loadedReactClientManifests = new Map<string, Record<string, unknown>>();
 
 export default function loadReactClientManifest(reactClientManifestFileName: string) {
   // React client manifest is uploaded to node renderer as an asset.
