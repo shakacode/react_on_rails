@@ -4,8 +4,8 @@
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "exports": {
     ".": {
-      "node": "./node_package/lib/ReactOnRails.node.js",
       "react-server": "./node_package/lib/ReactOnRailsRSC.js",
+      "node": "./node_package/lib/ReactOnRails.node.js",
       "default": "./node_package/lib/ReactOnRails.js"
     },
     "./RSCWebpackLoader": "./node_package/lib/RSCWebpackLoader.js",
