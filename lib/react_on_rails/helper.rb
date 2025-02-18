@@ -119,11 +119,13 @@ module ReactOnRails
     # @option options [Hash] :props Props to pass to the react component
     # @option options [String] :dom_id DOM ID of the component container
     # @option options [Hash] :html_options Options passed to content_tag
-    # @option options [Boolean] :prerender Set to false to disable server-side rendering
     # @option options [Boolean] :trace Set to true to add extra debugging information to the HTML
     # @option options [Boolean] :raise_on_prerender_error Set to true to raise exceptions during server-side rendering
     # Any other options are passed to the content tag, including the id.
     def stream_react_component(component_name, options = {})
+      # stream_react_component doesn't have the prerender option
+      # Because setting prerender to false is equivalent to calling react_component with prerender: false
+      options[:prerender] = true
       options = options.merge(force_load: true) unless options.key?(:force_load)
       run_stream_inside_fiber do
         internal_stream_react_component(component_name, options)
@@ -186,6 +188,8 @@ module ReactOnRails
     # @see https://www.shakacode.com/react-on-rails-pro/docs/how-react-server-components-works.md
     #   for technical details about the RSC payload format
     def rsc_payload_react_component(component_name, options = {})
+      # rsc_payload_react_component doesn't have the prerender option
+      # Because setting prerender to false will not do anything
       options[:prerender] = true
       run_stream_inside_fiber do
         internal_rsc_payload_react_component(component_name, options)
