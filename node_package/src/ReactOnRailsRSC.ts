@@ -33,10 +33,10 @@ const streamRenderRSCComponent = (reactElement: ReactElement, options: RSCRender
   };
 
   const { pipeToTransform, readableStream, emitError } = transformRenderStreamChunksToResultObject(renderState);
-  try {
+  loadReactClientManifest(reactClientManifestFileName).then((reactClientManifest) => {
     const rscStream = renderToPipeableStream(
       reactElement,
-      loadReactClientManifest(reactClientManifestFileName),
+      reactClientManifest,
       {
         onError: (err) => {
           const error = convertToError(err);
@@ -50,15 +50,15 @@ const streamRenderRSCComponent = (reactElement: ReactElement, options: RSCRender
       }
     );
     pipeToTransform(rscStream);
-    return readableStream;
-  } catch (e) {
+  }).catch((e) => {
     const error = convertToError(e);
     renderState.hasErrors = true;
     renderState.error = error;
     const htmlResult = handleError({ e: error, name: options.name, serverSide: true });
     const jsonResult = JSON.stringify(createResultObject(htmlResult, buildConsoleReplay(), renderState));
     return stringToStream(jsonResult);
-  }
+  });
+  return readableStream;
 };
 
 ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
