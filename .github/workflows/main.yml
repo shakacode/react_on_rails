@@ -28,7 +28,7 @@ jobs:
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ matrix.versions == 'oldest' && '18' || '20' }}
+        node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
     - name: Print system information
       run: |
         echo "Linux release: "; cat /etc/issue
@@ -104,7 +104,7 @@ jobs:
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ matrix.versions == 'oldest' && '18' || '20' }}
+        node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
     - name: Print system information
       run: |
         echo "Linux release: "; cat /etc/issue

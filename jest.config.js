@@ -12,5 +12,7 @@ module.exports = {
       }
     : {
         'react-server-dom-webpack/client': '<rootDir>/node_package/tests/emptyForTesting.js',
+        '^@testing-library/dom$': '<rootDir>/node_package/tests/emptyForTesting.js',
+        '^@testing-library/react$': '<rootDir>/node_package/tests/emptyForTesting.js',
       },
 };
