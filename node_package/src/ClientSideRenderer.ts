@@ -116,7 +116,7 @@ class ComponentRenderer {
         }
       }
     } catch (e: unknown) {
-      const error = e instanceof Error ? e : new Error('Unknown error');
+      const error = e instanceof Error ? e : new Error(e?.toString() ?? 'Unknown error');
       console.error(error.message);
       error.message = `ReactOnRails encountered an error while rendering component: ${name}. See above error message.`
       throw error;
