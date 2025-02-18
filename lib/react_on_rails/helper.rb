@@ -477,7 +477,10 @@ module ReactOnRails
 
     def create_render_options(react_component_name, options)
       # If no store dependencies are passed, default to all registered stores up till now
-      options[:store_dependencies] ||= registered_stores_including_deferred.map { |store| store[:store_name] }
+      unless options.key?(:store_dependencies)
+        store_dependencies = registered_stores_including_deferred.map { |store| store[:store_name] }
+        options = options.merge(store_dependencies: store_dependencies.presence)
+      end
       ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: react_component_name,
                                                       options: options)
     end
@@ -641,7 +644,7 @@ module ReactOnRails
                                                 "data-component-name" => render_options.react_component_name,
                                                 "data-trace" => (render_options.trace ? true : nil),
                                                 "data-dom-id" => render_options.dom_id,
-                                                "data-store-dependencies" => render_options.store_dependencies.to_json,
+                                                "data-store-dependencies" => render_options.store_dependencies&.to_json,
                                                 "data-force-load" => (render_options.force_load ? true : nil))
 
       if render_options.force_load

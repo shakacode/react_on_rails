@@ -14,7 +14,7 @@ export function debugTurbolinks(...msg: string[]): void {
   }
 
   const context = reactOnRailsContext();
-  if (context.ReactOnRails && context.ReactOnRails.option('traceTurbolinks')) {
+  if (context.ReactOnRails?.option('traceTurbolinks')) {
     console.log('TURBO:', ...msg);
   }
 }

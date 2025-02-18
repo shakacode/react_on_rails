@@ -24,10 +24,10 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
           });
 
         for (const jsonChunk of jsonChunks) {
-          const { html, consoleReplayScript } = jsonChunk;
+          const { html, consoleReplayScript = '' } = jsonChunk;
           controller.enqueue(encoder.encode(html));
 
-          const replayConsoleCode = consoleReplayScript?.trim().replace(/^<script.*>/, '').replace(/<\/script>$/, '');
+          const replayConsoleCode = consoleReplayScript.trim().replace(/^<script.*>/, '').replace(/<\/script>$/, '');
           if (replayConsoleCode?.trim() !== '') {
             const scriptElement = document.createElement('script');
             scriptElement.textContent = replayConsoleCode;
