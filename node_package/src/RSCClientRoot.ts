@@ -5,11 +5,11 @@ import * as RSDWClient from 'react-server-dom-webpack/client';
 import { fetch } from './utils';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs';
 
-if (!('use' in React && typeof React.use === 'function')) {
+const { use } = React;
+
+if (typeof use !== 'function') {
   throw new Error('React.use is not defined. Please ensure you are using React 18 with experimental features enabled or React 19+ to use server components.');
 }
-
-const { use } = React;
 
 let renderCache: Record<string, Promise<React.ReactNode>> = {};
 export const resetRenderCache = () => {

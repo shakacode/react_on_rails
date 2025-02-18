@@ -101,7 +101,7 @@ ctx.ReactOnRails = {
   },
 
   /**
-   * Renders or hydrates the react element passed. In case react version is >=18 will use the new api.
+   * Renders or hydrates the React element passed. In case React version is >=18 will use the root API.
    * @param domNode
    * @param reactElement
    * @param hydrate if true will perform hydration, if false will render
@@ -283,7 +283,7 @@ ctx.ReactOnRails = {
   },
 
   /**
-   * Used by rsc payload generation by Rails
+   * Generates RSC payload, used by Rails
    */
   serverRenderRSCReactComponent() {
     throw new Error('serverRenderRSCReactComponent is supported in RSC bundle only.');
