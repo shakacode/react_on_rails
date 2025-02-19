@@ -12,7 +12,6 @@ import type { Context } from './context.js';
 import createReactOutput from './createReactOutput.js';
 import { isServerRenderHash } from './isServerRenderResult.js';
 import reactHydrateOrRender from './reactHydrateOrRender.js';
-import { supportsRootApi } from './reactApis.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -168,9 +167,7 @@ You returned a server side type of react-router error: ${JSON.stringify(reactEle
 You should return a React.Component always for the client side entry point.`);
       } else {
         const rootOrElement = reactHydrateOrRender(domNode, reactElementOrRouterResult as ReactElement, shouldHydrate);
-        if (supportsRootApi) {
-          context.roots.push(rootOrElement as Root);
-        }
+        context.roots.push(rootOrElement as Root);
       }
     }
   } catch (e: any) {
@@ -211,9 +208,7 @@ export function reactOnRailsPageLoaded(): void {
   if (!railsContext) return;
 
   const context = findContext();
-  if (supportsRootApi) {
-    context.roots = [];
-  }
+  context.roots = [];
   forEachStore(context, railsContext);
   forEachReactOnRailsComponentRender(context, railsContext);
 }
@@ -227,9 +222,7 @@ export function reactOnRailsComponentLoaded(domId: string): void {
   if (!railsContext) return;
 
   const context = findContext();
-  if (supportsRootApi) {
-    context.roots = [];
-  }
+  context.roots = [];
 
   const el = document.querySelector(`[data-dom-id=${domId}]`);
   if (!el) return;
@@ -237,36 +230,15 @@ export function reactOnRailsComponentLoaded(domId: string): void {
   render(el, context, railsContext);
 }
 
-function unmount(el: Element): void {
-  const domNodeId = domNodeIdForEl(el);
-  const domNode = document.getElementById(domNodeId);
-  if (domNode === null) {
-    return;
-  }
-  try {
-    ReactDOM.unmountComponentAtNode(domNode);
-  } catch (e: any) {
-    console.info(`Caught error calling unmountComponentAtNode: ${e.message} for domNode`,
-      domNode, e);
-  }
-}
-
 function reactOnRailsPageUnloaded(): void {
   debugTurbolinks('reactOnRailsPageUnloaded');
-  if (supportsRootApi) {
-    const { roots } = findContext();
+  const { roots } = findContext();
 
-    // If no react on rails components
-    if (!roots) return;
+  // If no react on rails components
+  if (!roots) return;
 
-    for (const root of roots) {
-      root.unmount();
-    }
-  } else {
-    const els = reactOnRailsHtmlElements();
-    for (let i = 0; i < els.length; i += 1) {
-      unmount(els[i]);
-    }
+  for (const root of roots) {
+    root.unmount();
   }
 }
 
