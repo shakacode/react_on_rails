@@ -8,26 +8,35 @@
 window.__webpack_require__ = jest.fn();
 window.__webpack_chunk_load__ = jest.fn();
 
-import * as React from 'react';
 import { enableFetchMocks } from 'jest-fetch-mock';
-import { render, screen, act } from '@testing-library/react';
+import { screen, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import path from 'path';
 import fs from 'fs';
 import { createNodeReadableStream, getNodeVersion } from './testUtils';
 
-import RSCClientRoot, { resetRenderCache } from '../src/RSCClientRoot';
+import RSCClientRoot from '../src/RSCClientRoot';
 
 enableFetchMocks();
 
 // React Server Components tests are not compatible with Experimental React 18 and React 19
 // That only run with node version 18 and above
 (getNodeVersion() >= 18 ? describe : describe.skip)('RSCClientRoot', () => {
+  let container;
+  const mockDomNodeId = 'test-container';
+
   beforeEach(() => {
+    // Setup DOM element
+    container = document.createElement('div');
+    container.id = mockDomNodeId;
+    document.body.appendChild(container);
     jest.clearAllMocks();
 
     jest.resetModules();
-    resetRenderCache();
+  });
+
+  afterEach(() => {
+    document.body.removeChild(container);
   });
 
   it('throws error when React.use is not defined', () => {
@@ -60,10 +69,14 @@ enableFetchMocks();
       rscPayloadGenerationUrlPath,
     };
 
-    const { rerender } = await act(async () => render(<RSCClientRoot {...props} />));
+    // Execute the render
+    const render = () =>
+      act(async () => {
+        await RSCClientRoot(props, undefined, mockDomNodeId);
+      });
 
     return {
-      rerender: () => rerender(<RSCClientRoot {...props} />),
+      render,
       pushFirstChunk: () => push(`${JSON.stringify(chunk1)}\n`),
       pushSecondChunk: () => push(`${JSON.stringify(chunk2)}\n`),
       pushCustomChunk: (chunk) => push(`${chunk}\n`),
@@ -71,16 +84,17 @@ enableFetchMocks();
     };
   };
 
-  it('fetches and caches component data', async () => {
-    const { rerender, pushFirstChunk, pushSecondChunk, endStream } = await mockRSCRequest();
+  it('renders component progressively', async () => {
+    const { render, pushFirstChunk, pushSecondChunk, endStream } = await mockRSCRequest();
 
-    expect(window.fetch).toHaveBeenCalledWith('/rsc-render/TestComponent');
-    expect(window.fetch).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('StaticServerComponent')).not.toBeInTheDocument();
 
     await act(async () => {
       pushFirstChunk();
+      render();
     });
+    expect(window.fetch).toHaveBeenCalledWith('/rsc-render/TestComponent?props=undefined');
+    expect(window.fetch).toHaveBeenCalledTimes(1);
     expect(screen.getByText('StaticServerComponent')).toBeInTheDocument();
     expect(screen.getByText('Loading AsyncComponent...')).toBeInTheDocument();
     expect(screen.queryByText('AsyncComponent')).not.toBeInTheDocument();
@@ -91,24 +105,21 @@ enableFetchMocks();
     });
     expect(screen.getByText('AsyncComponent')).toBeInTheDocument();
     expect(screen.queryByText('Loading AsyncComponent...')).not.toBeInTheDocument();
-
-    // Second render - should use cache
-    rerender();
-
-    expect(screen.getByText('AsyncComponent')).toBeInTheDocument();
-    expect(window.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('replays console logs', async () => {
     const consoleSpy = jest.spyOn(console, 'log');
-    const { rerender, pushFirstChunk, pushSecondChunk, endStream } = await mockRSCRequest();
+    const { render, pushFirstChunk, pushSecondChunk, endStream } = await mockRSCRequest();
 
     await act(async () => {
+      render();
       pushFirstChunk();
     });
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining('Console log at first chunk'),
-      expect.anything(), expect.anything(), expect.anything()
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
     );
     expect(consoleSpy).toHaveBeenCalledTimes(1);
 
@@ -117,28 +128,27 @@ enableFetchMocks();
     });
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining('Console log at second chunk'),
-      expect.anything(), expect.anything(), expect.anything()
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
     );
     await act(async () => {
       endStream();
     });
     expect(consoleSpy).toHaveBeenCalledTimes(2);
-
-    // On rerender, console logs should not be replayed again
-    rerender();
-    expect(consoleSpy).toHaveBeenCalledTimes(2);
   });
 
   it('strips leading and trailing slashes from rscPayloadGenerationUrlPath', async () => {
-    const { pushFirstChunk, pushSecondChunk, endStream } = await mockRSCRequest('/rsc-render/');
+    const { render, pushFirstChunk, pushSecondChunk, endStream } = await mockRSCRequest('/rsc-render/');
 
     await act(async () => {
+      render();
       pushFirstChunk();
       pushSecondChunk();
       endStream();
     });
 
-    expect(window.fetch).toHaveBeenCalledWith('/rsc-render/TestComponent');
+    expect(window.fetch).toHaveBeenCalledWith('/rsc-render/TestComponent?props=undefined');
     expect(window.fetch).toHaveBeenCalledTimes(1);
 
     expect(screen.getByText('StaticServerComponent')).toBeInTheDocument();

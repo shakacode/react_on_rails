@@ -1,7 +1,6 @@
-import * as React from 'react';
 import ReactOnRails from './ReactOnRails.client';
 import RSCClientRoot from './RSCClientRoot';
-import { RegisterServerComponentOptions } from './types';
+import { RegisterServerComponentOptions, RailsContext, ReactComponentOrRenderFunction } from './types';
 
 /**
  * Registers React Server Components (RSC) with React on Rails.
@@ -36,12 +35,13 @@ import { RegisterServerComponentOptions } from './types';
  * ```
  */
 const registerServerComponent = (options: RegisterServerComponentOptions, ...componentNames: string[]) => {
-  const componentsWrappedInRSCClientRoot: Record<string, () => React.ReactElement> = {};
+  const componentsWrappedInRSCClientRoot: Record<string, ReactComponentOrRenderFunction> = {};
   for (const name of componentNames) {
-    componentsWrappedInRSCClientRoot[name] = () => React.createElement(RSCClientRoot, {
+    componentsWrappedInRSCClientRoot[name] = (componentProps?: unknown, _railsContext?: RailsContext, domNodeId?: string) => RSCClientRoot({
       componentName: name,
-      rscPayloadGenerationUrlPath: options.rscPayloadGenerationUrlPath
-    });
+      rscPayloadGenerationUrlPath: options.rscPayloadGenerationUrlPath,
+      componentProps,
+    }, _railsContext, domNodeId);
   }
   ReactOnRails.register(componentsWrappedInRSCClientRoot);
 };

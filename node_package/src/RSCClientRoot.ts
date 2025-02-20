@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from 'react';
+import * as ReactDOMClient from 'react-dom/client';
 import * as RSDWClient from 'react-server-dom-webpack/client';
 import { fetch } from './utils';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs';
+import { RailsContext, RenderFunction } from './types';
 
 const { use } = React;
 
@@ -11,14 +13,10 @@ if (typeof use !== 'function') {
   throw new Error('React.use is not defined. Please ensure you are using React 18 with experimental features enabled or React 19+ to use server components.');
 }
 
-let renderCache: Record<string, Promise<React.ReactNode>> = {};
-export const resetRenderCache = () => {
-  renderCache = {};
-}
-
 export type RSCClientRootProps = {
   componentName: string;
   rscPayloadGenerationUrlPath: string;
+  componentProps?: unknown;
 }
 
 const createFromFetch = async (fetchPromise: Promise<Response>) => {
@@ -31,12 +29,10 @@ const createFromFetch = async (fetchPromise: Promise<Response>) => {
   return RSDWClient.createFromReadableStream(transformedStream);
 }
 
-const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath }: RSCClientRootProps) => {
-  if (!renderCache[componentName]) {
-    const strippedUrlPath = rscPayloadGenerationUrlPath.replace(/^\/|\/$/g, '');
-    renderCache[componentName] = createFromFetch(fetch(`/${strippedUrlPath}/${componentName}`)) as Promise<React.ReactNode>;
-  }
-  return renderCache[componentName];
+const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath, componentProps }: RSCClientRootProps) => {
+  const propsString = JSON.stringify(componentProps);
+  const strippedUrlPath = rscPayloadGenerationUrlPath.replace(/^\/|\/$/g, '');
+  return createFromFetch(fetch(`/${strippedUrlPath}/${componentName}?props=${propsString}`)) as Promise<React.ReactNode>;
 }
 
 /**
@@ -52,9 +48,28 @@ const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath }: RSCClientRootP
  * @requires React 18+ with experimental features or React 19+
  * @requires react-server-dom-webpack/client
  */
-const RSCClientRoot = ({
+const RSCClientRoot: RenderFunction = async ({
   componentName,
   rscPayloadGenerationUrlPath,
-}: RSCClientRootProps) => use(fetchRSC({ componentName, rscPayloadGenerationUrlPath }));
+  componentProps,
+}: RSCClientRootProps, _railsContext?: RailsContext, domNodeId?: string) => {
+  const root = await fetchRSC({ componentName, rscPayloadGenerationUrlPath, componentProps })
+  if (!domNodeId) {
+    throw new Error('RSCClientRoot: No domNodeId provided');
+  }
+  const domNode = document.getElementById(domNodeId);
+  if (!domNode) {
+    throw new Error(`RSCClientRoot: No DOM node found for id: ${domNodeId}`);
+  }
+  if (domNode.innerHTML) {
+    ReactDOMClient.hydrateRoot(domNode, root);
+  } else {
+    ReactDOMClient.createRoot(domNode).render(root);
+  }
+  // Added only to satisfy the return type of RenderFunction
+  // However, the returned value of renderFunction is not used in ReactOnRails
+  // TODO: fix this behavior
+  return '';
+}
 
 export default RSCClientRoot;
