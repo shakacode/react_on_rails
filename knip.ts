@@ -16,6 +16,9 @@ const config: KnipConfig = {
       babel: {
         config: ['node_package/babel.config.js'],
       },
+      ignore: [
+        'node_package/tests/emptyForTesting.js',
+      ],
       ignoreBinaries: [
         // Knip fails to detect it's declared in devDependencies
         'nps',
