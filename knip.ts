@@ -12,7 +12,7 @@ const config: KnipConfig = {
         'node_package/src/registerServerComponent.ts!',
         'node_package/src/RSCClientRoot.ts!',
       ],
-      project: ['node_package/src/**/*.[jt]s!', 'node_package/tests/**/*.[jt]s'],
+      project: ['node_package/src/**/*.[jt]s{x,}!', 'node_package/tests/**/*.[jt]s{x,}'],
       babel: {
         config: ['node_package/babel.config.js'],
       },
@@ -36,8 +36,6 @@ const config: KnipConfig = {
         'eslint-plugin-react',
         // Used in CI
         '@arethetypeswrong/cli',
-        'react-server-dom-webpack',
-        'cross-fetch',
         'jsdom',
       ],
     },

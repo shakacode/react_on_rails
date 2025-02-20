@@ -33,7 +33,6 @@
     "@typescript-eslint/parser": "^6.18.1",
     "concurrently": "^8.2.2",
     "create-react-class": "^15.7.0",
-    "cross-fetch": "^4.1.0",
     "eslint": "^7.32.0",
     "eslint-config-prettier": "^7.0.0",
     "eslint-config-shakacode": "^16.0.1",

@@ -39,7 +39,7 @@ declare module 'react-server-dom-webpack/server.node' {
 }
 
 declare module 'react-server-dom-webpack/client' {
-  export const createFromFetch: (promise: Promise<Response>) => Promise<unknown>;
+  export function createFromFetch<T>(res: Promise<Response>): Promise<T>;
 
-  export const createFromReadableStream: (stream: ReadableStream) => Promise<unknown>;
+  export function createFromReadableStream<T>(stream: ReadableStream): Promise<T>;
 }
