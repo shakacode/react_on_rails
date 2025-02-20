@@ -1,6 +1,6 @@
 {
-  "html": "2:[\"$\",\"div\",null,{\"children\":\"AsyncComponent\"}]\n",
-  "consoleReplayScript": "\n\u003cscript id=\"consoleReplayLog\"\u003e\nconsole.log.apply(console, [\"[SERVER] Console log at second chunk\"]);\n\u003c/script\u003e",
+  "html": "6:W[\"log\",[[\"AsyncComponent\",\"webpack://react_on_rails_pro_dummy/./client/app/ror-auto-load-components/SimpleComponentForTesting.jsx?\",24,11]],\"$5\",\"Server\",\"Console log at second chunk\"]\n4:[\"$\",\"div\",null,{\"children\":\"AsyncComponent\"},\"$5\"]\n",
+  "consoleReplayScript": "",
   "hasErrors": false,
   "isShellReady": true
 }

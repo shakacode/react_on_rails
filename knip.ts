@@ -36,8 +36,6 @@ const config: KnipConfig = {
         'react-server-dom-webpack',
         'cross-fetch',
         'jsdom',
-        'react-18',
-        'react-dom-18',
       ],
     },
     'spec/dummy': {
