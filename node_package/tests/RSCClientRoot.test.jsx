@@ -1,8 +1,5 @@
 /* eslint-disable no-underscore-dangle */
 /* eslint-disable import/first */
-/**
- * @jest-environment jsdom
- */
 
 // Mock webpack require system for RSC
 window.__webpack_require__ = jest.fn();

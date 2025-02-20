@@ -26,13 +26,13 @@ const createFromFetch = async (fetchPromise: Promise<Response>) => {
     throw new Error('No stream found in response');
   }
   const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream);
-  return RSDWClient.createFromReadableStream(transformedStream);
+  return RSDWClient.createFromReadableStream<React.ReactNode>(transformedStream);
 }
 
 const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath, componentProps }: RSCClientRootProps) => {
   const propsString = JSON.stringify(componentProps);
   const strippedUrlPath = rscPayloadGenerationUrlPath.replace(/^\/|\/$/g, '');
-  return createFromFetch(fetch(`/${strippedUrlPath}/${componentName}?props=${propsString}`)) as Promise<React.ReactNode>;
+  return createFromFetch(fetch(`/${strippedUrlPath}/${componentName}?props=${propsString}`));
 }
 
 /**
