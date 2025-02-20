@@ -14,17 +14,15 @@ import { render, screen, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import path from 'path';
 import fs from 'fs';
-import { createNodeReadableStream } from './testUtils';
+import { createNodeReadableStream, getNodeVersion } from './testUtils';
 
 import RSCClientRoot, { resetRenderCache } from '../src/RSCClientRoot';
 
 enableFetchMocks();
 
-const nodeVersion = parseInt(process.version.slice(1), 10);
-
 // React Server Components tests are not compatible with Experimental React 18 and React 19
 // That only run with node version 18 and above
-(nodeVersion >= 18 ? describe : describe.skip)('RSCClientRoot', () => {
+(getNodeVersion() >= 18 ? describe : describe.skip)('RSCClientRoot', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
