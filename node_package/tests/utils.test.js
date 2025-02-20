@@ -1,11 +1,14 @@
 import { enableFetchMocks } from 'jest-fetch-mock';
 
 import { fetch } from '../src/utils';
-import { createNodeReadableStream } from './testUtils';
+import { createNodeReadableStream, getNodeVersion } from './testUtils';
 
 enableFetchMocks();
 
-describe('fetch', () => {
+// The fetch mock functionality that returns a ReadableStream is not supported in Node.js v16.
+// Additionally, fetch function is used in RSCClientRoot only that is compatible with Node.js v18+,
+// so these tests are conditionally skipped on older Node versions.
+(getNodeVersion() >= 18 ? describe : describe.skip)('fetch', () => {
   it('streams body as ReadableStream', async () => {
     // create Readable stream that emits 5 chunks with 10ms delay between each chunk
     const { stream, push } = createNodeReadableStream();

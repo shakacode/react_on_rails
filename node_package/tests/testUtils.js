@@ -8,7 +8,6 @@ import { Readable } from 'stream';
  *   push: (chunk: any) => void
  * }} Object containing the stream and push function
  */
-// eslint-disable-next-line import/prefer-default-export
 export const createNodeReadableStream = () => {
   const pendingChunks = [];
   let pushFn;
@@ -31,3 +30,5 @@ export const createNodeReadableStream = () => {
 
   return { stream, push };
 };
+
+export const getNodeVersion = () => parseInt(process.version.slice(1), 10);
