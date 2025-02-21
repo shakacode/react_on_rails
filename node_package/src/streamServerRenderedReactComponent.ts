@@ -82,7 +82,7 @@ const bufferStream = (stream: Readable) => {
     stream: bufferedStream,
     emitError: (error: unknown) => {
       if (startedReading) {
-        stream.emit('error', error);
+        bufferedStream.emit('error', error);
       } else {
         bufferedEvents.push({ event: 'error', data: error });
       }
