@@ -17,6 +17,79 @@ const stringToStream = (str: string): Readable => {
   return stream;
 };
 
+type BufferdEvent = {
+  event: 'data' | 'error' | 'end';
+  data: unknown;
+}
+
+/**
+ * Creates a new Readable stream that safely buffers all events from the input stream until reading begins.
+ * 
+ * This function solves two important problems:
+ * 1. Error handling: If an error occurs on the source stream before error listeners are attached,
+ *    it would normally crash the process. This wrapper buffers error events until reading begins,
+ *    ensuring errors are properly handled once listeners are ready.
+ * 2. Event ordering: All events (data, error, end) are buffered and replayed in the exact order
+ *    they were received, maintaining the correct sequence even if events occur before reading starts.
+ * 
+ * @param stream - The source Readable stream to buffer
+ * @returns {Object} An object containing:
+ *   - stream: A new Readable stream that will buffer and replay all events
+ *   - emitError: A function to manually emit errors into the stream
+ */
+const bufferStream = (stream: Readable) => {
+  const bufferedEvents: BufferdEvent[] = [];
+  let startedReading = false;
+
+  const listeners = (['data', 'error', 'end'] as const).map(event => {
+    const listener = (data: unknown) => {
+      if (!startedReading) {
+        bufferedEvents.push({ event, data });
+      }
+    };
+    stream.on(event, listener);
+    return { event, listener };
+  });
+
+  const bufferedStream = new Readable({
+    read() {
+      if (startedReading) return;
+      startedReading = true;
+
+      // Remove initial listeners
+      listeners.forEach(({ event, listener }) => stream.off(event, listener));
+      const handleEvent = ({ event, data }: BufferdEvent) => {
+        if (event === 'data') {
+          this.push(data);
+        } else if (event === 'error') {
+          this.emit('error', data);
+        } else {
+          this.push(null);
+        }
+      };
+
+      // Replay buffered events
+      bufferedEvents.forEach(handleEvent);
+
+      // Attach new listeners for future events
+      (['data', 'error', 'end'] as const).forEach(event => {
+        stream.on(event, (data: unknown) => handleEvent({ event, data }));
+      });
+    }
+  });
+
+  return {
+    stream: bufferedStream,
+    emitError: (error: unknown) => {
+      if (startedReading) {
+        stream.emit('error', error);
+      } else {
+        bufferedEvents.push({ event: 'error', data: error });
+      }
+    },
+  }
+};
+
 export const transformRenderStreamChunksToResultObject = (renderState: StreamRenderState) => {
   const consoleHistory = console.history;
   let previouslyReplayedConsoleMessages = 0;
@@ -44,10 +117,9 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   // 2. If an error is emitted into the transformStream, it would cause the render to fail
   // 3. By wrapping in Readable.from(), we can explicitly emit errors into the readableStream without affecting the transformStream
   // Note: Readable.from can merge multiple chunks into a single chunk, so we need to ensure that we can separate them later
-  const readableStream = Readable.from(transformStream);
+  const { stream: readableStream, emitError } = bufferStream(transformStream);
 
   const writeChunk = (chunk: string) => transformStream.write(chunk);
-  const emitError = (error: unknown) => readableStream.emit('error', error);
   const endStream = () => {
     transformStream.end();
     pipedStream?.abort();
