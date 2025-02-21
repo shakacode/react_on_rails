@@ -80,10 +80,7 @@ module ReactOnRails
             raise ReactOnRails::Error, msg, err.backtrace
           end
 
-          unless render_options.streaming?
-            return parse_result_and_replay_console_messages(result,
-                                                            render_options)
-          end
+          return parse_result_and_replay_console_messages(result, render_options) unless render_options.streaming?
 
           # Streamed component is returned as stream of strings.
           # We need to parse each chunk and replay the console messages.
