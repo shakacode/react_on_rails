@@ -10,7 +10,7 @@ import { RailsContext, RenderFunction } from './types';
 const { use } = React;
 
 if (typeof use !== 'function') {
-  throw new Error('React.use is not defined. Please ensure you are using React 18 with experimental features enabled or React 19+ to use server components.');
+  throw new Error('React.use is not defined. Please ensure you are using React 19 to use server components.');
 }
 
 export type RSCClientRootProps = {
@@ -45,7 +45,7 @@ const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath, componentProps }
  * 3. Transforms the response stream to replay server-side console logs
  * 4. Uses React.use() to handle the async data fetching
  *
- * @requires React 18+ with experimental features or React 19+
+ * @requires React 19+
  * @requires react-server-dom-webpack/client
  */
 const RSCClientRoot: RenderFunction = async ({

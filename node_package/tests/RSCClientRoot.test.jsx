@@ -16,7 +16,7 @@ import RSCClientRoot from '../src/RSCClientRoot';
 
 enableFetchMocks();
 
-// React Server Components tests are not compatible with Experimental React 18 and React 19
+// React Server Components tests are compatible with React 19
 // That only run with node version 18 and above
 (getNodeVersion() >= 18 ? describe : describe.skip)('RSCClientRoot', () => {
   let container;
