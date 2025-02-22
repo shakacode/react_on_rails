@@ -11,6 +11,7 @@
     },
     "./client": "./node_package/lib/ReactOnRails.client.js",
     "./RSCWebpackLoader": "./node_package/lib/RSCWebpackLoader.js",
+    "./RSCWebpackPlugin": "./node_package/lib/RSCWebpackPlugin.js",
     "./registerServerComponent/client": "./node_package/lib/registerServerComponent/client.js",
     "./registerServerComponent/server": "./node_package/lib/registerServerComponent/server.js"
   },
@@ -52,17 +53,18 @@
     "prop-types": "^15.8.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-server-dom-webpack": "19.0.0",
+    "react-server-dom-webpack": "^19.0.0",
     "redux": "^4.2.1",
     "ts-jest": "^29.2.5",
     "typescript": "^5.6.2",
     "webpack": "^5.97.1"
   },
-  "dependencies": {},
+  "dependencies": {
+    "react-server-dom-webpack": "^19.0.0"
+  },
   "peerDependencies": {
     "react": ">= 16",
-    "react-dom": ">= 16",
-    "react-server-dom-webpack": ">= 18.3.0-canary-670811593-20240322"
+    "react-dom": ">= 16"
   },
   "files": [
     "node_package/lib"
