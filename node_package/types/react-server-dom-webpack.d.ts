@@ -43,3 +43,12 @@ declare module 'react-server-dom-webpack/client' {
 
   export function createFromReadableStream<T>(stream: ReadableStream): Promise<T>;
 }
+
+declare module 'react-server-dom-webpack/plugin' {
+  import { Compiler } from "webpack";
+
+  export default class ReactFlightWebpackPlugin {
+    constructor(options: unknown);
+    apply(compiler: Compiler): void;
+  }
+}
