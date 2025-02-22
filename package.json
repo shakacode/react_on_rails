@@ -11,7 +11,8 @@
     },
     "./client": "./node_package/lib/ReactOnRails.client.js",
     "./RSCWebpackLoader": "./node_package/lib/RSCWebpackLoader.js",
-    "./registerServerComponent": "./node_package/lib/registerServerComponent.js"
+    "./registerServerComponent/client": "./node_package/lib/registerServerComponent/client.js",
+    "./registerServerComponent/server": "./node_package/lib/registerServerComponent/server.js"
   },
   "directories": {
     "doc": "docs"

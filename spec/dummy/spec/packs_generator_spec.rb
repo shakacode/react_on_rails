@@ -238,7 +238,7 @@ module ReactOnRails
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
           expected_content = <<~CONTENT.strip
-            import registerServerComponent from 'react-on-rails/registerServerComponent';
+            import registerServerComponent from 'react-on-rails/registerServerComponent/client';
 
             registerServerComponent({
               rscPayloadGenerationUrlPath: "#{rsc_payload_generation_url_path}",
@@ -274,7 +274,7 @@ module ReactOnRails
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
           expected_content = <<~CONTENT.strip
-            import registerServerComponent from 'react-on-rails/registerServerComponent';
+            import registerServerComponent from 'react-on-rails/registerServerComponent/client';
 
             registerServerComponent({
               rscPayloadGenerationUrlPath: "#{rsc_payload_generation_url_path}",
@@ -337,7 +337,7 @@ module ReactOnRails
           described_class.instance.generate_packs_if_stale
         end
 
-        it "register all components using ReactOnRails.register" do
+        it "register server components using registerServerComponent" do
           generated_server_bundle_path = File.join(
             Pathname(packer_source_entry_path).parent,
             "generated/server-bundle-generated.js"
@@ -351,10 +351,12 @@ module ReactOnRails
             import ReactClientComponentWithClientAndServer from '../components/ReactServerComponents/ror_components/ReactClientComponentWithClientAndServer.server.jsx';
             import ReactServerComponentWithClientAndServer from '../components/ReactServerComponents/ror_components/ReactServerComponentWithClientAndServer.server.jsx';
 
-            ReactOnRails.register({ReactClientComponent,
-            ReactServerComponent,
-            ReactClientComponentWithClientAndServer,
+            import registerServerComponent from 'react-on-rails/registerServerComponent/server';
+            registerServerComponent({ReactServerComponent,
             ReactServerComponentWithClientAndServer});
+
+            ReactOnRails.register({ReactClientComponent,
+            ReactClientComponentWithClientAndServer});
           CONTENT
 
           expect(generated_server_bundle_content.strip).to eq(expected_content.strip)
