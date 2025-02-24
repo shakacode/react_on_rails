@@ -162,8 +162,10 @@ module ReactOnRailsPro
             origin: ReactOnRailsPro.configuration.renderer_url,
             # Version of HTTP protocol to use by default in the absence of protocol negotiation
             fallback_protocol: "h2",
-            max_concurrent_requests: ReactOnRailsPro.configuration.renderer_http_pool_size,
             persistent: true,
+            pool_options: {
+              max_connections_per_origin: ReactOnRailsPro.configuration.renderer_http_pool_size
+            },
             # Other timeouts supported https://honeyryderchuck.gitlab.io/httpx/wiki/Timeouts:
             # :write_timeout
             # :request_timeout

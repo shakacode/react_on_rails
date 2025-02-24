@@ -30,9 +30,7 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "addressable"
   s.add_runtime_dependency "connection_pool"
   s.add_runtime_dependency "execjs", "~> 2.9"
-  # Update to "~>1.4, >=1.4.1" once 1.4.1 is released
-  # Can't use 1.4.0 due to https://gitlab.com/os85/httpx/-/issues/333
-  s.add_runtime_dependency "httpx", "1.3.3"
+  s.add_runtime_dependency "httpx", "~> 1.4", ">= 1.4.1"
   s.add_runtime_dependency "rainbow"
   s.add_runtime_dependency "react_on_rails", ">= 14.1.0"
   s.add_development_dependency "bundler"
