@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import * as RSDWClient from 'react-server-dom-webpack/client';
+import { createFromReadableStream } from '@shakacode-tools/react-on-rails-rsc/client';
 import { fetch } from './utils';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs';
 import { RailsContext, RenderFunction } from './types';
@@ -26,7 +26,7 @@ const createFromFetch = async (fetchPromise: Promise<Response>) => {
     throw new Error('No stream found in response');
   }
   const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream);
-  return RSDWClient.createFromReadableStream<React.ReactNode>(transformedStream);
+  return createFromReadableStream<React.ReactNode>(transformedStream);
 }
 
 const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath, componentProps }: RSCClientRootProps) => {
@@ -46,7 +46,7 @@ const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath, componentProps }
  * 4. Uses React.use() to handle the async data fetching
  *
  * @requires React 19+
- * @requires react-server-dom-webpack/client
+ * @requires @shakacode-tools/react-on-rails-rsc
  */
 const RSCClientRoot: RenderFunction = async ({
   componentName,

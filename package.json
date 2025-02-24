@@ -10,8 +10,6 @@
       "default": "./node_package/lib/ReactOnRails.full.js"
     },
     "./client": "./node_package/lib/ReactOnRails.client.js",
-    "./RSCWebpackLoader": "./node_package/lib/RSCWebpackLoader.js",
-    "./RSCWebpackPlugin": "./node_package/lib/RSCWebpackPlugin.js",
     "./registerServerComponent/client": "./node_package/lib/registerServerComponent/client.js",
     "./registerServerComponent/server": "./node_package/lib/registerServerComponent/server.js"
   },
@@ -53,14 +51,10 @@
     "prop-types": "^15.8.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-server-dom-webpack": "^19.0.0",
     "redux": "^4.2.1",
     "ts-jest": "^29.2.5",
     "typescript": "^5.6.2",
     "webpack": "^5.97.1"
-  },
-  "dependencies": {
-    "react-server-dom-webpack": "^19.0.0"
   },
   "peerDependencies": {
     "react": ">= 16",
@@ -104,5 +98,8 @@
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
   "homepage": "https://github.com/shakacode/react_on_rails#readme",
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
+  "dependencies": {
+    "@shakacode-tools/react-on-rails-rsc": "git+https://github.com/shakacode/react_on_rails_rsc.git#main"
+  }
 }
