@@ -1,4 +1,4 @@
-import { renderToPipeableStream } from 'react-server-dom-webpack/server.node';
+import { renderToPipeableStream } from '@shakacode-tools/react-on-rails-rsc/server.node';
 import { PassThrough, Readable } from 'stream';
 import type { ReactElement } from 'react';
 
