@@ -13,8 +13,8 @@ export async function reactOnRailsProNodeRenderer(config: Partial<Config> = {}) 
 Please either use Node.js v20 or higher or downgrade Fastify by setting the following resolutions in your package.json:
 {
   "@fastify/formbody": "^7.4.0",
-  "@fastify/multipart": "^8.3.0",
-  "fastify": "^4.28.1",
+  "@fastify/multipart": "^8.3.1",
+  "fastify": "^4.29.0",
 }`,
     );
     process.exit(1);

@@ -6,7 +6,7 @@ import { ApolloClient, createHttpLink, InMemoryCache } from '@apollo/client';
 import { preloadQuery } from '../ssr-computations/userQuery.ssr-computation';
 import { setApolloClient } from '../utils/lazyApollo';
 import { getSSRCache } from '@shakacode/use-ssr-computation.runtime/lib/ssrCache';
-import { RailsContext } from 'react-on-rails/node_package/lib/types';
+import { RailsContext } from 'react-on-rails';
 
 type Props = {
   ssrOnlyProps: {
