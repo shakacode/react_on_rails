@@ -14,7 +14,7 @@ aliases:
              echo "Bundler version: "; bundle --version
   - &lint-js
     name: Linting of JS
-    command: yarn start eslint
+    command: yarn run nps eslint
 
   - &lint-ruby
     name: Linting of Ruby
@@ -22,7 +22,7 @@ aliases:
 
   - &format
     name: Check formatting
-    command: yarn start format.listDifferent
+    command: yarn run nps format.listDifferent
 
   - &typescript-check
     name: Check TypeScript
