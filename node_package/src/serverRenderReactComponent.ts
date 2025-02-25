@@ -1,4 +1,4 @@
-import ReactDOMServer from 'react-dom/server';
+import * as ReactDOMServer from 'react-dom/server';
 import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';

@@ -1,4 +1,4 @@
-import ReactDOM from 'react-dom';
+import * as ReactDOM from 'react-dom';
 
 const reactMajorVersion = Number(ReactDOM.version?.split('.')[0]) || 16;
 

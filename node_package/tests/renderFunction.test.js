@@ -3,8 +3,8 @@
 /* eslint-disable react/prefer-stateless-function */
 /* eslint-disable react/jsx-filename-extension */
 
-import React from 'react';
-import createReactClass from 'create-react-class';
+import * as React from 'react';
+import * as createReactClass from 'create-react-class';
 
 import isRenderFunction from '../src/isRenderFunction';
 

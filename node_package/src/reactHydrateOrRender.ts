@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import ReactDOM from 'react-dom';
+import * as ReactDOM from 'react-dom';
 import type { RenderReturnType } from './types';
 import { supportsRootApi } from './reactApis';
 

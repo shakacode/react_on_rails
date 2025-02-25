@@ -2,8 +2,8 @@
  * @jest-environment node
  */
 
-import React, { Suspense } from 'react';
-import PropTypes from 'prop-types';
+import * as React from 'react';
+import * as PropTypes from 'prop-types';
 import streamServerRenderedReactComponent from '../src/streamServerRenderedReactComponent';
 import ComponentRegistry from '../src/ComponentRegistry';
 
@@ -23,9 +23,9 @@ const TestComponentForStreaming = ({ throwSyncError, throwAsyncError }) => {
   return (
     <div>
       <h1>Header In The Shell</h1>
-      <Suspense fallback={<div>Loading...</div>}>
+      <React.Suspense fallback={<div>Loading...</div>}>
         <AsyncContent throwAsyncError={throwAsyncError} />
-      </Suspense>
+      </React.Suspense>
     </div>
   );
 };
