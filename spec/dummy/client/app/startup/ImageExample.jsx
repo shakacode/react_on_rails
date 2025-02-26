@@ -1,13 +1,15 @@
 import React from 'react';
-import css from '../components/ImageExample/ImageExample.module.scss';
 
 // Note the global alias for images
-import bowerLogo from '../components/ImageExample/bower.png';
-import blueprintIcon from '../components/ImageExample/blueprint_icon.svg';
 import logo from 'Assets/images/256egghead.png';
 import legoIcon from 'Assets/images/lego_icon.svg';
 
-const TestComponent = (_props) => (
+import css from '../components/ImageExample/ImageExample.module.scss';
+
+import bowerLogo from '../components/ImageExample/bower.png';
+import blueprintIcon from '../components/ImageExample/blueprint_icon.svg';
+
+const TestComponent = () => (
   <div>
     <h1 className={css.red}>This is a test of CSS module color red.</h1>
     <hr />
