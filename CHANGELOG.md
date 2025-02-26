@@ -18,10 +18,8 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
-#### Breaking
-- Reduced bundle size [PR 1697](https://github.com/shakacode/react_on_rails/pull/1697) by [Romex91](https://github.com/Romex91)
-  - Migrated from CJS to ESM for more compact modules (~1KB improvement). **Breaking change:** Dropped CJS support. All projects running `require('react-on-rails')` will need to update to ESM `import ReactOnRails from 'react-on-rails'`.
-  - Add export option 'react-on-rails/client' to avoid shipping server-rendering code to browsers (~14KB improvement).
+#### Added
+- Add export option 'react-on-rails/client' to avoid shipping server-rendering code to browsers (~5KB improvement) [PR 1697](https://github.com/shakacode/react_on_rails/pull/1697) by [Romex91](https://github.com/Romex91).
 
 #### Fixed
 - Fix obscure errors by introducing FULL_TEXT_ERRORS [PR 1695](https://github.com/shakacode/react_on_rails/pull/1695) by [Romex91](https://github.com/Romex91).
