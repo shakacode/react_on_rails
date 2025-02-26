@@ -1390,9 +1390,9 @@
 
 "@shakacode-tools/react-on-rails-rsc@git+https://github.com/shakacode/react_on_rails_rsc.git#main":
   version "19.0.0"
-  resolved "git+https://github.com/shakacode/react_on_rails_rsc.git#085be3967430c9a4fc941ff8356982dca1ff3b06"
+  resolved "git+https://github.com/shakacode/react_on_rails_rsc.git#6e72fd0a1a51729c7e9c298fb96c3eea7cfa1dab"
   dependencies:
-    react-server-dom-webpack "^19.0.0"
+    react-server-dom-webpack "19.0.0"
 
 "@sinclair/typebox@^0.27.8":
   version "0.27.8"
@@ -5390,7 +5390,7 @@ react-is@^18.0.0:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-18.2.0.tgz#199431eeaaa2e09f86427efbb4f1473edb47609b"
   integrity sha512-xWGDIW6x921xtzPkhiULtthJHoJvBbF3q26fzloPCK0hsvxtPVelvftw3zjbHWSkR2km9Z+4uxbDDK/6Zw9B8w==
 
-react-server-dom-webpack@^19.0.0:
+react-server-dom-webpack@19.0.0:
   version "19.0.0"
   resolved "https://registry.yarnpkg.com/react-server-dom-webpack/-/react-server-dom-webpack-19.0.0.tgz#c60819b6cb54e317e675ddc0c5959ff915b789d0"
   integrity sha512-hLug9KEXLc8vnU9lDNe2b2rKKDaqrp5gNiES4uyu2Up3FZfZJZmdwLFXlWzdA9gTB/6/cWduSB2K1Lfag2pSvw==
