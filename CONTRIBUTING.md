@@ -9,7 +9,7 @@
 * After updating code via Git, to prepare all examples:
 ```sh
 cd react_on_rails/
-bundle && yarn && rake examples:gen_all && rake node_package && rake
+bundle && yarn && rake shakapacker_examples:gen_all && rake node_package && rake
 ```
 
 See [Dev Initial Setup](#dev-initial-setup) below for, well... initial setup,

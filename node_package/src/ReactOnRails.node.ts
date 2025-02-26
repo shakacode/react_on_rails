@@ -1,7 +1,7 @@
-import ReactOnRails from './ReactOnRails';
+import ReactOnRails from './ReactOnRails.full';
 import streamServerRenderedReactComponent from './streamServerRenderedReactComponent';
 
 ReactOnRails.streamServerRenderedReactComponent = streamServerRenderedReactComponent;
 
-export * from './ReactOnRails';
-export { default } from './ReactOnRails';
+export * from './ReactOnRails.full';
+export { default } from './ReactOnRails.full';

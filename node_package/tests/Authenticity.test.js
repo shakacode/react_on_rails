@@ -1,4 +1,4 @@
-import ReactOnRails from '../src/ReactOnRails';
+import ReactOnRails from '../src/ReactOnRails.client';
 
 const testToken = 'TEST_CSRF_TOKEN';
 
