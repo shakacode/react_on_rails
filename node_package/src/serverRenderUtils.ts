@@ -1,5 +1,5 @@
 
-import type { RegisteredComponent, RenderResult, RenderState, StreamRenderState } from './types';
+import type { RegisteredComponent, RenderResult, RenderState, StreamRenderState } from './types/index.js';
 
 export function createResultObject(html: string | null, consoleReplayScript: string, renderState: RenderState | StreamRenderState): RenderResult {
   return {

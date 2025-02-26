@@ -28,11 +28,16 @@ overrides:
       - eslint:recommended
       - plugin:@typescript-eslint/eslint-recommended
       - plugin:@typescript-eslint/recommended
+      - plugin:require-extensions/recommended
     plugins:
       - "@typescript-eslint"
+      - "require-extensions"
     rules:
       "@typescript-eslint/no-namespace": 0
       "@typescript-eslint/no-shadow": ["error"]
+      # The following imports conflict with "require-extensions". TS will handle import errors.
+      "import/no-unresolved": 0
+      "import/extensions": 0
 
 rules:
   no-shadow: 0

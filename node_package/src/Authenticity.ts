@@ -1,4 +1,4 @@
-import type { AuthenticityHeaders } from './types/index';
+import type { AuthenticityHeaders } from './types/index.js';
 
 export default {
   authenticityToken(): string | null {

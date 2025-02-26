@@ -6,5 +6,5 @@ export type Context = Window | typeof globalThis;
 export default function context(this: void): Context | void {
   return ((typeof window !== 'undefined') && window) ||
     ((typeof global !== 'undefined') && global) ||
-    this;
+    globalThis;
 }
