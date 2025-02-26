@@ -21,6 +21,7 @@
     "@babel/core": "^7.20.12",
     "@babel/preset-env": "^7.20.2",
     "@tsconfig/node14": "^14.1.2",
+    "@shakacode-tools/react-on-rails-rsc": "git+https://github.com/shakacode/react_on_rails_rsc.git#main",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
@@ -51,7 +52,6 @@
     "prop-types": "^15.8.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@shakacode-tools/react-on-rails-rsc": "git+https://github.com/shakacode/react_on_rails_rsc.git#main",
     "redux": "^4.2.1",
     "ts-jest": "^29.2.5",
     "typescript": "^5.6.2"

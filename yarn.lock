@@ -1382,7 +1382,7 @@
 
 "@shakacode-tools/react-on-rails-rsc@git+https://github.com/shakacode/react_on_rails_rsc.git#main":
   version "19.0.0"
-  resolved "git+https://github.com/shakacode/react_on_rails_rsc.git#6e72fd0a1a51729c7e9c298fb96c3eea7cfa1dab"
+  resolved "git+https://github.com/shakacode/react_on_rails_rsc.git#5453eaa574cd6ad54698b0f2ad8c1c44985e169d"
   dependencies:
     react-server-dom-webpack "19.0.0"
 
