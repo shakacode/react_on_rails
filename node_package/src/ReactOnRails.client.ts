@@ -240,7 +240,7 @@ ctx.ReactOnRails = {
    * @param options
    */
   serverRenderReactComponent(): null | string | Promise<RenderResult> {
-    throw new Error('serverRenderReactComponent is not available in "react-on-rails/client". Import "react-on-rails" server-side.');
+    throw new Error('serverRenderReactComponent is not available in "react-on-rails.client". Import "react-on-rails" server-side.');
   },
 
   /**
@@ -256,7 +256,7 @@ ctx.ReactOnRails = {
    * @param options
    */
   handleError(): string | undefined {
-    throw new Error('handleError is not available in "react-on-rails/client". Import "react-on-rails" server-side.');
+    throw new Error('handleError is not available in "react-on-rails.client". Import "react-on-rails" server-side.');
   },
 
   /**
