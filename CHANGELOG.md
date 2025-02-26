@@ -22,6 +22,9 @@ Changes since the last non-beta release.
 - Fix obscure errors by introducing FULL_TEXT_ERRORS [PR 1695](https://github.com/shakacode/react_on_rails/pull/1695) by [Romex91](https://github.com/Romex91).
 - Disable `esModuleInterop` to increase interoperability [PR 1699](https://github.com/shakacode/react_on_rails/pull/1699) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
+#### Changed
+- More up-to-date TS config [PR 1700](https://github.com/shakacode/react_on_rails/pull/1700) by [alexeyr-ci](https://github.com/alexeyr-ci).
+
 ### [14.1.1] - 2025-01-15
 
 #### Fixed
