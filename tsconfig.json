@@ -1,15 +1,14 @@
 {
+  "extends": "@tsconfig/node14",
   "compilerOptions": {
     "allowJs": true,
     "esModuleInterop": false,
+    // needed for Jest tests even though we don't use .tsx
     "jsx": "react-jsx",
-    "lib": ["dom", "es2015"],
-    "module": "CommonJS",
     "noImplicitAny": true,
     "outDir": "node_package/lib",
     "strict": true,
-    "incremental": true,
-    "target": "es5"
+    "incremental": true
   },
   "include": ["node_package/src/**/*"]
 }
