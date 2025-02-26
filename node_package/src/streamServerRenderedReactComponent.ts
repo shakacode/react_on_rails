@@ -1,4 +1,4 @@
-import ReactDOMServer, { type PipeableStream } from 'react-dom/server';
+import * as ReactDOMServer from 'react-dom/server';
 import { PassThrough, Readable } from 'stream';
 import type { ReactElement } from 'react';
 
@@ -34,8 +34,8 @@ const transformRenderStreamChunksToResultObject = (renderState: StreamRenderStat
     }
   });
 
-  let pipedStream: PipeableStream | null = null;
-  const pipeToTransform = (pipeableStream: PipeableStream) => {
+  let pipedStream: ReactDOMServer.PipeableStream | null = null;
+  const pipeToTransform = (pipeableStream: ReactDOMServer.PipeableStream) => {
     pipeableStream.pipe(transformStream);
     pipedStream = pipeableStream;
   };

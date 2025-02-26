@@ -5,8 +5,8 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable import/extensions */
 
-import React from 'react';
-import createReactClass from 'create-react-class';
+import * as React from 'react';
+import * as createReactClass from 'create-react-class';
 
 import ComponentRegistry from '../src/ComponentRegistry';
 

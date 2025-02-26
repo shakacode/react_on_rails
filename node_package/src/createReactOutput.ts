@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 
-import React from 'react';
+import * as React from 'react';
 import type { ServerRenderResult,
   CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index';
 import {isServerRenderHash, isPromise} from "./isServerRenderResult";

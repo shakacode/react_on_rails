@@ -1,7 +1,7 @@
 /* eslint-disable react/jsx-filename-extension */
 /* eslint-disable no-unused-vars */
 
-import React from 'react';
+import * as React from 'react';
 
 import serverRenderReactComponent from '../src/serverRenderReactComponent';
 import ComponentRegistry from '../src/ComponentRegistry';

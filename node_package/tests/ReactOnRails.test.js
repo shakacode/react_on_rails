@@ -4,8 +4,8 @@
 /* eslint-disable react/jsx-filename-extension */
 
 import { createStore } from 'redux';
-import React from 'react';
-import createReactClass from 'create-react-class';
+import * as React from 'react';
+import * as createReactClass from 'create-react-class';
 import ReactOnRails from '../src/ReactOnRails';
 
 describe('ReactOnRails', () => {
