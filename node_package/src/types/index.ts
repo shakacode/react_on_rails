@@ -47,23 +47,23 @@ type RenderFunctionResult = ReactComponent | ServerRenderResult | Promise<string
 /**
  * Render functions are used to create dynamic React components or server-rendered HTML with side effects.
  * They receive two arguments: props and railsContext.
- * 
+ *
  * @param props - The component props passed to the render function
  * @param railsContext - The Rails context object containing environment information
  * @returns A string, React component, React element, or a Promise resolving to a string
- * 
+ *
  * @remarks
  * To distinguish a render function from a React Function Component:
  * 1. Ensure it accepts two parameters (props and railsContext), even if railsContext is unused, or
  * 2. Set the `renderFunction` property to `true` on the function object.
- * 
+ *
  * If neither condition is met, it will be treated as a React Function Component,
  * and ReactDOMServer will attempt to render it.
- * 
+ *
  * @example
  * // Option 1: Two-parameter function
  * const renderFunction = (props, railsContext) => { ... };
- * 
+ *
  * // Option 2: Using renderFunction property
  * const anotherRenderFunction = (props) => { ... };
  * anotherRenderFunction.renderFunction = true;
@@ -82,7 +82,6 @@ export type { // eslint-disable-line import/prefer-default-export
   ReactComponent,
   AuthenticityHeaders,
   RenderFunction,
-  RenderFunctionResult,
   Store,
   StoreGenerator,
   CreateReactOutputResult,
@@ -131,7 +130,7 @@ export interface ErrorOptions {
   serverSide: boolean;
 }
 
-export type RenderingError = Pick<Error, 'message' | 'stack'>;
+type RenderingError = Pick<Error, 'message' | 'stack'>;
 
 export interface RenderResult {
   html: string | null;

@@ -4,7 +4,7 @@ const config: KnipConfig = {
   // ! at the end means files are used in production
   workspaces: {
     '.': {
-      entry: ['node_package/src/ReactOnRails.ts!', 'node_package/src/ReactOnRails.node.ts!'],
+      entry: ['node_package/src/ReactOnRails.node.ts!'],
       project: ['node_package/src/**/*.[jt]s!', 'node_package/tests/**/*.[jt]s'],
       babel: {
         config: ['node_package/babel.config.js'],
