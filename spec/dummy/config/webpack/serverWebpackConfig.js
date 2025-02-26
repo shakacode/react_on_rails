@@ -109,6 +109,15 @@ const configureServer = () => {
   // If using the React on Rails Pro node server renderer, uncomment the next line
   // serverWebpackConfig.target = 'node'
 
+  // Needed to load the server version of ReactOnRails (see "exports" in <root>/package.json).
+  // Implied by serverWebpackConfig.target = 'node' and can be removed you use the Node renderer.
+  if (serverWebpackConfig.resolve.conditionNames !== undefined) {
+    serverWebpackConfig.resolve.conditionNames.unshift('server');
+  } else {
+    // '...' uses the default conditions
+    serverWebpackConfig.resolve.conditionNames = ['server', '...'];
+  }
+
   return serverWebpackConfig;
 };
 
