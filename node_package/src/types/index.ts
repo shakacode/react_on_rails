@@ -173,7 +173,7 @@ export interface ReactOnRails {
   getOrWaitForStoreGenerator(name: string): Promise<StoreGenerator>;
   setOptions(newOptions: {traceTurbolinks: boolean}): void;
   reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType;
-  reactOnRailsPageLoaded(): void;
+  reactOnRailsPageLoaded(): Promise<void>;
   reactOnRailsComponentLoaded(domId: string): void;
   reactOnRailsStoreLoaded(storeName: string): void;
   authenticityToken(): string | null;

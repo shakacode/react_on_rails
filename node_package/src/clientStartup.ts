@@ -9,10 +9,12 @@ import {
 import { onPageLoaded, onPageUnloaded } from './pageLifecycle';
 import { debugTurbolinks } from './turbolinksUtils';
 
-export function reactOnRailsPageLoaded(): void {
+export async function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded');
-  hydrateAllStores();
-  renderOrHydrateAllComponents();
+  await Promise.all([
+    hydrateAllStores(),
+    renderOrHydrateAllComponents(),
+  ]);
 }
 
 function reactOnRailsPageUnloaded(): void {

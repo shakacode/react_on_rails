@@ -145,8 +145,8 @@ ctx.ReactOnRails = {
    * More details can be found here:
    * https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/turbolinks.md
    */
-  reactOnRailsPageLoaded(): void {
-    ClientStartup.reactOnRailsPageLoaded();
+  reactOnRailsPageLoaded() {
+    return ClientStartup.reactOnRailsPageLoaded();
   },
 
   reactOnRailsComponentLoaded(domId: string): void {
