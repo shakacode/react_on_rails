@@ -1,0 +1,126 @@
+name: Lint JS and Ruby
+
+
+on:
+  push:
+    branches:
+      - 'master'
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3
+        bundler: 2.5.9
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+    - name: Print system information
+      run: |
+        echo "Linux release: "; cat /etc/issue
+        echo "Current user: "; whoami
+        echo "Current directory: "; pwd
+        echo "Ruby version: "; ruby -v
+        echo "Node version: "; node -v
+        echo "Yarn version: "; yarn --version
+        echo "Bundler version: "; bundle --version
+    - name: Save root node_modules to cache
+      uses: actions/cache@v4
+      with:
+        path: node_modules
+        key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+    - name: Save root ruby gems to cache
+      uses: actions/cache@v4
+      with:
+        path: vendor/bundle
+        key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-oldest
+    - name: Install Node modules with Yarn for renderer package
+      run: |
+        yarn install --no-progress --no-emoji
+        sudo yarn global add yalc
+    - name: yalc publish for react-on-rails
+      run: yalc publish
+    - name: Save spec/dummy/node_modules to cache
+      uses: actions/cache@v4
+      with:
+        path: spec/dummy/node_modules
+        key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-newest
+    - name: yalc add react-on-rails
+      run: cd spec/dummy && yalc add react-on-rails
+    - name: Install Node modules with Yarn for dummy app
+      run: cd spec/dummy && yarn install --no-progress --no-emoji
+    - name: Install Ruby Gems for package
+      run: bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+    - name: Lint Ruby
+      run: bundle exec rubocop
+    - name: Install Node modules with Yarn for dummy app
+      run: cd spec/dummy && yarn install --ignore-scripts --no-progress --no-emoji
+    - name: Save dummy app ruby gems to cache
+      uses: actions/cache@v4
+      with:
+        path: spec/dummy/vendor/bundle
+        key: dummy-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-oldest
+    - name: Install Ruby Gems for dummy app
+      run: |
+        cd spec/dummy
+        bundle lock --add-platform 'x86_64-linux'
+        if ! bundle check --path=vendor/bundle; then
+          bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+        fi
+    - name: generate file system-based packs
+      run: cd spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
+    - name: Detect dead code
+      run: |
+        yarn run knip
+        yarn run knip --production
+    - name: Lint JS
+      run: yarn start lint
+    - name: Check formatting
+      run: yarn start format.listDifferent
+    - name: Type-check TypeScript
+      run: yarn run type-check
+    # We only download and run Actionlint if there is any difference in GitHub Action workflows
+    # https://github.com/rhysd/actionlint/blob/main/docs/usage.md#on-github-actions
+    - name: Check for GitHub Actions changes
+      id: check-workflows
+      run: |
+        git fetch origin ${{ github.event.pull_request.base.sha }}
+        if git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep -q '^.github/workflows'; then
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          response=$(curl -sf https://api.github.com/repos/rhysd/actionlint/releases/latest)
+          if [ $? -eq 0 ]; then
+            actionlint_version=$(echo "$response" | jq -r .tag_name)
+            if [ -z "$actionlint_version" ]; then
+              echo "Failed to parse Actionlint version"
+              exit 1
+            fi
+          else
+            echo "Failed to fetch latest Actionlint version"
+            exit 1
+          fi
+          echo "actionlint_version=\"$actionlint_version\"" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Setup Actionlint
+      if: steps.check-workflows.outputs.changed == 'true'
+      uses: actions/cache@v4
+      id: cache-actionlint
+      with:
+        path: ./actionlint
+        key: ${{ runner.os }}-actionlint-${{ steps.check-workflows.outputs.actionlint_version }}
+    - name: Download Actionlint
+      if: steps.check-workflows.outputs.changed == 'true' && steps.cache-actionlint.outputs.cache-hit != 'true'
+      run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+    - name: Lint GitHub Actions
+      if: steps.check-workflows.outputs.changed == 'true'
+      run: |
+        echo "::add-matcher::.github/actionlint-matcher.json"
+        SHELLCHECK_OPTS="-S warning" ./actionlint -color
+      shell: bash
