@@ -4,7 +4,7 @@ import 'jquery';
 import 'jquery-ujs';
 import '@hotwired/turbo-rails';
 
-import ReactOnRails from 'react-on-rails';
+import ReactOnRails from 'react-on-rails/client';
 
 import HelloTurboStream from '../startup/HelloTurboStream';
 import SharedReduxStore from '../stores/SharedReduxStore';
