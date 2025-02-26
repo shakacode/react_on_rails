@@ -15,8 +15,31 @@ If you think ShakaCode can help your project, [click here](https://meetings.hubs
 Please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## Versions
-### [Unreleased]
-Changes since the last non-beta release.
+### [15.0.0-alpha.2]
+#### Added
+- 🚀 **Introducing React Server Components Support!** 🎉
+  - Experience the future of React with full RSC integration
+  - Seamlessly use React Server Components in your Rails apps
+  - Reduce client bundle sizes
+  - Enable powerful new patterns for data fetching
+  - ⚡️ Requires React on Rails Pro - [See the full tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components-tutorial)
+
+[PR 1644](https://github.com/shakacode/react_on_rails/pull/1644) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+#### Improved (Breaking)
+- Improved component and store hydration by removing page load dependency:
+  - Components and stores now hydrate immediately rather than waiting for page load
+  - Enables faster hydration, especially beneficial for streamed pages
+  - Components can hydrate before the page is fully streamed
+  - Can use `async` scripts in the page with no fear of race condition. You don't have to use `defer` anymore.
+  - To disable this behavior, set `force_load: false` in the `react_component` helper or `force_load` configuration
+  - The `force_load` configuration and `react_component` option `force_load` is not a new option, but in old versions of React on Rails, could be used only with turbo streams to prevent race condition.
+- Breaking changes:
+  - `ReactOnRails.reactOnRailsPageLoaded` is now an async function
+  - `force_load` configuration now defaults to `true` (previously `false`)
+  - `force_load` configuration and `react_component` option `force_load` are now always enabled by default since race conditions are no longer a concern
+
+[PR 1656](https://github.com/shakacode/react_on_rails/pull/1656) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### [14.2.0] - 2025-03-03
 
