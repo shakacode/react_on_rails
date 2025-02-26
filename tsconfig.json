@@ -3,23 +3,15 @@
     "allowJs": true,
     "esModuleInterop": true,
     "jsx": "react-jsx",
-    "lib": ["dom", "es2020"],
-    "module": "es2020",
-    "moduleResolution": "bundler",
+    "lib": ["dom", "es2015"],
+    "module": "node16",
+    "moduleResolution": "node16",
     "noImplicitAny": true,
     "outDir": "node_package/lib",
     "strict": true,
     "incremental": true,
-    "target": "es2020",
-    "typeRoots": [
-      "./node_modules/@types",
-      "./node_modules/@shakacode-tools/react-on-rails-rsc/types",
-      "./node_package/types"
-    ]
+    "target": "es5",
+    "typeRoots": ["./node_modules/@types", "./node_package/types"]
   },
-  "include": [
-    "node_package/src/**/*",
-    "node_modules/@shakacode-tools/react-on-rails-rsc/types",
-    "node_package/types/**/*"
-  ]
+  "include": ["node_package/src/**/*", "node_package/types/**/*"]
 }
