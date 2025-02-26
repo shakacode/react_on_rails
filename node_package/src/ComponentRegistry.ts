@@ -1,7 +1,12 @@
-import type { RegisteredComponent, ReactComponentOrRenderFunction, RenderFunction } from './types/index';
+import {
+  type RegisteredComponent,
+  type ReactComponentOrRenderFunction,
+  type RenderFunction,
+} from './types';
 import isRenderFunction from './isRenderFunction';
+import CallbackRegistry from './CallbackRegistry';
 
-const registeredComponents = new Map<string, RegisteredComponent>();
+const componentRegistry = new CallbackRegistry<RegisteredComponent>('component');
 
 export default {
   /**
@@ -9,7 +14,7 @@ export default {
    */
   register(components: { [id: string]: ReactComponentOrRenderFunction }): void {
     Object.keys(components).forEach(name => {
-      if (registeredComponents.has(name)) {
+      if (componentRegistry.has(name)) {
         console.warn('Called register for component that is already registered', name);
       }
 
@@ -21,7 +26,7 @@ export default {
       const renderFunction = isRenderFunction(component);
       const isRenderer = renderFunction && (component as RenderFunction).length === 3;
 
-      registeredComponents.set(name, {
+      componentRegistry.set(name, {
         name,
         component,
         renderFunction,
@@ -35,14 +40,11 @@ export default {
    * @returns { name, component, isRenderFunction, isRenderer }
    */
   get(name: string): RegisteredComponent {
-    const registeredComponent = registeredComponents.get(name);
-    if (registeredComponent !== undefined) {
-      return registeredComponent;
-    }
+    return componentRegistry.get(name);
+  },
 
-    const keys = Array.from(registeredComponents.keys()).join(', ');
-    throw new Error(`Could not find component registered with name ${name}. \
-Registered component names include [ ${keys} ]. Maybe you forgot to register the component?`);
+  getOrWaitForComponent(name: string): Promise<RegisteredComponent> {
+    return componentRegistry.getOrWaitForItem(name);
   },
 
   /**
@@ -51,6 +53,10 @@ Registered component names include [ ${keys} ]. Maybe you forgot to register the
    * { name, component, renderFunction, isRenderer}
    */
   components(): Map<string, RegisteredComponent> {
-    return registeredComponents;
+    return componentRegistry.getAll();
+  },
+
+  clear(): void {
+    componentRegistry.clear();
   },
 };

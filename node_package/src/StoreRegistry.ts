@@ -1,7 +1,8 @@
+import CallbackRegistry from './CallbackRegistry';
 import type { Store, StoreGenerator } from './types';
 
-const registeredStoreGenerators = new Map<string, StoreGenerator>();
-const hydratedStores = new Map<string, Store>();
+const storeGeneratorRegistry = new CallbackRegistry<StoreGenerator>('store generator');
+const hydratedStoreRegistry = new CallbackRegistry<Store>('hydrated store');
 
 export default {
   /**
@@ -10,7 +11,7 @@ export default {
    */
   register(storeGenerators: { [id: string]: StoreGenerator }): void {
     Object.keys(storeGenerators).forEach(name => {
-      if (registeredStoreGenerators.has(name)) {
+      if (storeGeneratorRegistry.has(name)) {
         console.warn('Called registerStore for store that is already registered', name);
       }
 
@@ -20,7 +21,7 @@ export default {
           `for the store generator with key ${name}.`);
       }
 
-      registeredStoreGenerators.set(name, store);
+      storeGeneratorRegistry.set(name, store);
     });
   },
 
@@ -32,29 +33,24 @@ export default {
    * @returns Redux Store, possibly hydrated
    */
   getStore(name: string, throwIfMissing = true): Store | undefined {
-    if (hydratedStores.has(name)) {
-      return hydratedStores.get(name);
-    }
-
-    const storeKeys = Array.from(hydratedStores.keys()).join(', ');
-
-    if (storeKeys.length === 0) {
-      const msg =
+    try {
+      return hydratedStoreRegistry.get(name);
+    } catch (error) {
+      if (hydratedStoreRegistry.getAll().size === 0) {
+        const msg =
 `There are no stores hydrated and you are requesting the store ${name}.
 This can happen if you are server rendering and either:
 1. You do not call redux_store near the top of your controller action's view (not the layout)
    and before any call to react_component.
 2. You do not render redux_store_hydration_data anywhere on your page.`;
-      throw new Error(msg);
-    }
+        throw new Error(msg);
+      }
 
-    if (throwIfMissing) {
-      console.log('storeKeys', storeKeys);
-      throw new Error(`Could not find hydrated store with name '${name}'. ` +
-        `Hydrated store names include [${storeKeys}].`);
+      if (throwIfMissing) {
+        throw error;
+      }
+      return undefined;
     }
-
-    return undefined;
   },
 
   /**
@@ -63,14 +59,7 @@ This can happen if you are server rendering and either:
    * @returns storeCreator with given name
    */
   getStoreGenerator(name: string): StoreGenerator {
-    const registeredStoreGenerator = registeredStoreGenerators.get(name);
-    if (registeredStoreGenerator) {
-      return registeredStoreGenerator;
-    }
-
-    const storeKeys = Array.from(registeredStoreGenerators.keys()).join(', ');
-    throw new Error(`Could not find store registered with name '${name}'. Registered store ` +
-      `names include [ ${storeKeys} ]. Maybe you forgot to register the store?`);
+    return storeGeneratorRegistry.get(name);
   },
 
   /**
@@ -79,14 +68,14 @@ This can happen if you are server rendering and either:
    * @param store (not the storeGenerator, but the hydrated store)
    */
   setStore(name: string, store: Store): void {
-    hydratedStores.set(name, store);
+    hydratedStoreRegistry.set(name, store);
   },
 
   /**
    * Internally used function to completely clear hydratedStores Map.
    */
   clearHydratedStores(): void {
-    hydratedStores.clear();
+    hydratedStoreRegistry.clear();
   },
 
   /**
@@ -94,7 +83,7 @@ This can happen if you are server rendering and either:
    * @returns Map where key is the component name and values are the store generators.
    */
   storeGenerators(): Map<string, StoreGenerator> {
-    return registeredStoreGenerators;
+    return storeGeneratorRegistry.getAll();
   },
 
   /**
@@ -102,6 +91,24 @@ This can happen if you are server rendering and either:
    * @returns Map where key is the component name and values are the hydrated stores.
    */
   stores(): Map<string, Store> {
-    return hydratedStores;
+    return hydratedStoreRegistry.getAll();
+  },
+
+  /**
+   * Used by components to get the hydrated store, waiting for it to be hydrated if necessary.
+   * @param name Name of the store to wait for
+   * @returns Promise that resolves with the Store once hydrated
+   */
+  getOrWaitForStore(name: string): Promise<Store> {
+    return hydratedStoreRegistry.getOrWaitForItem(name);
+  },
+
+  /**
+   * Used by components to get the store generator, waiting for it to be registered if necessary.
+   * @param name Name of the store generator to wait for
+   * @returns Promise that resolves with the StoreGenerator once registered
+   */
+  getOrWaitForStoreGenerator(name: string): Promise<StoreGenerator> {
+    return storeGeneratorRegistry.getOrWaitForItem(name);
   },
 };
