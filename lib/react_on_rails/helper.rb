@@ -172,16 +172,9 @@ module ReactOnRails
     #     config.enable_rsc_support = true
     #   end
     #
-    # @note The NDJSON stream format enables:
-    #   - Progressive streaming of RSC payloads as components finish rendering
-    #   - Real-time console log replay for debugging
-    #   - Error handling and reporting during rendering
-    #   - Selective hydration of client components
-    #   - Efficient code splitting and bundle loading
-    #
     # @raise [ReactOnRailsPro::Error] if RSC support is not enabled in configuration
     #
-    # Note: You don't have to deal directly with this helper function - it's used internally by the
+    # @note You don't have to deal directly with this helper function - it's used internally by the
     # `rsc_payload_route` helper function. The returned data from this function is used internally by
     # components registered using the `registerServerComponent` function. Don't use it unless you need
     # more control over the RSC payload generation. To know more about RSC payload, see the following link:
@@ -256,7 +249,8 @@ module ReactOnRails
     #    defer: false -- pass as true if you wish to render this below your component.
     #    force_load: false -- pass as true if you wish to hydrate this store immediately instead of
     #                        waiting for the page to load.
-    def redux_store(store_name, props: {}, defer: false, force_load: false)
+    def redux_store(store_name, props: {}, defer: false, force_load: nil)
+      force_load = ReactOnRails.configuration.force_load if force_load.nil?
       redux_store_data = { store_name: store_name,
                            props: props,
                            force_load: force_load }

@@ -45,7 +45,7 @@ module ReactOnRails
       make_generated_server_bundle_the_entrypoint: false,
       defer_generated_component_packs: true,
       # forces the loading of React components
-      force_load: false,
+      force_load: true,
       # Maximum time in milliseconds to wait for client-side component registration after page load.
       # If exceeded, an error will be thrown for server-side rendered components not registered on the client.
       # Set to 0 to disable the timeout and wait indefinitely for component registration.
