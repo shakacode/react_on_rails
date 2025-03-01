@@ -28,7 +28,8 @@ const configureServer = () => {
   // replace file-loader with null-loader
   serverWebpackConfig.module.rules.forEach((loader) => {
     if (loader.use && loader.use.filter) {
-      loader.use = loader.use.filter( // eslint-disable-line no-param-reassign
+      // eslint-disable-next-line no-param-reassign
+      loader.use = loader.use.filter(
         (item) => !(typeof item === 'string' && item.match(/mini-css-extract-plugin/)),
       );
     }
@@ -69,7 +70,8 @@ const configureServer = () => {
   rules.forEach((rule) => {
     if (Array.isArray(rule.use)) {
       // remove the mini-css-extract-plugin and style-loader
-      rule.use = rule.use.filter((item) => { // eslint-disable-line no-param-reassign
+      // eslint-disable-next-line no-param-reassign
+      rule.use = rule.use.filter((item) => {
         let testValue;
         if (typeof item === 'string') {
           testValue = item;

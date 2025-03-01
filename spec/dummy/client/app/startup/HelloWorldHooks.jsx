@@ -19,8 +19,8 @@ function HelloWorldHooks(props) {
 
 HelloWorldHooks.propTypes = {
   helloWorldData: PropTypes.shape({
-      name: PropTypes.string.isRequired,
-    }).isRequired,
-}
+    name: PropTypes.string.isRequired,
+  }).isRequired,
+};
 
 export default HelloWorldHooks;

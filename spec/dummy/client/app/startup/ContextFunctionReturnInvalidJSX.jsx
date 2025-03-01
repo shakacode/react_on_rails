@@ -14,9 +14,9 @@ const ContextFunctionReturnInvalidJSX = (props, railsContext) => (
 
 ContextFunctionReturnInvalidJSX.propTypes = {
   helloWorldData: PropTypes.shape({
-      name: PropTypes.string,
-    }).isRequired,
-}
+    name: PropTypes.string,
+  }).isRequired,
+};
 
 /* Wrapping in a function would be correct in this case, since two params
    are passed to the registered function:

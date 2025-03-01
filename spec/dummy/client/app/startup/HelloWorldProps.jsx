@@ -27,9 +27,9 @@ function HelloWorldProps(props) {
 
 HelloWorldProps.propTypes = {
   helloWorldData: PropTypes.shape({
-      name: PropTypes.string,
-    }).isRequired,
+    name: PropTypes.string,
+  }).isRequired,
   modificationTarget: PropTypes.string.isRequired,
-}
+};
 
 export default HelloWorldProps;

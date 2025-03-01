@@ -5,7 +5,7 @@ import PropTypes from 'prop-types';
 import css from '../components/HelloWorld.module.scss';
 import RailsContext from '../components/RailsContext';
 
-  // You could pass props here or use the closure
+// You could pass props here or use the closure
 const HelloWorldHooksContext = (props, railsContext) => {
   const Result = () => {
     const [name, setName] = useState(props.helloWorldData.name);
@@ -24,8 +24,8 @@ const HelloWorldHooksContext = (props, railsContext) => {
 
   Result.propTypes = {
     helloWorldData: PropTypes.shape({
-        name: PropTypes.string,
-      }).isRequired,
+      name: PropTypes.string,
+    }).isRequired,
   };
 
   return Result;
