@@ -45,12 +45,29 @@ jobs:
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji
+        sudo yarn global add yalc
+    - name: yalc publish for react-on-rails
+      run: yalc publish
+    - name: Save spec/dummy/node_modules to cache
+      uses: actions/cache@v4
+      with:
+        path: spec/dummy/node_modules
+        key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-newest
+    - name: yalc add react-on-rails
+      run: cd spec/dummy && yalc add react-on-rails
+    - name: Install Node modules with Yarn for dummy app
+      run: cd spec/dummy && yarn install --no-progress --no-emoji
     - name: Install Ruby Gems for package
       run: bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
     - name: Lint Ruby
       run: bundle exec rubocop
     - name: Install Node modules with Yarn for dummy app
       run: cd spec/dummy && yarn install --ignore-scripts --no-progress --no-emoji
+    - name: Save dummy app ruby gems to cache
+      uses: actions/cache@v4
+      with:
+        path: spec/dummy/vendor/bundle
+        key: dummy-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-oldest
     - name: Install Ruby Gems for dummy app
       run: |
         cd spec/dummy

@@ -1,10 +1,12 @@
-node_modules
 coverage
 spec/react_on_rails/dummy-for-generators
-spec/dummy
+spec/dummy/.yalc
+spec/dummy/public
+spec/dummy/vendor
+spec/dummy/tmp
+spec/dummy/app/assets/config/manifest.js
+spec/dummy/client/app/components/HelloWorldReScript.res.js
 node_package/lib/
-node_package/tests/node_modules
-node_package/webpack.config.js
 **/node_modules/**
 **/assets/webpack/**
 **/public/webpack/**

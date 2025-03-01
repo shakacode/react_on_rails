@@ -2,6 +2,7 @@
   "name": "react-on-rails",
   "version": "14.1.1",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
+  "main": "node_package/lib/ReactOnRails.js",
   "exports": {
     ".": {
       "node": "./node_package/lib/ReactOnRails.node.js",
@@ -27,6 +28,7 @@
     "eslint": "^7.32.0",
     "eslint-config-prettier": "^7.0.0",
     "eslint-config-shakacode": "^16.0.1",
+    "eslint-import-resolver-alias": "^1.1.2",
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-jsx-a11y": "^6.8.0",
     "eslint-plugin-prettier": "^3.4.1",
@@ -43,8 +45,7 @@
     "ts-jest": "^29.2.5",
     "typescript": "^5.6.2"
   },
-  "dependencies": {
-  },
+  "dependencies": {},
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16"

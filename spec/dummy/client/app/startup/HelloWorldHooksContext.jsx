@@ -1,12 +1,13 @@
 // Example of using hooks when taking the props and railsContext
 // Note, you need the call the hooks API within the react component stateless function
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import css from '../components/HelloWorld.module.scss';
 import RailsContext from '../components/RailsContext';
 
+// You could pass props here or use the closure
 const HelloWorldHooksContext = (props, railsContext) => {
-  // You could pass props here or use the closure
-  return () => {
+  const Result = () => {
     const [name, setName] = useState(props.helloWorldData.name);
     return (
       <>
@@ -20,6 +21,14 @@ const HelloWorldHooksContext = (props, railsContext) => {
       </>
     );
   };
+
+  Result.propTypes = {
+    helloWorldData: PropTypes.shape({
+      name: PropTypes.string,
+    }).isRequired,
+  };
+
+  return Result;
 };
 
 export default HelloWorldHooksContext;

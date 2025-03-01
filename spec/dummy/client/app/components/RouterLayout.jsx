@@ -1,10 +1,9 @@
-import PropTypes from 'prop-types';
 import React from 'react';
 import { Link, Route, Switch } from 'react-router-dom';
 import RouterFirstPage from './RouterFirstPage';
 import RouterSecondPage from './RouterSecondPage';
 
-const RouterLayout = ({ children }) => (
+const RouterLayout = () => (
   <div className="container">
     <h1>React Router is working!</h1>
     <p>
@@ -28,9 +27,5 @@ const RouterLayout = ({ children }) => (
     </Switch>
   </div>
 );
-
-RouterLayout.propTypes = {
-  children: PropTypes.object,
-};
 
 export default RouterLayout;

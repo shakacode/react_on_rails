@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import css from '../components/HelloWorld.module.scss';
 
-function HelloWorldHooks(props) {
+function HelloWorldProps(props) {
   console.log(`HelloWorldProps modification target prop value: ${props.modificationTarget}`);
 
   const [name, setName] = useState(props.helloWorldData.name);
@@ -24,4 +25,11 @@ function HelloWorldHooks(props) {
   );
 }
 
-export default HelloWorldHooks;
+HelloWorldProps.propTypes = {
+  helloWorldData: PropTypes.shape({
+    name: PropTypes.string,
+  }).isRequired,
+  modificationTarget: PropTypes.string.isRequired,
+};
+
+export default HelloWorldProps;
