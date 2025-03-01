@@ -5,10 +5,13 @@
     "esModuleInterop": false,
     // needed for Jest tests even though we don't use .tsx
     "jsx": "react-jsx",
+    "lib": ["dom", "es2020"],
+    "module": "node16",
     "noImplicitAny": true,
     "outDir": "node_package/lib",
     "strict": true,
-    "incremental": true
+    "incremental": true,
+    "target": "es2020"
   },
   "include": ["node_package/src/**/*"]
 }

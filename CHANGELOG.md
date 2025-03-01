@@ -18,6 +18,9 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+#### Added
+- Add export option 'react-on-rails/client' to avoid shipping server-rendering code to browsers (~5KB improvement) [PR 1697](https://github.com/shakacode/react_on_rails/pull/1697) by [Romex91](https://github.com/Romex91).
+
 #### Fixed
 - Fix obscure errors by introducing FULL_TEXT_ERRORS [PR 1695](https://github.com/shakacode/react_on_rails/pull/1695) by [Romex91](https://github.com/Romex91).
 - Disable `esModuleInterop` to increase interoperability [PR 1699](https://github.com/shakacode/react_on_rails/pull/1699) by [alexeyr-ci](https://github.com/alexeyr-ci).
