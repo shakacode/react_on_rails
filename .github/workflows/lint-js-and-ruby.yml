@@ -87,7 +87,13 @@ jobs:
       run: yarn start format.listDifferent
     - name: Type-check TypeScript
       run: yarn run type-check
-    # We only download and run Actionlint if there is any difference in GitHub Action workflows
+    - name: Lint package publishing
+      # --profile because we don't care about node10
+      # --ignore-rules CJS default export can't be resolved at the moment,
+      # in 15.0.0 we may switch to named exports or modify transpilation
+      run: |
+        attw --pack . --profile node16 --ignore-rules cjs-only-exports-default
+      # We only download and run Actionlint if there is any difference in GitHub Action workflows
     # https://github.com/rhysd/actionlint/blob/main/docs/usage.md#on-github-actions
     - name: Check for GitHub Actions changes
       id: check-workflows
