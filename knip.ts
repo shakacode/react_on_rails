@@ -24,6 +24,8 @@ const config: KnipConfig = {
         // though we don't actually use its rules anywhere.
         'eslint-plugin-jsx-a11y',
         'eslint-plugin-react',
+        // Used in CI
+        '@arethetypeswrong/cli',
       ],
     },
     'spec/dummy': {
