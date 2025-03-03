@@ -76,9 +76,15 @@ module ReactOnRails
         run "bundle"
       end
 
+      def use_local_react_on_rails
+        false
+      end
+
       def add_js_dependencies
         major_minor_patch_only = /\A\d+\.\d+\.\d+\z/
-        if ReactOnRails::VERSION.match?(major_minor_patch_only)
+        if use_local_react_on_rails
+          package_json.manager.add(["react-on-rails@link:.yalc/react-on-rails"])
+        elsif ReactOnRails::VERSION.match?(major_minor_patch_only)
           package_json.manager.add(["react-on-rails@#{ReactOnRails::VERSION}"])
         else
           # otherwise add latest

@@ -16,6 +16,10 @@ module ReactOnRails
                    default: false,
                    desc: "Setup prerender true for server rendered examples"
 
+      def use_local_react_on_rails
+        true
+      end
+
       def copy_rspec_files
         %w[.eslintrc
            spec/spec_helper.rb
