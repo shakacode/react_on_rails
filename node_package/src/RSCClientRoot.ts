@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import { createFromReadableStream } from '@shakacode-tools/react-on-rails-rsc/client';
+import { createFromReadableStream } from '@abanoubghadban/react-on-rails-rsc/client';
 import { fetch } from './utils';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs';
 import { RailsContext, RenderFunction } from './types';
