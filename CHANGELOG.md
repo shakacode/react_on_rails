@@ -18,6 +18,8 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+### [14.2.0] - 2025-03-03
+
 #### Added
 - Add export option 'react-on-rails/client' to avoid shipping server-rendering code to browsers (~5KB improvement) [PR 1697](https://github.com/shakacode/react_on_rails/pull/1697) by [Romex91](https://github.com/Romex91).
 
@@ -1192,7 +1194,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.1.1...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.2.0...master
+[14.2.0]: https://github.com/shakacode/react_on_rails/compare/14.1.1...14.2.0
 [14.1.1]: https://github.com/shakacode/react_on_rails/compare/14.1.0...14.1.1
 [14.1.0]: https://github.com/shakacode/react_on_rails/compare/14.0.5...14.1.0
 [14.0.5]: https://github.com/shakacode/react_on_rails/compare/14.0.4...14.0.5
