@@ -46,6 +46,10 @@ jobs:
       with:
         path: node_modules
         key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+    - name: Configure .npmrc for react-on-rails-rsc
+      run: |
+        echo "//npm.pkg.github.com/:_authToken=${{ secrets.REACT_ON_RAILS_RSC_PACKAGE_TOKEN }}" >> .npmrc
+        echo "@abanoubghadban:registry=https://npm.pkg.github.com/" >> .npmrc
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji
@@ -144,6 +148,10 @@ jobs:
       with:
         path: spec/dummy/public/webpack
         key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
+    - name: Configure .npmrc for react-on-rails-rsc
+      run: |
+        echo "//npm.pkg.github.com/:_authToken=${{ secrets.REACT_ON_RAILS_RSC_PACKAGE_TOKEN }}" >> .npmrc
+        echo "@abanoubghadban:registry=https://npm.pkg.github.com/" >> .npmrc
     - name: Install Node modules with Yarn
       run: |
         yarn install --no-progress --no-emoji
