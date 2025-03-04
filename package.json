@@ -3,6 +3,7 @@
   "version": "14.2.0",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "node_package/lib/ReactOnRails.full.js",
+  "type": "commonjs",
   "exports": {
     ".": {
       "node": "./node_package/lib/ReactOnRails.node.js",
@@ -41,6 +42,7 @@
     "nps": "^5.9.3",
     "prettier": "^2.8.8",
     "prop-types": "^15.8.1",
+    "publint": "^0.3.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "redux": "^4.2.1",
