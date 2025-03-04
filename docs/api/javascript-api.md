@@ -19,7 +19,7 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 
 ## API
 
-The best source of docs is the main [ReactOnRails.ts](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/ReactOnRails.ts) file. Here's a quick summary. No guarantees that this won't be outdated!
+The best source of docs is the main [ReactOnRails.client.ts](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/ReactOnRails.client.ts) file, and extended [ReactOnRails.full.ts](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/ReactOnRails.full.ts) and [ReactOnRails.node.ts](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/ReactOnRails.node.ts) for the server-only functions. Here's a quick summary. No guarantees that this won't be outdated!
 
 ```js
   /**
