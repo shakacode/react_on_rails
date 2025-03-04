@@ -8,8 +8,8 @@ window.__webpack_chunk_load__ = jest.fn();
 import { enableFetchMocks } from 'jest-fetch-mock';
 import { screen, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import path from 'path';
-import fs from 'fs';
+import * as path from 'path';
+import * as fs from 'fs';
 import { createNodeReadableStream, getNodeVersion } from './testUtils';
 
 import RSCClientRoot from '../src/RSCClientRoot';
