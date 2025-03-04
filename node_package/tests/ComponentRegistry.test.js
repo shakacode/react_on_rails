@@ -10,9 +10,32 @@ import * as createReactClass from 'create-react-class';
 
 import ComponentRegistry from '../src/ComponentRegistry';
 
+const onPageLoadedCallbacks = [];
+const onPageUnloadedCallbacks = [];
+
+jest.mock('../src/pageLifecycle', () => ({
+  onPageLoaded: jest.fn((cb) => {
+    onPageLoadedCallbacks.push(cb);
+    cb();
+  }),
+  onPageUnloaded: jest.fn((cb) => {
+    onPageUnloadedCallbacks.push(cb);
+    cb();
+  }),
+}));
+
+jest.mock('../src/context', () => ({
+  getContextAndRailsContext: () => ({ railsContext: { componentRegistryTimeout: 100 } }),
+}));
+
 describe('ComponentRegistry', () => {
   beforeEach(() => {
-    ComponentRegistry.components().clear();
+    ComponentRegistry.clear();
+    onPageLoadedCallbacks.forEach((cb) => cb());
+  });
+
+  afterEach(() => {
+    onPageUnloadedCallbacks.forEach((cb) => cb());
   });
 
   it('registers and retrieves React function components', () => {
@@ -137,5 +160,28 @@ describe('ComponentRegistry', () => {
     expect.assertions(1);
     const C9 = null;
     expect(() => ComponentRegistry.register({ C9 })).toThrow(/Called register with null component named C9/);
+  });
+
+  it('retrieves component asynchronously when registered later', async () => {
+    expect.assertions(1);
+    const C1 = () => <div>HELLO</div>;
+    const componentPromise = ComponentRegistry.getOrWaitForComponent('C1');
+    ComponentRegistry.register({ C1 });
+    const component = await componentPromise;
+    expect(component).toEqual({
+      name: 'C1',
+      component: C1,
+      renderFunction: false,
+      isRenderer: false,
+    });
+  });
+
+  it('handles timeout for unregistered components', async () => {
+    expect.assertions(1);
+    try {
+      await ComponentRegistry.getOrWaitForComponent('NonExistent');
+    } catch (error) {
+      expect(error.message).toMatch(/Could not find component/);
+    }
   });
 });

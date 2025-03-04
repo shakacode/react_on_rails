@@ -4,11 +4,21 @@ const config: KnipConfig = {
   // ! at the end means files are used in production
   workspaces: {
     '.': {
-      entry: ['node_package/src/ReactOnRails.ts!', 'node_package/src/ReactOnRails.node.ts!'],
-      project: ['node_package/src/**/*.[jt]s!', 'node_package/tests/**/*.[jt]s'],
+      entry: [
+        'node_package/src/ReactOnRails.ts!',
+        'node_package/src/ReactOnRails.node.ts!',
+        'node_package/src/ReactOnRailsRSC.ts!',
+        'node_package/src/registerServerComponent/client.ts!',
+        'node_package/src/registerServerComponent/server.ts!',
+        'node_package/src/RSCClientRoot.ts!',
+      ],
+      project: ['node_package/src/**/*.[jt]s{x,}!', 'node_package/tests/**/*.[jt]s{x,}'],
       babel: {
         config: ['node_package/babel.config.js'],
       },
+      ignore: [
+        'node_package/tests/emptyForTesting.js',
+      ],
       ignoreBinaries: [
         // Knip fails to detect it's declared in devDependencies
         'nps',
@@ -26,6 +36,7 @@ const config: KnipConfig = {
         'eslint-plugin-react',
         // Used in CI
         '@arethetypeswrong/cli',
+        'jsdom',
       ],
     },
     'spec/dummy': {
