@@ -144,7 +144,8 @@ describe ReactOnRailsHelper do
       <<-SCRIPT.strip_heredoc
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
-        data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
+        data-component-name="App" data-dom-id="App-react-component"
+        data-force-load="true">{"name":"My Test Name"}</script>
       SCRIPT
     end
 
@@ -152,7 +153,8 @@ describe ReactOnRailsHelper do
       <<-SCRIPT.strip_heredoc
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
-        data-component-name="App" data-dom-id="App-react-component">{}</script>
+        data-component-name="App" data-dom-id="App-react-component"
+        data-force-load="true">{}</script>
       SCRIPT
     end
 
@@ -200,7 +202,8 @@ describe ReactOnRailsHelper do
         <<-SCRIPT.strip_heredoc
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
-          data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="App-react-component"
+          data-force-load="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -215,7 +218,8 @@ describe ReactOnRailsHelper do
         <<-SCRIPT.strip_heredoc
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component-0" \
-          data-component-name="App" data-dom-id="App-react-component-0">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="App-react-component-0"
+          data-force-load="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -236,7 +240,8 @@ describe ReactOnRailsHelper do
         <<-SCRIPT.strip_heredoc
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
-          data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="App-react-component"
+          data-force-load="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -253,7 +258,8 @@ describe ReactOnRailsHelper do
         <<-SCRIPT.strip_heredoc
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-shaka_div" \
-          data-component-name="App" data-dom-id="shaka_div">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="shaka_div"
+          data-force-load="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -302,16 +308,16 @@ ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');
         ).html_safe
       end
 
-      context "with 'force_load' == true" do
-        subject { react_component("App", force_load: true) }
+      context "with 'force_load' == false" do
+        subject { react_component("App", force_load: false) }
 
-        it { is_expected.to include force_load_script }
+        it { is_expected.not_to include force_load_script }
       end
 
       context "without 'force_load' tag option" do
         subject { react_component("App") }
 
-        it { is_expected.not_to include force_load_script }
+        it { is_expected.to include force_load_script }
       end
     end
   end
@@ -324,7 +330,7 @@ ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');
     end
 
     let(:react_store_script) do
-      '<script type="application/json" data-js-react-on-rails-store="reduxStore">' \
+      '<script type="application/json" data-js-react-on-rails-store="reduxStore" data-force-load="true">' \
         '{"name":"My Test Name"}' \
         "</script>"
     end
