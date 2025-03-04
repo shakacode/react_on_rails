@@ -86,14 +86,18 @@ jobs:
         run: yarn start format.listDifferent
       - name: Type-check TypeScript
         run: yarn run type-check
-      - name: Lint package publishing
+      - name: Pack for attw and publint
+        run: yarn pack -f react-on-rails.tgz
+      - name: Lint package types
         # --profile because we don't care about node10
         # --ignore-rules CJS default export can't be resolved at the moment,
         # revisit in 15.0.0
-        run: yarn run attw --pack . --profile node16 --ignore-rules cjs-only-exports-default
+        run: yarn run attw react-on-rails.tgz --profile node16 --ignore-rules cjs-only-exports-default
+      - name: Lint package publishing
+        run: yarn run publint --strict react-on-rails.tgz
       # We only download and run Actionlint if there is any difference in GitHub Action workflows
       # https://github.com/rhysd/actionlint/blob/main/docs/usage.md#on-github-actions
-      - name: Check for GitHub Actions changes
+      - name: Check GitHub Action changes
         id: check-workflows
         run: |
           git fetch origin ${{ github.event.pull_request.base.sha }}
@@ -106,12 +110,8 @@ jobs:
                 echo "Failed to parse Actionlint version"
                 exit 1
               fi
-            else
-              echo "Failed to fetch latest Actionlint version"
-              exit 1
+              echo "actionlint_version=\"$actionlint_version\"" >> "$GITHUB_OUTPUT"
             fi
-            echo "actionlint_version=\"$actionlint_version\"" >> "$GITHUB_OUTPUT"
-          fi
       - name: Setup Actionlint
         if: steps.check-workflows.outputs.changed == 'true'
         uses: actions/cache@v4
