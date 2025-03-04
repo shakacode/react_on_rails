@@ -44,7 +44,7 @@ jobs:
         key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-oldest
     - name: Configure .npmrc for react-on-rails-rsc
       run: |
-        echo "//npm.pkg.github.com/:_authToken=${{ secrets.REACT_ON_RAILS_RSC_PACKAGE_TOKEN }}" >> .npmrc
+        echo "//npm.pkg.github.com/:_authToken=${{ secrets.SHAKACODE_TOOLS_PACKAGES_TOKEN }}" >> .npmrc
         echo "@abanoubghadban:registry=https://npm.pkg.github.com/" >> .npmrc
     - name: Install Node modules with Yarn for renderer package
       run: |

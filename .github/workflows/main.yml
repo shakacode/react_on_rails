@@ -48,7 +48,7 @@ jobs:
         key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
     - name: Configure .npmrc for react-on-rails-rsc
       run: |
-        echo "//npm.pkg.github.com/:_authToken=${{ secrets.REACT_ON_RAILS_RSC_PACKAGE_TOKEN }}" >> .npmrc
+        echo "//npm.pkg.github.com/:_authToken=${{ secrets.SHAKACODE_TOOLS_PACKAGES_TOKEN }}" >> .npmrc
         echo "@abanoubghadban:registry=https://npm.pkg.github.com/" >> .npmrc
     - name: Install Node modules with Yarn for renderer package
       run: |
@@ -150,7 +150,7 @@ jobs:
         key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
     - name: Configure .npmrc for react-on-rails-rsc
       run: |
-        echo "//npm.pkg.github.com/:_authToken=${{ secrets.REACT_ON_RAILS_RSC_PACKAGE_TOKEN }}" >> .npmrc
+        echo "//npm.pkg.github.com/:_authToken=${{ secrets.SHAKACODE_TOOLS_PACKAGES_TOKEN }}" >> .npmrc
         echo "@abanoubghadban:registry=https://npm.pkg.github.com/" >> .npmrc
     - name: Install Node modules with Yarn
       run: |
