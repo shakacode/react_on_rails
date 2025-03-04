@@ -304,7 +304,7 @@ describe ReactOnRailsHelper do
     describe "'force_load' tag option" do
       let(:force_load_script) do
         %(
-ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');
+typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');
         ).html_safe
       end
 

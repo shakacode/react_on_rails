@@ -644,7 +644,7 @@ module ReactOnRails
       if render_options.force_load
         component_specification_tag.concat(
           content_tag(:script, %(
-ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
+typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
           ).html_safe)
         )
       end
@@ -670,7 +670,7 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
       if redux_store_data[:force_load]
         store_hydration_data.concat(
           content_tag(:script, <<~JS.strip_heredoc.html_safe
-            ReactOnRails.reactOnRailsStoreLoaded('#{redux_store_data[:store_name]}');
+            typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsStoreLoaded('#{redux_store_data[:store_name]}');
           JS
           )
         )
