@@ -17,14 +17,14 @@
     "doc": "docs"
   },
   "devDependencies": {
-    "@abanoubghadban/react-on-rails-rsc": "^19.0.0-rc.3",
     "@arethetypeswrong/cli": "^0.17.4",
     "@babel/core": "^7.20.12",
     "@babel/preset-env": "^7.20.2",
-    "@tsconfig/node14": "^14.1.2",
+    "@shakacode-tools/react-on-rails-rsc": "^19.0.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
+    "@tsconfig/node14": "^14.1.2",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.17.16",
     "@types/react": "^18.3.18",

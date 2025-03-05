@@ -65,7 +65,7 @@ jobs:
     - name: Configure .npmrc for react-on-rails-rsc
       run: |
         echo "//npm.pkg.github.com/:_authToken=${{ secrets.SHAKACODE_TOOLS_PACKAGES_TOKEN }}" >> .npmrc
-        echo "@abanoubghadban:registry=https://npm.pkg.github.com/" >> .npmrc
+        echo "@shakacode-tools:registry=https://npm.pkg.github.com/" >> .npmrc
     - name: Install Node modules with Yarn for renderer package
       run: |
         yarn install --no-progress --no-emoji
