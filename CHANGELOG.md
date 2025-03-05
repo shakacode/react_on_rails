@@ -15,7 +15,7 @@ If you think ShakaCode can help your project, [click here](https://meetings.hubs
 Please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## Versions
-### [15.0.0-alpha.2]
+### [Unreleased]
 #### Added
 - 🚀 **Introducing React Server Components Support!** 🎉
   - Experience the future of React with full RSC integration
