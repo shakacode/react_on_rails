@@ -71,9 +71,6 @@ module ReactOnRails
               ===============================================================
               Caught error:
               #{err.message}
-
-              Stack trace:
-              #{err.backtrace.join("\n")}
               ===============================================================
             MSG
 
