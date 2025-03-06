@@ -71,6 +71,9 @@ module ReactOnRails
               ===============================================================
               Caught error:
               #{err.message}
+
+              Stack trace:
+              #{err.backtrace.join("\n")}
               ===============================================================
             MSG
 
@@ -238,6 +241,7 @@ module ReactOnRails
             raise ReactOnRails::JsonParseError.new(parse_error: e, json: result_string)
           end
 
+          binding.pry
           if render_options.logging_on_server
             console_script = result["consoleReplayScript"]
             console_script_lines = console_script.split("\n")
