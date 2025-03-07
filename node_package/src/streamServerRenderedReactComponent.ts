@@ -128,7 +128,7 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
 }
 
 const streamRenderReactComponent = (reactRenderingResult: ReactElement, options: RenderParams) => {
-  const { name: componentName, throwJsErrors } = options;
+  const { name: componentName, throwJsErrors, domNodeId } = options;
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
@@ -172,6 +172,7 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement, options:
       renderState.hasErrors = true;
       renderState.error = error;
     },
+    identifierPrefix: domNodeId,
   });
 
   return readableStream;
