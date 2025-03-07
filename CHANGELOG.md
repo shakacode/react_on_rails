@@ -16,6 +16,7 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 
 ## Versions
 ### [Unreleased]
+Changes since the last non-beta release.
 #### Added
 - 🚀 **Introducing React Server Components Support!** 🎉
   - Experience the future of React with full RSC integration

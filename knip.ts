@@ -5,7 +5,6 @@ const config: KnipConfig = {
   workspaces: {
     '.': {
       entry: [
-        'node_package/src/ReactOnRails.ts!',
         'node_package/src/ReactOnRails.node.ts!',
         'node_package/src/ReactOnRailsRSC.ts!',
         'node_package/src/registerServerComponent/client.ts!',
@@ -36,6 +35,7 @@ const config: KnipConfig = {
         'eslint-plugin-react',
         // Used in CI
         '@arethetypeswrong/cli',
+        // used by Jest
         'jsdom',
       ],
     },
