@@ -17,30 +17,17 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ## Versions
 ### [Unreleased]
 Changes since the last non-beta release.
+
+See [Release Notes](docs/release-notes/15.0.0.md) for full details.
+
 #### Added
-- 🚀 **Introducing React Server Components Support!** 🎉
-  - Experience the future of React with full RSC integration
-  - Seamlessly use React Server Components in your Rails apps
-  - Reduce client bundle sizes
-  - Enable powerful new patterns for data fetching
-  - ⚡️ Requires React on Rails Pro - [See the full tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components-tutorial)
+- React Server Components Support (Pro Feature) [PR 1644](https://github.com/shakacode/react_on_rails/pull/1644) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- Improved component and store hydration performance [PR 1656](https://github.com/shakacode/react_on_rails/pull/1656) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
-[PR 1644](https://github.com/shakacode/react_on_rails/pull/1644) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-#### Improved (Breaking)
-- Improved component and store hydration by removing page load dependency:
-  - Components and stores now hydrate immediately rather than waiting for page load
-  - Enables faster hydration, especially beneficial for streamed pages
-  - Components can hydrate before the page is fully streamed
-  - Can use `async` scripts in the page with no fear of race condition. You don't have to use `defer` anymore.
-  - To disable this behavior, set `force_load: false` in the `react_component` helper or `force_load` configuration
-  - The `force_load` configuration and `react_component` option `force_load` is not a new option, but in old versions of React on Rails, could be used only with turbo streams to prevent race condition.
-- Breaking changes:
-  - `ReactOnRails.reactOnRailsPageLoaded` is now an async function
-  - `force_load` configuration now defaults to `true` (previously `false`)
-  - `force_load` configuration and `react_component` option `force_load` are now always enabled by default since race conditions are no longer a concern
-
-[PR 1656](https://github.com/shakacode/react_on_rails/pull/1656) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+#### Breaking Changes
+- `ReactOnRails.reactOnRailsPageLoaded` is now an async function
+- `force_load` configuration now defaults to `true`
+- `defer_generated_component_packs` configuration now defaults to `false`
 
 ### [14.2.0] - 2025-03-03
 
