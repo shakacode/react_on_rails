@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import { createFromReadableStream } from '@shakacode-tools/react-on-rails-rsc/client';
+import { createFromReadableStream } from 'react-on-rails-rsc/client';
 import { fetch } from './utils';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs';
 import { RailsContext, RenderFunction } from './types';
@@ -46,7 +46,7 @@ const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath, componentProps }
  * 4. Uses React.use() to handle the async data fetching
  *
  * @requires React 19+
- * @requires @shakacode-tools/react-on-rails-rsc
+ * @requires react-on-rails-rsc
  */
 const RSCClientRoot: RenderFunction = async ({
   componentName,

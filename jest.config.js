@@ -9,7 +9,7 @@ module.exports = {
   moduleNameMapper:
     nodeVersion < 18
       ? {
-          '@shakacode-tools/react-on-rails-rsc/client': '<rootDir>/node_package/tests/emptyForTesting.js',
+          'react-on-rails-rsc/client': '<rootDir>/node_package/tests/emptyForTesting.js',
           '^@testing-library/dom$': '<rootDir>/node_package/tests/emptyForTesting.js',
           '^@testing-library/react$': '<rootDir>/node_package/tests/emptyForTesting.js',
         }

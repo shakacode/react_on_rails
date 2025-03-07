@@ -1380,13 +1380,6 @@
     "@nodelib/fs.scandir" "2.1.3"
     fastq "^1.6.0"
 
-"@shakacode-tools/react-on-rails-rsc@^19.0.0":
-  version "19.0.0"
-  resolved "https://npm.pkg.github.com/download/@shakacode-tools/react-on-rails-rsc/19.0.0/9ed22080a97f3f9f3d9eaad9a9c6f49f6adf925d#9ed22080a97f3f9f3d9eaad9a9c6f49f6adf925d"
-  integrity sha512-r6ENgCLeqechHHDZsAtxc64i6y4Tl0NG/EIlFvSxOLXx3u8qM2OWs7HLQCwSRo9QJmySteuzIhS/vdOpC8PRww==
-  dependencies:
-    react-server-dom-webpack "19.0.0"
-
 "@sinclair/typebox@^0.27.8":
   version "0.27.8"
   resolved "https://registry.yarnpkg.com/@sinclair/typebox/-/typebox-0.27.8.tgz#6667fac16c436b5434a387a34dedb013198f6e6e"
@@ -1739,9 +1732,9 @@ acorn@^8.1.0, acorn@^8.8.1:
   integrity sha512-Y9rRfJG5jcKOE0CLisYbojUjIrIEE7AGMzA/Sm4BslANhbS+cDMpgBdcPT91oJ7OuJ9hYJBx59RjbhxVnrF8Xg==
 
 acorn@^8.11.0:
-  version "8.14.0"
-  resolved "https://registry.yarnpkg.com/acorn/-/acorn-8.14.0.tgz#063e2c70cac5fb4f6467f0b11152e04c682795b0"
-  integrity sha512-cl669nCJTZBsL97OF4kUQm5g5hC2uihk0NxY3WENAC0TYdILVkAyHymAntgxGkl7K+t0cXIrH5siy5S4XkFycA==
+  version "8.14.1"
+  resolved "https://registry.yarnpkg.com/acorn/-/acorn-8.14.1.tgz#721d5dc10f7d5b5609a891773d47731796935dfb"
+  integrity sha512-OvQ/2pUDKmgfCg++xsTX1wGxfTaszcHVcTctW4UJB4hibJx2HXxxO5UmVgyjMa+ZDsiaf5wWLXYpRWMmBI0QHg==
 
 agent-base@6:
   version "6.0.2"
@@ -5100,6 +5093,13 @@ react-is@^18.0.0:
   version "18.2.0"
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-18.2.0.tgz#199431eeaaa2e09f86427efbb4f1473edb47609b"
   integrity sha512-xWGDIW6x921xtzPkhiULtthJHoJvBbF3q26fzloPCK0hsvxtPVelvftw3zjbHWSkR2km9Z+4uxbDDK/6Zw9B8w==
+
+react-on-rails-rsc@19.0.0:
+  version "19.0.0"
+  resolved "https://registry.yarnpkg.com/react-on-rails-rsc/-/react-on-rails-rsc-19.0.0.tgz#0061d8f3eb7cdf12a23c66985212f46e3e2ed2ef"
+  integrity sha512-70K46d9Zs071VgUNxZLz0ModMkPRKpSCu5XiICd/8ChMdivSyxdHEZzY4GSiztQnizzKFX7k25N0EIv/DmUPNg==
+  dependencies:
+    react-server-dom-webpack "19.0.0"
 
 react-server-dom-webpack@19.0.0:
   version "19.0.0"
