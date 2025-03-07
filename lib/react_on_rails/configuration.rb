@@ -43,7 +43,7 @@ module ReactOnRails
       i18n_output_format: nil,
       components_subdirectory: nil,
       make_generated_server_bundle_the_entrypoint: false,
-      defer_generated_component_packs: true,
+      defer_generated_component_packs: false,
       # forces the loading of React components
       force_load: true,
       # Maximum time in milliseconds to wait for client-side component registration after page load.
