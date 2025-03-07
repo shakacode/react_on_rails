@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
-
 import * as ClientStartup from './clientStartup';
+import { renderOrHydrateComponent, hydrateStore } from './ClientSideRenderer';
 import ComponentRegistry from './ComponentRegistry';
 import StoreRegistry from './StoreRegistry';
 import buildConsoleReplay from './buildConsoleReplay';
@@ -83,7 +83,25 @@ ctx.ReactOnRails = {
   },
 
   /**
-   * Renders or hydrates the react element passed. In case react version is >=18 will use the new api.
+   * Get a store by name, or wait for it to be registered.
+   * @param name
+   * @returns Promise<Store>
+   */
+  getOrWaitForStore(name: string): Promise<Store> {
+    return StoreRegistry.getOrWaitForStore(name);
+  },
+
+  /**
+   * Get a store generator by name, or wait for it to be registered.
+   * @param name
+   * @returns Promise<StoreGenerator>
+   */
+  getOrWaitForStoreGenerator(name: string): Promise<StoreGenerator> {
+    return StoreRegistry.getOrWaitForStoreGenerator(name);
+  },
+
+  /**
+   * Renders or hydrates the React element passed. In case React version is >=18 will use the root API.
    * @param domNode
    * @param reactElement
    * @param hydrate if true will perform hydration, if false will render
@@ -127,12 +145,16 @@ ctx.ReactOnRails = {
    * More details can be found here:
    * https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/turbolinks.md
    */
-  reactOnRailsPageLoaded(): void {
-    ClientStartup.reactOnRailsPageLoaded();
+  reactOnRailsPageLoaded() {
+    return ClientStartup.reactOnRailsPageLoaded();
   },
 
   reactOnRailsComponentLoaded(domId: string): void {
-    ClientStartup.reactOnRailsComponentLoaded(domId);
+    renderOrHydrateComponent(domId);
+  },
+
+  reactOnRailsStoreLoaded(storeName: string): void {
+    hydrateStore(storeName);
   },
 
   /**
@@ -236,6 +258,15 @@ ctx.ReactOnRails = {
   },
 
   /**
+   * Get the component that you registered, or wait for it to be registered
+   * @param name
+   * @returns {name, component, renderFunction, isRenderer}
+   */
+  getOrWaitForComponent(name: string): Promise<RegisteredComponent> {
+    return ComponentRegistry.getOrWaitForComponent(name);
+  },
+
+  /**
    * Used by server rendering by Rails
    * @param options
    */
@@ -249,6 +280,13 @@ ctx.ReactOnRails = {
    */
   streamServerRenderedReactComponent() {
     throw new Error('streamServerRenderedReactComponent is only supported when using a bundle built for Node.js environments');
+  },
+
+  /**
+   * Generates RSC payload, used by Rails
+   */
+  serverRenderRSCReactComponent() {
+    throw new Error('serverRenderRSCReactComponent is supported in RSC bundle only.');
   },
 
   /**

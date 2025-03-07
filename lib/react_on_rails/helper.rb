@@ -119,34 +119,74 @@ module ReactOnRails
     # @option options [Hash] :props Props to pass to the react component
     # @option options [String] :dom_id DOM ID of the component container
     # @option options [Hash] :html_options Options passed to content_tag
-    # @option options [Boolean] :prerender Set to false to disable server-side rendering
     # @option options [Boolean] :trace Set to true to add extra debugging information to the HTML
     # @option options [Boolean] :raise_on_prerender_error Set to true to raise exceptions during server-side rendering
     # Any other options are passed to the content tag, including the id.
     def stream_react_component(component_name, options = {})
-      unless ReactOnRails::Utils.react_on_rails_pro?
-        raise ReactOnRails::Error,
-              "You must use React on Rails Pro to use the stream_react_component method."
+      # stream_react_component doesn't have the prerender option
+      # Because setting prerender to false is equivalent to calling react_component with prerender: false
+      options[:prerender] = true
+      options = options.merge(force_load: true) unless options.key?(:force_load)
+      run_stream_inside_fiber do
+        internal_stream_react_component(component_name, options)
       end
+    end
 
-      if @rorp_rendering_fibers.nil?
-        raise ReactOnRails::Error,
-              "You must call stream_view_containing_react_components to render the view containing the react component"
+    # Renders the React Server Component (RSC) payload for a given component. This helper generates
+    # a special format designed by React for serializing server components and transmitting them
+    # to the client.
+    #
+    # @return [String] Returns a Newline Delimited JSON (NDJSON) stream where each line contains a JSON object with:
+    #   - html: The RSC payload containing the rendered server components and client component references
+    #   - consoleReplayScript: JavaScript to replay server-side console logs in the client
+    #   - hasErrors: Boolean indicating if any errors occurred during rendering
+    #   - isShellReady: Boolean indicating if the initial shell is ready for hydration
+    #
+    # Example NDJSON stream:
+    #   {"html":"<RSC Payload>","consoleReplayScript":"","hasErrors":false,"isShellReady":true}
+    #   {"html":"<RSC Payload>","consoleReplayScript":"console.log('Loading...')","hasErrors":false,"isShellReady":true}
+    #
+    # The RSC payload within the html field contains:
+    # - The component's rendered output from the server
+    # - References to client components that need hydration
+    # - Data props passed to client components
+    #
+    # @param component_name [String] The name of the React component to render. This component should
+    #   be a server component or a mixed component tree containing both server and client components.
+    #
+    # @param options [Hash] Options for rendering the component
+    # @option options [Hash] :props Props to pass to the component (default: {})
+    # @option options [Boolean] :trace Enable tracing for debugging (default: false)
+    # @option options [String] :id Custom DOM ID for the component container (optional)
+    #
+    # @example Basic usage with a server component
+    #   <%= rsc_payload_react_component("ReactServerComponentPage") %>
+    #
+    # @example With props and tracing enabled
+    #   <%= rsc_payload_react_component("RSCPostsPage",
+    #         props: { artificialDelay: 1000 },
+    #         trace: true) %>
+    #
+    # @note This helper requires React Server Components support to be enabled in your configuration:
+    #   ReactOnRailsPro.configure do |config|
+    #     config.enable_rsc_support = true
+    #   end
+    #
+    # @raise [ReactOnRailsPro::Error] if RSC support is not enabled in configuration
+    #
+    # @note You don't have to deal directly with this helper function - it's used internally by the
+    # `rsc_payload_route` helper function. The returned data from this function is used internally by
+    # components registered using the `registerServerComponent` function. Don't use it unless you need
+    # more control over the RSC payload generation. To know more about RSC payload, see the following link:
+    # @see https://www.shakacode.com/react-on-rails-pro/docs/how-react-server-components-works.md
+    #   for technical details about the RSC payload format
+    def rsc_payload_react_component(component_name, options = {})
+      # rsc_payload_react_component doesn't have the prerender option
+      # Because setting prerender to false will not do anything
+      options[:prerender] = true
+      run_stream_inside_fiber do
+        internal_rsc_payload_react_component(component_name, options)
       end
-
-      rendering_fiber = Fiber.new do
-        stream = internal_stream_react_component(component_name, options)
-        stream.each_chunk do |chunk|
-          Fiber.yield chunk
-        end
-      end
-
-      @rorp_rendering_fibers << rendering_fiber
-
-      # return the first chunk of the fiber
-      # It contains the initial html of the component
-      # all updates will be appended to the stream sent to browser
-      rendering_fiber.resume
     end
 
     # react_component_hash is used to return multiple HTML strings for server rendering, such as for
@@ -207,17 +247,19 @@ module ReactOnRails
     # props: Ruby Hash or JSON string which contains the properties to pass to the redux store.
     # Options
     #    defer: false -- pass as true if you wish to render this below your component.
-    def redux_store(store_name, props: {}, defer: false)
+    #    force_load: false -- pass as true if you wish to hydrate this store immediately instead of
+    #                        waiting for the page to load.
+    def redux_store(store_name, props: {}, defer: false, force_load: nil)
+      force_load = ReactOnRails.configuration.force_load if force_load.nil?
       redux_store_data = { store_name: store_name,
-                           props: props }
+                           props: props,
+                           force_load: force_load }
       if defer
-        @registered_stores_defer_render ||= []
-        @registered_stores_defer_render << redux_store_data
+        registered_stores_defer_render << redux_store_data
         "YOU SHOULD NOT SEE THIS ON YOUR VIEW -- Uses as a code block, like <% redux_store %> " \
           "and not <%= redux store %>"
       else
-        @registered_stores ||= []
-        @registered_stores << redux_store_data
+        registered_stores << redux_store_data
         result = render_redux_store_data(redux_store_data)
         prepend_render_rails_context(result)
       end
@@ -229,9 +271,9 @@ module ReactOnRails
     # client side rendering of this hydration data, which is a hidden div with a matching class
     # that contains a data props.
     def redux_store_hydration_data
-      return if @registered_stores_defer_render.blank?
+      return if registered_stores_defer_render.blank?
 
-      @registered_stores_defer_render.reduce(+"") do |accum, redux_store_data|
+      registered_stores_defer_render.reduce(+"") do |accum, redux_store_data|
         accum << render_redux_store_data(redux_store_data)
       end.html_safe
     end
@@ -321,6 +363,7 @@ module ReactOnRails
       # ALERT: Keep in sync with node_package/src/types/index.ts for the properties of RailsContext
       @rails_context ||= begin
         result = {
+          componentRegistryTimeout: ReactOnRails.configuration.component_registry_timeout,
           railsEnv: Rails.env,
           inMailer: in_mailer?,
           # Locale settings
@@ -388,14 +431,71 @@ module ReactOnRails
 
     private
 
+    def run_stream_inside_fiber
+      unless ReactOnRails::Utils.react_on_rails_pro?
+        raise ReactOnRails::Error,
+              "You must use React on Rails Pro to use the stream_react_component method."
+      end
+
+      if @rorp_rendering_fibers.nil?
+        raise ReactOnRails::Error,
+              "You must call stream_view_containing_react_components to render the view containing the react component"
+      end
+
+      rendering_fiber = Fiber.new do
+        stream = yield
+        stream.each_chunk do |chunk|
+          Fiber.yield chunk
+        end
+      end
+
+      @rorp_rendering_fibers << rendering_fiber
+
+      # return the first chunk of the fiber
+      # It contains the initial html of the component
+      # all updates will be appended to the stream sent to browser
+      rendering_fiber.resume
+    end
+
+    def registered_stores
+      @registered_stores ||= []
+    end
+
+    def registered_stores_defer_render
+      @registered_stores_defer_render ||= []
+    end
+
+    def registered_stores_including_deferred
+      registered_stores + registered_stores_defer_render
+    end
+
+    def create_render_options(react_component_name, options)
+      # If no store dependencies are passed, default to all registered stores up till now
+      unless options.key?(:store_dependencies)
+        store_dependencies = registered_stores_including_deferred.map { |store| store[:store_name] }
+        options = options.merge(store_dependencies: store_dependencies.presence)
+      end
+      ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: react_component_name,
+                                                      options: options)
+    end
+
     def internal_stream_react_component(component_name, options = {})
-      options = options.merge(stream?: true)
+      options = options.merge(render_mode: :html_streaming)
       result = internal_react_component(component_name, options)
       build_react_component_result_for_server_streamed_content(
         rendered_html_stream: result[:result],
         component_specification_tag: result[:tag],
         render_options: result[:render_options]
       )
+    end
+
+    def internal_rsc_payload_react_component(react_component_name, options = {})
+      options = options.merge(render_mode: :rsc_payload_streaming)
+      render_options = create_render_options(react_component_name, options)
+      json_stream = server_rendered_react_component(render_options)
+      json_stream.transform do |chunk|
+        "#{chunk.to_json}\n".html_safe
+      end
     end
 
     def generated_components_pack_path(component_name)
@@ -489,14 +589,13 @@ module ReactOnRails
       )
     end
 
-    def compose_react_component_html_with_spec_and_console(component_specification_tag, rendered_output, console_script)
+    def compose_react_component_html_with_spec_and_console(component_specification_tag, rendered_output,
+                                                           console_script)
       # IMPORTANT: Ensure that we mark string as html_safe to avoid escaping.
-      html_content = <<~HTML
-        #{rendered_output}
-              #{component_specification_tag}
-              #{console_script}
-      HTML
-      html_content.strip.html_safe
+      added_html = "#{component_specification_tag}\n#{console_script}".strip
+      added_html = added_html.present? ? "\n#{added_html}" : ""
+
+      "#{rendered_output}#{added_html}".html_safe
     end
 
     def rails_context_if_not_already_rendered
@@ -514,7 +613,9 @@ module ReactOnRails
 
     # prepend the rails_context if not yet applied
     def prepend_render_rails_context(render_value)
-      "#{rails_context_if_not_already_rendered}\n#{render_value}".strip.html_safe
+      rails_context_content = rails_context_if_not_already_rendered
+      rails_context_content = rails_context_content.present? ? "#{rails_context_content}\n" : ""
+      "#{rails_context_content}#{render_value}".html_safe
     end
 
     def internal_react_component(react_component_name, options = {})
@@ -525,8 +626,7 @@ module ReactOnRails
       # (re-hydrate the data). This enables react rendered on the client to see that the
       # server has already rendered the HTML.
 
-      render_options = ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: react_component_name,
-                                                                       options: options)
+      render_options = create_render_options(react_component_name, options)
 
       # Setup the page_loaded_js, which is the same regardless of prerendering or not!
       # The reason is that React is smart about not doing extra work if the server rendering did its job.
@@ -534,14 +634,17 @@ module ReactOnRails
                                                 json_safe_and_pretty(render_options.client_props).html_safe,
                                                 type: "application/json",
                                                 class: "js-react-on-rails-component",
+                                                id: "js-react-on-rails-component-#{render_options.dom_id}",
                                                 "data-component-name" => render_options.react_component_name,
                                                 "data-trace" => (render_options.trace ? true : nil),
-                                                "data-dom-id" => render_options.dom_id)
+                                                "data-dom-id" => render_options.dom_id,
+                                                "data-store-dependencies" => render_options.store_dependencies&.to_json,
+                                                "data-force-load" => (render_options.force_load ? true : nil))
 
       if render_options.force_load
         component_specification_tag.concat(
           content_tag(:script, %(
-ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
+typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
           ).html_safe)
         )
       end
@@ -558,12 +661,22 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
     end
 
     def render_redux_store_data(redux_store_data)
-      result = content_tag(:script,
-                           json_safe_and_pretty(redux_store_data[:props]).html_safe,
-                           type: "application/json",
-                           "data-js-react-on-rails-store" => redux_store_data[:store_name].html_safe)
+      store_hydration_data = content_tag(:script,
+                                         json_safe_and_pretty(redux_store_data[:props]).html_safe,
+                                         type: "application/json",
+                                         "data-js-react-on-rails-store" => redux_store_data[:store_name].html_safe,
+                                         "data-force-load" => (redux_store_data[:force_load] ? true : nil))
 
-      prepend_render_rails_context(result)
+      if redux_store_data[:force_load]
+        store_hydration_data.concat(
+          content_tag(:script, <<~JS.strip_heredoc.html_safe
+            typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsStoreLoaded('#{redux_store_data[:store_name]}');
+          JS
+          )
+        )
+      end
+
+      prepend_render_rails_context(store_hydration_data)
     end
 
     def props_string(props)
@@ -620,7 +733,7 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
       js_code = ReactOnRails::ServerRenderingJsCode.server_rendering_component_js_code(
         props_string: props_string(props).gsub("\u2028", '\u2028').gsub("\u2029", '\u2029'),
         rails_context: rails_context(server_side: true).to_json,
-        redux_stores: initialize_redux_stores,
+        redux_stores: initialize_redux_stores(render_options),
         react_component_name: react_component_name,
         render_options: render_options
       )
@@ -636,7 +749,7 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
                                                js_code: js_code)
       end
 
-      if render_options.stream?
+      if render_options.streaming?
         result.transform do |chunk_json_result|
           if should_raise_streaming_prerender_error?(chunk_json_result, render_options)
             raise_prerender_error(chunk_json_result, react_component_name, props, js_code)
@@ -651,17 +764,20 @@ ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
       result
     end
 
-    def initialize_redux_stores
+    def initialize_redux_stores(render_options)
       result = +<<-JS
       ReactOnRails.clearHydratedStores();
       JS
 
-      return result unless @registered_stores.present? || @registered_stores_defer_render.present?
+      store_dependencies = render_options.store_dependencies
+      return result unless store_dependencies.present?
 
       declarations = +"var reduxProps, store, storeGenerator;\n"
-      all_stores = (@registered_stores || []) + (@registered_stores_defer_render || [])
+      store_objects = registered_stores_including_deferred.select do |store|
+        store_dependencies.include?(store[:store_name])
+      end
 
-      result << all_stores.each_with_object(declarations) do |redux_store_data, memo|
+      result << store_objects.each_with_object(declarations) do |redux_store_data, memo|
         store_name = redux_store_data[:store_name]
         props = props_string(redux_store_data[:props])
         memo << <<-JS.strip_heredoc

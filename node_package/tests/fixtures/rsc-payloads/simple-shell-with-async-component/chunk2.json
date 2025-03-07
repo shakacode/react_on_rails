@@ -1,0 +1,6 @@
+{
+  "html": "6:W[\"log\",[[\"AsyncComponent\",\"webpack://react_on_rails_pro_dummy/./client/app/ror-auto-load-components/SimpleComponentForTesting.jsx?\",24,11]],\"$5\",\"Server\",\"Console log at second chunk\"]\n4:[\"$\",\"div\",null,{\"children\":\"AsyncComponent\"},\"$5\"]\n",
+  "consoleReplayScript": "",
+  "hasErrors": false,
+  "isShellReady": true
+}

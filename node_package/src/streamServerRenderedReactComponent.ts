@@ -17,7 +17,80 @@ const stringToStream = (str: string): Readable => {
   return stream;
 };
 
-const transformRenderStreamChunksToResultObject = (renderState: StreamRenderState) => {
+type BufferdEvent = {
+  event: 'data' | 'error' | 'end';
+  data: unknown;
+}
+
+/**
+ * Creates a new Readable stream that safely buffers all events from the input stream until reading begins.
+ * 
+ * This function solves two important problems:
+ * 1. Error handling: If an error occurs on the source stream before error listeners are attached,
+ *    it would normally crash the process. This wrapper buffers error events until reading begins,
+ *    ensuring errors are properly handled once listeners are ready.
+ * 2. Event ordering: All events (data, error, end) are buffered and replayed in the exact order
+ *    they were received, maintaining the correct sequence even if events occur before reading starts.
+ * 
+ * @param stream - The source Readable stream to buffer
+ * @returns {Object} An object containing:
+ *   - stream: A new Readable stream that will buffer and replay all events
+ *   - emitError: A function to manually emit errors into the stream
+ */
+const bufferStream = (stream: Readable) => {
+  const bufferedEvents: BufferdEvent[] = [];
+  let startedReading = false;
+
+  const listeners = (['data', 'error', 'end'] as const).map(event => {
+    const listener = (data: unknown) => {
+      if (!startedReading) {
+        bufferedEvents.push({ event, data });
+      }
+    };
+    stream.on(event, listener);
+    return { event, listener };
+  });
+
+  const bufferedStream = new Readable({
+    read() {
+      if (startedReading) return;
+      startedReading = true;
+
+      // Remove initial listeners
+      listeners.forEach(({ event, listener }) => stream.off(event, listener));
+      const handleEvent = ({ event, data }: BufferdEvent) => {
+        if (event === 'data') {
+          this.push(data);
+        } else if (event === 'error') {
+          this.emit('error', data);
+        } else {
+          this.push(null);
+        }
+      };
+
+      // Replay buffered events
+      bufferedEvents.forEach(handleEvent);
+
+      // Attach new listeners for future events
+      (['data', 'error', 'end'] as const).forEach(event => {
+        stream.on(event, (data: unknown) => handleEvent({ event, data }));
+      });
+    }
+  });
+
+  return {
+    stream: bufferedStream,
+    emitError: (error: unknown) => {
+      if (startedReading) {
+        bufferedStream.emit('error', error);
+      } else {
+        bufferedEvents.push({ event: 'error', data: error });
+      }
+    },
+  }
+};
+
+export const transformRenderStreamChunksToResultObject = (renderState: StreamRenderState) => {
   const consoleHistory = console.history;
   let previouslyReplayedConsoleMessages = 0;
 
@@ -44,10 +117,9 @@ const transformRenderStreamChunksToResultObject = (renderState: StreamRenderStat
   // 2. If an error is emitted into the transformStream, it would cause the render to fail
   // 3. By wrapping in Readable.from(), we can explicitly emit errors into the readableStream without affecting the transformStream
   // Note: Readable.from can merge multiple chunks into a single chunk, so we need to ensure that we can separate them later
-  const readableStream = Readable.from(transformStream);
+  const { stream: readableStream, emitError } = bufferStream(transformStream);
 
   const writeChunk = (chunk: string) => transformStream.write(chunk);
-  const emitError = (error: unknown) => readableStream.emit('error', error);
   const endStream = () => {
     transformStream.end();
     pipedStream?.abort();
@@ -56,7 +128,7 @@ const transformRenderStreamChunksToResultObject = (renderState: StreamRenderStat
 }
 
 const streamRenderReactComponent = (reactRenderingResult: ReactElement, options: RenderParams) => {
-  const { name: componentName, throwJsErrors } = options;
+  const { name: componentName, throwJsErrors, domNodeId } = options;
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
@@ -100,12 +172,21 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement, options:
       renderState.hasErrors = true;
       renderState.error = error;
     },
+    identifierPrefix: domNodeId,
   });
 
   return readableStream;
 }
 
-const streamServerRenderedReactComponent = (options: RenderParams): Readable => {
+type StreamRenderer<T, P extends RenderParams> = (
+  reactElement: ReactElement,
+  options: P,
+) => T;
+
+export const streamServerRenderedComponent = <T, P extends RenderParams>(
+  options: P,
+  renderStrategy: StreamRenderer<T, P>
+): T => {
   const { name: componentName, domNodeId, trace, props, railsContext, throwJsErrors } = options;
 
   try {
@@ -124,7 +205,7 @@ const streamServerRenderedReactComponent = (options: RenderParams): Readable => 
       throw new Error('Server rendering of streams is not supported for server render hashes or promises.');
     }
 
-    return streamRenderReactComponent(reactRenderingResult, options);
+    return renderStrategy(reactRenderingResult, options);
   } catch (e) {
     if (throwJsErrors) {
       throw e;
@@ -133,8 +214,10 @@ const streamServerRenderedReactComponent = (options: RenderParams): Readable => 
     const error = convertToError(e);
     const htmlResult = handleError({ e: error, name: componentName, serverSide: true });
     const jsonResult = JSON.stringify(createResultObject(htmlResult, buildConsoleReplay(), { hasErrors: true, error, result: null }));
-    return stringToStream(jsonResult);
+    return stringToStream(jsonResult) as T;
   }
 };
+
+const streamServerRenderedReactComponent = (options: RenderParams): Readable => streamServerRenderedComponent(options, streamRenderReactComponent);
 
 export default streamServerRenderedReactComponent;

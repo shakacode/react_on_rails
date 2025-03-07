@@ -5,7 +5,7 @@ React on Rails Pro supports streaming server rendering using React 18's latest A
 ## Prerequisites
 
 - React on Rails Pro subscription
-- React 18 or higher (experimental version)
+- React 19
 - React on Rails v15.0.0-alpha.0 or higher
 - React on Rails Pro v4.0.0.rc.5 or higher
 
@@ -19,14 +19,14 @@ React on Rails Pro supports streaming server rendering using React 18's latest A
 
 ## Implementation Steps
 
-1. **Use Experimental React 18 Version**
+1. **Use React 19 Version**
 
-First, ensure you're using React 18's experimental version in your package.json:
+First, ensure you're using React 19 in your package.json:
 
 ```json
 "dependencies": {
-  "react": "18.3.0-canary-670811593-20240322",
-  "react-dom": "18.3.0-canary-670811593-20240322"
+  "react": "19.0.0",
+  "react-dom": "19.0.0"
 }
 ```
 

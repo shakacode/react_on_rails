@@ -1,3 +1,6 @@
+// eslint-disable-next-line spaced-comment
+/// <reference types="react/experimental" />
+
 import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
 import type { Readable } from 'stream';
 
@@ -11,6 +14,7 @@ type ReactComponent = ComponentType<any> | string;
 
 // Keep these in sync with method lib/react_on_rails/helper.rb#rails_context
 export interface RailsContext {
+  componentRegistryTimeout: number;
   railsEnv: string;
   inMailer: boolean;
   i18nLocale: string;
@@ -104,6 +108,12 @@ export interface RegisteredComponent {
   isRenderer: boolean;
 }
 
+export interface RegisterServerComponentOptions {
+  rscPayloadGenerationUrlPath: string;
+}
+
+export type ItemRegistrationCallback<T> = (component: T) => void;
+
 interface Params {
   props?: Record<string, unknown>;
   railsContext?: RailsContext;
@@ -115,6 +125,10 @@ export interface RenderParams extends Params {
   name: string;
   throwJsErrors: boolean;
   renderingReturnsPromises: boolean;
+}
+
+export interface RSCRenderParams extends RenderParams {
+  reactClientManifestFileName: string;
 }
 
 export interface CreateParams extends Params {
@@ -155,10 +169,13 @@ export interface ReactOnRails {
   registerStore(stores: { [id: string]: StoreGenerator }): void;
   registerStoreGenerators(storeGenerators: { [id: string]: StoreGenerator }): void;
   getStore(name: string, throwIfMissing?: boolean): Store | undefined;
+  getOrWaitForStore(name: string): Promise<Store>;
+  getOrWaitForStoreGenerator(name: string): Promise<StoreGenerator>;
   setOptions(newOptions: {traceTurbolinks: boolean}): void;
   reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType;
-  reactOnRailsPageLoaded(): void;
+  reactOnRailsPageLoaded(): Promise<void>;
   reactOnRailsComponentLoaded(domId: string): void;
+  reactOnRailsStoreLoaded(storeName: string): void;
   authenticityToken(): string | null;
   authenticityHeaders(otherHeaders: { [id: string]: string }): AuthenticityHeaders;
   option(key: string): string | number | boolean | undefined;
@@ -169,8 +186,10 @@ export interface ReactOnRails {
     name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean
   ): RenderReturnType;
   getComponent(name: string): RegisteredComponent;
+  getOrWaitForComponent(name: string): Promise<RegisteredComponent>;
   serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;
   streamServerRenderedReactComponent(options: RenderParams): Readable;
+  serverRenderRSCReactComponent(options: RSCRenderParams): Readable;
   handleError(options: ErrorOptions): string | undefined;
   buildConsoleReplay(): string;
   registeredComponents(): Map<string, RegisteredComponent>;

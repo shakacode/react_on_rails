@@ -22,6 +22,11 @@ module ReactOnRails
     let(:old_auto_load_bundle) { ReactOnRails.configuration.auto_load_bundle }
 
     before do
+      stub_const("ReactOnRailsPro", Class.new do
+        def self.configuration
+          @configuration ||= Struct.new(:enable_rsc_support, :rsc_payload_generation_url_path).new(false, nil)
+        end
+      end)
       ReactOnRails.configuration.server_bundle_js_file = server_bundle_js_file
       ReactOnRails.configuration.components_subdirectory = "ror_components"
       ReactOnRails.configuration.webpack_generated_files = webpack_generated_files
@@ -209,6 +214,156 @@ module ReactOnRails
       end
     end
 
+    context "when RSC support is enabled" do
+      let(:components_directory) { "ReactServerComponents" }
+      let(:rsc_payload_generation_url_path) { "/rsc" }
+
+      before do
+        stub_packer_source_path(component_name: components_directory,
+                                packer_source_path: packer_source_path)
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        allow(ReactOnRailsPro.configuration).to receive_messages(
+          enable_rsc_support: true,
+          rsc_payload_generation_url_path: rsc_payload_generation_url_path
+        )
+      end
+
+      context "when common component is not a client entrypoint" do
+        before do
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "creates pack with server component registration" do
+          component_name = "ReactServerComponent"
+          component_pack = "#{generated_directory}/#{component_name}.js"
+          pack_content = File.read(component_pack)
+          expected_content = <<~CONTENT.strip
+            import registerServerComponent from 'react-on-rails/registerServerComponent/client';
+
+            registerServerComponent({
+              rscPayloadGenerationUrlPath: "#{rsc_payload_generation_url_path}",
+            }, "#{component_name}")
+          CONTENT
+
+          expect(pack_content).to eq(expected_content)
+        end
+      end
+
+      context "when client component is not a client entrypoint" do
+        before do
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "creates pack with client component registration" do
+          component_name = "ReactClientComponentWithClientAndServer"
+          component_pack = "#{generated_directory}/#{component_name}.js"
+          pack_content = File.read(component_pack)
+          expect(pack_content).to include("import ReactOnRails from 'react-on-rails';")
+          expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
+          expect(pack_content).not_to include("registerServerComponent")
+        end
+      end
+
+      context "when server component is a client entrypoint" do
+        before do
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "creates pack with server component registration" do
+          component_name = "ReactServerComponentWithClientAndServer"
+          component_pack = "#{generated_directory}/#{component_name}.js"
+          pack_content = File.read(component_pack)
+          expected_content = <<~CONTENT.strip
+            import registerServerComponent from 'react-on-rails/registerServerComponent/client';
+
+            registerServerComponent({
+              rscPayloadGenerationUrlPath: "#{rsc_payload_generation_url_path}",
+            }, "#{component_name}")
+          CONTENT
+
+          expect(pack_content).to eq(expected_content)
+        end
+      end
+
+      context "when common component is a client entrypoint" do
+        before do
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "creates pack with client component registration" do
+          component_name = "ReactClientComponent"
+          component_pack = "#{generated_directory}/#{component_name}.js"
+          pack_content = File.read(component_pack)
+          expect(pack_content).to include("import ReactOnRails from 'react-on-rails';")
+          expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
+          expect(pack_content).not_to include("registerServerComponent")
+        end
+      end
+
+      context "when RSC support is disabled" do
+        before do
+          allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "creates pack with client component registration" do
+          component_name = "ReactServerComponent"
+          component_pack = "#{generated_directory}/#{component_name}.js"
+          pack_content = File.read(component_pack)
+          expect(pack_content).to include("import ReactOnRails from 'react-on-rails';")
+          expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
+          expect(pack_content).not_to include("registerServerComponent")
+        end
+      end
+
+      context "when not using ReactOnRailsPro" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "creates pack with client component registration" do
+          component_name = "ReactServerComponent"
+          component_pack = "#{generated_directory}/#{component_name}.js"
+          pack_content = File.read(component_pack)
+          expect(pack_content).to include("import ReactOnRails from 'react-on-rails';")
+          expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
+          expect(pack_content).not_to include("registerServerComponent")
+        end
+      end
+
+      context "when registered on server bundle" do
+        before do
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "register server components using registerServerComponent" do
+          generated_server_bundle_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-bundle-generated.js"
+          )
+          generated_server_bundle_content = File.read(generated_server_bundle_path)
+          expected_content = <<~CONTENT.strip
+            import ReactOnRails from 'react-on-rails';
+
+            import ReactClientComponent from '../components/ReactServerComponents/ror_components/ReactClientComponent.jsx';
+            import ReactServerComponent from '../components/ReactServerComponents/ror_components/ReactServerComponent.jsx';
+            import ReactClientComponentWithClientAndServer from '../components/ReactServerComponents/ror_components/ReactClientComponentWithClientAndServer.server.jsx';
+            import ReactServerComponentWithClientAndServer from '../components/ReactServerComponents/ror_components/ReactServerComponentWithClientAndServer.server.jsx';
+
+            import registerServerComponent from 'react-on-rails/registerServerComponent/server';
+            registerServerComponent({ReactServerComponent,
+            ReactServerComponentWithClientAndServer});
+
+            ReactOnRails.register({ReactClientComponent,
+            ReactClientComponentWithClientAndServer});
+          CONTENT
+
+          expect(generated_server_bundle_content.strip).to eq(expected_content.strip)
+        end
+      end
+    end
+
     context "when pack generator is called" do
       let(:component_name) { "ComponentWithCommonOnly" }
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
@@ -290,6 +445,304 @@ module ReactOnRails
     def stub_packer_source_path(packer_source_path:, component_name:)
       allow(ReactOnRails::PackerUtils).to receive(:packer_source_path)
         .and_return("#{packer_source_path}/components/#{component_name}")
+    end
+
+    describe "#first_js_statement_in_code" do
+      subject { described_class.instance.send(:first_js_statement_in_code, content) }
+
+      context "with simple content" do
+        let(:content) { "const x = 1;" }
+
+        it { is_expected.to eq "const x = 1;" }
+      end
+
+      context "with single-line comments" do
+        let(:content) do
+          <<~JS
+            // First comment
+            // Second comment
+            const x = 1;
+            const y = 2;
+          JS
+        end
+
+        it { is_expected.to eq "const x = 1;" }
+      end
+
+      context "with multi-line comments" do
+        let(:content) do
+          <<~JS
+            /* This is a
+               multiline comment */
+            const x = 1;
+          JS
+        end
+
+        it { is_expected.to eq "const x = 1;" }
+      end
+
+      context "with mixed comments" do
+        let(:content) do
+          <<~JS
+            // Single line comment
+            /* Multi-line
+               comment */
+            // Another single line
+            const x = 1;
+          JS
+        end
+
+        it { is_expected.to eq "const x = 1;" }
+      end
+
+      context "with mixed comments and whitespace" do
+        let(:content) do
+          <<~JS
+
+            // First comment
+            #{'  '}
+            /*
+              multiline comment
+            */
+
+                // comment with preceding whitespace
+
+            // Another single line
+
+
+            const x = 1;
+          JS
+        end
+
+        it { is_expected.to eq "const x = 1;" }
+      end
+
+      context "with only comments" do
+        let(:content) do
+          <<~JS
+            // Just a comment
+            /* Another comment */
+          JS
+        end
+
+        it { is_expected.to eq "" }
+      end
+
+      context "with comment at end of file" do
+        let(:content) { "const x = 1;\n// Final comment" }
+
+        it { is_expected.to eq "const x = 1;" }
+      end
+
+      context "with empty content" do
+        let(:content) { "" }
+
+        it { is_expected.to eq "" }
+      end
+
+      context "with only whitespace" do
+        let(:content) { "   \n  \t  " }
+
+        it { is_expected.to eq "" }
+      end
+
+      context "with statement containing comment-like strings" do
+        let(:content) { 'const url = "http://example.com"; // Real comment' }
+
+        # it returns the statement starting from non-space character until the next line even if it contains a comment
+        it { is_expected.to eq 'const url = "http://example.com"; // Real comment' }
+      end
+
+      context "with unclosed multi-line comment" do
+        let(:content) do
+          <<~JS
+            /* This comment
+               never ends
+            const x = 1;
+          JS
+        end
+
+        it { is_expected.to eq "" }
+      end
+
+      context "with nested comments" do
+        let(:content) do
+          <<~JS
+            // /* This is still a single line comment */
+            const x = 1;
+          JS
+        end
+
+        it { is_expected.to eq "const x = 1;" }
+      end
+
+      context "with one line comment with no space after //" do
+        let(:content) { "//const x = 1;" }
+
+        it { is_expected.to eq "" }
+      end
+
+      context "with one line comment with no new line after it" do
+        let(:content) { "// const x = 1" }
+
+        it { is_expected.to eq "" }
+      end
+
+      context "with string directive" do
+        context "when on top of the file" do
+          let(:content) do
+            <<~JS
+              "use client";
+              // const x = 1
+              const b = 2;
+            JS
+          end
+
+          it { is_expected.to eq '"use client";' }
+        end
+
+        context "when on top of the file and one line comment" do
+          let(:content) { '"use client"; // const x = 1' }
+
+          it { is_expected.to eq '"use client"; // const x = 1' }
+        end
+
+        context "when after some one-line comments" do
+          let(:content) do
+            <<~JS
+              // First comment
+              // Second comment
+              "use client";
+            JS
+          end
+
+          it { is_expected.to eq '"use client";' }
+        end
+
+        context "when after some multi-line comments" do
+          let(:content) do
+            <<~JS
+              /* First comment */
+              /*
+                multiline comment
+              */
+              "use client";
+            JS
+          end
+
+          it { is_expected.to eq '"use client";' }
+        end
+
+        context "when after some mixed comments" do
+          let(:content) do
+            <<~JS
+              // First comment
+              /*
+                multiline comment
+              */
+              "use client";
+            JS
+          end
+
+          it { is_expected.to eq '"use client";' }
+        end
+
+        context "when after any non-comment code" do
+          let(:content) do
+            <<~JS
+              // First comment
+              const x = 1;
+              "use client";
+            JS
+          end
+
+          it { is_expected.to eq "const x = 1;" }
+        end
+      end
+    end
+
+    describe "#client_entrypoint?" do
+      subject { described_class.instance.send(:client_entrypoint?, "dummy_path.js") }
+
+      before do
+        allow(File).to receive(:read).with("dummy_path.js").and_return(content)
+      end
+
+      context "when file has 'use client' directive" do
+        context "with double quotes" do
+          let(:content) { '"use client";' }
+
+          it { is_expected.to be true }
+        end
+
+        context "with single quotes" do
+          let(:content) { "'use client';" }
+
+          it { is_expected.to be true }
+        end
+
+        context "without semicolon" do
+          let(:content) { '"use client"' }
+
+          it { is_expected.to be true }
+        end
+
+        context "with trailing whitespace" do
+          let(:content) { '"use client"  ' }
+
+          it { is_expected.to be true }
+        end
+
+        context "with comments before directive" do
+          let(:content) do
+            <<~JS
+              // some comment
+              /* multi-line
+                 comment */
+              "use client";
+            JS
+          end
+
+          it { is_expected.to be true }
+        end
+      end
+
+      context "when file does not have 'use client' directive" do
+        context "with empty file" do
+          let(:content) { "" }
+
+          it { is_expected.to be false }
+        end
+
+        context "with regular JS code" do
+          let(:content) { "const x = 1;" }
+
+          it { is_expected.to be false }
+        end
+
+        context "with 'use client' in a comment" do
+          let(:content) { "// 'use client'" }
+
+          it { is_expected.to be false }
+        end
+
+        context "with 'use client' in middle of file" do
+          let(:content) do
+            <<~JS
+              const x = 1;
+              "use client";
+            JS
+          end
+
+          it { is_expected.to be false }
+        end
+
+        context "with similar but incorrect directive" do
+          let(:content) { "use client;" } # without quotes
+
+          it { is_expected.to be false }
+        end
+      end
     end
   end
   # rubocop:enable Metrics/BlockLength

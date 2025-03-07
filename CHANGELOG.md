@@ -18,6 +18,17 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+See [Release Notes](docs/release-notes/15.0.0.md) for full details.
+
+#### Added
+- React Server Components Support (Pro Feature) [PR 1644](https://github.com/shakacode/react_on_rails/pull/1644) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- Improved component and store hydration performance [PR 1656](https://github.com/shakacode/react_on_rails/pull/1656) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+#### Breaking Changes
+- `ReactOnRails.reactOnRailsPageLoaded` is now an async function
+- `force_load` configuration now defaults to `true`
+- `defer_generated_component_packs` configuration now defaults to `false`
+
 ### [14.2.0] - 2025-03-03
 
 #### Added

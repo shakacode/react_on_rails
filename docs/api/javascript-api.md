@@ -59,7 +59,7 @@ The best source of docs is the main [ReactOnRails.ts](https://github.com/shakaco
   getStore(name, throwIfMissing = true )
 
   /**
-   * Renders or hydrates the react element passed. In case react version is >=18 will use the new api.
+   * Renders or hydrates the React element passed. In case React version is >=18 will use the root API.
    * @param domNode
    * @param reactElement
    * @param hydrate if true will perform hydration, if false will render

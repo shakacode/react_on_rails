@@ -49,7 +49,7 @@ describe('', () => {
   it('StoreRegistry throws error for retrieving unregistered store', () => {
     expect.assertions(1);
     expect(() => StoreRegistry.getStoreGenerator('foobar')).toThrow(
-      /Could not find store registered with name 'foobar'\. Registered store names include/,
+      /Could not find store generator registered with name foobar\. Registered store generator names include/,
     );
   });
 
@@ -73,13 +73,13 @@ describe('', () => {
   it('StoreRegistry throws error for retrieving unregistered hydrated store', () => {
     expect.assertions(1);
     expect(() => StoreRegistry.getStore('foobar')).toThrow(
-      /Could not find hydrated store with name 'foobar'\. Hydrated store names include/,
+      /Could not find hydrated store registered with name foobar\. Registered hydrated store names include/,
     );
   });
 
   it('StoreRegistry clearHydratedStores', () => {
     expect.assertions(2);
-    StoreRegistry.stores().clear();
+    StoreRegistry.clearHydratedStores();
 
     const result = storeGenerator({});
     StoreRegistry.setStore('storeGenerator', result);
