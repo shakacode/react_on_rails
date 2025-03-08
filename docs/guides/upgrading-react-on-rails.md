@@ -37,7 +37,7 @@ If you still need that feature, please file an issue.
 
 ### i18n default format changed to JSON
 
-- If you're using the internalization helper, then set `config.i18n_output_format = 'js'`. You can
+- If you're using the internationalization helper, then set `config.i18n_output_format = 'js'`. You can
   later update to the default JSON format as you will need to update your usage of that file. A JSON
   format is more efficient.
 
@@ -130,7 +130,7 @@ wrapper such that you're returning a function rather than a React Element, then:
 
 ### Custom Webpack build file
 
-The default value for `extract_css` is **false** in `config/webpack.yml`. Custom webpack builds should set this value to true or else no CSS link tags are generated. You have a custom webpack build if you are not using [rails/webpacker](https://github.com/rails/webpacker) to setup your Webpack configuration.
+The default value for `extract_css` is **false** in `config/webpack.yml`. Custom webpack builds should set this value to true, or else no CSS link tags are generated. You have a custom Webpack build if you are not using [rails/webpacker](https://github.com/rails/webpacker) to set up your Webpack configuration.
 
 ```yml
 default: &default # other stuff
@@ -157,12 +157,12 @@ Pretty simple:
 
 Webpacker provides areas of value:
 
-- View helpers that support bypassing the asset pipeline, which allows you to avoid double minification and enable source maps in production. This is 100% a best practice as source maps in production greatly increases the value of services such as HoneyBadger or Sentry.
+- View helpers that support bypassing the asset pipeline, which allows you to avoid double minification and enable source maps in production. This is 100% a best practice, as source maps in production greatly increases the value of services such as HoneyBadger or Sentry.
 - A default Webpack config so that you only need to do minimal modifications and customizations. However, if you're doing server rendering, you may not want to give up control. Since Webpacker's default webpack config is changing often, we at Shakacode can give you definitive advice on webpack configuration best practices. In general, if you're happy with doing your own Webpack configuration, then we suggest using the `client` strategy discussed below. Most corporate projects will prefer having more control than direct dependence on webpacker easily allows.
 
 ### Integrating Webpacker
 
-Reason for doing this: This enables your webpack bundles to bypass the Rails asset pipeline and it's extra minification, enabling you to use source-maps in production, while still maintaining total control over everything in the client directory
+Reason for doing this: This enables your webpack bundles to bypass the Rails asset pipeline and its extra minification, enabling you to use source-maps in production, while still maintaining total control over everything in the client directory.
 
 #### From version 7 or lower
 
@@ -239,11 +239,11 @@ For an example of upgrading, see [react-webpack-rails-tutorial/pull/416](https:/
 
 - Breaking Configuration Changes
 
-  1. Added `config.node_modules_location` which defaults to `""` if Webpacker is installed. You may want to set this to 'client'`to`config/initializers/react_on_rails.rb`to keep your node_modules inside of`/client`
+  1. Added `config.node_modules_location` which defaults to `""` if Webpacker is installed. You may want to set this to `'client'` in `config/initializers/react_on_rails.rb` to keep your `node_modules` inside the `/client` directory.
   2. Renamed
 
-  - config.npm_build_test_command ==> config.build_test_command
-  - config.npm_build_production_command ==> config.build_production_command
+     - config.npm_build_test_command ==> config.build_test_command
+     - config.npm_build_production_command ==> config.build_production_command
 
 - Update the gemfile. Switch over to using the webpacker gem.
 

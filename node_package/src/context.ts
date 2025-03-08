@@ -55,7 +55,7 @@ export function getContextAndRailsContext(): { context: Context | null; railsCon
   try {
     currentRailsContext = JSON.parse(el.textContent);
   } catch (e) {
-    console.error('Error parsing rails context:', e);
+    console.error('Error parsing Rails context:', e);
     return { context: null, railsContext: null };
   }
 

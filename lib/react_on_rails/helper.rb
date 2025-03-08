@@ -32,7 +32,7 @@ module ReactOnRails
     #
     #   Exposing the react_component_name is necessary to both a plain ReactComponent as well as
     #     a generator:
-    #   See README.md for how to "register" your react components.
+    #   See README.md for how to "register" your React components.
     #   See spec/dummy/client/app/packs/server-bundle.js and
     #     spec/dummy/client/app/packs/client-bundle.js for examples of this.
     #

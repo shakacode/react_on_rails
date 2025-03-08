@@ -48,7 +48,7 @@ query: {
 },
 ```
 
-both of these two example above do the exact same thing, just using different syntaxes. For the rest of this doc we will be using the JSON object style. For more information about webpack loaders, read [this](https://webpack.github.io/docs/using-loaders.html).
+Both examples above do the exact same thing, just using different syntaxes. For the rest of this doc we will be using the JSON object style. For more information about webpack loaders, read [this](https://webpack.github.io/docs/using-loaders.html).
 
 _For the sake of this doc, we're also going to add a `resolve["alias"]` inside our webpack.config to make it easier to include our assets in our jsx files. In `resolve["alias"]`, simply add:_
 
@@ -58,13 +58,13 @@ _For the sake of this doc, we're also going to add a `resolve["alias"]` inside o
 
 ##### Configuring your file-loader Query Parameters
 
-The first property we'll want to set is our file's resulting name after bundling. For now we're just going to use:
+The first property we'll want to set is our file's resulting name after bundling. For now, we're just going to use:
 
 ```javascript
 name: '[name][md5:hash].[ext]',
 ```
 
-This will just set the name to the file's original name + a md5 digested hash + the extension of the original file (.png, .jpg, etc).
+This will just set the name to the file's original name + an MD5-digested hash + the extension of the original file (.png, .jpg, etc.).
 
 Next we'll set the outputPath for our files. This is the directory we want the files to be placed in after webpack runs. When Webpack runs with file-loader, all files (in this case assets) that have been used in the bundled JavaScript will be bundled and outputted to the output destination. **Keep in mind that react_on_rails outputs by default to the `app/assets/webpack/` directory so when we specify the outputPath here it will be relative the `app/assets/webpack` directory.** You can set the outputPath to whatever you want, in this example we will add it to a directory `/app/assets/webpack/webpack-assets/`, and here's how we would do that:
 

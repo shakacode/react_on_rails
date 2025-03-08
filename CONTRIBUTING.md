@@ -4,7 +4,7 @@
 - [docs/contributor-info/pull-requests](./docs/contributor-info/pull-requests.md)
 - See other docs in [docs/contributor-info](./docs/contributor-info)
 
-## To run tests:
+## Prerequisites
 
 - [Yalc](https://github.com/whitecolor/yalc) must be installed globally for most local development.
 - After updating code via Git, to prepare all examples:
@@ -19,7 +19,7 @@ and [Running tests](#running-tests) for more details on running tests.
 
 # IDE/IDE SETUP
 
-It's critical to configure your IDE/editor to ignore certain directories. Otherwise your IDE might slow to a crawl!
+It's critical to configure your IDE/editor to ignore certain directories. Otherwise, your IDE might slow to a crawl!
 
 - /coverage
 - /tmp
