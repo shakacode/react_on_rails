@@ -56,7 +56,7 @@ By the way, we're _not_ omakase for standard Rails. That would be CoffeeScript. 
 
 ## No One Paradigm
 
-React on Rails fits into the "No One Paradigm" of the Rails ecosystem from the perspective that it rocks for client side development with Rails, even though it's a totally different language than the server code written in Ruby.
+React on Rails fits into the "No One Paradigm" of the Rails ecosystem from the perspective that it rocks for client-side development with Rails, even though it's a totally different language than the server code written in Ruby.
 
 ## Exalt Beautiful Code
 
@@ -64,11 +64,11 @@ ES5 was ugly. ES6 is beautiful. React is beautiful. Client side code written wit
 
 ## Value Integrated Systems
 
-Assuming that you're building the type of app that's a good fit for Rails (document/database based with lots of business rules), the tight integration of modern JavaScript with React on top of Ruby on Rails is better than building a pure client side app and separate microservices. Here's why:
+Assuming that you're building the type of app that's a good fit for Rails (document/database based with lots of business rules), the tight integration of modern JavaScript with React on top of Ruby on Rails is better than building a pure client-side app and separate microservices. Here's why:
 
 - Via React on Rails, we can seamlessly integrate React UI components with Rails.
 - Tight integration allows for trivial set up of server rendering of React on top of Rails, complete with support for fragment caching of the server rendered HTML, and integration with [Turbolinks](https://github.com/turbolinks/turbolinks).
-- Tight integration allows mixing and matching Rails pages with React driven pages, even on the same page. Not every part of a UI requires the high fidelity achievable using React. Many existing apps may have hundreds of standards Rails forms. Support for mixing and matching React with Rails forms provides the best of both worlds.
+- Tight integration allows mixing and matching Rails pages with React-driven pages, even on the same page. Not every part of a UI requires the high fidelity achievable using React. Many existing apps may have hundreds of standard Rails forms. Support for mixing and matching React with Rails forms provides the best of both worlds.
 
 ## Progress over Stability
 

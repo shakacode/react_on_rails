@@ -63,9 +63,7 @@ const { webpackConfig: baseClientWebpackConfig } = require('shakapacker');
 config.optimization = baseClientWebpackConfig.optimization;
 ```
 
-As it set the `optimization.runtimeChunk` to `single`. See its source:
-
-`package/environments/base.js:115`
+As it set the `optimization.runtimeChunk` to `single`. [See its source](https://github.com/shakacode/shakapacker/blob/cdf32835d3e0949952b8b4b53063807f714f9b24/package/environments/base.js#L115-L119):
 
 ```js
   optimization: {
@@ -74,7 +72,5 @@ As it set the `optimization.runtimeChunk` to `single`. See its source:
     runtimeChunk: 'single'
   },
 ```
-
-https://github.com/shakacode/shakapacker/blob/cdf32835d3e0949952b8b4b53063807f714f9b24/package/environments/base.js#L115-L119
 
 Or set `optimization.runtimeChunk` to `single` directly.

@@ -1,6 +1,6 @@
 # Capistrano Deployment
 
-Make sure ReactOnRails is working in development environment.
+Make sure ReactOnRails is working in the development environment.
 
 Add the following to development your Gemfile and bundle install.
 
@@ -22,4 +22,4 @@ Add the following in your Capfile.
 require 'capistrano/yarn'
 ```
 
-If the deployment is taking too long or getting stuck at assets:precompile stage, it probably is because of memory. Webpack consumes a lot of memory so if possible, try increasing the RAM of your server.
+If the deployment is taking too long or getting stuck at `assets:precompile` stage, it is probably because of memory. Webpack consumes a lot of memory so if possible, try increasing the RAM of your server.

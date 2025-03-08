@@ -41,13 +41,13 @@ Another good option is to create a simple test app per the [Tutorial](https://ww
 
 # Understanding the Organization of the Generated Client Code
 
-The generated client code follows our organization scheme. Each unique set of functionality, is given its own folder inside of `app/javascript/app/bundles`. Note, the recommended for bigger projects is `client/app/bundles`. This encourages for modularity of _domains_.
+The generated client code follows our organization scheme. Each unique set of functionality is given its own folder inside of `app/javascript/app/bundles`. This encourages modularity of _domains_.
 
-Inside of the generated "HelloWorld" domain you will find the following folders:
+Inside the generated "HelloWorld" domain you will find the following folders:
 
-- `startup`: This contains the entry point files for webpack. It defaults to a single file that is used for server and client compilation, but if these need to be different, then you can create two webpack configurations with separate endpoints.
-- `containers`: "smart components" (components that have functionality and logic that is passed to child "dumb components").
-- `components`: includes "dumb components", or components that simply render their properties and call functions given to them as properties by a parent component. Ultimately, at least one of these dumb components will have a parent container component.
+- `startup`: contains the entry point files for webpack. It defaults to a single file that is used for both server and client compilation. But if these need to be different, then you can create two Webpack configurations with separate endpoints. Since RoR v14.2 this is strongly recommended because the client can import `react-on-rails/client` instead of `react-on-rails` for decreased bundle size.
+- `containers`: contains "smart components" (components that have functionality and logic that is passed to child "dumb components").
+- `components`: contains "dumb components", or components that simply render their properties and call functions given to them as properties by a parent component. Ultimately, at least one of these dumb components will have a parent container component.
 
 You may also notice the `app/lib` folder. This is for any code that is common between bundles and therefore needs to be shared (for example, middleware).
 

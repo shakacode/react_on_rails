@@ -6,9 +6,9 @@ The `webpack-dev-server` provides:
 2. Optional HMR which means that the page will reload automatically when after
    compilation completes. Note, some developers do not like this, as you'll
    abruptly lose any tweaks within the Chrome development tools.
-3. Optional hot-reloading. The older react-hot-loader has been deprecated in
+3. Optional hot-reloading. The older `react-hot-loader` has been deprecated in
    favor of [fast-refresh](https://reactnative.dev/docs/fast-refresh).
-   For use with webpack, see **Client Side rendering and HMR using react-refresh-webpack-plugin** section bellow or visit [react-refresh-webpack-plugin](https://github.com/pmmmwh/react-refresh-webpack-plugin) for additional details.
+   For use with webpack, see **Client Side rendering and HMR using react-refresh-webpack-plugin** section below or visit [react-refresh-webpack-plugin](https://github.com/pmmmwh/react-refresh-webpack-plugin) for additional details.
 
 If you are **_not_** using server-side rendering (**_not_** using `prerender: true`),
 then you can follow all the regular docs for using the `bin/shakapacker-dev-server`
@@ -25,8 +25,8 @@ rendering.
 If you do use the `webpack-dev-server` for prerendering, be sure to set the
 `config/initializers/react_on_rails.rb` setting of
 
-```
-  config.same_bundle_for_client_and_server = true
+```ruby
+config.same_bundle_for_client_and_server = true
 ```
 
 `dev_server.hmr` maps to [devServer.hot](https://webpack.js.org/configuration/dev-server/#devserverhot).
@@ -37,18 +37,18 @@ This must also be false.
 
 If you don't configure these two to false, you'll see errors like:
 
-- `"ReferenceError: window is not defined" (if hmr is true)`
-- `"TypeError: Cannot read property 'prototype' of undefined" (if inline is true)`
+- `ReferenceError: window is not defined` (if `hmr` is true)
+- `TypeError: Cannot read property 'prototype' of undefined` (if `inline` is true)
 
-# Client Side rendering with HMR using react-refresh-webpack-plugin
+# Client-Side rendering with HMR using react-refresh-webpack-plugin
 
 ## Basic installation
 
-To enable HMR functionality you have to use `./bin/shakapacker-dev-server`
+To enable the HMR functionality, you have to use `./bin/shakapacker-dev-server`
 
-1. In `config/shakapacker.yml` set **hmr** and **inline** `dev_server` properties to true.
+1. In `config/shakapacker.yml` set `hmr` and `inline` `dev_server` properties to true.
 
-   ```
+   ```yaml
    dev_server:
      https: false
      host: localhost
@@ -59,8 +59,11 @@ To enable HMR functionality you have to use `./bin/shakapacker-dev-server`
      inline: true
    ```
 
-2. Add react refresh packages:
-   ` yarn add @pmmmwh/react-refresh-webpack-plugin react-refresh -D`
+2. Add react-refresh packages:
+
+   ```bash
+   yarn add -D @pmmmwh/react-refresh-webpack-plugin react-refresh
+   ```
 
 3. HMR is for use with the `webpack-dev-server`, so we only add this for the `webpack-dev-server`.
 
@@ -69,7 +72,7 @@ To enable HMR functionality you have to use `./bin/shakapacker-dev-server`
 
    const isWebpackDevServer = process.env.WEBPACK_DEV_SERVER;
 
-   //plugins
+   // plugins
    if (isWebpackDevServer) {
      environment.plugins.append(
        'ReactRefreshWebpackPlugin',
@@ -82,9 +85,9 @@ To enable HMR functionality you have to use `./bin/shakapacker-dev-server`
    }
    ```
 
-   We added `overlay.sockPort` option in `ReactRefreshWebpackPlugin` to match the webpack dev-server port specified in `config/shakapacker.yml`. That way we make sockjs works properly and suppress error in browser console `GET http://localhost:[port]/sockjs-node/info?t=[xxxxxxxxxx] 404 (Not Found)`.
+   We added `overlay.sockPort` option in `ReactRefreshWebpackPlugin` to match the webpack-dev-server port specified in `config/shakapacker.yml`. This makes SockJS works properly and fixes this error in browser console: `GET http://localhost:[port]/sockjs-node/info?t=[xxxxxxxxxx] 404 (Not Found)`.
 
-4. Add react-refresh plugin in `babel.config.js`
+4. Add the react-refresh plugin in `babel.config.js`
 
    ```js
    module.exports = function (api) {
@@ -97,7 +100,7 @@ To enable HMR functionality you have to use `./bin/shakapacker-dev-server`
 That's it :).
 Now Browser should reflect `.js` along with `.css` changes without reloading.
 
-If by some reason plugin doesn't work you could revert changes and left only devServer hmr/inline to true affecting only css files.
+If for some reason the plugin doesn't work, you can revert the changes and leave only devServer `hmr`/`inline` set to true, affecting only CSS files.
 
 These plugins are working and tested with
 

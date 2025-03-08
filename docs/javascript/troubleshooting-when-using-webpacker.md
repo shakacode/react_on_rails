@@ -7,7 +7,7 @@ react_on_rails: upgraded from 6.6.0 to 9.0.3
 
 Rspec failing with
 
-```
+```text
 Failure/Error: raise Webpacker::Manifest::MissingEntryError, missing_file_from_manifest_error(name)
 
      Webpacker::Manifest::MissingEntryError:
@@ -38,7 +38,7 @@ Failure/Error: raise Webpacker::Manifest::MissingEntryError, missing_file_from_m
 ...
 ```
 
-At the same time dev/prod environments works fine (with extra webpack calling step outside rails).
+At the same time dev/prod environments work fine (with extra Webpack calling step outside Rails).
 
 ## Configs
 

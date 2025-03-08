@@ -44,7 +44,7 @@ If you think ShakaCode can help your project, [click here](https://meetings.hubs
 
 ## React on Rails Pro
 
-Are you interested in optimizing your webpack setup for React on Rails, including code splitting with [react-router](https://github.com/ReactTraining/react-router#readme) and [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers?
+Are you interested in optimizing your Webpack setup for React on Rails, including code splitting with [react-router](https://github.com/ReactTraining/react-router#readme) and [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers?
 We did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://www.shakacode.com/recent-work/popmenu/). Several years later, Popmenu serves tens of millions of SSR requests daily with React on Rails Pro.
 
 If you're interested, read more about [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) and [book a call](https://meetings.hubspot.com/justingordon/30-minute-consultation).
@@ -94,12 +94,12 @@ Ruby on Rails >=5, rails/webpacker >= 4.2 or shakapacker > 6, Ruby >= 3.0.0
 
 - [Click to join **React + Rails Slack**](https://reactrails.slack.com/join/shared_invite/enQtNjY3NTczMjczNzYxLTlmYjdiZmY3MTVlMzU2YWE0OWM0MzNiZDI0MzdkZGFiZTFkYTFkOGVjODBmOWEyYWQ3MzA2NGE1YWJjNmVlMGE).
 
-* [**Subscribe**](https://app.mailerlite.com/webforms/landing/l1d9x5) for announcements of new releases of React on Rails and of our latest [blog articles](https://blog.shakacode.com) and tutorials.
-* [Discussions](https://github.com/shakacode/react_on_rails/discussions): Post your questions regarding React on Rails
-* **[forum.shakacode.com](https://forum.shakacode.com)**: Other discussions
-* **[@railsonmaui on Twitter](https://twitter.com/railsonmaui)**
-* _See [NEWS.md](https://github.com/shakacode/react_on_rails/tree/master/NEWS.md) for more notes over time._
-* See [Projects](https://github.com/shakacode/react_on_rails/tree/master/PROJECTS.md) using and [KUDOS](https://github.com/shakacode/react_on_rails/tree/master/KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
+- [**Subscribe**](https://app.mailerlite.com/webforms/landing/l1d9x5) for announcements of new releases of React on Rails and of our latest [blog articles](https://blog.shakacode.com) and tutorials.
+- [Discussions](https://github.com/shakacode/react_on_rails/discussions): Post your questions regarding React on Rails
+- **[forum.shakacode.com](https://forum.shakacode.com)**: Other discussions
+- **[@railsonmaui on Twitter](https://twitter.com/railsonmaui)**
+- _See [NEWS.md](https://github.com/shakacode/react_on_rails/tree/master/NEWS.md) for more notes over time._
+- See [Projects](https://github.com/shakacode/react_on_rails/tree/master/PROJECTS.md) using and [KUDOS](https://github.com/shakacode/react_on_rails/tree/master/KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
 
 ## Contributing
 

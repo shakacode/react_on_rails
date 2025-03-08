@@ -4,7 +4,7 @@ The following only apply to Webpack V1. Take 1 hour and update to v2! It's worth
 
 ## Use the `--bail` Option When Running Webpack for CI or Deployments if using Webpack V1
 
-For your scripts that statically build your Webpack bundles, use the `--bail` option. This will ensure that CI and your product deployment **halt** if Webpack cannot complete! For more details, see the documentation for [Webpack's `--bail` option](https://webpack.js.org/configuration/other-options/#bail). Note, you might not want to use the `--bail` option if you just want to depend on Webpack returning a non-zero error code and you want to see all the errors, rather than only the first error.
+For your scripts that statically build your Webpack bundles, use the `--bail` option. This will ensure that CI and your product deployment **halt** if Webpack cannot complete. For more details, see the documentation for [Webpack's `--bail` option](https://webpack.js.org/configuration/other-options/#bail). Note, you might not want to use the `--bail` option if you just want to depend on Webpack returning a non-zero error code and you want to see all the errors, rather than only the first error.
 
 ## Entry Points
 

@@ -19,7 +19,7 @@ For non-doc fixes:
 
 From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/)
 
-#### The seven rules of a great git commit message
+### The seven rules of a great git commit message
 
 > Keep in mind: This has all been said before.
 

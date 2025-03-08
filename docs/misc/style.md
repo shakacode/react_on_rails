@@ -22,7 +22,7 @@ Follow these style guidelines per the linter configuration. Basically, lint your
 ### JavaScript Coding Standards
 
 - [ShakaCode Javascript](https://github.com/shakacode/style-guide-javascript)
-- Use the [eslint-config-shakacode](https://github.com/shakacode/style-guide-javascript/tree/master/packages/eslint-config-shakacode) npm package with eslint.
+- Use the [eslint-config-shakacode](https://github.com/shakacode/style-guide-javascript/tree/master/packages/eslint-config-shakacode) NPM package with ESLint.
 - [JSDoc](http://usejsdoc.org/)
 
 ### Git coding Standards
@@ -36,6 +36,6 @@ Follow these style guidelines per the linter configuration. Basically, lint your
 
 # Git Usage
 
-- Follow a github-flow model where you branch off of master for features.
+- Follow a [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow) model where you branch off master for features.
 - Before merging a branch to master, rebase it on top of master, by using command like `git fetch; git checkout my-branch; git rebase -i origin/master`. Clean up your commit message at this point. Be super careful to communicate with anybody else working on this branch and do not do this when others have uncommitted changes. Ideally, your merge of your feature back to master should be one nice commit.
 - Run hosted CI and code coverage.

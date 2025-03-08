@@ -5,7 +5,7 @@ _A history of the news. A few bullets at the top will also show on the [README.m
 - **October 14, 2020**: [RUBY ROGUES
   RR 474: React on Rails V12 – Don’t Shave That Yak! with Justin Gordon](https://devchat.tv/ruby-rogues/rr-474-react-on-rails-v12-dont-shave-that-yak-with-justin-gordon/).
 
-- **October 1, 2020**: See the [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) example repo for a simple configuration of webpack via the rails/webpacker gem
+- **October 1, 2020**: See the [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) example repo for a simple configuration of Webpack via the rails/webpacker gem
   that supports SSR.
 - **August 2, 2020**: See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_demo_ssr_hmr) for a new way to setup the creation of your SSR bundle with `rails/webpacker`.
 - July 8, 2020: Release **v12**.
@@ -23,7 +23,7 @@ _A history of the news. A few bullets at the top will also show on the [README.m
 - 2017-03-06: Updated to Webpack v2!
 - 2017-03-02: Demo of internationalization (i18n) is live at [reactrails.com](https://www.reactrails.com/). Docs [here](docs/guides/i18n.md).
 - 2017-02-28: See [discussions here on Webpacker](https://github.com/rails/webpacker/issues/139) regarding how Webpacker will allow React on Rails to avoid using the asset pipeline in the near future.
-- 2017-02-28: Upgrade to Webpack v2 or use the `--bail` option in your webpack script for test and production builds. See the discussion on [PR #730](https://github.com/shakacode/react_on_rails/pull/730).
+- 2017-02-28: Upgrade to Webpack v2 or use the `--bail` option in your Webpack script for test and production builds. See the discussion on [PR #730](https://github.com/shakacode/react_on_rails/pull/730).
 - 2016-11-03: Spoke at [LA Ruby: "React on Rails: Why, What, and How?"](http://www.meetup.com/laruby/events/234825187/). [Video and pictures in this article](https://blog.shakacode.com/my-react-on-rails-talk-at-the-la-ruby-rails-meetup-november-10-2016-eaaa83aff800#.ej6h4eglp).
 - 2016-12-20: New Video on Egghead.io: [Creating a component with React on Rails](https://egghead.io/lessons/react-creating-a-component-with-react-on-rails)
 - 2016-11-03: Spoke at [LA Ruby, 7pm, Thursday, November 10 in Venice, CA: "React on Rails: Why, What, and How?"](http://www.meetup.com/laruby/events/234825187/). [Video and pictures in this article](https://blog.shakacode.com/my-react-on-rails-talk-at-the-la-ruby-rails-meetup-november-10-2016-eaaa83aff800#.ej6h4eglp).
@@ -58,5 +58,5 @@ _A history of the news. A few bullets at the top will also show on the [README.m
   1. Fixed a **critical** problem with TurboLinks. Be sure to see [turbolinks docs](docs/additional-reading/turbolinks.md) for more information on how to debug TurboLinks issues.
   2. Provides a convenient helper to ensure that JavaScript assets are compiled before running tests.
 - React on Rails does not yet have _generator_ support for building new apps that use CSS modules and hot reloading via the Rails server as is demonstrated in the [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/). _We do support this, but we don't generate the code._ If you did generate a fresh app from react_on_rails and want to move to CSS Modules, then see [PR 175: Babel 6 / CSS Modules / Rails hot reloading](https://github.com/shakacode/react-webpack-rails-tutorial/pull/175). Note, while there are probably fixes after this PR was accepted, this has the majority of the changes. See [the tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/#news) for more information. Ping us if you want to help!
-- [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/Github based coaching for "React on Rails". [Click here](http://www.shakacode.com/work/index.html) for more information.
+- [ShakaCode](http://www.shakacode.com) is doing Skype plus Slack/GitHub based coaching for "React on Rails". [Click here](http://www.shakacode.com/work/index.html) for more information.
 - Be sure to read our article [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724).

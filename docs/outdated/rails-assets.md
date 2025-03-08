@@ -36,7 +36,7 @@ _If you are interested in learning how to use assets in your React components, r
 ## The Solution: Symlink Original File Names to New File Names
 
 _Note, this solution was removed in v14. If you're interested in this symlink solution, please create
-a github issue._
+a GitHub issue._
 
 ## Example from /spec/dummy
 
