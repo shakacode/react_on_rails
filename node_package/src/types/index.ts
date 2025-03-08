@@ -1,7 +1,8 @@
 // eslint-disable-next-line spaced-comment
 /// <reference types="react/experimental" />
 
-import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
+import type { ReactElement, ComponentType } from 'react';
+import type { Root } from 'react-dom/client';
 import type { Readable } from 'stream';
 
 // Don't import redux just for the type definitions
@@ -158,14 +159,6 @@ export interface RenderResult {
   isShellReady?: boolean;
 }
 
-// from react-dom 18
-export interface Root {
-  render(children: ReactNode): void;
-  unmount(): void;
-}
-
-export type RenderReturnType = void | Element | Component | Root;
-
 export interface ReactOnRails {
   register(components: { [id: string]: ReactComponentOrRenderFunction }): void;
   /** @deprecated Use registerStoreGenerators instead */
@@ -175,7 +168,7 @@ export interface ReactOnRails {
   getOrWaitForStore(name: string): Promise<Store>;
   getOrWaitForStoreGenerator(name: string): Promise<StoreGenerator>;
   setOptions(newOptions: { traceTurbolinks: boolean }): void;
-  reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType;
+  reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): Root;
   reactOnRailsPageLoaded(): Promise<void>;
   reactOnRailsComponentLoaded(domId: string): void;
   reactOnRailsStoreLoaded(storeName: string): void;
@@ -185,7 +178,7 @@ export interface ReactOnRails {
   getStoreGenerator(name: string): StoreGenerator;
   setStore(name: string, store: Store): void;
   clearHydratedStores(): void;
-  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): RenderReturnType;
+  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): Root;
   getComponent(name: string): RegisteredComponent;
   getOrWaitForComponent(name: string): Promise<RegisteredComponent>;
   serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;

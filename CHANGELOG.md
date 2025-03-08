@@ -29,8 +29,13 @@ See [Release Notes](docs/release-notes/15.0.0.md) for full details.
 - React Server Components Support (Pro Feature) [PR 1644](https://github.com/shakacode/react_on_rails/pull/1644) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - Improved component and store hydration performance [PR 1656](https://github.com/shakacode/react_on_rails/pull/1656) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+#### Removed
+
+- Support for React 16 and 17. [PR 1710](https://github.com/shakacode/react_on_rails/pull/1710) by [alexeyr-ci](https://github.com/alexeyr-ci).
+
 #### Breaking Changes
 
+- React >=18 is now required
 - `ReactOnRails.reactOnRailsPageLoaded` is now an async function
 - `force_load` configuration now defaults to `true`
 - `defer_generated_component_packs` configuration now defaults to `false`

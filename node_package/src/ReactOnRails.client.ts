@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import type { Root } from 'react-dom/client';
 import * as ClientStartup from './clientStartup';
 import { renderOrHydrateComponent, hydrateStore } from './ClientSideRenderer';
 import ComponentRegistry from './ComponentRegistry';
@@ -10,7 +11,6 @@ import context from './context';
 import type {
   RegisteredComponent,
   RenderResult,
-  RenderReturnType,
   ReactComponentOrRenderFunction,
   AuthenticityHeaders,
   Store,
@@ -103,13 +103,13 @@ ctx.ReactOnRails = {
   },
 
   /**
-   * Renders or hydrates the React element passed. In case React version is >=18 will use the root API.
+   * Renders or hydrates the React element passed.
    * @param domNode
    * @param reactElement
    * @param hydrate if true will perform hydration, if false will render
-   * @returns {Root|ReactComponent|ReactElement|null}
+   * @returns {Root}
    */
-  reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType {
+  reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): Root {
     return reactHydrateOrRender(domNode, reactElement, hydrate);
   },
 
@@ -222,26 +222,19 @@ ctx.ReactOnRails = {
    *
    * Does this:
    * ```js
-   * ReactDOM.render(React.createElement(HelloWorldApp, {name: "Stranger"}),
-   *   document.getElementById('app'))
-   * ```
-   * under React 16/17 and
-   * ```js
    * const root = ReactDOMClient.createRoot(document.getElementById('app'))
-   * root.render(React.createElement(HelloWorldApp, {name: "Stranger"}))
+   * root.render(React.createElement(HelloWorldApp, {name: 'Stranger'}))
    * return root
    * ```
-   * under React 18+.
    *
    * @param name Name of your registered component
    * @param props Props to pass to your component
    * @param domNodeId
-   * @param hydrate Pass truthy to update server rendered html. Default is falsy
-   * @returns {Root|ReactComponent|ReactElement} Under React 18+: the created React root
+   * @param hydrate Pass truthy to update server rendered HTML. Default is falsy
+   * @returns {Root} The created React root
    *   (see "What is a root?" in https://github.com/reactwg/react-18/discussions/5).
-   *   Under React 16/17: Reference to your component's backing instance or `null` for stateless components.
    */
-  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): RenderReturnType {
+  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): Root {
     const componentObj = ComponentRegistry.get(name);
     const reactElement = createReactOutput({ componentObj, props, domNodeId });
 
