@@ -49,10 +49,6 @@ _Please support the project by [emailing Justin Gordon](mailto:justin@shakacode.
 - [Relay Rails Blog](https://github.com/gauravtiwari/relay-rails-blog): Tutorial to learn Relay with Rails.
 - [Hot Module Replacement with react_on_rails](https://medium.com/@hrishio/lesson-5-hot-module-replacement-for-react-in-rails-using-the-react-on-rails-gem-643c5b01f3d7#.ehevxok16) : Step-by-step tutorial for a quick basic set up of hot asset reloading with HMR in a Rails 5 app. [Code on Github](https://github.com/learnetto/calreact-hmr).....
 
-## Per Github.
-
----
-
 ## Projects Based on React on Rails
 
 - [github.com/Limenius/symfony-react-sandbox](https://github.com/Limenius/symfony-react-sandbox)

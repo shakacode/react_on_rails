@@ -39,7 +39,7 @@ export default MyAppComponent;
 
 ---
 
-_This would be alternate API where you have to call React.createElement and the React on Rails code doesn't do that._
+_This would be an alternate API where you have to call React.`createElement` and the React on Rails code doesn't do that._
 
 ```js
 import React from 'react';

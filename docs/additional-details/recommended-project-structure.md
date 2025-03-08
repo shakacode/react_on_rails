@@ -2,13 +2,13 @@
 
 The React on Rails generator uses the standard Shakapacker convention of this structure:
 
-```yml
+```text
 app/javascript:
   ├── bundles:
-  │   # Logical groups of files that can be used for code splitting
+  │   # Logical groups of files that can be used for code splitting
   │   └── hello-world-bundle.js
   ├── packs:
-  │   # only webpack entry files here
+  │   # only webpack entry files here
   │   └── hello-world-bundle.js
 ```
 
@@ -19,7 +19,7 @@ you should consider keeping your codebase mostly consistent with the defaults fo
 
 1. Move the directory:
 
-```
+```sh
 mv app/javascript client
 ```
 
@@ -53,11 +53,11 @@ You have 2 basic choices:
 
 ### Simple Rails Way
 
-This isn't really any technique, as you keep handling all your styling assets using Rails standard tools, such as using the [sass-rails gem](https://rubygems.org/gems/sass-rails/versions/5.0.4). Basically, Webpack doesn't get involved with styling. Your Rails layouts just doing the styling the standard Rails way.
+This isn't really a technique, as you keep handling all your styling assets using Rails standard tools, such as using the [sass-rails gem](https://rubygems.org/gems/sass-rails/versions/5.0.4). Basically, Webpack doesn't get involved with styling. Your Rails layouts just continue doing the styling the standard Rails way.
 
 #### Advantages to the Simple Rails Way
 
-1. Much simpler! There's no changes really from your current processes.
+1. Much simpler! There's no change from your current processes.
 
 ### Using Webpack to Manage Styling Assets
 
@@ -70,6 +70,6 @@ This technique involves customization of the webpack config files to generate CS
 
 #### Advantages to having Webpack Manage Styles
 
-1. You can use [CSS modules](https://github.com/css-modules/css-modules), which is super compelling once you seen the benefits.
+1. You can use [CSS modules](https://github.com/css-modules/css-modules), which is super compelling once you see the benefits.
 1. You can use CSS in JS.
 1. You can do hot reloading of your assets. Thus, you do not have to refresh your web page to see asset change, including changing styles.

@@ -44,7 +44,7 @@ If you think ShakaCode can help your project, [click here](https://meetings.hubs
 
 ## React on Rails Pro
 
-Are you interested in optimizing your webpack setup for React on Rails, including code splitting with [react-router](https://github.com/ReactTraining/react-router#readme) and [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers?
+Are you interested in optimizing your Webpack setup for React on Rails, including code splitting with [react-router](https://github.com/ReactTraining/react-router#readme) and [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers?
 We did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://www.shakacode.com/recent-work/popmenu/). Several years later, Popmenu serves tens of millions of SSR requests daily with React on Rails Pro.
 
 If you're interested, read more about [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) and [book a call](https://meetings.hubspot.com/justingordon/30-minute-consultation).

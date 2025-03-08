@@ -4,7 +4,7 @@
 
 ## Assets Handling
 
-Ideally, you should have your JavaScript libraries packaged by `webpack` and gathered by `yarn`. If you have not already done this, then you can setup the `ReactOnRails` default JS code directory of `/client` to load the JS libraries related to AngularJS, etc. You can configure Webpack to globally export these libraries, so inclusion this way will be no different than using the Rails asset pipeline. However, so long as you _understand_ how your JavaScript will eventually make its way onto your main layout, you will be OK.
+Ideally, you should have your JavaScript libraries packaged by `webpack` and gathered by `yarn`. If you have not already done this, then you can set up the `ReactOnRails` default JS code directory of `/client` to load the JS libraries related to AngularJS, etc. You can configure Webpack to globally export these libraries, so inclusion this way will be no different from using the Rails asset pipeline. However, so long as you _understand_ how your JavaScript will eventually make its way onto your main layout, you will be OK.
 
 ## Styling and CSS Modules
 

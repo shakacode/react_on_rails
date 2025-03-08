@@ -4,7 +4,6 @@ This document describes the coding style of [ShakaCode](http://www.shakacode.com
 
 - Use of linters with our standard linter configuration.
 - References to existing style guidelines that support the linter configuration.
-- Anything additional goes next.
 
 ## Client Side JavaScript and React
 

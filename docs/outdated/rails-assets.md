@@ -5,7 +5,7 @@ _This doc needs updating for the use of Shakapacker or rails/webpacker with Reac
 The [Webpack file loader](https://github.com/webpack/file-loader) copies referenced files to
 the destination output directory, with an MD5 hash. The other term for this is a "digest".
 
-> By default the filename of the resulting file is the MD5 hash of the file's contents with
+> By default, the filename of the resulting file is the MD5 hash of the file's contents with
 > the original extension of the required resource.
 
 The most common use cases for Webpack processed files are images used for backgrounds in
@@ -36,7 +36,7 @@ _If you are interested in learning how to use assets in your React components, r
 ## The Solution: Symlink Original File Names to New File Names
 
 _Note, this solution was removed in v14. If you're interested in this symlink solution, please create
-a github issue._
+a GitHub issue._
 
 ## Example from /spec/dummy
 
