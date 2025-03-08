@@ -23,6 +23,14 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### Removed
+
+- Support for React 16 and 17. [PR 1710](https://github.com/shakacode/react_on_rails/pull/1710) by [alexeyr-ci](https://github.com/alexeyr-ci).
+
+#### Breaking Changes
+
+- React >=18 is now required.
+
 ### [15.0.0] - 2025-08-28
 
 See [Release Notes](docs/release-notes/15.0.0.md) for full details.

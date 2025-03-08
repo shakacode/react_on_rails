@@ -1,12 +1,12 @@
 /* eslint-disable max-classes-per-file */
 
 import type { ReactElement } from 'react';
-import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './types/index.ts';
+import type { Root } from 'react-dom/client';
+import type { RailsContext, RegisteredComponent, RenderFunction } from './types/index.ts';
 
 import { getRailsContext, resetRailsContext } from './context.ts';
 import createReactOutput from './createReactOutput.ts';
 import { isServerRenderHash } from './isServerRenderResult.ts';
-import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from './reactApis.cts';
 import reactHydrateOrRender from './reactHydrateOrRender.ts';
 import { debugTurbolinks } from './turbolinksUtils.ts';
 import * as StoreRegistry from './StoreRegistry.ts';
@@ -100,8 +100,8 @@ class ComponentRenderer {
           return;
         }
 
-        // Hydrate if available and was server rendered
-        const shouldHydrate = supportsHydrate && !!domNode.innerHTML;
+        // Hydrate if the node was server rendered
+        const shouldHydrate = !!domNode.innerHTML;
 
         const reactElementOrRouterResult = createReactOutput({
           componentObj,
@@ -117,15 +117,12 @@ class ComponentRenderer {
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);
         } else {
-          const rootOrElement = reactHydrateOrRender(
+          this.root = reactHydrateOrRender(
             domNode,
             reactElementOrRouterResult as ReactElement,
             shouldHydrate,
           );
           this.state = 'rendered';
-          if (supportsRootApi) {
-            this.root = rootOrElement as Root;
-          }
         }
       }
     } catch (e: unknown) {
@@ -143,27 +140,8 @@ You should return a React.Component always for the client side entry point.`);
     }
     this.state = 'unmounted';
 
-    if (supportsRootApi) {
-      this.root?.unmount();
-      this.root = undefined;
-    } else {
-      const domNode = document.getElementById(this.domNodeId);
-      if (!domNode) {
-        return;
-      }
-
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-deprecated
-        unmountComponentAtNode(domNode);
-      } catch (e: unknown) {
-        const error = e instanceof Error ? e : new Error('Unknown error');
-        console.info(
-          `Caught error calling unmountComponentAtNode: ${error.message} for domNode`,
-          domNode,
-          error,
-        );
-      }
-    }
+    this.root?.unmount();
+    this.root = undefined;
   }
 
   waitUntilRendered(): Promise<void> {

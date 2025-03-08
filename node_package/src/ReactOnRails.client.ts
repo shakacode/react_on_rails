@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import type { Root } from 'react-dom/client';
 import * as ClientStartup from './clientStartup.ts';
 import { renderOrHydrateComponent, hydrateStore } from './ClientSideRenderer.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
@@ -9,7 +10,6 @@ import * as Authenticity from './Authenticity.ts';
 import type {
   RegisteredComponent,
   RenderResult,
-  RenderReturnType,
   ReactComponentOrRenderFunction,
   AuthenticityHeaders,
   Store,
@@ -64,7 +64,7 @@ globalThis.ReactOnRails = {
     return StoreRegistry.getOrWaitForStoreGenerator(name);
   },
 
-  reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType {
+  reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): Root {
     return reactHydrateOrRender(domNode, reactElement, hydrate);
   },
 
@@ -128,7 +128,7 @@ globalThis.ReactOnRails = {
     StoreRegistry.clearHydratedStores();
   },
 
-  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): RenderReturnType {
+  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): Root {
     const componentObj = ComponentRegistry.get(name);
     const reactElement = createReactOutput({ componentObj, props, domNodeId });
 
