@@ -1,13 +1,12 @@
 # Webpack Tips
 
-## Where do I learn about advanced Webpack setups, such as with "CSS Modules", "Code Splitting", etc
-You can try out example app, [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial). We're building comprehensive production examples in our new, premium product, [**React on Rails Pro**](https://forum.shakacode.com/t/introducing-react-on-rails-pro-subscriptions/785). If you're interested, please see the details in [this forum post](https://forum.shakacode.com/t/introducing-react-on-rails-pro-subscriptions/785).
+## Where can I learn about advanced Webpack setups, including e.g. "CSS Modules", "Code Splitting", etc.?
 
-## Webpack v1 or v2?
-We recommend using Webpack version 2.3.1 or greater.
+You can try our example app, [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial). We're building comprehensive production examples in our new, premium product, [**React on Rails Pro**](https://forum.shakacode.com/t/introducing-react-on-rails-pro-subscriptions/785). If you're interested, please see the details in [this forum post](https://forum.shakacode.com/t/introducing-react-on-rails-pro-subscriptions/785).
 
 ## yarn or npm?
-Yarn is the current recommendation!
+
+Yarn v1 is our current recommendation!
 
 ## Entry Points
 
@@ -15,8 +14,11 @@ You should ensure you configure the entry points correctly for webpack if you wa
 
 Webpack v2 makes this very convenient! See:
 
-* [Implicit Common Vendor Chunk](https://webpack.js.org/guides/code-splitting-libraries/#implicit-common-vendor-chunk)
-* [Manifest File](https://webpack.js.org/guides/code-splitting-libraries/#manifest-file)
+- [Implicit Common Vendor Chunk](https://webpack.js.org/guides/code-splitting-libraries/#implicit-common-vendor-chunk)
+- [Manifest File](https://webpack.js.org/guides/code-splitting-libraries/#manifest-file)
 
-## Webpack v4
-Webpack v4 is heartily recommended. If you need help with migrating your project to Webpack v4, please contact me, [justin@shakacode.com](mailto:justin@shakacode.com).
+## Webpack v5
+
+Webpack v5 is highly recommended. See [the release post](https://webpack.js.org/blog/2020-10-10-webpack-5-release/) and [the official migration documentation](https://webpack.js.org/migrate/5/).
+
+If you need help with migrating your project to Webpack v5, please contact Justin Gordon at [justin@shakacode.com](mailto:justin@shakacode.com).

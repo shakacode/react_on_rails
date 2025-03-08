@@ -1,4 +1,4 @@
-*Note: this doc reflects using Sprockets for assets and has not been updated for Shakapacker or rails/webpacker*
+_Note: this doc reflects using Sprockets for assets and has not been updated for Shakapacker or rails/webpacker_
 
 # Using Webpack bundled assets with the Rails Asset Pipeline
 
@@ -36,17 +36,16 @@ Once you have added file-loader (or whatever loader you would like to use) to yo
 2. `loader`: the name of the loader you will be using (in this doc we will be using [file-loader](https://github.com/webpack-contrib/file-loader))
 3. `query`: query parameters are additional configuration options that get passed to the loader. This can either be appended to your `loader` attribute like follows:
 
-
 ```javascript
-loader: "file-loader?name=[name].[ext]"
+loader: 'file-loader?name=[name].[ext]',
 ```
 
 or as a JSON object:
 
 ```javascript
 query: {
-  name: "[name].[ext]"
-}
+  name: '[name].[ext]',
+},
 ```
 
 both of these two example above do the exact same thing, just using different syntaxes. For the rest of this doc we will be using the JSON object style. For more information about webpack loaders, read [this](https://webpack.github.io/docs/using-loaders.html).
@@ -54,7 +53,7 @@ both of these two example above do the exact same thing, just using different sy
 _For the sake of this doc, we're also going to add a `resolve["alias"]` inside our webpack.config to make it easier to include our assets in our jsx files. In `resolve["alias"]`, simply add:_
 
 ```javascript
-'assets': path.resolve('./app/assets')
+'assets': path.resolve('./app/assets'),
 ```
 
 ##### Configuring your file-loader Query Parameters
@@ -62,7 +61,7 @@ _For the sake of this doc, we're also going to add a `resolve["alias"]` inside o
 The first property we'll want to set is our file's resulting name after bundling. For now we're just going to use:
 
 ```javascript
-name: "[name][md5:hash].[ext]"
+name: '[name][md5:hash].[ext]',
 ```
 
 This will just set the name to the file's original name + a md5 digested hash + the extension of the original file (.png, .jpg, etc).
@@ -70,7 +69,7 @@ This will just set the name to the file's original name + a md5 digested hash + 
 Next we'll set the outputPath for our files. This is the directory we want the files to be placed in after webpack runs. When Webpack runs with file-loader, all files (in this case assets) that have been used in the bundled JavaScript will be bundled and outputted to the output destination. **Keep in mind that react_on_rails outputs by default to the `app/assets/webpack/` directory so when we specify the outputPath here it will be relative the `app/assets/webpack` directory.** You can set the outputPath to whatever you want, in this example we will add it to a directory `/app/assets/webpack/webpack-assets/`, and here's how we would do that:
 
 ```javascript
-outputPath: "webpack-assets/"
+outputPath: 'webpack-assets/',
 ```
 
 Note: _You can output these files in the asset pipeline wherever you see fit. My preference is outputting somewhere inside the `app/assets/webpack/` directory just because anything in this directory is already ignored by git due to the react_on_rails generated gitignore, meaning they will not be added by git twice! (once in your `client/app/assets/` and once in your outputted path after webpack bundling)_
@@ -82,7 +81,7 @@ Note: _If you're having a hard time figuring out what an asset's path will be on
 Our publicPath setting will match the path to our outputted assets on our rails web server. Given our assets in this example will be outputted to `/app/assets/webpack/webpack-assets/` and hosted at `/assets/webpack-assets/`, our publicPath would be:
 
 ```javascript
-publicPath: "/assets/webpack-assets/"
+publicPath: '/assets/webpack-assets/',
 ```
 
 Voila! Your webpack setup is complete.
@@ -92,7 +91,8 @@ Voila! Your webpack setup is complete.
 Now for the fun part, we actually get to use our client assets now. The first thing you'll want to do is create an assets directory inside your client directory. The best place for this directory is probably at `client/app/assets`. Put any assets you want in there, images, stylesheets, whatever. Now that the assets are in place, we can simply `import` or `require` them in our jsx files for use in our components. For example:
 
 ```javascript
-import myImage from 'assets/images/my-image.png'; // This uses the assets alias we created earlier to map to the client/app/assets/ directory followed by `images/my-image.png`
+// This uses the assets alias we created earlier to map to the client/app/assets/ directory followed by `images/my-image.png`
+import myImage from 'assets/images/my-image.png';
 
 export default class MyImageBox extends React.Component {
   constructor(props, context) {
@@ -100,7 +100,7 @@ export default class MyImageBox extends React.Component {
   }
 
   render() {
-    return <img src={myImage} />
+    return <img src={myImage} />;
   }
 }
 ```
@@ -133,13 +133,11 @@ const devBuild = process.env.NODE_ENV !== 'production';
 const nodeEnv = devBuild ? 'development' : 'production';
 
 module.exports = {
-  entry: [
-    './app/bundles/HelloWorld/startup/registration',
-  ],
+  entry: ['./app/bundles/HelloWorld/startup/registration'],
 
   output: {
     filename: 'hello-world-bundle.js',
-    path: '../app/assets/webpack'
+    path: '../app/assets/webpack',
   },
 
   resolve: {
@@ -155,8 +153,8 @@ module.exports = {
     new webpack.DefinePlugin({
       'process.env': {
         NODE_ENV: JSON.stringify(nodeEnv),
-      }
-    })
+      },
+    }),
   ],
   module: {
     rules: [
@@ -173,7 +171,7 @@ module.exports = {
             shim: 'es5-shim/es5-shim',
             sham: 'es5-shim/es5-sham',
           },
-        }
+        },
       },
       {
         // The important stuff
@@ -183,12 +181,12 @@ module.exports = {
           options: {
             name: '[name][md5:hash].[ext]', // Name of bundled asset
             outputPath: 'webpack-assets/', // Output location for assets. Final: `app/assets/webpack/webpack-assets/`
-            publicPath: '/assets/webpack-assets/' // Endpoint asset can be found at on Rails server
-          }
-        }
-      }
-    ]
-  }
+            publicPath: '/assets/webpack-assets/', // Endpoint asset can be found at on Rails server
+          },
+        },
+      },
+    ],
+  },
 };
 ```
 

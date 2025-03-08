@@ -15,9 +15,7 @@ const config: KnipConfig = {
       babel: {
         config: ['node_package/babel.config.js'],
       },
-      ignore: [
-        'node_package/tests/emptyForTesting.js',
-      ],
+      ignore: ['node_package/tests/emptyForTesting.js'],
       ignoreBinaries: [
         // Knip fails to detect it's declared in devDependencies
         'nps',
@@ -27,8 +25,6 @@ const config: KnipConfig = {
       ignoreDependencies: [
         // Required for TypeScript compilation, but we don't depend on Turbolinks itself.
         '@types/turbolinks',
-        // used in package-scripts.yml
-        'concurrently',
         // The Knip ESLint plugin fails to detect these are transitively required by a config,
         // though we don't actually use its rules anywhere.
         'eslint-plugin-jsx-a11y',

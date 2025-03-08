@@ -22,8 +22,9 @@ To provide a high performance framework for integrating Ruby on Rails with React
 
 See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
 
-----
+---
 
 ## Prerequisites
+
 - Ruby on Rails >=5
 - Shakapacker 6.5.1+.

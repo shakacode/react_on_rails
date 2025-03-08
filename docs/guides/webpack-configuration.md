@@ -24,7 +24,7 @@ A key decision in your use React on Rails is whether you go with the Shakapacker
 
 Typical Shakapacker apps have a standard directory structure as documented [here](https://github.com/shakacode/shakapacker/blob/master/README.md#configuration-and-code). If you follow the steps in the the [basic tutorial](https://www.shakacode.com/react-on-rails/docs/guides/tutorial/), you will see this pattern in action. In order to customize the Webpack configuration, you need to consult with the [webpack configuration](https://www.shakacode.com/react-on-rails/docs/javascript/webpack/).
 
-The *advantage* of using Shakapacker to configure Webpack is that there is very little code needed to get started and you don't need to understand really anything about webpack customization.
+The _advantage_ of using Shakapacker to configure Webpack is that there is very little code needed to get started, and you don't need to understand really anything about webpack customization.
 
 ## Option 2: Traditional React on Rails using the /client directory
 
@@ -38,5 +38,5 @@ const { config, devServer } = require('shakapacker');
 
 You will want to consider using some of the same values set in these files:
 
-* https://github.com/shakacode/shakapacker/blob/master/package/environments/base.js
-* https://github.com/shakacode/shakapacker/blob/master/package/environments/development.js
+- https://github.com/shakacode/shakapacker/blob/master/package/environments/base.js
+- https://github.com/shakacode/shakapacker/blob/master/package/environments/development.js

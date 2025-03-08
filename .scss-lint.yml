@@ -5,47 +5,47 @@ scss_files:
 exclude:
   - 'spec/dummy/app/assets/stylesheets/application.css'
 linters:
-#  BangFormat:
-#    enabled: true
-#    space_before_bang: true
-#    space_after_bang: false
-#
-#  BorderZero:
-#    enabled: true
-#    convention: zero # or `none`
-#
+  #  BangFormat:
+  #    enabled: true
+  #    space_before_bang: true
+  #    space_after_bang: false
+  #
+  #  BorderZero:
+  #    enabled: true
+  #    convention: zero # or `none`
+  #
   ColorKeyword:
     enabled: false
   ColorVariable:
     enabled: false
-#
-#  Comment:
-#    enabled: true
-#
-#  DebugStatement:
-#    enabled: true
-#
-#  DeclarationOrder:
-#    enabled: true
-#
-#  DuplicateProperty:
-#    enabled: true
-#
-#  ElsePlacement:
-#    enabled: true
-#    style: same_line # or 'new_line'
-#
-#  EmptyLineBetweenBlocks:
-#    enabled: true
-#    ignore_single_line_blocks: true
-#
-#  EmptyRule:
-#    enabled: true
-#
-#  FinalNewline:
-#    enabled: true
-#    present: true
-#
+  #
+  #  Comment:
+  #    enabled: true
+  #
+  #  DebugStatement:
+  #    enabled: true
+  #
+  #  DeclarationOrder:
+  #    enabled: true
+  #
+  #  DuplicateProperty:
+  #    enabled: true
+  #
+  #  ElsePlacement:
+  #    enabled: true
+  #    style: same_line # or 'new_line'
+  #
+  #  EmptyLineBetweenBlocks:
+  #    enabled: true
+  #    ignore_single_line_blocks: true
+  #
+  #  EmptyRule:
+  #    enabled: true
+  #
+  #  FinalNewline:
+  #    enabled: true
+  #    present: true
+  #
   HexLength:
     enabled: true
     style: long
@@ -53,27 +53,27 @@ linters:
   HexNotation:
     enabled: true
     style: uppercase
-#
-#  HexValidation:
-#    enabled: true
-#
+  #
+  #  HexValidation:
+  #    enabled: true
+  #
   IdSelector:
     enabled: true
-#
-#  ImportantRule:
-#    enabled: true
-#
-#  ImportPath:
-#    enabled: true
-#    leading_underscore: false
-#    filename_extension: false
-#
-#  Indentation:
-#    enabled: true
-#    allow_non_nested_indentation: false
-#    character: space # or 'tab'
-#    width: 2
-#
+  #
+  #  ImportantRule:
+  #    enabled: true
+  #
+  #  ImportPath:
+  #    enabled: true
+  #    leading_underscore: false
+  #    filename_extension: false
+  #
+  #  Indentation:
+  #    enabled: true
+  #    allow_non_nested_indentation: false
+  #    character: space # or 'tab'
+  #    width: 2
+  #
   LeadingZero:
     enabled: true
     style: include_zero

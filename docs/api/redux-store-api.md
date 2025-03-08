@@ -29,7 +29,7 @@ function appStore(props, railsContext) {
 }
 
 ReactOnRails.registerStore({
-  appStore
+  appStore,
 });
 ```
 
@@ -37,7 +37,7 @@ When registering your component with React on Rails, you can get the store via `
 
 ```js
 // getStore will initialize the store if not already initialized, so creates or retrieves store
-const appStore = ReactOnRails.getStore("appStore");
+const appStore = ReactOnRails.getStore('appStore');
 return (
   <Provider store={appStore}>
     <CommentsApp />
@@ -59,19 +59,19 @@ yield
 
 Components should be created as [stateless function(al) components](https://facebook.github.io/react/docs/reusable-components.html#stateless-functions). Since you can pass in initial props via the helper `redux_store`, you do not need to pass any props directly to the component. Instead, the component hydrates by connecting to the store.
 
-**_comments.html.erb**
+**\_comments.html.erb**
 
 ```erb
 <%= react_component("CommentsApp") %>
 ```
 
-**_blogs.html.erb**
+**\_blogs.html.erb**
 
 ```erb
 <%= react_component("BlogsApp") %>
 ```
 
-*Note:* You will not be doing any partial updates to the Redux store when loading a new page. When the page content loads, React on Rails will rehydrate a new version of the store with whatever props are placed on the page.
+_Note:_ You will not be doing any partial updates to the Redux store when loading a new page. When the page content loads, React on Rails will rehydrate a new version of the store with whatever props are placed on the page.
 
 ## Controller Extension
 
@@ -82,7 +82,7 @@ Include the module `ReactOnRails::Controller` in your controller, probably in Ap
 - **store_name:** A name for the store. You'll refer to this name in 2 places in your JavaScript:
   1. You'll call `ReactOnRails.registerStore({storeName})` in the same place that you register your components.
   2. In your component definition, you'll call `ReactOnRails.getStore('storeName')` to get the hydrated Redux store to attach to your components.
-- **props:**  Named parameter `props`. ReactOnRails takes care of setting up the hydration of your store with props from the view.
+- **props:** Named parameter `props`. ReactOnRails takes care of setting up the hydration of your store with props from the view.
 
 For an example, see [spec/dummy/app/controllers/pages_controller.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/controllers/pages_controller.rb). Note: this is preferable to using the equivalent view_helper `redux_store` in that you can be assured that the store is initialized before your components.
 
@@ -98,5 +98,5 @@ Place this view helper (no parameters) at the end of your shared layout so React
 
 # More Details
 
-* [lib/react_on_rails/controller.rb](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/controller.rb) source
-* [lib/react_on_rails/helper.rb](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/helper.rb) source
+- [lib/react_on_rails/controller.rb](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/controller.rb) source
+- [lib/react_on_rails/helper.rb](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/helper.rb) source

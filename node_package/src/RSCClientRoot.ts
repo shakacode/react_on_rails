@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
@@ -17,7 +17,7 @@ export type RSCClientRootProps = {
   componentName: string;
   rscPayloadGenerationUrlPath: string;
   componentProps?: unknown;
-}
+};
 
 const createFromFetch = async (fetchPromise: Promise<Response>) => {
   const response = await fetchPromise;
@@ -27,13 +27,13 @@ const createFromFetch = async (fetchPromise: Promise<Response>) => {
   }
   const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream);
   return createFromReadableStream<React.ReactNode>(transformedStream);
-}
+};
 
 const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath, componentProps }: RSCClientRootProps) => {
   const propsString = JSON.stringify(componentProps);
   const strippedUrlPath = rscPayloadGenerationUrlPath.replace(/^\/|\/$/g, '');
   return createFromFetch(fetch(`/${strippedUrlPath}/${componentName}?props=${propsString}`));
-}
+};
 
 /**
  * RSCClientRoot is a React component that handles client-side rendering of React Server Components (RSC).
@@ -48,12 +48,12 @@ const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath, componentProps }
  * @requires React 19+
  * @requires react-on-rails-rsc
  */
-const RSCClientRoot: RenderFunction = async ({
-  componentName,
-  rscPayloadGenerationUrlPath,
-  componentProps,
-}: RSCClientRootProps, _railsContext?: RailsContext, domNodeId?: string) => {
-  const root = await fetchRSC({ componentName, rscPayloadGenerationUrlPath, componentProps })
+const RSCClientRoot: RenderFunction = async (
+  { componentName, rscPayloadGenerationUrlPath, componentProps }: RSCClientRootProps,
+  _railsContext?: RailsContext,
+  domNodeId?: string,
+) => {
+  const root = await fetchRSC({ componentName, rscPayloadGenerationUrlPath, componentProps });
   if (!domNodeId) {
     throw new Error('RSCClientRoot: No domNodeId provided');
   }
@@ -70,6 +70,6 @@ const RSCClientRoot: RenderFunction = async ({
   // However, the returned value of renderFunction is not used in ReactOnRails
   // TODO: fix this behavior
   return '';
-}
+};
 
 export default RSCClientRoot;

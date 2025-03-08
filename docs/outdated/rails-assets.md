@@ -1,18 +1,19 @@
 # Rails assets and the Extract Text Plugin
 
-*This doc needs updating for the use of  Shakapacker or rails/webpacker with React on Rails*
+_This doc needs updating for the use of Shakapacker or rails/webpacker with React on Rails_
 
 The [Webpack file loader](https://github.com/webpack/file-loader) copies referenced files to
 the destination output directory, with an MD5 hash. The other term for this is a "digest".
 
 > By default the filename of the resulting file is the MD5 hash of the file's contents with
-the original extension of the required resource.
+> the original extension of the required resource.
 
 The most common use cases for Webpack processed files are images used for backgrounds in
 CSS and fonts for CSS. However, this applies to any file that might be processed using the
 Webpack file loader.
 
 ## The Problem
+
 To understand the problem, it helps to read this article:
 [What is fingerprinting and why should I care](http://guides.rubyonrails.org/asset_pipeline.html#what-is-fingerprinting-and-why-should-i-care-questionmark)
 Basically, when Rails prepares assets for production deployments, it also adds a digest
@@ -33,6 +34,7 @@ fail to load.
 _If you are interested in learning how to use assets in your React components, read this doc: [Webpack, the Asset Pipeline, and Using Assets w/ React](https://www.shakacode.com/react-on-rails/docs/outdated/rails-assets-relative-paths/)_
 
 ## The Solution: Symlink Original File Names to New File Names
+
 _Note, this solution was removed in v14. If you're interested in this symlink solution, please create
 a github issue._
 

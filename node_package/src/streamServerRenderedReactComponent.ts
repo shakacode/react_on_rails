@@ -20,18 +20,18 @@ const stringToStream = (str: string): Readable => {
 type BufferdEvent = {
   event: 'data' | 'error' | 'end';
   data: unknown;
-}
+};
 
 /**
  * Creates a new Readable stream that safely buffers all events from the input stream until reading begins.
- * 
+ *
  * This function solves two important problems:
  * 1. Error handling: If an error occurs on the source stream before error listeners are attached,
  *    it would normally crash the process. This wrapper buffers error events until reading begins,
  *    ensuring errors are properly handled once listeners are ready.
  * 2. Event ordering: All events (data, error, end) are buffered and replayed in the exact order
  *    they were received, maintaining the correct sequence even if events occur before reading starts.
- * 
+ *
  * @param stream - The source Readable stream to buffer
  * @returns {Object} An object containing:
  *   - stream: A new Readable stream that will buffer and replay all events
@@ -41,7 +41,7 @@ const bufferStream = (stream: Readable) => {
   const bufferedEvents: BufferdEvent[] = [];
   let startedReading = false;
 
-  const listeners = (['data', 'error', 'end'] as const).map(event => {
+  const listeners = (['data', 'error', 'end'] as const).map((event) => {
     const listener = (data: unknown) => {
       if (!startedReading) {
         bufferedEvents.push({ event, data });
@@ -72,10 +72,10 @@ const bufferStream = (stream: Readable) => {
       bufferedEvents.forEach(handleEvent);
 
       // Attach new listeners for future events
-      (['data', 'error', 'end'] as const).forEach(event => {
+      (['data', 'error', 'end'] as const).forEach((event) => {
         stream.on(event, (data: unknown) => handleEvent({ event, data }));
       });
-    }
+    },
   });
 
   return {
@@ -87,7 +87,7 @@ const bufferStream = (stream: Readable) => {
         bufferedEvents.push({ event: 'error', data: error });
       }
     },
-  }
+  };
 };
 
 export const transformRenderStreamChunksToResultObject = (renderState: StreamRenderState) => {
@@ -104,7 +104,7 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
 
       this.push(`${jsonChunk}\n`);
       callback();
-    }
+    },
   });
 
   let pipedStream: ReactDOMServer.PipeableStream | null = null;
@@ -123,25 +123,20 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   const endStream = () => {
     transformStream.end();
     pipedStream?.abort();
-  }
+  };
   return { readableStream, pipeToTransform, writeChunk, emitError, endStream };
-}
+};
 
 const streamRenderReactComponent = (reactRenderingResult: ReactElement, options: RenderParams) => {
   const { name: componentName, throwJsErrors, domNodeId } = options;
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
-    isShellReady: false
+    isShellReady: false,
   };
 
-  const {
-    readableStream,
-    pipeToTransform,
-    writeChunk,
-    emitError,
-    endStream
-  } = transformRenderStreamChunksToResultObject(renderState);
+  const { readableStream, pipeToTransform, writeChunk, emitError, endStream } =
+    transformRenderStreamChunksToResultObject(renderState);
 
   const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderingResult, {
     onShellError(e) {
@@ -176,16 +171,13 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement, options:
   });
 
   return readableStream;
-}
+};
 
-type StreamRenderer<T, P extends RenderParams> = (
-  reactElement: ReactElement,
-  options: P,
-) => T;
+type StreamRenderer<T, P extends RenderParams> = (reactElement: ReactElement, options: P) => T;
 
 export const streamServerRenderedComponent = <T, P extends RenderParams>(
   options: P,
-  renderStrategy: StreamRenderer<T, P>
+  renderStrategy: StreamRenderer<T, P>,
 ): T => {
   const { name: componentName, domNodeId, trace, props, railsContext, throwJsErrors } = options;
 
@@ -213,11 +205,14 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
 
     const error = convertToError(e);
     const htmlResult = handleError({ e: error, name: componentName, serverSide: true });
-    const jsonResult = JSON.stringify(createResultObject(htmlResult, buildConsoleReplay(), { hasErrors: true, error, result: null }));
+    const jsonResult = JSON.stringify(
+      createResultObject(htmlResult, buildConsoleReplay(), { hasErrors: true, error, result: null }),
+    );
     return stringToStream(jsonResult) as T;
   }
 };
 
-const streamServerRenderedReactComponent = (options: RenderParams): Readable => streamServerRenderedComponent(options, streamRenderReactComponent);
+const streamServerRenderedReactComponent = (options: RenderParams): Readable =>
+  streamServerRenderedComponent(options, streamRenderReactComponent);
 
 export default streamServerRenderedReactComponent;
