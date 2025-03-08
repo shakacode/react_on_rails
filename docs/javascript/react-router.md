@@ -37,7 +37,7 @@ For a fleshed out integration of react_on_rails with react-router, check out [Re
 Your Render-Function may not return an object with the property `renderedHtml`. Thus, you call
 `renderToString()` and return an object with this property.
 
-This example **only applies to server rendering** and should be only used in the server side bundle.
+This example **only applies to server-side rendering** and should only be used in the server-side bundle.
 
 From the [original example in the ReactRouter docs](https://github.com/ReactTraining/react-router/blob/v4.3.1/packages/react-router-dom/docs/guides/server-rendering.md)
 
@@ -76,4 +76,5 @@ const ReactServerRenderer = (props, railsContext) => {
     // we're good, send the response
     return { renderedHtml: html };
   }
+};
 ```

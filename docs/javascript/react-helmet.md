@@ -89,10 +89,10 @@ ReactOnRails.register({
 ```
 
 Now when the `react_component_hash` helper is called with **"ReactHelmetApp"** as a first argument it
-will return a hash instead of HTML string. Note, there is no need to specify "prerender" as it would not
+will return a hash instead of an HTML string. Note, there is no need to specify "prerender" as it would not
 make sense to use react_component_hash without server rendering:
 
-```ruby
+```erb
 <% react_helmet_app = react_component_hash("ReactHelmetApp", props: { hello: "world" }, trace: true) %>
 
 <% content_for :title do %>
@@ -104,6 +104,6 @@ make sense to use react_component_hash without server rendering:
 
 So now we're able to insert received title tag to our application layout:
 
-```ruby
+```erb
  <%= yield(:title) if content_for?(:title) %>
 ```

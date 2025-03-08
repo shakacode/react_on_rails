@@ -6,7 +6,7 @@ if you would be interested in help with code splitting using
 
 ---
 
-What is code splitting? From the webpack documentation:
+What is code splitting? From the Webpack documentation:
 
 > For big web apps it’s not efficient to put all code into a single file, especially if some blocks of code are only required under some circumstances. Webpack has a feature to split your codebase into “chunks” which are loaded on demand. Some other bundlers call them “layers”, “rollups”, or “fragments”. This feature is called “code splitting”.
 
@@ -24,7 +24,7 @@ Different markup is generated on the client than on the server. Why does this ha
 
 ### The solution
 
-To prevent this, you have to wait until the code chunk is fetched before doing the initial render on the client side. To accomplish this, react on rails allows you to register a renderer. This works just like registering a Render-Function, except that the function you pass takes three arguments: `renderer(props, railsContext, domNodeId)`, and is responsible for calling `ReactDOM.render` or `ReactDOM.hydrate` to render the component to the DOM. React on rails will automatically detect when a Render-Function takes three arguments, and will **not** call `ReactDOM.render` or `ReactDOM.hydrate`, instead allowing you to control the initial render yourself. Note, you have to be careful to call `ReactDOM.hydrate` rather than `ReactDOM.render` if you are server rendering.
+To prevent this, you have to wait until the code chunk is fetched before doing the initial render on the client side. To accomplish this, React on Rails allows you to register a renderer. This works just like registering a Render-Function, except that the function you pass takes three arguments: `renderer(props, railsContext, domNodeId)`, and is responsible for calling `ReactDOM.render` or `ReactDOM.hydrate` to render the component to the DOM. React on Rails will automatically detect when a Render-Function takes three arguments, and will **not** call `ReactDOM.render` or `ReactDOM.hydrate`, instead allowing you to control the initial render yourself. Note, you have to be careful to call `ReactDOM.hydrate` rather than `ReactDOM.render` if you are server rendering.
 
 Here's an example of how you might use this in practice:
 
@@ -134,15 +134,15 @@ See:
 
 ### Caveats
 
-If you're going to try to do code splitting with server rendered routes, you'll probably need to use separate route definitions for client and server to prevent code splitting from happening for the server bundle. The server bundle should be one file containing all the JavaScript code. This will require you to have separate webpack configurations for client and server.
+If you're going to try to do code splitting with server-rendered routes, you'll probably need to use separate route definitions for client and server to prevent code splitting from happening for the server bundle. The server bundle should be one file containing all the JavaScript code. This will require you to have separate Webpack configurations for client and server.
 
 The reason is we do server rendering with ExecJS, which is not capable of doing anything asynchronous. It would be impossible to asynchronously fetch a code chunk while server rendering. See [this issue](https://github.com/shakacode/react_on_rails/issues/477) for a discussion.
 
-Also, do not attempt to register a renderer function on the server. Instead, register either a Render-Function or a component. If you register a renderer in the server bundle, you'll get an error when react on rails tries to server render the component.
+Also, do not attempt to register a renderer function on the server. Instead, register either a Render-Function or a component. If you register a renderer in the server bundle, you'll get an error when React on Rails tries to server render the component.
 
 ## How does Webpack know where to find my code chunks?
 
-Add the following to the output key of your webpack config:
+Add the following to the output key of your Webpack config:
 
 ```js
 config = {
@@ -152,11 +152,11 @@ config = {
 };
 ```
 
-This causes Webpack to prepend the code chunk filename with `/assets/` in the request url. The react on rails sets up the webpack config to put webpack bundles in `app/assets/javascripts/webpack`, and modifies `config/initializers/assets.rb` so that rails detects the bundles. This means that when we prepend the request url with `/assets/`, rails will know what webpack is asking for.
+This causes Webpack to prepend the code chunk filename with `/assets/` in the request url. The React on Rails sets up the Webpack config to put Webpack bundles in `app/assets/javascripts/webpack`, and modifies `config/initializers/assets.rb` so that rails detects the bundles. This means that when we prepend the request URL with `/assets/`, rails will know what Webpack is asking for.
 
-See [our rails assets documentation](https://www.shakacode.com/react-on-rails/docs/outdated/rails-assets/) to learn more about static assets.
+See [our Rails assets documentation](https://www.shakacode.com/react-on-rails/docs/outdated/rails-assets/) to learn more about static assets.
 
-If you forget to set the public path, webpack will request the code chunk at `/{filename}`. This will cause the request to be handled by the Rails router, which will send back a 404 response, assuming that you don't have a catch-all route. In your javascript console, you'll get the following error:
+If you forget to set the public path, Webpack will request the code chunk at `/{filename}`. This will cause the request to be handled by the Rails router, which will send back a 404 response, assuming that you don't have a catch-all route. In your JavaScript console, you'll get the following error:
 
 > GET http://localhost:3000/1.1-bundle.js
 

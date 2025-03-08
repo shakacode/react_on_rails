@@ -36,7 +36,7 @@ Here is the new link:
 
 ## **Additional Details**
 
-- [Migration from react-rails](./docs/guides/migrating-from-react-rails.md)
+- [Migration from `react-rails`](./docs/guides/migrating-from-react-rails.md)
 - [Generator Details](docs/guides/generator-details.md)
 - [Updating Dependencies](./docs/additional-reading/updating-dependencies.md)
 - [Manual Installation Overview](docs/outdated/manual-installation-overview.md)

@@ -60,7 +60,7 @@ Trying out **React on Rails** is super easy, so long as you have the basic prere
 
 Then we need to create a fresh Rails application as follows.
 
-First, be sure to run `rails -v` and check you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install webpacker with react per the instructions [here](https://github.com/rails/webpacker).
+First, be sure to run `rails -v` and check you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install Webpacker with React per the instructions [here](https://github.com/rails/webpacker).
 
 ```bash
 # For Rails 6.x
@@ -113,7 +113,7 @@ one by one or enter `a` to replace all configuration files required by the proje
 You can check the diffs before you commit to see what changed.
 
 Note, using `redux` is no longer recommended as the basic installer uses React Hooks.
-If you want the redux install, run:
+If you want the Redux install, run:
 
 ```bash
 rails generate react_on_rails:install --redux

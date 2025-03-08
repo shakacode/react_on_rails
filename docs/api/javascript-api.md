@@ -22,15 +22,15 @@ The best source of docs is the main [ReactOnRails.ts](https://github.com/shakaco
 
 ```js
 /**
- * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
+ * Main entry point to using the react-on-rails NPM package. This is how Rails will be able to
  * find you components for rendering. Components get called with props, or you may use a
  * "Render-Function" to return a React component or an object with the following shape:
  * { renderedHtml, redirectLocation, error }.
  * For server rendering, if you wish to return multiple HTML strings from a Render-Function,
- * you may return an Object from your Render-Function with a single top level property of
- * renderedHtml. Inside this Object, place a key called componentHtml, along with any other
- * needed keys. This is useful when you using side effects libraries like react helmet.
- * Your Ruby code with get this Object as a Hash containing keys componentHtml and any other
+ * you may return an object from your Render-Function with a single top level property of
+ * renderedHtml. Inside this object, place a key called componentHtml, along with any other
+ * needed keys. This is useful when you using side effects libraries like React Helmet.
+ * Your Ruby code with get this object as a Hash containing keys componentHtml and any other
  * custom keys that you added:
  * { renderedHtml: { componentHtml, customKey1, customKey2 } }
  * See the example in https://www.shakacode.com/react-on-rails/docs/javascript/react-helmet
@@ -39,9 +39,9 @@ The best source of docs is the main [ReactOnRails.ts](https://github.com/shakaco
 register(components);
 
 /**
- * Allows registration of store generators to be used by multiple react components on one Rails
- * view. store generators are functions that take one arg, props, and return a store. Note that
- * the setStore API is different in tha it's the actual store hydrated with props.
+ * Allows registration of store generators to be used by multiple React components on one Rails
+ * view. Store generators are functions that take one arg, props, and return a store. Note that
+ * the setStore API is different in that it's the actual store hydrated with props.
  * @param stores (key is store name, value is the store generator)
  */
 registerStore(stores);
@@ -74,7 +74,7 @@ reactHydrateOrRender(domNode, reactElement, hydrate);
 setOptions(options);
 
 /**
- * Allow directly calling the page loaded script in case the default events that trigger react
+ * Allow directly calling the page loaded script in case the default events that trigger React
  * rendering are not sufficient, such as when loading JavaScript asynchronously with TurboLinks:
  * More details can be found here:
  * https://www.shakacode.com/react-on-rails/docs/rails/turbolinks

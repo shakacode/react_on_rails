@@ -2,22 +2,22 @@
 
 ## Render-Functions
 
-When you use a render-function to create react components (or renderedHtml on the server), or you
-used shared redux stores, you get two params passed to your function that creates a React component:
+When you use a render-function to create React components (or `renderedHtml` on the server), or you
+use shared Redux stores, you get two params passed to your function that creates a React component:
 
 1. `props`: Props that you pass in the view helper of either `react_component` or `redux_store`
 2. `railsContext`: Rails contextual information, such as the current pathname. You can customize
    this in your config file. **Note**: The `railsContext` is not related to the concept of a
    ["context" for React components](https://facebook.github.io/react/docs/context.html#how-to-use-context).
 
-These parameters (`props` and `railsContext`) will be the same regardless of either client or server
-side rendering, except for the key `serverSide` based on whether or not you are server rendering.
+These parameters (`props` and `railsContext`) will be the same for client- and server-side rendering,
+except for the property `railsContext.serverSide` which tells you which one it is.
 
 While you could manually configure your Rails code to pass the "`railsContext` information" with
 the rest of your "props", the `railsContext` is a convenience because it's passed consistently to
 all invocations of Render-Functions.
 
-For example, suppose you create a "render-function" called MyAppComponent.
+For example, suppose you create a "render-function" called `MyAppComponent`.
 
 ```js
 import React from 'react';
@@ -39,7 +39,7 @@ export default MyAppComponent;
 
 ---
 
-_This would be alternate API where you have to call React.createElement and the React on Rails code doesn't do that._
+_This would be an alternate API where you have to call React.`createElement` and the React on Rails code doesn't do that._
 
 ```js
 import React from 'react';
@@ -68,7 +68,7 @@ So if you register your render-function `MyAppComponent`, it will get called lik
 reactComponent = MyAppComponent(props, railsContext);
 ```
 
-and, similarly, any redux store is always initialized with 2 parameters:
+Similarly, any Redux store is always initialized with 2 parameters:
 
 ```js
 reduxStore = MyReduxStore(props, railsContext);
@@ -76,7 +76,7 @@ reduxStore = MyReduxStore(props, railsContext);
 
 Note: you never make these calls. React on Rails makes these calls when it does either client or server rendering. You will define functions that take these 2 params and return a React component or a Redux Store. Naturally, you do not have to use second parameter of the railsContext if you do not need it. If you don't take a second parameter, then you're probably defining a React function component and you will simply return a React Element, often just JSX.
 
-(Note: see below [section](#multiple-react-components-on-a-page-with-one-store) on how to setup redux stores that allow multiple components to talk to the same store.)
+(Note: see below [section](#multiple-react-components-on-a-page-with-one-store) on how to set up Redux stores that allow multiple components to talk to the same store.)
 
 The `railsContext` has: (see implementation in file [ReactOnRails::Helper](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/helper.rb), method `rails_context` for the definitive list).
 
@@ -138,7 +138,7 @@ export default (props, railsContext) => {
 
 ## Why is the railsContext only passed to render-functions?
 
-There's no reason that the railsContext would ever get passed to your React component unless the value is explicitly put into the props used for rendering. If you create a react component, rather than a render-function, for use by React on Rails, then you get whatever props are passed in from the view helper, which **does not include the Rails Context**. It's trivial to wrap your component in a "render-function" to return a new component that takes both:
+There's no reason that the railsContext would ever get passed to your React component unless the value is explicitly put into the props used for rendering. If you create a React component, rather than a render-function, for use by React on Rails, then you get whatever props are passed in from the view helper, which **does not include the Rails Context**. It's trivial to wrap your component in a "render-function" to return a new component that takes both:
 
 ```js
 import React from 'react';
@@ -163,7 +163,7 @@ The outer `{...` is for the [JSX spread operator for attributes](https://faceboo
 
 ### Heroku Preboot Considerations
 
-[Heroku Preboot](https://devcenter.heroku.com/articles/preboot) is a feature on Heroku that allows for faster deploy times. When you promote your staging app to production, Preboot simply switches the production server to point at the staging app's container. This means it can deploy much faster since it doesn't have to rebuild anything. However, this means that if you use the [Define Plugin](https://github.com/webpack/docs/wiki/list-of-plugins#defineplugin) to provide the rails environment to your client code as a variable, that variable will erroneously still have a value of `Staging` instead of `Production`. The `Rails.env` provided at runtime in the railsContext is, however, accurate.
+[Heroku Preboot](https://devcenter.heroku.com/articles/preboot) is a feature on Heroku that allows for faster deploy times. When you promote your staging app to production, Preboot simply switches the production server to point at the staging app's container. This means it can deploy much faster since it doesn't have to rebuild anything. However, this means that if you use the [Define Plugin](https://github.com/webpack/docs/wiki/list-of-plugins#defineplugin) to provide the Rails environment to your client code as a variable, that variable will erroneously still have a value of `Staging` instead of `Production`. The `Rails.env` provided at runtime in the railsContext is, however, accurate.
 
 ### Needing the current URL path for server rendering
 

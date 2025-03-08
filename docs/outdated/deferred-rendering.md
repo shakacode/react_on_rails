@@ -5,7 +5,7 @@ Please see [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) i
 
 ---
 
-What is code splitting? From the webpack documentation:
+What is code splitting? From the Webpack documentation:
 
 > For big web apps it’s not efficient to put all code into a single file, especially if some blocks of code are only required under some circumstances. Webpack has a feature to split your codebase into “chunks” which are loaded on demand. Some other bundlers call them “layers”, “rollups”, or “fragments”. This feature is called “code splitting”.
 
@@ -23,13 +23,13 @@ Different markup is generated on the client than on the server. Why does this ha
 
 ## Solution
 
-To prevent this, you have to wait until the code chunk is fetched before doing the initial render on the client side. To accomplish this, react on rails allows you to register a renderer. This works just like registering a Render-Function, except that the function you pass takes three arguments: `renderer(props, railsContext, domNodeId)`, and is responsible for calling `ReactDOM.render` or `ReactDOM.hydrate` to render the component to the DOM. React on rails will automatically detect when a Render-Function takes three arguments, and will **not** call `ReactDOM.render` or `ReactDOM.hydrate`, instead allowing you to control the initial render yourself. Note, you have to be careful to call `ReactDOM.hydrate` rather than `ReactDOM.render` if you are server rendering.
+To prevent this, you have to wait until the code chunk is fetched before doing the initial render on the client side. To accomplish this, React on Rails allows you to register a renderer. This works just like registering a Render-Function, except that the function you pass takes three arguments: `renderer(props, railsContext, domNodeId)`, and is responsible for calling `ReactDOM.render` or `ReactDOM.hydrate` to render the component to the DOM. React on rails will automatically detect when a Render-Function takes three arguments, and will **not** call `ReactDOM.render` or `ReactDOM.hydrate`, instead allowing you to control the initial render yourself. Note, you have to be careful to call `ReactDOM.hydrate` rather than `ReactDOM.render` if you are server rendering.
 
 ## Server vs. Client Code Caveats
 
-If you're going to try to do code splitting with server rendered routes, you'll probably need to use separate route definitions for client and server to prevent code splitting from happening for the server bundle. The server bundle should be one file containing all the JavaScript code. This will require you to have separate webpack configurations for client and server.
+If you're going to try to do code splitting with server rendered routes, you'll probably need to use separate route definitions for client and server to prevent code splitting from happening for the server bundle. The server bundle should be one file containing all the JavaScript code. This will require you to have separate Webpack configurations for client and server.
 
-Do not attempt to register a renderer function on the server. Instead, register either a Render-Function or a component. If you register a renderer in the server bundle, you'll get an error when react on rails tries to server render the component.
+Do not attempt to register a renderer function on the server. Instead, register either a Render-Function or a component. If you register a renderer in the server bundle, you'll get an error when React on Rails tries to server render the component.
 
 ## React on Rails Pro
 

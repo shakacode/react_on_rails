@@ -1,10 +1,12 @@
 # Redux Store
 
-_This redux API is no longer recommended as it prevents dynamic code splitting for performance. Instead, you should use the standard react_component view helper passing in a "Render-Function."_
+> [!WARNING]
+>
+> This Redux API is no longer recommended as it prevents dynamic code splitting for performance. Instead, you should use the standard `react_component` view helper passing in a "Render-Function."
 
-You don't need to use the `redux_store` api to use redux. This api was setup to support multiple calls to `react_component` on one page that all talk to the same redux store.
+You don't need to use the `redux_store` api to use Redux. This API was set up to support multiple calls to `react_component` on one page that all talk to the same Redux store.
 
-If you are only rendering one react component on a page, as is typical to do a "Single Page App" in React, then you should _probably_ pass the props to your React component in a "Render-Function."
+If you are only rendering one React component on a page, as is typical to do a "Single Page App" in React, then you should _probably_ pass the props to your React component in a "Render-Function."
 
 Consider using the `redux_store` helper for the two following use cases:
 

@@ -29,7 +29,7 @@ _Please support the project by [emailing Justin Gordon](mailto:justin@shakacode.
 - **[Deliveroo](https://deliveroo.co.uk/)**: The leading food delivery site in Europe has gone live with React on Rails, with multi-lingual JavaScript support!
   ![2016-05-03_19-18-34](https://cloud.githubusercontent.com/assets/1118459/15027253/91fd151a-11de-11e6-93e3-720518995fe0.png)
 - **[Airgoat](https://airgoat.com/)**: Marketplace for sneakers.
-- **[Apprentus](https://www.apprentus.com/)**: A marketplace to find the best private teachers. Using react-on-rails from the homepage to infinity!
+- **[Apprentus](https://www.apprentus.com/)**: A marketplace to find the best private teachers. Using React on Rails from the homepage to infinity!
 - **[Confident Financial Solutions](https://www.mycfsapp.com/)**: Auto Repair Financing to help people get back on the road and back to life.
 - **[Flyhomes](https://www.flyhomes.com/)**: Real estate brokerage service that awards frequent flyer miles.
 - **[Undeveloped](https://undeveloped.com/)**: Buy and sell domain names. ![image](https://cloud.githubusercontent.com/assets/1118459/19623703/7c6d63d0-9870-11e6-83f2-8b83ca49daa9.png)
@@ -48,10 +48,6 @@ _Please support the project by [emailing Justin Gordon](mailto:justin@shakacode.
 - [reactrails.com](http://www.reactrails.com), source code [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/)
 - [Relay Rails Blog](https://github.com/gauravtiwari/relay-rails-blog): Tutorial to learn Relay with Rails.
 - [Hot Module Replacement with react_on_rails](https://medium.com/@hrishio/lesson-5-hot-module-replacement-for-react-in-rails-using-the-react-on-rails-gem-643c5b01f3d7#.ehevxok16) : Step-by-step tutorial for a quick basic set up of hot asset reloading with HMR in a Rails 5 app. [Code on Github](https://github.com/learnetto/calreact-hmr).....
-
-## Per Github.
-
----
 
 ## Projects Based on React on Rails
 

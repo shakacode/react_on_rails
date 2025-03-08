@@ -55,7 +55,7 @@ See [Release Notes](docs/release-notes/15.0.0.md) for full details.
 
 #### Fixed
 
-- Separated streamServerRenderedReactComponent from the ReactOnRails object in order to stop users from getting errors during webpack compilation about needing the `stream-browserify` package. [PR 1680](https://github.com/shakacode/react_on_rails/pull/1680) by [judahmeek](https://github.com/judahmeek).
+- Separated streamServerRenderedReactComponent from the ReactOnRails object in order to stop users from getting errors during Webpack compilation about needing the `stream-browserify` package. [PR 1680](https://github.com/shakacode/react_on_rails/pull/1680) by [judahmeek](https://github.com/judahmeek).
 - Removed obsolete `js-yaml` peer dependency. [PR 1678](https://github.com/shakacode/react_on_rails/pull/1678) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
 ### [14.1.0] - 2025-01-06
@@ -163,7 +163,7 @@ _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigL
 
 #### Fixed
 
-- Fixed race condition where a react component could attempt to initialize before it had been registered. [PR 1540](https://github.com/shakacode/react_on_rails/pull/1540) by [judahmeek](https://github.com/judahmeek).
+- Fixed race condition where a React component could attempt to initialize before it had been registered. [PR 1540](https://github.com/shakacode/react_on_rails/pull/1540) by [judahmeek](https://github.com/judahmeek).
 
 ### [13.3.4] - 2023-05-23
 
@@ -202,7 +202,7 @@ _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigL
 #### Fixed
 
 - Fixed pack not found warning while using `react_component` and `react_component_hash` helpers, even when corresponding chunks are present. [PR 1511](https://github.com/shakacode/react_on_rails/pull/1511) by [pulkitkkr](https://github.com/pulkitkkr).
-- Fixed FS-based packs generation functionality to trigger pack generation on the creation of a new react component inside `components_subdirectory`. [PR 1506](https://github.com/shakacode/react_on_rails/pull/1506) by [pulkitkkr](https://github.com/pulkitkkr).
+- Fixed FS-based packs generation functionality to trigger pack generation on the creation of a new React component inside `components_subdirectory`. [PR 1506](https://github.com/shakacode/react_on_rails/pull/1506) by [pulkitkkr](https://github.com/pulkitkkr).
 - Upgrade several JS dependencies to fix security issues. [PR 1514](https://github.com/shakacode/react_on_rails/pull/1514) by [ahangarha](https://github.com/ahangarha).
 
 #### Added
@@ -297,12 +297,12 @@ _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigL
 #### Added
 
 - Support for React 18, including the changed SSR API. [PR 1409](https://github.com/shakacode/react_on_rails/pull/1409) by [kylemellander](https://github.com/kylemellander).
-- Added webpack configuration files as part of the generator and updated webpacker to version 6. [PR 1404](https://github.com/shakacode/react_on_rails/pull/1404) by [gscarv13](https://github.com/gscarv13).
+- Added Webpack configuration files as part of the generator and updated webpacker to version 6. [PR 1404](https://github.com/shakacode/react_on_rails/pull/1404) by [gscarv13](https://github.com/gscarv13).
 - Supports Rails 7.
 
 #### Changed
 
-- Changed logic of determining the usage of the default rails/webpacker webpack config or a custom command to only check if the config.build_production_command is defined. [PR 1402](https://github.com/shakacode/react_on_rails/pull/1402) by [justin808](https://github.com/justin808) and [gscarv13](https://github.com/gscarv13).
+- Changed logic of determining the usage of the default rails/webpacker Webpack config or a custom command to only check if the config.build_production_command is defined. [PR 1402](https://github.com/shakacode/react_on_rails/pull/1402) by [justin808](https://github.com/justin808) and [gscarv13](https://github.com/gscarv13).
 - Minimum required Ruby is 2.7 to match latest rails/webpacker.
 
 ### [12.4.0] - 2021-09-22
@@ -328,7 +328,7 @@ _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigL
 
 #### Added
 
-- Ability to configure server react rendering to throw rather than just logging the error. Useful for
+- Ability to configure server React rendering to throw rather than just logging the error. Useful for
   React on Rails Pro Node rendering [PR 1365](https://github.com/shakacode/react_on_rails/pull/1365) by [justin808](https://github.com/justin808).
 
 ### [12.1.0] - 2021-03-23
@@ -394,12 +394,12 @@ for details.
 
 #### Other Updates
 
-- `react_on_rails` fully supports `rails/webpacker`. The example test app in `spec/dummy` was recently converted over to use rails/webpacker v4+. It's a good example of how to leverage rails/webpacker's webpack configuration for server-side rendering.
+- `react_on_rails` fully supports `rails/webpacker`. The example test app in `spec/dummy` was recently converted over to use rails/webpacker v4+. It's a good example of how to leverage rails/webpacker's Webpack configuration for server-side rendering.
 - Changed the precompile task to use the rails/webpacker one by default
 - Updated generators to use React hooks
 - Requires the use of rails/webpacker view helpers
-- If the webpacker webpack config files exist, then React on Rails will not override the default
-  assets:precompile setup by rails/webpacker. If you are not using the rails/webpacker setup for webpack,
+- If the webpacker Webpack config files exist, then React on Rails will not override the default
+  assets:precompile set up by rails/webpacker. If you are not using the rails/webpacker setup for Webpack,
   then be sure to remove the JS files inside of config/webpack, like `config/webpack/production.js.`
 - Removed **env_javascript_include_tag** and **env_stylesheet_link_tag** as these are replaced by view helpers
   from rails/webpacker
@@ -424,8 +424,8 @@ for details.
 
   [PR 1271](https://github.com/shakacode/react_on_rails/pull/1271) by [ashgaliyev](https://github.com/ashgaliyev).
 
-* Added Typescript definitions to the Node package. By [justin808](https://github.com/justin808) and [judahmeek](https://github.com/judahmeek) in [PR 1287](https://github.com/shakacode/react_on_rails/pull/1287).
-* Removed restriction to keep the server bundle in the same directory with the client bundles. Rails/webpacker 4 has an advanced cleanup that will remove any files in the directory of other webpack files. Removing this restriction allows the server bundle to be created in a sibling directory. By [justin808](https://github.com/shakacode/react_on_rails/pull/1240).
+- Added Typescript definitions to the Node package. By [justin808](https://github.com/justin808) and [judahmeek](https://github.com/judahmeek) in [PR 1287](https://github.com/shakacode/react_on_rails/pull/1287).
+- Removed restriction to keep the server bundle in the same directory with the client bundles. Rails/webpacker 4 has an advanced cleanup that will remove any files in the directory of other Webpack files. Removing this restriction allows the server bundle to be created in a sibling directory. By [justin808](https://github.com/shakacode/react_on_rails/pull/1240).
 
 ### [11.3.0] - 2019-05-24
 
@@ -674,7 +674,7 @@ Do not use. Unpublished. Caused by an issue with the release script.
 
 #### Fixed
 
-- Use redux component in generated redux Hello World example: [PR 1006](https://github.com/shakacode/react_on_rails/pull/1006) by [lewaabahmad](https://github.com/lewaabahmad).
+- Use Redux component in the generated Redux Hello World example: [PR 1006](https://github.com/shakacode/react_on_rails/pull/1006) by [lewaabahmad](https://github.com/lewaabahmad).
 - Fixed `Utils.bundle_js_file_path` generating the incorrect path for `manifest.json` in webpacker projects: [Issue #1011](https://github.com/shakacode/react_on_rails/issues/1011) by [elstgav](https://github.com/elstgav)
 
 ### [10.0.2] - 2017-11-10
@@ -742,7 +742,7 @@ Moved to [our documentation](https://www.shakacode.com/react-on-rails/docs/guide
 #### Fixed
 
 - Fixes server rendering when using a CDN. Server rendering would try to fetch a file with the "asset_host". This change updates the webpacker_lite dependency to 2.1.0 which has a new helper `pack_path`. [#901](https://github.com/shakacode/react_on_rails/pull/901) by [justin808](https://github.com/justin808). Be sure to update webpacker_lite to 2.1.0.
-- The package.json file created by the generator now creates minified javascript production builds by default. This was done by adding the -p flag to webpack on the build:production script. [#895](https://github.com/shakacode/react_on_rails/pull/895) by [serodriguez68 ](https://github.com/serodriguez68)
+- The package.json file created by the generator now creates minified javascript production builds by default. This was done by adding the -p flag to Webpack on the build:production script. [#895](https://github.com/shakacode/react_on_rails/pull/895) by [serodriguez68 ](https://github.com/serodriguez68)
 - Fixes GitUtils.uncommitted_changes? throwing an error when called in an environment without Git, and allows install generator to be run successfully with `--ignore-warnings` [#878](https://github.com/shakacode/react_on_rails/pull/878) by [jasonblalock](https://github.com/jasonblalock).
 
 ## [8.0.5] - 2017-07-04
@@ -1008,7 +1008,7 @@ No changes.
 
 #### Fixed
 
-- The redux generator now creates a HelloWorld component that uses redux rather than local state. [#669](https://github.com/shakacode/react_on_rails/issues/669) by [justin808](https://github.com/justin808).
+- The Redux generator now creates a HelloWorld component that uses redux rather than local state. [#669](https://github.com/shakacode/react_on_rails/issues/669) by [justin808](https://github.com/justin808).
 
 ## [6.3.4] - 2016-12-25
 
@@ -1059,7 +1059,7 @@ No changes.
 
 ##### Changed
 
-- Updated the generator templates to reflect current best practices, especially for the redux version. [#584](https://github.com/shakacode/react_on_rails/pull/584) by [nostophilia](https://github.com/nostophilia).
+- Updated the generator templates to reflect current best practices, especially for the Redux version. [#584](https://github.com/shakacode/react_on_rails/pull/584) by [nostophilia](https://github.com/nostophilia).
 
 ## [6.1.2] - 2016-10-24
 
@@ -1092,13 +1092,13 @@ No changes.
 
 ##### Added
 
-- Added better error messages to avoid issues with shared redux stores [#470](https://github.com/shakacode/react_on_rails/pull/470) by [justin808](https://github.com/justin808).
+- Added better error messages to avoid issues with shared Redux stores [#470](https://github.com/shakacode/react_on_rails/pull/470) by [justin808](https://github.com/justin808).
 
 ## [6.0.4] - 2016-06-13
 
 ##### Fixed
 
-- Added polyfill for clearTimeout which is used by babel-polyfill [#451](https://github.com/shakacode/react_on_rails/pull/451) by [martyphee](https://github.com/martyphee)
+- Added a polyfill for `clearTimeout` which is used by `babel-polyfill` [#451](https://github.com/shakacode/react_on_rails/pull/451) by [martyphee](https://github.com/martyphee)
 
 ## [6.0.3] - 2016-06-07
 
@@ -1224,11 +1224,11 @@ All 5.1.0 changes can be found in [#362](https://github.com/shakacode/react_on_r
 
 ##### Added
 
-- Added `railsContext`, an object which gets passed always as the second parameter to both react component and redux store generator functions, both for server and client rendering. This provides data like the current locale, the pathname, etc. The data values are customizable by a new configuration called `rendering_extension` where you can create a module with a method called `rendering_extension`. This allows you to add additional values to the Rails Context. Implement one static method called `custom_context(view_context)` and return a Hash. See [#345](https://github.com/shakacode/react_on_rails/pull/345) by [justin808](https://github.com/justin808)
+- Added `railsContext`, an object which gets passed always as the second parameter to both React component and Redux store generator functions, both for server and client rendering. This provides data like the current locale, the pathname, etc. The data values are customizable by a new configuration called `rendering_extension` where you can create a module with a method called `rendering_extension`. This allows you to add additional values to the Rails Context. Implement one static method called `custom_context(view_context)` and return a Hash. See [#345](https://github.com/shakacode/react_on_rails/pull/345) by [justin808](https://github.com/justin808)
 
 ##### Changed
 
-- Previously, you could pass arbitrary additional html attributes to react_component. Now, you need to pass them in as a named parameter `html_options` to react_component.
+- Previously, you could pass arbitrary additional HTML attributes to react_component. Now, you need to pass them in as a named parameter `html_options` to react_component.
 
 ##### Breaking Changes
 
@@ -1259,7 +1259,7 @@ All 5.1.0 changes can be found in [#362](https://github.com/shakacode/react_on_r
 - [spec/dummy](spec/dummy) is a full sample app of React on Rails techniques **including** the hot reloading of assets from Rails!
 - Added helpers `env_stylesheet_link_tag` and `env_javascript_include_tag` to support hot reloading Rails. See the [README.md](./README.md) for more details and see the example application in `spec/dummy`. Also see how this is used in the [tutorial: application.html.erb](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/app%2Fviews%2Flayouts%2Fapplication.html.erb#L6)
 - Added optional parameter for ReactOnRails.getStore(name, throwIfMissing = true) so that you can check if a store is defined easily.
-- Added controller `module ReactOnRails::Controller`. Adds method `redux_store` to setup redux stores in the view.
+- Added controller `module ReactOnRails::Controller`. Adds method `redux_store` to set up Redux stores in the view.
 - Added option `defer: true` for view helper `redux_store`. This allows the view helper to specify the props for store hydration, yet still render the props at the bottom of the view.
 - Added view helper `redux_store_hydration_data` to render the props on the application's layout, near the bottom. This allows for the client hydration data to be parsed after the server rendering, which may result in a faster load time.
 - The checker for outdated bundles before running tests will two configuration options: `generated_assets_dir` and `webpack_generated_files`.
@@ -1354,7 +1354,7 @@ All 5.1.0 changes can be found in [#362](https://github.com/shakacode/react_on_r
   You'll get a deprecation message to change this.
 
 - Renamed `ReactOnRails.configure_rspec_to_compile_assets` to `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`. The code has also been optimized to check for whether or not the compiled webpack bundles are up to date or not and will not run if not necessary. If you are using non-standard directories for your generated webpack assets (`app/assets/javascripts/generated` and `app/assets/stylesheets/generated`) or have additional directories you wish the helper to check, you need to update your ReactOnRails configuration accordingly. See [documentation](https://www.shakacode.com/react-on-rails/docs/guides/rspec_configuration) for how to do this. [#253](https://github.com/shakacode/react_on_rails/pull/253).
-- You have to call `ReactOnRails.register` to register react components. This was deprecated in v2. [#273](https://github.com/shakacode/react_on_rails/pull/273).
+- You have to call `ReactOnRails.register` to register React components. This was deprecated in v2. [#273](https://github.com/shakacode/react_on_rails/pull/273).
 
 ##### Migration Steps v2 to v3
 
@@ -1469,9 +1469,9 @@ such as:
 ```
 
 - All npm dependency libraries updated. Most notable is going to Babel 6.
-- Dropped support for react 0.13.
+- Dropped support for React 0.13.
 - JS Linter uses ShakaCode JavaScript style: https://github.com/shakacode/style-guide-javascript
-- Generators account these differences.
+- Generators account for these differences.
 
 ##### Migration Steps v1 to v2
 

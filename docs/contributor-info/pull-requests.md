@@ -2,7 +2,7 @@
 
 ## Checklist before Committing
 
-1. `rake`: runs all linters and specs (you need Docker setup, see below)
+1. Run all linters and specs (you need Docker set up, see below).
 2. Did you need any more tests for your change?
 3. Did you document your change? Update the README.md?
 4. Did you add a CHANGELOG.md entry?
@@ -19,7 +19,7 @@ For non-doc fixes:
 
 From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/)
 
-#### The seven rules of a great git commit message
+### The seven rules of a great git commit message
 
 > Keep in mind: This has all been said before.
 
