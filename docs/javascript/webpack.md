@@ -10,7 +10,7 @@ Yarn v1 is our current recommendation!
 
 ## Entry Points
 
-You should ensure you configure the entry points correctly for webpack if you want to break out libraries into a "vendor" bundle where your libraries are packaged separately from your app's code. If you send web clients your vendor bundle separately from your app bundles, then web clients might have the vendor bundle cached while they receive updates for your app.
+You should ensure you configure the entry points correctly for Webpack if you want to break out libraries into a "vendor" bundle where your libraries are packaged separately from your app's code. If you send web clients your vendor bundle separately from your app bundles, then web clients might have the vendor bundle cached while they receive updates for your app.
 
 Webpack v2 makes this very convenient! See:
 

@@ -140,7 +140,7 @@ ctx.ReactOnRails = {
   },
 
   /**
-   * Allow directly calling the page loaded script in case the default events that trigger react
+   * Allow directly calling the page loaded script in case the default events that trigger React
    * rendering are not sufficient, such as when loading JavaScript asynchronously with TurboLinks:
    * More details can be found here:
    * https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/turbolinks.md

@@ -123,7 +123,7 @@ Your layout would contain:
 
 Now suppose you want to use bundle splitting to minimize unnecessary javascript loaded on each page, you would put each of your components in the `packs` directory.
 
-```
+```text
 app/javascript:
   └── packs:                   # sets up webpack entries
   │   └── FooComponentOne.jsx  # Internally uses ReactOnRails.register
@@ -177,7 +177,7 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
      │   │   │ └── BarComponentTwo.jsx
    ```
 
-   4. You no longer need to register the React components within the `ReactOnRails.configuration.components_subdirectory` nor directly add their bundles. For example you can have a Rails view using three components:
+   4. You no longer need to register the React components within the `ReactOnRails.configuration.components_subdirectory` nor directly add their bundles. For example, you can have a Rails view using three components:
 
       ```erb
       <% append_javascript_pack('BarComponentTwo') %>
@@ -206,12 +206,13 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
 
 ### Server Rendering and Client Rendering Components
 
-If server rendering is enabled, the component will be registered for usage both in server and client rendering. In order to have separate definitions for client and server rendering, name the component files as `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file.
+If server rendering is enabled, the component will be registered for usage both in server and client rendering. To have separate definitions for client and server rendering, name the component files `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file.
 
 Once generated, all server entrypoints will be imported into a file named `[ReactOnRails.configuration.server_bundle_js_file]-generated.js`, which in turn will be imported into a source file named the same as `ReactOnRails.configuration.server_bundle_js_file`. If your server bundling logic is such that your server bundle source entrypoint is not named the same as your `ReactOnRails.configuration.server_bundle_js_file` and changing it would be difficult, please let us know.
 
-_Note: If specifying separate definitions for client and server rendering, please make sure to delete the generalized `ComponentName.jsx` file._
+> [!IMPORTANT]
+> When specifying separate definitions for client and server rendering, you need to delete the generalized `ComponentName.jsx` file.
 
 ### Using Automated Bundle Generation Feature with already defined packs
 
-As of version 13.3.4, bundles inside of directories that match `config.components_subdirectory` will be automatically added as entrypoints, while bundles outside of those directories will have to be manually added to the Shakapacker.config.source_entry_path or Webpack's `entry` rules.
+As of version 13.3.4, bundles inside directories that match `config.components_subdirectory` will be automatically added as entrypoints, while bundles outside those directories need to be manually added to the `Shakapacker.config.source_entry_path` or Webpack's `entry` rules.

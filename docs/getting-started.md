@@ -71,7 +71,7 @@ issue.
 
 - Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](https://www.shakacode.com/react-on-rails/docs/guides/configuration/) for documentation of all configuration options.
 - Configure `config/shakapacker.yml`. If you used the generator and the default Shakapacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/shakapacker.yml](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/shakapacker.yml) example or the official default [shakapacker.yml](https://github.com/shakacode/shakapacker/blob/master/lib/install/config/shakapacker.yml).
-- Most apps should rely on the Shakapacker setup for Webpack. Shakapacker v6+ includes support for webpack version 5.
+- Most apps should rely on the Shakapacker setup for Webpack. Shakapacker v6+ includes support for Webpack version 5.
 
 ## Including your React Component on your Rails Views
 
@@ -95,7 +95,7 @@ issue.
   ReactOnRails.register({ HelloWorld });
   ```
 
-  Exposing your component in this way is how React on Rails is able to reference your component from a Rails view. You can expose as many components as you like, as long as their names do not collide. See below for the details of how you expose your components via the react_on_rails webpack configuration. You may call `ReactOnRails.register` many times.
+  Exposing your component in this way allows you to reference the component from a Rails view. You can expose as many components as you like, but their names must all be different. See below for the details of how you expose your components via the react_on_rails Webpack configuration. You may call `ReactOnRails.register` many times.
 
 - `@some_props` can be either a hash or JSON string. This is an optional argument assuming you do not need to pass any options (if you want to pass options, such as `prerender: true`, but you do not want to pass any properties, simply pass an empty hash `{}`). This will make the data available in your component:
 
@@ -139,9 +139,9 @@ ReactOnRails.register({ HelloWorld });
 
 #### Different Server-Side Rendering Code (and a Server-Specific Bundle)
 
-You may want different code for your server-rendered components running server side versus client side. For example, if you have an animation that runs when a component is displayed, you might need to turn that off when server rendering. One way to handle this is conditional code like `if (window) { doClientOnlyCode() }`.
+You may want different code for your server-rendered components running on the server side versus client side. For example, if you have an animation that runs when a component is displayed, you might need to turn that off when server rendering. One way to handle this is conditional code like `if (window) { doClientOnlyCode() }`.
 
-Another way is to use a separate webpack configuration file that can use a different server side entry file, like 'serverRegistration.js' as opposed to 'clientRegistration.js.' That would set up different code for server rendering.
+Another way is to use a separate Webpack configuration file that can use a different server side entry file, like 'serverRegistration.js' as opposed to 'clientRegistration.js.' That would set up different code for server rendering.
 
 For details on techniques to use different code for client and server rendering, see: [How to use different versions of a file for client and server rendering](https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352). (_Requires creating a free account._)
 

@@ -8,7 +8,7 @@ The `webpack-dev-server` provides:
    abruptly lose any tweaks within the Chrome development tools.
 3. Optional hot-reloading. The older `react-hot-loader` has been deprecated in
    favor of [fast-refresh](https://reactnative.dev/docs/fast-refresh).
-   For use with webpack, see **Client Side rendering and HMR using react-refresh-webpack-plugin** section bellow or visit [react-refresh-webpack-plugin](https://github.com/pmmmwh/react-refresh-webpack-plugin) for additional details.
+   For use with webpack, see **Client Side rendering and HMR using react-refresh-webpack-plugin** section below or visit [react-refresh-webpack-plugin](https://github.com/pmmmwh/react-refresh-webpack-plugin) for additional details.
 
 If you are **_not_** using server-side rendering (**_not_** using `prerender: true`),
 then you can follow all the regular docs for using the `bin/shakapacker-dev-server`
@@ -16,7 +16,7 @@ during development.
 
 # Server Side Rendering with the Default shakacode/shakapacker bin/shakapacker-dev-server
 
-If you are using server-side rendering, then you have a couple options. The
+If you are using server-side rendering, then you have a couple of options. The
 recommended technique is to have a different webpack configuration for server
 rendering.
 
@@ -25,8 +25,8 @@ rendering.
 If you do use the `webpack-dev-server` for prerendering, be sure to set the
 `config/initializers/react_on_rails.rb` setting of
 
-```
-  config.same_bundle_for_client_and_server = true
+```ruby
+config.same_bundle_for_client_and_server = true
 ```
 
 `dev_server.hmr` maps to [devServer.hot](https://webpack.js.org/configuration/dev-server/#devserverhot).
@@ -72,7 +72,7 @@ To enable the HMR functionality, you have to use `./bin/shakapacker-dev-server`
 
    const isWebpackDevServer = process.env.WEBPACK_DEV_SERVER;
 
-   //plugins
+   // plugins
    if (isWebpackDevServer) {
      environment.plugins.append(
        'ReactRefreshWebpackPlugin',
@@ -98,9 +98,9 @@ To enable the HMR functionality, you have to use `./bin/shakapacker-dev-server`
    ```
 
 That's it :).
-Now Browser should reflect `.js` along with `.css` changes without reloading.
+Now the browser should reflect changes in `.js` and `.css` files without reloading.
 
-If by some reason plugin doesn't work you could revert changes and left only devServer hmr/inline to true affecting only css files.
+If for some reason the plugin doesn't work, you can revert the changes and leave only devServer `hmr`/`inline` set to true, affecting only CSS files.
 
 These plugins are working and tested with
 
