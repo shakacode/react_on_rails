@@ -77,8 +77,9 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   msg = <<~MSG
     Once you have successfully published, run these commands to update the spec apps:
 
+    bundle install
     cd #{dummy_app_dir}; bundle update react_on_rails
-    cd #{gem_root}#{' '}
+    cd #{gem_root}
     git commit -a -m 'Update Gemfile.lock for spec app'
     git push
   MSG
