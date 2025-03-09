@@ -89,9 +89,7 @@ end
 # rubocop:enable Metrics/BlockLength
 
 task :test do
-  bundle_install_in(gem_root)
-  bundle_exec(gem_root, "rake update_changelog")
   unbundled_sh_in_dir(gem_root, "cd #{dummy_app_dir}; bundle update react_on_rails")
-  sh_in_dir(gem_root, "git commit -a -m 'Update Gemfile.lock and CHANGELOG.md'")
+  sh_in_dir(gem_root, "git commit -a -m 'Update Gemfile.lock for spec app'")
   sh_in_dir(gem_root, "git push")
 end

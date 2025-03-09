@@ -16,6 +16,8 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 After a release, please make sure to run `bundle exec rake update_changelog`. This will add a heading for the latest version and update the links at the end of the file.
 
 ## Versions
+
+### [Unreleased]
 Changes since the last non-beta release.
 
 ### [15.0.0-alpha.2] - 2025-03-07
