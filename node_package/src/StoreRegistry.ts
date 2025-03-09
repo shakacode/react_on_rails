@@ -9,7 +9,7 @@ export default {
    * Register a store generator, a function that takes props and returns a store.
    * @param storeGenerators { name1: storeGenerator1, name2: storeGenerator2 }
    */
-  register(storeGenerators: { [id: string]: StoreGenerator }): void {
+  register(storeGenerators: Record<string, StoreGenerator>): void {
     Object.keys(storeGenerators).forEach((name) => {
       if (storeGeneratorRegistry.has(name)) {
         console.warn('Called registerStore for store that is already registered', name);
