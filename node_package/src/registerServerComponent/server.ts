@@ -30,7 +30,7 @@ import { ReactComponent } from '../types';
  * });
  * ```
  */
-const registerServerComponent = (components: { [id: string]: ReactComponent }) => {
+const registerServerComponent = (components: Record<string, ReactComponent>) => {
   ReactOnRails.register(components);
 };
 
