@@ -55,3 +55,9 @@ _Please support the project by [emailing Justin Gordon](mailto:justin@shakacode.
 - [github.com/tswayne/react-helper](https://github.com/tswayne/react-helper)
 - [github.com/KissKissBankBank/kitten](https://github.com/KissKissBankBank/kitten)
 - [github.com/sharetribe/sharetribe](https://github.com/sharetribe/sharetribe): Open source marketplace platform.
+- [GitHub search for repos using `react_on_rails`](https://github.com/search?q=gem+react_on_rails&ref=advsearch&type=repositories&utf8=%E2%9C%93) (may include some false positives)
+
+## Reverse dependencies
+
+- [Gems depending on `react_on_rails`](https://rubygems.org/gems/react_on_rails/reverse_dependencies)
+- [NPM packages depending on `react-on-rails`](https://www.npmjs.com/browse/depended/react-on-rails)
