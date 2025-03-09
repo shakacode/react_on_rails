@@ -173,7 +173,7 @@ module ReactOnRails
         raise ReactOnRails::Error, msg
       end
 
-      return if [:async, :defer, :sync].include?(generated_component_packs_loading_strategy)
+      return if %i[async defer sync].include?(generated_component_packs_loading_strategy)
 
       raise ReactOnRails::Error, "generated_component_packs_loading_strategy must be either :async, :defer, or :sync"
     end

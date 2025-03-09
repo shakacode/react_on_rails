@@ -427,9 +427,7 @@ module ReactOnRails
       # Old versions of Shakapacker don't support async script tags.
       # ReactOnRails.configure already validates if async loading is supported by the installed Shakapacker version.
       # Therefore, we only need to pass the async option if the loading strategy is explicitly set to :async
-      if ReactOnRails.configuration.generated_component_packs_loading_strategy == :async
-        options[:async] = true
-      end
+      options[:async] = true if ReactOnRails.configuration.generated_component_packs_loading_strategy == :async
       append_javascript_pack_tag("generated/#{react_component_name}", **options)
       append_stylesheet_pack_tag("generated/#{react_component_name}")
     end
