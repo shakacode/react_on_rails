@@ -1,6 +1,6 @@
 import { createStore } from 'redux';
 
-import StoreRegistry from '../src/StoreRegistry';
+import * as StoreRegistry from '../src/StoreRegistry';
 
 function reducer() {
   return {};
@@ -20,10 +20,10 @@ describe('', () => {
     expect.assertions(2);
     StoreRegistry.stores().clear();
     expect(() => StoreRegistry.register({ storeGenerator: null })).toThrow(
-      /Called ReactOnRails.registerStores with a null or undefined as a value/,
+      /Called ReactOnRails.registerStoreGenerators with a null or undefined as a value/,
     );
     expect(() => StoreRegistry.register({ storeGenerator: undefined })).toThrow(
-      /Called ReactOnRails.registerStores with a null or undefined as a value/,
+      /Called ReactOnRails.registerStoreGenerators with a null or undefined as a value/,
     );
   });
 
