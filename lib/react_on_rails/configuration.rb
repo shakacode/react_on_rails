@@ -43,13 +43,13 @@ module ReactOnRails
       i18n_output_format: nil,
       components_subdirectory: nil,
       make_generated_server_bundle_the_entrypoint: false,
-      defer_generated_component_packs: false,
       # forces the loading of React components
       force_load: true,
       # Maximum time in milliseconds to wait for client-side component registration after page load.
       # If exceeded, an error will be thrown for server-side rendered components not registered on the client.
       # Set to 0 to disable the timeout and wait indefinitely for component registration.
-      component_registry_timeout: DEFAULT_COMPONENT_REGISTRY_TIMEOUT
+      component_registry_timeout: DEFAULT_COMPONENT_REGISTRY_TIMEOUT,
+      generated_component_packs_loading_strategy: nil
     )
   end
 
@@ -64,7 +64,7 @@ module ReactOnRails
                   :server_render_method, :random_dom_id, :auto_load_bundle,
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
-                  :defer_generated_component_packs, :force_load, :rsc_bundle_js_file,
+                  :generated_component_packs_loading_strategy, :force_load, :rsc_bundle_js_file,
                   :react_client_manifest_file, :component_registry_timeout
 
     # rubocop:disable Metrics/AbcSize
@@ -76,7 +76,7 @@ module ReactOnRails
                    skip_display_none: nil, generated_assets_dirs: nil,
                    generated_assets_dir: nil, webpack_generated_files: nil,
                    rendering_extension: nil, build_test_command: nil,
-                   build_production_command: nil, defer_generated_component_packs: nil,
+                   build_production_command: nil, generated_component_packs_loading_strategy: nil,
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil, i18n_yml_safe_load_options: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
@@ -122,8 +122,8 @@ module ReactOnRails
       self.components_subdirectory = components_subdirectory
       self.auto_load_bundle = auto_load_bundle
       self.make_generated_server_bundle_the_entrypoint = make_generated_server_bundle_the_entrypoint
-      self.defer_generated_component_packs = defer_generated_component_packs
       self.force_load = force_load
+      self.generated_component_packs_loading_strategy = generated_component_packs_loading_strategy
     end
     # rubocop:enable Metrics/AbcSize
 
@@ -139,6 +139,7 @@ module ReactOnRails
       # check_deprecated_settings
       adjust_precompile_task
       check_component_registry_timeout
+      validate_generated_component_packs_loading_strategy
     end
 
     private
@@ -149,6 +150,32 @@ module ReactOnRails
       return if component_registry_timeout.is_a?(Integer) && component_registry_timeout >= 0
 
       raise ReactOnRails::Error, "component_registry_timeout must be a positive integer"
+    end
+
+    def validate_generated_component_packs_loading_strategy
+      if PackerUtils.shakapacker_version_requirement_met?([8, 2, 0])
+        self.generated_component_packs_loading_strategy ||= :async
+      elsif generated_component_packs_loading_strategy.nil?
+        msg = <<~MSG
+          **WARNING** ReactOnRails: Your current version of #{ReactOnRails::PackerUtils.packer_type.upcase_first} \
+          does not support async script loading which may cause performance issues. Please upgrade to Shakapacker v8.2.0 \
+          or above to enable async script loading for better performance.
+        MSG
+        Rails.logger.warn(msg)
+        self.generated_component_packs_loading_strategy = :sync
+      elsif generated_component_packs_loading_strategy == :async
+        msg = <<~MSG
+          **ERROR** ReactOnRails: Your current version of #{ReactOnRails::PackerUtils.packer_type.upcase_first} \
+          does not support async script loading. Please either:
+          1. Use :sync or :defer loading strategy instead of :async
+          2. Upgrade to Shakapacker v8.2.0 or above to enable async script loading
+        MSG
+        raise ReactOnRails::Error, msg
+      end
+
+      return if [:async, :defer, :sync].include?(generated_component_packs_loading_strategy)
+
+      raise ReactOnRails::Error, "generated_component_packs_loading_strategy must be either :async, :defer, or :sync"
     end
 
     def check_autobundling_requirements
