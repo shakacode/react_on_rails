@@ -26,7 +26,7 @@ namespace :react_on_rails do
       else
         # Left in this warning message in case this rake task is run directly
         msg = <<~MSG
-          React on Rails is aborting webpack compilation from task react_on_rails:assets:webpack
+          React on Rails is aborting Webpack compilation from task react_on_rails:assets:webpack
           because you do not have the `config.build_production_command` defined.
         MSG
         puts Rainbow(msg).red

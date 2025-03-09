@@ -79,7 +79,7 @@ jobs:
         run: cd spec/dummy && rm -rf public/webpack/test && yarn run build:rescript && RAILS_ENV="test" NODE_ENV="test" bin/${{ matrix.versions == 'oldest' && 'web' || 'shaka' }}packer
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
-      - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
+      - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
         uses: actions/cache/save@v4
         with:
           path: spec/dummy/public/webpack
@@ -139,7 +139,7 @@ jobs:
           key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-${{ matrix.versions }}
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
-      - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
+      - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
         uses: actions/cache@v4
         with:
           path: spec/dummy/public/webpack

@@ -33,7 +33,8 @@ export interface RailsContext {
   httpAcceptLanguage: string;
 }
 
-type AuthenticityHeaders = { [id: string]: string } & {
+// not strictly what we want, see https://github.com/microsoft/TypeScript/issues/17867#issuecomment-323164375
+type AuthenticityHeaders = Record<string, string> & {
   'X-CSRF-Token': string | null;
   'X-Requested-With': string;
 };
@@ -167,10 +168,10 @@ export interface Root {
 export type RenderReturnType = void | Element | Component | Root;
 
 export interface ReactOnRails {
-  register(components: { [id: string]: ReactComponentOrRenderFunction }): void;
+  register(components: Record<string, ReactComponentOrRenderFunction>): void;
   /** @deprecated Use registerStoreGenerators instead */
-  registerStore(stores: { [id: string]: StoreGenerator }): void;
-  registerStoreGenerators(storeGenerators: { [id: string]: StoreGenerator }): void;
+  registerStore(stores: Record<string, StoreGenerator>): void;
+  registerStoreGenerators(storeGenerators: Record<string, StoreGenerator>): void;
   getStore(name: string, throwIfMissing?: boolean): Store | undefined;
   getOrWaitForStore(name: string): Promise<Store>;
   getOrWaitForStoreGenerator(name: string): Promise<StoreGenerator>;
@@ -180,7 +181,7 @@ export interface ReactOnRails {
   reactOnRailsComponentLoaded(domId: string): void;
   reactOnRailsStoreLoaded(storeName: string): void;
   authenticityToken(): string | null;
-  authenticityHeaders(otherHeaders: { [id: string]: string }): AuthenticityHeaders;
+  authenticityHeaders(otherHeaders: Record<string, string>): AuthenticityHeaders;
   option(key: string): string | number | boolean | undefined;
   getStoreGenerator(name: string): StoreGenerator;
   setStore(name: string, store: Store): void;

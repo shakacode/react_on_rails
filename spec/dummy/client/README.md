@@ -6,23 +6,27 @@ The `.eslintrc` file is based on the AirBnb [eslintrc](https://github.com/airbnb
 
 It also includes many eslint defaults that the AirBnb eslint does not include.
 
-# Running linter:
+# Running linter
 
 Running the linter:
 
-    yarn run lint
+```bash
+yarn run lint
+```
 
 or to autofix
 
-    yarn run lint -- --fix
+```bash
+yarn run lint -- --fix
+```
 
 # Updating Node Dependencies
 
-```
+```bash
 yarn global add npm-check-updates
 ```
 
-```
+```bash
 # Make sure you are in the `client` directory, then run:
 cd client
 npm-check-updates -u -a
@@ -31,11 +35,11 @@ yarn
 
 Another option for upgrading:
 
-```
+```bash
 yarn upgrade
 ```
 
-Then confirm that the hot reload server and the rails server both work fine. You
+Then confirm that the hot reload server and the Rails server both work fine. You
 may have to delete `node_modules`.
 
 # Adding Node Modules

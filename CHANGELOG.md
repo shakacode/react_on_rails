@@ -55,7 +55,7 @@ See [Release Notes](docs/release-notes/15.0.0.md) for full details.
 
 #### Fixed
 
-- Separated streamServerRenderedReactComponent from the ReactOnRails object in order to stop users from getting errors during webpack compilation about needing the `stream-browserify` package. [PR 1680](https://github.com/shakacode/react_on_rails/pull/1680) by [judahmeek](https://github.com/judahmeek).
+- Separated streamServerRenderedReactComponent from the ReactOnRails object in order to stop users from getting errors during Webpack compilation about needing the `stream-browserify` package. [PR 1680](https://github.com/shakacode/react_on_rails/pull/1680) by [judahmeek](https://github.com/judahmeek).
 - Removed obsolete `js-yaml` peer dependency. [PR 1678](https://github.com/shakacode/react_on_rails/pull/1678) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
 ### [14.1.0] - 2025-01-06

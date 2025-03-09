@@ -43,7 +43,7 @@ Another good option is to create a simple test app per the [Tutorial](https://ww
 
 The generated client code follows our organization scheme. Each unique set of functionality is given its own folder inside of `app/javascript/app/bundles`. This encourages modularity of _domains_.
 
-Inside of the generated "HelloWorld" domain you will find the following folders:
+Inside the generated "HelloWorld" domain you will find the following folders:
 
 - `startup`: contains the entry point files for webpack. It defaults to a single file that is used for both server and client compilation. But if these need to be different, then you can create two Webpack configurations with separate endpoints. Since RoR v14.2 this is strongly recommended because the client can import `react-on-rails/client` instead of `react-on-rails` for decreased bundle size.
 - `containers`: contains "smart components" (components that have functionality and logic that is passed to child "dumb components").

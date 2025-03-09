@@ -46,11 +46,11 @@ ctx.ReactOnRails = {
    * find you components for rendering.
    * @param components (key is component name, value is component)
    */
-  register(components: { [id: string]: ReactComponentOrRenderFunction }): void {
+  register(components: Record<string, ReactComponentOrRenderFunction>): void {
     ComponentRegistry.register(components);
   },
 
-  registerStore(stores: { [id: string]: StoreGenerator }): void {
+  registerStore(stores: Record<string, StoreGenerator>): void {
     this.registerStoreGenerators(stores);
   },
 
@@ -60,7 +60,7 @@ ctx.ReactOnRails = {
    * the setStore API is different in that it's the actual store hydrated with props.
    * @param storeGenerators (keys are store names, values are the store generators)
    */
-  registerStoreGenerators(storeGenerators: { [id: string]: StoreGenerator }): void {
+  registerStoreGenerators(storeGenerators: Record<string, StoreGenerator>): void {
     if (!storeGenerators) {
       throw new Error(
         'Called ReactOnRails.registerStoreGenerators with a null or undefined, rather than ' +
@@ -140,7 +140,7 @@ ctx.ReactOnRails = {
   },
 
   /**
-   * Allow directly calling the page loaded script in case the default events that trigger react
+   * Allow directly calling the page loaded script in case the default events that trigger React
    * rendering are not sufficient, such as when loading JavaScript asynchronously with TurboLinks:
    * More details can be found here:
    * https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/turbolinks.md
@@ -172,7 +172,7 @@ ctx.ReactOnRails = {
    * @returns {*} header
    */
 
-  authenticityHeaders(otherHeaders: { [id: string]: string } = {}): AuthenticityHeaders {
+  authenticityHeaders(otherHeaders: Record<string, string> = {}): AuthenticityHeaders {
     return Authenticity.authenticityHeaders(otherHeaders);
   },
 
