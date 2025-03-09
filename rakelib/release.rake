@@ -75,12 +75,13 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   sh_in_dir(gem_root, "gem release") unless is_dry_run
 
   msg = <<~MSG
-    Once you have successfully published, run these commands to update Gemfile.lock locally and in the spec apps:
+    Once you have successfully published, run these commands to update Gemfile.lock and CHANGELOG.md:
 
     bundle install
+    bundle exec rake update_changelog
     cd #{dummy_app_dir}; bundle update react_on_rails
     cd #{gem_root}
-    git commit -a -m 'Update Gemfile.lock'
+    git commit -a -m 'Update Gemfile.lock and CHANGELOG.md'
     git push
   MSG
   puts msg
@@ -89,7 +90,8 @@ end
 
 task :test do
   bundle_install_in(gem_root)
+  bundle_exec(gem_root, "rake test")
   unbundled_sh_in_dir(gem_root, "cd #{dummy_app_dir}; bundle update react_on_rails")
-  sh_in_dir(gem_root, "git commit -a -m 'Update Gemfile.lock'")
+  sh_in_dir(gem_root, "git commit -a -m 'Update Gemfile.lock and CHANGELOG.md'")
   sh_in_dir(gem_root, "git push")
 end

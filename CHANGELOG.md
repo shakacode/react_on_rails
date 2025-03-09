@@ -18,6 +18,8 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 Changes since the last non-beta release.
 
+## [15.0.0-alpha.2] - 2025-03-07
+
 See [Release Notes](docs/release-notes/15.0.0.md) for full details.
 
 #### Added
@@ -1205,7 +1207,8 @@ Best done with Object destructing:
 ##### Fixed
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/14.2.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/15.0.0-alpha.2...master
+[15.0.0-alpha.2]: https://github.com/shakacode/react_on_rails/compare/14.2.0...15.0.0-alpha.2
 [14.2.0]: https://github.com/shakacode/react_on_rails/compare/14.1.1...14.2.0
 [14.1.1]: https://github.com/shakacode/react_on_rails/compare/14.1.0...14.1.1
 [14.1.0]: https://github.com/shakacode/react_on_rails/compare/14.0.5...14.1.0
