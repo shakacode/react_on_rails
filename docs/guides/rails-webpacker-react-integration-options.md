@@ -84,6 +84,8 @@ const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptio
 module.exports = commonWebpackConfig;
 ```
 
+Note this can be removed after you upgrade to React 18+.
+
 ---
 
 ## HMR and React Hot Reloading
