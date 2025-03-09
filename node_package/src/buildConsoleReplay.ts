@@ -1,4 +1,4 @@
-import RenderUtils from './RenderUtils';
+import { wrapInScriptTags } from './RenderUtils';
 import scriptSanitizedVal from './scriptSanitizedVal';
 
 declare global {
@@ -54,7 +54,7 @@ export default function buildConsoleReplay(
   customConsoleHistory: (typeof console)['history'] | undefined = undefined,
   numberOfMessagesToSkip: number = 0,
 ): string {
-  return RenderUtils.wrapInScriptTags(
+  return wrapInScriptTags(
     'consoleReplayLog',
     consoleReplay(customConsoleHistory, numberOfMessagesToSkip),
   );
