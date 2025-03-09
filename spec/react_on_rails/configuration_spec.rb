@@ -265,7 +265,7 @@ module ReactOnRails
       end
 
       expect(ReactOnRails::PackerUtils).to have_received(:using_packer?).thrice
-      expect(ReactOnRails::PackerUtils).to have_received(:shakapacker_version_requirement_met?)
+      expect(ReactOnRails::PackerUtils).to have_received(:shakapacker_version_requirement_met?).twice
       expect(ReactOnRails::PackerUtils).to have_received(:nested_entries?)
     end
 
@@ -276,6 +276,95 @@ module ReactOnRails
       # rubocop:enable Lint/EmptyBlock
 
       expect(ReactOnRails.configuration.random_dom_id).to be(true)
+    end
+
+    describe ".generated_component_packs_loading_strategy" do
+      context "when using Shakapacker >= 8.2.0" do
+        before do
+          allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
+            .with([8, 2, 0]).and_return(true)
+        end
+
+        it "defaults to :async" do
+          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:async)
+        end
+
+        it "accepts :async value" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.generated_component_packs_loading_strategy = :async
+            end
+          end.not_to raise_error
+          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:async)
+        end
+
+        it "accepts :defer value" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.generated_component_packs_loading_strategy = :defer
+            end
+          end.not_to raise_error
+          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:defer)
+        end
+
+        it "accepts :sync value" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.generated_component_packs_loading_strategy = :sync
+            end
+          end.not_to raise_error
+          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:sync)
+        end
+
+        it "raises error for invalid values" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.generated_component_packs_loading_strategy = :invalid
+            end
+          end.to raise_error(ReactOnRails::Error, /must be either :async, :defer, or :sync/)
+        end
+      end
+
+      context "when using Shakapacker < 8.2.0" do
+        before do
+          allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
+            .with([8, 2, 0]).and_return(false)
+          allow(Rails.logger).to receive(:warn)
+        end
+
+        it "defaults to :sync and logs a warning" do
+          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:sync)
+          expect(Rails.logger).to have_received(:warn).with(/does not support async script loading/)
+        end
+
+        it "accepts :defer value" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.generated_component_packs_loading_strategy = :defer
+            end
+          end.not_to raise_error
+          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:defer)
+        end
+
+        it "accepts :sync value" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.generated_component_packs_loading_strategy = :sync
+            end
+          end.not_to raise_error
+          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:sync)
+        end
+
+        it "raises error for :async value" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.generated_component_packs_loading_strategy = :async
+            end
+          end.to raise_error(ReactOnRails::Error, /does not support async script loading/)
+        end
+      end
     end
   end
 end
