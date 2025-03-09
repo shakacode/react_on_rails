@@ -78,7 +78,7 @@ Turbolinks.start();
 
 ### Async script loading
 
-Async script loading can be done like this:
+Async script loading can be done like this (starting with Shakapacker 8.2):
 
 ```erb
   <%= javascript_include_tag 'application', async: Rails.env.production? %>
@@ -101,6 +101,9 @@ document.addEventListener('turbolinks:load', function () {
 ```
 
 React on Rails 15 fixes both issues, so if you still have the listener it can be removed (and should be as `reactOnRailsPageLoaded()` is now async).
+
+> [!WARNING]
+> Do not use `force_load: false` with Turbolinks if you have async scripts.
 
 ## Troubleshooting
 
