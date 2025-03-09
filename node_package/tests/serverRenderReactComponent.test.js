@@ -4,7 +4,7 @@
 import * as React from 'react';
 
 import serverRenderReactComponent from '../src/serverRenderReactComponent';
-import ComponentRegistry from '../src/ComponentRegistry';
+import * as ComponentRegistry from '../src/ComponentRegistry';
 
 describe('serverRenderReactComponent', () => {
   beforeEach(() => {
