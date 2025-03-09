@@ -44,7 +44,7 @@ module ReactOnRails
 
     # Runs bundle exec using that directory's Gemfile
     def bundle_exec(dir: nil, args: nil, env_vars: "")
-      sh_in_dir(dir, "#{env_vars} #{args}")
+      sh_in_dir(dir, "#{env_vars} bundle exec #{args}")
     end
 
     def generators_source_dir
