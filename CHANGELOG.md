@@ -15,7 +15,7 @@ If you think ShakaCode can help your project, [click here](https://meetings.hubs
 Please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## Versions
-### [Unreleased]
+### [15.0.0-alpha.2] - 2025-03-07
 Changes since the last non-beta release.
 
 See [Release Notes](docs/release-notes/15.0.0.md) for full details.
