@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-gem "shakapacker", "8.0.0"
+# TODO: Revert before merging
+gem "shakapacker", github: "shakacode/shakapacker", branch: "abanoubghadban/pro521-add-support-for-async-scripts-in-the-view"
 gem "bootsnap", require: false
 gem "rails", "~> 7.1"
 
