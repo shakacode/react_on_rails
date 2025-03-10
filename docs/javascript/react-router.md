@@ -61,7 +61,7 @@ const ReactServerRenderer = (props, railsContext) => {
 
   const { location } = railsContext;
 
-  const html = ReactDOMServer.renderToString(
+  const html = renderToString(
     <Provider store={store}>
       <StaticRouter location={location} context={context} props={props}>
         <App />
