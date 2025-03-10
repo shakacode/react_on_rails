@@ -24,11 +24,14 @@ import {
 } from '../shared/utils';
 import { getConfig } from '../shared/configBuilder';
 import * as errorReporter from '../shared/errorReporter';
-import { buildVM, getVmBundleFilePath, runInVM } from './vm';
+import { buildVM, hasVMContextForBundle, runInVM } from './vm';
 
-async function prepareResult(renderingRequest: string): Promise<ResponseResult> {
+async function prepareResult(
+  renderingRequest: string,
+  bundleFilePathPerTimestamp: string,
+): Promise<ResponseResult> {
   try {
-    const result = await runInVM(renderingRequest, cluster);
+    const result = await runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster);
 
     let exceptionMessage = null;
     if (!result) {
@@ -133,7 +136,7 @@ to ${bundleFilePathPerTimestamp})`,
       // file must be fully written
       log.info('buildVM, bundleFilePathPerTimestamp', bundleFilePathPerTimestamp);
       await buildVM(bundleFilePathPerTimestamp);
-      return prepareResult(renderingRequest);
+      return prepareResult(renderingRequest, bundleFilePathPerTimestamp);
     } catch (error) {
       const msg = formatExceptionMessage(
         renderingRequest,
@@ -181,8 +184,8 @@ export = async function handleRenderRequest({
     const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
 
     // If the current VM has the correct bundle and is ready
-    if (getVmBundleFilePath() === bundleFilePathPerTimestamp) {
-      return prepareResult(renderingRequest);
+    if (hasVMContextForBundle(bundleFilePathPerTimestamp)) {
+      return prepareResult(renderingRequest, bundleFilePathPerTimestamp);
     }
 
     // If gem has posted updated bundle:
@@ -211,7 +214,7 @@ export = async function handleRenderRequest({
     log.info('Bundle %s exists. Building VM for worker %s.', bundleFilePathPerTimestamp, workerIdLabel());
     await buildVM(bundleFilePathPerTimestamp);
 
-    return prepareResult(renderingRequest);
+    return prepareResult(renderingRequest, bundleFilePathPerTimestamp);
   } catch (error) {
     const msg = formatExceptionMessage(
       renderingRequest,

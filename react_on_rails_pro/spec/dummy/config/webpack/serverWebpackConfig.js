@@ -1,6 +1,6 @@
-const { merge, config } = require('shakapacker');
+const { config } = require('shakapacker');
+const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
 const commonWebpackConfig = require('./commonWebpackConfig');
-
 const webpack = require('webpack');
 
 function extractLoader(rule, loaderName) {
@@ -53,6 +53,7 @@ const configureServer = () => {
     minimize: false,
   };
 
+  serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
   serverWebpackConfig.plugins.unshift(new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
   // Custom output for the server-bundle that matches the config in
   // config/initializers/react_on_rails.rb
@@ -122,4 +123,7 @@ const configureServer = () => {
   return serverWebpackConfig;
 };
 
-module.exports = configureServer;
+module.exports = {
+  default: configureServer,
+  extractLoader,
+};

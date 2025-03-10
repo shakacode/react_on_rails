@@ -1,4 +1,5 @@
 /* eslint-disable react/prefer-es6-class */
+'use client';
 
 import PropTypes from 'prop-types';
 import React from 'react';

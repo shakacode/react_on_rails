@@ -216,6 +216,44 @@ describe "Pages/stream_async_components_for_testing", :js do
     end
     expect(chunks_count).to be >= 5
   end
+
+  it "doesn't hydrate status component if packs are not loaded" do
+    # visit waits for the page to load, so we ensure that the page is loaded before checking the hydration status
+    visit "/stream_async_components_for_testing?skip_js_packs=true"
+    expect(page).to have_text "HydrationStatus: Streaming server render"
+    expect(page).not_to have_text "HydrationStatus: Hydrated"
+    expect(page).not_to have_text "HydrationStatus: Page loaded"
+  end
+
+  it "hydrates loaded components early before the full page is loaded" do
+    chunks_count = 0
+    status_component_hydrated_on_chunk = nil
+    input_component_hydrated_on_chunk = nil
+    navigate_with_streaming("/stream_async_components_for_testing") do |_content|
+      chunks_count += 1
+      expect(page).to have_text "HydrationStatus: Streaming server render" if chunks_count == 1
+
+      # The code that updates the states to Hydrated is executed on `useEffect` which is called only on hydration
+      if status_component_hydrated_on_chunk.nil? && page.has_text?("HydrationStatus: Hydrated")
+        status_component_hydrated_on_chunk = chunks_count
+      end
+
+      if input_component_hydrated_on_chunk.nil?
+        begin
+          # Checks that the input field is hydrated
+          change_text_expect_dom_selector("#AsyncComponentsTreeForTesting-react-component-0")
+          input_component_hydrated_on_chunk = chunks_count
+        rescue RSpec::Expectations::ExpectationNotMetError
+          # Do nothing if the test fails - component not yet hydrated
+        end
+      end
+    end
+
+    # The component should be hydrated before the full page is loaded
+    expect(status_component_hydrated_on_chunk).to be < chunks_count
+    expect(input_component_hydrated_on_chunk).to be < chunks_count
+    expect(page).to have_text "HydrationStatus: Page loaded"
+  end
 end
 
 describe "Pages/Pure Component", :js do

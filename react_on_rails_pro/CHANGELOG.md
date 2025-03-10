@@ -16,6 +16,19 @@ You can find the **package** version numbers from this repo's tags and below in 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+### Added
+- 🚀 **Introducing React Server Components Support!** 🎉
+  - Experience the future of React with full RSC integration
+  - Seamlessly use React Server Components in your Rails apps
+  - Reduce client bundle sizes
+  - Enable powerful new patterns for data fetching
+  - [See the full tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components-tutorial)
+
+[PR 422](https://github.com/shakacode/react_on_rails_pro/pull/422) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+### Changed (Breaking)
+- `ReactOnRailsPro::Utils#copy_assets` retuns `nil` instead of `Response` object. Because it throws an error if an error occurs.
+
 ## [4.0.0.rc.11] - 2025-02-09
 
 ### Changed
@@ -26,6 +39,9 @@ You can find the **package** version numbers from this repo's tags and below in 
 - Specify exact httpx version until the bug there is fixed [PR #496](https://github.com/shakacode/react_on_rails_pro/pull/496) by  [alexeyr-ci](https://github.com/alexeyr-ci)
 
 - Make bundle hash environment aware. [PR 512](https://github.com/shakacode/react_on_rails_pro/pull/512) by [judahmeek](https://github.com/judahmeek).
+
+### Fixed
+- Enabled `queueMicrotask` use in server bundle to support React 19. [PR 505](https://github.com/shakacode/react_on_rails_pro/pull/505) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
 ### Changed
 - Renamed `includeTimerPolyfills` configuration option to `stubTimers`. [PR 506](https://github.com/shakacode/react_on_rails_pro/pull/506) by [alexeyr-ci](https://github.com/alexeyr-ci).

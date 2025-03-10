@@ -17,6 +17,10 @@ tmp
 /spec/dummy/public/assets
 /spec/dummy/public/stylesheets
 
+# For local development
+Gemfile.local
+post-yarn-install.local
+
 # IDEs
 .idea/
 .vscode/

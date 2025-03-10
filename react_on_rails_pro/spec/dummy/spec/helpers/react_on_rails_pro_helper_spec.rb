@@ -182,7 +182,7 @@ describe ReactOnRailsProHelper, type: :helper do
   describe "html_streaming_react_component" do
     include StreamingTestHelpers
 
-    let(:component_name) { "StreamAsyncComponents" }
+    let(:component_name) { "TestingStreamableComponent" }
     let(:props) { { helloWorldData: { name: "Mr. Server Side Rendering" } } }
     let(:component_options) { { prerender: true, trace: true, id: "#{component_name}-react-component-0" } }
     let(:chunks) do
@@ -201,31 +201,42 @@ describe ReactOnRailsProHelper, type: :helper do
     let(:chunks_read) { [] }
     let(:react_component_specification_tag) do
       <<-SCRIPT.strip_heredoc
-        <script type="application/json" class="js-react-on-rails-component" data-component-name="StreamAsyncComponents" data-trace="true" data-dom-id="StreamAsyncComponents-react-component-0">{"helloWorldData":{"name":"Mr. Server Side Rendering"}}</script>
+        <script type="application/json"
+          id="js-react-on-rails-component-TestingStreamableComponent-react-component-0"
+          class="js-react-on-rails-component"
+          data-component-name="TestingStreamableComponent"
+          data-trace="true"
+          data-dom-id="TestingStreamableComponent-react-component-0"
+          data-force-load="true"
+        >{"helloWorldData":{"name":"Mr. Server Side Rendering"}}</script>
       SCRIPT
     end
     let(:rails_context_tag) do
       <<-SCRIPT.strip_heredoc
-        <script type="application/json" id="js-react-on-rails-context">{"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":true,"rorProVersion":"#{ReactOnRailsPro::VERSION}","href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+        <script type="application/json" id="js-react-on-rails-context">{"componentRegistryTimeout":5000,"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":true,"rorProVersion":"#{ReactOnRailsPro::VERSION}","href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
       SCRIPT
     end
     let(:react_component_div_with_initial_chunk) do
       <<-HTML.strip
-        <div id="StreamAsyncComponents-react-component-0">#{chunks.first[:html]}</div>
+        <div id="TestingStreamableComponent-react-component-0">#{chunks.first[:html]}</div>
       HTML
     end
 
-    def mock_request_and_response
+    def mock_request_and_response(mock_chunks = chunks)
+      # Reset connection instance variables to ensure clean state for tests
+      ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
+      original_httpx_plugin = HTTPX.method(:plugin)
+      allow(HTTPX).to receive(:plugin) do |*args|
+        original_httpx_plugin.call(:mock_stream).plugin(*args)
+      end
+      clear_stream_mocks
+
       chunks_read.clear
-      allow(ReactOnRailsPro::Request).to receive(:perform_request) do |_path, _form_data|
-        stream_response = instance_double(HTTPX::StreamResponse)
-        allow(stream_response).to receive(:each_line) do |&chunk_block|
-          chunks.each do |chunk|
-            chunks_read << chunk
-            chunk_block.call(chunk.to_json)
-          end
+      mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200) do |yielder|
+        mock_chunks.each do |chunk|
+          chunks_read << chunk
+          yielder.call("#{chunk.to_json}\n")
         end
-        stream_response
       end
     end
 
@@ -237,10 +248,10 @@ describe ReactOnRailsProHelper, type: :helper do
         # This setup is necessary because stream_react_component relies on @rorp_rendering_fibers
         # to function correctly within the streaming context.
         @rorp_rendering_fibers = []
-        mock_request_and_response
       end
 
       it "returns the component shell that exist in the initial chunk with the consoleReplayScript" do
+        mock_request_and_response
         initial_result = stream_react_component(component_name, props: props, **component_options)
         expect(initial_result).to include(react_component_div_with_initial_chunk)
         expect(initial_result).to include(chunks.first[:consoleReplayScript])
@@ -249,6 +260,7 @@ describe ReactOnRailsProHelper, type: :helper do
       end
 
       it "creates a fiber to read subsequent chunks" do
+        mock_request_and_response
         stream_react_component(component_name, props: props, **component_options)
         expect(@rorp_rendering_fibers.count).to eq(1) # rubocop:disable RSpec/InstanceVariable
         fiber = @rorp_rendering_fibers.first # rubocop:disable RSpec/InstanceVariable
@@ -270,6 +282,23 @@ describe ReactOnRailsProHelper, type: :helper do
         expect(fiber.resume).to be_nil
         expect(fiber).not_to be_alive
         expect(chunks_read.count).to eq(chunks.count)
+      end
+
+      it "does not trim whitespaces from html" do
+        first_chunk_string = +"  <div>Chunk 1: with whitespaces</div>  "
+        chunks_with_whitespaces = [
+          { html: first_chunk_string },
+          { html: "\n\n\n<div>Chunk 2: with newlines</div>\n\n\n" },
+          { html: "<div>Chunk 3: with tabs</div>\t\t\t" },
+          { html: "\t\t\t<div>Chunk 4: with mixed whitespaces</div>  \n\n\n" }
+        ].map { |chunk| chunk.merge(consoleReplayScript: "") }
+        mock_request_and_response(chunks_with_whitespaces)
+        initial_result = stream_react_component(component_name, props: props, **component_options)
+        expect(initial_result).to include(chunks_with_whitespaces.first[:html])
+        fiber = @rorp_rendering_fibers.first # rubocop:disable RSpec/InstanceVariable
+        expect(fiber.resume).to include(chunks_with_whitespaces[1][:html])
+        expect(fiber.resume).to include(chunks_with_whitespaces[2][:html])
+        expect(fiber.resume).to include(chunks_with_whitespaces[3][:html])
       end
     end
 

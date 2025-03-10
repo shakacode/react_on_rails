@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { ChunkExtractor } from '@loadable/server';
 import { renderToString } from 'react-dom/server';

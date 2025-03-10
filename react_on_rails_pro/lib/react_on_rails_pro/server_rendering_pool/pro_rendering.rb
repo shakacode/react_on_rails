@@ -25,7 +25,7 @@ module ReactOnRailsPro
             # TODO: support caching for streams
             if ReactOnRailsPro.configuration.prerender_caching &&
                render_options.internal_option(:skip_prerender_cache).nil? &&
-               !render_options.stream?
+               !render_options.streaming?
               prerender_cache_key = cache_key(js_code, render_options)
               prerender_cache_hit = true
               result = Rails.cache.fetch(prerender_cache_key) do

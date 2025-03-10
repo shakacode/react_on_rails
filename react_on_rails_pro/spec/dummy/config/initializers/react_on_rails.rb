@@ -27,6 +27,7 @@ end
 
 ReactOnRails.configure do |config|
   config.server_bundle_js_file = "server-bundle.js"
+  config.rsc_bundle_js_file = "rsc-bundle.js"
   config.random_dom_id = false # default is true
 
   # Next 2 lines are commented out because we've set test.compile to true
@@ -38,4 +39,5 @@ ReactOnRails.configure do |config|
 
   config.auto_load_bundle = true
   config.components_subdirectory = "ror-auto-load-components"
+  config.defer_generated_component_packs = false
 end

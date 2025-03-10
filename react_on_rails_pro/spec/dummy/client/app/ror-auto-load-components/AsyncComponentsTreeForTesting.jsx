@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
-import HelloWorldHooks from './HelloWorldHooks';
+import HelloWorldHooks from '../components/HelloWorldHooks';
+import HydrationStatus from '../components/HydrationStatus';
 
 const AsyncComponentsBranch = ({ branchName, level }) => {
   const buildResult = () => {
@@ -58,6 +59,7 @@ const AsyncComponentsTreeForTesting = (props) => {
       <Suspense fallback={<div>Loading HelloWorldHooks...</div>}>
         <AsyncHelloWorldHooks {...props} />
       </Suspense>
+      <HydrationStatus />
       <Suspense fallback={<div>Loading branch1...</div>}>
         <AsyncComponentsBranch branchName="branch1" level={4} />
       </Suspense>

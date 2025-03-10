@@ -38,7 +38,7 @@ export interface Config {
   bundlePath: string;
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS
   // global objects and functions that get added to the VM context:
-  // `{ Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval, setImmediate, clearImmediate, queueMicrotask }`.
+  // `{ Buffer, TextDecoder, TextEncoder, URLSearchParams, ReadableStream, process, setTimeout, setInterval, setImmediate, clearTimeout, clearInterval, clearImmediate, queueMicrotask }`.
   // This option is required to equal `true` if you want to use loadable components.
   // Setting this value to false causes the NodeRenderer to behave like ExecJS.
   supportModules: boolean;
@@ -76,6 +76,10 @@ export interface Config {
   // If set to false, only logs that occur on the server prior to any awaited asynchronous operations will be replayed.
   // The default value is true in development, otherwise it is set to false.
   replayServerAsyncOperationLogs: boolean;
+  // Maximum number of VM contexts to keep in memory. Defaults to 2 since typically only two contexts
+  // are needed - one for the server bundle and one for React Server Components (RSC) if enabled.
+  // Older contexts are removed when this limit is reached.
+  maxVMPoolSize: number;
 }
 
 let config: Config | undefined;
@@ -171,6 +175,10 @@ const defaultConfig: Config = {
   replayServerAsyncOperationLogs: truthy(
     env.REPLAY_SERVER_ASYNC_OPERATION_LOGS ?? NODE_ENV === 'development',
   ),
+
+  // Maximum number of VM contexts to keep in memory. Defaults to 2 since typically only two contexts
+  // are needed - one for the server bundle and one for React Server Components (RSC) if enabled.
+  maxVMPoolSize: (env.MAX_VM_POOL_SIZE && parseInt(env.MAX_VM_POOL_SIZE, 10)) || 2,
 };
 
 function envValuesUsed() {
@@ -191,6 +199,7 @@ function envValuesUsed() {
     INCLUDE_TIMER_POLYFILLS: !('includeTimerPolyfills' in userConfig) && env.INCLUDE_TIMER_POLYFILLS,
     REPLAY_SERVER_ASYNC_OPERATION_LOGS:
       !userConfig.replayServerAsyncOperationLogs && env.REPLAY_SERVER_ASYNC_OPERATION_LOGS,
+    MAX_VM_POOL_SIZE: !userConfig.maxVMPoolSize && env.MAX_VM_POOL_SIZE,
   };
 }
 
@@ -224,6 +233,10 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   config = { ...defaultConfig, ...userConfig };
 
   config.supportModules = truthy(config.supportModules);
+
+  if (config.maxVMPoolSize <= 0 || !Number.isInteger(config.maxVMPoolSize)) {
+    throw new Error('maxVMPoolSize must be a positive integer');
+  }
 
   let currentArg: string | undefined;
 

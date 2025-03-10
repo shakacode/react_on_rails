@@ -74,12 +74,22 @@ module ReactOnRailsPro
       return enum_for(:each_chunk) unless block_given?
 
       send_bundle = false
+      error_body = +""
       loop do
         stream_response = @request_executor.call(send_bundle)
-        # stream_response.each may yield merged chunks, but the real chunks are separated by newlines.
-        stream_response.each_line do |chunk|
-          stripped_chunk = chunk.strip
-          yield stripped_chunk unless stripped_chunk.empty?
+
+        # Chunks can be merged during streaming, so we separate them by newlines
+        # Also, we check the status code inside the loop block because calling `status` outside the loop block
+        # is blocking, it will wait for the response to be fully received
+        # Look at the spec of `status` in `spec/react_on_rails_pro/stream_spec.rb` for more details
+        loop_response_lines(stream_response) do |chunk|
+          if stream_response.status >= 400
+            error_body << chunk
+            next
+          end
+
+          processed_chunk = chunk.strip
+          yield processed_chunk unless processed_chunk.empty?
         end
         break
       rescue HTTPX::HTTPError => e
@@ -89,9 +99,9 @@ module ReactOnRailsPro
           send_bundle = true
           next
         when ReactOnRailsPro::STATUS_INCOMPATIBLE
-          raise ReactOnRailsPro::Error, response.body
+          raise ReactOnRailsPro::Error, error_body
         else
-          raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{response.status}:\n#{response.body}"
+          raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{response.status}:\n#{error_body}"
         end
       end
     end
@@ -99,6 +109,29 @@ module ReactOnRailsPro
     # Method to start the decoration
     def self.create(&request_block)
       StreamDecorator.new(new(&request_block))
+    end
+
+    private
+
+    # This method is considered as an override of response.each_line
+    # It fixes the problem of not yielding the last chunk on error
+    # You can check the spec of `each_line` in `spec/react_on_rails_pro/stream_spec.rb` for more details
+    def loop_response_lines(response)
+      return enum_for(__method__, response) unless block_given?
+
+      line = "".b
+
+      response.each do |chunk|
+        line << chunk
+
+        while (idx = line.index("\n"))
+          yield line.byteslice(0..idx - 1)
+
+          line = line.byteslice(idx + 1..-1)
+        end
+      end
+    ensure
+      yield line unless line.empty?
     end
   end
 end

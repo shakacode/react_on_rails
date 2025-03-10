@@ -56,7 +56,7 @@ scripts:
   eslint:
     default:
       description: Run eslint.
-      script: eslint . --ext ".js,.jsx,.ts,.tsx" --report-unused-disable-directives
+      script: eslint . --ext ".js,.mts,.mjs,.jsx,.ts,.tsx" --report-unused-disable-directives
     fix:
       description: Run eslint and auto-fix.
       script: nps "eslint --fix"
@@ -81,10 +81,10 @@ scripts:
     js:
       default:
         description: Run prettier on JS.
-        script: prettier "**/*.@(js|jsx)" --write
+        script: prettier "**/*.@(js|jsx|mjs)" --write
       listDifferent:
         description: Check if any JS files would change by running prettier.
-        script: prettier "**/*.@(js|jsx)" --list-different
+        script: prettier "**/*.@(js|jsx|mjs)" --list-different
     ts:
       default:
         description: Run prettier on TS.

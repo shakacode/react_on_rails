@@ -9,7 +9,7 @@ import {
   BUNDLE_TIMESTAMP,
   lockfilePath,
 } from './helper';
-import { getVmBundleFilePath } from '../src/worker/vm';
+import { hasVMContextForBundle } from '../src/worker/vm';
 import handleRenderRequest from '../src/worker/handleRenderRequest';
 import { delay, Asset } from '../src/shared/utils';
 
@@ -48,7 +48,7 @@ describe(testName, () => {
     });
 
     expect(result).toEqual(renderResult);
-    expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, `./tmp/${testName}/1495063024898.js`));
+    expect(hasVMContextForBundle(path.resolve(__dirname, `./tmp/${testName}/1495063024898.js`))).toBeTruthy();
   });
 
   test('If bundle was not uploaded yet and not provided', async () => {
@@ -96,7 +96,7 @@ describe(testName, () => {
     });
 
     expect(result).toEqual(renderResult);
-    expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, `./tmp/${testName}/1495063024898.js`));
+    expect(hasVMContextForBundle(path.resolve(__dirname, `./tmp/${testName}/1495063024898.js`))).toBeTruthy();
   });
 
   test('If lockfile exists from another thread and bundle provided.', async () => {
@@ -121,6 +121,6 @@ describe(testName, () => {
     });
 
     expect(result).toEqual(renderResult);
-    expect(getVmBundleFilePath()).toBe(path.resolve(__dirname, `./tmp/${testName}/1495063024898.js`));
+    expect(hasVMContextForBundle(path.resolve(__dirname, `./tmp/${testName}/1495063024898.js`))).toBeTruthy();
   });
 });

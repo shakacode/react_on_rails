@@ -120,7 +120,7 @@ module ReactOnRailsPro
             config.renderer_url = invalid_url
           end
         end.to raise_error(ReactOnRailsPro::Error,
-                           /Unparseable ReactOnRailsPro.config.renderer_url #{invalid_url} provided./)
+                           /Unparseable ReactOnRailsPro.config.renderer_url #{invalid_url} /)
       end
     end
 

@@ -1,3 +1,5 @@
+'use client';
+
 // Example of using hooks when taking the props and railsContext
 // Note, you need the call the hooks API within the react component stateless function
 import React, { useState } from 'react';

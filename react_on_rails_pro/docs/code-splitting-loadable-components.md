@@ -285,9 +285,8 @@ if (isWebpackDevServer) {
   environment.plugins.append(
     'NormalModuleReplacement',
     new webpack.NormalModuleReplacementPlugin(/(.*)\.imports-loadable(\.jsx)?/, (resource) => {
-      /* eslint-disable no-param-reassign */
+      // eslint-disable-next-line no-param-reassign
       resource.request = resource.request.replace(/imports-loadable/, 'imports-hmr');
-      /* eslint-enable no-param-reassign */
       return resource.request;
     }),
   );

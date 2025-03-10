@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, Suspense } from 'react';
 import css from '../components/HelloWorld.module.scss';
 

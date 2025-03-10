@@ -13,6 +13,7 @@ describe "Upload asset" do
 
   before do
     dbl_configuration = instance_double(ReactOnRailsPro::Configuration,
+                                        enable_rsc_support: false,
                                         server_renderer: "NodeRenderer",
                                         renderer_password: "myPassword1",
                                         renderer_url: "http://localhost:3800",
@@ -41,8 +42,7 @@ describe "Upload asset" do
     it "copying asset to public folder" do
       expect(asset_exist_on_renderer?(asset_filename)).to be(false)
       expect(asset_exist_on_renderer?(asset_filename2)).to be(false)
-      response = ReactOnRailsPro::Request.upload_assets
-      expect(response.status).to eq(200)
+      ReactOnRailsPro::Request.upload_assets
       expect(asset_exist_on_renderer?(asset_filename)).to be(true)
       expect(asset_exist_on_renderer?(asset_filename2)).to be(true)
     end

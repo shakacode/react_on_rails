@@ -1,3 +1,5 @@
+'use client';
+
 // This is loaded by execJs and Rails to generate the HTML used for server rendering.
 // Compare this file to ./ClientApp.jsx
 // This module should export one default method that take props and returns the react component to

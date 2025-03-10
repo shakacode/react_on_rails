@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { ApolloProvider, ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { hydrateRoot } from 'react-dom/client';

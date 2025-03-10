@@ -13,7 +13,9 @@ ReactOnRailsPro.configure do |config|
 
   config.renderer_password = "myPassword1"
 
+  config.enable_rsc_support = true
   config.renderer_url = "http://localhost:3800"
+  config.rsc_payload_generation_url_path = "rsc_payload/"
 
   # Set this to false specs fail if remote renderer is not available. We want to ensure
   # that the remote renderer works for CI.

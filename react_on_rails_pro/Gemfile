@@ -5,4 +5,4 @@ source "https://rubygems.org"
 # Specify your gem"s dependencies in react_on_rails.gemspec
 gemspec
 
-eval_gemfile File.expand_path("./Gemfile.development_dependencies", __dir__)
+eval_gemfile File.expand_path("./Gemfile.loader", __dir__)

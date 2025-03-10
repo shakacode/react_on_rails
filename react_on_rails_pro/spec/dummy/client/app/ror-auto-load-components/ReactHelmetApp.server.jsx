@@ -1,3 +1,5 @@
+'use client';
+
 import 'cross-fetch/polyfill';
 
 // Top level component for simple client side only rendering

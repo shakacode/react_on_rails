@@ -17,13 +17,24 @@ module ReactOnRailsPro
           # Resetting the pool for server bundle modifications is accomplished by changing the mtime
           # of the server bundle in the request to the remote rendering server.
           # In non-development mode, we don't need to re-read this value.
-          return @bundle_hash if @bundle_hash.present? && !ReactOnRails.configuration.development_mode
+          if @server_bundle_hash.blank? || ReactOnRails.configuration.development_mode
+            @server_bundle_hash = ReactOnRailsPro::Utils.bundle_hash
+          end
 
-          @bundle_hash = ReactOnRailsPro::Utils.bundle_hash
+          unless ReactOnRailsPro.configuration.enable_rsc_support &&
+                 (@rsc_bundle_hash.blank? || ReactOnRails.configuration.development_mode)
+            return
+          end
+
+          @rsc_bundle_hash = ReactOnRailsPro::Utils.rsc_bundle_hash
         end
 
         def renderer_bundle_file_name
           "#{ReactOnRailsPro::Utils.bundle_hash}.js"
+        end
+
+        def rsc_renderer_bundle_file_name
+          "#{ReactOnRailsPro::Utils.rsc_bundle_hash}.js"
         end
 
         # js_code: JavaScript expression that returns a string.
@@ -43,7 +54,11 @@ module ReactOnRailsPro
 
         def eval_streaming_js(js_code, render_options)
           path = prepare_render_path(js_code, render_options)
-          ReactOnRailsPro::Request.render_code_as_stream(path, js_code)
+          ReactOnRailsPro::Request.render_code_as_stream(
+            path,
+            js_code,
+            is_rsc_payload: render_options.rsc_payload_streaming?
+          )
         end
 
         def eval_js(js_code, render_options, send_bundle: false)
@@ -69,18 +84,24 @@ module ReactOnRailsPro
           fallback_exec_js(js_code, render_options, e)
         end
 
+        def server_bundle_hash
+          @server_bundle_hash ||= ReactOnRailsPro::Utils.bundle_hash
+        end
+
+        def rsc_bundle_hash
+          @rsc_bundle_hash ||= ReactOnRailsPro::Utils.rsc_bundle_hash
+        end
+
         def prepare_render_path(js_code, render_options)
           ReactOnRailsPro::ServerRenderingPool::ProRendering
             .set_request_digest_on_render_options(js_code, render_options)
 
-          # In case this method is called with simple, raw JS, not depending on the bundle, next line
-          # is needed.
-          @bundle_hash ||= ReactOnRailsPro::Utils.bundle_hash
-
+          is_rendering_rsc_payload = render_options.rsc_payload_streaming?
+          bundle_hash = is_rendering_rsc_payload ? rsc_bundle_hash : server_bundle_hash
           # TODO: Remove the request_digest. See https://github.com/shakacode/react_on_rails_pro/issues/119
           # From the request path
           # path = "/bundles/#{@bundle_hash}/render"
-          "/bundles/#{@bundle_hash}/render/#{render_options.request_digest}"
+          "/bundles/#{bundle_hash}/render/#{render_options.request_digest}"
         end
 
         def fallback_exec_js(js_code, render_options, error)
