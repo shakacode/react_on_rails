@@ -153,7 +153,8 @@ module ReactOnRails
     end
 
     def validate_generated_component_packs_loading_strategy
-      if PackerUtils.shakapacker_version_requirement_met?([8, 2, 0])
+      # TODO: Use version 8.2.0 after it's released and before merging this branch
+      if PackerUtils.shakapacker_version_requirement_met?([8, 1, 0])
         self.generated_component_packs_loading_strategy ||= :async
       elsif generated_component_packs_loading_strategy.nil?
         msg = <<~MSG

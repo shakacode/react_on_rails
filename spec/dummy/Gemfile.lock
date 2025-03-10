@@ -1,3 +1,15 @@
+GIT
+  remote: https://github.com/shakacode/shakapacker.git
+  revision: 01462be63865356d9e3127e9f7422ae4348f7b5c
+  branch: abanoubghadban/pro521-add-support-for-async-scripts-in-the-view
+  specs:
+    shakapacker (8.1.0)
+      activesupport (>= 5.2)
+      package_json
+      rack-proxy (>= 0.6.1)
+      railties (>= 5.2)
+      semantic_range (>= 2.3.0)
+
 PATH
   remote: ../..
   specs:
@@ -331,13 +343,7 @@ GEM
       rexml (~> 3.2, >= 3.2.5)
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
-    semantic_range (3.0.0)
-    shakapacker (8.0.0)
-      activesupport (>= 5.2)
-      package_json
-      rack-proxy (>= 0.6.1)
-      railties (>= 5.2)
-      semantic_range (>= 2.3.0)
+    semantic_range (3.1.0)
     simplecov (0.16.1)
       docile (~> 1.1)
       json (>= 1.8, < 3)
@@ -423,7 +429,7 @@ DEPENDENCIES
   scss_lint
   sdoc
   selenium-webdriver (= 4.9.0)
-  shakapacker (= 8.0.0)
+  shakapacker!
   spring (~> 4.0)
   sprockets (~> 4.0)
   sqlite3 (~> 1.6)
