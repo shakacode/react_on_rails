@@ -5,9 +5,10 @@ git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
 ruby '3.3.0'
 
-gem "react_on_rails", "14.1.1" # keep in sync with package.json files
+gem "react_on_rails", "15.0.0.alpha.2" # keep in sync with package.json files
 
 # For local development
+# Add the following line to the Gemfile.local file
 # gem "react_on_rails", path: "../react_on_rails"
 
 gem "shakapacker", "8.0.0"
@@ -57,6 +58,7 @@ group :development, :test do
   gem 'rubocop-performance', "1.15.0", require: false
   gem 'rubocop-rspec', "2.13.2", require: false
   gem "scss_lint", require: false
+  gem 'fakefs', require: 'fakefs/safe'
 end
 
 group :test do

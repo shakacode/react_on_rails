@@ -55,6 +55,16 @@ module ReactOnRailsPro
       @bundle_hash = calc_bundle_hash(server_bundle_js_file_path)
     end
 
+    def self.rsc_bundle_hash
+      return @rsc_bundle_hash if @rsc_bundle_hash && !(Rails.env.development? || Rails.env.test?)
+
+      server_rsc_bundle_js_file_path = ReactOnRails::Utils.rsc_bundle_js_file_path
+
+      return @rsc_bundle_hash if @rsc_bundle_hash && bundle_mtime_same?(server_rsc_bundle_js_file_path)
+
+      @rsc_bundle_hash = calc_bundle_hash(server_rsc_bundle_js_file_path)
+    end
+
     # Returns the hashed file name when using webpacker. Useful for creating cache keys.
     def self.bundle_file_name(bundle_name)
       unless ReactOnRails::PackerUtils.using_packer?
@@ -99,7 +109,8 @@ module ReactOnRailsPro
 
     def self.contains_hash?(server_bundle_basename)
       # TODO: Need to consider if the configuration value has the ".js" on the end.
-      ReactOnRails.configuration.server_bundle_js_file != server_bundle_basename
+      ReactOnRails.configuration.server_bundle_js_file != server_bundle_basename &&
+        ReactOnRails.configuration.rsc_bundle_js_file != server_bundle_basename
     end
 
     def self.with_trace(message = nil)

@@ -1,3 +1,5 @@
+'use client';
+
 import PropTypes from 'prop-types';
 import React from 'react';
 import RailsContext from '../components/RailsContext';

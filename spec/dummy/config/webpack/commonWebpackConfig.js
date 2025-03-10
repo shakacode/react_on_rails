@@ -2,7 +2,7 @@ const { generateWebpackConfig, merge } = require('shakapacker');
 const webpack = require('webpack');
 
 const sassResources = ['./client/app/assets/styles/app-variables.scss'];
-const aliasConfig = require('./alias.js');
+const aliasConfig = require('./alias');
 
 const commonOptions = {
   resolve: {
@@ -34,9 +34,8 @@ baseClientWebpackConfig.module.rules[scssConfigIndex].use.push(sassLoaderConfig)
 if (isHMR) {
   baseClientWebpackConfig.plugins.push(
     new webpack.NormalModuleReplacementPlugin(/(.*)\.imports-loadable(\.jsx)?/, (resource) => {
-      /* eslint-disable no-param-reassign */
+      // eslint-disable-next-line no-param-reassign
       resource.request = resource.request.replace(/imports-loadable/, 'imports-hmr');
-      /* eslint-enable no-param-reassign */
       return resource.request;
     }),
   );

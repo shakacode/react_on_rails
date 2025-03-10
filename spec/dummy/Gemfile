@@ -3,7 +3,7 @@
 source "https://rubygems.org"
 
 ENV["SPEC_DUMMY"] = "yes"
-eval_gemfile File.expand_path("../../Gemfile.development_dependencies", __dir__)
+eval_gemfile File.expand_path("../../Gemfile.loader", __dir__)
 
 gem "react_on_rails_pro", path: "../.."
 

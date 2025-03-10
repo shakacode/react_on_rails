@@ -23,6 +23,8 @@ module ReactOnRailsPro
           before do
             allow(ReactOnRails.configuration)
               .to receive(:server_bundle_js_file).and_return(nil)
+            allow(ReactOnRails.configuration)
+              .to receive(:rsc_bundle_js_file).and_return(nil)
             allow(Shakapacker).to receive_message_chain("manifest.lookup!")
               .with("client-bundle.js")
               .and_return("/webpack/production/client-bundle-0123456789abcdef.js")
@@ -42,6 +44,8 @@ module ReactOnRailsPro
                 .and_return(server_bundle_js_file_path)
               allow(ReactOnRails.configuration)
                 .to receive(:server_bundle_js_file).and_return("webpack-bundle.js")
+              allow(ReactOnRails.configuration)
+                .to receive(:rsc_bundle_js_file).and_return("rsc-webpack-bundle.js")
               allow(File).to receive(:mtime).with(server_bundle_js_file_path).and_return(123)
 
               result = described_class.bundle_hash
@@ -68,6 +72,31 @@ module ReactOnRailsPro
               result = described_class.bundle_hash
 
               expect(result).to eq("foobarfoobar-development")
+            end
+          end
+
+          context "with rsc bundle without hash in webpack output filename" do
+            it "returns MD5 for rsc bundle file name" do
+              rsc_bundle_js_file = "webpack/production/rsc-webpack-bundle.js"
+              rsc_bundle_js_file_path = File.expand_path("./public/#{rsc_bundle_js_file}")
+              allow(Shakapacker).to receive_message_chain("manifest.lookup!")
+                .and_return(rsc_bundle_js_file)
+              allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
+                .and_return(rsc_bundle_js_file_path.gsub("rsc-", ""))
+              allow(ReactOnRails::Utils).to receive(:rsc_bundle_js_file_path)
+                .and_return(rsc_bundle_js_file_path)
+              allow(ReactOnRails.configuration)
+                .to receive(:server_bundle_js_file).and_return("webpack-bundle.js")
+              allow(ReactOnRails.configuration)
+                .to receive(:rsc_bundle_js_file).and_return("rsc-webpack-bundle.js")
+              allow(Digest::MD5).to receive(:file)
+                .with(rsc_bundle_js_file_path)
+                .and_return("barfoobarfoo")
+              allow(File).to receive(:mtime).with(rsc_bundle_js_file_path).and_return(345)
+
+              result = described_class.rsc_bundle_hash
+
+              expect(result).to eq("barfoobarfoo-development")
             end
           end
         end

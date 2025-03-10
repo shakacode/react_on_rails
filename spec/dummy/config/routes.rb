@@ -23,6 +23,8 @@ Rails.application.routes.draw do
   get "stream_async_components" => "pages#stream_async_components", as: :stream_async_components
   get "stream_async_components_for_testing" => "pages#stream_async_components_for_testing",
       as: :stream_async_components_for_testing
+  get "rsc_posts_page" => "pages#rsc_posts_page", as: :rsc_posts_page
+  rsc_payload_route controller: "pages"
 
   # routes copied over from react on rails
   get "client_side_hello_world" => "pages#client_side_hello_world"
@@ -58,4 +60,13 @@ Rails.application.routes.draw do
   get "server_render_with_timeout" => "pages#server_render_with_timeout"
   get "context_function_return_jsx" => "pages#context_function_return_jsx"
   get "pure_component_wrapped_in_function" => "pages#pure_component_wrapped_in_function"
+  get "posts_page" => "pages#posts_page"
+
+  # API Routes
+  namespace :api do
+    resources :posts do
+      resources :comments
+    end
+    resources :users
+  end
 end

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class PagesController < ApplicationController
-  include ActionController::Live
+  include ReactOnRailsPro::RSCPayloadRenderer
 
   XSS_PAYLOAD = { "<script>window.alert('xss1');</script>" => '<script>window.alert("xss2");</script>' }.freeze
   PROPS_NAME = "Mr. Server Side Rendering"
@@ -10,9 +10,6 @@ class PagesController < ApplicationController
       name: PROPS_NAME
     }.merge(XSS_PAYLOAD)
   }.freeze
-
-  include ReactOnRails::Controller
-  include ReactOnRailsPro::Stream
 
   before_action do
     session[:something_useful] = "REALLY USEFUL"
@@ -41,6 +38,31 @@ class PagesController < ApplicationController
 
   def stream_async_components_for_testing
     stream_view_containing_react_components(template: "/pages/stream_async_components_for_testing")
+  end
+
+  def rsc_posts_page
+    stream_view_containing_react_components(template: "/pages/rsc_posts_page")
+  end
+
+  def posts_page # rubocop:disable Metrics/AbcSize
+    artificial_delay = params[:artificial_delay] || 0
+    posts = JSON.parse(HTTPX.get("http://localhost:3000/api/posts").body, symbolize_names: true)
+    # pick one post per user
+    posts = posts.group_by { |post| post[:user_id] }.map { |_, user_posts| user_posts.first }
+    posts = posts.map do |post|
+      comments = JSON.parse(HTTPX.get("http://localhost:3000/api/posts/#{post[:id]}/comments").body,
+                            symbolize_names: true)
+      comments = comments.map do |comment|
+        comment.merge(user: JSON.parse(HTTPX.get("http://localhost:3000/api/users/#{comment[:user_id]}").body,
+                                       symbolize_names: true))
+      end
+      post.merge(comments: comments)
+    rescue StandardError => e
+      raise "Error while fetching post #{post} #{post[:id]}: #{e.message}"
+    end
+    sleep artificial_delay.to_i / 1000 * 2
+    @posts = posts
+    render "/pages/posts_page"
   end
 
   def loadable_component

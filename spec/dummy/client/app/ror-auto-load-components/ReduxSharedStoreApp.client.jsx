@@ -1,3 +1,5 @@
+'use client';
+
 // Top level component for client side.
 // Compare this to the ./ServerApp.jsx file which is used for server side rendering.
 

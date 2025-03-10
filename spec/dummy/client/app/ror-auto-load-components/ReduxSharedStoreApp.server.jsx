@@ -1,3 +1,5 @@
+'use client';
+
 // Top level component for serer side.
 // Compare this to the ./ClientReduxSharedStoreApp.jsx file which is used for client side rendering.
 

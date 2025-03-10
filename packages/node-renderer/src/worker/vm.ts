@@ -9,8 +9,10 @@ import vm from 'vm';
 import m from 'module';
 import cluster from 'cluster';
 import type { Readable } from 'stream';
-import { promisify } from 'util';
+import { ReadableStream } from 'stream/web';
+import { promisify, TextEncoder } from 'util';
 import type { ReactOnRails as ROR } from 'react-on-rails';
+import type { Context } from 'vm';
 
 import SharedConsoleHistory from '../shared/sharedConsoleHistory';
 import log from '../shared/log';
@@ -21,20 +23,27 @@ import * as errorReporter from '../shared/errorReporter';
 const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
 
-// Both context and vmBundleFilePath are set when the VM is ready.
-let context: vm.Context | undefined;
-let sharedConsoleHistory: SharedConsoleHistory | undefined;
+interface VMContext {
+  context: Context;
+  sharedConsoleHistory: SharedConsoleHistory;
+  lastUsed: number; // Track when this VM was last used
+}
 
-// vmBundleFilePath is cleared at the beginning of creating the context and set only when the
-// context is properly created.
-let vmBundleFilePath: string | undefined;
+// Store contexts by their bundle file paths
+const vmContexts = new Map<string, VMContext>();
 
 /**
- * Value is set after VM created from the bundleFilePath. This value is undefined if the context is
- * not ready.
+ * Returns all bundle paths that have a VM context
  */
-export function getVmBundleFilePath() {
-  return vmBundleFilePath;
+export function hasVMContextForBundle(bundlePath: string) {
+  return vmContexts.has(bundlePath);
+}
+
+/**
+ * Get a specific VM context by bundle path
+ */
+function getVMContext(bundlePath: string): VMContext | undefined {
+  return vmContexts.get(bundlePath);
 }
 
 /**
@@ -64,20 +73,50 @@ const extendContext = (contextObject: vm.Context, additionalContext: Record<stri
   Object.assign(contextObject, additionalContext);
 };
 
+// Helper function to manage VM pool size
+function manageVMPoolSize() {
+  const { maxVMPoolSize } = getConfig();
+
+  if (vmContexts.size <= maxVMPoolSize) {
+    return;
+  }
+
+  const sortedEntries = Array.from(vmContexts.entries()).sort(([, a], [, b]) => a.lastUsed - b.lastUsed);
+
+  while (sortedEntries.length > maxVMPoolSize) {
+    const oldestPath = sortedEntries.shift()?.[0];
+    if (oldestPath) {
+      vmContexts.delete(oldestPath);
+      log.debug(`Removed VM for bundle ${oldestPath} due to pool size limit (max: ${maxVMPoolSize})`);
+    }
+  }
+}
+
 export async function buildVM(filePath: string) {
-  if (filePath === vmBundleFilePath && context) {
+  // Check if VM for this bundle already exists
+  const vmContext = vmContexts.get(filePath);
+  if (vmContext) {
+    // Update last used time when accessing existing VM
+    vmContext.lastUsed = Date.now();
     return Promise.resolve(true);
   }
 
   try {
     const { supportModules, stubTimers, additionalContext } = getConfig();
     const additionalContextIsObject = additionalContext !== null && additionalContext.constructor === Object;
-    vmBundleFilePath = undefined;
-    sharedConsoleHistory = new SharedConsoleHistory();
+    const sharedConsoleHistory = new SharedConsoleHistory();
     const contextObject = { sharedConsoleHistory };
+
     if (supportModules) {
+      // IMPORTANT: When adding anything to this object, update:
+      // 1. docs/node-renderer/js-configuration.md
+      // 2. packages/node-renderer/src/shared/configBuilder.ts
       extendContext(contextObject, {
         Buffer,
+        TextDecoder,
+        TextEncoder,
+        URLSearchParams,
+        ReadableStream,
         process,
         setTimeout,
         setInterval,
@@ -92,7 +131,17 @@ export async function buildVM(filePath: string) {
     if (additionalContextIsObject) {
       extendContext(contextObject, additionalContext);
     }
-    context = vm.createContext(contextObject);
+    const context = vm.createContext(contextObject);
+
+    // Store the new context with timestamp
+    vmContexts.set(filePath, {
+      context,
+      sharedConsoleHistory,
+      lastUsed: Date.now(),
+    });
+
+    // Manage pool size after adding new VM
+    manageVMPoolSize();
 
     // Create explicit reference to global context, just in case (some libs can use it):
     vm.runInContext('global = this', context);
@@ -168,7 +217,7 @@ export async function buildVM(filePath: string) {
 
     // isWorker check is required for JS unit testing:
     if (cluster.isWorker && cluster.worker !== undefined) {
-      log.debug(`Built VM for worker #${cluster.worker.id}`);
+      log.debug(`Built VM for worker #${cluster.worker.id} with bundle ${filePath}`);
     }
 
     if (log.level === 'debug') {
@@ -182,8 +231,6 @@ export async function buildVM(filePath: string) {
       );
     }
 
-    vmBundleFilePath = filePath;
-
     return Promise.resolve(true);
   } catch (error) {
     log.error('Caught Error when creating context in buildVM, %O', error);
@@ -195,30 +242,41 @@ export async function buildVM(filePath: string) {
 /**
  *
  * @param renderingRequest JS Code to execute for SSR
+ * @param filePath
  * @param vmCluster
  */
-export async function runInVM(renderingRequest: string, vmCluster?: typeof cluster): Promise<RenderResult> {
+export async function runInVM(
+  renderingRequest: string,
+  filePath: string,
+  vmCluster?: typeof cluster,
+): Promise<RenderResult> {
   const { bundlePath } = getConfig();
 
   try {
-    if (context == null || sharedConsoleHistory == null) {
-      throw new Error('runInVM called before buildVM');
+    // Get the correct VM context based on the provided bundle path
+    const vmContext = getVMContext(filePath);
+
+    if (!vmContext) {
+      throw new Error(`No VM context found for bundle ${filePath}`);
     }
+
+    // Update last used timestamp
+    vmContext.lastUsed = Date.now();
+
+    const { context, sharedConsoleHistory } = vmContext;
 
     if (log.level === 'debug') {
       // worker is nullable in the primary process
       const workerId = vmCluster?.worker?.id;
-      log.debug(`worker ${workerId ? `${workerId} ` : ''}received render request with code
+      log.debug(`worker ${workerId ? `${workerId} ` : ''}received render request for bundle ${filePath} with code
 ${smartTrim(renderingRequest)}`);
       const debugOutputPathCode = path.join(bundlePath, 'code.js');
       log.debug(`Full code executed written to: ${debugOutputPathCode}`);
       await writeFileAsync(debugOutputPathCode, renderingRequest);
     }
 
-    // Capture context to ensure TypeScript sees it as defined within the callback
-    const localContext = context;
     let result = sharedConsoleHistory.trackConsoleHistoryInRenderRequest(
-      () => vm.runInContext(renderingRequest, localContext) as RenderCodeResult,
+      () => vm.runInContext(renderingRequest, context) as RenderCodeResult,
     );
 
     if (isReadableStream(result)) {
@@ -245,6 +303,11 @@ ${smartTrim(result)}`);
 }
 
 export function resetVM() {
-  context = undefined;
-  vmBundleFilePath = undefined;
+  // Clear all VM contexts
+  vmContexts.clear();
+}
+
+// Optional: Add a method to remove a specific VM if needed
+export function removeVM(bundlePath: string) {
+  vmContexts.delete(bundlePath);
 }

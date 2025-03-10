@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 $LOAD_PATH.unshift File.expand_path("../../lib", __dir__)
+
 require "react_on_rails"
 require "react_on_rails/packer_utils"
 require "react_on_rails_pro"

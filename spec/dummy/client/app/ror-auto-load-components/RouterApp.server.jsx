@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { createStaticHandler, createStaticRouter, StaticRouterProvider } from 'react-router-dom/server';
