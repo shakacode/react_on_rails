@@ -15,6 +15,13 @@ If you think ShakaCode can help your project, [click here](https://meetings.hubs
 Please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide, and add a link for the version diff at the bottom of the file. Also, please update the `Unreleased` link to compare to the latest release version.
 
 ## Versions
+### [Unreleased]
+#### Added
+- Configuration option `generated_component_packs_loading_strategy` to control how generated component packs are loaded. It supports `sync`, `async`, and `defer` strategies. [PR 1707](https://github.com/shakacode/react_on_rails/pull/1707) by [judahmeek](https://github.com/judahmeek).
+
+### Removed (Breaking Changes)
+- Removed `defer_generated_component_packs` configuration option. You can use `generated_component_packs_loading_strategy` instead. [PR 1707](https://github.com/shakacode/react_on_rails/pull/1707) by [judahmeek](https://github.com/judahmeek).
+
 ### [15.0.0-alpha.2] - 2025-03-07
 Changes since the last non-beta release.
 
