@@ -55,7 +55,7 @@ describe ReactOnRailsHelper do
         expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: false })
       else
         expect(helper).to have_received(:append_javascript_pack_tag)
-          .with("generated/component_name",{ defer: false, async: true })
+          .with("generated/component_name", { defer: false, async: true })
       end
       expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
     end
