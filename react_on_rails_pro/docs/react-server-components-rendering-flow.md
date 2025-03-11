@@ -15,7 +15,7 @@ In a React Server Components project, there are three distinct types of bundles:
 ### Server Bundle (server-bundle.js)
 - Contains both server and client components in their full form
 - Used for traditional server-side rendering (SSR)
-- Enables direct HTML generation of all components
+- Enables HTML generation of any components
 - Does not transform client components into references
 
 ### Client Bundle
@@ -24,7 +24,7 @@ In a React Server Components project, there are three distinct types of bundles:
 - Code splitting occurs automatically for client components
 - Chunks are loaded on-demand during client component hydration
 
-## Current Rendering Flow
+## Current React Server Component Rendering Flow
 
 When a request is made to a page using React Server Components, the following sequence occurs:
 
@@ -47,13 +47,14 @@ When a request is made to a page using React Server Components, the following se
    - Client component chunks are fetched based on references
    - Components are hydrated progressively
 
-## Current Limitations
+## Current React Server Component Rendering Limitations
+_See open PRs. Active development will soon solve these limitations_
 
 This approach has two main inefficiencies:
 
 1. **Double Rendering**: Server components are rendered twice:
    - Once for HTML generation using the server bundle
-   - Again for RSC payload generation using the RSC bundle
+   - Again, for RSC payload generation using the RSC bundle
 
 2. **Multiple Requests**: Requires two separate HTTP requests:
    - Initial request for HTML
@@ -62,14 +63,14 @@ This approach has two main inefficiencies:
 ```mermaid
 sequenceDiagram
     participant Browser
-    participant View
+    participant RailsView
     participant NodeRenderer
     participant ServerBundle
     participant RSCBundle
     
     Note over Browser,RSCBundle: 1. Initial HTML Generation
-    Browser->>View: Request page
-    View->>NodeRenderer: stream_react_component
+    Browser->>RailsView: Request page
+    RailsView->>NodeRenderer: stream_react_component
     NodeRenderer->>ServerBundle: Generate HTML
     ServerBundle-->>NodeRenderer: HTML for all components
     NodeRenderer-->>Browser: Stream HTML
@@ -98,7 +99,7 @@ These inefficiencies will be addressed in the upcoming ["Use RSC payload to rend
 1. Initial Request:
    - `stream_react_component` triggers node renderer
    - Renderer uses **RSC Bundle** to generate RSC payload
-   - Payload is passed to rendering function in **Server Bundle**
+   - Payload is passed to the rendering function in **Server Bundle**
    - HTML of server components is generated using RSC payload
    - Client component references are filled with HTML of the client components
 
@@ -113,14 +114,14 @@ This improved approach eliminates double rendering and reduces HTTP requests, re
 ```mermaid
 sequenceDiagram
     participant Browser
-    participant View
+    participant RailsView
     participant NodeRenderer
     participant RSCBundle
     participant ServerBundle
     
     Note over Browser,ServerBundle: 1. Initial Request
-    Browser->>View: Request page
-    View->>NodeRenderer: stream_react_component
+    Browser->>RailsView: Request page
+    RailsView->>NodeRenderer: stream_react_component
     NodeRenderer->>RSCBundle: Generate RSC payload
     RSCBundle-->>NodeRenderer: RSC payload
     NodeRenderer->>ServerBundle: Pass RSC payload
