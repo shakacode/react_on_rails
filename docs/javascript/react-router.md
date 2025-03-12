@@ -24,7 +24,7 @@ const RouterApp = (props, railsContext) => {
 };
 ```
 
-For a fleshed out integration of react_on_rails with react-router, check out [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial), specifically the files:
+For a fleshed out integration of react_on_rails with React Router, check out [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial), specifically the files:
 
 - [react-webpack-rails-tutorial/client/app/bundles/comments/routes/routes.jsx](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/app/bundles/comments/routes/routes.jsx)
 

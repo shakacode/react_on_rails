@@ -44,7 +44,7 @@ If you think ShakaCode can help your project, [click here](https://meetings.hubs
 
 ## React on Rails Pro
 
-Are you interested in optimizing your Webpack setup for React on Rails, including code splitting with [react-router](https://github.com/ReactTraining/react-router#readme) and [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers?
+Are you interested in optimizing your Webpack setup for React on Rails, including code splitting with [React Router](https://reactrouter.com/) and [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers?
 We did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://www.shakacode.com/recent-work/popmenu/). Several years later, Popmenu serves tens of millions of SSR requests daily with React on Rails Pro.
 
 If you're interested, read more about [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) and [book a call](https://meetings.hubspot.com/justingordon/30-minute-consultation).
@@ -67,7 +67,7 @@ Given that `shakacode/shakapacker` gem already provides basic React integration,
    Tight integration with [shakapacker](https://github.com/shakacode/shakapacker) (or its predecessor [rails/webpacker](https://github.com/rails/webpacker)).
 1. Server-Side Rendering (SSR), often used for SEO crawler indexing and UX performance.
 1. [Automated optimized entry-point creation and bundle inclusion when placing a component on a page. With this feature, you no longer need to configure `javascript_pack_tags` and `stylesheet_pack_tags` on your layouts based on what’s shown. “It just works!”](https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation/)
-1. [Redux](https://github.com/reactjs/redux) and [React Router](https://github.com/ReactTraining/react-router#readme) integration with server-side-rendering.
+1. [Redux](https://redux.js.org/) and [React Router](https://reactrouter.com/) integration with server-side-rendering.
 1. [Internationalization (I18n) and (localization)](https://www.shakacode.com/react-on-rails/docs/guides/i18n)
 1. A supportive community. This [web search shows how live public sites are using React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/).
 1. [ReScript Support](https://github.com/shakacode/rescript-react-on-rails-example).

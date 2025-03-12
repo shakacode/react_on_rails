@@ -40,9 +40,9 @@ Here's the chef's selection from the React on Rails community:
 
 - [Bootstrap](http://getbootstrap.com/), loaded from [bootstrap-loader](https://github.com/shakacode/bootstrap-loader/). Common UI styles.
 - [Lodash](https://lodash.com/): Swiss army knife of utilities.
-- [React](https://facebook.github.io/react/): UI components.
-- [React-Router](https://github.com/reactjs/react-router): Provider of deep links for client-side application.
-- [Redux](https://github.com/reactjs/redux): Flux implementation (aka "state container").
+- [React](https://react.dev/): UI components.
+- [React Router](https://reactrouter.com/): Provider of deep links for client-side application.
+- [Redux](https://redux.js.org/): Flux implementation (aka "state container").
 
 ### JavaScript Tooling
 
