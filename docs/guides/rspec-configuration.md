@@ -1,7 +1,9 @@
 # RSpec Configuration
+
 _Click [here for minitest](https://www.shakacode.com/react-on-rails/docs/guides/minitest-configuration/)_
 
 # If your webpack configurations correspond to Shakapacker's default setup
+
 If you're able to configure your webpack configuration to be run by having your webpack configuration
 returned by the files in `/config/webpack`, then you have 2 options to ensure that your files are
 compiled by webpack before running tests and during production deployment:
@@ -12,7 +14,7 @@ compiled by webpack before running tests and during production deployment:
 2. **Use the react_on_rails settings and helpers**. Use the settings in `config/initializers/react_on_rails.rb`. Refer to [docs/configuration](https://www.shakacode.com/react-on-rails/docs/guides/configuration/).
 
 ```yml
-  config.build_test_command = "NODE_ENV=test RAILS_ENV=test bin/shakapacker"
+config.build_test_command = "NODE_ENV=test RAILS_ENV=test bin/shakapacker"
 ```
 
 Which should you use? If you're already using the `Shakapacker` way to configure webpack, then
@@ -44,6 +46,7 @@ If you are using Webpack to build CSS assets, you should do something like this 
 ```
 
 Please take note of the following:
+
 - If you are using Shakapacker, be **SURE** to configure the `source_path` in your `config/shakapacker.yml` unless you are using the defaults for Shakapacker.
 
 - This utility uses your `build_test_command` to build the static generated files. This command **must not** include the `--watch` option. If you have different server and client bundle files, this command **must** create all the bundles. If you are using Shakapacker, the default value will come from the `config/shakapacker.yml` value for the `public_output_path` and the `source_path`
@@ -53,6 +56,7 @@ Please take note of the following:
 - By default, the webpack processes look in the webpack generated files folder, configured via the `config/shakapacker.yml` config values of `public_root_path` and `public_output_path`. If the webpack generated files folder is missing, is empty, or contains files in the `config.webpack_generated_files` list with `mtime`s older than any of the files in your `client` folder, the helper will recompile your assets.
 
 The following `config/react_on_rails.rb` settings **must** match your setup:
+
 ```ruby
   # Define the files we need to check for webpack compilation when running tests.
   config.webpack_generated_files = %w( manifest.json )

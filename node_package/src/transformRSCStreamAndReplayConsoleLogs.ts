@@ -13,7 +13,7 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
         lastIncompleteChunk = chunks.pop() ?? '';
 
         const jsonChunks = chunks
-          .filter(line => line.trim() !== '')
+          .filter((line) => line.trim() !== '')
           .map((line) => {
             try {
               return JSON.parse(line);
@@ -27,7 +27,10 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
           const { html, consoleReplayScript = '' } = jsonChunk;
           controller.enqueue(encoder.encode(html));
 
-          const replayConsoleCode = consoleReplayScript.trim().replace(/^<script.*>/, '').replace(/<\/script>$/, '');
+          const replayConsoleCode = consoleReplayScript
+            .trim()
+            .replace(/^<script.*>/, '')
+            .replace(/<\/script>$/, '');
           if (replayConsoleCode?.trim() !== '') {
             const scriptElement = document.createElement('script');
             scriptElement.textContent = replayConsoleCode;
@@ -39,6 +42,6 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
         ({ value, done } = await reader.read());
       }
       controller.close();
-    }
+    },
   });
 }

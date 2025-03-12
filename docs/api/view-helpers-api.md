@@ -1,9 +1,10 @@
 # View and Controller Helpers
-##  View Helpers API
+
+## View Helpers API
 
 Once the bundled files have been generated in your `app/assets/webpack` folder, and you have registered your components, you will want to render these components on your Rails views using the included helper method, [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component).
 
-------------
+---
 
 ### react_component
 
@@ -15,6 +16,7 @@ react_component(component_name,
 ```
 
 Uncommonly used options:
+
 ```
   trace: nil,
   replay_console: nil,
@@ -37,7 +39,7 @@ Uncommonly used options:
   - **logging_on_server:** Default is true. True will log JS console messages and errors to the server.
   - **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
 
--------------
+---
 
 ### react_component_hash
 
@@ -76,9 +78,10 @@ export default (props, _railsContext) => {
 };
 ```
 
-------------
+---
 
 ### cached_react_component and cached_react_component_hash
+
 Fragment caching is a [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki) feature. The API is the same as the above, but for 2 differences:
 
 1. The `cache_key` takes the same parameters as any Rails `cache` view helper.
@@ -89,13 +92,14 @@ Fragment caching is a [React on Rails Pro](https://github.com/shakacode/react_on
   some_slow_method_that_returns_props
 end %>
 ```
-------------
+
+---
 
 ### rails_context
 
 You can call `rails_context` or `rails_context(server_side: true|false)` from your controller or view to see what values are in the Rails Context. Pass true or false depending on whether you want to see the server side or the client side rails_context. Typically, for computing cache keys, you should leave server_side as the default true. When calling this from a controller method, use `helpers.rails_context`.
 
-------------
+---
 
 ### Renderer Functions (function that will call ReactDOM.render or ReactDOM.hydrate)
 
@@ -105,7 +109,7 @@ Why would you want to call `ReactDOM.hydrate` yourself? One possible use case is
 
 Renderer functions are not meant to be used on the server since there's no DOM on the server. Instead, use a Render-Function. Attempting to server render with a renderer function will throw an error.
 
-------------
+---
 
 ### React Router
 
@@ -115,7 +119,7 @@ Renderer functions are not meant to be used on the server since there's no DOM o
 2. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/ServerRouterApp.jsx).
 3. [Code Splitting docs](https://www.shakacode.com/react-on-rails/docs/javascript/code-splitting/) for information about how to set up code splitting for server rendered routes.
 
-------------
+---
 
 ## server_render_js
 
@@ -126,7 +130,7 @@ Renderer functions are not meant to be used on the server since there's no DOM o
 
 This is a helper method that takes any JavaScript expression and returns the output from evaluating it. If you have more than one line that needs to be executed, wrap it in an IIFE. JS exceptions will be caught and console messages handled properly.
 
-------------
+---
 
 # More details
 

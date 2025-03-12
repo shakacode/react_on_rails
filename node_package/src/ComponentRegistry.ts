@@ -1,8 +1,4 @@
-import {
-  type RegisteredComponent,
-  type ReactComponentOrRenderFunction,
-  type RenderFunction,
-} from './types';
+import { type RegisteredComponent, type ReactComponentOrRenderFunction, type RenderFunction } from './types';
 import isRenderFunction from './isRenderFunction';
 import CallbackRegistry from './CallbackRegistry';
 
@@ -13,7 +9,7 @@ export default {
    * @param components { component1: component1, component2: component2, etc. }
    */
   register(components: { [id: string]: ReactComponentOrRenderFunction }): void {
-    Object.keys(components).forEach(name => {
+    Object.keys(components).forEach((name) => {
       if (componentRegistry.has(name)) {
         console.warn('Called register for component that is already registered', name);
       }
