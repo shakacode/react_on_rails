@@ -9,7 +9,7 @@ function handleRenderFunctionIssue(options: ErrorOptions): string {
 
   if (name) {
     const lastLine =
-      'A Render-Function takes a single arg of props (and the location for react-router) ' +
+      'A Render-Function takes a single arg of props (and the location for React Router) ' +
       'and returns a ReactElement.';
 
     let shouldBeRenderFunctionError = `ERROR: ReactOnRails is incorrectly detecting Render-Function to be false. \

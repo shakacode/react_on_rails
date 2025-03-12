@@ -2,7 +2,7 @@ _This article needs updating for the latest version of React Router_
 
 # Using React Router
 
-React on Rails supports the use of React Router. Client-side code doesn't need any special configuration for the React on Rails gem. Implement React Router how you normally would. Note, you might want to avoid using Turbolinks as both Turbolinks and React-Router will be trying to handle the back and forward buttons. If you get this figured out, please do share with the community! Otherwise, you might have to tweak the basic settings for Turbolinks, and this may or may not be worth the effort.
+React on Rails supports the use of React Router. Client-side code doesn't need any special configuration for the React on Rails gem. Implement React Router how you normally would. Note, you might want to avoid using Turbolinks as both Turbolinks and React Router will be trying to handle the back and forward buttons. If you get this figured out, please do share with the community! Otherwise, you might have to tweak the basic settings for Turbolinks, and this may or may not be worth the effort.
 
 If you are working with the HelloWorldApp created by the react_on_rails generator, then the code below corresponds to the module in `client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx`.
 
@@ -24,7 +24,7 @@ const RouterApp = (props, railsContext) => {
 };
 ```
 
-For a fleshed out integration of react_on_rails with react-router, check out [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial), specifically the files:
+For a fleshed out integration of React on Rails with React Router, check out [React Webpack Rails Tutorial Code](https://github.com/shakacode/react-webpack-rails-tutorial), specifically the files:
 
 - [react-webpack-rails-tutorial/client/app/bundles/comments/routes/routes.jsx](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/app/bundles/comments/routes/routes.jsx)
 
@@ -39,7 +39,7 @@ Your Render-Function may not return an object with the property `renderedHtml`. 
 
 This example **only applies to server-side rendering** and should only be used in the server-side bundle.
 
-From the [original example in the ReactRouter docs](https://github.com/ReactTraining/react-router/blob/v4.3.1/packages/react-router-dom/docs/guides/server-rendering.md)
+From the [original example in the React Router docs](https://github.com/ReactTraining/react-router/blob/v4.3.1/packages/react-router-dom/docs/guides/server-rendering.md)
 
 ```javascript
 import React from 'react';

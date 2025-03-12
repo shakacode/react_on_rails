@@ -30,12 +30,12 @@ This definitely can make an app perform better, even if the JavaScript and style
 
 ## Requirements for Using Turbolinks
 
-1. Either **avoid using [React Router](https://github.com/ReactTraining/react-router)** or be prepared to deal with any conflicts between it and Turbolinks.
+1. Either **avoid using [React Router](https://reactrouter.com/)** or be prepared to deal with any conflicts between it and Turbolinks.
 2. **Use one JS and one CSS file** throughout your app. Otherwise, you will have to figure out how best to handle multiple JS and CSS files throughout the app given Turbolinks.
 
 ## Why Not Turbolinks
 
-1. [React Router](https://github.com/ReactTraining/react-router) handles the back and forward buttons, as does Turbolinks. You _might_ be able to make this work. _Please share your findings._
+1. [React Router](https://reactrouter.com/) handles the back and forward buttons, as does Turbolinks. You _might_ be able to make this work. _Please share your findings._
 1. You want to do code splitting to minimize the JavaScript loaded.
 
 ## More Information

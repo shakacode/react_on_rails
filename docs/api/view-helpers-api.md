@@ -113,9 +113,9 @@ Renderer functions are not meant to be used on the server since there's no DOM o
 
 ### React Router
 
-[React Router](https://github.com/reactjs/react-router) is supported, including server-side rendering! See:
+[React Router](https://reactrouter.com/) is supported, including server-side rendering! See:
 
-1. [React on Rails docs for react-router](https://www.shakacode.com/react-on-rails/docs/javascript/react-router/)
+1. [React on Rails docs for React Router](https://www.shakacode.com/react-on-rails/docs/javascript/react-router/)
 2. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/ServerRouterApp.jsx).
 3. [Code Splitting docs](https://www.shakacode.com/react-on-rails/docs/javascript/code-splitting/) for information about how to set up code splitting for server rendered routes.
 

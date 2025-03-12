@@ -9,6 +9,6 @@ import HelloWorld from './HelloWorld';
  *  Note, this is imported as "HelloWorldApp" by "client-bundle.js"
  *
  *  Note, this is a fictional example, as you'd only use a Render-Function if you wanted to run
- *  some extra code, such as setting up Redux and React-Router.
+ *  some extra code, such as setting up Redux and React Router.
  */
 export default (props) => <HelloWorld {...props} />;

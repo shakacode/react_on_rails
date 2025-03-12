@@ -20,7 +20,7 @@ Let's say you're requesting a page that needs to fetch a code chunk from the ser
 
 > (server) `<div data-reactroot="`
 
-Different markup is generated on the client than on the server. Why does this happen? When you register a component or Render-Function with `ReactOnRails.register`, react on rails will render the component as soon as the page loads. However, react-router renders a comment while waiting for the code chunk to be fetched from the server. This means that react will tear all the server rendered code out of the DOM, and then rerender it a moment later once the code chunk arrives from the server, defeating most of the purpose of server rendering.
+Different markup is generated on the client than on the server. Why does this happen? When you register a component or Render-Function with `ReactOnRails.register`, React on Rails will render the component as soon as the page loads. However, React Router renders a comment while waiting for the code chunk to be fetched from the server. This means that React will tear all the server rendered code out of the DOM, and then rerender it a moment later once the code chunk arrives from the server, defeating most of the purpose of server rendering.
 
 ### The solution
 
@@ -111,7 +111,7 @@ export default RouterAppRenderer;
 
 What's going on in this example is that we're putting the rendering code in the callback passed to `match`. The effect is that the client render doesn't happen until the code chunk gets fetched from the server, preventing the client/server checksum mismatch.
 
-The idea is that match from react-router is async; it fetches the component using the getComponent method that you provide with the route definition, and then passes the props to the callback that are needed to do the complete render. Then we do the first render inside the callback, so that the first render is the same as the server render.
+The idea is that `match` from React Router is async; it fetches the component using the `getComponent` method that you provide with the route definition, and then passes the props needed for the complete render to the callback. Then we do the first render inside the callback, so that the first render is the same as the server render.
 
 The server render matches the deferred render because the server bundle is a single file, and so it doesn't need to wait for anything to be fetched.
 
