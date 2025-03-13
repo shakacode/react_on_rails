@@ -90,7 +90,7 @@ jobs:
         run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
       - name: Set packer version environment variable
         run: |
-          echo "CI_PACKER_VERSION=${{ matrix.versions == 'oldest' && 'old' || 'new' }}" >> $GITHUB_ENV
+          echo "CI_PACKER_VERSION=${{ matrix.versions }}" >> $GITHUB_ENV
       - name: Main CI
         if: steps.changed-files.outputs.any_changed == 'true'
         run: bundle exec rake run_rspec:${{ matrix.versions == 'oldest' && 'web' || 'shaka' }}packer_examples
