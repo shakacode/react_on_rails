@@ -192,7 +192,7 @@ jobs:
       - run: cd spec/dummy && bundle info shakapacker
       - name: Set packer version environment variable
         run: |
-          echo "CI_PACKER_VERSION=${{ matrix.versions == 'oldest' && 'old' || 'new' }}" >> $GITHUB_ENV
+          echo "CI_PACKER_VERSION=${{ matrix.versions }}" >> $GITHUB_ENV
       - name: Main CI
         run: bundle exec rake run_rspec:all_dummy
       - name: Store test results

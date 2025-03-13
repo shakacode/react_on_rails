@@ -10,9 +10,9 @@ module ReactOnRails
     # If rspec tests are run locally, we want to test both packers.
     # If rspec tests are run in CI, we want to test the packer specified in the CI_PACKER_VERSION environment variable.
     # Check script/convert and .github/workflows/rspec-package-specs.yml for more details.
-    packers_to_test = if ENV["CI_PACKER_VERSION"] == "old"
+    packers_to_test = if ENV["CI_PACKER_VERSION"] == "oldest"
                         ["webpacker"]
-                      elsif ENV["CI_PACKER_VERSION"] == "new"
+                      elsif ENV["CI_PACKER_VERSION"] == "newest"
                         ["shakapacker"]
                       else
                         %w[shakapacker webpacker]
