@@ -282,8 +282,7 @@ module ReactOnRails
       context "when using Shakapacker >= 8.2.0" do
         before do
           allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
-            # TODO: Set to 8.2.0 after it's released and before merging this branch
-            .with([8, 1, 0]).and_return(true)
+            .with([8, 2, 0]).and_return(true)
         end
 
         it "defaults to :async" do
@@ -330,8 +329,7 @@ module ReactOnRails
       context "when using Shakapacker < 8.2.0" do
         before do
           allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
-            # TODO: Set to 8.2.0 after it's released and before merging this branch
-            .with([8, 1, 0]).and_return(false)
+            .with([8, 2, 0]).and_return(false)
           allow(Rails.logger).to receive(:warn)
         end
 
