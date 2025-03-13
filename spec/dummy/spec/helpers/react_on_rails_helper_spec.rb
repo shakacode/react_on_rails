@@ -75,6 +75,7 @@ describe ReactOnRailsHelper do
           def helper.append_javascript_pack_tag(name, **options)
             original_append_javascript_pack_tag.call(name, **options)
           end
+
           allow(helper).to receive(:append_javascript_pack_tag)
           allow(helper).to receive(:append_stylesheet_pack_tag)
           expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
