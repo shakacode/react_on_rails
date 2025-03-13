@@ -23,8 +23,7 @@ For example, suppose you create a "render-function" called `MyAppComponent`.
 import React from 'react';
 const MyAppComponent =
   (props, railsContext) =>
-  // NOTE: need to wrap in a function so this is proper React function component that can use
-  // hooks
+  // NOTE: need to wrap in a function so this is a proper React function component that can use hooks
 
   // the props get passed again, but we ignore since we use a closure
   // or should we
@@ -39,7 +38,7 @@ export default MyAppComponent;
 
 ---
 
-_This would be an alternate API where you have to call React.`createElement` and the React on Rails code doesn't do that._
+_This would be an alternate API where you have to call `React.createElement` and the React on Rails code doesn't do that._
 
 ```js
 import React from 'react';
@@ -60,7 +59,8 @@ export default MyAppComponent;
 
 ---
 
-_Note: you will get a React browser console warning if you try to serverRender this since the value of `serverSide` will be different for server rendering._
+> [!NOTE]
+> You will get a React browser console warning if you try to render this on the server since the value of `serverSide` will be different for server rendering.
 
 So if you register your render-function `MyAppComponent`, it will get called like:
 
@@ -74,21 +74,23 @@ Similarly, any Redux store is always initialized with 2 parameters:
 reduxStore = MyReduxStore(props, railsContext);
 ```
 
-Note: you never make these calls. React on Rails makes these calls when it does either client or server rendering. You will define functions that take these 2 params and return a React component or a Redux Store. Naturally, you do not have to use second parameter of the railsContext if you do not need it. If you don't take a second parameter, then you're probably defining a React function component and you will simply return a React Element, often just JSX.
+> [!NOTE]
+> You never make these calls. React on Rails makes these calls when it does either client or server rendering. You will define functions that take these 2 params and return a React component or a Redux Store. Naturally, you do not have to use second parameter, `railsContext`, if you do not need it. If you don't take a second parameter, then you're probably defining a React function component and you will simply return a React Element, often just JSX.
 
-(Note: see below [section](#multiple-react-components-on-a-page-with-one-store) on how to set up Redux stores that allow multiple components to talk to the same store.)
+> [!NOTE]
+> See [Redux Store](https://www.shakacode.com/react-on-rails/docs/api/redux-store-api/#multiple-react-components-on-a-page-with-one-store) on how to set up Redux stores that allow multiple components to talk to the same store.
 
-The `railsContext` has: (see implementation in file [ReactOnRails::Helper](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/helper.rb), method `rails_context` for the definitive list).
+The `railsContext` has: (see the implementation in [ReactOnRails::Helper](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/helper.rb), method `rails_context` for the definitive list).
 
 ```ruby
   {
-    railsEnv: Rails.env
+    railsEnv: Rails.env,
     inMailer: in_mailer?,
     # Locale settings
     i18nLocale: I18n.locale,
     i18nDefaultLocale: I18n.default_locale,
     rorVersion: ReactOnRails::VERSION,
-    rorPro: ReactOnRails::Utils.react_on_rails_pro?
+    rorPro: ReactOnRails::Utils.react_on_rails_pro?,
 
     # URL settings
     href: request.original_url,
@@ -98,10 +100,11 @@ The `railsContext` has: (see implementation in file [ReactOnRails::Helper](https
     port: uri.port,
     pathname: uri.path, # /posts
     search: uri.query, # id=30&limit=5
-    httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"]
+    httpAcceptLanguage: request.env["HTTP_ACCEPT_LANGUAGE"],
 
     # Other
-    serverSide: boolean # Are we being called on the server or client? Note: if you conditionally
+    serverSide: boolean,
+    # Are we being called on the server or client? Note: if you conditionally
      # render something different on the server than the client, then React will only show the
      # server version!
   }
@@ -115,7 +118,7 @@ The `railsContext` is a second param passed to your render-functions for React c
 
 ERB view file:
 
-```ruby
+```erb
   # Rails View
   <%= react_component("HelloWorld", props: { name: "Stranger" }) %>
 ```
@@ -157,7 +160,7 @@ Consider this line in depth:
 <AppComponent {...{ ...props, railsContext }} />
 ```
 
-The outer `{...` is for the [JSX spread operator for attributes](https://facebook.github.io/react/docs/jsx-in-depth.html#spread-attributes) and the inner `{...` is for the [Spread in object literals](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_operator#Spread_in_object_literals).
+The outer `{...` is for the [JSX spread operator for attributes](https://legacy.reactjs.org/docs/jsx-in-depth.html#spread-attributes) and the inner `{...` is for the [Spread in object literals](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_operator#Spread_in_object_literals).
 
 ## Use Cases
 
@@ -173,7 +176,7 @@ Suppose you want to display a nav bar with the current navigation link highlight
 
 Suppose you want to turn off animation when doing server side rendering. The `serverSide` value is just what you need.
 
-## Customization of the rails_context
+## Customization of the Rails context
 
 You can customize the values passed in the `railsContext` in your `config/initializers/react_on_rails.rb`. Here's how.
 
@@ -201,4 +204,4 @@ module RenderingExtension
 end
 ```
 
-In this case, a prop and value for `somethingUseful` will go into the railsContext passed to all react_component and redux_store calls. You may set any values available in the view rendering context.
+In this case, a prop and value for `somethingUseful` will go into the `railsContext` passed to all `react_component` and `redux_store` calls. You may set any values available in the view rendering context.
