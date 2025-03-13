@@ -297,7 +297,7 @@ gem "webpacker"
 - Find your `webpacker_lite.yml` and rename it to `webpacker.yml`
 
   - Consider copying a default webpacker.yml setup such as https://github.com/shakacode/react-on-rails-v9-rc-generator/blob/master/config/webpacker.yml
-  - If you are not using the webpacker webpacker setup, be sure to put in `compile: false` in the `default` section.
+  - If you are not using the webpacker Webpack setup, be sure to put in `compile: false` in the `default` section.
   - Alternately, if you are updating from webpacker_lite, you can manually change these:
   - Add a default setting
     ```

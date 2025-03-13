@@ -112,7 +112,7 @@ Don't forget you may need to run yarn after adding packages with yalc to install
 
 ### Prereqs
 
-After checking out the repo, making sure you have rvm and nvm setup (setup ruby and node), cd to `spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+After checking out the repo, making sure you have Ruby and Node version managers set up (such as rvm and nvm, or rbenv and nodenv, etc.), cd to `spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
 ### Local Node Package
 

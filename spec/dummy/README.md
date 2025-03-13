@@ -7,7 +7,7 @@ Using NPM for React on Rails
 
 Read [Dev Initial Setup in Tips for Contributors](/CONTRIBUTING.md#dev-initial-setup).
 
-## Setup yalc
+## Set up yalc
 
 ```sh
 cd react_on_rails

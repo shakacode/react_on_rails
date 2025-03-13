@@ -172,7 +172,7 @@ heroku buildpacks:add --index 1 heroku/nodejs
 
 ## Swap out sqlite for postgres:
 
-Heroku requires your app to use Postgresql. If you have not setup your app
+Heroku requires your app to use Postgresql. If you have not set up your app
 with Postgresql, you need to change your app settings to use this database.
 
 Run the following command (in Rails 6+):
@@ -215,7 +215,7 @@ production:
   database: ror_production
 ```
 
-Then you need to setup postgres so you can run locally:
+Then you need to set up Postgres so you can run locally:
 
 ```bash
 rake db:setup

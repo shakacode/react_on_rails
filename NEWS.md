@@ -7,7 +7,7 @@ _A history of the news. A few bullets at the top will also show on the [README.m
 
 - **October 1, 2020**: See the [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) example repo for a simple configuration of Webpack via the rails/webpacker gem
   that supports SSR.
-- **August 2, 2020**: See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_demo_ssr_hmr) for a new way to setup the creation of your SSR bundle with `rails/webpacker`.
+- **August 2, 2020**: See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_demo_ssr_hmr) for a new way to set up the creation of your SSR bundle with `rails/webpacker`.
 - July 8, 2020: Release **v12**.
   1. **React Hooks Support** for top level components
   2. **Typescript bindings**
