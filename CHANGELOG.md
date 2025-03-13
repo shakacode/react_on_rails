@@ -21,9 +21,11 @@ Please follow the recommendations outlined at [keepachangelog.com](http://keepac
 ### [Unreleased]
 
 #### Added
+
 - Configuration option `generated_component_packs_loading_strategy` to control how generated component packs are loaded. It supports `sync`, `async`, and `defer` strategies. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### Removed (Breaking Changes)
+
 - Removed `defer_generated_component_packs` configuration option. You can use `generated_component_packs_loading_strategy` instead. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### [15.0.0-alpha.2] - 2025-03-07
