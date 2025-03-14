@@ -30,7 +30,9 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "addressable"
   s.add_runtime_dependency "connection_pool"
   s.add_runtime_dependency "execjs", "~> 2.9"
-  s.add_runtime_dependency "httpx", "~> 1.4", ">= 1.4.2"
+  # 1.4.x runs into https://gitlab.com/os85/httpx/-/issues/340, upgrade when fixed
+  # (and switch from max_concurrent_requests to pool_options.max_connections_per_origin)
+  s.add_runtime_dependency "httpx", "1.3.4"
   s.add_runtime_dependency "rainbow"
   s.add_runtime_dependency "react_on_rails", ">= 14.1.0"
   s.add_development_dependency "bundler"
