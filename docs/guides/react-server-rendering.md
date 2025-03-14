@@ -2,9 +2,9 @@
 
 See also [Client vs. Server Rendering](https://www.shakacode.com/react-on-rails/docs/guides/client-vs-server-rendering/).
 
-## What is the easiest way to setup a webpack configuration for server-side-rendering?
+## What is the easiest way to set up a Webpack configuration for server-side-rendering?
 
-See the example webpack setup here: [github.com/shakacode/react_on_rails_demo_ssr_hmr](https://github.com/shakacode/react_on_rails_demo_ssr_hmr).
+See the example Webpack setup here: [github.com/shakacode/react_on_rails_demo_ssr_hmr](https://github.com/shakacode/react_on_rails_demo_ssr_hmr).
 
 ## What is Server Rendering?
 

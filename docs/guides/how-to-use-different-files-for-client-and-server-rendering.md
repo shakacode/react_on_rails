@@ -4,7 +4,7 @@ There are 3 main ways to use different code for server vs. client rendering.
 
 ## A. Using different Entry Points
 
-Many projects will have different entry points for client and server rendering. This only works for a top-level entry point such as the entry point for a react-router app component.
+Many projects will have different entry points for client and server rendering. This only works for a top-level entry point such as the entry point for a React Router app component.
 
 Your Client Entry can look like this:
 

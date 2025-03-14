@@ -2,7 +2,7 @@
 
 ## Checklist before Committing
 
-1. `rake`: runs all linters and specs (you need Docker setup, see below)
+1. Run all linters and specs (you need Docker set up, see below).
 2. Did you need any more tests for your change?
 3. Did you document your change? Update the README.md?
 4. Did you add a CHANGELOG.md entry?
@@ -19,7 +19,7 @@ For non-doc fixes:
 
 From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/)
 
-#### The seven rules of a great git commit message
+### The seven rules of a great git commit message
 
 > Keep in mind: This has all been said before.
 
@@ -37,8 +37,8 @@ When making doc changes, we want the change to work on both the gitbook and the 
 
 ### Links to other docs:
 
-- When making references to doc files, use a relative URL path like:
+- When making references to doc files, use a full URL to <https://www.shakacode.com/react-on-rails/docs>, for example:
   `[Installation Overview](https://www.shakacode.com/react-on-rails/docs/additional-details/manual-installation-overview/)`
 
-- When making references to source code files, use a full url path like:
+- When making references to source code files, use a full GitHub URL, for example:
   `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb)`

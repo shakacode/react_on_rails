@@ -12,12 +12,12 @@ Besides the project objective, let's stick with the "Rails Doctrine" and keep th
 
 The React on Rails setup provides several key components related to front-end developer happiness:
 
-1. [Hot reloading of both JavaScript and CSS](https://gaearon.github.io/react-hot-loader/), via the [webpack dev server](https://webpack.github.io/docs/webpack-dev-server.html). This works for both using an [express server](http://expressjs.com/) to load stubs for the ajax requests, as well as using a live Rails server. **Oh yes**, your Rails server can do hot reloading!
+1. [Hot reloading of both JavaScript and CSS](https://gaearon.github.io/react-hot-loader/), using the [webpack-dev-server](https://webpack.github.io/docs/webpack-dev-server.html) package. This works for both using an [Express server](http://expressjs.com/) to load stubs for the ajax requests, as well as using a live Rails server. **Oh yes**, your Rails server can do hot reloading!
 2. [CSS modules](https://github.com/css-modules/webpack-demo) which remove the madness of a global namespace for CSS. We organize our CSS (Sass, actually) right next to our JavaScript React component files. This means no more creating long class names to ensure that CSS picks up the right styles.
 3. [ES6 JavaScript](http://es6-features.org/#Constants) is a great language for client side coding, much more so than Ruby due to the asynchronous nature of UI programming.
 4. JavaScript libraries and tooling work better in the native node way, rather than via some aspect of Sprockets and the Rails Asset Pipeline. We find way less frustration this way, especially from being able to get the latest advances with the rest of the JavaScript community. Why complicated beautiful JavaScript tooling Rails asset pipeline complexity?
-5. We want our JavaScript from npm. Getting JavaScript from rubygems.org is comparatively frustrating.
-6. Happiness for us is actively participating in open source, so we want to be where the action is, which is with the npm libraries on github.com.
+5. We want our JavaScript from NPM. Getting JavaScript from rubygems.org is comparatively frustrating.
+6. Happiness for us is actively participating in open source, so we want to be where the action is, which is with the NPM libraries on github.com.
 7. You can get set up on React on Rails **FAST** using our application generator.
 8. By placing all client-side development inside of the `/client` directory, pure JavaScript developers can productively do development separate from Rails. Instead of Rails APIs, stub APIs on an express server can provide a simple backend, allowing for rapid iteration of UI prototypes.
 9. Just because we're not relying on the Rails asset pipeline for ES6 conversion does not mean that we're deploying Rails apps in any different way. We still use the asset pipeline to include our Webpack compiled JavaScript. This only requires a few small modifications, as explained in [our heroku deployment documentation](https://www.shakacode.com/react-on-rails/docs/deployment/heroku-deployment/).
@@ -40,9 +40,9 @@ Here's the chef's selection from the React on Rails community:
 
 - [Bootstrap](http://getbootstrap.com/), loaded from [bootstrap-loader](https://github.com/shakacode/bootstrap-loader/). Common UI styles.
 - [Lodash](https://lodash.com/): Swiss army knife of utilities.
-- [React](https://facebook.github.io/react/): UI components.
-- [React-Router](https://github.com/reactjs/react-router): Provider of deep links for client-side application.
-- [Redux](https://github.com/reactjs/redux): Flux implementation (aka "state container").
+- [React](https://react.dev/): UI components.
+- [React Router](https://reactrouter.com/): Provider of deep links for client-side application.
+- [Redux](https://redux.js.org/): Flux implementation (aka "state container").
 
 ### JavaScript Tooling
 

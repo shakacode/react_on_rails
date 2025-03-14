@@ -6,8 +6,8 @@
 
 [Shakapacker](https://github.com/shakcode/shakapacker) (the official successor of [rails/webpacker](https://github.com/rails/webpacker)) is the Ruby gem that mainly gives us 2 things:
 
-1. View helpers for placing the webpack bundles on your Rails views. React on Rails depends on these view helpers.
-2. A layer of abstraction on top of Webpack customization. The base setup works great for the client side webpack configuration.
+1. View helpers for placing the Webpack bundles on your Rails views. React on Rails depends on these view helpers.
+2. A layer of abstraction on top of Webpack customization. The base setup works great for the client-side Webpack configuration.
 
 To get a deeper understanding of Shakapacker, watch [RailsConf 2020 CE - Webpacker, It-Just-Works, But How? by Justin Gordon](https://youtu.be/sJLoOpc5LD8).
 
@@ -22,15 +22,15 @@ A key decision in your use React on Rails is whether you go with the Shakapacker
 
 ## Option 1: Default Generator Setup: Shakapacker app/javascript
 
-Typical Shakapacker apps have a standard directory structure as documented [here](https://github.com/shakacode/shakapacker/blob/master/README.md#configuration-and-code). If you follow the steps in the the [basic tutorial](https://www.shakacode.com/react-on-rails/docs/guides/tutorial/), you will see this pattern in action. In order to customize the Webpack configuration, you need to consult with the [webpack configuration](https://www.shakacode.com/react-on-rails/docs/javascript/webpack/).
+Typical Shakapacker apps have a standard directory structure as documented [here](https://github.com/shakacode/shakapacker/blob/master/README.md#configuration-and-code). If you follow [the basic tutorial](https://www.shakacode.com/react-on-rails/docs/guides/tutorial/), you will see this pattern in action. In order to customize the Webpack configuration, consult [Webpack Tips](https://www.shakacode.com/react-on-rails/docs/javascript/webpack/).
 
-The _advantage_ of using Shakapacker to configure Webpack is that there is very little code needed to get started, and you don't need to understand really anything about webpack customization.
+The _advantage_ of using Shakapacker to configure Webpack is that there is very little code needed to get started, and you don't need to understand really anything about Webpack customization.
 
 ## Option 2: Traditional React on Rails using the /client directory
 
-Until version 9, all React on Rails apps used the `/client` directory for configuring React on Rails in terms of the configuration of Webpack and location of your JavaScript and webpack files, including the `node_modules` directory. Version 9 changed the default to `/` for the `node_modules` location using this value in `config/initializers/react_on_rails.rb`: `config.node_modules_location`.
+Until version 9, all React on Rails apps used the `/client` directory for configuring React on Rails in terms of the configuration of Webpack and location of your JavaScript and Webpack files, including the `node_modules` directory. Version 9 changed the default to `/` for the `node_modules` location using this value in `config/initializers/react_on_rails.rb`: `config.node_modules_location`.
 
-You can access values in the `config/shakapacker.yml`
+You can access values from `config/shakapacker.yml`:
 
 ```js
 const { config, devServer } = require('shakapacker');

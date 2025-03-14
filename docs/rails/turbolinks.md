@@ -4,7 +4,7 @@
 
 - See [PR 1620](https://github.com/shakacode/react_on_rails/pull/1620).
 - See [PR 1374](https://github.com/shakacode/react_on_rails/pull/1374).
-- Ability to use with Turbo (@hotwired/turbo), as Turbolinks gets obsolete.
+- Ability to use with [Turbo (`@hotwired/turbo`)](https://turbo.hotwired.dev/), as Turbolinks becomes obsolete.
 
 # Using Turbo
 
@@ -25,25 +25,24 @@ _The following docs may be outdated. We recommend updating to the latest Turbo o
 
 ## Why Turbolinks?
 
-As you switch between Rails HTML controller requests, you will only load the HTML and you will
-not reload JavaScript and stylesheets. This definitely can make an app perform better, even if
-the JavaScript and stylesheets are cached by the browser, as they will still require parsing.
+As you switch between Rails HTML controller requests, you will only load the HTML and you will not reload JavaScript and stylesheets.
+This definitely can make an app perform better, even if the JavaScript and stylesheets are cached by the browser, as they will still require parsing.
 
 ## Requirements for Using Turbolinks
 
-1. You are **not using [react-router](https://github.com/ReactTraining/react-router)** or you are prepared to deal with some potential issues with where react-router and Turbolinks overlaps.
-2. You are **using one JS and one CSS file** throughout your app. Otherwise, you will have to figure out how best to handle multiple JS and CSS files throughout the app given Turbolinks.
+1. Either **avoid using [React Router](https://reactrouter.com/)** or be prepared to deal with any conflicts between it and Turbolinks.
+2. **Use one JS and one CSS file** throughout your app. Otherwise, you will have to figure out how best to handle multiple JS and CSS files throughout the app given Turbolinks.
 
 ## Why Not Turbolinks
 
-1. [react-router](https://github.com/ReactTraining/react-router) handles the back and forward buttons, as does TurboLinks. You _might_ be able to make this work. _Please share your findings._
+1. [React Router](https://reactrouter.com/) handles the back and forward buttons, as does Turbolinks. You _might_ be able to make this work. _Please share your findings._
 1. You want to do code splitting to minimize the JavaScript loaded.
 
 ## More Information
 
-- CSRF tokens need thorough checking with Turbolinks5. Turbolinks5 changes the head element by JavaScript (not only body) on page changes with the correct csrf meta tag, but if the JS code parsed this from head when several windows were opened, then our specs were not all passing. I didn't look details however, may be it is app code related, not library code. Anyway it may need additional check because there is CSRF helper in ReactOnRails and it need to work with Turbolinks5.
-- Turbolinks5 sends requests without the `Accept: */*` in the header, only exactly like `Accept: text/html` which makes Rails behave a bit specifically compared to normal and mime-parsing, which is skipped by when Rails sees `*/*`. For some more details on Rails and `*/*` you can read [Mime Type Resolution in Rails](http://blog.bigbinary.com/2010/11/23/mime-type-resolution-in-rails.html).
-- If you're using multiple Webpack bundles, be sure to ensure that there are no name conflicts between JS objects or redux store paths.
+- CSRF tokens need thorough checking with Turbolinks5. Turbolinks5 changes the head element by JavaScript (not only body) on page changes with the correct csrf meta tag. But if the JS code parsed this from head when several windows were opened, then our specs didn't all pass. I didn't examine the details, it may be caused by app code, not library code. Anyway, it may need additional checking because there is a CSRF helper in ReactOnRails and it needs to work with Turbolinks5.
+- Turbolinks5 sends requests without the `Accept: */*` in the header, only exactly like `Accept: text/html` which makes Rails behave a bit specifically compared to normal and mime-parsing, which is skipped when Rails sees `*/*`. For more details on the special handling of `*/*` you can read [Mime Type Resolution in Rails](http://blog.bigbinary.com/2010/11/23/mime-type-resolution-in-rails.html).
+- If you're using multiple Webpack bundles, make sure that there are no name conflicts between JS objects or Redux store paths.
 
 ### Install Checklist
 
@@ -64,7 +63,7 @@ NOTE: for Turbolinks 2.x, use `'data-turbolinks-track' => true`
 
 ## Turbolinks 5
 
-Turbolinks 5 is now being supported. React on Rails will automatically detect which version of Turbolinks you are using and use the correct event handlers.
+Turbolinks 5 is now supported. React on Rails will automatically detect which version of Turbolinks you are using and use the correct event handlers.
 
 For more information on Turbolinks 5: [https://github.com/turbolinks/turbolinks](https://github.com/turbolinks/turbolinks)
 
@@ -79,13 +78,13 @@ Turbolinks.start();
 
 ### Async script loading
 
-Async script loading can be done like this:
+Async script loading can be done like this (starting with Shakapacker 8.2):
 
 ```erb
   <%= javascript_include_tag 'application', async: Rails.env.production? %>
 ```
 
-If you use `document.addEventListener("turbolinks:load", function() {...});` somewhere in your code, you will notice, that Turbolinks 5 does not fire `turbolinks:load` on initial page load. A quick workaround is to use `defer` instead of `async`:
+If you use `document.addEventListener("turbolinks:load", function() {...});` somewhere in your code, you will notice that Turbolinks 5 does not fire `turbolinks:load` on initial page load. A quick workaround for React on Rails <15 is to use `defer` instead of `async`:
 
 ```erb
   <%= javascript_include_tag 'application', defer: Rails.env.production? %>
@@ -100,6 +99,11 @@ document.addEventListener('turbolinks:load', function () {
   ReactOnRails.reactOnRailsPageLoaded();
 });
 ```
+
+React on Rails 15 fixes both issues, so if you still have the listener it can be removed (and should be as `reactOnRailsPageLoaded()` is now async).
+
+> [!WARNING]
+> Do not use `force_load: false` with Turbolinks if you have async scripts.
 
 ## Troubleshooting
 
@@ -147,6 +151,6 @@ TURBO: WITH TURBOLINKS 5: document turbolinks:before-render and turbolinks:rende
 TURBO: reactOnRailsPageLoaded
 ```
 
-We've noticed that Turbolinks doesn't work if you use the ruby gem version of jQuery and jQuery ujs. Therefore we recommend using the node packages instead. See the [tutorial app](https://github.com/shakacode/react-webpack-rails-tutorial) for how to accomplish this.
+We've noticed that Turbolinks doesn't work if you use the RubyGem versions of jQuery and jQuery ujs. Therefore, we recommend using the JS packages instead. See the [tutorial app](https://github.com/shakacode/react-webpack-rails-tutorial) for how to accomplish this.
 
-![2016-02-02_10-38-07](https://cloud.githubusercontent.com/assets/1118459/12760060/6546e254-c999-11e5-828b-a8aaa473e5bd.png)
+![Show we only install the Turbolinks handlers once](https://cloud.githubusercontent.com/assets/1118459/12760060/6546e254-c999-11e5-828b-a8aaa473e5bd.png)

@@ -8,9 +8,9 @@ import EchoProps from '../components/EchoProps';
  *  Note, this is imported as "RenderedHtml" by "serverRegistration.jsx"
  *
  *  Note, this is a fictional example, as you'd only use a Render-Function if you wanted to run
- *  some extra code, such as setting up Redux and React-Router.
+ *  some extra code, such as setting up Redux and React Router.
  *
- *  And the use of renderToString would probably be done with react-router v4
+ *  And the use of renderToString would probably be done with React Router v4
  *
  */
 export default (props, _railsContext) => {

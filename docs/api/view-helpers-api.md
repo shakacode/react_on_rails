@@ -27,7 +27,7 @@ Uncommonly used options:
 - **component_name:** Can be a React component, created using a React Function Component, an ES6 class or a Render-Function that returns a React component (or, only on the server side, an object with shape `{ redirectLocation, error, renderedHtml }`), or a "renderer function" that manually renders a React component to the dom (client side only). Note, a "renderer function" is a special type of "Render-Function." A "renderer function" takes a 3rd param of a DOM ID.
   All options except `props, id, html_options` will inherit from your `react_on_rails.rb` initializer, as described [here](https://www.shakacode.com/react-on-rails/docs/guides/configuration/).
 - **general options:**
-  - **props:** Ruby Hash which contains the properties to pass to the react object, or a JSON string. If you pass a string, we'll escape it for you.
+  - **props:** Ruby Hash which contains the properties to pass to the React object, or a JSON string. If you pass a string, we'll escape it for you.
   - **prerender:** enable server-side rendering of a component. Set to false when debugging!
   - **auto_load_bundle:** will automatically load the bundle for component by calling `append_javascript_pack_tag` and `append_stylesheet_pack_tag` under the hood.
   - **id:** Id for the div, will be used to attach the React component. This will get assigned automatically if you do not provide an id. Must be unique.
@@ -87,7 +87,7 @@ Fragment caching is a [React on Rails Pro](https://github.com/shakacode/react_on
 1. The `cache_key` takes the same parameters as any Rails `cache` view helper.
 1. The **props** are passed via a block so that evaluation of the props is not done unless the cache is broken. Suppose you put your props calculation into some method called `some_slow_method_that_returns_props`:
 
-```ruby
+```erb
 <%= cached_react_component("App", cache_key: [@user, @post], prerender: true) do
   some_slow_method_that_returns_props
 end %>
@@ -97,7 +97,7 @@ end %>
 
 ### rails_context
 
-You can call `rails_context` or `rails_context(server_side: true|false)` from your controller or view to see what values are in the Rails Context. Pass true or false depending on whether you want to see the server side or the client side rails_context. Typically, for computing cache keys, you should leave server_side as the default true. When calling this from a controller method, use `helpers.rails_context`.
+You can call `rails_context` or `rails_context(server_side: true|false)` from your controller or view to see what values are in the Rails Context. Pass true or false depending on whether you want to see the server-side or the client-side `rails_context`. Typically, for computing cache keys, you should leave `server_side` as the default true. When calling this from a controller method, use `helpers.rails_context`.
 
 ---
 
@@ -113,9 +113,9 @@ Renderer functions are not meant to be used on the server since there's no DOM o
 
 ### React Router
 
-[React Router](https://github.com/reactjs/react-router) is supported, including server-side rendering! See:
+[React Router](https://reactrouter.com/) is supported, including server-side rendering! See:
 
-1. [React on Rails docs for react-router](https://www.shakacode.com/react-on-rails/docs/javascript/react-router/)
+1. [React on Rails docs for React Router](https://www.shakacode.com/react-on-rails/docs/javascript/react-router/)
 2. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/ServerRouterApp.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/ServerRouterApp.jsx).
 3. [Code Splitting docs](https://www.shakacode.com/react-on-rails/docs/javascript/code-splitting/) for information about how to set up code splitting for server rendered routes.
 

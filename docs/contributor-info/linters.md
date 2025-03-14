@@ -7,21 +7,21 @@ These linters support the [ShakaCode Style Guidelines](https://www.shakacode.com
 If you haven't tried the autofix options for `eslint` and `rubocop`, you're seriously missing out!
 
 1. Be **SURE** you have a clean git status, as you'll want to review what the autofix does to your code!
-2. **Rubocop:** Be sure to be in the right directory where you have Ruby files, probably the top level of your Rails project.
+2. **Rubocop:** Be sure to be in the correct directory where you have Ruby files, usually the top level of your Rails project.
 
-```
+```bash
 rubocop -a
 ```
 
-3. **eslint:**: Be sure to be in the right directory where you have JS files.
+3. **ESLint:** Be sure to be in the correct directory where you have JS files.
 
-```
+```bash
 eslint --fix .
 ```
 
 or
 
-```
+```bash
 npm run lint -- --fix
 ```
 
@@ -29,11 +29,15 @@ Autofixing is a **HUGE** time saver!
 
 ## ESLint
 
+See the [ESLint](https://eslint.org/) website for more information.
+
 ### Configuring Rules
 
-Rules are configured with a 0, 1 or 2. Setting a rule to 0 is turning it off, setting it to 1 triggers a warning if that rule is violated, and setting it to 2 triggers an error.
+See [the documentation](https://eslint.org/docs/latest/use/configure/rules) first.
 
-Rules can also take a few additional options. In this case, the rule can be set to an array, the first item of which is the 0/1/2 flag and the rest are options.
+Rule severity is configured with `'off'`, `'warn'` or `'error'`. In older configurations you can see `0`, `1`, and `2` instead.
+
+Rules can also take a few additional options. In this case, the rule can be set to an array, the first item of which is the severity and the rest are options.
 
 See file [.eslintrc](https://github.com/shakacode/react_on_rails/tree/master/.eslintrc) for examples of configuration
 
@@ -63,9 +67,6 @@ alert('more alert');
 
 You can disable all rules for a line or block, or only specific rules, as shown above.
 
-### Useful Reference Links
+## RuboCop
 
-- [Configuring ESLint](http://eslint.org/docs/user-guide/configuring.html#configuring-rules)
-- [ESLint quick start](http://untilfalse.com/eslint-quick-start/)
-- [RuboCop](https://github.com/bbatsov/rubocop)
-- [ESLint](http://eslint.org/)
+See the [RuboCop website](https://rubocop.org/).

@@ -8,11 +8,11 @@ In this guide, it is assumed that you have upgraded the `react-rails` project to
    2. Remove `react_ujs` from `package.json` and run `yarn install`.
    3. Commit changes!
 
-2. Run `rails g react_on_rails:install` but do not commit the change. `react_on_rails` installs node dependencies and also creates sample react component, Rails view/controller, and update `config/routes.rb`.
+2. Run `rails g react_on_rails:install` but do not commit the change. `react_on_rails` installs node dependencies and also creates sample React component, Rails view/controller, and updates `config/routes.rb`.
 
 3. Adapt the project: Check the changes and carefully accept, reject, or modify them as per your project's needs. Besides changes in `config/shakapacker` or `babel.config` which are project-specific, here are the most noticeable changes to address:
 
-   1. Check webpack config files at `config/webpack/*`. If coming from `react-rails` v3, the changes are minor since you have already made separate configurations for client and server bundles. The most important change here is to notice the different names for the server bundle entry file. You may choose to stick with `server_rendering.js` or use `server-bundle.js` which is the default name in `react_on_rails`. The decision made here, affects the other steps.
+   1. Check Webpack config files at `config/webpack/*`. If coming from `react-rails` v3, the changes are minor since you have already made separate configurations for client and server bundles. The most important change here is to notice the different names for the server bundle entry file. You may choose to stick with `server_rendering.js` or use `server-bundle.js` which is the default name in `react_on_rails`. The decision made here affects the other steps.
 
    2. In `app/javascript` directory you may notice some changes.
 
