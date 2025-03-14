@@ -9,7 +9,7 @@ Many projects will have different entry points for client and server rendering. 
 Your Client Entry can look like this:
 
 ```js
-import ReactOnRails from 'react-on-rails';
+import ReactOnRails from 'react-on-rails/client';
 import App from './ClientApp';
 ReactOnRails.register({ App });
 ```
@@ -22,7 +22,7 @@ import App from './ServerApp';
 ReactOnRails.register({ App });
 ```
 
-Note that the only difference is on the second line of each of these examples.
+Note that the only difference is in the imports.
 
 ## B. Two Options for Using Webpack Resolve Alias in the Webpack Config
 

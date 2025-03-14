@@ -47,14 +47,10 @@ module ReactOnRails
 
       def add_yarn_relative_install_script_in_package_json
         package_json = File.join(destination_root, "package.json")
-        contents = File.read(package_json)
-        replacement_value = <<-STRING
-  "scripts": {
-    "postinstall": "yalc link react-on-rails",
-        STRING
-        new_client_package_json_contents = contents.gsub(/ {2}"scripts": {/,
-                                                         replacement_value)
-        File.open(package_json, "w+") { |f| f.puts new_client_package_json_contents }
+        contents = JSON.parse(File.read(package_json))
+        contents["scripts"] ||= {}
+        contents["scripts"]["postinstall"] = "yalc link react-on-rails"
+        File.open(package_json, "w+") { |f| f.puts JSON.pretty_generate(contents) }
       end
     end
   end

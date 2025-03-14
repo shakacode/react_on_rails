@@ -230,7 +230,7 @@ yalc add react-on-rails
 
 The generators are covered by generator tests using Rails's generator testing helpers, but it never hurts to do a sanity check and explore the API. See [generator_testing_script.md](generator_testing_script.md) for a script on how to run the generator on a fresh project.
 
-`rake run_rspec:example_basic` is a great way to run tests on one generator. Once that works, you should run `rake run_rspec:examples`. Be aware that this will create a hug number of files under a `/gen-examples` directory. You should be sure to exclude this directory from your IDE and delete it once your testing is done.
+`rake run_rspec:shakapacker_examples_basic` is a great way to run tests on one generator. Once that works, you should run `rake run_rspec:shakapacker_examples`. Be aware that this will create a huge number of files under a `/gen-examples` directory. You should be sure to exclude this directory from your IDE and delete it once your testing is done.
 
 ### Linting
 
