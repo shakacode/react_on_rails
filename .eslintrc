@@ -10,6 +10,11 @@ globals:
   __DEBUG_SERVER_ERRORS__: true
   __SERVER_ERRORS__: true
 
+parserOptions:
+  requireConfigFile: false
+  babelOptions:
+    presets: ["@babel/preset-env", "@babel/preset-react"]
+
 env:
   browser: true
   node: true
