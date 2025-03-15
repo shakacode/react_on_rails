@@ -33,9 +33,6 @@ const config = tsEslint.config([
     '**/public/packs*/*',
     '**/gen-examples',
     '**/bundle/',
-    // These files can't be included in tsconfig.json because they can't be compiled under Node 16
-    'eslint.config.ts',
-    'knip.ts',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],
@@ -123,7 +120,9 @@ const config = tsEslint.config([
 
     languageOptions: {
       parserOptions: {
-        project: true,
+        projectService: {
+          allowDefaultProject: ['eslint.config.ts', 'knip.ts'],
+        },
       },
     },
 
