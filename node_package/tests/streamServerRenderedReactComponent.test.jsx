@@ -8,11 +8,17 @@ import streamServerRenderedReactComponent from '../src/streamServerRenderedReact
 import ComponentRegistry from '../src/ComponentRegistry';
 
 const AsyncContent = async ({ throwAsyncError }) => {
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
   if (throwAsyncError) {
     throw new Error('Async Error');
   }
   return <div>Async Content</div>;
+};
+
+AsyncContent.propTypes = {
+  throwAsyncError: PropTypes.bool,
 };
 
 const TestComponentForStreaming = ({ throwSyncError, throwAsyncError }) => {
@@ -75,7 +81,9 @@ describe('streamServerRenderedReactComponent', () => {
 
   it('streamServerRenderedReactComponent streams the rendered component', async () => {
     const { renderResult, chunks } = setupStreamTest();
-    await new Promise((resolve) => renderResult.on('end', resolve));
+    await new Promise((resolve) => {
+      renderResult.on('end', resolve);
+    });
 
     expect(chunks).toHaveLength(2);
     expect(chunks[0].html).toContain('Header In The Shell');
@@ -92,7 +100,9 @@ describe('streamServerRenderedReactComponent', () => {
     const { renderResult, chunks } = setupStreamTest({ throwSyncError: true, throwJsErrors: true });
     const onError = jest.fn();
     renderResult.on('error', onError);
-    await new Promise((resolve) => renderResult.on('end', resolve));
+    await new Promise((resolve) => {
+      renderResult.on('end', resolve);
+    });
 
     expect(onError).toHaveBeenCalled();
     expect(chunks).toHaveLength(1);
@@ -106,7 +116,9 @@ describe('streamServerRenderedReactComponent', () => {
     const { renderResult, chunks } = setupStreamTest({ throwSyncError: true, throwJsErrors: false });
     const onError = jest.fn();
     renderResult.on('error', onError);
-    await new Promise((resolve) => renderResult.on('end', resolve));
+    await new Promise((resolve) => {
+      renderResult.on('end', resolve);
+    });
 
     expect(onError).not.toHaveBeenCalled();
     expect(chunks).toHaveLength(1);
@@ -120,7 +132,9 @@ describe('streamServerRenderedReactComponent', () => {
     const { renderResult, chunks } = setupStreamTest({ throwAsyncError: true, throwJsErrors: true });
     const onError = jest.fn();
     renderResult.on('error', onError);
-    await new Promise((resolve) => renderResult.on('end', resolve));
+    await new Promise((resolve) => {
+      renderResult.on('end', resolve);
+    });
 
     expect(onError).toHaveBeenCalled();
     expect(chunks).toHaveLength(2);
@@ -139,7 +153,9 @@ describe('streamServerRenderedReactComponent', () => {
     const { renderResult, chunks } = setupStreamTest({ throwAsyncError: true, throwJsErrors: false });
     const onError = jest.fn();
     renderResult.on('error', onError);
-    await new Promise((resolve) => renderResult.on('end', resolve));
+    await new Promise((resolve) => {
+      renderResult.on('end', resolve);
+    });
 
     expect(onError).not.toHaveBeenCalled();
     expect(chunks).toHaveLength(2);

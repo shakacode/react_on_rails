@@ -23,7 +23,7 @@ function renderContextRows(railsContext) {
   );
 }
 
-const RailsContext = (props) => (
+const RailsContext = ({ railsContext }) => (
   <table>
     <thead>
       <tr>
@@ -35,7 +35,7 @@ const RailsContext = (props) => (
         </th>
       </tr>
     </thead>
-    <tbody>{renderContextRows(props.railsContext)}</tbody>
+    <tbody>{renderContextRows(railsContext)}</tbody>
   </table>
 );
 
