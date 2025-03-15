@@ -1,6 +1,5 @@
 /* eslint-disable react/prefer-es6-class */
 /* eslint-disable react/prefer-stateless-function */
-/* eslint-disable react/jsx-filename-extension */
 
 import { createStore } from 'redux';
 import * as React from 'react';

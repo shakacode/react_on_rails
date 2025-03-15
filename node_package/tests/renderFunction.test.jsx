@@ -1,6 +1,6 @@
 /* eslint-disable react/prefer-es6-class */
 /* eslint-disable react/prefer-stateless-function */
-/* eslint-disable react/jsx-filename-extension */
+/* eslint-disable max-classes-per-file */
 
 import * as React from 'react';
 import * as createReactClass from 'create-react-class';
