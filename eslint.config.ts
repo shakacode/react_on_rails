@@ -33,6 +33,8 @@ const config = tsEslint.config([
     '**/public/packs*/*',
     '**/gen-examples',
     '**/bundle/',
+    // These files can't be included in tsconfig.json because they can't be compiled under Node 16
+    'eslint.config.ts',
     'knip.ts',
   ]),
   {
