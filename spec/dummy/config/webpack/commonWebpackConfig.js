@@ -23,7 +23,7 @@ const sassLoaderConfig = {
 
 const scssConfigIndex = baseClientWebpackConfig.module.rules.findIndex((config) =>
   '.scss'.match(config.test),
-); // eslint-disable-next-line no-undef
+);
 baseClientWebpackConfig.module.rules[scssConfigIndex]?.use.push(sassLoaderConfig);
 
 // add jquery

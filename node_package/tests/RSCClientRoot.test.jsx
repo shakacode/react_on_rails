@@ -1,5 +1,4 @@
 /* eslint-disable no-underscore-dangle */
-/* eslint-disable import/first */
 
 // Mock webpack require system for RSC
 window.__webpack_require__ = jest.fn();

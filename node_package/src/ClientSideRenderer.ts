@@ -1,3 +1,6 @@
+/* eslint-disable max-classes-per-file */
+/* eslint-disable react/no-deprecated -- while we need to support React 16 */
+
 import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
 import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './types';
@@ -40,8 +43,11 @@ const getDomId = (domIdOrElement: string | Element): string =>
   typeof domIdOrElement === 'string' ? domIdOrElement : domIdOrElement.getAttribute('data-dom-id') || '';
 class ComponentRenderer {
   private domNodeId: string;
+
   private state: 'unmounted' | 'rendering' | 'rendered';
+
   private root?: Root;
+
   private renderPromise?: Promise<void>;
 
   constructor(domIdOrElement: string | Element) {
@@ -166,6 +172,7 @@ You should return a React.Component always for the client side entry point.`);
 
 class StoreRenderer {
   private hydratePromise?: Promise<void>;
+
   private state: 'unmounted' | 'hydrating' | 'hydrated';
 
   constructor(storeDataElement: Element) {

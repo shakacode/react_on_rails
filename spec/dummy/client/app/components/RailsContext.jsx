@@ -3,7 +3,6 @@ import React from 'react';
 import _ from 'lodash';
 
 function renderContextRows(railsContext) {
-  // eslint-disable-next-line no-console
   console.log('railsContext.serverSide is ', railsContext.serverSide);
   return _.transform(
     railsContext,
@@ -24,7 +23,7 @@ function renderContextRows(railsContext) {
   );
 }
 
-const RailsContext = (props) => (
+const RailsContext = ({ railsContext }) => (
   <table>
     <thead>
       <tr>
@@ -36,7 +35,7 @@ const RailsContext = (props) => (
         </th>
       </tr>
     </thead>
-    <tbody>{renderContextRows(props.railsContext)}</tbody>
+    <tbody>{renderContextRows(railsContext)}</tbody>
   </table>
 );
 

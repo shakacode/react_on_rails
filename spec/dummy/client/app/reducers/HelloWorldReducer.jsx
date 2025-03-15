@@ -8,7 +8,7 @@ const initialState = {
 // Why name function the same as the reducer?
 // https://github.com/gaearon/redux/issues/428#issuecomment-129223274
 // Naming the function will help with debugging!
-export default function helloWorldReducer(state = initialState, action) {
+export default function helloWorldReducer(state = initialState, action = undefined) {
   const { type, name } = action;
   switch (type) {
     case actionTypes.HELLO_WORLD_NAME_UPDATE:

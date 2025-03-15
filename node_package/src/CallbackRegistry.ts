@@ -14,11 +14,15 @@ type WaitingPromiseInfo<T> = {
 
 export default class CallbackRegistry<T> {
   private readonly registryType: string;
+
   private registeredItems = new Map<string, T>();
+
   private waitingPromises = new Map<string, WaitingPromiseInfo<T>>();
+
   private notUsedItems = new Set<string>();
 
   private timeoutEventsInitialized = false;
+
   private timedout = false;
 
   constructor(registryType: string) {

@@ -4,8 +4,8 @@ import PropTypes from 'prop-types';
 import css from '../components/HelloWorld.module.scss';
 
 // TODO: make more like the HelloWorld.jsx
-function HelloWorldHooks(props) {
-  const [name, setName] = useState(props.helloWorldData.name);
+function HelloWorldHooks({ helloWorldData }) {
+  const [name, setName] = useState(helloWorldData.name);
   return (
     <div>
       <h3 className={css.brightColor}>Hello, {name}!</h3>

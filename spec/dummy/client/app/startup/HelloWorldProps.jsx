@@ -2,16 +2,16 @@ import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import css from '../components/HelloWorld.module.scss';
 
-function HelloWorldProps(props) {
-  console.log(`HelloWorldProps modification target prop value: ${props.modificationTarget}`);
+function HelloWorldProps({ helloWorldData, modificationTarget }) {
+  console.log(`HelloWorldProps modification target prop value: ${modificationTarget}`);
 
-  const [name, setName] = useState(props.helloWorldData.name);
+  const [name, setName] = useState(helloWorldData.name);
   // a trick to display a client-only prop value without creating a server/client conflict
   const [delayedValue, setDelayedValue] = useState(null);
 
   useEffect(() => {
-    setDelayedValue(props.modificationTarget);
-  }, []);
+    setDelayedValue(modificationTarget);
+  }, [modificationTarget]);
 
   return (
     <div>
