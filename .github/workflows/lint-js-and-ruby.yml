@@ -81,7 +81,7 @@ jobs:
           yarn run knip
           yarn run knip --production
       - name: Lint JS
-        run: yarn start lint
+        run: yarn run eslint --report-unused-disable-directives
       - name: Check formatting
         run: yarn start format.listDifferent
       - name: Type-check TypeScript
