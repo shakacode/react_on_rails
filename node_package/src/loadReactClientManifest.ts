@@ -1,7 +1,8 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 
-const loadedReactClientManifests = new Map<string, Record<string, unknown>>();
+type ClientManifest = Record<string, unknown>;
+const loadedReactClientManifests = new Map<string, ClientManifest>();
 
 export default async function loadReactClientManifest(reactClientManifestFileName: string) {
   // React client manifest is uploaded to node renderer as an asset.
@@ -11,7 +12,7 @@ export default async function loadReactClientManifest(reactClientManifestFileNam
   if (!loadedReactClientManifests.has(manifestPath)) {
     // TODO: convert to async
     try {
-      const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+      const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as ClientManifest;
       loadedReactClientManifests.set(manifestPath, manifest);
     } catch (error) {
       throw new Error(`Failed to load React client manifest from ${manifestPath}: ${error}`);

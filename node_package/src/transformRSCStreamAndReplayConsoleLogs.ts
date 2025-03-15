@@ -1,4 +1,6 @@
-export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableStream) {
+import { RenderResult } from './types';
+
+export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableStream<Uint8Array>) {
   return new ReadableStream({
     async start(controller) {
       const reader = stream.getReader();
@@ -16,7 +18,7 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
           .filter((line) => line.trim() !== '')
           .map((line) => {
             try {
-              return JSON.parse(line);
+              return JSON.parse(line) as RenderResult;
             } catch (error) {
               console.error('Error parsing JSON:', line, error);
               throw error;
@@ -25,7 +27,7 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
 
         for (const jsonChunk of jsonChunks) {
           const { html, consoleReplayScript = '' } = jsonChunk;
-          controller.enqueue(encoder.encode(html));
+          controller.enqueue(encoder.encode(html ?? ''));
 
           const replayConsoleCode = consoleReplayScript
             .trim()
