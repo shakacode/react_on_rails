@@ -7,19 +7,18 @@ type HydrateOrRenderType = (domNode: Element, reactElement: ReactElement) => Ren
 
 // TODO: once React dependency is updated to >= 18, we can remove this and just
 // import ReactDOM from 'react-dom/client';
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let reactDomClient: any;
+let reactDomClient: typeof import('react-dom/client');
 if (supportsRootApi) {
   // This will never throw an exception, but it's the way to tell Webpack the dependency is optional
   // https://github.com/webpack/webpack/issues/339#issuecomment-47739112
   // Unfortunately, it only converts the error to a warning.
   try {
     // eslint-disable-next-line global-require,@typescript-eslint/no-require-imports
-    reactDomClient = require('react-dom/client');
+    reactDomClient = require('react-dom/client') as typeof import('react-dom/client');
   } catch (_e) {
     // We should never get here, but if we do, we'll just use the default ReactDOM
     // and live with the warning.
-    reactDomClient = ReactDOM;
+    reactDomClient = ReactDOM as unknown as typeof import('react-dom/client');
   }
 }
 

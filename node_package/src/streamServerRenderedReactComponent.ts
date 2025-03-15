@@ -17,7 +17,7 @@ const stringToStream = (str: string): Readable => {
   return stream;
 };
 
-type BufferdEvent = {
+type BufferedEvent = {
   event: 'data' | 'error' | 'end';
   data: unknown;
 };
@@ -38,7 +38,7 @@ type BufferdEvent = {
  *   - emitError: A function to manually emit errors into the stream
  */
 const bufferStream = (stream: Readable) => {
-  const bufferedEvents: BufferdEvent[] = [];
+  const bufferedEvents: BufferedEvent[] = [];
   let startedReading = false;
 
   const listeners = (['data', 'error', 'end'] as const).map((event) => {
@@ -58,7 +58,7 @@ const bufferStream = (stream: Readable) => {
 
       // Remove initial listeners
       listeners.forEach(({ event, listener }) => stream.off(event, listener));
-      const handleEvent = ({ event, data }: BufferdEvent) => {
+      const handleEvent = ({ event, data }: BufferedEvent) => {
         if (event === 'data') {
           this.push(data);
         } else if (event === 'error') {
@@ -96,7 +96,8 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
 
   const transformStream = new PassThrough({
     transform(chunk, _, callback) {
-      const htmlChunk = chunk.toString();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
+      const htmlChunk = chunk.toString() as string;
       const consoleReplayScript = buildConsoleReplay(consoleHistory, previouslyReplayedConsoleMessages);
       previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
 
