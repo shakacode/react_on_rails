@@ -14,5 +14,5 @@
     "target": "es5",
     "typeRoots": ["./node_modules/@types", "./node_package/types"]
   },
-  "include": ["node_package/src/**/*", "node_package/types/**/*"]
+  "include": ["node_package/src/**/*", "node_package/types/**/*", "eslint.config.ts"]
 }

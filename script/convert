@@ -16,6 +16,7 @@ File.rename(old_config, new_config)
 gsub_file_content("../Gemfile.development_dependencies", 'gem "shakapacker", "8.0.0"', 'gem "shakapacker", "6.6.0"')
 
 # The below packages don't work on the oldest supported Node version and aren't needed there anyway
+gsub_file_content("../package.json", /"eslint": "[^"]*",/, "")
 gsub_file_content("../package.json", /"knip": "[^"]*",/, "")
 gsub_file_content("../package.json", %r{"@arethetypeswrong/cli": "[^"]*",}, "")
 gsub_file_content("../package.json", %r{"@testing-library/dom": "[^"]*",}, "")
