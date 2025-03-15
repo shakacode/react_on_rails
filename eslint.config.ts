@@ -13,14 +13,15 @@ const compat = new FlatCompat({
 
 const config = tsEslint.config([
   globalIgnores([
+    'lib/generators/react_on_rails/templates',
+    'node_package/lib/',
     'spec/react_on_rails/dummy-for-generators',
     'spec/dummy/.yalc',
     'spec/dummy/public',
     'spec/dummy/vendor',
     'spec/dummy/tmp',
     'spec/dummy/app/assets/config/manifest.js',
-    'spec/dummy/client/app/components/HelloWorldReScript.res.js',
-    'node_package/lib/',
+    '**/*.res.js',
     '**/coverage',
     '**/node_modules/**/*',
     '**/assets/webpack/**/*',
@@ -90,7 +91,26 @@ const config = tsEslint.config([
 
       'import/first': 'off',
       'import/no-extraneous-dependencies': 'off',
+      // The rule seems broken: it's reporting errors on imports in files using `export` too,
+      // not just `module.exports`.
+      'import/no-import-module-exports': 'off',
+      'react/destructuring-assignment': [
+        'error',
+        'always',
+        {
+          ignoreClassFields: true,
+        },
+      ],
       'react/forbid-prop-types': 'off',
+      'react/function-component-definition': [
+        'error',
+        {
+          namedComponents: ['arrow-function', 'function-declaration'],
+          unnamedComponents: 'arrow-function',
+        },
+      ],
+      'react/jsx-props-no-spreading': 'off',
+      'react/static-property-placement': 'off',
       'jsx-a11y/anchor-is-valid': 'off',
     },
   },
@@ -108,6 +128,12 @@ const config = tsEslint.config([
     rules: {
       '@typescript-eslint/no-namespace': 'off',
       '@typescript-eslint/no-shadow': 'error',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
     },
   },
   // must be the last config in the array
