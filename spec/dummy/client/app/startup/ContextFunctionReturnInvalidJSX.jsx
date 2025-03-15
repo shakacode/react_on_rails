@@ -4,9 +4,9 @@ import PropTypes from 'prop-types';
 import css from '../components/HelloWorld.module.scss';
 import RailsContext from '../components/RailsContext';
 
-const ContextFunctionReturnInvalidJSX = (props, railsContext) => (
+const ContextFunctionReturnInvalidJSX = ({ helloWorldData }, railsContext) => (
   <>
-    <h3 className={css.brightColor}>Hello, {props.helloWorldData.name}!</h3>
+    <h3 className={css.brightColor}>Hello, {helloWorldData.name}!</h3>
     <p>Rails Context :</p>
     <RailsContext {...{ railsContext }} />
   </>

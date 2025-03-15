@@ -14,15 +14,16 @@ if (supportsRootApi) {
   // https://github.com/webpack/webpack/issues/339#issuecomment-47739112
   // Unfortunately, it only converts the error to a warning.
   try {
-    // eslint-disable-next-line global-require
+    // eslint-disable-next-line global-require,@typescript-eslint/no-require-imports
     reactDomClient = require('react-dom/client');
-  } catch (e) {
+  } catch (_e) {
     // We should never get here, but if we do, we'll just use the default ReactDOM
     // and live with the warning.
     reactDomClient = ReactDOM;
   }
 }
 
+/* eslint-disable react/no-deprecated -- while we need to support React 16 */
 const reactHydrate: HydrateOrRenderType = supportsRootApi
   ? reactDomClient.hydrateRoot
   : (domNode, reactElement) => ReactDOM.hydrate(reactElement, domNode);
@@ -37,6 +38,7 @@ function reactRender(domNode: Element, reactElement: ReactElement): RenderReturn
   // eslint-disable-next-line react/no-render-return-value
   return ReactDOM.render(reactElement, domNode);
 }
+/* eslint-enable react/no-deprecated */
 
 export default function reactHydrateOrRender(
   domNode: Element,
