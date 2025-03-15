@@ -37,6 +37,7 @@ export function consoleReplay(
           val = 'undefined';
         }
       } catch (e) {
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string -- if we here, JSON.stringify didn't work
         val = `${(e as Error).message}: ${arg}`;
       }
 

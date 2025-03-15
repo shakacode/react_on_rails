@@ -171,6 +171,7 @@ export interface ReactOnRails {
   /** @deprecated Use registerStoreGenerators instead */
   registerStore(stores: Record<string, StoreGenerator>): void;
   registerStoreGenerators(storeGenerators: Record<string, StoreGenerator>): void;
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
   getStore(name: string, throwIfMissing?: boolean): Store | undefined;
   getOrWaitForStore(name: string): Promise<Store>;
   getOrWaitForStoreGenerator(name: string): Promise<StoreGenerator>;

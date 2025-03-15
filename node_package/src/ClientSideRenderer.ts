@@ -16,7 +16,7 @@ const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
 function delegateToRenderer(
   componentObj: RegisteredComponent,
-  props: Record<string, string>,
+  props: Record<string, unknown>,
   railsContext: RailsContext,
   domNodeId: string,
   trace: boolean,
@@ -81,7 +81,7 @@ class ComponentRenderer {
     // This must match lib/react_on_rails/helper.rb
     const name = el.getAttribute('data-component-name') || '';
     const { domNodeId } = this;
-    const props = el.textContent !== null ? JSON.parse(el.textContent) : {};
+    const props = el.textContent !== null ? (JSON.parse(el.textContent) as Record<string, unknown>) : {};
     const trace = el.getAttribute('data-trace') === 'true';
 
     try {
@@ -183,7 +183,10 @@ class StoreRenderer {
     }
 
     const name = storeDataElement.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
-    const props = storeDataElement.textContent !== null ? JSON.parse(storeDataElement.textContent) : {};
+    const props =
+      storeDataElement.textContent !== null
+        ? (JSON.parse(storeDataElement.textContent) as Record<string, unknown>)
+        : {};
     this.hydratePromise = this.hydrate(context, railsContext, name, props);
   }
 
@@ -191,7 +194,7 @@ class StoreRenderer {
     context: Context,
     railsContext: RailsContext,
     name: string,
-    props: Record<string, string>,
+    props: Record<string, unknown>,
   ) {
     const storeGenerator = await context.ReactOnRails.getOrWaitForStoreGenerator(name);
     if (this.state === 'unmounted') {
