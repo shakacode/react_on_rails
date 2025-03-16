@@ -13,7 +13,6 @@ const compat = new FlatCompat({
 
 const config = tsEslint.config([
   globalIgnores([
-    'lib/generators/react_on_rails/templates',
     // compiled code
     'node_package/lib/',
     // used for tests only
@@ -121,6 +120,15 @@ const config = tsEslint.config([
       'react/jsx-props-no-spreading': 'off',
       'react/static-property-placement': 'off',
       'jsx-a11y/anchor-is-valid': 'off',
+    },
+  },
+  {
+    files: ['lib/generators/react_on_rails/templates/**/*'],
+    rules: {
+      // It doesn't use package.json from the template
+      'import/no-unresolved': 'off',
+      // We have `const [name, setName] = useState(props.name)` so can't just destructure props
+      'react/destructuring-assignment': 'off',
     },
   },
   {
