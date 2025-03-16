@@ -22,7 +22,6 @@
     "@babel/eslint-parser": "^7.26.10",
     "@babel/preset-env": "^7.20.2",
     "@babel/preset-react": "^7.26.3",
-    "@eslint/compat": "^1.2.7",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",

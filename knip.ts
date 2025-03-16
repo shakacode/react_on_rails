@@ -10,6 +10,7 @@ const config: KnipConfig = {
         'node_package/src/registerServerComponent/client.ts!',
         'node_package/src/registerServerComponent/server.ts!',
         'node_package/src/RSCClientRoot.ts!',
+        'eslint.config.ts',
       ],
       project: ['node_package/src/**/*.[jt]s{x,}!', 'node_package/tests/**/*.[jt]s{x,}'],
       babel: {
@@ -27,8 +28,17 @@ const config: KnipConfig = {
         '@types/turbolinks',
         // The Knip ESLint plugin fails to detect these are transitively required by a config,
         // though we don't actually use its rules anywhere.
+        '@babel/eslint-parser',
+        '@babel/preset-react',
+        'eslint-config-shakacode',
+        'eslint-import-resolver-alias',
+        'eslint-plugin-import',
         'eslint-plugin-jsx-a11y',
         'eslint-plugin-react',
+        'eslint-plugin-react-hooks',
+        // These are used as transitive dependencies and missing from package.json
+        '@eslint/eslintrc',
+        '@eslint/js',
         // Used in CI
         '@arethetypeswrong/cli',
         // used by Jest
