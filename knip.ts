@@ -39,8 +39,6 @@ const config: KnipConfig = {
         // These are used as transitive dependencies and missing from package.json
         '@eslint/eslintrc',
         '@eslint/js',
-        // Used in CI
-        '@arethetypeswrong/cli',
         // used by Jest
         'jsdom',
       ],
