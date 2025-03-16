@@ -14,8 +14,11 @@ const compat = new FlatCompat({
 const config = tsEslint.config([
   globalIgnores([
     'lib/generators/react_on_rails/templates',
+    // compiled code
     'node_package/lib/',
+    // used for tests only
     'spec/react_on_rails/dummy-for-generators',
+    // temporary and generated files
     'spec/dummy/.yalc',
     'spec/dummy/public',
     'spec/dummy/vendor',
@@ -24,16 +27,16 @@ const config = tsEslint.config([
     'spec/dummy/client/app/packs/server-bundle.js',
     '**/*.res.js',
     '**/coverage',
-    '**/node_modules/**/*',
     '**/assets/webpack/**/*',
     '**/public/webpack/**/*',
     '**/generated/**/*',
     '**/app/assets/javascripts/application.js',
-    '**/coverage/**/*',
     '**/cable.js',
     '**/public/packs*/*',
-    '**/gen-examples',
+    '**/gen-examples/',
     '**/bundle/',
+    // dependencies
+    '**/node_modules/**/*',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],
