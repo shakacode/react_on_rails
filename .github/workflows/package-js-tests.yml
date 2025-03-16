@@ -38,7 +38,6 @@ jobs:
       - name: Install Node modules with Yarn for renderer package
         run: |
           yarn install --no-progress --no-emoji
-          yarn run eslint -v
           sudo yarn global add yalc
       - name: Run JS unit tests for Renderer package
         run: yarn test

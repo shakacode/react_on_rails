@@ -82,8 +82,7 @@
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",
     "release:patch": "node_package/scripts/release patch",
     "release:minor": "node_package/scripts/release minor",
-    "release:major": "node_package/scripts/release major",
-    "knip": "knip"
+    "release:major": "node_package/scripts/release major"
   },
   "repository": {
     "type": "git",

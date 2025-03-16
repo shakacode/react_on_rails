@@ -21,6 +21,7 @@ const config = tsEslint.config([
     'spec/dummy/vendor',
     'spec/dummy/tmp',
     'spec/dummy/app/assets/config/manifest.js',
+    'spec/dummy/client/app/packs/server-bundle.js',
     '**/*.res.js',
     '**/coverage',
     '**/node_modules/**/*',
@@ -93,6 +94,12 @@ const config = tsEslint.config([
       // The rule seems broken: it's reporting errors on imports in files using `export` too,
       // not just `module.exports`.
       'import/no-import-module-exports': 'off',
+      'import/no-unresolved': [
+        'error',
+        {
+          ignore: ['\\.res\\.js$'],
+        },
+      ],
       'react/destructuring-assignment': [
         'error',
         'always',
