@@ -197,6 +197,7 @@ export interface ReactOnRails {
   stores(): Map<string, Store>;
   resetOptions(): void;
   options: Record<string, string | number | boolean>;
+  isRSCBundle: boolean;
 }
 
 export type RenderState = {
