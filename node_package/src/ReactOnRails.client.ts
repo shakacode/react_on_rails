@@ -34,9 +34,10 @@ Check your Webpack configuration. Read more at https://github.com/shakacode/reac
   /* eslint-enable @typescript-eslint/no-base-to-string */
 }
 
-const DEFAULT_OPTIONS = {
+const DEFAULT_OPTIONS: ReactOnRailsOptions = {
   traceTurbolinks: false,
   turbo: false,
+  rscPayloadGenerationUrlPath: '/rsc_payload',
 };
 
 ctx.ReactOnRails = {
@@ -85,16 +86,22 @@ ctx.ReactOnRails = {
       delete newOptions.traceTurbolinks;
     }
 
-    if (typeof newOptions.turbo !== 'undefined') {
-      this.options.turbo = newOptions.turbo;
-
-      // eslint-disable-next-line no-param-reassign
-      delete newOptions.turbo;
+    const validOptionKeys = Object.keys(DEFAULT_OPTIONS);
+    const providedOptionKeys = Object.keys(newOptions);
+    
+    const invalidOptions = providedOptionKeys.filter(key => !validOptionKeys.includes(key));
+    if (invalidOptions.length > 0) {
+      throw new Error(
+        `Invalid options passed to ReactOnRails.options: ${JSON.stringify(invalidOptions)}`,
+      );
     }
 
-    if (Object.keys(newOptions).length > 0) {
-      throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`);
-    }
+    // Filter out undefined values before merging
+    const definedOptions = Object.fromEntries(
+      Object.entries(newOptions).filter(([_, value]) => value !== undefined)
+    );
+
+    this.options = { ...this.options, ...definedOptions };
   },
 
   reactOnRailsPageLoaded() {
@@ -197,6 +204,8 @@ ctx.ReactOnRails = {
   resetOptions(): void {
     this.options = { ...DEFAULT_OPTIONS };
   },
+
+  isRSCBundle: false,
 };
 
 ctx.ReactOnRails.resetOptions();
