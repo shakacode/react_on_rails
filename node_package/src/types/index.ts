@@ -169,12 +169,6 @@ export interface Root {
 // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- inherited from React 16/17, can't avoid here
 export type RenderReturnType = void | Element | Component | Root;
 
-export interface ReactOnRailsOptions {
-  traceTurbolinks: boolean;
-  turbo: boolean;
-  rscPayloadGenerationUrlPath: string;
-}
-
 export interface ReactOnRails {
   register(components: Record<string, ReactComponentOrRenderFunction>): void;
   /** @deprecated Use registerStoreGenerators instead */
