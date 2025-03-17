@@ -23,16 +23,14 @@ function delegateToRenderer(
   domNodeId: string,
   trace: boolean,
 ): boolean {
-  const { name, component, isRenderer } = componentObj;
-
-  if (isRenderer) {
+  if (componentObj.type === 'renderer-function') {
     if (trace) {
       console.log(`\
-DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, railsContext:`,
+DELEGATING TO RENDERER ${componentObj.name} for dom node with id: ${domNodeId} with props, railsContext:`,
         props, railsContext);
     }
 
-    (component as RenderFunction)(props, railsContext, domNodeId);
+    componentObj.component(props, railsContext, domNodeId);
     return true;
   }
 
