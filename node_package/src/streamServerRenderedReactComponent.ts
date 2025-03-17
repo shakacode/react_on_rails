@@ -229,13 +229,17 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
     const componentObj = ComponentRegistry.get(componentName);
     validateComponent(componentObj, componentName);
 
-    const reactRenderingResult = createReactOutput({
-      componentObj,
-      domNodeId,
-      trace,
-      props,
-      railsContext,
-    });
+    if (componentObj.type === 'server-component-reference') {
+      const reactRenderingResult = React.createElement(componentObj.component as ReactComponent, props);
+    } else {
+      const reactRenderingResult = createReactOutput({
+        componentObj,
+        domNodeId,
+        trace,
+        props,
+        railsContext,
+      });
+    }
 
     if (isServerRenderHash(reactRenderingResult)) {
       throw new Error('Server rendering of streams is not supported for server render hashes.');

@@ -67,5 +67,11 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
   }
 };
 
+ReactOnRails.isRSCBundle = true;
+
+ReactOnRails.registerServerComponentReferences = () => {
+  throw new Error('registerServerComponentReferences is not supported in the RSC bundle. Server components themselves should be registered not referenced.');
+}
+
 export * from './types';
 export default ReactOnRails;
