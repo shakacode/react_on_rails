@@ -55,7 +55,53 @@ describe('ReactOnRails', () => {
   it('setOptions method throws error for invalid options', () => {
     ReactOnRails.resetOptions();
     expect.assertions(1);
-    expect(() => ReactOnRails.setOptions({ foobar: true })).toThrow(/Invalid option/);
+    expect(() => ReactOnRails.setOptions({ foobar: true })).toThrow(/Invalid options/);
+  });
+
+  it('setOptions allows setting multiple options at once', () => {
+    ReactOnRails.resetOptions();
+    ReactOnRails.setOptions({ 
+      traceTurbolinks: true, 
+      rscPayloadGenerationUrlPath: '/custom_rsc' 
+    });
+    expect(ReactOnRails.option('traceTurbolinks')).toBe(true);
+    expect(ReactOnRails.option('rscPayloadGenerationUrlPath')).toBe('/custom_rsc');
+  });
+
+  it('setOptions preserves unspecified options when setting specific ones', () => {
+    ReactOnRails.resetOptions();
+    
+    ReactOnRails.setOptions({ 
+      traceTurbolinks: true,
+      turbo: true,
+      rscPayloadGenerationUrlPath: '/custom_rsc'
+    });
+    
+    ReactOnRails.setOptions({ 
+      rscPayloadGenerationUrlPath: '/different_path' 
+    });
+    
+    expect(ReactOnRails.option('rscPayloadGenerationUrlPath')).toBe('/different_path');
+    
+    expect(ReactOnRails.option('traceTurbolinks')).toBe(true);
+    expect(ReactOnRails.option('turbo')).toBe(true);
+  });
+
+  it('setOptions ignores undefined values', () => {
+    ReactOnRails.resetOptions();
+    ReactOnRails.setOptions({
+      traceTurbolinks: true,
+      turbo: true,
+      rscPayloadGenerationUrlPath: '/custom_rsc'
+    });
+    
+    ReactOnRails.setOptions({
+      rscPayloadGenerationUrlPath: undefined
+    });
+  
+    expect(ReactOnRails.option('rscPayloadGenerationUrlPath')).toBe('/custom_rsc');
+    expect(ReactOnRails.option('traceTurbolinks')).toBe(true);
+    expect(ReactOnRails.option('turbo')).toBe(true);
   });
 
   it('registerStore throws if passed a falsey object (null, undefined, etc)', () => {
