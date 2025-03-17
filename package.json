@@ -56,7 +56,7 @@
     "publint": "^0.3.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-on-rails-rsc": "19.0.0",
+    "react-on-rails-rsc": "git+https://github.com/shakacode/react_on_rails_rsc.git#add-support-for-generating-client-components-manifest-for-server-bundle",
     "redux": "^4.2.1",
     "ts-jest": "^29.2.5",
     "typescript": "^5.8.3"
@@ -64,7 +64,7 @@
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
-    "react-on-rails-rsc": "19.0.0"
+    "react-on-rails-rsc": "git+https://github.com/shakacode/react_on_rails_rsc.git#add-support-for-generating-client-components-manifest-for-server-bundle"
   },
   "files": [
     "node_package/lib"
