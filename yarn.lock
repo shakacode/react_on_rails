@@ -5210,17 +5210,9 @@ react-is@^18.0.0:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-18.2.0.tgz#199431eeaaa2e09f86427efbb4f1473edb47609b"
   integrity sha512-xWGDIW6x921xtzPkhiULtthJHoJvBbF3q26fzloPCK0hsvxtPVelvftw3zjbHWSkR2km9Z+4uxbDDK/6Zw9B8w==
 
-react-on-rails-rsc@19.0.0:
-  version "19.0.0"
-  resolved "https://registry.yarnpkg.com/react-on-rails-rsc/-/react-on-rails-rsc-19.0.0.tgz#0061d8f3eb7cdf12a23c66985212f46e3e2ed2ef"
-  integrity sha512-70K46d9Zs071VgUNxZLz0ModMkPRKpSCu5XiICd/8ChMdivSyxdHEZzY4GSiztQnizzKFX7k25N0EIv/DmUPNg==
-  dependencies:
-    react-server-dom-webpack "19.0.0"
-
-react-server-dom-webpack@19.0.0:
-  version "19.0.0"
-  resolved "https://registry.yarnpkg.com/react-server-dom-webpack/-/react-server-dom-webpack-19.0.0.tgz#c60819b6cb54e317e675ddc0c5959ff915b789d0"
-  integrity sha512-hLug9KEXLc8vnU9lDNe2b2rKKDaqrp5gNiES4uyu2Up3FZfZJZmdwLFXlWzdA9gTB/6/cWduSB2K1Lfag2pSvw==
+"react-on-rails-rsc@git+https://github.com/shakacode/react_on_rails_rsc.git#add-support-for-generating-client-components-manifest-for-server-bundle":
+  version "19.0.0-rc.2"
+  resolved "git+https://github.com/shakacode/react_on_rails_rsc.git#f49dc3fd94629ff23c1c6a397b19b6feff437b2f"
   dependencies:
     acorn-loose "^8.3.0"
     neo-async "^2.6.1"

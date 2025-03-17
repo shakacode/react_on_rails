@@ -376,6 +376,10 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * Current options.
    */
   options: ReactOnRailsOptions;
+  /**
+   * Indicates if the RSC bundle is being used.
+   */
+  isRSCBundle: boolean;
 }
 
 export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult>;
