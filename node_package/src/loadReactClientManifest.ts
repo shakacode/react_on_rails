@@ -10,16 +10,15 @@ export default async function loadReactClientManifest(reactClientManifestFileNam
   // Thus, the __dirname of this code is where we can find the manifest file.
   const manifestPath = path.resolve(__dirname, reactClientManifestFileName);
   const loadedReactClientManifest = loadedReactClientManifests.get(manifestPath);
-  if (!loadedReactClientManifest) {
-    // TODO: convert to async
-    try {
-      const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as ClientManifest;
-      loadedReactClientManifests.set(manifestPath, manifest);
-      return manifest;
-    } catch (error) {
-      throw new Error(`Failed to load React client manifest from ${manifestPath}: ${error}`);
-    }
+  if (loadedReactClientManifest) {
+    return loadedReactClientManifest;
   }
 
-  return loadedReactClientManifest;
+  try {
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as ClientManifest;
+    loadedReactClientManifests.set(manifestPath, manifest);
+    return manifest;
+  } catch (error) {
+    throw new Error(`Failed to load React client manifest from ${manifestPath}: ${error}`);
+  }
 }
