@@ -24,7 +24,7 @@ const stringToStream = (str: string) => {
   return stream;
 };
 
-const streamRenderRSCComponent = (reactElement: ReactElement | Promise<ReactElement>, options: RSCRenderParams): Readable => {
+const streamRenderRSCComponent = (reactElement: ReactElement, options: RSCRenderParams): Readable => {
   const { throwJsErrors, reactClientManifestFileName } = options;
   const renderState: StreamRenderState = {
     result: null,
@@ -68,12 +68,6 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
     console.history = [];
   }
 };
-
-ReactOnRails.isRSCBundle = true;
-
-ReactOnRails.registerServerComponentReferences = () => {
-  throw new Error('registerServerComponentReferences is not supported in the RSC bundle. Server components themselves should be registered not referenced.');
-}
 
 export * from './types';
 export default ReactOnRails;

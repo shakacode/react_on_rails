@@ -24,7 +24,7 @@ export default function createReactOutput({
   trace,
   shouldHydrate,
 }: CreateParams): CreateReactOutputResult {
-  const { name, type, component } = componentObj;
+  const { name, component, renderFunction } = componentObj;
 
   if (trace) {
     if (railsContext && railsContext.serverSide) {
@@ -38,12 +38,12 @@ export default function createReactOutput({
     }
   }
 
-  if (type === 'render-function') {
+  if (renderFunction) {
     // Let's invoke the function to get the result
     if (trace) {
       console.log(`${name} is a renderFunction`);
     }
-    const renderFunctionResult = component(props, railsContext);
+    const renderFunctionResult = (component as RenderFunction)(props, railsContext);
     if (isServerRenderHash(renderFunctionResult as CreateReactOutputResult)) {
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
