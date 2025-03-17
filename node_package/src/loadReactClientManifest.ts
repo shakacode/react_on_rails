@@ -9,15 +9,17 @@ export default async function loadReactClientManifest(reactClientManifestFileNam
   // Renderer copies assets to the same place as the server-bundle.js and rsc-bundle.js.
   // Thus, the __dirname of this code is where we can find the manifest file.
   const manifestPath = path.resolve(__dirname, reactClientManifestFileName);
-  if (!loadedReactClientManifests.has(manifestPath)) {
+  const loadedReactClientManifest = loadedReactClientManifests.get(manifestPath);
+  if (!loadedReactClientManifest) {
     // TODO: convert to async
     try {
       const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as ClientManifest;
       loadedReactClientManifests.set(manifestPath, manifest);
+      return manifest;
     } catch (error) {
       throw new Error(`Failed to load React client manifest from ${manifestPath}: ${error}`);
     }
   }
 
-  return loadedReactClientManifests.get(manifestPath)!;
+  return loadedReactClientManifest;
 }

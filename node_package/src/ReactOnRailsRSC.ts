@@ -46,7 +46,7 @@ const streamRenderRSCComponent = (reactElement: ReactElement, options: RSCRender
       });
       pipeToTransform(rscStream);
     })
-    .catch((e) => {
+    .catch((e: unknown) => {
       const error = convertToError(e);
       renderState.hasErrors = true;
       renderState.error = error;

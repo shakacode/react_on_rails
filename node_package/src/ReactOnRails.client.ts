@@ -203,11 +203,10 @@ ctx.ReactOnRails = {
 
   /**
    * Allows saving the store populated by Rails form props. Used internally by ReactOnRails.
-   * @param name
    * @returns Redux Store, possibly hydrated
    */
   setStore(name: string, store: Store): void {
-    return StoreRegistry.setStore(name, store);
+    StoreRegistry.setStore(name, store);
   },
 
   /**
