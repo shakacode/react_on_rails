@@ -98,32 +98,20 @@ export type {
   ServerRenderResult,
 };
 
-export type RegisteredComponent = {
+export interface RegisteredComponent {
   name: string;
-} & ({
-  component: ReactComponent;
-  type: 'react-component';
-} | {
-  component: RenderFunction;
-  type:
-      /**
-       * Indicates if the registered component is a RenderFunction
-       * @see RenderFunction for more details on its behavior and usage.
-       */
-       'render-function' |
-      /**
-       * Indicates if the registered component is a Renderer function.
-       * Renderer function handles DOM rendering or hydration with 3 args: (props, railsContext, domNodeId)
-       * Supported on the client side only.
-       * All renderer functions are render functions, but not all render functions are renderer functions.
-       */
-      'renderer-function';
-} | {
-  // This variant exists to support server component references, where we only need the type field
-  // but want to maintain consistent destructuring patterns like { type, component } = componentObj
-  component: undefined;
-  type: 'server-component-reference';
-});
+  component: ReactComponentOrRenderFunction;
+  /**
+   * Indicates if the registered component is a RenderFunction
+   * @see RenderFunction for more details on its behavior and usage.
+   */
+  renderFunction: boolean;
+  // Indicates if the registered component is a Renderer function.
+  // Renderer function handles DOM rendering or hydration with 3 args: (props, railsContext, domNodeId)
+  // Supported on the client side only.
+  // All renderer functions are render functions, but not all render functions are renderer functions.
+  isRenderer: boolean;
+}
 
 export interface RegisterServerComponentOptions {
   rscPayloadGenerationUrlPath: string;
@@ -181,15 +169,8 @@ export interface Root {
 // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- inherited from React 16/17, can't avoid here
 export type RenderReturnType = void | Element | Component | Root;
 
-export interface ReactOnRailsOptions {
-  traceTurbolinks: boolean;
-  turbo: boolean;
-  rscPayloadGenerationUrlPath: string;
-}
-
 export interface ReactOnRails {
   register(components: Record<string, ReactComponentOrRenderFunction>): void;
-  registerServerComponentReferences(...references: string[]): void;
   /** @deprecated Use registerStoreGenerators instead */
   registerStore(stores: Record<string, StoreGenerator>): void;
   registerStoreGenerators(storeGenerators: Record<string, StoreGenerator>): void;
@@ -203,7 +184,7 @@ export interface ReactOnRails {
   reactOnRailsStoreLoaded(storeName: string): Promise<void>;
   authenticityToken(): string | null;
   authenticityHeaders(otherHeaders: Record<string, string>): AuthenticityHeaders;
-  option(key: keyof ReactOnRailsOptions): string | number | boolean | undefined;
+  option(key: string): string | number | boolean | undefined;
   getStoreGenerator(name: string): StoreGenerator;
   setStore(name: string, store: Store): void;
   clearHydratedStores(): void;
@@ -219,7 +200,7 @@ export interface ReactOnRails {
   storeGenerators(): Map<string, StoreGenerator>;
   stores(): Map<string, Store>;
   resetOptions(): void;
-  options: ReactOnRailsOptions;
+  options: Record<string, string | number | boolean>;
   isRSCBundle: boolean;
 }
 

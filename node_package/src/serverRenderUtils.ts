@@ -22,7 +22,7 @@ export function convertToError(e: unknown): Error {
 }
 
 export function validateComponent(componentObj: RegisteredComponent, componentName: string) {
-  if (componentObj.type === 'renderer-function') {
+  if (componentObj.isRenderer) {
     throw new Error(
       `Detected a renderer while server rendering component '${componentName}'. See https://github.com/shakacode/react_on_rails#renderer-functions`,
     );

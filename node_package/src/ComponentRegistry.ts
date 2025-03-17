@@ -19,28 +19,14 @@ export default {
         throw new Error(`Called register with null component named ${name}`);
       }
 
-      if (isRenderFunction(component)) {
-        return componentRegistry.set(name, {
-          name,
-          component,
-          type: component.length === 3 ? 'renderer-function' : 'render-function',
-        });
-      }
+      const renderFunction = isRenderFunction(component);
+      const isRenderer = renderFunction && (component as RenderFunction).length === 3;
 
       componentRegistry.set(name, {
         name,
         component,
-        type: 'react-component',
-      });
-    });
-  },
-
-  registerServerComponentReferences(...references: string[]): void {
-    references.forEach(reference => {
-      componentRegistry.set(reference, {
-        name: reference,
-        component: undefined,
-        type: 'server-component-reference',
+        renderFunction,
+        isRenderer,
       });
     });
   },
