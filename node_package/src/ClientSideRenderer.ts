@@ -1,5 +1,5 @@
 /* eslint-disable max-classes-per-file */
-/* eslint-disable react/no-deprecated -- while we need to support React 16 */
+/* eslint-disable react/no-deprecated,@typescript-eslint/no-deprecated -- while we need to support React 16 */
 
 import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
@@ -163,8 +163,8 @@ You should return a React.Component always for the client side entry point.`);
   }
 
   waitUntilRendered(): Promise<void> {
-    if (this.state === 'rendering') {
-      return this.renderPromise!;
+    if (this.state === 'rendering' && this.renderPromise) {
+      return this.renderPromise;
     }
     return Promise.resolve();
   }
@@ -207,8 +207,8 @@ class StoreRenderer {
   }
 
   waitUntilHydrated(): Promise<void> {
-    if (this.state === 'hydrating') {
-      return this.hydratePromise!;
+    if (this.state === 'hydrating' && this.hydratePromise) {
+      return this.hydratePromise;
     }
     return Promise.resolve();
   }

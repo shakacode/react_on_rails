@@ -140,7 +140,7 @@ const config = tsEslint.config([
   {
     files: ['**/*.ts', '**/*.tsx'],
 
-    extends: tsEslint.configs.recommendedTypeChecked,
+    extends: tsEslint.configs.strictTypeChecked,
 
     languageOptions: {
       parserOptions: {
@@ -156,6 +156,12 @@ const config = tsEslint.config([
     rules: {
       '@typescript-eslint/no-namespace': 'off',
       '@typescript-eslint/no-shadow': 'error',
+      '@typescript-eslint/no-confusing-void-expression': [
+        'error',
+        {
+          ignoreArrowShorthand: true,
+        },
+      ],
       // Too many false positives
       '@typescript-eslint/no-unnecessary-condition': 'off',
       '@typescript-eslint/no-unused-vars': [
