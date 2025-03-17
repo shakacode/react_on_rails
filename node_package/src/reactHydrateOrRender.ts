@@ -22,14 +22,16 @@ if (supportsRootApi) {
   }
 }
 
-/* eslint-disable react/no-deprecated -- while we need to support React 16 */
+/* eslint-disable react/no-deprecated,@typescript-eslint/no-deprecated,@typescript-eslint/no-non-null-assertion --
+ * while we need to support React 16
+ */
 const reactHydrate: HydrateOrRenderType = supportsRootApi
-  ? reactDomClient.hydrateRoot
+  ? reactDomClient!.hydrateRoot
   : (domNode, reactElement) => ReactDOM.hydrate(reactElement, domNode);
 
 function reactRender(domNode: Element, reactElement: ReactElement): RenderReturnType {
   if (supportsRootApi) {
-    const root = reactDomClient.createRoot(domNode);
+    const root = reactDomClient!.createRoot(domNode);
     root.render(reactElement);
     return root;
   }
@@ -37,7 +39,7 @@ function reactRender(domNode: Element, reactElement: ReactElement): RenderReturn
   // eslint-disable-next-line react/no-render-return-value
   return ReactDOM.render(reactElement, domNode);
 }
-/* eslint-enable react/no-deprecated */
+/* eslint-enable react/no-deprecated,@typescript-eslint/no-deprecated,@typescript-eslint/no-non-null-assertion */
 
 export default function reactHydrateOrRender(
   domNode: Element,
