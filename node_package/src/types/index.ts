@@ -163,6 +163,12 @@ export interface Root {
 
 export type RenderReturnType = void | Element | Component | Root;
 
+export interface ReactOnRailsOptions {
+  traceTurbolinks: boolean;
+  turbo: boolean;
+  rscPayloadGenerationUrlPath: string;
+}
+
 export interface ReactOnRails {
   register(components: { [id: string]: ReactComponentOrRenderFunction }): void;
   /** @deprecated Use registerStoreGenerators instead */
