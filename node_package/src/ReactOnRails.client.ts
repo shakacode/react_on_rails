@@ -155,8 +155,8 @@ ctx.ReactOnRails = {
     renderOrHydrateComponent(domId);
   },
 
-  reactOnRailsStoreLoaded(storeName: string): void {
-    hydrateStore(storeName);
+  async reactOnRailsStoreLoaded(storeName: string): Promise<void> {
+    await hydrateStore(storeName);
   },
 
   /**
@@ -347,7 +347,7 @@ ctx.ReactOnRails = {
 
 ctx.ReactOnRails.resetOptions();
 
-ClientStartup.clientStartup(ctx);
+void ClientStartup.clientStartup(ctx);
 
 export * from './types';
 export default ctx.ReactOnRails;

@@ -180,7 +180,7 @@ export interface ReactOnRails {
   reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType;
   reactOnRailsPageLoaded(): Promise<void>;
   reactOnRailsComponentLoaded(domId: string): void;
-  reactOnRailsStoreLoaded(storeName: string): void;
+  reactOnRailsStoreLoaded(storeName: string): Promise<void>;
   authenticityToken(): string | null;
   authenticityHeaders(otherHeaders: Record<string, string>): AuthenticityHeaders;
   option(key: string): string | number | boolean | undefined;

@@ -14,13 +14,13 @@ import { debugTurbolinks } from './turbolinksUtils';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
-function delegateToRenderer(
+async function delegateToRenderer(
   componentObj: RegisteredComponent,
   props: Record<string, unknown>,
   railsContext: RailsContext,
   domNodeId: string,
   trace: boolean,
-): boolean {
+): Promise<boolean> {
   const { name, component, isRenderer } = componentObj;
 
   if (isRenderer) {
@@ -32,7 +32,7 @@ function delegateToRenderer(
       );
     }
 
-    (component as RenderFunction)(props, railsContext, domNodeId);
+    await (component as RenderFunction)(props, railsContext, domNodeId);
     return true;
   }
 
@@ -92,7 +92,7 @@ class ComponentRenderer {
           return;
         }
 
-        if (delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) {
+        if (await delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) {
           return;
         }
 
