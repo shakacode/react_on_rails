@@ -15,6 +15,7 @@ import type {
   AuthenticityHeaders,
   Store,
   StoreGenerator,
+  ReactOnRailsOptions
 } from './types';
 import reactHydrateOrRender from './reactHydrateOrRender';
 
@@ -33,13 +34,14 @@ Check your Webpack configuration. Read more at https://github.com/shakacode/reac
   /* eslint-enable @typescript-eslint/no-base-to-string */
 }
 
-const DEFAULT_OPTIONS = {
+const DEFAULT_OPTIONS: ReactOnRailsOptions = {
   traceTurbolinks: false,
   turbo: false,
+  rscPayloadGenerationUrlPath: '/rsc_payload',
 };
 
 ctx.ReactOnRails = {
-  options: {},
+  options: { ...DEFAULT_OPTIONS },
   /**
    * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
    * find you components for rendering.
@@ -117,25 +119,29 @@ ctx.ReactOnRails = {
    * Available Options:
    * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
    * `turbo: true|false Turbo (the follower of Turbolinks) events will be registered, if set to true.
+   * `rscPayloadGenerationUrlPath: string The path or url of the endpoint that will generate the RSC payload.
    */
-  setOptions(newOptions: { traceTurbolinks?: boolean; turbo?: boolean }): void {
-    if (typeof newOptions.traceTurbolinks !== 'undefined') {
-      this.options.traceTurbolinks = newOptions.traceTurbolinks;
-
-      // eslint-disable-next-line no-param-reassign
-      delete newOptions.traceTurbolinks;
+  setOptions(newOptions: Partial<ReactOnRailsOptions>): void {
+    if (!newOptions || typeof newOptions !== 'object') {
+      throw new Error('Error calling ReactOnRails.setOptions: newOptions must be a plain object.');
     }
 
-    if (typeof newOptions.turbo !== 'undefined') {
-      this.options.turbo = newOptions.turbo;
-
-      // eslint-disable-next-line no-param-reassign
-      delete newOptions.turbo;
+    const validOptionKeys = Object.keys(DEFAULT_OPTIONS);
+    const providedOptionKeys = Object.keys(newOptions);
+    
+    const invalidOptions = providedOptionKeys.filter(key => !validOptionKeys.includes(key));
+    if (invalidOptions.length > 0) {
+      throw new Error(
+        `Invalid options passed to ReactOnRails.options: ${JSON.stringify(invalidOptions)}`,
+      );
     }
 
-    if (Object.keys(newOptions).length > 0) {
-      throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`);
-    }
+    // Filter out undefined values before merging
+    const definedOptions = Object.fromEntries(
+      Object.entries(newOptions).filter(([_, value]) => value !== undefined)
+    );
+
+    this.options = { ...this.options, ...definedOptions };
   },
 
   /**
@@ -184,7 +190,7 @@ ctx.ReactOnRails = {
    * @param key
    * @returns option value
    */
-  option(key: string): string | number | boolean | undefined {
+  option(key: keyof ReactOnRailsOptions): string | number | boolean | undefined {
     return this.options[key];
   },
 
@@ -339,9 +345,9 @@ ctx.ReactOnRails = {
   resetOptions(): void {
     this.options = { ...DEFAULT_OPTIONS };
   },
-};
 
-ctx.ReactOnRails.resetOptions();
+  isRSCBundle: false,
+};
 
 ClientStartup.clientStartup(ctx);
 
