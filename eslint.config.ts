@@ -80,6 +80,12 @@ const config = tsEslint.config([
       'function-paren-newline': 'off',
       'object-curly-newline': 'off',
       'no-restricted-syntax': ['error', 'SequenceExpression'],
+      'no-void': [
+        'error',
+        {
+          allowAsStatement: true,
+        },
+      ],
 
       'import/extensions': [
         'error',

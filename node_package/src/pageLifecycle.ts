@@ -6,7 +6,7 @@ import {
   turbolinksVersion5,
 } from './turbolinksUtils';
 
-type PageLifecycleCallback = () => void;
+type PageLifecycleCallback = () => void | Promise<void>;
 type PageState = 'load' | 'unload' | 'initial';
 
 const pageLoadedCallbacks = new Set<PageLifecycleCallback>();
@@ -16,12 +16,16 @@ let currentPageState: PageState = 'initial';
 
 function runPageLoadedCallbacks(): void {
   currentPageState = 'load';
-  pageLoadedCallbacks.forEach((callback) => callback());
+  pageLoadedCallbacks.forEach((callback) => {
+    void callback();
+  });
 }
 
 function runPageUnloadedCallbacks(): void {
   currentPageState = 'unload';
-  pageUnloadedCallbacks.forEach((callback) => callback());
+  pageUnloadedCallbacks.forEach((callback) => {
+    void callback();
+  });
 }
 
 function setupTurbolinksEventListeners(): void {
@@ -69,17 +73,17 @@ function initializePageEventListeners(): void {
   }
 }
 
-export function onPageLoaded(callback: PageLifecycleCallback): void {
+export async function onPageLoaded(callback: PageLifecycleCallback): Promise<void> {
   if (currentPageState === 'load') {
-    callback();
+    await callback();
   }
   pageLoadedCallbacks.add(callback);
   initializePageEventListeners();
 }
 
-export function onPageUnloaded(callback: PageLifecycleCallback): void {
+export async function onPageUnloaded(callback: PageLifecycleCallback): Promise<void> {
   if (currentPageState === 'unload') {
-    callback();
+    await callback();
   }
   pageUnloadedCallbacks.add(callback);
   initializePageEventListeners();
