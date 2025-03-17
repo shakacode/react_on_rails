@@ -8,6 +8,7 @@ import { isPromise, isServerRenderHash } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
+import loadJsonFile from './loadJsonFile';
 import type { RenderParams, StreamRenderState } from './types';
 
 const stringToStream = (str: string): Readable => {
@@ -20,6 +21,35 @@ const stringToStream = (str: string): Readable => {
 type BufferedEvent = {
   event: 'data' | 'error' | 'end';
   data: unknown;
+};
+
+const createSSRManifest = async (
+  reactServerManifestFileName: string,
+  reactClientManifestFileName: string,
+) => {
+  const reactServerManifest = await loadJsonFile(reactServerManifestFileName);
+  const reactClientManifest = await loadJsonFile(reactClientManifestFileName);
+
+  const ssrManifest = {
+    moduleLoading: {
+      prefix: '/webpack/development/',
+      crossOrigin: null,
+    },
+    moduleMap: {} as Record<string, unknown>,
+  };
+
+  Object.entries(reactClientManifest).forEach(([aboluteFileUrl, clientFileBundlingInfo]) => {
+    const serverFileBundlingInfo = reactServerManifest[aboluteFileUrl];
+    ssrManifest.moduleMap[(clientFileBundlingInfo as { id: string }).id] = {
+      '*': {
+        id: (serverFileBundlingInfo as { id: string }).id,
+        chunks: (serverFileBundlingInfo as { chunks: string[] }).chunks,
+        name: '*',
+      },
+    };
+  });
+
+  return ssrManifest;
 };
 
 /**

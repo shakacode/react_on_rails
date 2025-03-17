@@ -12,7 +12,7 @@ import {
   streamServerRenderedComponent,
   transformRenderStreamChunksToResultObject,
 } from './streamServerRenderedReactComponent';
-import loadReactClientManifest from './loadReactClientManifest';
+import loadJsonFile from './loadJsonFile';
 
 const stringToStream = (str: string) => {
   const stream = new PassThrough();
@@ -31,7 +31,7 @@ const streamRenderRSCComponent = (reactElement: ReactElement, options: RSCRender
 
   const { pipeToTransform, readableStream, emitError } =
     transformRenderStreamChunksToResultObject(renderState);
-  loadReactClientManifest(reactClientManifestFileName)
+  loadJsonFile(reactClientManifestFileName)
     .then((reactClientManifest) => {
       const rscStream = renderToPipeableStream(reactElement, reactClientManifest, {
         onError: (err) => {
