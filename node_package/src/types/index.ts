@@ -7,7 +7,9 @@ import type { Readable } from 'stream';
 // See https://github.com/shakacode/react_on_rails/issues/1321
 // and https://redux.js.org/api/store for the actual API.
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type Store = unknown;
+type Store = {
+  getState(): unknown;
+};
 
 type ReactComponent = ComponentType<any> | string;
 
@@ -171,7 +173,6 @@ export interface ReactOnRails {
   /** @deprecated Use registerStoreGenerators instead */
   registerStore(stores: Record<string, StoreGenerator>): void;
   registerStoreGenerators(storeGenerators: Record<string, StoreGenerator>): void;
-  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
   getStore(name: string, throwIfMissing?: boolean): Store | undefined;
   getOrWaitForStore(name: string): Promise<Store>;
   getOrWaitForStoreGenerator(name: string): Promise<StoreGenerator>;
