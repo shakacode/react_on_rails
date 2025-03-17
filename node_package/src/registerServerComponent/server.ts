@@ -31,10 +31,7 @@ import { ReactComponent } from '../types';
  * ```
  */
 const registerServerComponent = (components: Record<string, ReactComponent>) => {
-  if (ReactOnRails.isRSCBundle) {
-    return ReactOnRails.register(components);
-  }
-  ReactOnRails.registerServerComponentReferences(...Object.keys(components));
+  ReactOnRails.register(components);
 };
 
 export default registerServerComponent;
