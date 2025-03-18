@@ -7,7 +7,7 @@ import { isPromise, isServerRenderHash } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
-import type { CreateReactOutputResult, RenderParams, RenderResult, RenderState, RenderOptions, ServerRenderResult } from './types';
+import type { CreateReactOutputResult, RenderParams, RenderResult, RenderState, RenderOptions, ServerRenderResult, ReactComponent } from './types';
 
 function processServerRenderHash(result: ServerRenderResult, options: RenderOptions): RenderState {
   const { redirectLocation, routeError } = result;
@@ -33,16 +33,6 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
   return { result: htmlResult, hasErrors };
 }
 
-function processPromise(result: Promise<string>, renderingReturnsPromises: boolean): Promise<string> | string {
-  if (!renderingReturnsPromises) {
-    console.error('Your render function returned a Promise, which is only supported by a node renderer, not ExecJS.');
-    // If the app is using server rendering with ExecJS, then the promise will not be awaited.
-    // And when a promise is passed to JSON.stringify, it will be converted to '{}'.
-    return '{}';
-  }
-  return result;
-}
-
 function processReactElement(result: ReactElement): string {
   try {
     return ReactDOMServer.renderToString(result);
@@ -52,6 +42,21 @@ calls renderToString, that takes one parameter. You need to add an extra unused 
 as a renderFunction and not a simple React Function Component.`);
     throw error;
   }
+}
+
+function processPromise(result: Promise<string | ReactElement>, renderingReturnsPromises: boolean): Promise<string> | string {
+  if (!renderingReturnsPromises) {
+    console.error('Your render function returned a Promise, which is only supported by a node renderer, not ExecJS.');
+    // If the app is using server rendering with ExecJS, then the promise will not be awaited.
+    // And when a promise is passed to JSON.stringify, it will be converted to '{}'.
+    return '{}';
+  }
+  return result.then((result) => {
+    if (typeof result !== 'string') {
+      return processReactElement(result);
+    }
+    return result;
+  });
 }
 
 function processRenderingResult(result: CreateReactOutputResult, options: RenderOptions): RenderState {

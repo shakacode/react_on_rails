@@ -24,7 +24,7 @@ const stringToStream = (str: string) => {
   return stream;
 };
 
-const streamRenderRSCComponent = (reactElement: ReactElement, options: RSCRenderParams): Readable => {
+const streamRenderRSCComponent = (reactRenderingResult: ReactElement | Promise<ReactElement | string>, options: RSCRenderParams): Readable => {
   const { throwJsErrors, reactClientManifestFileName } = options;
   const renderState: StreamRenderState = {
     result: null,
@@ -33,7 +33,7 @@ const streamRenderRSCComponent = (reactElement: ReactElement, options: RSCRender
   };
 
   const { pipeToTransform, readableStream, emitError } = transformRenderStreamChunksToResultObject(renderState);
-  loadJsonFile(reactClientManifestFileName).then((reactClientManifest) => {
+  Promise.all([loadJsonFile(reactClientManifestFileName), reactRenderingResult]).then(([reactClientManifest, reactElement]) => {
     const rscStream = renderToPipeableStream(
       reactElement,
       reactClientManifest,
@@ -68,6 +68,8 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
     console.history = [];
   }
 };
+
+ReactOnRails.isRSCBundle = true;
 
 export * from './types';
 export default ReactOnRails;
