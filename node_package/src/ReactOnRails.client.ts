@@ -190,6 +190,8 @@ globalThis.ReactOnRails = {
   resetOptions(): void {
     this.options = Object.assign({}, DEFAULT_OPTIONS);
   },
+
+  isRSCBundle: false,
 };
 
 globalThis.ReactOnRails.resetOptions();

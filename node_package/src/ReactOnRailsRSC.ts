@@ -67,5 +67,7 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
   }
 };
 
+ReactOnRails.isRSCBundle = true;
+
 export * from './types/index.ts';
 export default ReactOnRails;
