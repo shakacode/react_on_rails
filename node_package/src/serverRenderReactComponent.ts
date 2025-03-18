@@ -82,7 +82,7 @@ function handleRenderingError(e: unknown, options: { componentName: string, thro
 }
 
 async function createPromiseResult(
-  renderState: RenderState & { result: Promise<string> },
+  renderState: RenderState & { result: Promise<string | ReactElement> },
   componentName: string,
   throwJsErrors: boolean
 ): Promise<RenderResult> {
