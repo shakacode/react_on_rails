@@ -8,6 +8,26 @@ import type {
 } from './types/index';
 import { isServerRenderHash, isPromise } from './isServerRenderResult';
 
+export function createReactElementFromRenderFunction(
+  renderFunctionResult: ReactComponent,
+  name: string,
+  props: Record<string, unknown> | undefined,
+): React.ReactElement {
+  if (React.isValidElement(renderFunctionResult)) {
+    // If already a ReactElement, then just return it.
+    console.error(
+`Warning: ReactOnRails: Your registered render-function (ReactOnRails.register) for ${name}
+incorrectly returned a React Element (JSX). Instead, return a React Function Component by
+wrapping your JSX in a function. ReactOnRails v13 will throw error on this, as React Hooks do not
+work if you return JSX. Update by wrapping the result JSX of ${name} in a fat arrow function.`);
+    return renderFunctionResult;
+  }
+
+  // If a component, then wrap in an element
+  const reactComponent = renderFunctionResult as ReactComponent;
+  return React.createElement(reactComponent, props);
+}
+
 /**
  * Logic to either call the renderFunction or call React.createElement to get the
  * React.Component
@@ -62,23 +82,13 @@ export default function createReactOutput({
     if (isPromise(renderFunctionResult as CreateReactOutputResult)) {
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
-      return renderFunctionResult as Promise<string>;
+      return (renderFunctionResult as Promise<string | ReactComponent>).then((result) => {
+        if (typeof result === 'string') return result;
+        return createReactElementFromRenderFunction(result, name, props)
+      });
     }
 
-    if (React.isValidElement(renderFunctionResult)) {
-      // If already a ReactElement, then just return it.
-      console.error(
-        `Warning: ReactOnRails: Your registered render-function (ReactOnRails.register) for ${name}
-incorrectly returned a React Element (JSX). Instead, return a React Function Component by
-wrapping your JSX in a function. ReactOnRails v13 will throw error on this, as React Hooks do not
-work if you return JSX. Update by wrapping the result JSX of ${name} in a fat arrow function.`,
-      );
-      return renderFunctionResult;
-    }
-
-    // If a component, then wrap in an element
-    const reactComponent = renderFunctionResult as ReactComponent;
-    return React.createElement(reactComponent, props);
+    return createReactElementFromRenderFunction(renderFunctionResult as ReactComponent, name, props);
   }
   // else
   return React.createElement(component as ReactComponent, props);
