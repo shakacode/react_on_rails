@@ -1,7 +1,6 @@
 const { config } = require('shakapacker');
-const commonWebpackConfig = require('./commonWebpackConfig');
-
 const webpack = require('webpack');
+const commonWebpackConfig = require('./commonWebpackConfig');
 
 const configureServer = () => {
   // We need to use "merge" because the clientConfigObject, EVEN after running

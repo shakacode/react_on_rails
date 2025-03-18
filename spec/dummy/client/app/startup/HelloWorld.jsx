@@ -22,17 +22,16 @@ class HelloWorld extends React.Component {
     this.handleChange = this.handleChange.bind(this);
   }
 
-  setNameDomRef(nameDomNode) {
-    this.nameDomRef = nameDomNode;
-  }
-
   handleChange() {
     const name = this.nameDomRef.value;
     this.setState({ name });
   }
 
+  setNameDomRef(nameDomNode) {
+    this.nameDomRef = nameDomNode;
+  }
+
   render() {
-    // eslint-disable-next-line no-console
     console.log(
       'HelloWorld demonstrating a call to console.log in ' +
         'spec/dummy/client/app/components/HelloWorld.jsx:18',

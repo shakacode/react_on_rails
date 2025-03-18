@@ -31,10 +31,10 @@ export default (props, _railsContext, domNodeId) => {
 
   // Provider uses this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
-  const renderApp = (Komponent) => {
+  const renderApp = (Component) => {
     const element = (
       <Provider store={store}>
-        <Komponent />
+        <Component />
       </Provider>
     );
     render(document.getElementById(domNodeId), element);

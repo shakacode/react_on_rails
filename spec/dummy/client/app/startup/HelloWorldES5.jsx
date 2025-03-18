@@ -6,21 +6,23 @@ import createReactClass from 'create-react-class';
 
 // Super simple example of React component using React.createClass
 const HelloWorldES5 = createReactClass({
+  // eslint-disable-next-line react/no-unused-class-component-methods
   propTypes: {
     helloWorldData: PropTypes.object,
   },
 
   getInitialState() {
+    // eslint-disable-next-line react/destructuring-assignment
     return this.props.helloWorldData;
-  },
-
-  setNameDomRef(nameDomNode) {
-    this.nameDomRef = nameDomNode;
   },
 
   handleChange() {
     const name = this.nameDomRef.value;
     this.setState({ name });
+  },
+
+  setNameDomRef(nameDomNode) {
+    this.nameDomRef = nameDomNode;
   },
 
   render() {

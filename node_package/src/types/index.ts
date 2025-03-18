@@ -1,4 +1,3 @@
-// eslint-disable-next-line spaced-comment
 /// <reference types="react/experimental" />
 
 import type { ReactElement, ReactNode, Component, ComponentType } from 'react';

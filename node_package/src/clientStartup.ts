@@ -31,7 +31,7 @@ export async function clientStartup(context: Context): Promise<void> {
     return;
   }
 
-  // eslint-disable-next-line no-underscore-dangle, no-param-reassign
+  // eslint-disable-next-line no-underscore-dangle
   context.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
 
   // force loaded components and stores are rendered and hydrated immediately

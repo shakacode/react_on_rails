@@ -1,7 +1,6 @@
-/* eslint-disable react/no-multi-comp */
 /* eslint-disable react/prefer-es6-class */
 /* eslint-disable react/prefer-stateless-function */
-/* eslint-disable react/jsx-filename-extension */
+/* eslint-disable max-classes-per-file */
 
 import * as React from 'react';
 import * as createReactClass from 'create-react-class';
@@ -63,9 +62,7 @@ describe('isRenderFunction', () => {
   it('returns false for a stateless functional component with one param', () => {
     expect.assertions(1);
 
-    /* eslint-disable react/prop-types */
     const pureComponent = (props) => <h1>{props.title}</h1>;
-    /* eslint-enable react/prop-types */
 
     expect(isRenderFunction(pureComponent)).toBe(false);
   });
