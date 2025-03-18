@@ -112,6 +112,7 @@ jobs:
               fi
               echo "actionlint_version=\"$actionlint_version\"" >> "$GITHUB_OUTPUT"
             fi
+          fi
       - name: Setup Actionlint
         if: steps.check-workflows.outputs.changed == 'true'
         uses: actions/cache@v4
