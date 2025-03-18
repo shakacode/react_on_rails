@@ -222,7 +222,7 @@ const renderedRoots = new Map<string, ComponentRenderer>();
 
 export function renderOrHydrateComponent(domIdOrElement: string | Element): ComponentRenderer | undefined {
   const domId = getDomId(domIdOrElement);
-  debugTurbolinks(`renderOrHydrateComponent ${domId}`);
+  debugTurbolinks('renderOrHydrateComponent', domId);
   let root = renderedRoots.get(domId);
   if (!root) {
     root = new ComponentRenderer(domIdOrElement);
