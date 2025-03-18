@@ -68,7 +68,7 @@ describe('serverRenderReactComponent', () => {
     expect(result).toBeTruthy();
   });
 
-  it('serverRenderReactComponent renders promises', async () => {
+  it('serverRenderReactComponent renders promises that return strings', async () => {
     expect.assertions(2);
     const expectedHtml = '<div>Hello</div>';
     const X5 = (props, _railsContext) => Promise.resolve(expectedHtml);
@@ -84,6 +84,28 @@ describe('serverRenderReactComponent', () => {
     const html = await renderResult.html;
 
     expect(html).toEqual(expectedHtml);
+    expect(renderResult.hasErrors).toBeFalsy();
+  });
+
+  it('serverRenderReactComponent renders promises that return React components', async () => {
+    expect.assertions(2);
+    const AsyncComponent = () => <div>Async Component</div>;
+    // Return a promise that resolves to a React component
+    const X6 = (_, _railsContext) => Promise.resolve(AsyncComponent);
+
+    ComponentRegistry.register({ X6 });
+
+    const renderResult = await serverRenderReactComponent({
+      name: 'X6',
+      domNodeId: 'myDomId',
+      trace: false,
+      renderingReturnsPromises: true,
+    });
+    const html = await renderResult.html;
+
+    // Verify the component was rendered correctly
+    const result = html.indexOf('>Async Component</div>') > 0;
+    expect(result).toBeTruthy();
     expect(renderResult.hasErrors).toBeFalsy();
   });
 });

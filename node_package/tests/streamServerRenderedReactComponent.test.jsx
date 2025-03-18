@@ -60,8 +60,24 @@ describe('streamServerRenderedReactComponent', () => {
     throwSyncError = false,
     throwJsErrors = false,
     throwAsyncError = false,
+    componentType = 'reactComponent',
   } = {}) => {
-    ComponentRegistry.register({ TestComponentForStreaming });
+    switch (componentType) {
+      case 'reactComponent':
+        ComponentRegistry.register({ TestComponentForStreaming });
+        break;
+      case 'renderFunction':
+        ComponentRegistry.register({
+          TestComponentForStreaming: (props, _railsContext) => () => <TestComponentForStreaming {...props} />,
+        });
+        break;
+      case 'asyncRenderFunction':
+        ComponentRegistry.register({
+          TestComponentForStreaming: (props, _railsContext) => () =>
+            Promise.resolve(<TestComponentForStreaming {...props} />),
+        });
+        break;
+    }
     const renderResult = streamServerRenderedReactComponent({
       name: 'TestComponentForStreaming',
       domNodeId: 'myDomId',
@@ -168,5 +184,48 @@ describe('streamServerRenderedReactComponent', () => {
     expect(chunks[1].consoleReplayScript).toBe('');
     expect(chunks[1].hasErrors).toBe(true);
     expect(chunks[1].isShellReady).toBe(true);
+  });
+
+  it.each(['asyncRenderFunction', 'renderFunction'])(
+    'streams a component from a %s that resolves to a React component',
+    async (componentType) => {
+      const { renderResult, chunks } = setupStreamTest({ componentType });
+      await new Promise((resolve) => renderResult.on('end', resolve));
+
+      expect(chunks).toHaveLength(2);
+      expect(chunks[0].html).toContain('Header In The Shell');
+      expect(chunks[0].consoleReplayScript).toBe('');
+      expect(chunks[0].hasErrors).toBe(false);
+      expect(chunks[0].isShellReady).toBe(true);
+      expect(chunks[1].html).toContain('Async Content');
+      expect(chunks[1].consoleReplayScript).toBe('');
+      expect(chunks[1].hasErrors).toBe(false);
+      expect(chunks[1].isShellReady).toBe(true);
+    },
+  );
+
+  it('streams a string from a Promise that resolves to a string', async () => {
+    const StringPromiseComponent = () => Promise.resolve('<div>String from Promise</div>');
+    ComponentRegistry.register({ StringPromiseComponent });
+
+    const renderResult = streamServerRenderedReactComponent({
+      name: 'StringPromiseComponent',
+      domNodeId: 'stringPromiseId',
+      trace: false,
+      throwJsErrors: false,
+    });
+
+    const chunks = [];
+    renderResult.on('data', (chunk) => {
+      const decodedText = new TextDecoder().decode(chunk);
+      chunks.push(expectStreamChunk(decodedText));
+    });
+
+    await new Promise((resolve) => renderResult.on('end', resolve));
+
+    // Verify we have at least one chunk and it contains our string
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(chunks[0].html).toContain('String from Promise');
+    expect(chunks[0].hasErrors).toBe(false);
   });
 });
