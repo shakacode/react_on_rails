@@ -4,9 +4,9 @@ _Note: This document is outdated._ Please email [justin@shakacode.com](mailto:ju
 if you would be interested in help with code splitting using
 [loadable-components.com](https://loadable-components.com/docs) with React on Rails.
 
------
+---
 
-What is code splitting? From the webpack documentation:
+What is code splitting? From the Webpack documentation:
 
 > For big web apps it’s not efficient to put all code into a single file, especially if some blocks of code are only required under some circumstances. Webpack has a feature to split your codebase into “chunks” which are loaded on demand. Some other bundlers call them “layers”, “rollups”, or “fragments”. This feature is called “code splitting”.
 
@@ -20,15 +20,16 @@ Let's say you're requesting a page that needs to fetch a code chunk from the ser
 
 > (server) `<div data-reactroot="`
 
-Different markup is generated on the client than on the server. Why does this happen? When you register a component or Render-Function with `ReactOnRails.register`, react on rails will render the component as soon as the page loads. However, react-router renders a comment while waiting for the code chunk to be fetched from the server. This means that react will tear all the server rendered code out of the DOM, and then rerender it a moment later once the code chunk arrives from the server, defeating most of the purpose of server rendering.
+Different markup is generated on the client than on the server. Why does this happen? When you register a component or Render-Function with `ReactOnRails.register`, React on Rails will render the component as soon as the page loads. However, React Router renders a comment while waiting for the code chunk to be fetched from the server. This means that React will tear all the server rendered code out of the DOM, and then rerender it a moment later once the code chunk arrives from the server, defeating most of the purpose of server rendering.
 
 ### The solution
 
-To prevent this, you have to wait until the code chunk is fetched before doing the initial render on the client side. To accomplish this, react on rails allows you to register a renderer. This works just like registering a Render-Function, except that the function you pass takes three arguments: `renderer(props, railsContext, domNodeId)`, and is responsible for calling `ReactDOM.render` or `ReactDOM.hydrate` to render the component to the DOM. React on rails will automatically detect when a Render-Function takes three arguments, and will **not** call `ReactDOM.render` or `ReactDOM.hydrate`, instead allowing you to control the initial render yourself. Note, you have to be careful to call `ReactDOM.hydrate` rather than `ReactDOM.render` if you are server rendering.
+To prevent this, you have to wait until the code chunk is fetched before doing the initial render on the client side. To accomplish this, React on Rails allows you to register a renderer. This works just like registering a Render-Function, except that the function you pass takes three arguments: `renderer(props, railsContext, domNodeId)`, and is responsible for calling `ReactDOM.render` or `ReactDOM.hydrate` to render the component to the DOM. React on Rails will automatically detect when a Render-Function takes three arguments, and will **not** call `ReactDOM.render` or `ReactDOM.hydrate`, instead allowing you to control the initial render yourself. Note, you have to be careful to call `ReactDOM.hydrate` rather than `ReactDOM.render` if you are server rendering.
 
 Here's an example of how you might use this in practice:
 
 #### page.html.erb
+
 ```erb
 <%= react_component("NavigationApp", prerender: true) %>
 <%= react_component("RouterApp", prerender: true) %>
@@ -36,6 +37,7 @@ Here's an example of how you might use this in practice:
 ```
 
 #### clientRegistration.js
+
 ```js
 import ReactOnRails from 'node_package/lib/ReactOnRails';
 import NavigationApp from './NavigationApp';
@@ -45,7 +47,7 @@ import NavigationApp from './NavigationApp';
 import RouterApp from './RouterAppRenderer';
 import applicationStore from '../store/applicationStore';
 
-ReactOnRails.registerStore({applicationStore});
+ReactOnRails.registerStore({ applicationStore });
 ReactOnRails.register({
   NavigationApp,
   RouterApp,
@@ -53,6 +55,7 @@ ReactOnRails.register({
 ```
 
 #### serverRegistration.js
+
 ```js
 import ReactOnRails from 'react-on-rails';
 import NavigationApp from './NavigationApp';
@@ -61,15 +64,17 @@ import NavigationApp from './NavigationApp';
 import RouterApp from './RouterAppServer';
 import applicationStore from '../store/applicationStore';
 
-ReactOnRails.registerStore({applicationStore});
+ReactOnRails.registerStore({ applicationStore });
 ReactOnRails.register({
   NavigationApp,
   RouterApp,
 });
 ```
+
 Note that you should not register a renderer on the server, since there won't be a domNodeId when we're server rendering. Note that the `RouterApp` imported by `serverRegistration.js` is from a different file. For an example of how to set up an app for server rendering, see the [react router docs](https://www.shakacode.com/react-on-rails/docs/javascript/react-router/).
 
 #### RouterAppRenderer.jsx
+
 ```jsx
 import ReactOnRails from 'react-on-rails';
 import React from 'react';
@@ -106,7 +111,7 @@ export default RouterAppRenderer;
 
 What's going on in this example is that we're putting the rendering code in the callback passed to `match`. The effect is that the client render doesn't happen until the code chunk gets fetched from the server, preventing the client/server checksum mismatch.
 
-The idea is that match from react-router is async; it fetches the component using the getComponent method that you provide with the route definition, and then passes the props to the callback that are needed to do the complete render. Then we do the first render inside the callback, so that the first render is the same as the server render.
+The idea is that `match` from React Router is async; it fetches the component using the `getComponent` method that you provide with the route definition, and then passes the props needed for the complete render to the callback. Then we do the first render inside the callback, so that the first render is the same as the server render.
 
 The server render matches the deferred render because the server bundle is a single file, and so it doesn't need to wait for anything to be fetched.
 
@@ -129,29 +134,29 @@ See:
 
 ### Caveats
 
-If you're going to try to do code splitting with server rendered routes, you'll probably need to use separate route definitions for client and server to prevent code splitting from happening for the server bundle. The server bundle should be one file containing all the JavaScript code. This will require you to have separate webpack configurations for client and server.
+If you're going to try to do code splitting with server-rendered routes, you'll probably need to use separate route definitions for client and server to prevent code splitting from happening for the server bundle. The server bundle should be one file containing all the JavaScript code. This will require you to have separate Webpack configurations for client and server.
 
 The reason is we do server rendering with ExecJS, which is not capable of doing anything asynchronous. It would be impossible to asynchronously fetch a code chunk while server rendering. See [this issue](https://github.com/shakacode/react_on_rails/issues/477) for a discussion.
 
-Also, do not attempt to register a renderer function on the server. Instead, register either a Render-Function or a component. If you register a renderer in the server bundle, you'll get an error when react on rails tries to server render the component.
+Also, do not attempt to register a renderer function on the server. Instead, register either a Render-Function or a component. If you register a renderer in the server bundle, you'll get an error when React on Rails tries to server render the component.
 
 ## How does Webpack know where to find my code chunks?
 
-Add the following to the output key of your webpack config:
+Add the following to the output key of your Webpack config:
 
 ```js
 config = {
   output: {
     publicPath: '/assets/',
-  }
+  },
 };
 ```
 
-This causes Webpack to prepend the code chunk filename with `/assets/` in the request url. The react on rails sets up the webpack config to put webpack bundles in `app/assets/javascripts/webpack`, and modifies `config/initializers/assets.rb` so that rails detects the bundles. This means that when we prepend the request url with `/assets/`, rails will know what webpack is asking for.
+This causes Webpack to prepend the code chunk filename with `/assets/` in the request url. The React on Rails sets up the Webpack config to put Webpack bundles in `app/assets/javascripts/webpack`, and modifies `config/initializers/assets.rb` so that rails detects the bundles. This means that when we prepend the request URL with `/assets/`, rails will know what Webpack is asking for.
 
-See [our rails assets documentation](https://www.shakacode.com/react-on-rails/docs/outdated/rails-assets/) to learn more about static assets.
+See [our Rails assets documentation](https://www.shakacode.com/react-on-rails/docs/outdated/rails-assets/) to learn more about static assets.
 
-If you forget to set the public path, webpack will request the code chunk at `/{filename}`. This will cause the request to be handled by the Rails router, which will send back a 404 response, assuming that you don't have a catch-all route. In your javascript console, you'll get the following error:
+If you forget to set the public path, Webpack will request the code chunk at `/{filename}`. This will cause the request to be handled by the Rails router, which will send back a 404 response, assuming that you don't have a catch-all route. In your JavaScript console, you'll get the following error:
 
 > GET http://localhost:3000/1.1-bundle.js
 

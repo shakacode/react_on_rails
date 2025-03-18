@@ -4,7 +4,6 @@ about: Create a report to help us improve
 title: ''
 labels: ''
 assignees: ''
-
 ---
 
 A bug is a crash or incorrect behavior. If you have a debugging or troubleshooting question, please open [a discussion](https://github.com/shakacode/react_on_rails/discussions).

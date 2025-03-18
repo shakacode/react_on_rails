@@ -5,7 +5,7 @@ React on Rails Pro supports streaming server rendering using React 18's latest A
 ## Prerequisites
 
 - React on Rails Pro subscription
-- React 18 or higher (experimental version)
+- React 19
 - React on Rails v15.0.0-alpha.0 or higher
 - React on Rails Pro v4.0.0.rc.5 or higher
 
@@ -19,14 +19,14 @@ React on Rails Pro supports streaming server rendering using React 18's latest A
 
 ## Implementation Steps
 
-1. **Use Experimental React 18 Version**
+1. **Use React 19 Version**
 
-First, ensure you're using React 18's experimental version in your package.json:
+First, ensure you're using React 19 in your package.json:
 
 ```json
 "dependencies": {
-  "react": "18.3.0-canary-670811593-20240322",
-  "react-dom": "18.3.0-canary-670811593-20240322"
+  "react": "19.0.0",
+  "react-dom": "19.0.0"
 }
 ```
 
@@ -114,12 +114,12 @@ end
 
 You can test your application by running `rails server` and navigating to the appropriate route.
 
-
 6. **What Happens During Streaming**
 
 When a user visits the page, they'll experience the following sequence:
 
 1. The initial HTML shell is sent immediately, including:
+
    - The page layout
    - Any static content (like the `<h1>` and footer)
    - Placeholder content for the React component (typically a loading state)
@@ -154,9 +154,7 @@ For example, with our `MyStreamingComponent`, the sequence might be:
 
 <script>
   // This implementation is slightly simplified
-  document.getElementById('s0').replaceChildren(
-    document.getElementById('b0')
-  );
+  document.getElementById('s0').replaceChildren(document.getElementById('b0'));
 </script>
 ```
 
@@ -167,11 +165,13 @@ Streaming SSR is particularly valuable in specific scenarios. Here's when to con
 ### Ideal Use Cases
 
 1. **Data-Heavy Pages**
+
    - Pages that fetch data from multiple sources
    - Dashboard-style layouts where different sections can load independently
    - Content that requires heavy processing or computation
 
 2. **Progressive Enhancement**
+
    - When you want users to see and interact with parts of the page while others load
    - For improving perceived performance on slower connections
    - When different parts of your page have different priority levels
@@ -184,6 +184,7 @@ Streaming SSR is particularly valuable in specific scenarios. Here's when to con
 ### Best Practices for Streaming
 
 1. **Component Structure**
+
    ```jsx
    // Good: Independent sections that can stream separately
    <Layout>

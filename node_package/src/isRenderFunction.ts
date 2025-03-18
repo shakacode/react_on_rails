@@ -1,6 +1,6 @@
 // See discussion:
 // https://discuss.reactjs.org/t/how-to-determine-if-js-object-is-react-component/2825/2
-import { ReactComponentOrRenderFunction, RenderFunction } from "./types/index";
+import { ReactComponentOrRenderFunction, RenderFunction } from './types/index';
 
 /**
  * Used to determine we'll call be calling React.createElement on the component of if this is a
@@ -8,7 +8,9 @@ import { ReactComponentOrRenderFunction, RenderFunction } from "./types/index";
  * @param component
  * @returns {boolean}
  */
-export default function isRenderFunction(component: ReactComponentOrRenderFunction): component is RenderFunction {
+export default function isRenderFunction(
+  component: ReactComponentOrRenderFunction,
+): component is RenderFunction {
   // No for es5 or es6 React Component
   if ((component as RenderFunction).prototype?.isReactComponent) {
     return false;

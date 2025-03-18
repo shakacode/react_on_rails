@@ -5,16 +5,19 @@ semi: true
 singleQuote: true
 trailingComma: all
 bracketSpacing: true
-jsxBracketSameLine: false
-parser: flow
+bracketSameLine: false
 
 overrides:
-- files: "*.@(css|scss)"
-  options:
-    parser: css
-    singleQuote: false
-    printWidth: 120
-- files: "*.@(json)"
-  options:
-    parser: json
-    printWidth: 100
+  - files: '*.@(css|scss)'
+    options:
+      singleQuote: false
+      printWidth: 120
+  - files: '*.@(json)'
+    options:
+      printWidth: 100
+  - files: '.*rc'
+    excludeFiles:
+      # Direnv file, not YAML
+      - '.envrc'
+    options:
+      parser: yaml

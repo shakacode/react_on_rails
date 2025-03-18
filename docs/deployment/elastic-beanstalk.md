@@ -1,7 +1,7 @@
 # Deploying React on Rails to Elastic Beanstalk
 
-In order to deploy a React on Rails app to elastic beanstalk, you must install yarn on each instance.
-If yarn is not installed, asset compilation will fail on the elastic beanstalk instance.
+In order to deploy a React on Rails app to Elastic Beanstalk, you must install yarn on each instance.
+If yarn is not installed, asset compilation will fail on the Elastic Beanstalk instance.
 
 You can install `yarn` by adding a `0x_install_yarn.config` file to your `.ebextensions` folder which contains these commands.
 
@@ -42,9 +42,9 @@ files:
       chmod 700 /home/webapp
 ```
 
-This script installs `yarn` and all `node.js` dependencies before the rails do `assets:precompile`. Also, it creates `/home/webapp` directory allowing the precompile task to create temp files. 
+This script installs `yarn` and all JS dependencies before Rails runs `assets:precompile`. Also, it creates `/home/webapp` directory, allowing the precompile task to create temporary files.
 
-Your app can be deployed to elastic beanstalk successfully. However, the react app javascript files are under `public/packs`. If you are using nginx, you need to let it know the location of `https://yourhost/packs`. 
+Your app can be deployed to Elastic Beanstalk successfully. However, the React app JavaScript files are under `public/packs`. If you are using Nginx, you need to let it know the location of `https://yourhost/packs`.
 
 In your `proxy.conf` setting, please add the following code.
 

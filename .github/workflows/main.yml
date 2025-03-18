@@ -13,77 +13,77 @@ jobs:
         versions: ['oldest', 'newest']
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-    - name: Setup Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: ${{ matrix.versions == 'oldest' && '3.0' || '3.3' }}
-        bundler: 2.5.9
-    # libyaml-dev is needed for psych v5
-    # this gem depends on sdoc which depends on rdoc which depends on psych
-    - name: Fix dependency for libyaml-dev
-      run: sudo apt install libyaml-dev
-    - name: Setup Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
-    - name: Print system information
-      run: |
-        echo "Linux release: "; cat /etc/issue
-        echo "Current user: "; whoami
-        echo "Current directory: "; pwd
-        echo "Ruby version: "; ruby -v
-        echo "Node version: "; node -v
-        echo "Yarn version: "; yarn --version
-        echo "Bundler version: "; bundle --version
-    - name: run conversion script to support shakapacker v6
-      if: matrix.versions == 'oldest'
-      run: script/convert
-    - name: Save root node_modules to cache
-      uses: actions/cache@v4
-      with:
-        path: node_modules
-        key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
-    - name: Install Node modules with Yarn for renderer package
-      run: |
-        yarn install --no-progress --no-emoji
-        sudo yarn global add yalc
-    - name: yalc publish for react-on-rails
-      run: yalc publish
-    - name: Save spec/dummy/node_modules to cache
-      uses: actions/cache@v4
-      with:
-        path: spec/dummy/node_modules
-        key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-${{ matrix.versions }}
-    - name: yalc add react-on-rails
-      run: cd spec/dummy && yalc add react-on-rails
-    - name: Install Node modules with Yarn for dummy app
-      run: cd spec/dummy && yarn install --no-progress --no-emoji
-    - name: Save dummy app ruby gems to cache
-      uses: actions/cache@v4
-      with:
-        path: spec/dummy/vendor/bundle
-        key: dummy-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
-    - name: Install Ruby Gems for dummy app
-      run: |
-        cd spec/dummy
-        bundle lock --add-platform 'x86_64-linux'
-        if ! bundle check --path=vendor/bundle; then
-          bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
-        fi
-    - name: generate file system-based packs
-      run: cd spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
-    - name: Build test bundles for dummy app
-      run: cd spec/dummy && rm -rf public/webpack/test && yarn run build:rescript && RAILS_ENV="test" NODE_ENV="test" bin/${{ matrix.versions == 'oldest' && 'web' || 'shaka' }}packer
-    - id: get-sha
-      run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
-    - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
-      uses: actions/cache/save@v4
-      with:
-        path: spec/dummy/public/webpack
-        key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.versions == 'oldest' && '3.0' || '3.3' }}
+          bundler: 2.5.9
+      # libyaml-dev is needed for psych v5
+      # this gem depends on sdoc which depends on rdoc which depends on psych
+      - name: Fix dependency for libyaml-dev
+        run: sudo apt install libyaml-dev
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "Yarn version: "; yarn --version
+          echo "Bundler version: "; bundle --version
+      - name: run conversion script to support shakapacker v6
+        if: matrix.versions == 'oldest'
+        run: script/convert
+      - name: Save root node_modules to cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+      - name: Install Node modules with Yarn for renderer package
+        run: |
+          yarn install --no-progress --no-emoji
+          sudo yarn global add yalc
+      - name: yalc publish for react-on-rails
+        run: yalc publish
+      - name: Save spec/dummy/node_modules to cache
+        uses: actions/cache@v4
+        with:
+          path: spec/dummy/node_modules
+          key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-${{ matrix.versions }}
+      - name: yalc add react-on-rails
+        run: cd spec/dummy && yalc add react-on-rails
+      - name: Install Node modules with Yarn for dummy app
+        run: cd spec/dummy && yarn install --no-progress --no-emoji
+      - name: Save dummy app ruby gems to cache
+        uses: actions/cache@v4
+        with:
+          path: spec/dummy/vendor/bundle
+          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
+      - name: Install Ruby Gems for dummy app
+        run: |
+          cd spec/dummy
+          bundle lock --add-platform 'x86_64-linux'
+          if ! bundle check --path=vendor/bundle; then
+            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+          fi
+      - name: generate file system-based packs
+        run: cd spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
+      - name: Build test bundles for dummy app
+        run: cd spec/dummy && rm -rf public/webpack/test && yarn run build:rescript && RAILS_ENV="test" NODE_ENV="test" bin/${{ matrix.versions == 'oldest' && 'web' || 'shaka' }}packer
+      - id: get-sha
+        run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
+      - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
+        uses: actions/cache/save@v4
+        with:
+          path: spec/dummy/public/webpack
+          key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
 
   dummy-app-integration-tests:
     needs: build-dummy-app-webpack-test-bundles
@@ -93,122 +93,122 @@ jobs:
         versions: ['oldest', 'newest']
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-    - name: Setup Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: ${{ matrix.versions == 'oldest' && '3.0' || '3.3' }}
-        bundler: 2.5.9
-    - name: Setup Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
-    - name: Print system information
-      run: |
-        echo "Linux release: "; cat /etc/issue
-        echo "Current user: "; whoami
-        echo "Current directory: "; pwd
-        echo "Ruby version: "; ruby -v
-        echo "Node version: "; node -v
-        echo "Yarn version: "; yarn --version
-        echo "Bundler version: "; bundle --version
-    - name: run conversion script to support shakapacker v6
-      if: matrix.versions == 'oldest'
-      run: script/convert
-    - name: Save root node_modules to cache
-      uses: actions/cache@v4
-      with:
-        path: node_modules
-        key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
-    - name: Save root ruby gems to cache
-      uses: actions/cache@v4
-      with:
-        path: vendor/bundle
-        key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
-    - name: Save dummy app ruby gems to cache
-      uses: actions/cache@v4
-      with:
-        path: spec/dummy/vendor/bundle
-        key: dummy-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
-    - name: Save spec/dummy/node_modules to cache
-      uses: actions/cache@v4
-      with:
-        path: spec/dummy/node_modules
-        key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-${{ matrix.versions }}
-    - id: get-sha
-      run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
-    - name: Save test webpack bundles to cache (for build number checksum used by rspec job)
-      uses: actions/cache@v4
-      with:
-        path: spec/dummy/public/webpack
-        key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
-    - name: Install Node modules with Yarn
-      run: |
-        yarn install --no-progress --no-emoji
-        sudo yarn global add yalc
-    - name: yalc publish for react-on-rails
-      run: yalc publish
-    - name: yalc add react-on-rails
-      run: cd spec/dummy && yalc add react-on-rails
-    - name: Install Node modules with Yarn for dummy app
-      run: cd spec/dummy && yarn install --no-progress --no-emoji
-    - name: Install Ruby Gems for package
-      run: |
-        bundle lock --add-platform 'x86_64-linux'
-        if ! bundle check --path=vendor/bundle; then
-          bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
-        fi
-    - name: Install Ruby Gems for dummy app
-      run: |
-        cd spec/dummy
-        bundle lock --add-platform 'x86_64-linux'
-        if ! bundle check --path=vendor/bundle; then
-          bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
-        fi
-    - name: Ensure minimum required Chrome version
-      run: |
-        echo -e "Already installed $(google-chrome --version)\n"
-        MINIMUM_REQUIRED_CHROME_VERSION=75
-        INSTALLED_CHROME_MAJOR_VERSION="$(google-chrome --version | tr ' .' '\t' | cut -f3)"
-        if [[ $INSTALLED_CHROME_MAJOR_VERSION -lt $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
-          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
-          sudo apt-get update
-          sudo apt-get install google-chrome-stable
-          echo -e "\nInstalled $(google-chrome --version)"
-        fi
-    - name: Increase the amount of inotify watchers
-      run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
-    - name: generate file system-based packs
-      run: cd spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
-    - name: Git Stuff
-      if: matrix.versions == 'oldest'
-      run: |
-        git config user.email "you@example.com"
-        git config user.name "Your Name"
-        git commit -am "stop generators from complaining about uncommitted code"
-    - run: cd spec/dummy && bundle info shakapacker
-    - name: Main CI
-      run: bundle exec rake run_rspec:all_dummy
-    - name: Store test results
-      uses: actions/upload-artifact@v4
-      with:
-        name: main-rspec-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
-        path: ~/rspec
-    - name: Store artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: dummy-app-capybara-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
-        path: spec/dummy/tmp/capybara
-    - name: Store artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: dummy-app-test-log-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
-        path: spec/dummy/log/test.log
-    - name: Store artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: dummy-app-yarn-log-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
-        path: spec/dummy/yarn-error.log
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.versions == 'oldest' && '3.0' || '3.3' }}
+          bundler: 2.5.9
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "Yarn version: "; yarn --version
+          echo "Bundler version: "; bundle --version
+      - name: run conversion script to support shakapacker v6
+        if: matrix.versions == 'oldest'
+        run: script/convert
+      - name: Save root node_modules to cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
+      - name: Save root ruby gems to cache
+        uses: actions/cache@v4
+        with:
+          path: vendor/bundle
+          key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
+      - name: Save dummy app ruby gems to cache
+        uses: actions/cache@v4
+        with:
+          path: spec/dummy/vendor/bundle
+          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
+      - name: Save spec/dummy/node_modules to cache
+        uses: actions/cache@v4
+        with:
+          path: spec/dummy/node_modules
+          key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-${{ matrix.versions }}
+      - id: get-sha
+        run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
+      - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
+        uses: actions/cache@v4
+        with:
+          path: spec/dummy/public/webpack
+          key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
+      - name: Install Node modules with Yarn
+        run: |
+          yarn install --no-progress --no-emoji
+          sudo yarn global add yalc
+      - name: yalc publish for react-on-rails
+        run: yalc publish
+      - name: yalc add react-on-rails
+        run: cd spec/dummy && yalc add react-on-rails
+      - name: Install Node modules with Yarn for dummy app
+        run: cd spec/dummy && yarn install --no-progress --no-emoji
+      - name: Install Ruby Gems for package
+        run: |
+          bundle lock --add-platform 'x86_64-linux'
+          if ! bundle check --path=vendor/bundle; then
+            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+          fi
+      - name: Install Ruby Gems for dummy app
+        run: |
+          cd spec/dummy
+          bundle lock --add-platform 'x86_64-linux'
+          if ! bundle check --path=vendor/bundle; then
+            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+          fi
+      - name: Ensure minimum required Chrome version
+        run: |
+          echo -e "Already installed $(google-chrome --version)\n"
+          MINIMUM_REQUIRED_CHROME_VERSION=75
+          INSTALLED_CHROME_MAJOR_VERSION="$(google-chrome --version | tr ' .' '\t' | cut -f3)"
+          if [[ $INSTALLED_CHROME_MAJOR_VERSION -lt $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+            sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+            sudo apt-get update
+            sudo apt-get install google-chrome-stable
+            echo -e "\nInstalled $(google-chrome --version)"
+          fi
+      - name: Increase the amount of inotify watchers
+        run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+      - name: generate file system-based packs
+        run: cd spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
+      - name: Git Stuff
+        if: matrix.versions == 'oldest'
+        run: |
+          git config user.email "you@example.com"
+          git config user.name "Your Name"
+          git commit -am "stop generators from complaining about uncommitted code"
+      - run: cd spec/dummy && bundle info shakapacker
+      - name: Main CI
+        run: bundle exec rake run_rspec:all_dummy
+      - name: Store test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: main-rspec-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
+          path: ~/rspec
+      - name: Store artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dummy-app-capybara-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
+          path: spec/dummy/tmp/capybara
+      - name: Store artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dummy-app-test-log-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
+          path: spec/dummy/log/test.log
+      - name: Store artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dummy-app-yarn-log-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
+          path: spec/dummy/yarn-error.log

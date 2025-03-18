@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
-
 import * as ClientStartup from './clientStartup';
+import { renderOrHydrateComponent, hydrateStore } from './ClientSideRenderer';
 import ComponentRegistry from './ComponentRegistry';
 import StoreRegistry from './StoreRegistry';
 import buildConsoleReplay from './buildConsoleReplay';
@@ -46,11 +46,11 @@ ctx.ReactOnRails = {
    * find you components for rendering.
    * @param components (key is component name, value is component)
    */
-  register(components: { [id: string]: ReactComponentOrRenderFunction }): void {
+  register(components: Record<string, ReactComponentOrRenderFunction>): void {
     ComponentRegistry.register(components);
   },
 
-  registerStore(stores: { [id: string]: StoreGenerator }): void {
+  registerStore(stores: Record<string, StoreGenerator>): void {
     this.registerStoreGenerators(stores);
   },
 
@@ -60,10 +60,12 @@ ctx.ReactOnRails = {
    * the setStore API is different in that it's the actual store hydrated with props.
    * @param storeGenerators (keys are store names, values are the store generators)
    */
-  registerStoreGenerators(storeGenerators: { [id: string]: StoreGenerator }): void {
+  registerStoreGenerators(storeGenerators: Record<string, StoreGenerator>): void {
     if (!storeGenerators) {
-      throw new Error('Called ReactOnRails.registerStoreGenerators with a null or undefined, rather than ' +
-        'an Object with keys being the store names and the values are the store generators.');
+      throw new Error(
+        'Called ReactOnRails.registerStoreGenerators with a null or undefined, rather than ' +
+          'an Object with keys being the store names and the values are the store generators.',
+      );
     }
 
     StoreRegistry.register(storeGenerators);
@@ -83,7 +85,25 @@ ctx.ReactOnRails = {
   },
 
   /**
-   * Renders or hydrates the react element passed. In case react version is >=18 will use the new api.
+   * Get a store by name, or wait for it to be registered.
+   * @param name
+   * @returns Promise<Store>
+   */
+  getOrWaitForStore(name: string): Promise<Store> {
+    return StoreRegistry.getOrWaitForStore(name);
+  },
+
+  /**
+   * Get a store generator by name, or wait for it to be registered.
+   * @param name
+   * @returns Promise<StoreGenerator>
+   */
+  getOrWaitForStoreGenerator(name: string): Promise<StoreGenerator> {
+    return StoreRegistry.getOrWaitForStoreGenerator(name);
+  },
+
+  /**
+   * Renders or hydrates the React element passed. In case React version is >=18 will use the root API.
    * @param domNode
    * @param reactElement
    * @param hydrate if true will perform hydration, if false will render
@@ -99,7 +119,7 @@ ctx.ReactOnRails = {
    * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
    * `turbo: true|false Turbo (the follower of Turbolinks) events will be registered, if set to true.
    */
-  setOptions(newOptions: {traceTurbolinks?: boolean, turbo?: boolean }): void {
+  setOptions(newOptions: { traceTurbolinks?: boolean; turbo?: boolean }): void {
     if (typeof newOptions.traceTurbolinks !== 'undefined') {
       this.options.traceTurbolinks = newOptions.traceTurbolinks;
 
@@ -115,24 +135,26 @@ ctx.ReactOnRails = {
     }
 
     if (Object.keys(newOptions).length > 0) {
-      throw new Error(
-        `Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`,
-      );
+      throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`);
     }
   },
 
   /**
-   * Allow directly calling the page loaded script in case the default events that trigger react
+   * Allow directly calling the page loaded script in case the default events that trigger React
    * rendering are not sufficient, such as when loading JavaScript asynchronously with TurboLinks:
    * More details can be found here:
    * https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/turbolinks.md
    */
-  reactOnRailsPageLoaded(): void {
-    ClientStartup.reactOnRailsPageLoaded();
+  reactOnRailsPageLoaded() {
+    return ClientStartup.reactOnRailsPageLoaded();
   },
 
   reactOnRailsComponentLoaded(domId: string): void {
-    ClientStartup.reactOnRailsComponentLoaded(domId);
+    renderOrHydrateComponent(domId);
+  },
+
+  reactOnRailsStoreLoaded(storeName: string): void {
+    hydrateStore(storeName);
   },
 
   /**
@@ -150,7 +172,7 @@ ctx.ReactOnRails = {
    * @returns {*} header
    */
 
-  authenticityHeaders(otherHeaders: { [id: string]: string } = {}): AuthenticityHeaders {
+  authenticityHeaders(otherHeaders: Record<string, string> = {}): AuthenticityHeaders {
     return Authenticity.authenticityHeaders(otherHeaders);
   },
 
@@ -223,7 +245,11 @@ ctx.ReactOnRails = {
     const componentObj = ComponentRegistry.get(name);
     const reactElement = createReactOutput({ componentObj, props, domNodeId });
 
-    return reactHydrateOrRender(document.getElementById(domNodeId) as Element, reactElement as ReactElement, hydrate);
+    return reactHydrateOrRender(
+      document.getElementById(domNodeId) as Element,
+      reactElement as ReactElement,
+      hydrate,
+    );
   },
 
   /**
@@ -236,11 +262,22 @@ ctx.ReactOnRails = {
   },
 
   /**
+   * Get the component that you registered, or wait for it to be registered
+   * @param name
+   * @returns {name, component, renderFunction, isRenderer}
+   */
+  getOrWaitForComponent(name: string): Promise<RegisteredComponent> {
+    return ComponentRegistry.getOrWaitForComponent(name);
+  },
+
+  /**
    * Used by server rendering by Rails
    * @param options
    */
   serverRenderReactComponent(): null | string | Promise<RenderResult> {
-    throw new Error('serverRenderReactComponent is not available in "react-on-rails/client". Import "react-on-rails" server-side.');
+    throw new Error(
+      'serverRenderReactComponent is not available in "react-on-rails/client". Import "react-on-rails" server-side.',
+    );
   },
 
   /**
@@ -248,7 +285,16 @@ ctx.ReactOnRails = {
    * @param options
    */
   streamServerRenderedReactComponent() {
-    throw new Error('streamServerRenderedReactComponent is only supported when using a bundle built for Node.js environments');
+    throw new Error(
+      'streamServerRenderedReactComponent is only supported when using a bundle built for Node.js environments',
+    );
+  },
+
+  /**
+   * Generates RSC payload, used by Rails
+   */
+  serverRenderRSCReactComponent() {
+    throw new Error('serverRenderRSCReactComponent is supported in RSC bundle only.');
   },
 
   /**
@@ -256,7 +302,9 @@ ctx.ReactOnRails = {
    * @param options
    */
   handleError(): string | undefined {
-    throw new Error('handleError is not available in "react-on-rails/client". Import "react-on-rails" server-side.');
+    throw new Error(
+      'handleError is not available in "react-on-rails/client". Import "react-on-rails" server-side.',
+    );
   },
 
   /**
@@ -299,5 +347,5 @@ ctx.ReactOnRails.resetOptions();
 
 ClientStartup.clientStartup(ctx);
 
-export * from "./types";
+export * from './types';
 export default ctx.ReactOnRails;

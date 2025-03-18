@@ -2,13 +2,13 @@
 
 *Note, older versions of React on Rails pushed the Webpack bundles through the Asset Pipeline. This older method has *many* disadvantages, such as broken sourcemaps, performance issues, etc. If you need help migrating to the current way of bypassing the Asset Pipeline, [email Justin](mailto:justin@shakacode.com).*
 
-Webpack is used to generate JavaScript and CSS "bundles" directly to your `/public` directory. [Shakapacker](https://github.com/shakacode/shakapacker) provides view helpers to access the Webpack-generated (and fingerprinted) JS and CSS. These files totally skip the Rails asset pipeline. You are responsible for properly configuring your Webpack output. You will either use the standard Webpack configuration (*recommended*) or the `shakapacker` setup for Webpack.
+Webpack is used to generate JavaScript and CSS "bundles" directly to your `/public` directory. [Shakapacker](https://github.com/shakacode/shakapacker) provides view helpers to access the Webpack-generated (and fingerprinted) JS and CSS. These files totally skip the Rails asset pipeline. You are responsible for properly configuring your Webpack output. You will either use the standard Webpack configuration (_recommended_) or the `shakapacker` setup for Webpack.
 
-Ensure these generated bundle files are in your `.gitignore`, as you never want to add the large compiled bundles to git.
+Ensure these generated bundle files are in your `.gitignore`, as you never want to add the large compiled bundles to Git.
 
-Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the react component helper.
+Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the React component helper.
 
-Optionally, you can also initialize a Redux store with the view or controller helper `redux_store` so that the redux store can be shared amongst multiple React components.
+Optionally, you can also initialize a Redux store with the view or controller helper `redux_store` so that the Redux store can be shared amongst multiple React components.
 
 ## Client-Side Rendering vs. Server-Side Rendering
 
@@ -28,13 +28,14 @@ You can see all this on the source for [reactrails.com](https://www.reactrails.c
 
 ## Building the Bundles
 
-Each time you change your client code, you will need to re-generate the bundles (the webpack-created JavaScript files included in application.js). The included example Foreman `Procfile.dev` files will take care of this for you by starting a webpack process with the watch flag. This will watch your JavaScript code files for changes. Alternatively, the `shakapacker` library also can ensure that your bundles are built.
+Each time you change your client code, you will need to re-generate the bundles (the Webpack-created JavaScript files included in `application.js`). The included example Foreman `Procfile.dev` files will take care of this for you by starting a Webpack process with the watch flag. This will watch your JavaScript code files for changes. Alternatively, the `shakapacker` library also can ensure that your bundles are built.
 
 For example, you might create a [Procfile.dev](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/Procfile.dev).
 
-On production deployments that use asset precompilation, such as Heroku deployments, `shakapacker`, by default, will automatically run webpack to build your JavaScript bundles, running the command `bin/shakapacker` in your app.
+On production deployments that use asset precompilation, such as Heroku deployments, `shakapacker`, by default, will automatically run Webpack to build your JavaScript bundles, running the command `bin/shakapacker` in your app.
 
-However, if you want to run a custom command to run webpack to build your bundles, then you will:
+However, if you want to run a custom command to run Webpack to build your bundles, then you will:
+
 1. Define `config.build_production_command` in your [config/initializers/react_on_rails.rb](https://www.shakacode.com/react-on-rails/docs/guides/configuration/)
 
 Then React on Rails modifies the `assets:precompile` task to run your `build_production_command`.

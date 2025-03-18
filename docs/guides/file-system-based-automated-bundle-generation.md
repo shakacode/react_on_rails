@@ -5,6 +5,7 @@ To use the automated bundle generation feature introduced in React on Rails v13.
 ## Configuration
 
 ### Enable nested_entries for Shakapacker
+
 To use the automated bundle generation feature, set `nested_entries: true` in the `shakapacker.yml` file like this.
 The generated files will go in a nested directory.
 
@@ -17,8 +18,9 @@ default:
 For more details, see [Configuration and Code](https://github.com/shakacode/shakapacker#configuration-and-code) section in [shakapacker](https://github.com/shakacode/shakapacker/).
 
 ### Configure Components Subdirectory
-`components_subdirectory`  is the name of the matched directories containing components that will be automatically registered for use by the view helpers.
-For example, configure `config/initializers/react_on_rails` to set the name for `components_subdirectory`.·
+
+`components_subdirectory` is the name of the matched directories containing components that will be automatically registered for use by the view helpers.
+For example, configure `config/initializers/react_on_rails` to set the name for `components_subdirectory`:
 
 ```rb
 config.components_subdirectory = "ror_components"
@@ -37,11 +39,14 @@ config.auto_load_bundle = true
 ```
 
 ### Location of generated files
+
 Generated files will go to the following two directories:
-* Pack files for entrypoint components will be generated in the `{Shakapacker.config.source_entry_path}/generated` directory.
-* The interim server bundle file, which is only generated if you already have a server bundle entrypoint and have not set `make_generated_server_bundle_the_entrypoint` to `true`, will be generated in the `{Pathname(Shakapacker.config.source_entry_path).parent}/generated` directory.
+
+- Pack files for entrypoint components will be generated in the `{Shakapacker.config.source_entry_path}/generated` directory.
+- The interim server bundle file, which is only generated if you already have a server bundle entrypoint and have not set `make_generated_server_bundle_the_entrypoint` to `true`, will be generated in the `{Pathname(Shakapacker.config.source_entry_path).parent}/generated` directory.
 
 ### Update `.gitignore` file
+
 To avoid committing generated files to your version control system, please update `.gitignore` to include:
 
 ```gitignore
@@ -50,11 +55,14 @@ To avoid committing generated files to your version control system, please updat
 ```
 
 ### Commit changes to server bundle entrypoint
+
 If you already have an existing server bundle entrypoint and have not set `make_generated_server_bundle_the_entrypoint` to `true`, then pack generation will add an import statement to your existing server bundle entrypoint similar to:
+
 ```javascript
 // import statement added by react_on_rails:generate_packs rake task
-import "./../generated/server-bundle-generated.js"
+import './../generated/server-bundle-generated.js';
 ```
+
 We recommend committing this import statement to your version control system.
 
 ## Usage
@@ -62,6 +70,7 @@ We recommend committing this import statement to your version control system.
 ### Basic usage
 
 #### Background
+
 If the `shakapacker.yml` file is configured as instructed [here](https://github.com/shakacode/shakapacker#configuration-and-code), with the following configurations
 
 ```yml
@@ -114,7 +123,7 @@ Your layout would contain:
 
 Now suppose you want to use bundle splitting to minimize unnecessary javascript loaded on each page, you would put each of your components in the `packs` directory.
 
-```
+```text
 app/javascript:
   └── packs:                   # sets up webpack entries
   │   └── FooComponentOne.jsx  # Internally uses ReactOnRails.register
@@ -142,67 +151,68 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
 1. Remove generated entrypoints from parameters passed directly to `javascript_pack_tag` and `stylesheet_pack_tag`.
 2. Remove generated entrypoints from parameters passed directly to `append_javascript_pack_tag` and `append_stylesheet_pack_tag`.
 
-    Your layout would now contain:
+   Your layout would now contain:
 
-    ```erb
-    <%= javascript_pack_tag('BarComponentTwo') %>
-    <%= stylesheet_pack_tag('BarComponentTwo') %>
-    ```
+   ```erb
+   <%= javascript_pack_tag('BarComponentTwo') %>
+   <%= stylesheet_pack_tag('BarComponentTwo') %>
+   ```
 
 3. Create a directory structure where the components that you want to be auto-generated are within `ReactOnRails.configuration.components_subdirectory`, which should be a subdirectory of `Shakapacker.config.source_path`:
 
-    ```
-    app/javascript:
-      └── packs:
-      │   └── BarComponentTwo.jsx  # Internally uses ReactOnRails.register
-      └── src:
-      │   └── Foo
-      │   │ └── ...
-      │   │ └── ror_components          # configured as `components_subdirectory`
-      │   │   └── FooComponentOne.jsx
-      │   └── Bar
-      │   │ └── ...
-      │   │ └── ror_components          # configured as `components_subdirectory`
-      │   │   │ └── BarComponentOne.jsx
-      │   │ └── something_else
-      │   │   │ └── BarComponentTwo.jsx
-    ```
+   ```text
+   app/javascript:
+     └── packs:
+     │   └── BarComponentTwo.jsx  # Internally uses ReactOnRails.register
+     └── src:
+     │   └── Foo
+     │   │ └── ...
+     │   │ └── ror_components          # configured as `components_subdirectory`
+     │   │   └── FooComponentOne.jsx
+     │   └── Bar
+     │   │ └── ...
+     │   │ └── ror_components          # configured as `components_subdirectory`
+     │   │   │ └── BarComponentOne.jsx
+     │   │ └── something_else
+     │   │   │ └── BarComponentTwo.jsx
+   ```
 
-4. You no longer need to register the React components within the `ReactOnRails.configuration.components_subdirectory` nor directly add their bundles. For example you can have a Rails view using three components:
+   4. You no longer need to register the React components within the `ReactOnRails.configuration.components_subdirectory` nor directly add their bundles. For example, you can have a Rails view using three components:
 
-    ```erb
-    <% append_javascript_pack('BarComponentTwo') %>
-    <%= react_component("FooComponentOne", {}, auto_load_bundle: true) %>
-    <%= react_component("BarComponentOne", {}, auto_load_bundle: true) %>
-    <%= react_component("BarComponentTwo", {}) %>
-    ```
+      ```erb
+      <% append_javascript_pack('BarComponentTwo') %>
+      <%= react_component("FooComponentOne", {}, auto_load_bundle: true) %>
+      <%= react_component("BarComponentOne", {}, auto_load_bundle: true) %>
+      <%= react_component("BarComponentTwo", {}) %>
+      ```
 
-    If a component uses multiple HTML strings for server rendering, the [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper can be used on the Rails view, as illustrated below.
+      If a component uses multiple HTML strings for server rendering, the [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper can be used on the Rails view, as illustrated below.
 
-    ```erb
-    <% foo_component_one_data = react_component_hash("FooComponentOne",
-                                                prerender: true,
-                                                auto_load_bundle: true
-                                                props: {}
-                                              ) %>
-    <% content_for :title do %>
-      <%= foo_component_one_data['title'] %>
-    <% end %>
-    <%= foo_component_one_data["componentHtml"] %>
-    ```
+      ```erb
+      <% foo_component_one_data = react_component_hash(
+           "FooComponentOne",
+           prerender: true,
+           auto_load_bundle: true,
+           props: {}
+         )
+      %>
+      <% content_for :title do %>
+        <%= foo_component_one_data["title"] %>
+      <% end %>
+      <%= foo_component_one_data["componentHtml"] %>
+      ```
 
-    The default value of the `auto_load_bundle` parameter can be specified by setting `config.auto_load_bundle` in `config/initializers/react_on_rails.rb` and thus removed from each call to `react_component`.
+      The default value of the `auto_load_bundle` parameter can be specified by setting `config.auto_load_bundle` in `config/initializers/react_on_rails.rb` and thus removed from each call to `react_component`.
 
 ### Server Rendering and Client Rendering Components
 
-If server rendering is enabled, the component will be registered for usage both in server and client rendering. In order to have separate definitions for client and server rendering, name the component files as `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file.
+If server rendering is enabled, the component will be registered for usage both in server and client rendering. To have separate definitions for client and server rendering, name the component files `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file.
 
 Once generated, all server entrypoints will be imported into a file named `[ReactOnRails.configuration.server_bundle_js_file]-generated.js`, which in turn will be imported into a source file named the same as `ReactOnRails.configuration.server_bundle_js_file`. If your server bundling logic is such that your server bundle source entrypoint is not named the same as your `ReactOnRails.configuration.server_bundle_js_file` and changing it would be difficult, please let us know.
 
-*Note: If specifying separate definitions for client and server rendering, please make sure to delete the generalized `ComponentName.jsx` file.*
+> [!IMPORTANT]
+> When specifying separate definitions for client and server rendering, you need to delete the generalized `ComponentName.jsx` file.
 
 ### Using Automated Bundle Generation Feature with already defined packs
 
-As of version 13.3.4, bundles inside of directories that match `config.components_subdirectory` will be automatically added as entrypoints, while bundles outside of those directories will have to be manually added to the Shakapacker.config.source_entry_path or Webpack's `entry` rules.
-
-
+As of version 13.3.4, bundles inside directories that match `config.components_subdirectory` will be automatically added as entrypoints, while bundles outside those directories need to be manually added to the `Shakapacker.config.source_entry_path` or Webpack's `entry` rules.

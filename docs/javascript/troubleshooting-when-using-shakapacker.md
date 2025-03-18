@@ -9,7 +9,7 @@
 
 ## The failure
 
-Configuring Webpack to embed the runtime in each chunk and calling `react_component` twice in a rails view/partial causes the client render to crash with the following error:
+Configuring Webpack to embed the runtime in each chunk and calling `react_component` twice in a Rails view/partial causes the client render to crash with the following error:
 
 ```
 Could not find component registered with name XXX. Registered component names include [ YYY ]. Maybe you forgot to register the component?
@@ -47,7 +47,7 @@ optimization: {
 
 ## The problem
 
-Configuring Webpack to embed the runtime in each chunk and calling `react_component` twice in a rails view/partial causes the client render to crash.
+Configuring Webpack to embed the runtime in each chunk and calling `react_component` twice in a Rails view/partial causes the client render to crash.
 
 Read more at https://github.com/shakacode/react_on_rails/issues/1558.
 
@@ -62,9 +62,9 @@ const { webpackConfig: baseClientWebpackConfig } = require('shakapacker');
 
 config.optimization = baseClientWebpackConfig.optimization;
 ```
-As it set the `optimization.runtimeChunk` to `single`. See its source:
 
-`package/environments/base.js:115`
+As it set the `optimization.runtimeChunk` to `single`. [See its source](https://github.com/shakacode/shakapacker/blob/cdf32835d3e0949952b8b4b53063807f714f9b24/package/environments/base.js#L115-L119):
+
 ```js
   optimization: {
     splitChunks: { chunks: 'all' },
@@ -72,6 +72,5 @@ As it set the `optimization.runtimeChunk` to `single`. See its source:
     runtimeChunk: 'single'
   },
 ```
-https://github.com/shakacode/shakapacker/blob/cdf32835d3e0949952b8b4b53063807f714f9b24/package/environments/base.js#L115-L119
 
 Or set `optimization.runtimeChunk` to `single` directly.

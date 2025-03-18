@@ -1,14 +1,17 @@
 {
   "name": "react-on-rails",
-  "version": "14.2.0",
+  "version": "15.0.0-alpha.2",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "node_package/lib/ReactOnRails.full.js",
   "exports": {
     ".": {
+      "react-server": "./node_package/lib/ReactOnRailsRSC.js",
       "node": "./node_package/lib/ReactOnRails.node.js",
       "default": "./node_package/lib/ReactOnRails.full.js"
     },
-    "./client": "./node_package/lib/ReactOnRails.client.js"
+    "./client": "./node_package/lib/ReactOnRails.client.js",
+    "./registerServerComponent/client": "./node_package/lib/registerServerComponent/client.js",
+    "./registerServerComponent/server": "./node_package/lib/registerServerComponent/server.js"
   },
   "directories": {
     "doc": "docs"
@@ -17,6 +20,9 @@
     "@arethetypeswrong/cli": "^0.17.4",
     "@babel/core": "^7.20.12",
     "@babel/preset-env": "^7.20.2",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
     "@tsconfig/node14": "^14.1.2",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.17.16",
@@ -25,32 +31,34 @@
     "@types/turbolinks": "^5.2.2",
     "@typescript-eslint/eslint-plugin": "^6.18.1",
     "@typescript-eslint/parser": "^6.18.1",
-    "concurrently": "^8.2.2",
     "create-react-class": "^15.7.0",
     "eslint": "^7.32.0",
-    "eslint-config-prettier": "^7.0.0",
+    "eslint-config-prettier": "^10.1.1",
     "eslint-config-shakacode": "^16.0.1",
     "eslint-import-resolver-alias": "^1.1.2",
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-jsx-a11y": "^6.8.0",
-    "eslint-plugin-prettier": "^3.4.1",
+    "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-react": "^7.33.2",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
+    "jest-fetch-mock": "^3.0.3",
+    "jsdom": "^22.1.0",
     "knip": "^5.43.1",
     "nps": "^5.9.3",
-    "prettier": "^2.8.8",
+    "prettier": "^3.5.2",
     "prop-types": "^15.8.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-on-rails-rsc": "19.0.0",
     "redux": "^4.2.1",
     "ts-jest": "^29.2.5",
     "typescript": "^5.6.2"
   },
-  "dependencies": {},
   "peerDependencies": {
     "react": ">= 16",
-    "react-dom": ">= 16"
+    "react-dom": ">= 16",
+    "react-on-rails-rsc": "19.0.0"
   },
   "files": [
     "node_package/lib"
@@ -90,5 +98,6 @@
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
   "homepage": "https://github.com/shakacode/react_on_rails#readme",
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
+  "dependencies": {}
 }

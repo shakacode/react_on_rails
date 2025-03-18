@@ -1,3 +1,6 @@
+// eslint-disable-next-line spaced-comment
+/// <reference types="react/experimental" />
+
 import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
 import type { Readable } from 'stream';
 
@@ -11,6 +14,7 @@ type ReactComponent = ComponentType<any> | string;
 
 // Keep these in sync with method lib/react_on_rails/helper.rb#rails_context
 export interface RailsContext {
+  componentRegistryTimeout: number;
   railsEnv: string;
   inMailer: boolean;
   i18nLocale: string;
@@ -29,13 +33,17 @@ export interface RailsContext {
   httpAcceptLanguage: string;
 }
 
-type AuthenticityHeaders = {[id: string]: string} & {'X-CSRF-Token': string | null; 'X-Requested-With': string};
+// not strictly what we want, see https://github.com/microsoft/TypeScript/issues/17867#issuecomment-323164375
+type AuthenticityHeaders = Record<string, string> & {
+  'X-CSRF-Token': string | null;
+  'X-Requested-With': string;
+};
 
-type StoreGenerator = (props: Record<string, unknown>, railsContext: RailsContext) => Store
+type StoreGenerator = (props: Record<string, unknown>, railsContext: RailsContext) => Store;
 
 interface ServerRenderResult {
   renderedHtml?: string | { componentHtml: string; [key: string]: string };
-  redirectLocation?: {pathname: string; search: string};
+  redirectLocation?: { pathname: string; search: string };
   routeError?: Error;
   error?: Error;
 }
@@ -47,23 +55,23 @@ type RenderFunctionResult = ReactComponent | ServerRenderResult | Promise<string
 /**
  * Render functions are used to create dynamic React components or server-rendered HTML with side effects.
  * They receive two arguments: props and railsContext.
- * 
+ *
  * @param props - The component props passed to the render function
  * @param railsContext - The Rails context object containing environment information
  * @returns A string, React component, React element, or a Promise resolving to a string
- * 
+ *
  * @remarks
  * To distinguish a render function from a React Function Component:
  * 1. Ensure it accepts two parameters (props and railsContext), even if railsContext is unused, or
  * 2. Set the `renderFunction` property to `true` on the function object.
- * 
+ *
  * If neither condition is met, it will be treated as a React Function Component,
  * and ReactDOMServer will attempt to render it.
- * 
+ *
  * @example
  * // Option 1: Two-parameter function
  * const renderFunction = (props, railsContext) => { ... };
- * 
+ *
  * // Option 2: Using renderFunction property
  * const anotherRenderFunction = (props) => { ... };
  * anotherRenderFunction.renderFunction = true;
@@ -77,7 +85,7 @@ interface RenderFunction {
 
 type ReactComponentOrRenderFunction = ReactComponent | RenderFunction;
 
-export type { // eslint-disable-line import/prefer-default-export
+export type {
   ReactComponentOrRenderFunction,
   ReactComponent,
   AuthenticityHeaders,
@@ -87,7 +95,7 @@ export type { // eslint-disable-line import/prefer-default-export
   StoreGenerator,
   CreateReactOutputResult,
   ServerRenderResult,
-}
+};
 
 export interface RegisteredComponent {
   name: string;
@@ -104,6 +112,12 @@ export interface RegisteredComponent {
   isRenderer: boolean;
 }
 
+export interface RegisterServerComponentOptions {
+  rscPayloadGenerationUrlPath: string;
+}
+
+export type ItemRegistrationCallback<T> = (component: T) => void;
+
 interface Params {
   props?: Record<string, unknown>;
   railsContext?: RailsContext;
@@ -115,6 +129,10 @@ export interface RenderParams extends Params {
   name: string;
   throwJsErrors: boolean;
   renderingReturnsPromises: boolean;
+}
+
+export interface RSCRenderParams extends RenderParams {
+  reactClientManifestFileName: string;
 }
 
 export interface CreateParams extends Params {
@@ -150,27 +168,30 @@ export interface Root {
 export type RenderReturnType = void | Element | Component | Root;
 
 export interface ReactOnRails {
-  register(components: { [id: string]: ReactComponentOrRenderFunction }): void;
+  register(components: Record<string, ReactComponentOrRenderFunction>): void;
   /** @deprecated Use registerStoreGenerators instead */
-  registerStore(stores: { [id: string]: StoreGenerator }): void;
-  registerStoreGenerators(storeGenerators: { [id: string]: StoreGenerator }): void;
+  registerStore(stores: Record<string, StoreGenerator>): void;
+  registerStoreGenerators(storeGenerators: Record<string, StoreGenerator>): void;
   getStore(name: string, throwIfMissing?: boolean): Store | undefined;
-  setOptions(newOptions: {traceTurbolinks: boolean}): void;
+  getOrWaitForStore(name: string): Promise<Store>;
+  getOrWaitForStoreGenerator(name: string): Promise<StoreGenerator>;
+  setOptions(newOptions: { traceTurbolinks: boolean }): void;
   reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType;
-  reactOnRailsPageLoaded(): void;
+  reactOnRailsPageLoaded(): Promise<void>;
   reactOnRailsComponentLoaded(domId: string): void;
+  reactOnRailsStoreLoaded(storeName: string): void;
   authenticityToken(): string | null;
-  authenticityHeaders(otherHeaders: { [id: string]: string }): AuthenticityHeaders;
+  authenticityHeaders(otherHeaders: Record<string, string>): AuthenticityHeaders;
   option(key: string): string | number | boolean | undefined;
   getStoreGenerator(name: string): StoreGenerator;
   setStore(name: string, store: Store): void;
   clearHydratedStores(): void;
-  render(
-    name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean
-  ): RenderReturnType;
+  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): RenderReturnType;
   getComponent(name: string): RegisteredComponent;
+  getOrWaitForComponent(name: string): Promise<RegisteredComponent>;
   serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;
   streamServerRenderedReactComponent(options: RenderParams): Readable;
+  serverRenderRSCReactComponent(options: RSCRenderParams): Readable;
   handleError(options: ErrorOptions): string | undefined;
   buildConsoleReplay(): string;
   registeredComponents(): Map<string, RegisteredComponent>;

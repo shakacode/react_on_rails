@@ -1,4 +1,5 @@
 # Heroku Deployment
+
 ## Heroku buildpacks
 
 React on Rails requires both a ruby environment (for Rails) and a Node environment (for Webpack), so you will need to have Heroku use multiple buildpacks.
@@ -14,12 +15,12 @@ For more information, see [Using Multiple Buildpacks for an App](https://devcent
 
 ## assets:precompile
 
-### Shakapacker webpack configuration
+### Shakapacker Webpack configuration
 
 Shakapacker hooks up a new `shakapacker:compile` task to `assets:precompile`, which gets run whenever you run `assets:precompile`.
 If you are not using Sprockets, `shakapacker:compile` is automatically aliased to `assets:precompile`.
 
-If you're using the standard `shakacode/shakapacker` configuration of webpack, then `shakacode/shakapacker`
+If you're using the standard `shakacode/shakapacker` configuration for Webpack, then `shakacode/shakapacker`
 will automatically modify or create an `assets:precompile` task to build your assets.
 
 Alternatively, you can specify `config.build_production_command` to have

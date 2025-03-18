@@ -1,0 +1,6 @@
+{
+  "html": "3:\"$Sreact.suspense\"\n1:{\"name\":\"SimpleComponentForTesting\",\"env\":\"Server\",\"key\":null,\"owner\":null,\"props\":{\"helloWorldData\":{\"name\":\"Mr. Server Side Rendering\",\"\u003cscript\u003ewindow.alert('xss1');\u003c/script\u003e\":\"\u003cscript\u003ewindow.alert(\\\"xss2\\\");\u003c/script\u003e\"}}}\n0:D\"$1\"\n2:W[\"log\",[[\"SimpleComponentForTesting\",\"webpack://react_on_rails_pro_dummy/./client/app/ror-auto-load-components/SimpleComponentForTesting.jsx?\",35,11]],\"$1\",\"Server\",\"Console log at first chunk\"]\n5:{\"name\":\"AsyncComponent\",\"env\":\"Server\",\"key\":null,\"owner\":\"$1\",\"props\":{}}\n4:D\"$5\"\n0:[\"$\",\"div\",null,{\"children\":[[\"$\",\"h1\",null,{\"children\":\"StaticServerComponent\"},\"$1\"],[\"$\",\"p\",null,{\"children\":\"This is a static server component\"},\"$1\"],[\"$\",\"$3\",null,{\"fallback\":[\"$\",\"div\",null,{\"children\":\"Loading AsyncComponent...\"},\"$1\"],\"children\":\"$L4\"},\"$1\"]]},\"$1\"]\n",
+  "consoleReplayScript": "",
+  "hasErrors": false,
+  "isShellReady": true
+}

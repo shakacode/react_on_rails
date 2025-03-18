@@ -7,7 +7,7 @@ This documentation assumes the usage of ReactOnRails with Shakapacker 7. For ins
 1. Do the quick [tutorial](https://www.shakacode.com/react-on-rails/docs/guides/tutorial/).
 2. Add React on Rails to an existing Rails app per [the instructions](https://www.shakacode.com/react-on-rails/docs/guides/installation-into-an-existing-rails-app/).
 3. Look at [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy), a simple, no DB example.
-3. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full-featured example live at [www.reactrails.com](http://reactrails.com).
+4. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full-featured example live at [www.reactrails.com](http://reactrails.com).
 
 ## Basic Installation
 
@@ -44,14 +44,13 @@ You may need to check [the instructions for installing into an existing Rails ap
 
 4. Visit http://localhost:3000/hello_world.
 
-
 ### Turning on server rendering
 
 With the code from running the React on Rails generator above:
 
 1. Edit `app/views/hello_world/index.html.erb` and set the `prerender` option to `true`.
 
-    You may need to use `Node` as your js runtime environment by setting `EXECJS_RUNTIME=Node` into your environment variables.
+   You may need to use `Node` as your js runtime environment by setting `EXECJS_RUNTIME=Node` into your environment variables.
 
 2. Refresh the page.
 
@@ -70,9 +69,9 @@ issue.
 
 ### Configuration
 
-* Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](https://www.shakacode.com/react-on-rails/docs/guides/configuration/) for documentation of all configuration options.
-* Configure `config/shakapacker.yml`. If you used the generator and the default Shakapacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/shakapacker.yml](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/shakapacker.yml) example or the official default [shakapacker.yml](https://github.com/shakacode/shakapacker/blob/master/lib/install/config/shakapacker.yml).
-* Most apps should rely on the Shakapacker setup for Webpack. Shakapacker v6+ includes support for webpack version 5.
+- Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](https://www.shakacode.com/react-on-rails/docs/guides/configuration/) for documentation of all configuration options.
+- Configure `config/shakapacker.yml`. If you used the generator and the default Shakapacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/shakapacker.yml](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/shakapacker.yml) example or the official default [shakapacker.yml](https://github.com/shakacode/shakapacker/blob/master/lib/install/config/shakapacker.yml).
+- Most apps should rely on the Shakapacker setup for Webpack. Shakapacker v6+ includes support for Webpack version 5.
 
 ## Including your React Component on your Rails Views
 
@@ -96,11 +95,11 @@ issue.
   ReactOnRails.register({ HelloWorld });
   ```
 
-  Exposing your component in this way is how React on Rails is able to reference your component from a Rails view. You can expose as many components as you like, as long as their names do not collide. See below for the details of how you expose your components via the react_on_rails webpack configuration. You may call `ReactOnRails.register` many times.
+  Exposing your component in this way allows you to reference the component from a Rails view. You can expose as many components as you like, but their names must be unique. See below for the details of how you expose your components via the React on Rails Webpack configuration. You may call `ReactOnRails.register` many times.
 
 - `@some_props` can be either a hash or JSON string. This is an optional argument assuming you do not need to pass any options (if you want to pass options, such as `prerender: true`, but you do not want to pass any properties, simply pass an empty hash `{}`). This will make the data available in your component:
 
-  ```ruby
+  ```erb
     # Rails View
     <%= react_component("HelloWorld", props: { name: "Stranger" }) %>
   ```
@@ -114,7 +113,7 @@ issue.
     // Note wrap in a function to make this a React function component
     return () => (
       <div>
-        Your locale is {railsContext.i18nLocale}.<br/>
+        Your locale is {railsContext.i18nLocale}.<br />
         Hello, {props.name}!
       </div>
     );
@@ -132,17 +131,17 @@ Use modules just as you would when using Webpack and React without Rails. The di
 This is how to expose a component to the `react_component` view helper.
 
 ```javascript
-  // app/javascript/packs/hello-world-bundle.js
-  import HelloWorld from '../components/HelloWorld';
-  import ReactOnRails from 'react-on-rails';
-  ReactOnRails.register({ HelloWorld });
+// app/javascript/packs/hello-world-bundle.js
+import HelloWorld from '../components/HelloWorld';
+import ReactOnRails from 'react-on-rails';
+ReactOnRails.register({ HelloWorld });
 ```
 
 #### Different Server-Side Rendering Code (and a Server-Specific Bundle)
 
-You may want different code for your server-rendered components running server side versus client side. For example, if you have an animation that runs when a component is displayed, you might need to turn that off when server rendering. One way to handle this is conditional code like `if (window) { doClientOnlyCode() }`.
+You may want different code for your server-rendered components running on the server side versus the client side. For example, if you have an animation that runs when a component is displayed, you might need to turn that off when server rendering. One way to handle this is conditional code like `if (typeof window !== 'undefined') { doClientOnlyCode() }`.
 
-Another way is to use a separate webpack configuration file that can use a different server side entry file, like  'serverRegistration.js' as opposed to 'clientRegistration.js.' That would set up different code for server rendering.
+Another way is to use a separate Webpack configuration file that can use a different server-side entry file, like 'serverRegistration.js' as opposed to 'clientRegistration.js.' That would set up different code for server rendering.
 
 For details on techniques to use different code for client and server rendering, see: [How to use different versions of a file for client and server rendering](https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352). (_Requires creating a free account._)
 
@@ -169,7 +168,7 @@ const MyComponentGenerator = (props, _railsContext) => {
     // This is a React FunctionComponent because it is wrapped in a function.
     return () => <H1>{JSON.stringify(props)}</H1>;
   }
-}
+};
 ```
 
 Thus, there is no difference between registering a React Function Component or class Component versus a "Render-Function." Just call `ReactOnRails.register`.
@@ -181,17 +180,23 @@ Another reason to use a Render-Function is that sometimes in server rendering, s
 For server rendering, if you wish to return multiple HTML strings from a Render-Function, you may return an Object from your Render-Function with a single top-level property of `renderedHtml`. Inside this Object, place a key called `componentHtml`, along with any other needed keys. An example scenario of this is when you are using side effects libraries like [React Helmet](https://github.com/nfl/react-helmet). Your Ruby code will get this Object as a Hash containing keys `componentHtml` and any other custom keys that you added:
 
 ```js
-{ renderedHtml: { componentHtml, customKey1, customKey2} }
+{
+  renderedHtml: {
+    componentHtml,
+    customKey1,
+    customKey2,
+  },
+}
 ```
 
 For details on using react_component_hash with react-helmet, see [our react-helmet documentation](https://www.shakacode.com/react-on-rails/docs/javascript/react-helmet/).
 
 ## Error Handling
 
-* All errors from ReactOnRails will be of type ReactOnRails::Error.
-* Prerendering (server rendering) errors get context information for HoneyBadger and Sentry for easier debugging.
+- All errors from ReactOnRails will be of type ReactOnRails::Error.
+- Prerendering (server rendering) errors get context information for HoneyBadger and Sentry for easier debugging.
 
 ## I18n
 
-React on Rails provides an option for automatic conversions of Rails `*.yml` locale files into `*.json` or `*.js*.
+React on Rails provides an option for automatic conversions of Rails `*.yml` locale files into `*.json` or `*.js`.
 See the [How to add I18n](https://www.shakacode.com/react-on-rails/docs/guides/i18n/) for a summary of adding I18n.

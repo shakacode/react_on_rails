@@ -50,7 +50,7 @@ describe ReactOnRailsHelper do
       allow(helper).to receive(:append_javascript_pack_tag)
       allow(helper).to receive(:append_stylesheet_pack_tag)
       expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
-      expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: true })
+      expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: false })
       expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
     end
 
@@ -140,24 +140,21 @@ describe ReactOnRailsHelper do
 
     let(:id) { "App-react-component-0" }
 
-    let(:react_definition_script_random) do
-      <<-SCRIPT.strip_heredoc
-        <script type="application/json" class="js-react-on-rails-component" \
-        data-component-name="App" data-dom-id="App-react-component-0">{"name":"My Test Name"}</script>
-      SCRIPT
-    end
-
     let(:react_definition_script) do
       <<-SCRIPT.strip_heredoc
         <script type="application/json" class="js-react-on-rails-component" \
-        data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
+        id="js-react-on-rails-component-App-react-component" \
+        data-component-name="App" data-dom-id="App-react-component"
+        data-force-load="true">{"name":"My Test Name"}</script>
       SCRIPT
     end
 
     let(:react_definition_script_no_params) do
       <<-SCRIPT.strip_heredoc
         <script type="application/json" class="js-react-on-rails-component" \
-        data-component-name="App" data-dom-id="App-react-component">{}</script>
+        id="js-react-on-rails-component-App-react-component" \
+        data-component-name="App" data-dom-id="App-react-component"
+        data-force-load="true">{}</script>
       SCRIPT
     end
 
@@ -203,7 +200,10 @@ describe ReactOnRailsHelper do
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
-          <script type="application/json" class="js-react-on-rails-component" data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
+          <script type="application/json" class="js-react-on-rails-component" \
+          id="js-react-on-rails-component-App-react-component" \
+          data-component-name="App" data-dom-id="App-react-component"
+          data-force-load="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -216,7 +216,10 @@ describe ReactOnRailsHelper do
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
-          <script type="application/json" class="js-react-on-rails-component" data-component-name="App" data-dom-id="App-react-component-0">{"name":"My Test Name"}</script>
+          <script type="application/json" class="js-react-on-rails-component" \
+          id="js-react-on-rails-component-App-react-component-0" \
+          data-component-name="App" data-dom-id="App-react-component-0"
+          data-force-load="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -235,7 +238,10 @@ describe ReactOnRailsHelper do
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
-          <script type="application/json" class="js-react-on-rails-component" data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
+          <script type="application/json" class="js-react-on-rails-component" \
+          id="js-react-on-rails-component-App-react-component" \
+          data-component-name="App" data-dom-id="App-react-component"
+          data-force-load="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -250,7 +256,10 @@ describe ReactOnRailsHelper do
 
       let(:react_definition_script) do
         <<-SCRIPT.strip_heredoc
-          <script type="application/json" class="js-react-on-rails-component" data-component-name="App" data-dom-id="shaka_div">{"name":"My Test Name"}</script>
+          <script type="application/json" class="js-react-on-rails-component" \
+          id="js-react-on-rails-component-shaka_div" \
+          data-component-name="App" data-dom-id="shaka_div"
+          data-force-load="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -295,20 +304,20 @@ describe ReactOnRailsHelper do
     describe "'force_load' tag option" do
       let(:force_load_script) do
         %(
-ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');
+typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');
         ).html_safe
       end
 
-      context "with 'force_load' == true" do
-        subject { react_component("App", force_load: true) }
+      context "with 'force_load' == false" do
+        subject { react_component("App", force_load: false) }
 
-        it { is_expected.to include force_load_script }
+        it { is_expected.not_to include force_load_script }
       end
 
       context "without 'force_load' tag option" do
         subject { react_component("App") }
 
-        it { is_expected.not_to include force_load_script }
+        it { is_expected.to include force_load_script }
       end
     end
   end
@@ -321,7 +330,7 @@ ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');
     end
 
     let(:react_store_script) do
-      '<script type="application/json" data-js-react-on-rails-store="reduxStore">' \
+      '<script type="application/json" data-js-react-on-rails-store="reduxStore" data-force-load="true">' \
         '{"name":"My Test Name"}' \
         "</script>"
     end

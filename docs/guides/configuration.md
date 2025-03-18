@@ -8,12 +8,12 @@ Here is the setup when using the recommended `/` directory for your `node_module
 # Note: Base output directory of /public is assumed for static files
 default: &default
   compile: false
-  # Used in your webpack configuration. Must be created in the
+  # Used in your Webpack configuration. Must be created in the
   # public_output_path folder
   manifest: manifest.json
   cache_manifest: false
 
-  # Source path is used to check if webpack compilation needs to be run for `compile: true`
+  # Source path is used to check if Webpack compilation needs to be run for `compile: true`
   source_path: client/app
 
 development:
@@ -23,7 +23,7 @@ development:
 
 test:
   <<: *default
-  # Ensure that shakapacker invokes webpack to build files for tests if not using the
+  # Ensure that shakapacker invokes Webpack to build files for tests if not using the
   #   ReactOnRails rspec helper.
   compile: true
 
@@ -40,7 +40,6 @@ production:
 Here's a representative `/config/initializers/react_on_rails.rb` setup when using this `/client` directory
 for all client files, including your sources and node_modules.
 
-
 ```ruby
 # frozen_string_literal: true
 
@@ -51,7 +50,7 @@ ReactOnRails.configure do |config|
   # every time a component renders.
   # See below for an example definition of RenderingExtension
   config.rendering_extension = RenderingExtension
-  
+
   # `trace`: General debugging flag.
   # The default is true for development, off otherwise.
   # With true, you get detailed logs of rendering and stack traces if you call setTimout,
@@ -71,7 +70,7 @@ ReactOnRails.configure do |config|
   # defaults to "" (top level)
   config.node_modules_location = "" # If using Shakapacker you should use "".
 
-  # If you're using the standard Shakapacker configuration of webpack, then Shakapacker
+  # If you're using the standard Shakapacker configuration of Webpack, then Shakapacker
   # will automatically modify or create an assets:precompile task to build your assets. If so,
   # set this value to nil.  Alternatively, you can specify `config.build_production_command`
   # to have react_on_rails invoke a command for you during assets:precompile.
@@ -80,7 +79,7 @@ ReactOnRails.configure do |config|
   config.build_production_command = "RAILS_ENV=production bin/shakapacker"
 
   # NOTE:
-  # When specifying `build_production_command`, you need to disable `rails/shakapacker` 
+  # When specifying `build_production_command`, you need to disable `rails/shakapacker`
   # configuration by setting `shakapacker_precompile: false` in your `config/shakapacker.yml` file.
 
   # See bottom for an example of the BuildProductionCommand module.
@@ -102,12 +101,12 @@ ReactOnRails.configure do |config|
   # While you may configure this to be the same as your client bundle file, this file is typically
   # different. Note, be sure to include the exact file name with the ".js" if you are not hashing this file.
   # If you are hashing this file (supposing you are using the same file for client rendering), then
-  # you should include a name that matches your bundle name in your webpack config.
+  # you should include a name that matches your bundle name in your Webpack config.
   config.server_bundle_js_file = "server-bundle.js"
-  
+
   # `prerender` means server-side rendering
   # default is false. This is an option for view helpers `render_component` and `render_component_hash`.
-  # Set to true to change the default value to true. 
+  # Set to true to change the default value to true.
   config.prerender = false
 
   # THE BELOW OPTIONS FOR SERVER-SIDE RENDERING RARELY NEED CHANGING
@@ -175,7 +174,7 @@ ReactOnRails.configure do |config|
   # components_subdirectory is the name of the subdirectory matched to detect and register components automatically
   # The default is nil. You can enable the feature by updating it in the next line.
   config.components_subdirectory = nil
-  # Change to a value like this example to enable this feature 
+  # Change to a value like this example to enable this feature
   # config.components_subdirectory = "ror_components"
 
   # Default is false.
@@ -189,9 +188,9 @@ ReactOnRails.configure do |config|
   # config.server_bundle_js_file for the filename.
   config.make_generated_server_bundle_the_entrypoint = false
 
-  # Default is true, which matches Webpacker/Shakapacker's defer default for `append_javascript_pack`
-  # Set this to false to have `defer: false` added to your `append_javascript_pack` calls for generated entrypoints.
-  config.defer_generated_component_packs = true
+  # Default is false
+  # Set this to true to have `defer: true` added to your `append_javascript_pack` calls for generated entrypoints.
+  config.defer_generated_component_packs = false
 
   ################################################################################
   # I18N OPTIONS
@@ -233,7 +232,7 @@ ReactOnRails.configure do |config|
   # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
   #
   # with rspec then this controls what yarn command is run
-  # to automatically refresh your webpack assets on every test run.
+  # to automatically refresh your Webpack assets on every test run.
   #
   config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 
@@ -242,7 +241,7 @@ ReactOnRails.configure do |config|
   # by your config/shakapacker.yml source_path:
   # source_path: client/app # if using recommended /client directory
   #
-  # Define the files we need to check for webpack compilation when running tests.
+  # Define the files we need to check for Webpack compilation when running tests.
   # The default is `%w( manifest.json )` as will be sufficient for most shakapacker builds.
   # However, if you are generating a server bundle that is NOT hashed (present in manifest.json),
   # then include the file in this list like this:

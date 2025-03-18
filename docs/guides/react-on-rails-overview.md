@@ -15,15 +15,16 @@ To provide a high performance framework for integrating Ruby on Rails with React
 1. Server-Side Rendering (SSR), often used for SEO crawler indexing and UX performance, is not offered by `shakacode/shakapacker`.
 1. Support for HMR for a great developer experience.
 1. Supports latest versions of React with hooks.
-1. [Redux](https://github.com/reactjs/redux) and [React Router](https://github.com/ReactTraining/react-router#readme) integration including server-side-rendering.
+1. [Redux](https://redux.js.org/) and [React Router](https://reactrouter.com/) integration including server-side-rendering.
 1. [Internationalization (I18n) and (localization)](https://www.shakacode.com/react-on-rails/docs/guides/i18n/)
 1. A supportive community. This [web search shows how live public sites are using React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/).
 1. [ReScript (Reason ML) Support](https://github.com/shakacode/reason-react-on-rails-example).
 
 See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
 
-----
+---
 
 ## Prerequisites
+
 - Ruby on Rails >=5
 - Shakapacker 6.5.1+.

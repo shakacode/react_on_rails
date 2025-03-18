@@ -6,9 +6,10 @@ react_on_rails: upgraded from 6.6.0 to 9.0.3
 ## The failure
 
 Rspec failing with
-```
+
+```text
 Failure/Error: raise Webpacker::Manifest::MissingEntryError, missing_file_from_manifest_error(name)
-     
+
      Webpacker::Manifest::MissingEntryError:
        Webpacker can't find webpack-bundle.js in /home/user/ws/pp/code/pp-core-checkout_spa_update_npm/public/webpack-test/manifest.json. Possible causes:
        1. You want to set webpacker.yml value of compile to true for your environment
@@ -37,7 +38,7 @@ Failure/Error: raise Webpacker::Manifest::MissingEntryError, missing_file_from_m
 ...
 ```
 
-At the same time dev/prod environments works fine (with extra webpack calling step outside rails).
+At the same time, dev/prod environments work fine (with extra Webpack calling step outside Rails).
 
 ## Configs
 
