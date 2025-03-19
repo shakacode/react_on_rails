@@ -24,7 +24,12 @@ const streamRenderRSCComponent = (
   reactRenderingResult: StreamableComponentResult,
   options: RSCRenderParams,
 ): Readable => {
-  const { throwJsErrors, reactClientManifestFileName } = options;
+  const { throwJsErrors } = options;
+  if (!options.railsContext?.serverSide || !options.railsContext.reactClientManifestFileName) {
+    throw new Error('Rails context is not available');
+  }
+
+  const { reactClientManifestFileName } = options.railsContext;
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
