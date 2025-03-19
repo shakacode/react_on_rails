@@ -27,5 +27,9 @@ export default function transformRSCStream(stream: NodeJS.ReadableStream): NodeJ
     },
   });
 
-  return stream.pipe(htmlExtractor);
+  try {
+    return stream.pipe(htmlExtractor);
+  } catch (error) {
+    throw new Error(`Error transforming RSC stream (${stream.constructor.name}), (stream: ${stream}), stringified stream: ${JSON.stringify(stream)}, error: ${error}`);
+  }
 }
