@@ -148,12 +148,12 @@ ctx.ReactOnRails = {
     return ClientStartup.reactOnRailsPageLoaded();
   },
 
-  reactOnRailsComponentLoaded(domId: string): void {
-    renderOrHydrateComponent(domId);
+  reactOnRailsComponentLoaded(domId: string): Promise<void> {
+    return renderOrHydrateComponent(domId);
   },
 
-  async reactOnRailsStoreLoaded(storeName: string): Promise<void> {
-    await hydrateStore(storeName);
+  reactOnRailsStoreLoaded(storeName: string): Promise<void> {
+    return hydrateStore(storeName);
   },
 
   /**

@@ -220,7 +220,7 @@ class StoreRenderer {
 
 const renderedRoots = new Map<string, ComponentRenderer>();
 
-export function renderOrHydrateComponent(domIdOrElement: string | Element): ComponentRenderer | undefined {
+export function renderOrHydrateComponent(domIdOrElement: string | Element) {
   const domId = getDomId(domIdOrElement);
   debugTurbolinks('renderOrHydrateComponent', domId);
   let root = renderedRoots.get(domId);
@@ -228,18 +228,22 @@ export function renderOrHydrateComponent(domIdOrElement: string | Element): Comp
     root = new ComponentRenderer(domIdOrElement);
     renderedRoots.set(domId, root);
   }
-  return root;
+  return root.waitUntilRendered();
 }
 
-export function renderOrHydrateForceLoadedComponents(): void {
-  const els = document.querySelectorAll(`.js-react-on-rails-component[data-force-load="true"]`);
-  els.forEach((el) => renderOrHydrateComponent(el));
+async function forAllElementsAsync(
+  selector: string,
+  callback: (el: Element) => Promise<void>,
+): Promise<void> {
+  const els = document.querySelectorAll(selector);
+  await Promise.all(Array.from(els).map(callback));
 }
 
-export function renderOrHydrateAllComponents(): void {
-  const els = document.querySelectorAll(`.js-react-on-rails-component`);
-  els.forEach((el) => renderOrHydrateComponent(el));
-}
+export const renderOrHydrateForceLoadedComponents = () =>
+  forAllElementsAsync('.js-react-on-rails-component[data-force-load="true"]', renderOrHydrateComponent);
+
+export const renderOrHydrateAllComponents = () =>
+  forAllElementsAsync('.js-react-on-rails-component', renderOrHydrateComponent);
 
 function unmountAllComponents(): void {
   renderedRoots.forEach((root) => root.unmount());
@@ -270,15 +274,11 @@ export async function hydrateStore(storeNameOrElement: string | Element) {
   await storeRenderer.waitUntilHydrated();
 }
 
-export async function hydrateForceLoadedStores(): Promise<void> {
-  const els = document.querySelectorAll(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-force-load="true"]`);
-  await Promise.all(Array.from(els).map((el) => hydrateStore(el)));
-}
+export const hydrateForceLoadedStores = () =>
+  forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-force-load="true"]`, hydrateStore);
 
-export async function hydrateAllStores(): Promise<void> {
-  const els = document.querySelectorAll(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`);
-  await Promise.all(Array.from(els).map((el) => hydrateStore(el)));
-}
+export const hydrateAllStores = () =>
+  forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`, hydrateStore);
 
 function unmountAllStores(): void {
   storeRenderers.forEach((storeRenderer) => storeRenderer.unmount());

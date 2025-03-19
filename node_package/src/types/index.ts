@@ -180,7 +180,7 @@ export interface ReactOnRails {
   setOptions(newOptions: { traceTurbolinks: boolean }): void;
   reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType;
   reactOnRailsPageLoaded(): Promise<void>;
-  reactOnRailsComponentLoaded(domId: string): void;
+  reactOnRailsComponentLoaded(domId: string): Promise<void>;
   reactOnRailsStoreLoaded(storeName: string): Promise<void>;
   authenticityToken(): string | null;
   authenticityHeaders(otherHeaders: Record<string, string>): AuthenticityHeaders;
