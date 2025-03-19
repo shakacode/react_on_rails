@@ -38,7 +38,9 @@ export async function clientStartup(context: Context): Promise<void> {
 
   // force loaded components and stores are rendered and hydrated immediately
   renderOrHydrateForceLoadedComponents();
-  await hydrateForceLoadedStores();
+  // The hydration process can handle the concurrent hydration of components and stores,
+  // so awaiting this isn't necessary.
+  void hydrateForceLoadedStores();
 
   // Other components and stores are rendered and hydrated when the page is fully loaded
   await onPageLoaded(reactOnRailsPageLoaded);
