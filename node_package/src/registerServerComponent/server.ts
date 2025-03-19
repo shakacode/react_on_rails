@@ -1,24 +1,17 @@
 import ReactOnRails from '../ReactOnRails.client';
-import { ReactComponent } from '../types';
+import RSCServerRoot from '../RSCServerRoot';
+import { ReactComponent, RenderFunction, RailsContext } from '../types';
 
 /**
- * Registers React Server Components (RSC) with React on Rails for both server and RSC bundles.
- * Currently, this function behaves identically to ReactOnRails.register, but is introduced to enable
- * future RSC-specific functionality without breaking changes.
- *
- * Future behavior will differ based on bundle type:
- *
- * RSC Bundle:
- * - Components are registered as any other component by adding the component to the ComponentRegistry
- *
- * Server Bundle:
- * - It works like the function defined at `registerServerComponent/client`
- * - The function itself is not added to the ComponentRegistry
- * - Instead, a RSCServerRoot component is added to the ComponentRegistry
- * - This RSCServerRoot component will use the pre-generated RSC payloads from the RSC bundle to
- *   build the rendering tree of the server component instead of rendering it again
+ * Registers React Server Components (RSC) with React on Rails for the server bundle.
  * 
- * This functionality is added now without real implementation to avoid breaking changes in the future.
+ * This function wraps each component with RSCServerRoot, which handles the server-side
+ * rendering of React Server Components using pre-generated RSC payloads.
+ * 
+ * The RSCServerRoot component:
+ * - Uses pre-generated RSC payloads from the RSC bundle
+ * - Builds the rendering tree of the server component
+ * - Handles the integration with React's streaming SSR
  *
  * @param components - Object mapping component names to their implementations
  *
@@ -30,8 +23,15 @@ import { ReactComponent } from '../types';
  * });
  * ```
  */
-const registerServerComponent = (components: { [id: string]: ReactComponent }) => {
-  ReactOnRails.register(components);
+const registerServerComponent = (components: { [id: string]: ReactComponent | RenderFunction }) => {
+  const componentsWrappedInRSCServerRoot: { [id: string]: RenderFunction } = {};
+  for (const [componentName] of Object.entries(components)) {
+    componentsWrappedInRSCServerRoot[componentName] = (
+      componentProps?: unknown,
+      railsContext?: RailsContext,
+    ) => RSCServerRoot({ componentName, componentProps }, railsContext);
+  }
+  return ReactOnRails.register(componentsWrappedInRSCServerRoot);
 };
 
 export default registerServerComponent;

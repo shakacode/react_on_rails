@@ -71,6 +71,23 @@ describe('streamServerRenderedReactComponent', () => {
             Promise.resolve(<TestComponentForStreaming {...props} />),
         });
         break;
+      case 'erroneousRenderFunction':
+        ComponentRegistry.register({
+          TestComponentForStreaming: (_props, _railsContext) => {
+            // The error happen inside the render function itself not inside the returned React component
+            throw new Error('Sync Error from render function');
+          },
+        });
+        break;
+      case 'erroneousAsyncRenderFunction':
+        ComponentRegistry.register({
+          TestComponentForStreaming: (_props, _railsContext) =>
+            // The error happen inside the render function itself not inside the returned React component
+            Promise.reject(new Error('Async Error from render function')),
+        });
+        break;
+      default:
+        throw new Error(`Unknown component type: ${componentType}`);
     }
     const renderResult = streamServerRenderedReactComponent({
       name: 'TestComponentForStreaming',
@@ -185,6 +202,81 @@ describe('streamServerRenderedReactComponent', () => {
       expect(chunks[1].consoleReplayScript).toBe('');
       expect(chunks[1].hasErrors).toBe(false);
       expect(chunks[1].isShellReady).toBe(true);
+    },
+  );
+
+  it.each(['asyncRenderFunction', 'renderFunction'])(
+    'handles sync errors in the %s',
+    async (componentType) => {
+      const { renderResult, chunks } = setupStreamTest({ componentType, throwSyncError: true });
+      await new Promise((resolve) => renderResult.on('end', resolve));
+
+      expect(chunks).toHaveLength(1);
+      expect(chunks[0].html).toMatch(/<pre>Exception in rendering[.\s\S]*Sync Error[.\s\S]*<\/pre>/);
+      expect(chunks[0].consoleReplayScript).toBe('');
+      expect(chunks[0].hasErrors).toBe(true);
+      expect(chunks[0].isShellReady).toBe(false);
+    },
+  );
+
+  it.each(['asyncRenderFunction', 'renderFunction'])(
+    'handles async errors in the %s',
+    async (componentType) => {
+      const { renderResult, chunks } = setupStreamTest({ componentType, throwAsyncError: true });
+      await new Promise((resolve) => renderResult.on('end', resolve));
+
+      expect(chunks).toHaveLength(2);
+      expect(chunks[0].html).toContain('Header In The Shell');
+      expect(chunks[0].consoleReplayScript).toBe('');
+      expect(chunks[0].hasErrors).toBe(false);
+      expect(chunks[0].isShellReady).toBe(true);
+      expect(chunks[1].html).toMatch(/<script>[.\s\S]*Async Error[.\s\S]*<\/script>/);
+      expect(chunks[1].consoleReplayScript).toBe('');
+      expect(chunks[1].hasErrors).toBe(true);
+      expect(chunks[1].isShellReady).toBe(true);
+    },
+  );
+
+  it.each(['erroneousRenderFunction', 'erroneousAsyncRenderFunction'])(
+    'handles error in the %s',
+    async (componentType) => {
+      const { renderResult, chunks } = setupStreamTest({ componentType });
+      await new Promise((resolve) => renderResult.on('end', resolve));
+
+      expect(chunks).toHaveLength(1);
+      const errorMessage =
+        componentType === 'erroneousRenderFunction'
+          ? 'Sync Error from render function'
+          : 'Async Error from render function';
+      expect(chunks[0].html).toMatch(
+        new RegExp(`<pre>Exception in rendering[.\\s\\S]*${errorMessage}[.\\s\\S]*<\\/pre>`),
+      );
+      expect(chunks[0].consoleReplayScript).toBe('');
+      expect(chunks[0].hasErrors).toBe(true);
+      expect(chunks[0].isShellReady).toBe(false);
+    },
+  );
+
+  it.only.each(['erroneousRenderFunction', 'erroneousAsyncRenderFunction'])(
+    'emits an error if there is an error in the %s',
+    async (componentType) => {
+      const { renderResult, chunks } = setupStreamTest({ componentType, throwJsErrors: true });
+      const onError = jest.fn();
+      renderResult.on('error', onError);
+      await new Promise((resolve) => renderResult.on('end', resolve));
+
+      expect(chunks).toHaveLength(1);
+      const errorMessage =
+        componentType === 'erroneousRenderFunction'
+          ? 'Sync Error from render function'
+          : 'Async Error from render function';
+      expect(chunks[0].html).toMatch(
+        new RegExp(`<pre>Exception in rendering[.\\s\\S]*${errorMessage}[.\\s\\S]*<\\/pre>`),
+      );
+      expect(chunks[0].consoleReplayScript).toBe('');
+      expect(chunks[0].hasErrors).toBe(true);
+      expect(chunks[0].isShellReady).toBe(false);
+      expect(onError).toHaveBeenCalled();
     },
   );
 

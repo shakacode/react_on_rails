@@ -7,7 +7,7 @@ import { isPromise, isServerRenderHash } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
-import type { CreateReactOutputResult, RenderParams, RenderResult, RenderState, RenderOptions, ServerRenderResult, ReactComponent } from './types';
+import type { CreateReactOutputResult, RenderParams, RenderResult, RenderState, RenderOptions, ServerRenderResult } from './types';
 
 function processServerRenderHash(result: ServerRenderResult, options: RenderOptions): RenderState {
   const { redirectLocation, routeError } = result;
@@ -51,11 +51,11 @@ function processPromise(result: Promise<string | ReactElement>, renderingReturns
     // And when a promise is passed to JSON.stringify, it will be converted to '{}'.
     return '{}';
   }
-  return result.then((result) => {
-    if (typeof result !== 'string') {
-      return processReactElement(result);
+  return result.then((renderedResult) => {
+    if (typeof renderedResult !== 'string') {
+      return processReactElement(renderedResult);
     }
-    return result;
+    return renderedResult;
   });
 }
 

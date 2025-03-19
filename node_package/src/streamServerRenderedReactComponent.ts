@@ -8,45 +8,11 @@ import { isServerRenderHash } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
-import loadJsonFile from './loadJsonFile';
 import type { RenderParams, StreamRenderState } from './types';
-
-const stringToStream = (str: string): Readable => {
-  const stream = new PassThrough();
-  stream.write(str);
-  stream.end();
-  return stream;
-};
 
 type BufferdEvent = {
   event: 'data' | 'error' | 'end';
   data: unknown;
-}
-
-const createSSRManifest = async (reactServerManifestFileName: string, reactClientManifestFileName: string) => {
-  const reactServerManifest = await loadJsonFile(reactServerManifestFileName);
-  const reactClientManifest = await loadJsonFile(reactClientManifestFileName);
-
-  const ssrManifest = {
-    moduleLoading: {
-      prefix: "/webpack/development/",
-      crossOrigin: null,
-    },
-    moduleMap: {} as Record<string, unknown>,
-  };
-
-  Object.entries(reactClientManifest).forEach(([aboluteFileUrl, clientFileBundlingInfo]) => {
-    const serverFileBundlingInfo = reactServerManifest[aboluteFileUrl];
-    ssrManifest.moduleMap[(clientFileBundlingInfo as { id: string }).id] = {
-      '*': {
-        id: (serverFileBundlingInfo as { id: string }).id,
-        chunks: (serverFileBundlingInfo as { chunks: string[] }).chunks,
-        name: '*',
-      }
-    };
-  });
-
-  return ssrManifest;
 }
 
 /**
@@ -170,6 +136,20 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement | Promise
     endStream
   } = transformRenderStreamChunksToResultObject(renderState);
 
+  const onShellError = (e: unknown) => {
+    const error = convertToError(e);
+    renderState.hasErrors = true;
+    renderState.error = error;
+
+    if (throwJsErrors) {
+      emitError(error);
+    }
+
+    const errorHtml = handleError({ e: error, name: componentName, serverSide: true });
+    writeChunk(errorHtml);
+    endStream();
+  }
+
   Promise.resolve(reactRenderingResult).then(reactRenderedElement => {
     if (typeof reactRenderedElement === 'string') {
       console.error(
@@ -184,19 +164,7 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement | Promise
     }
 
     const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderedElement, {
-      onShellError(e) {
-        const error = convertToError(e);
-        renderState.hasErrors = true;
-        renderState.error = error;
-
-        if (throwJsErrors) {
-          emitError(error);
-        }
-
-        const errorHtml = handleError({ e: error, name: componentName, serverSide: true });
-        writeChunk(errorHtml);
-        endStream();
-      },
+      onShellError,
       onShellReady() {
         renderState.isShellReady = true;
         pipeToTransform(renderingStream);
@@ -214,7 +182,7 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement | Promise
       },
       identifierPrefix: domNodeId,
     });
-  });
+  }).catch(onShellError);
 
   return readableStream;
 }
@@ -248,14 +216,21 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
 
     return renderStrategy(reactRenderingResult, options);
   } catch (e) {
+    const {
+      readableStream,
+      writeChunk,
+      emitError,
+      endStream
+    } = transformRenderStreamChunksToResultObject({ hasErrors: true, isShellReady: false, result: null });
     if (throwJsErrors) {
-      throw e;
+      emitError(e);
     }
 
     const error = convertToError(e);
     const htmlResult = handleError({ e: error, name: componentName, serverSide: true });
-    const jsonResult = JSON.stringify(createResultObject(htmlResult, buildConsoleReplay(), { hasErrors: true, error, result: null }));
-    return stringToStream(jsonResult) as T;
+    writeChunk(htmlResult);
+    endStream();
+    return readableStream as T;
   }
 };
 

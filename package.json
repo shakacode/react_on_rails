@@ -11,7 +11,10 @@
     },
     "./client": "./node_package/lib/ReactOnRails.client.js",
     "./registerServerComponent/client": "./node_package/lib/registerServerComponent/client.js",
-    "./registerServerComponent/server": "./node_package/lib/registerServerComponent/server.js"
+    "./registerServerComponent/server": {
+      "react-server": "./node_package/lib/registerServerComponent/server.rsc.js",
+      "default": "./node_package/lib/registerServerComponent/server.js"
+    }
   },
   "directories": {
     "doc": "docs"
