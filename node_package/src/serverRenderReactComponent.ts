@@ -63,11 +63,11 @@ function processPromise(
     // And when a promise is passed to JSON.stringify, it will be converted to '{}'.
     return '{}';
   }
-  return result.then((result) => {
-    if (typeof result !== 'string') {
-      return processReactElement(result);
+  return result.then((renderedResult) => {
+    if (typeof renderedResult !== 'string') {
+      return processReactElement(renderedResult);
     }
-    return result;
+    return renderedResult;
   });
 }
 
