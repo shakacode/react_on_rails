@@ -92,7 +92,8 @@ class ComponentRenderer {
           return;
         }
 
-        if (await delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) {
+        // Abort if component unmounted during awaiting the async operation
+        if (await delegateToRenderer(componentObj, props, railsContext, domNodeId, trace) || this.state === 'unmounted') {
           return;
         }
 
