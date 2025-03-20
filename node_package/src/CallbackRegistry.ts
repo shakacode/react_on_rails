@@ -29,7 +29,7 @@ export default class CallbackRegistry<T> {
     this.registryType = registryType;
   }
 
-  private async initializeTimeoutEvents() {
+  private initializeTimeoutEvents() {
     if (this.timeoutEventsInitialized) return;
     this.timeoutEventsInitialized = true;
 
@@ -46,14 +46,14 @@ export default class CallbackRegistry<T> {
       });
     };
 
-    await onPageLoaded(() => {
+    onPageLoaded(() => {
       const registryTimeout = getContextAndRailsContext().railsContext?.componentRegistryTimeout;
       if (!registryTimeout) return;
 
       timeoutId = setTimeout(triggerTimeout, registryTimeout);
     });
 
-    await onPageUnloaded(() => {
+    onPageUnloaded(() => {
       this.waitingPromises.clear();
       this.timedout = false;
       clearTimeout(timeoutId);
@@ -97,7 +97,7 @@ export default class CallbackRegistry<T> {
   }
 
   async getOrWaitForItem(name: string): Promise<T> {
-    await this.initializeTimeoutEvents();
+    this.initializeTimeoutEvents();
     try {
       return this.get(name);
     } catch (error) {

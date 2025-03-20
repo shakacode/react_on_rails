@@ -343,7 +343,7 @@ ctx.ReactOnRails = {
 
 ctx.ReactOnRails.resetOptions();
 
-void ClientStartup.clientStartup(ctx);
+ClientStartup.clientStartup(ctx);
 
 export * from './types';
 export default ctx.ReactOnRails;

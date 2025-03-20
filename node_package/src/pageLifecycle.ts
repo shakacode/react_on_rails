@@ -73,17 +73,17 @@ function initializePageEventListeners(): void {
   }
 }
 
-export async function onPageLoaded(callback: PageLifecycleCallback): Promise<void> {
+export function onPageLoaded(callback: PageLifecycleCallback): void {
   if (currentPageState === 'load') {
-    await callback();
+    void callback();
   }
   pageLoadedCallbacks.add(callback);
   initializePageEventListeners();
 }
 
-export async function onPageUnloaded(callback: PageLifecycleCallback): Promise<void> {
+export function onPageUnloaded(callback: PageLifecycleCallback): void {
   if (currentPageState === 'unload') {
-    await callback();
+    void callback();
   }
   pageUnloadedCallbacks.add(callback);
   initializePageEventListeners();

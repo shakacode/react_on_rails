@@ -19,7 +19,7 @@ function reactOnRailsPageUnloaded(): void {
   unmountAll();
 }
 
-export async function clientStartup(context: Context): Promise<void> {
+export function clientStartup(context: Context) {
   // Check if server rendering
   if (!isWindow(context)) {
     return;
@@ -41,6 +41,6 @@ export async function clientStartup(context: Context): Promise<void> {
   void hydrateForceLoadedStores();
 
   // Other components and stores are rendered and hydrated when the page is fully loaded
-  await onPageLoaded(reactOnRailsPageLoaded);
-  await onPageUnloaded(reactOnRailsPageUnloaded);
+  onPageLoaded(reactOnRailsPageLoaded);
+  onPageUnloaded(reactOnRailsPageUnloaded);
 }
