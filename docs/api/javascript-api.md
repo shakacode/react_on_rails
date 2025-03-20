@@ -18,7 +18,7 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 
 ## API
 
-The best source of docs is the main [ReactOnRails.ts](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/ReactOnRails.ts) file. Here's a quick summary. No guarantees that this won't be outdated!
+The best source of docs is the `interface ReactOnRails` in [types/index.ts](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/types/index.ts). Here's a quick summary. No guarantees that this won't be outdated!
 
 ```js
 /**
@@ -44,7 +44,7 @@ register(components);
  * the setStore API is different in that it's the actual store hydrated with props.
  * @param stores (key is store name, value is the store generator)
  */
-registerStore(stores);
+registerStoreGenerators(storesGenerators);
 
 /**
  * Allows retrieval of the store by name. This store will be hydrated by any Rails form props.
@@ -85,7 +85,6 @@ reactOnRailsPageLoaded();
  * Returns CSRF authenticity token inserted by Rails csrf_meta_tags
  * @returns String or null
  */
-
 authenticityToken();
 
 /**
@@ -93,6 +92,5 @@ authenticityToken();
  * @param {*} other headers
  * @returns {*} header
  */
-
 authenticityHeaders((otherHeaders = {}));
 ```
