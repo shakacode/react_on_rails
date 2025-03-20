@@ -6,7 +6,7 @@ import {
   turbolinksVersion5,
 } from './turbolinksUtils';
 
-type PageLifecycleCallback = () => void;
+type PageLifecycleCallback = () => void | Promise<void>;
 type PageState = 'load' | 'unload' | 'initial';
 
 const pageLoadedCallbacks = new Set<PageLifecycleCallback>();
@@ -16,12 +16,16 @@ let currentPageState: PageState = 'initial';
 
 function runPageLoadedCallbacks(): void {
   currentPageState = 'load';
-  pageLoadedCallbacks.forEach((callback) => callback());
+  pageLoadedCallbacks.forEach((callback) => {
+    void callback();
+  });
 }
 
 function runPageUnloadedCallbacks(): void {
   currentPageState = 'unload';
-  pageUnloadedCallbacks.forEach((callback) => callback());
+  pageUnloadedCallbacks.forEach((callback) => {
+    void callback();
+  });
 }
 
 function setupTurbolinksEventListeners(): void {
@@ -71,7 +75,7 @@ function initializePageEventListeners(): void {
 
 export function onPageLoaded(callback: PageLifecycleCallback): void {
   if (currentPageState === 'load') {
-    callback();
+    void callback();
   }
   pageLoadedCallbacks.add(callback);
   initializePageEventListeners();
@@ -79,7 +83,7 @@ export function onPageLoaded(callback: PageLifecycleCallback): void {
 
 export function onPageUnloaded(callback: PageLifecycleCallback): void {
   if (currentPageState === 'unload') {
-    callback();
+    void callback();
   }
   pageUnloadedCallbacks.add(callback);
   initializePageEventListeners();

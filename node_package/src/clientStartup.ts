@@ -19,7 +19,7 @@ function reactOnRailsPageUnloaded(): void {
   unmountAll();
 }
 
-export async function clientStartup(context: Context): Promise<void> {
+export function clientStartup(context: Context) {
   // Check if server rendering
   if (!isWindow(context)) {
     return;
@@ -34,9 +34,11 @@ export async function clientStartup(context: Context): Promise<void> {
   // eslint-disable-next-line no-underscore-dangle
   context.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
 
-  // force loaded components and stores are rendered and hydrated immediately
-  renderOrHydrateForceLoadedComponents();
-  hydrateForceLoadedStores();
+  // Force loaded components and stores are rendered and hydrated immediately.
+  // The hydration process can handle the concurrent hydration of components and stores,
+  // so awaiting this isn't necessary.
+  void renderOrHydrateForceLoadedComponents();
+  void hydrateForceLoadedStores();
 
   // Other components and stores are rendered and hydrated when the page is fully loaded
   onPageLoaded(reactOnRailsPageLoaded);

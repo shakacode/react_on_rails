@@ -8,7 +8,12 @@ declare global {
   }
 }
 
-export function debugTurbolinks(...msg: string[]): void {
+/**
+ * Formats a message if the `traceTurbolinks` option is enabled.
+ * Multiple arguments can be passed like to `console.log`,
+ * except format specifiers aren't substituted (because it isn't used as the first argument).
+ */
+export function debugTurbolinks(...msg: unknown[]): void {
   if (!window) {
     return;
   }

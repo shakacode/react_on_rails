@@ -25,13 +25,12 @@ if (ctx === undefined) {
 }
 
 if (ctx.ReactOnRails !== undefined) {
-  throw new Error(`
-    The ReactOnRails value exists in the ${ctx} scope, it may not be safe to overwrite it.
-    
-    This could be caused by setting Webpack's optimization.runtimeChunk to "true" or "multiple," rather than "single." Check your Webpack configuration.
-    
-    Read more at https://github.com/shakacode/react_on_rails/issues/1558.
-  `);
+  /* eslint-disable @typescript-eslint/no-base-to-string -- Window and Global both have useful toString() */
+  throw new Error(`\
+The ReactOnRails value exists in the ${ctx} scope, it may not be safe to overwrite it.
+This could be caused by setting Webpack's optimization.runtimeChunk to "true" or "multiple," rather than "single."
+Check your Webpack configuration. Read more at https://github.com/shakacode/react_on_rails/issues/1558.`);
+  /* eslint-enable @typescript-eslint/no-base-to-string */
 }
 
 const DEFAULT_OPTIONS = {
@@ -149,12 +148,12 @@ ctx.ReactOnRails = {
     return ClientStartup.reactOnRailsPageLoaded();
   },
 
-  reactOnRailsComponentLoaded(domId: string): void {
-    renderOrHydrateComponent(domId);
+  reactOnRailsComponentLoaded(domId: string): Promise<void> {
+    return renderOrHydrateComponent(domId);
   },
 
-  reactOnRailsStoreLoaded(storeName: string): void {
-    hydrateStore(storeName);
+  reactOnRailsStoreLoaded(storeName: string): Promise<void> {
+    return hydrateStore(storeName);
   },
 
   /**
@@ -201,11 +200,10 @@ ctx.ReactOnRails = {
 
   /**
    * Allows saving the store populated by Rails form props. Used internally by ReactOnRails.
-   * @param name
    * @returns Redux Store, possibly hydrated
    */
   setStore(name: string, store: Store): void {
-    return StoreRegistry.setStore(name, store);
+    StoreRegistry.setStore(name, store);
   },
 
   /**

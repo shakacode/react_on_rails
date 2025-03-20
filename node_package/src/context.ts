@@ -18,6 +18,7 @@ export type Context = Window | typeof globalThis;
 /**
  * Get the context, be it window or global
  */
+// eslint-disable-next-line @typescript-eslint/no-invalid-void-type
 export default function context(this: void): Context | void {
   return (typeof window !== 'undefined' && window) || (typeof global !== 'undefined' && global) || this;
 }
@@ -53,7 +54,7 @@ export function getContextAndRailsContext(): { context: Context | null; railsCon
   }
 
   try {
-    currentRailsContext = JSON.parse(el.textContent);
+    currentRailsContext = JSON.parse(el.textContent) as RailsContext;
   } catch (e) {
     console.error('Error parsing Rails context:', e);
     return { context: null, railsContext: null };

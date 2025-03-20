@@ -12,6 +12,7 @@ export default function isRenderFunction(
   component: ReactComponentOrRenderFunction,
 ): component is RenderFunction {
   // No for es5 or es6 React Component
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   if ((component as RenderFunction).prototype?.isReactComponent) {
     return false;
   }

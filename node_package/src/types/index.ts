@@ -7,7 +7,9 @@ import type { Readable } from 'stream';
 // See https://github.com/shakacode/react_on_rails/issues/1321
 // and https://redux.js.org/api/store for the actual API.
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type Store = unknown;
+type Store = {
+  getState(): unknown;
+};
 
 type ReactComponent = ComponentType<any> | string;
 
@@ -164,6 +166,7 @@ export interface Root {
   unmount(): void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- inherited from React 16/17, can't avoid here
 export type RenderReturnType = void | Element | Component | Root;
 
 export interface ReactOnRails {
@@ -177,8 +180,8 @@ export interface ReactOnRails {
   setOptions(newOptions: { traceTurbolinks: boolean }): void;
   reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType;
   reactOnRailsPageLoaded(): Promise<void>;
-  reactOnRailsComponentLoaded(domId: string): void;
-  reactOnRailsStoreLoaded(storeName: string): void;
+  reactOnRailsComponentLoaded(domId: string): Promise<void>;
+  reactOnRailsStoreLoaded(storeName: string): Promise<void>;
   authenticityToken(): string | null;
   authenticityHeaders(otherHeaders: Record<string, string>): AuthenticityHeaders;
   option(key: string): string | number | boolean | undefined;

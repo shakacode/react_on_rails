@@ -80,6 +80,12 @@ const config = tsEslint.config([
       'function-paren-newline': 'off',
       'object-curly-newline': 'off',
       'no-restricted-syntax': ['error', 'SequenceExpression'],
+      'no-void': [
+        'error',
+        {
+          allowAsStatement: true,
+        },
+      ],
 
       'import/extensions': [
         'error',
@@ -134,12 +140,15 @@ const config = tsEslint.config([
   {
     files: ['**/*.ts', '**/*.tsx'],
 
-    extends: tsEslint.configs.recommended,
+    extends: tsEslint.configs.strictTypeChecked,
 
     languageOptions: {
       parserOptions: {
         projectService: {
           allowDefaultProject: ['eslint.config.ts', 'knip.ts'],
+          // Needed because `import * as ... from` instead of `import ... from` doesn't work in this file
+          // for some imports.
+          defaultProject: 'tsconfig.eslint.json',
         },
       },
     },
@@ -147,12 +156,21 @@ const config = tsEslint.config([
     rules: {
       '@typescript-eslint/no-namespace': 'off',
       '@typescript-eslint/no-shadow': 'error',
+      '@typescript-eslint/no-confusing-void-expression': [
+        'error',
+        {
+          ignoreArrowShorthand: true,
+        },
+      ],
+      // Too many false positives
+      '@typescript-eslint/no-unnecessary-condition': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
           caughtErrorsIgnorePattern: '^_',
         },
       ],
+      '@typescript-eslint/restrict-template-expressions': 'off',
     },
   },
   // must be the last config in the array

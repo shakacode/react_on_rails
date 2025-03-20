@@ -1,4 +1,4 @@
-import { type RegisteredComponent, type ReactComponentOrRenderFunction, type RenderFunction } from './types';
+import { type RegisteredComponent, type ReactComponentOrRenderFunction } from './types';
 import isRenderFunction from './isRenderFunction';
 import CallbackRegistry from './CallbackRegistry';
 
@@ -20,7 +20,7 @@ export default {
       }
 
       const renderFunction = isRenderFunction(component);
-      const isRenderer = renderFunction && (component as RenderFunction).length === 3;
+      const isRenderer = renderFunction && component.length === 3;
 
       componentRegistry.set(name, {
         name,

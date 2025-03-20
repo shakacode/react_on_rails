@@ -1,5 +1,5 @@
 /* eslint-disable max-classes-per-file */
-/* eslint-disable react/no-deprecated -- while we need to support React 16 */
+/* eslint-disable react/no-deprecated,@typescript-eslint/no-deprecated -- while we need to support React 16 */
 
 import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
@@ -14,13 +14,13 @@ import { debugTurbolinks } from './turbolinksUtils';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
-function delegateToRenderer(
+async function delegateToRenderer(
   componentObj: RegisteredComponent,
-  props: Record<string, string>,
+  props: Record<string, unknown>,
   railsContext: RailsContext,
   domNodeId: string,
   trace: boolean,
-): boolean {
+): Promise<boolean> {
   const { name, component, isRenderer } = componentObj;
 
   if (isRenderer) {
@@ -32,7 +32,7 @@ function delegateToRenderer(
       );
     }
 
-    (component as RenderFunction)(props, railsContext, domNodeId);
+    await (component as RenderFunction)(props, railsContext, domNodeId);
     return true;
   }
 
@@ -81,7 +81,7 @@ class ComponentRenderer {
     // This must match lib/react_on_rails/helper.rb
     const name = el.getAttribute('data-component-name') || '';
     const { domNodeId } = this;
-    const props = el.textContent !== null ? JSON.parse(el.textContent) : {};
+    const props = el.textContent !== null ? (JSON.parse(el.textContent) as Record<string, unknown>) : {};
     const trace = el.getAttribute('data-trace') === 'true';
 
     try {
@@ -92,7 +92,11 @@ class ComponentRenderer {
           return;
         }
 
-        if (delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) {
+        if (
+          (await delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) ||
+          // @ts-expect-error The state can change while awaiting delegateToRenderer
+          this.state === 'unmounted'
+        ) {
           return;
         }
 
@@ -163,8 +167,8 @@ You should return a React.Component always for the client side entry point.`);
   }
 
   waitUntilRendered(): Promise<void> {
-    if (this.state === 'rendering') {
-      return this.renderPromise!;
+    if (this.state === 'rendering' && this.renderPromise) {
+      return this.renderPromise;
     }
     return Promise.resolve();
   }
@@ -183,7 +187,10 @@ class StoreRenderer {
     }
 
     const name = storeDataElement.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
-    const props = storeDataElement.textContent !== null ? JSON.parse(storeDataElement.textContent) : {};
+    const props =
+      storeDataElement.textContent !== null
+        ? (JSON.parse(storeDataElement.textContent) as Record<string, unknown>)
+        : {};
     this.hydratePromise = this.hydrate(context, railsContext, name, props);
   }
 
@@ -191,7 +198,7 @@ class StoreRenderer {
     context: Context,
     railsContext: RailsContext,
     name: string,
-    props: Record<string, string>,
+    props: Record<string, unknown>,
   ) {
     const storeGenerator = await context.ReactOnRails.getOrWaitForStoreGenerator(name);
     if (this.state === 'unmounted') {
@@ -204,8 +211,8 @@ class StoreRenderer {
   }
 
   waitUntilHydrated(): Promise<void> {
-    if (this.state === 'hydrating') {
-      return this.hydratePromise!;
+    if (this.state === 'hydrating' && this.hydratePromise) {
+      return this.hydratePromise;
     }
     return Promise.resolve();
   }
@@ -217,26 +224,30 @@ class StoreRenderer {
 
 const renderedRoots = new Map<string, ComponentRenderer>();
 
-export function renderOrHydrateComponent(domIdOrElement: string | Element): ComponentRenderer | undefined {
+export function renderOrHydrateComponent(domIdOrElement: string | Element) {
   const domId = getDomId(domIdOrElement);
-  debugTurbolinks(`renderOrHydrateComponent ${domId}`);
+  debugTurbolinks('renderOrHydrateComponent', domId);
   let root = renderedRoots.get(domId);
   if (!root) {
     root = new ComponentRenderer(domIdOrElement);
     renderedRoots.set(domId, root);
   }
-  return root;
+  return root.waitUntilRendered();
 }
 
-export function renderOrHydrateForceLoadedComponents(): void {
-  const els = document.querySelectorAll(`.js-react-on-rails-component[data-force-load="true"]`);
-  els.forEach((el) => renderOrHydrateComponent(el));
+async function forAllElementsAsync(
+  selector: string,
+  callback: (el: Element) => Promise<void>,
+): Promise<void> {
+  const els = document.querySelectorAll(selector);
+  await Promise.all(Array.from(els).map(callback));
 }
 
-export function renderOrHydrateAllComponents(): void {
-  const els = document.querySelectorAll(`.js-react-on-rails-component`);
-  els.forEach((el) => renderOrHydrateComponent(el));
-}
+export const renderOrHydrateForceLoadedComponents = () =>
+  forAllElementsAsync('.js-react-on-rails-component[data-force-load="true"]', renderOrHydrateComponent);
+
+export const renderOrHydrateAllComponents = () =>
+  forAllElementsAsync('.js-react-on-rails-component', renderOrHydrateComponent);
 
 function unmountAllComponents(): void {
   renderedRoots.forEach((root) => root.unmount());
@@ -267,15 +278,11 @@ export async function hydrateStore(storeNameOrElement: string | Element) {
   await storeRenderer.waitUntilHydrated();
 }
 
-export async function hydrateForceLoadedStores(): Promise<void> {
-  const els = document.querySelectorAll(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-force-load="true"]`);
-  await Promise.all(Array.from(els).map((el) => hydrateStore(el)));
-}
+export const hydrateForceLoadedStores = () =>
+  forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-force-load="true"]`, hydrateStore);
 
-export async function hydrateAllStores(): Promise<void> {
-  const els = document.querySelectorAll(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`);
-  await Promise.all(Array.from(els).map((el) => hydrateStore(el)));
-}
+export const hydrateAllStores = () =>
+  forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`, hydrateStore);
 
 function unmountAllStores(): void {
   storeRenderers.forEach((storeRenderer) => storeRenderer.unmount());
