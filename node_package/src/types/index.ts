@@ -3,10 +3,13 @@
 import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
 import type { Readable } from 'stream';
 
-// Don't import redux just for the type definitions
-// See https://github.com/shakacode/react_on_rails/issues/1321
-// and https://redux.js.org/api/store for the actual API.
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * Don't import Redux just for the type definitions
+ * See https://github.com/shakacode/react_on_rails/issues/1321
+ * and https://redux.js.org/api/store for the actual API.
+ * @see {import('redux').Store}
+ */
 type Store = {
   getState(): unknown;
 };
