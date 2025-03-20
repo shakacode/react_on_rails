@@ -92,7 +92,11 @@ class ComponentRenderer {
           return;
         }
 
-        if (await delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) {
+        if (
+          (await delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) ||
+          // @ts-expect-error The state can change while awaiting delegateToRenderer
+          this.state === 'unmounted'
+        ) {
           return;
         }
 
