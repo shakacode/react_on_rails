@@ -169,38 +169,183 @@ export interface Root {
 // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- inherited from React 16/17, can't avoid here
 export type RenderReturnType = void | Element | Component | Root;
 
+export interface ReactOnRailsOptions {
+  /** Gives you debugging messages on Turbolinks events. */
+  traceTurbolinks?: boolean;
+  /** Turbo (the successor of Turbolinks) events will be registered, if set to true. */
+  turbo?: boolean;
+}
+
 export interface ReactOnRails {
+  /**
+   * Main entry point to using the react-on-rails npm package. This is how Rails will be able to
+   * find you components for rendering.
+   * @param components keys are component names, values are components
+   */
   register(components: Record<string, ReactComponentOrRenderFunction>): void;
   /** @deprecated Use registerStoreGenerators instead */
   registerStore(stores: Record<string, StoreGenerator>): void;
+  /**
+   * Allows registration of store generators to be used by multiple React components on one Rails
+   * view. Store generators are functions that take one arg, props, and return a store. Note that
+   * the `setStore` API is different in that it's the actual store hydrated with props.
+   * @param storeGenerators keys are store names, values are the store generators
+   */
   registerStoreGenerators(storeGenerators: Record<string, StoreGenerator>): void;
+  /**
+   * Allows retrieval of the store by name. This store will be hydrated by any Rails form props.
+   * @param name
+   * @param [throwIfMissing=true] When false, this function will return undefined if
+   *        there is no store with the given name.
+   * @returns Redux Store, possibly hydrated
+   */
   getStore(name: string, throwIfMissing?: boolean): Store | undefined;
+  /**
+   * Get a store by name, or wait for it to be registered.
+   */
   getOrWaitForStore(name: string): Promise<Store>;
+  /**
+   * Get a store generator by name, or wait for it to be registered.
+   */
   getOrWaitForStoreGenerator(name: string): Promise<StoreGenerator>;
-  setOptions(newOptions: { traceTurbolinks: boolean }): void;
+  /**
+   * Set options for ReactOnRails, typically before you call `ReactOnRails.register`.
+   * @see {ReactOnRailsOptions}
+   */
+  setOptions(newOptions: Partial<ReactOnRailsOptions>): void;
+  /**
+   * Renders or hydrates the React element passed. In case React version is >=18 will use the root API.
+   * @param domNode
+   * @param reactElement
+   * @param hydrate if true will perform hydration, if false will render
+   * @returns {Root|ReactComponent|ReactElement|null}
+   */
   reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType;
+  /**
+   * Allow directly calling the page loaded script in case the default events that trigger React
+   * rendering are not sufficient, such as when loading JavaScript asynchronously with TurboLinks.
+   * More details can be found here:
+   * https://github.com/shakacode/react_on_rails/blob/master/docs/additional-reading/turbolinks.md
+   */
   reactOnRailsPageLoaded(): Promise<void>;
   reactOnRailsComponentLoaded(domId: string): Promise<void>;
   reactOnRailsStoreLoaded(storeName: string): Promise<void>;
+  /**
+   * Returns CSRF authenticity token inserted by Rails csrf_meta_tags
+   * @returns String or null
+   */
   authenticityToken(): string | null;
+  /**
+   * Returns headers with CSRF authenticity token and XMLHttpRequest
+   * @param otherHeaders Other headers
+   */
   authenticityHeaders(otherHeaders: Record<string, string>): AuthenticityHeaders;
-  option(key: string): string | number | boolean | undefined;
+}
+
+/** Contains the parts of the `ReactOnRails` API intended for internal use only. */
+export interface ReactOnRailsInternal extends ReactOnRails {
+  /**
+   * Retrieve an option by key.
+   * @param key
+   * @returns option value
+   */
+  option<K extends keyof ReactOnRailsOptions>(key: K): ReactOnRailsOptions[K] | undefined;
+  /**
+   * Allows retrieval of the store generator by name. This is used internally by ReactOnRails after
+   * a Rails form loads to prepare stores.
+   * @param name
+   * @returns Redux Store generator function
+   */
   getStoreGenerator(name: string): StoreGenerator;
+  /**
+   * Allows saving the store populated by Rails form props. Used internally by ReactOnRails.
+   */
   setStore(name: string, store: Store): void;
+  /**
+   * Clears `hydratedStores` to avoid accidental usage of wrong store hydrated in a previous/parallel
+   * request.
+   */
   clearHydratedStores(): void;
-  render(name: string, props: Record<string, string>, domNodeId: string, hydrate: boolean): RenderReturnType;
+  /**
+   * @example
+   * ```js
+   * ReactOnRails.render("HelloWorldApp", {name: "Stranger"}, "app");
+   * ```
+   *
+   * Does this:
+   * ```js
+   * ReactDOM.render(
+   *   React.createElement(HelloWorldApp, {name: "Stranger"}),
+   *   document.getElementById("app")
+   * );
+   * ```
+   * under React 16/17 and
+   * ```js
+   * const root = ReactDOMClient.createRoot(document.getElementById("app"));
+   * root.render(React.createElement(HelloWorldApp, {name: "Stranger"}));
+   * return root;
+   * ```
+   * under React 18+.
+   *
+   * @param name Name of your registered component
+   * @param props Props to pass to your component
+   * @param domNodeId HTML ID of the node the component will be rendered at
+   * @param [hydrate=false] Pass truthy to update server rendered HTML. Default is falsy
+   * @returns {Root|ReactComponent|ReactElement} Under React 18+: the created React root
+   *   (see "What is a root?" in https://github.com/reactwg/react-18/discussions/5).
+   *   Under React 16/17: Reference to your component's backing instance or `null` for stateless components.
+   */
+  render(name: string, props: Record<string, string>, domNodeId: string, hydrate?: boolean): RenderReturnType;
+  /**
+   * Get the component that you registered
+   * @returns {name, component, renderFunction, isRenderer}
+   */
   getComponent(name: string): RegisteredComponent;
+  /**
+   * Get the component that you registered, or wait for it to be registered
+   * @returns {name, component, renderFunction, isRenderer}
+   */
   getOrWaitForComponent(name: string): Promise<RegisteredComponent>;
+  /**
+   * Used by server rendering by Rails
+   */
   serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;
+  /**
+   * Used by server rendering by Rails
+   */
   streamServerRenderedReactComponent(options: RenderParams): Readable;
+  /**
+   * Generates RSC payload, used by Rails
+   */
   serverRenderRSCReactComponent(options: RSCRenderParams): Readable;
+  /**
+   * Used by Rails to catch errors in rendering
+   */
   handleError(options: ErrorOptions): string | undefined;
+  /**
+   * Used by Rails server rendering to replay console messages.
+   */
   buildConsoleReplay(): string;
+  /**
+   * Get a Map containing all registered components. Useful for debugging.
+   */
   registeredComponents(): Map<string, RegisteredComponent>;
+  /**
+   * Get a Map containing all registered store generators. Useful for debugging.
+   */
   storeGenerators(): Map<string, StoreGenerator>;
+  /**
+   * Get a Map containing all hydrated stores. Useful for debugging.
+   */
   stores(): Map<string, Store>;
+  /**
+   * Reset options to default.
+   */
   resetOptions(): void;
-  options: Record<string, string | number | boolean>;
+  /**
+   * Current options.
+   */
+  options: ReactOnRailsOptions;
 }
 
 export type RenderState = {

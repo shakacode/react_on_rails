@@ -10,16 +10,8 @@ if (typeof window !== 'undefined') {
   );
 }
 
-/**
- * Used by Rails to catch errors in rendering
- * @param options
- */
 Client.handleError = (options: ErrorOptions): string | undefined => handleError(options);
 
-/**
- * Used by server rendering by Rails
- * @param options
- */
 Client.serverRenderReactComponent = (options: RenderParams): null | string | Promise<RenderResult> =>
   serverRenderReactComponent(options);
 
