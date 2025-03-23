@@ -21,14 +21,21 @@ jobs:
           persist-credentials: false
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v44
-        with:
-          files: |
-            lib/generators/**
-            rakelib/example_type.rb
-            rakelib/example_config.yml
-            rakelib/examples.rake
-            rakelib/run_rspec.rake
+        run: |
+          BASE_SHA=${{ github.event.pull_request.base.sha || github.event.before }}
+          git fetch origin $BASE_SHA
+          CHANGED_FILES=$(git diff --name-only $BASE_SHA ${{ github.sha }} -- \
+            lib/generators/ \
+            rakelib/example_type.rb \
+            rakelib/example_config.yml \
+            rakelib/examples.rake \
+            rakelib/run_rspec.rake)
+          if [ -n "$CHANGED_FILES" ]; then
+            ANY_CHANGED=true
+          else
+            ANY_CHANGED=false
+          fi
+          echo "any_changed=$ANY_CHANGED" >> "$GITHUB_OUTPUT"
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -79,7 +86,7 @@ jobs:
           echo -e "Already installed $(google-chrome --version)\n"
           MINIMUM_REQUIRED_CHROME_VERSION=75
           INSTALLED_CHROME_MAJOR_VERSION="$(google-chrome --version | tr ' .' '\t' | cut -f3)"
-          if [[ $INSTALLED_CHROME_MAJOR_VERSION < $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
+          if [[ $INSTALLED_CHROME_MAJOR_VERSION -lt $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
             wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
             sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
             sudo apt-get update
