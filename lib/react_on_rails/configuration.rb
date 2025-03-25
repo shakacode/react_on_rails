@@ -154,32 +154,35 @@ module ReactOnRails
       raise ReactOnRails::Error, "component_registry_timeout must be a positive integer"
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity
+    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def validate_generated_component_packs_loading_strategy
-      # rubocop:enable Metrics/CyclomaticComplexity
+      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+      if defer_generated_component_packs
+        if %i[async sync].include?(generated_component_packs_loading_strategy)
+          Rails.logger.warn "**WARNING** ReactOnRails: config.defer_generated_component_packs is " \
+                            "superseded by config.generated_component_packs_loading_strategy"
+        else
+          Rails.logger.warn "[DEPRECATION] ReactOnRails: Use config." \
+                            "generated_component_packs_loading_strategy = :defer rather than " \
+                            "defer_generated_component_packs"
+          self.generated_component_packs_loading_strategy ||= :defer
+        end
+      end
+
+      msg = <<~MSG
+        ReactOnRails: Your current version of #{ReactOnRails::PackerUtils.packer_type.upcase_first} \
+        does not support async script loading,  which may cause performance issues. Please either:
+        1. Use :sync or :defer loading strategy instead of :async
+        2. Upgrade to Shakapacker v8.2.0 or above to enable async script loading
+      MSG
       if PackerUtils.shakapacker_version_requirement_met?([8, 2, 0])
         self.generated_component_packs_loading_strategy ||= :async
-      elsif defer_generated_component_packs
-        generated_component_packs_loading_strategy ||= :defer
-        Rails.logger.warn "[DEPRECATION] ReactOnRails: Use config." \
-                          "generated_component_packs_loading_strategy = :defer rather than " \
-                          "defer_generated_component_packs"
       elsif generated_component_packs_loading_strategy.nil?
-        msg = <<~MSG
-          **WARNING** ReactOnRails: Your current version of #{ReactOnRails::PackerUtils.packer_type.upcase_first} \
-          does not support async script loading which may cause performance issues. Please upgrade to Shakapacker v8.2.0 \
-          or above to enable async script loading for better performance.
-        MSG
-        Rails.logger.warn(msg)
+        Rails.logger.warn("**WARNING** #{msg}")
         self.generated_component_packs_loading_strategy = :sync
       elsif generated_component_packs_loading_strategy == :async
-        msg = <<~MSG
-          **ERROR** ReactOnRails: Your current version of #{ReactOnRails::PackerUtils.packer_type.upcase_first} \
-          does not support async script loading. Please either:
-          1. Use :sync or :defer loading strategy instead of :async
-          2. Upgrade to Shakapacker v8.2.0 or above to enable async script loading
-        MSG
-        raise ReactOnRails::Error, msg
+        raise ReactOnRails::Error, "**ERROR** #{msg}"
       end
 
       return if %i[async defer sync].include?(generated_component_packs_loading_strategy)
