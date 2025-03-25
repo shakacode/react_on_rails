@@ -29,7 +29,7 @@ Changes since the last non-beta release.
 
 ### Removed (Breaking Changes)
 
-- Removed `defer_generated_component_packs` configuration option. You can use `generated_component_packs_loading_strategy` instead. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- Deprecated `defer_generated_component_packs` configuration option. You should use `generated_component_packs_loading_strategy` instead. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### [15.0.0-alpha.2] - 2025-03-07
 

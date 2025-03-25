@@ -43,6 +43,7 @@ module ReactOnRails
       i18n_output_format: nil,
       components_subdirectory: nil,
       make_generated_server_bundle_the_entrypoint: false,
+      defer_generated_component_packs: false,
       # forces the loading of React components
       force_load: true,
       # Maximum time in milliseconds to wait for client-side component registration after page load.
@@ -60,7 +61,7 @@ module ReactOnRails
                   :generated_assets_dirs, :generated_assets_dir, :components_subdirectory,
                   :webpack_generated_files, :rendering_extension, :build_test_command,
                   :build_production_command, :i18n_dir, :i18n_yml_dir, :i18n_output_format,
-                  :i18n_yml_safe_load_options,
+                  :i18n_yml_safe_load_options, :defer_generated_component_packs,
                   :server_render_method, :random_dom_id, :auto_load_bundle,
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
@@ -70,7 +71,7 @@ module ReactOnRails
     # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
                    replay_console: nil, make_generated_server_bundle_the_entrypoint: nil,
-                   trace: nil, development_mode: nil,
+                   trace: nil, development_mode: nil, defer_generated_component_packs: nil,
                    logging_on_server: nil, server_renderer_pool_size: nil,
                    server_renderer_timeout: nil, raise_on_prerender_error: true,
                    skip_display_none: nil, generated_assets_dirs: nil,
@@ -122,6 +123,7 @@ module ReactOnRails
       self.components_subdirectory = components_subdirectory
       self.auto_load_bundle = auto_load_bundle
       self.make_generated_server_bundle_the_entrypoint = make_generated_server_bundle_the_entrypoint
+      self.defer_generated_component_packs = defer_generated_component_packs
       self.force_load = force_load
       self.generated_component_packs_loading_strategy = generated_component_packs_loading_strategy
     end
@@ -152,9 +154,16 @@ module ReactOnRails
       raise ReactOnRails::Error, "component_registry_timeout must be a positive integer"
     end
 
+    # rubocop:disable Metrics/CyclomaticComplexity
     def validate_generated_component_packs_loading_strategy
+      # rubocop:enable Metrics/CyclomaticComplexity
       if PackerUtils.shakapacker_version_requirement_met?([8, 2, 0])
         self.generated_component_packs_loading_strategy ||= :async
+      elsif defer_generated_component_packs
+        generated_component_packs_loading_strategy ||= :defer
+        Rails.logger.warn "[DEPRECATION] ReactOnRails: Use config." \
+                          "generated_component_packs_loading_strategy = :defer rather than " \
+                          "defer_generated_component_packs"
       elsif generated_component_packs_loading_strategy.nil?
         msg = <<~MSG
           **WARNING** ReactOnRails: Your current version of #{ReactOnRails::PackerUtils.packer_type.upcase_first} \
