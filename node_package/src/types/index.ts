@@ -34,9 +34,9 @@ export type RailsContext = {
   pathname: string;
   search: string | null;
   httpAcceptLanguage: string;
+  rscPayloadGenerationUrl: string;
 } & ({
   serverSide: false;
-  rscPayloadGenerationUrl: string;
 } | {
   serverSide: true;
   // These parameters are passed from React on Rails Pro to the node renderer.
