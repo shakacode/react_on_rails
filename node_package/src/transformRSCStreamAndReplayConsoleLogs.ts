@@ -7,32 +7,41 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
 
       let lastIncompleteChunk = '';
       let { value, done } = await reader.read();
+      
+      const handleJsonChunk = (chunk: { html: string, consoleReplayScript: string }) => {
+        const { html, consoleReplayScript = '' } = chunk;
+        controller.enqueue(encoder.encode(html));
+
+        const replayConsoleCode = consoleReplayScript.trim().replace(/^<script.*>/, '').replace(/<\/script>$/, '');
+        if (replayConsoleCode?.trim() !== '') {
+          const scriptElement = document.createElement('script');
+          scriptElement.textContent = replayConsoleCode;
+          document.body.appendChild(scriptElement);
+        }
+      };
+      
       while (!done) {
-        const decodedValue = lastIncompleteChunk + decoder.decode(value);
-        const chunks = decodedValue.split('\n');
-        lastIncompleteChunk = chunks.pop() ?? '';
+        if (ArrayBuffer.isView(value)) {
+          const decodedValue = lastIncompleteChunk + decoder.decode(value);
+          const chunks = decodedValue.split('\n');
+          lastIncompleteChunk = chunks.pop() ?? '';
 
-        const jsonChunks = chunks
-          .filter(line => line.trim() !== '')
-          .map((line) => {
-            try {
-              return JSON.parse(line);
-            } catch (error) {
-              console.error('Error parsing JSON:', line, error);
-              throw error;
-            }
-          });
+          const jsonChunks = chunks
+            .filter(line => line.trim() !== '')
+            .map((line) => {
+              try {
+                return JSON.parse(line);
+              } catch (error) {
+                console.error('Error parsing JSON:', line, error);
+                throw error;
+              }
+            });
 
-        for (const jsonChunk of jsonChunks) {
-          const { html, consoleReplayScript = '' } = jsonChunk;
-          controller.enqueue(encoder.encode(html));
-
-          const replayConsoleCode = consoleReplayScript.trim().replace(/^<script.*>/, '').replace(/<\/script>$/, '');
-          if (replayConsoleCode?.trim() !== '') {
-            const scriptElement = document.createElement('script');
-            scriptElement.textContent = replayConsoleCode;
-            document.body.appendChild(scriptElement);
+          for (const jsonChunk of jsonChunks) {
+            handleJsonChunk(jsonChunk);
           }
+        } else {
+          handleJsonChunk(value);
         }
 
         // eslint-disable-next-line no-await-in-loop

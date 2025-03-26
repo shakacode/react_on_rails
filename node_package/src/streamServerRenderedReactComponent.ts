@@ -87,15 +87,40 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   const consoleHistory = console.history;
   let previouslyReplayedConsoleMessages = 0;
 
+  let consoleReplayTimeoutId: NodeJS.Timeout;
+  const buildConsoleReplayChunk = () => {
+    const consoleReplayScript = buildConsoleReplay(consoleHistory, previouslyReplayedConsoleMessages);
+    previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
+    if (consoleReplayScript.length === 0) {
+      return null;
+    }
+    const consoleReplayJsonChunk = JSON.stringify(createResultObject('', consoleReplayScript, renderState));
+    return consoleReplayJsonChunk;
+  }
+
   const transformStream = new PassThrough({
     transform(chunk, _, callback) {
       const htmlChunk = chunk.toString();
-      const consoleReplayScript = buildConsoleReplay(consoleHistory, previouslyReplayedConsoleMessages);
-      previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
-
-      const jsonChunk = JSON.stringify(createResultObject(htmlChunk, consoleReplayScript, renderState));
-
+      const jsonChunk = JSON.stringify(createResultObject(htmlChunk, '', renderState));
       this.push(`${jsonChunk}\n`);
+
+      clearTimeout(consoleReplayTimeoutId);
+      consoleReplayTimeoutId = setTimeout(() => {
+        const consoleReplayChunk = buildConsoleReplayChunk();
+        if (consoleReplayChunk) {
+          this.push(`${consoleReplayChunk}\n`);
+        }
+      }, 0);
+
+      callback();
+    },
+
+    flush(callback) {
+      clearTimeout(consoleReplayTimeoutId);
+      const consoleReplayChunk = buildConsoleReplayChunk();
+      if (consoleReplayChunk) {
+        this.push(`${consoleReplayChunk}\n`);
+      }
       callback();
     }
   });
