@@ -51,11 +51,12 @@ export function consoleReplay(
 }
 
 export default function buildConsoleReplay(
-  customConsoleHistory: (typeof console)['history'] | undefined = undefined,
+  customConsoleHistory: typeof console['history'] | undefined = undefined,
   numberOfMessagesToSkip: number = 0,
 ): string {
-  return RenderUtils.wrapInScriptTags(
-    'consoleReplayLog',
-    consoleReplay(customConsoleHistory, numberOfMessagesToSkip),
-  );
+  const consoleReplayJS = consoleReplay(customConsoleHistory, numberOfMessagesToSkip);
+  if (consoleReplayJS.length === 0) {
+    return '';
+  }
+  return RenderUtils.wrapInScriptTags('consoleReplayLog', consoleReplayJS);
 }
