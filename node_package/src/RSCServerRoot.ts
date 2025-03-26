@@ -3,6 +3,8 @@ import { createFromNodeStream } from 'react-on-rails-rsc/client.node';
 import type { RenderFunction, RailsContext } from './types';
 import transformRSCStream from './transformRSCNodeStreamAndReplayConsoleLogs';
 import loadJsonFile from './loadJsonFile';
+import RSCPayloadContainer from './RSCPayloadContainer';
+import { PassThrough } from 'stream';
 
 declare global {
   function generateRSCPayload(
@@ -82,9 +84,28 @@ const RSCServerRoot: RenderFunction = async ({ componentName, componentProps }: 
     componentProps,
     railsContext.serverSideRSCPayloadParameters
   );
-  const serverComponentElement = createFromReactOnRailsNodeStream(rscPayloadStream, ssrManifest);
 
-  return () => use(serverComponentElement);
+  // Tee the stream to pass it to the server component and the payload container
+  const rscPayloadStream1 = new PassThrough();
+  rscPayloadStream.pipe(rscPayloadStream1);
+  const rscPayloadStream2 = new PassThrough();
+  rscPayloadStream.pipe(rscPayloadStream2);
+  const serverComponentElement = createFromReactOnRailsNodeStream(rscPayloadStream1, ssrManifest);
+
+  return () => React.createElement(
+    React.Fragment,
+    null, [
+      React.createElement(
+        React.Fragment,
+        { key: 'serverComponentElement' },
+        use(serverComponentElement)
+      ),
+      React.createElement(
+        RSCPayloadContainer,
+        { RSCPayloadStream: rscPayloadStream2, key: 'rscPayloadContainer' },
+      ),
+    ]
+  );
 };
 
 export default RSCServerRoot;
