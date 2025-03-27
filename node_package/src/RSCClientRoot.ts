@@ -62,7 +62,7 @@ const createRSCStreamFromPage = () => {
         return chunks.length;
       };
       streamController = controller;
-    }
+    },
   });
 
   if (typeof document !== 'undefined' && document.readyState === 'loading') {
@@ -74,13 +74,13 @@ const createRSCStreamFromPage = () => {
   }
 
   return stream;
-}
+};
 
 const createFromRSCStream = () => {
   const stream = createRSCStreamFromPage();
   const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream);
   return createFromReadableStream<React.ReactNode>(transformedStream);
-}
+};
 
 /**
  * RSCClientRoot is a React component that handles client-side rendering of React Server Components (RSC).
@@ -111,7 +111,7 @@ const RSCClientRoot: RenderFunction = async (
     const root = await createFromRSCStream();
     ReactDOMClient.hydrateRoot(domNode, root);
   } else {
-    const root = await fetchRSC({ componentName, rscPayloadGenerationUrlPath, componentProps })
+    const root = await fetchRSC({ componentName, rscPayloadGenerationUrlPath, componentProps });
     ReactDOMClient.createRoot(domNode).render(root);
   }
   // Added only to satisfy the return type of RenderFunction
