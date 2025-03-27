@@ -1,10 +1,10 @@
 import * as React from 'react';
 import { createFromNodeStream } from 'react-on-rails-rsc/client.node';
+import { PassThrough } from 'stream';
 import type { RenderFunction, RailsContext } from './types';
 import transformRSCStream from './transformRSCNodeStreamAndReplayConsoleLogs';
 import loadJsonFile from './loadJsonFile';
 import RSCPayloadContainer from './RSCPayloadContainer';
-import { PassThrough } from 'stream';
 
 declare global {
   function generateRSCPayload(
