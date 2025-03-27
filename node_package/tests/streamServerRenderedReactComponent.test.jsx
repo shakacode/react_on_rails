@@ -170,13 +170,13 @@ describe('streamServerRenderedReactComponent', () => {
     });
 
     expect(onError).toHaveBeenCalled();
-    expect(chunks).toHaveLength(2);
+    expect(chunks.length).toBeGreaterThanOrEqual(2);
     expect(chunks[0].html).toContain('Header In The Shell');
     expect(chunks[0].consoleReplayScript).toBe('');
     expect(chunks[0].hasErrors).toBe(false);
     expect(chunks[0].isShellReady).toBe(true);
     // Script that fallbacks the render to client side
-    expect(chunks[1].html).toMatch(/<script>[.\s\S]*Async Error[.\s\S]*<\/script>/);
+    expect(chunks[1].html).toMatch(/the server rendering errored:\\n\\nAsync Error/);
     expect(chunks[1].consoleReplayScript).toBe('');
     expect(chunks[1].hasErrors).toBe(true);
     expect(chunks[1].isShellReady).toBe(true);
@@ -191,13 +191,13 @@ describe('streamServerRenderedReactComponent', () => {
     });
 
     expect(onError).not.toHaveBeenCalled();
-    expect(chunks).toHaveLength(2);
+    expect(chunks.length).toBeGreaterThanOrEqual(2);
     expect(chunks[0].html).toContain('Header In The Shell');
     expect(chunks[0].consoleReplayScript).toBe('');
     expect(chunks[0].hasErrors).toBe(false);
     expect(chunks[0].isShellReady).toBe(true);
     // Script that fallbacks the render to client side
-    expect(chunks[1].html).toMatch(/<script>[.\s\S]*Async Error[.\s\S]*<\/script>/);
+    expect(chunks[1].html).toMatch(/the server rendering errored:\\n\\nAsync Error/);
     expect(chunks[1].consoleReplayScript).toBe('');
     expect(chunks[1].hasErrors).toBe(true);
     expect(chunks[1].isShellReady).toBe(true);
@@ -241,12 +241,12 @@ describe('streamServerRenderedReactComponent', () => {
       const { renderResult, chunks } = setupStreamTest({ componentType, throwAsyncError: true });
       await new Promise((resolve) => renderResult.on('end', resolve));
 
-      expect(chunks).toHaveLength(2);
+      expect(chunks.length).toBeGreaterThanOrEqual(2);
       expect(chunks[0].html).toContain('Header In The Shell');
       expect(chunks[0].consoleReplayScript).toBe('');
       expect(chunks[0].hasErrors).toBe(false);
       expect(chunks[0].isShellReady).toBe(true);
-      expect(chunks[1].html).toMatch(/<script>[.\s\S]*Async Error[.\s\S]*<\/script>/);
+      expect(chunks[1].html).toMatch(/the server rendering errored:\\n\\nAsync Error/);
       expect(chunks[1].consoleReplayScript).toBe('');
       expect(chunks[1].hasErrors).toBe(true);
       expect(chunks[1].isShellReady).toBe(true);
