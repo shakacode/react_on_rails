@@ -50,7 +50,7 @@ export default function RSCPayloadContainerWrapper({ RSCPayloadStream }: RSCPayl
   const [chunkPromises] = React.useState<Promise<StreamChunk>[]>(() => {
     const promises: Promise<StreamChunk>[] = [];
     let resolveCurrentPromise: (streamChunk: StreamChunk) => void = () => {};
-    let rejectCurrentPromise: (error: Error) => void = () => {};
+    let rejectCurrentPromise: (error: unknown) => void = () => {};
     const decoder = new TextDecoder();
 
     const createNewPromise = () => {
@@ -64,7 +64,7 @@ export default function RSCPayloadContainerWrapper({ RSCPayloadStream }: RSCPayl
 
     createNewPromise();
     RSCPayloadStream.on('data', (streamChunk) => {
-      resolveCurrentPromise({ chunk: decoder.decode(streamChunk), isLastChunk: false });
+      resolveCurrentPromise({ chunk: decoder.decode(streamChunk as Uint8Array), isLastChunk: false });
       createNewPromise();
     });
 

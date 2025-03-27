@@ -31,7 +31,7 @@ const registerServerComponent = (components: Record<string, ReactComponent>) => 
       railsContext?: RailsContext,
     ) => RSCServerRoot({ componentName, componentProps }, railsContext);
   }
-  return ReactOnRails.register(componentsWrappedInRSCServerRoot);
+  ReactOnRails.register(componentsWrappedInRSCServerRoot);
 };
 
 export default registerServerComponent;
