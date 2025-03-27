@@ -25,7 +25,7 @@ work if you return JSX. Update by wrapping the result JSX of ${name} in a fat ar
   }
 
   // If a component, then wrap in an element
-  const reactComponent = renderFunctionResult as ReactComponent;
+  const reactComponent = renderFunctionResult;
   return React.createElement(reactComponent, props);
 }
 
