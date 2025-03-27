@@ -3,12 +3,12 @@ import { ReactComponent, RenderFunction } from '../types';
 
 /**
  * Registers React Server Components (RSC) with React on Rails for the RSC bundle.
- * 
+ *
  * This function handles the registration of components in the RSC bundle context,
  * where components are registered directly into the ComponentRegistry without any
  * additional wrapping. This is different from the server bundle registration,
  * which wraps components with RSCServerRoot.
- * 
+ *
  * @param components - Object mapping component names to their implementations
  *
  * @example
@@ -19,8 +19,7 @@ import { ReactComponent, RenderFunction } from '../types';
  * });
  * ```
  */
-const registerServerComponent = (
-  components: { [id: string]: ReactComponent | RenderFunction },
-) => ReactOnRails.register(components);
+const registerServerComponent = (components: { [id: string]: ReactComponent | RenderFunction }) =>
+  ReactOnRails.register(components);
 
 export default registerServerComponent;

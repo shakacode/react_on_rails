@@ -96,7 +96,7 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
     }
     const consoleReplayJsonChunk = JSON.stringify(createResultObject('', consoleReplayScript, renderState));
     return consoleReplayJsonChunk;
-  }
+  };
 
   const transformStream = new PassThrough({
     transform(chunk, _, callback) {
