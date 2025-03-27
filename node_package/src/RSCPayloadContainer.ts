@@ -3,26 +3,25 @@ import * as React from 'react';
 type StreamChunk = {
   chunk: string;
   isLastChunk: boolean;
-}
+};
 
 type RSCPayloadContainerProps = {
   RSCPayloadStream: NodeJS.ReadableStream;
-}
+};
 
 type RSCPayloadContainerInnerProps = {
   chunkIndex: number;
   getChunkPromise: (chunkIndex: number) => Promise<StreamChunk>;
-}
+};
 
 function escapeScript(script: string) {
-  return script
-    .replace(/<!--/g, '<\\!--')
-    .replace(/<\/(script)/gi, '</\\$1');
+  return script.replace(/<!--/g, '<\\!--').replace(/<\/(script)/gi, '</\\$1');
 }
 
-const RSCPayloadContainer = (
-  { chunkIndex, getChunkPromise }: RSCPayloadContainerInnerProps,
-): React.ReactNode => {
+const RSCPayloadContainer = ({
+  chunkIndex,
+  getChunkPromise,
+}: RSCPayloadContainerInnerProps): React.ReactNode => {
   const chunkPromise = getChunkPromise(chunkIndex);
   const chunk = React.use(chunkPromise);
 
@@ -42,13 +41,10 @@ const RSCPayloadContainer = (
     React.createElement(
       React.Suspense,
       { fallback: null, key: `suspense-${chunkIndex}` },
-      React.createElement(
-        RSCPayloadContainer,
-        { chunkIndex: chunkIndex + 1, getChunkPromise },
-      ),
+      React.createElement(RSCPayloadContainer, { chunkIndex: chunkIndex + 1, getChunkPromise }),
     ),
   ]);
-}
+};
 
 export default function RSCPayloadContainerWrapper({ RSCPayloadStream }: RSCPayloadContainerProps) {
   const [chunkPromises] = React.useState<Promise<StreamChunk>[]>(() => {
@@ -84,13 +80,16 @@ export default function RSCPayloadContainerWrapper({ RSCPayloadStream }: RSCPayl
     return promises;
   });
 
-  const getChunkPromise = React.useCallback((chunkIndex: number) => {
-    if (chunkIndex > chunkPromises.length) {
-      throw new Error('React on Rails Error: RSC Chunk index out of bounds');
-    }
+  const getChunkPromise = React.useCallback(
+    (chunkIndex: number) => {
+      if (chunkIndex > chunkPromises.length) {
+        throw new Error('React on Rails Error: RSC Chunk index out of bounds');
+      }
 
-    return chunkPromises[chunkIndex];
-  }, [chunkPromises]);
+      return chunkPromises[chunkIndex];
+    },
+    [chunkPromises],
+  );
 
   return React.createElement(
     React.Suspense,
