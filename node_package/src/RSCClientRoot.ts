@@ -7,7 +7,7 @@ import * as ReactDOMClient from 'react-dom/client';
 import { createFromReadableStream } from 'react-on-rails-rsc/client';
 import { fetch } from './utils.ts';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
-import { RailsContext, RenderFunction } from './types/index.ts';
+import { RailsContext, RenderFunction, RenderResult } from './types/index.ts';
 
 const { use } = React;
 
@@ -44,14 +44,14 @@ const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath, componentProps }
 };
 
 const createRSCStreamFromPage = () => {
-  let streamController: ReadableStreamController<unknown> | undefined;
-  const stream = new ReadableStream({
+  let streamController: ReadableStreamController<RenderResult> | undefined;
+  const stream = new ReadableStream<RenderResult>({
     start(controller) {
       if (typeof window === 'undefined') {
         return;
       }
       const handleChunk = (chunk: unknown) => {
-        controller.enqueue(chunk);
+        controller.enqueue(chunk as RenderResult);
       };
       if (!window.__FLIGHT_DATA) {
         window.__FLIGHT_DATA = [];

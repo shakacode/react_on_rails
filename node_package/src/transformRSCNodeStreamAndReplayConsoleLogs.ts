@@ -7,7 +7,7 @@ export default function transformRSCStream(stream: NodeJS.ReadableStream): NodeJ
   const htmlExtractor = new Transform({
     transform(oneOrMoreChunks, _, callback) {
       try {
-        const decodedChunk = lastIncompleteChunk + decoder.decode(oneOrMoreChunks);
+        const decodedChunk = lastIncompleteChunk + decoder.decode(oneOrMoreChunks as Uint8Array);
         const separateChunks = decodedChunk.split('\n').filter((chunk) => chunk.trim() !== '');
 
         if (!decodedChunk.endsWith('\n')) {
@@ -27,11 +27,5 @@ export default function transformRSCStream(stream: NodeJS.ReadableStream): NodeJ
     },
   });
 
-  try {
-    return stream.pipe(htmlExtractor);
-  } catch (error) {
-    throw new Error(
-      `Error transforming RSC stream (${stream.constructor.name}), (stream: ${stream}), stringified stream: ${JSON.stringify(stream)}, error: ${error}`,
-    );
-  }
+  return stream.pipe(htmlExtractor);
 }
