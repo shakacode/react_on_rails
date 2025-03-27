@@ -138,10 +138,7 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   // Note: Readable.from can merge multiple chunks into a single chunk, so we need to ensure that we can separate them later
   const { stream: readableStream, emitError } = bufferStream(transformStream);
 
-  const writeChunk = (chunk: string) => {
-    debugger;
-    transformStream.write(chunk);
-  }
+  const writeChunk = (chunk: string) => transformStream.write(chunk);
   const endStream = () => {
     transformStream.end();
     pipedStream?.abort();
