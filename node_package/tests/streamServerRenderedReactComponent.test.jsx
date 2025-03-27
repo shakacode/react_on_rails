@@ -273,7 +273,7 @@ describe('streamServerRenderedReactComponent', () => {
     },
   );
 
-  it.only.each(['erroneousRenderFunction', 'erroneousAsyncRenderFunction'])(
+  it.each(['erroneousRenderFunction', 'erroneousAsyncRenderFunction'])(
     'emits an error if there is an error in the %s',
     async (componentType) => {
       const { renderResult, chunks } = setupStreamTest({ componentType, throwJsErrors: true });
