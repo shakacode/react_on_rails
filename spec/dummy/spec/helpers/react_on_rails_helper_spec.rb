@@ -50,8 +50,58 @@ describe ReactOnRailsHelper do
       allow(helper).to receive(:append_javascript_pack_tag)
       allow(helper).to receive(:append_stylesheet_pack_tag)
       expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
-      expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: false })
+
+      if ENV["CI_PACKER_VERSION"] == "oldest"
+        expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: false })
+      else
+        expect(helper).to have_received(:append_javascript_pack_tag)
+          .with("generated/component_name", { defer: false, async: true })
+      end
       expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
+    end
+
+    context "when async loading is enabled" do
+      before do
+        allow(ReactOnRails.configuration).to receive(:generated_component_packs_loading_strategy).and_return(:async)
+      end
+
+      it "appends the async attribute to the script tag" do
+        original_append_javascript_pack_tag = helper.method(:append_javascript_pack_tag)
+        begin
+          # Temporarily redefine append_javascript_pack_tag to handle the async keyword argument.
+          # This is needed because older versions of Shakapacker (which may be used during testing)
+          # don't support async loading, but we still want to test that the async option is passed
+          # correctly when enabled.
+          def helper.append_javascript_pack_tag(name, **options)
+            original_append_javascript_pack_tag.call(name, **options)
+          end
+
+          allow(helper).to receive(:append_javascript_pack_tag)
+          allow(helper).to receive(:append_stylesheet_pack_tag)
+          expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
+          expect(helper).to have_received(:append_javascript_pack_tag).with(
+            "generated/component_name",
+            { defer: false, async: true }
+          )
+          expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
+        ensure
+          helper.define_singleton_method(:append_javascript_pack_tag, original_append_javascript_pack_tag)
+        end
+      end
+    end
+
+    context "when defer loading is enabled" do
+      before do
+        allow(ReactOnRails.configuration).to receive(:generated_component_packs_loading_strategy).and_return(:defer)
+      end
+
+      it "appends the defer attribute to the script tag" do
+        allow(helper).to receive(:append_javascript_pack_tag)
+        allow(helper).to receive(:append_stylesheet_pack_tag)
+        expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
+        expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: true })
+        expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
+      end
     end
 
     it "throws an error in development if generated component isn't found" do
