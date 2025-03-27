@@ -20,7 +20,7 @@ export default {
       }
 
       const renderFunction = isRenderFunction(component);
-      const isRenderer = renderFunction && component .length === 3;
+      const isRenderer = renderFunction && component.length === 3;
 
       componentRegistry.set(name, {
         name,

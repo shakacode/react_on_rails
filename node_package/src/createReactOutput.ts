@@ -8,7 +8,7 @@ import type {
 } from './types/index';
 import { isServerRenderHash, isPromise } from './isServerRenderResult';
 
-export function createReactElementFromRenderFunction(
+function createReactElementFromRenderFunction(
   renderFunctionResult: ReactComponent,
   name: string,
   props: Record<string, unknown> | undefined,
