@@ -29,16 +29,18 @@ const config = tsEslint.config([
     'spec/dummy/client/app/packs/server-bundle.js',
     '**/*.res.js',
     '**/coverage',
-    '**/assets/webpack/**/*',
-    '**/public/webpack/**/*',
-    '**/generated/**/*',
+    '**/assets/webpack/',
+    '**/public/webpack/',
+    '**/generated/',
     '**/app/assets/javascripts/application.js',
     '**/cable.js',
-    '**/public/packs*/*',
+    '**/public/packs*/',
     '**/gen-examples/',
     '**/bundle/',
     // dependencies
-    '**/node_modules/**/*',
+    '**/node_modules/',
+    // fixtures
+    '**/fixtures/',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],
