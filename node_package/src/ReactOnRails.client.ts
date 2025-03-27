@@ -93,9 +93,7 @@ ctx.ReactOnRails = {
     }
 
     if (Object.keys(newOptions).length > 0) {
-      throw new Error(
-        `Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`,
-      );
+      throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`);
     }
   },
 
