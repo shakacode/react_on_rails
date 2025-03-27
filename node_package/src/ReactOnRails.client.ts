@@ -339,6 +339,8 @@ ctx.ReactOnRails = {
   resetOptions(): void {
     this.options = { ...DEFAULT_OPTIONS };
   },
+
+  isRSCBundle: false,
 };
 
 ctx.ReactOnRails.resetOptions();

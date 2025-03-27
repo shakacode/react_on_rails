@@ -60,7 +60,10 @@ Message: ${e.message}
 ${e.stack}`;
 
     const reactElement = React.createElement('pre', null, msg);
-    return ReactDOMServer.renderToString(reactElement);
+    if (typeof ReactDOMServer.renderToString === 'function') {
+      return ReactDOMServer.renderToString(reactElement);
+    }
+    return msg;
   }
 
   return 'undefined';

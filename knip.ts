@@ -9,6 +9,7 @@ const config: KnipConfig = {
         'node_package/src/ReactOnRailsRSC.ts!',
         'node_package/src/registerServerComponent/client.ts!',
         'node_package/src/registerServerComponent/server.ts!',
+        'node_package/src/registerServerComponent/server.rsc.ts!',
         'node_package/src/RSCClientRoot.ts!',
         'eslint.config.ts',
       ],
