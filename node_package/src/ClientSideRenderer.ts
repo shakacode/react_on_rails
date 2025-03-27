@@ -20,19 +20,19 @@ async function delegateToRenderer(
   railsContext: RailsContext,
   domNodeId: string,
   trace: boolean,
-): boolean {
+): Promise<boolean> {
   const { name, component, isRenderer } = componentObj;
 
   if (isRenderer) {
     if (trace) {
       console.log(
-        `DELEGATING TO RENDERER ${componentObj.name} for dom node with id: ${domNodeId} with props, railsContext:`,
+        `DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, railsContext:`,
         props,
         railsContext,
       );
     }
 
-    (component as RenderFunction)(props, railsContext, domNodeId);
+    await (component as RenderFunction)(props, railsContext, domNodeId);
     return true;
   }
 
