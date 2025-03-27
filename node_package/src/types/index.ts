@@ -32,20 +32,23 @@ export type RailsContext = {
   search: string | null;
   httpAcceptLanguage: string;
   rscPayloadGenerationUrl: string;
-} & ({
-  serverSide: false;
-} | {
-  serverSide: true;
-  // These parameters are passed from React on Rails Pro to the node renderer.
-  // They contain the necessary information to generate the RSC (React Server Components) payload.
-  // Typically, this includes the bundle hash of the RSC bundle.
-  // The react-on-rails package uses 'unknown' for these parameters to avoid direct dependency.
-  // This ensures that if the communication protocol between the node renderer and the Rails server changes,
-  // we don't need to update this type or introduce a breaking change.
-  serverSideRSCPayloadParameters: unknown;
-  reactClientManifestFileName?: string;
-  reactServerClientManifestFileName?: string;
-});
+} & (
+  | {
+      serverSide: false;
+    }
+  | {
+      serverSide: true;
+      // These parameters are passed from React on Rails Pro to the node renderer.
+      // They contain the necessary information to generate the RSC (React Server Components) payload.
+      // Typically, this includes the bundle hash of the RSC bundle.
+      // The react-on-rails package uses 'unknown' for these parameters to avoid direct dependency.
+      // This ensures that if the communication protocol between the node renderer and the Rails server changes,
+      // we don't need to update this type or introduce a breaking change.
+      serverSideRSCPayloadParameters: unknown;
+      reactClientManifestFileName?: string;
+      reactServerClientManifestFileName?: string;
+    }
+);
 
 // not strictly what we want, see https://github.com/microsoft/TypeScript/issues/17867#issuecomment-323164375
 type AuthenticityHeaders = Record<string, string> & {

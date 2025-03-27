@@ -118,7 +118,7 @@ ctx.ReactOnRails = {
    * `traceTurbolinks: true|false Gives you debugging messages on Turbolinks events
    * `turbo: true|false Turbo (the follower of Turbolinks) events will be registered, if set to true.
    */
-  setOptions(newOptions: {traceTurbolinks?: boolean, turbo?: boolean }): void {
+  setOptions(newOptions: { traceTurbolinks?: boolean; turbo?: boolean }): void {
     if (typeof newOptions.traceTurbolinks !== 'undefined') {
       this.options.traceTurbolinks = newOptions.traceTurbolinks;
 
@@ -134,9 +134,7 @@ ctx.ReactOnRails = {
     }
 
     if (Object.keys(newOptions).length > 0) {
-      throw new Error(
-        `Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`,
-      );
+      throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`);
     }
   },
 

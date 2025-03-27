@@ -21,7 +21,10 @@ const stringToStream = (str: string) => {
   return stream;
 };
 
-const streamRenderRSCComponent = (reactRenderingResult: ReactElement | Promise<ReactElement | string>, options: RSCRenderParams): Readable => {
+const streamRenderRSCComponent = (
+  reactRenderingResult: ReactElement | Promise<ReactElement | string>,
+  options: RSCRenderParams,
+): Readable => {
   const { throwJsErrors } = options;
   if (!options.railsContext?.serverSide || !options.railsContext.reactClientManifestFileName) {
     throw new Error('Rails context is not available');
@@ -34,7 +37,8 @@ const streamRenderRSCComponent = (reactRenderingResult: ReactElement | Promise<R
     isShellReady: true,
   };
 
-  const { pipeToTransform, readableStream, emitError } = transformRenderStreamChunksToResultObject(renderState);
+  const { pipeToTransform, readableStream, emitError } =
+    transformRenderStreamChunksToResultObject(renderState);
   Promise.all([loadJsonFile(reactClientManifestFileName), reactRenderingResult])
     .then(([reactClientManifest, reactElement]) => {
       const rscStream = renderToPipeableStream(reactElement, reactClientManifest, {

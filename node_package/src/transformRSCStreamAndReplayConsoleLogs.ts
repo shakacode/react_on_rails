@@ -1,6 +1,8 @@
 import { RenderResult } from './types';
 
-export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableStream<Uint8Array | RenderResult>) {
+export default function transformRSCStreamAndReplayConsoleLogs(
+  stream: ReadableStream<Uint8Array | RenderResult>,
+) {
   return new ReadableStream({
     async start(controller) {
       const reader = stream.getReader();
@@ -9,19 +11,22 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
 
       let lastIncompleteChunk = '';
       let { value, done } = await reader.read();
-      
+
       const handleJsonChunk = (chunk: RenderResult) => {
         const { html, consoleReplayScript = '' } = chunk;
         controller.enqueue(encoder.encode(html ?? ''));
 
-        const replayConsoleCode = consoleReplayScript.trim().replace(/^<script.*>/, '').replace(/<\/script>$/, '');
+        const replayConsoleCode = consoleReplayScript
+          .trim()
+          .replace(/^<script.*>/, '')
+          .replace(/<\/script>$/, '');
         if (replayConsoleCode?.trim() !== '') {
           const scriptElement = document.createElement('script');
           scriptElement.textContent = replayConsoleCode;
           document.body.appendChild(scriptElement);
         }
       };
-      
+
       while (!done) {
         if (ArrayBuffer.isView(value)) {
           const decodedValue = lastIncompleteChunk + decoder.decode(value);
@@ -29,7 +34,7 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
           lastIncompleteChunk = chunks.pop() ?? '';
 
           const jsonChunks = chunks
-            .filter(line => line.trim() !== '')
+            .filter((line) => line.trim() !== '')
             .map((line) => {
               try {
                 return JSON.parse(line) as RenderResult;

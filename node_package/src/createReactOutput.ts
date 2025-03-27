@@ -16,10 +16,11 @@ export function createReactElementFromRenderFunction(
   if (React.isValidElement(renderFunctionResult)) {
     // If already a ReactElement, then just return it.
     console.error(
-`Warning: ReactOnRails: Your registered render-function (ReactOnRails.register) for ${name}
+      `Warning: ReactOnRails: Your registered render-function (ReactOnRails.register) for ${name}
 incorrectly returned a React Element (JSX). Instead, return a React Function Component by
 wrapping your JSX in a function. ReactOnRails v13 will throw error on this, as React Hooks do not
-work if you return JSX. Update by wrapping the result JSX of ${name} in a fat arrow function.`);
+work if you return JSX. Update by wrapping the result JSX of ${name} in a fat arrow function.`,
+    );
     return renderFunctionResult;
   }
 
@@ -84,7 +85,7 @@ export default function createReactOutput({
       // we can't call React.createElement with this type of Object.
       return (renderFunctionResult as Promise<string | ReactComponent>).then((result) => {
         if (typeof result === 'string') return result;
-        return createReactElementFromRenderFunction(result, name, props)
+        return createReactElementFromRenderFunction(result, name, props);
       });
     }
 

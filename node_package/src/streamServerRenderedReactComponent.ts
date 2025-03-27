@@ -96,7 +96,7 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
     }
     const consoleReplayJsonChunk = JSON.stringify(createResultObject('', consoleReplayScript, renderState));
     return consoleReplayJsonChunk;
-  }
+  };
 
   const transformStream = new PassThrough({
     transform(chunk, _, callback) {
@@ -146,7 +146,10 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   return { readableStream, pipeToTransform, writeChunk, emitError, endStream };
 };
 
-const streamRenderReactComponent = (reactRenderingResult: ReactElement | Promise<ReactElement | string>, options: RenderParams) => {
+const streamRenderReactComponent = (
+  reactRenderingResult: ReactElement | Promise<ReactElement | string>,
+  options: RenderParams,
+) => {
   const { name: componentName, throwJsErrors, domNodeId } = options;
   const renderState: StreamRenderState = {
     result: null,
@@ -169,41 +172,43 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement | Promise
     const errorHtml = handleError({ e: error, name: componentName, serverSide: true });
     writeChunk(errorHtml);
     endStream();
-  }
+  };
 
-  Promise.resolve(reactRenderingResult).then(reactRenderedElement => {
-    if (typeof reactRenderedElement === 'string') {
-      console.error(
-        `Error: stream_react_component helper received a string instead of a React component for component "${componentName}".\n` +
-        'To benefit from React on Rails Pro streaming feature, your render function should return a React component.\n' + 
-        'Do not call ReactDOMServer.renderToString() inside the render function as this defeats the purpose of streaming.\n'
-      );
+  Promise.resolve(reactRenderingResult)
+    .then((reactRenderedElement) => {
+      if (typeof reactRenderedElement === 'string') {
+        console.error(
+          `Error: stream_react_component helper received a string instead of a React component for component "${componentName}".\n` +
+            'To benefit from React on Rails Pro streaming feature, your render function should return a React component.\n' +
+            'Do not call ReactDOMServer.renderToString() inside the render function as this defeats the purpose of streaming.\n',
+        );
 
-      writeChunk(reactRenderedElement);
-      endStream();
-      return;
-    }
+        writeChunk(reactRenderedElement);
+        endStream();
+        return;
+      }
 
-    const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderedElement, {
-      onShellError,
-      onShellReady() {
-        renderState.isShellReady = true;
-        pipeToTransform(renderingStream);
-      },
-      onError(e) {
-        if (!renderState.isShellReady) {
-          return;
-        }
-        const error = convertToError(e);
-        if (throwJsErrors) {
-          emitError(error);
-        }
-        renderState.hasErrors = true;
-        renderState.error = error;
-      },
-      identifierPrefix: domNodeId,
-    });
-  }).catch(onShellError);
+      const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderedElement, {
+        onShellError,
+        onShellReady() {
+          renderState.isShellReady = true;
+          pipeToTransform(renderingStream);
+        },
+        onError(e) {
+          if (!renderState.isShellReady) {
+            return;
+          }
+          const error = convertToError(e);
+          if (throwJsErrors) {
+            emitError(error);
+          }
+          renderState.hasErrors = true;
+          renderState.error = error;
+        },
+        identifierPrefix: domNodeId,
+      });
+    })
+    .catch(onShellError);
 
   return readableStream;
 };
@@ -237,12 +242,11 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
 
     return renderStrategy(reactRenderingResult, options);
   } catch (e) {
-    const {
-      readableStream,
-      writeChunk,
-      emitError,
-      endStream
-    } = transformRenderStreamChunksToResultObject({ hasErrors: true, isShellReady: false, result: null });
+    const { readableStream, writeChunk, emitError, endStream } = transformRenderStreamChunksToResultObject({
+      hasErrors: true,
+      isShellReady: false,
+      result: null,
+    });
     if (throwJsErrors) {
       emitError(e);
     }
