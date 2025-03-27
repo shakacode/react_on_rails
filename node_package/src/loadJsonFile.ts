@@ -15,7 +15,7 @@ export default async function loadJsonFile(fileName: string) {
   }
 
   try {
-    const file = JSON.parse(await fs.readFile(filePath, 'utf8'));
+    const file = JSON.parse(await fs.readFile(filePath, 'utf8')) as LoadedJsonFile;
     loadedJsonFiles.set(filePath, file);
     return file;
   } catch (error) {

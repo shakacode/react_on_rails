@@ -195,7 +195,7 @@ ctx.ReactOnRails = {
   },
 
   resetOptions(): void {
-    this.options = Object.assign({}, DEFAULT_OPTIONS);
+    this.options = { ...DEFAULT_OPTIONS };
   },
 
   isRSCBundle: false,
