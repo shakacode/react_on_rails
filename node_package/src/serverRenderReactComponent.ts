@@ -1,7 +1,7 @@
 import * as ReactDOMServer from 'react-dom/server';
 import type { ReactElement } from 'react';
 
-import ComponentRegistry from './ComponentRegistry';
+import * as ComponentRegistry from './ComponentRegistry';
 import createReactOutput from './createReactOutput';
 import { isPromise, isServerRenderHash } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
@@ -136,10 +136,7 @@ function serverRenderReactComponentInternal(options: RenderParams): null | strin
     throwJsErrors,
   } = options;
 
-  let renderState: RenderState = {
-    result: null,
-    hasErrors: false,
-  };
+  let renderState: RenderState;
 
   try {
     const componentObj = ComponentRegistry.get(componentName);
