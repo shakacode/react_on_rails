@@ -42,8 +42,13 @@ type AuthenticityHeaders = Record<string, string> & {
 
 type StoreGenerator = (props: Record<string, unknown>, railsContext: RailsContext) => Store;
 
+type ServerRenderHashRenderedHtml = {
+  componentHtml: string;
+  [key: string]: string;
+};
+
 interface ServerRenderResult {
-  renderedHtml?: string | { componentHtml: string; [key: string]: string };
+  renderedHtml?: string | ServerRenderHashRenderedHtml;
   redirectLocation?: { pathname: string; search: string };
   routeError?: Error;
   error?: Error;
@@ -51,7 +56,10 @@ interface ServerRenderResult {
 
 type CreateReactOutputResult = ServerRenderResult | ReactElement | Promise<string>;
 
-type RenderFunctionResult = ReactComponent | ServerRenderResult | Promise<string>;
+type RenderFunctionResult =
+  | ReactComponent
+  | ServerRenderResult
+  | Promise<string | ServerRenderHashRenderedHtml>;
 
 /**
  * Render functions are used to create dynamic React components or server-rendered HTML with side effects.

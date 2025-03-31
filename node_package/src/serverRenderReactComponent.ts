@@ -35,8 +35,10 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
     // For redirects on server rendering, we can't stop Rails from returning the same result.
     // Possibly, someday, we could have the Rails server redirect.
     htmlResult = '';
+  } else if (typeof result.renderedHtml === 'string') {
+    htmlResult = result.renderedHtml;
   } else {
-    htmlResult = result.renderedHtml as string;
+    htmlResult = JSON.stringify(result.renderedHtml);
   }
 
   return { result: htmlResult, hasErrors };
