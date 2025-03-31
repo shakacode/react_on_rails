@@ -142,15 +142,16 @@ const streamRenderReactComponent = (
   const { readableStream, pipeToTransform, writeChunk, emitError, endStream } =
     transformRenderStreamChunksToResultObject(renderState);
 
-  const onShellError = (e: unknown) => {
-    const error = convertToError(e);
+  const reportError = (error: Error) => {
     renderState.hasErrors = true;
     renderState.error = error;
 
     if (throwJsErrors) {
       emitError(error);
     }
+  };
 
+  const sendErrorHtml = (error: Error) => {
     const errorHtml = handleError({ e: error, name: componentName, serverSide: true });
     writeChunk(errorHtml);
     endStream();
@@ -171,26 +172,24 @@ const streamRenderReactComponent = (
       }
 
       const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderedElement, {
-        onShellError,
+        onShellError(e) {
+          sendErrorHtml(convertToError(e));
+        },
         onShellReady() {
           renderState.isShellReady = true;
           pipeToTransform(renderingStream);
         },
         onError(e) {
-          if (!renderState.isShellReady) {
-            return;
-          }
-          const error = convertToError(e);
-          if (throwJsErrors) {
-            emitError(error);
-          }
-          renderState.hasErrors = true;
-          renderState.error = error;
+          reportError(convertToError(e));
         },
         identifierPrefix: domNodeId,
       });
     })
-    .catch(onShellError);
+    .catch((e: unknown) => {
+      const error = convertToError(e);
+      reportError(error);
+      sendErrorHtml(error);
+    });
 
   return readableStream;
 };
