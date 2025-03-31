@@ -57,12 +57,12 @@ interface ServerRenderResult {
   error?: Error;
 }
 
-type CreateReactOutputResult = ServerRenderResult | ReactElement | Promise<string>;
+type CreateReactOutputResult = ServerRenderResult | ReactElement | Promise<string | ReactElement>;
 
 type RenderFunctionResult =
   | ReactComponent
   | ServerRenderResult
-  | Promise<string | ServerRenderHashRenderedHtml>;
+  | Promise<string | ServerRenderHashRenderedHtml | ReactComponent>;
 
 /**
  * Render functions are used to create dynamic React components or server-rendered HTML with side effects.
