@@ -10,13 +10,6 @@ import handleError from './handleError';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
 import type { RenderParams, StreamRenderState } from './types';
 
-const stringToStream = (str: string): Readable => {
-  const stream = new PassThrough();
-  stream.write(str);
-  stream.end();
-  return stream;
-};
-
 type BufferedEvent = {
   event: 'data' | 'error' | 'end';
   data: unknown;
@@ -223,16 +216,20 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
 
     return renderStrategy(reactRenderingResult, options);
   } catch (e) {
+    const { readableStream, writeChunk, emitError, endStream } = transformRenderStreamChunksToResultObject({
+      hasErrors: true,
+      isShellReady: false,
+      result: null,
+    });
     if (throwJsErrors) {
-      throw e;
+      emitError(e);
     }
 
     const error = convertToError(e);
     const htmlResult = handleError({ e: error, name: componentName, serverSide: true });
-    const jsonResult = JSON.stringify(
-      createResultObject(htmlResult, buildConsoleReplay(), { hasErrors: true, error, result: null }),
-    );
-    return stringToStream(jsonResult) as T;
+    writeChunk(htmlResult);
+    endStream();
+    return readableStream as T;
   }
 };
 

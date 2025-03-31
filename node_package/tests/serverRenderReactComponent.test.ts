@@ -216,7 +216,7 @@ describe('serverRenderReactComponent', () => {
     const reactComponentHashResult = { componentHtml: '<div>Hello</div>' };
     const X7 = (_props: unknown, _railsContext?: RailsContext) => Promise.resolve(reactComponentHashResult);
 
-    ComponentRegistry.register({ X7: X7 as unknown as RenderFunction });
+    ComponentRegistry.register({ X7 });
 
     const renderParams: RenderParams = {
       name: 'X7',
@@ -230,6 +230,23 @@ describe('serverRenderReactComponent', () => {
     assertIsPromise(renderResult);
     const result = await renderResult;
     expect(result.html).toEqual(JSON.stringify(reactComponentHashResult));
+  });
+
+  it('serverRenderReactComponent renders async render function that returns react component', async () => {
+    const X8 = (_props: unknown, _railsContext?: RailsContext) =>
+      Promise.resolve(() => React.createElement('div', null, 'Hello'));
+    ComponentRegistry.register({ X8 });
+
+    const renderResult = serverRenderReactComponent({
+      name: 'X8',
+      domNodeId: 'myDomId',
+      trace: false,
+      throwJsErrors: false,
+      renderingReturnsPromises: true,
+    });
+    assertIsPromise(renderResult);
+    const result = await renderResult;
+    expect(result.html).toEqual('<div>Hello</div>');
   });
 
   it('serverRenderReactComponent renders an error if attempting to render a renderer', () => {
