@@ -183,15 +183,15 @@ describe('serverRenderReactComponent', () => {
     await expect(renderResult.then((r) => r.hasErrors)).resolves.toBeFalsy();
   });
 
-  // When an async render function returns an object, serverRenderReactComponent will return the object as is.
-  // It does not validate properties like renderedHtml or hasErrors; it simply returns the object.
+  // When an async render function returns an object, serverRenderReactComponent will return the object as it after stringifying it.
+  // It does not validate properties like renderedHtml or hasErrors; it simply returns the stringified object.
   // This behavior can cause issues with the ruby_on_rails gem.
   // To avoid such issues, ensure that the returned object includes a `componentHtml` property and use the `react_component_hash` helper.
   // This is demonstrated in the "can render async render function used with react_component_hash helper" test.
   it('serverRenderReactComponent returns the object returned by the async render function', async () => {
-    const expectedHtml = '<div>Hello</div>';
+    const resultObject = { renderedHtml: '<div>Hello</div>' };
     const X6 = ((_props: unknown, _railsContext?: RailsContext): Promise<ServerRenderResult> =>
-      Promise.resolve({ renderedHtml: expectedHtml })) as RenderFunction;
+      Promise.resolve(resultObject)) as RenderFunction;
 
     ComponentRegistry.register({ X6 });
 
@@ -205,16 +205,16 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsPromise(renderResult);
-    const html = (await renderResult.then((r) => r.html)) as ServerRenderResult;
-    expectMatchObject(html, { renderedHtml: expectedHtml });
+    const html = await renderResult.then((r) => r.html);
+    expect(html).toEqual(JSON.stringify(resultObject));
   });
 
   // Because the object returned by the async render function is returned as it is,
   // we can make the async render function returns an object with `componentHtml` property.
   // This is useful when we want to render a component using the `react_component_hash` helper.
   it('can render async render function used with react_component_hash helper', async () => {
-    const X7 = (_props: unknown, _railsContext?: RailsContext) =>
-      Promise.resolve({ componentHtml: '<div>Hello</div>' });
+    const reactComponentHashResult = { componentHtml: '<div>Hello</div>' };
+    const X7 = (_props: unknown, _railsContext?: RailsContext) => Promise.resolve(reactComponentHashResult);
 
     ComponentRegistry.register({ X7: X7 as unknown as RenderFunction });
 
@@ -229,7 +229,7 @@ describe('serverRenderReactComponent', () => {
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsPromise(renderResult);
     const result = await renderResult;
-    expect(result.html).toMatchObject({ componentHtml: '<div>Hello</div>' });
+    expect(result.html).toEqual(JSON.stringify(reactComponentHashResult));
   });
 
   it('serverRenderReactComponent renders an error if attempting to render a renderer', () => {

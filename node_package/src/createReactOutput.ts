@@ -1,11 +1,5 @@
 import * as React from 'react';
-import type {
-  ServerRenderResult,
-  CreateParams,
-  ReactComponent,
-  RenderFunction,
-  CreateReactOutputResult,
-} from './types/index';
+import type { CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index';
 import { isServerRenderHash, isPromise } from './isServerRenderResult';
 
 /**
@@ -53,16 +47,21 @@ export default function createReactOutput({
       console.log(`${name} is a renderFunction`);
     }
     const renderFunctionResult = (component as RenderFunction)(props, railsContext);
-    if (isServerRenderHash(renderFunctionResult as CreateReactOutputResult)) {
+    if (isServerRenderHash(renderFunctionResult)) {
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
-      return renderFunctionResult as ServerRenderResult;
+      return renderFunctionResult;
     }
 
-    if (isPromise(renderFunctionResult as CreateReactOutputResult)) {
+    if (isPromise(renderFunctionResult)) {
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
-      return renderFunctionResult as Promise<string>;
+      return renderFunctionResult.then((result) => {
+        if (typeof result === 'string') {
+          return result;
+        }
+        return JSON.stringify(result);
+      });
     }
 
     if (React.isValidElement(renderFunctionResult)) {
@@ -77,7 +76,7 @@ work if you return JSX. Update by wrapping the result JSX of ${name} in a fat ar
     }
 
     // If a component, then wrap in an element
-    const reactComponent = renderFunctionResult as ReactComponent;
+    const reactComponent = renderFunctionResult;
     return React.createElement(reactComponent, props);
   }
   // else
