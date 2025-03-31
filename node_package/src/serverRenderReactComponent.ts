@@ -44,8 +44,19 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
   return { result: htmlResult, hasErrors };
 }
 
+function processReactElement(result: ReactElement): string {
+  try {
+    return ReactDOMServer.renderToString(result);
+  } catch (error) {
+    console.error(`Invalid call to renderToString. Possibly you have a renderFunction, a function that already
+calls renderToString, that takes one parameter. You need to add an extra unused parameter to identify this function
+as a renderFunction and not a simple React Function Component.`);
+    throw error;
+  }
+}
+
 function processPromise(
-  result: Promise<string>,
+  result: Promise<string | ReactElement>,
   renderingReturnsPromises: boolean,
 ): Promise<string> | string {
   if (!renderingReturnsPromises) {
@@ -56,18 +67,12 @@ function processPromise(
     // And when a promise is passed to JSON.stringify, it will be converted to '{}'.
     return '{}';
   }
-  return result;
-}
-
-function processReactElement(result: ReactElement): string {
-  try {
-    return ReactDOMServer.renderToString(result);
-  } catch (error) {
-    console.error(`Invalid call to renderToString. Possibly you have a renderFunction, a function that already
-calls renderToString, that takes one parameter. You need to add an extra unused parameter to identify this function
-as a renderFunction and not a simple React Function Component.`);
-    throw error;
-  }
+  return result.then((promiseResult) => {
+    if (typeof promiseResult === 'string') {
+      return promiseResult;
+    }
+    return processReactElement(promiseResult);
+  });
 }
 
 function processRenderingResult(result: CreateReactOutputResult, options: RenderOptions): RenderState {
