@@ -77,14 +77,11 @@ export default function createReactOutput({
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
       return renderFunctionResult.then((result) => {
-        if (typeof result === 'string') {
-          return result;
-        }
         // If the result is a function, then it returned a React Component (even class components are functions).
         if (typeof result === 'function') {
           return createReactElementFromRenderFunctionResult(result, name, props);
         }
-        return JSON.stringify(result);
+        return result;
       });
     }
 
