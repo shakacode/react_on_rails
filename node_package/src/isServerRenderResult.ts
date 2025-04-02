@@ -1,4 +1,9 @@
-import type { CreateReactOutputResult, ServerRenderResult, RenderFunctionResult } from './types/index';
+import type {
+  CreateReactOutputResult,
+  ServerRenderResult,
+  RenderFunctionResult,
+  RenderStateHtml,
+} from './types/index';
 
 export function isServerRenderHash(
   testValue: CreateReactOutputResult | RenderFunctionResult,
@@ -12,7 +17,7 @@ export function isServerRenderHash(
 }
 
 export function isPromise<T>(
-  testValue: CreateReactOutputResult | RenderFunctionResult | Promise<T> | string | null,
+  testValue: CreateReactOutputResult | RenderFunctionResult | Promise<T> | RenderStateHtml | string | null,
 ): testValue is Promise<T> {
   return !!(testValue as Promise<T> | null)?.then;
 }
