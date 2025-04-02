@@ -52,6 +52,7 @@ describe('serverRenderReactComponent', () => {
     assertIsString(renderResult);
     const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
 
+    assertIsString(html);
     const result = html && html.indexOf('>HELLO</div>') > 0;
     expect(result).toBeTruthy();
     expect(hasErrors).toBeFalsy();
@@ -76,6 +77,7 @@ describe('serverRenderReactComponent', () => {
     assertIsString(renderResult);
     const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
 
+    assertIsString(html);
     const result = html && html.indexOf('XYZ') > 0 && html.indexOf('Exception in rendering!') > 0;
     expect(result).toBeTruthy();
     expect(hasErrors).toBeTruthy();
@@ -183,8 +185,8 @@ describe('serverRenderReactComponent', () => {
     await expect(renderResult.then((r) => r.hasErrors)).resolves.toBeFalsy();
   });
 
-  // When an async render function returns an object, serverRenderReactComponent will return the object as it after stringifying it.
-  // It does not validate properties like renderedHtml or hasErrors; it simply returns the stringified object.
+  // When an async render function returns an object, serverRenderReactComponent will return the object as it is.
+  // It does not validate properties like renderedHtml or hasErrors; it simply returns the object.
   // This behavior can cause issues with the ruby_on_rails gem.
   // To avoid such issues, ensure that the returned object includes a `componentHtml` property and use the `react_component_hash` helper.
   // This is demonstrated in the "can render async render function used with react_component_hash helper" test.
@@ -206,7 +208,7 @@ describe('serverRenderReactComponent', () => {
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsPromise(renderResult);
     const html = await renderResult.then((r) => r.html);
-    expect(html).toEqual(JSON.stringify(resultObject));
+    expect(html).toMatchObject(resultObject);
   });
 
   // Because the object returned by the async render function is returned as it is,
@@ -229,7 +231,7 @@ describe('serverRenderReactComponent', () => {
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsPromise(renderResult);
     const result = await renderResult;
-    expect(result.html).toEqual(JSON.stringify(reactComponentHashResult));
+    expect(result.html).toMatchObject(reactComponentHashResult);
   });
 
   it('serverRenderReactComponent renders async render function that returns react component', async () => {
@@ -270,6 +272,7 @@ describe('serverRenderReactComponent', () => {
     assertIsString(renderResult);
     const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
 
+    assertIsString(html);
     const result = html && html.indexOf('renderer') > 0 && html.indexOf('Exception in rendering!') > 0;
     expect(result).toBeTruthy();
     expect(hasErrors).toBeTruthy();

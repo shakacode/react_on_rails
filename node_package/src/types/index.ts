@@ -57,12 +57,17 @@ interface ServerRenderResult {
   error?: Error;
 }
 
-type CreateReactOutputResult = ServerRenderResult | ReactElement | Promise<string | ReactElement>;
+type CreateReactOutputSyncResult = ServerRenderResult | ReactElement<unknown>;
 
-type RenderFunctionResult =
-  | ReactComponent
-  | ServerRenderResult
-  | Promise<string | ServerRenderHashRenderedHtml | ReactComponent>;
+type CreateReactOutputAsyncResult = Promise<string | ServerRenderHashRenderedHtml | ReactElement<unknown>>;
+
+type CreateReactOutputResult = CreateReactOutputSyncResult | CreateReactOutputAsyncResult;
+
+type RenderFunctionSyncResult = ReactComponent | ServerRenderResult;
+
+type RenderFunctionAsyncResult = Promise<string | ServerRenderHashRenderedHtml | ReactComponent>;
+
+type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult;
 
 /**
  * Render functions are used to create dynamic React components or server-rendered HTML with side effects.
@@ -107,6 +112,11 @@ export type {
   StoreGenerator,
   CreateReactOutputResult,
   ServerRenderResult,
+  ServerRenderHashRenderedHtml,
+  CreateReactOutputSyncResult,
+  CreateReactOutputAsyncResult,
+  RenderFunctionSyncResult,
+  RenderFunctionAsyncResult,
 };
 
 export interface RegisteredComponent {
@@ -163,12 +173,18 @@ export interface ErrorOptions {
 
 export type RenderingError = Pick<Error, 'message' | 'stack'>;
 
+export type FinalHtmlResult = string | ServerRenderHashRenderedHtml;
+
 export interface RenderResult {
-  html: string | null;
+  html: FinalHtmlResult | null;
   consoleReplayScript: string;
   hasErrors: boolean;
   renderingError?: RenderingError;
   isShellReady?: boolean;
+}
+
+export interface RSCPayloadChunk extends RenderResult {
+  html: string;
 }
 
 // from react-dom 18
@@ -359,8 +375,10 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   options: ReactOnRailsOptions;
 }
 
+export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult>;
+
 export type RenderState = {
-  result: null | string | Promise<string>;
+  result: null | RenderStateHtml;
   hasErrors: boolean;
   error?: RenderingError;
 };

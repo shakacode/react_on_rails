@@ -1,10 +1,11 @@
+import * as React from 'react';
 import * as ReactDOMServer from 'react-dom/server';
 import { PassThrough, Readable } from 'stream';
 import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
 import createReactOutput from './createReactOutput';
-import { isServerRenderHash } from './isServerRenderResult';
+import { isPromise, isServerRenderHash } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
@@ -211,7 +212,21 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
     });
 
     if (isServerRenderHash(reactRenderingResult)) {
-      throw new Error('Server rendering of streams is not supported for server render hashes or promises.');
+      throw new Error('Server rendering of streams is not supported for server render hashes.');
+    }
+
+    if (isPromise(reactRenderingResult)) {
+      const promiseAfterRejectingHash = reactRenderingResult.then((result) => {
+        if (!React.isValidElement(result)) {
+          throw new Error(
+            `Invalid React element detected while rendering ${componentName}. If you are trying to stream a component registered as a render function, ` +
+              `please ensure that the render function returns a valid React component, not a server render hash. ` +
+              `This error typically occurs when the render function does not return a React element or returns an incorrect type.`,
+          );
+        }
+        return result;
+      });
+      return renderStrategy(promiseAfterRejectingHash, options);
     }
 
     return renderStrategy(reactRenderingResult, options);

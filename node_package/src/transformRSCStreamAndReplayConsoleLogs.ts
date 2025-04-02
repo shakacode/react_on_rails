@@ -1,4 +1,4 @@
-import { RenderResult } from './types';
+import { RSCPayloadChunk } from './types';
 
 export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableStream<Uint8Array>) {
   return new ReadableStream({
@@ -18,7 +18,7 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
           .filter((line) => line.trim() !== '')
           .map((line) => {
             try {
-              return JSON.parse(line) as RenderResult;
+              return JSON.parse(line) as RSCPayloadChunk;
             } catch (error) {
               console.error('Error parsing JSON:', line, error);
               throw error;

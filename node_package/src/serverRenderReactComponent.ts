@@ -1,3 +1,4 @@
+import * as React from 'react';
 import * as ReactDOMServer from 'react-dom/server';
 import type { ReactElement } from 'react';
 
@@ -14,6 +15,8 @@ import type {
   RenderState,
   RenderOptions,
   ServerRenderResult,
+  CreateReactOutputAsyncResult,
+  RenderStateHtml,
 } from './types';
 
 function processServerRenderHash(result: ServerRenderResult, options: RenderOptions): RenderState {
@@ -24,7 +27,7 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
     console.error(`React Router ERROR: ${JSON.stringify(routeError)}`);
   }
 
-  let htmlResult: string;
+  let htmlResult;
   if (redirectLocation) {
     if (options.trace) {
       const redirectPath = redirectLocation.pathname + redirectLocation.search;
@@ -35,13 +38,11 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
     // For redirects on server rendering, we can't stop Rails from returning the same result.
     // Possibly, someday, we could have the Rails server redirect.
     htmlResult = '';
-  } else if (typeof result.renderedHtml === 'string') {
-    htmlResult = result.renderedHtml;
   } else {
-    htmlResult = JSON.stringify(result.renderedHtml);
+    htmlResult = result.renderedHtml;
   }
 
-  return { result: htmlResult, hasErrors };
+  return { result: htmlResult ?? null, hasErrors };
 }
 
 function processReactElement(result: ReactElement): string {
@@ -56,9 +57,9 @@ as a renderFunction and not a simple React Function Component.`);
 }
 
 function processPromise(
-  result: Promise<string | ReactElement>,
+  result: CreateReactOutputAsyncResult,
   renderingReturnsPromises: boolean,
-): Promise<string> | string {
+): RenderStateHtml {
   if (!renderingReturnsPromises) {
     console.error(
       'Your render function returned a Promise, which is only supported by a node renderer, not ExecJS.',
@@ -68,10 +69,10 @@ function processPromise(
     return '{}';
   }
   return result.then((promiseResult) => {
-    if (typeof promiseResult === 'string') {
-      return promiseResult;
+    if (React.isValidElement(promiseResult)) {
+      return processReactElement(promiseResult);
     }
-    return processReactElement(promiseResult);
+    return promiseResult;
   });
 }
 
@@ -98,7 +99,7 @@ function handleRenderingError(e: unknown, options: { componentName: string; thro
 }
 
 async function createPromiseResult(
-  renderState: RenderState & { result: Promise<string> },
+  renderState: RenderState,
   componentName: string,
   throwJsErrors: boolean,
 ): Promise<RenderResult> {
