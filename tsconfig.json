@@ -6,12 +6,13 @@
     // needed for Jest tests even though we don't use .tsx
     "jsx": "react-jsx",
     "lib": ["dom", "es2020"],
-    "module": "node16",
+    "module": "es2020",
+    "moduleResolution": "bundler",
     "noImplicitAny": true,
-    "outDir": "node_package/lib",
+    "outDir": "node_package/lib/esm",
     "strict": true,
     "incremental": true,
-    "target": "es5",
+    "target": "es2020",
     "typeRoots": ["./node_modules/@types", "./node_package/types"]
   },
   "include": ["node_package/src/**/*", "node_package/types/**/*"]
