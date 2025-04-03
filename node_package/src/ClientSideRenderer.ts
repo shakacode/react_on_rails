@@ -3,7 +3,7 @@
 
 import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
-import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './types/index.ts';
+import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './_types.ts';
 
 import { getContextAndRailsContext, resetContextAndRailsContext, type Context } from './context.ts';
 import createReactOutput from './createReactOutput.ts';

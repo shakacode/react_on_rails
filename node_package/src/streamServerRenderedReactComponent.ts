@@ -8,7 +8,7 @@ import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
-import type { RenderParams, StreamRenderState } from './types/index.ts';
+import type { RenderParams, StreamRenderState } from './_types.ts';
 
 const stringToStream = (str: string): Readable => {
   const stream = new PassThrough();

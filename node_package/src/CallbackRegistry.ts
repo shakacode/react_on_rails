@@ -1,4 +1,4 @@
-import { ItemRegistrationCallback } from './types/index.ts';
+import { ItemRegistrationCallback } from './_types.ts';
 import { onPageLoaded, onPageUnloaded } from './pageLifecycle.ts';
 import { getContextAndRailsContext } from './context.ts';
 

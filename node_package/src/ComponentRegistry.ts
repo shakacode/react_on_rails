@@ -1,4 +1,4 @@
-import { type RegisteredComponent, type ReactComponentOrRenderFunction } from './types/index.ts';
+import { type RegisteredComponent, type ReactComponentOrRenderFunction } from './_types.ts';
 import isRenderFunction from './isRenderFunction.ts';
 import CallbackRegistry from './CallbackRegistry.ts';
 

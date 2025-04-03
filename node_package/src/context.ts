@@ -1,4 +1,4 @@
-import type { ReactOnRailsInternal as ReactOnRailsType, RailsContext } from './types/index.ts';
+import type { ReactOnRailsInternal as ReactOnRailsType, RailsContext } from './_types.ts';
 
 declare global {
   interface Window {

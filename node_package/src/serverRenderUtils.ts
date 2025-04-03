@@ -1,4 +1,4 @@
-import type { RegisteredComponent, RenderResult, RenderState, StreamRenderState } from './types/index.ts';
+import type { RegisteredComponent, RenderResult, RenderState, StreamRenderState } from './_types.ts';
 
 export function createResultObject(
   html: string | null,

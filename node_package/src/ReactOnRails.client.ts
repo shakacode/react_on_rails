@@ -16,7 +16,7 @@ import type {
   Store,
   StoreGenerator,
   ReactOnRailsOptions,
-} from './types/index.ts';
+} from './_types.ts';
 import reactHydrateOrRender from './reactHydrateOrRender.ts';
 
 const ctx = context();
@@ -203,5 +203,5 @@ ctx.ReactOnRails.resetOptions();
 
 ClientStartup.clientStartup(ctx);
 
-export * from './types/index.ts';
+export * from './_types.ts';
 export default ctx.ReactOnRails;

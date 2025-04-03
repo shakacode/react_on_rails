@@ -5,7 +5,7 @@ import * as ReactDOMClient from 'react-dom/client';
 import { createFromReadableStream } from 'react-on-rails-rsc/client';
 import { fetch } from './utils.ts';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
-import { RailsContext, RenderFunction } from './types/index.ts';
+import { RailsContext, RenderFunction } from './_types.ts';
 
 const { use } = React;
 

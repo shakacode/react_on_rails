@@ -5,7 +5,7 @@ import type {
   ReactComponent,
   RenderFunction,
   CreateReactOutputResult,
-} from './types/index.ts';
+} from './_types.ts';
 import { isServerRenderHash, isPromise } from './isServerRenderResult.ts';
 
 /**

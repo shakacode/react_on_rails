@@ -14,7 +14,7 @@ import type {
   RenderState,
   RenderOptions,
   ServerRenderResult,
-} from './types/index.ts';
+} from './_types.ts';
 
 function processServerRenderHash(result: ServerRenderResult, options: RenderOptions): RenderState {
   const { redirectLocation, routeError } = result;

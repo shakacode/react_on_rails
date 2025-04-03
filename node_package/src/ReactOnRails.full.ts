@@ -1,6 +1,6 @@
 import handleError from './handleError.ts';
 import serverRenderReactComponent from './serverRenderReactComponent.ts';
-import type { RenderParams, RenderResult, ErrorOptions } from './types/index.ts';
+import type { RenderParams, RenderResult, ErrorOptions } from './_types.ts';
 
 import Client from './ReactOnRails.client.ts';
 
@@ -15,5 +15,5 @@ Client.handleError = (options: ErrorOptions): string | undefined => handleError(
 Client.serverRenderReactComponent = (options: RenderParams): null | string | Promise<RenderResult> =>
   serverRenderReactComponent(options);
 
-export * from './types/index.ts';
+export * from './_types.ts';
 export default Client;

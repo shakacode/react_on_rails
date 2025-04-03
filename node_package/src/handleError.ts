@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDOMServer from 'react-dom/server';
-import type { ErrorOptions } from './types/index.ts';
+import type { ErrorOptions } from './_types.ts';
 
 function handleRenderFunctionIssue(options: ErrorOptions): string {
   const { e, name } = options;
