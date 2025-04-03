@@ -7,7 +7,6 @@ import type {
   RailsContext,
   RenderFunction,
   RenderFunctionResult,
-  ServerRenderResult,
 } from '../src/types';
 
 const assertIsString: (value: unknown) => asserts value is string = (value: unknown) => {
@@ -22,11 +21,6 @@ const assertIsPromise: <T>(value: null | string | Promise<T>) => asserts value i
   if (!value || typeof (value as Promise<T>).then !== 'function') {
     throw new Error(`Expected value to be of type 'Promise', but received type '${typeof value}'`);
   }
-};
-
-// This function is used to ensure type safety when matching objects in TypeScript tests
-const expectMatchObject = <T extends object>(actual: T, expected: T) => {
-  expect(actual).toMatchObject(expected);
 };
 
 describe('serverRenderReactComponent', () => {
@@ -83,9 +77,10 @@ describe('serverRenderReactComponent', () => {
 
   it('serverRenderReactComponent renders html renderedHtml property', () => {
     const expectedHtml = '<div>Hello</div>';
-    const X3: RenderFunction = (_: unknown, __?: RailsContext): { renderedHtml: string } => ({
+    const X3: RenderFunction = (): { renderedHtml: string } => ({
       renderedHtml: expectedHtml,
     });
+    X3.renderFunction = true;
 
     ComponentRegistry.register({ X3 });
 
@@ -106,9 +101,10 @@ describe('serverRenderReactComponent', () => {
   });
 
   it("doesn't render object without renderedHtml property", () => {
-    const X4 = (_props: unknown, _railsContext?: RailsContext): { foo: string } => ({
+    const X4 = (): { foo: string } => ({
       foo: 'bar',
     });
+    X4.renderFunction = true;
 
     ComponentRegistry.register({ X4: X4 as unknown as RenderFunction });
     const renderResult = serverRenderReactComponent({
@@ -137,7 +133,8 @@ describe('serverRenderReactComponent', () => {
   // "Error: Invalid tag name <div>Hello</div>"
   it("doesn't render html string returned directly from render function", () => {
     const expectedHtml = '<div>Hello</div>';
-    const X4: RenderFunction = (_props: unknown, _railsContext?: RailsContext): string => expectedHtml;
+    const X4: RenderFunction = (): string => expectedHtml;
+    X4.renderFunction = true;
 
     ComponentRegistry.register({ X4 });
 
@@ -162,8 +159,8 @@ describe('serverRenderReactComponent', () => {
 
   it('serverRenderReactComponent renders promise of string html', async () => {
     const expectedHtml = '<div>Hello</div>';
-    const X5: RenderFunction = (_props: unknown, _railsContext?: RailsContext): Promise<string> =>
-      Promise.resolve(expectedHtml);
+    const X5: RenderFunction = (): Promise<string> => Promise.resolve(expectedHtml);
+    X5.renderFunction = true;
 
     ComponentRegistry.register({ X5 });
 
@@ -190,8 +187,8 @@ describe('serverRenderReactComponent', () => {
   // This is demonstrated in the "can render async render function used with react_component_hash helper" test.
   it('serverRenderReactComponent returns the object returned by the async render function', async () => {
     const resultObject = { renderedHtml: '<div>Hello</div>' };
-    const X6 = ((_props: unknown, _railsContext?: RailsContext): Promise<ServerRenderResult> =>
-      Promise.resolve(resultObject)) as RenderFunction;
+    const X6 = (() => Promise.resolve(resultObject)) as RenderFunction;
+    X6.renderFunction = true;
 
     ComponentRegistry.register({ X6 });
 
@@ -214,7 +211,8 @@ describe('serverRenderReactComponent', () => {
   // This is useful when we want to render a component using the `react_component_hash` helper.
   it('can render async render function used with react_component_hash helper', async () => {
     const reactComponentHashResult = { componentHtml: '<div>Hello</div>' };
-    const X7 = (_props: unknown, _railsContext?: RailsContext) => Promise.resolve(reactComponentHashResult);
+    const X7: RenderFunction = () => Promise.resolve(reactComponentHashResult);
+    X7.renderFunction = true;
 
     ComponentRegistry.register({ X7 });
 
@@ -233,8 +231,9 @@ describe('serverRenderReactComponent', () => {
   });
 
   it('serverRenderReactComponent renders async render function that returns react component', async () => {
-    const X8 = (_props: unknown, _railsContext?: RailsContext) =>
-      Promise.resolve(() => React.createElement('div', null, 'Hello'));
+    const X8: RenderFunction = () => Promise.resolve(() => React.createElement('div', null, 'Hello'));
+    X8.renderFunction = true;
+
     ComponentRegistry.register({ X8 });
 
     const renderResult = serverRenderReactComponent({
@@ -251,8 +250,11 @@ describe('serverRenderReactComponent', () => {
 
   it('serverRenderReactComponent renders an error if attempting to render a renderer', () => {
     const X4: RenderFunction = (
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _props: unknown,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _railsContext?: RailsContext,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _domNodeId?: string,
     ): RenderFunctionResult => ({ renderedHtml: '' });
 
