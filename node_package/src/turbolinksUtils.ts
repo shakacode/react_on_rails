@@ -1,4 +1,4 @@
-import { reactOnRailsContext } from './context';
+import { reactOnRailsContext } from './context.ts';
 
 declare global {
   namespace Turbolinks {

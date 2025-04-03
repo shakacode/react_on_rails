@@ -1,6 +1,6 @@
-import ReactOnRails from '../ReactOnRails.client';
-import RSCClientRoot from '../RSCClientRoot';
-import { RegisterServerComponentOptions, RailsContext, ReactComponentOrRenderFunction } from '../types';
+import ReactOnRails from '../ReactOnRails.client.ts';
+import RSCClientRoot from '../RSCClientRoot.ts';
+import { RegisterServerComponentOptions, RailsContext, ReactComponentOrRenderFunction } from '../_types.ts';
 
 /**
  * Registers React Server Components (RSC) with React on Rails.

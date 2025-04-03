@@ -8,6 +8,7 @@ export default async function loadReactClientManifest(reactClientManifestFileNam
   // React client manifest is uploaded to node renderer as an asset.
   // Renderer copies assets to the same place as the server-bundle.js and rsc-bundle.js.
   // Thus, the __dirname of this code is where we can find the manifest file.
+  // And we need to be .cts to use __dirname
   const manifestPath = path.resolve(__dirname, reactClientManifestFileName);
   const loadedReactClientManifest = loadedReactClientManifests.get(manifestPath);
   if (loadedReactClientManifest) {

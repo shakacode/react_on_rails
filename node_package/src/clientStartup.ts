@@ -1,13 +1,13 @@
-import { type Context, isWindow } from './context';
+import { type Context, isWindow } from './context.ts';
 import {
   renderOrHydrateForceLoadedComponents,
   renderOrHydrateAllComponents,
   hydrateForceLoadedStores,
   hydrateAllStores,
   unmountAll,
-} from './ClientSideRenderer';
-import { onPageLoaded, onPageUnloaded } from './pageLifecycle';
-import { debugTurbolinks } from './turbolinksUtils';
+} from './ClientSideRenderer.ts';
+import { onPageLoaded, onPageUnloaded } from './pageLifecycle.ts';
+import { debugTurbolinks } from './turbolinksUtils.ts';
 
 export async function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded');

@@ -1,6 +1,6 @@
-import { ItemRegistrationCallback } from './types';
-import { onPageLoaded, onPageUnloaded } from './pageLifecycle';
-import { getContextAndRailsContext } from './context';
+import { ItemRegistrationCallback } from './_types.ts';
+import { onPageLoaded, onPageUnloaded } from './pageLifecycle.ts';
+import { getContextAndRailsContext } from './context.ts';
 
 /**
  * Represents information about a registered item including its value,

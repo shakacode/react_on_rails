@@ -26,6 +26,7 @@ Changes since the last non-beta release.
 #### Added
 
 - Configuration option `generated_component_packs_loading_strategy` to control how generated component packs are loaded. It supports `sync`, `async`, and `defer` strategies. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- The package now includes both ESM and CJS versions. [PR 1722](https://github.com/shakacode/react_on_rails/pull/1722) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
 ### Removed (Breaking Changes)
 

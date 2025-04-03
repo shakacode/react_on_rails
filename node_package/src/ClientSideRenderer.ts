@@ -1,16 +1,15 @@
 /* eslint-disable max-classes-per-file */
-/* eslint-disable react/no-deprecated,@typescript-eslint/no-deprecated -- while we need to support React 16 */
+/* eslint-disable @typescript-eslint/no-deprecated -- while we need to support React 16 */
 
-import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
-import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './types';
+import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './_types.ts';
 
-import { getContextAndRailsContext, resetContextAndRailsContext, type Context } from './context';
-import createReactOutput from './createReactOutput';
-import { isServerRenderHash } from './isServerRenderResult';
-import reactHydrateOrRender from './reactHydrateOrRender';
-import { supportsRootApi } from './reactApis';
-import { debugTurbolinks } from './turbolinksUtils';
+import { getContextAndRailsContext, resetContextAndRailsContext, type Context } from './context.ts';
+import createReactOutput from './createReactOutput.ts';
+import { isServerRenderHash } from './isServerRenderResult.ts';
+import reactHydrateOrRender from './reactHydrateOrRender.cts';
+import { canHydrate, unmountComponentAtNode, supportsRootApi } from './reactApis.cts';
+import { debugTurbolinks } from './turbolinksUtils.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
@@ -101,8 +100,7 @@ class ComponentRenderer {
         }
 
         // Hydrate if available and was server rendered
-        // @ts-expect-error potentially present if React 18 or greater
-        const shouldHydrate = !!(ReactDOM.hydrate || ReactDOM.hydrateRoot) && !!domNode.innerHTML;
+        const shouldHydrate = canHydrate && !!domNode.innerHTML;
 
         const reactElementOrRouterResult = createReactOutput({
           componentObj,
@@ -154,7 +152,7 @@ You should return a React.Component always for the client side entry point.`);
       }
 
       try {
-        ReactDOM.unmountComponentAtNode(domNode);
+        unmountComponentAtNode(domNode);
       } catch (e: unknown) {
         const error = e instanceof Error ? e : new Error('Unknown error');
         console.info(
