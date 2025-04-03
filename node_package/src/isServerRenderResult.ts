@@ -1,4 +1,4 @@
-import type { CreateReactOutputResult, ServerRenderResult } from './types/index';
+import type { CreateReactOutputResult, ServerRenderResult } from './types/index.ts';
 
 export function isServerRenderHash(testValue: CreateReactOutputResult): testValue is ServerRenderResult {
   return !!(

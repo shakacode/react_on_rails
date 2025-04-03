@@ -5,8 +5,8 @@ import type {
   ReactComponent,
   RenderFunction,
   CreateReactOutputResult,
-} from './types/index';
-import { isServerRenderHash, isPromise } from './isServerRenderResult';
+} from './types/index.ts';
+import { isServerRenderHash, isPromise } from './isServerRenderResult.ts';
 
 /**
  * Logic to either call the renderFunction or call React.createElement to get the

@@ -91,9 +91,9 @@ const config = tsEslint.config([
         'error',
         'ignorePackages',
         {
-          js: 'never',
-          jsx: 'never',
-          ts: 'never',
+          js: 'ignorePackages',
+          jsx: 'ignorePackages',
+          ts: 'ignorePackages',
         },
       ],
 
