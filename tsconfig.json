@@ -12,6 +12,8 @@
     "outDir": "node_package/lib/esm",
     "strict": true,
     "incremental": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "target": "es2020",
     "typeRoots": ["./node_modules/@types", "./node_package/types"]
   },

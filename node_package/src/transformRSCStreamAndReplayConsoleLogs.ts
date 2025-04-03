@@ -1,4 +1,4 @@
-import { RenderResult } from './types';
+import { RenderResult } from './types/index.ts';
 
 export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableStream<Uint8Array>) {
   return new ReadableStream({

@@ -76,7 +76,7 @@
     "react-on-rails-rsc": "19.0.0",
     "redux": "^4.2.1",
     "ts-jest": "^29.2.5",
-    "typescript": "^5.6.2"
+    "typescript": "^5.8.2"
   },
   "peerDependencies": {
     "react": ">= 16",

@@ -1,8 +1,8 @@
-import handleError from './handleError';
-import serverRenderReactComponent from './serverRenderReactComponent';
-import type { RenderParams, RenderResult, ErrorOptions } from './types';
+import handleError from './handleError.ts';
+import serverRenderReactComponent from './serverRenderReactComponent.ts';
+import type { RenderParams, RenderResult, ErrorOptions } from './types/index.ts';
 
-import Client from './ReactOnRails.client';
+import Client from './ReactOnRails.client.ts';
 
 if (typeof window !== 'undefined') {
   console.log(
@@ -15,5 +15,5 @@ Client.handleError = (options: ErrorOptions): string | undefined => handleError(
 Client.serverRenderReactComponent = (options: RenderParams): null | string | Promise<RenderResult> =>
   serverRenderReactComponent(options);
 
-export * from './types';
+export * from './types/index.ts';
 export default Client;

@@ -2,13 +2,13 @@ import * as ReactDOMServer from 'react-dom/server';
 import { PassThrough, Readable } from 'stream';
 import type { ReactElement } from 'react';
 
-import ComponentRegistry from './ComponentRegistry';
-import createReactOutput from './createReactOutput';
-import { isPromise, isServerRenderHash } from './isServerRenderResult';
-import buildConsoleReplay from './buildConsoleReplay';
-import handleError from './handleError';
-import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
-import type { RenderParams, StreamRenderState } from './types';
+import ComponentRegistry from './ComponentRegistry.ts';
+import createReactOutput from './createReactOutput.ts';
+import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
+import buildConsoleReplay from './buildConsoleReplay.ts';
+import handleError from './handleError.ts';
+import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
+import type { RenderParams, StreamRenderState } from './types/index.ts';
 
 const stringToStream = (str: string): Readable => {
   const stream = new PassThrough();

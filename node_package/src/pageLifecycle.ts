@@ -4,7 +4,7 @@ import {
   turbolinksSupported,
   turboInstalled,
   turbolinksVersion5,
-} from './turbolinksUtils';
+} from './turbolinksUtils.ts';
 
 type PageLifecycleCallback = () => void | Promise<void>;
 type PageState = 'load' | 'unload' | 'initial';

@@ -2,17 +2,17 @@ import { renderToPipeableStream } from 'react-on-rails-rsc/server.node';
 import { PassThrough, Readable } from 'stream';
 import type { ReactElement } from 'react';
 
-import { RSCRenderParams, StreamRenderState } from './types';
-import ReactOnRails from './ReactOnRails.full';
-import buildConsoleReplay from './buildConsoleReplay';
-import handleError from './handleError';
-import { convertToError, createResultObject } from './serverRenderUtils';
+import { RSCRenderParams, StreamRenderState } from './types/index.ts';
+import ReactOnRails from './ReactOnRails.full.ts';
+import buildConsoleReplay from './buildConsoleReplay.ts';
+import handleError from './handleError.ts';
+import { convertToError, createResultObject } from './serverRenderUtils.ts';
 
 import {
   streamServerRenderedComponent,
   transformRenderStreamChunksToResultObject,
-} from './streamServerRenderedReactComponent';
-import loadReactClientManifest from './loadReactClientManifest';
+} from './streamServerRenderedReactComponent.ts';
+import loadReactClientManifest from './loadReactClientManifest.ts';
 
 const stringToStream = (str: string) => {
   const stream = new PassThrough();
@@ -65,5 +65,5 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
   }
 };
 
-export * from './types';
+export * from './types/index.ts';
 export default ReactOnRails;
