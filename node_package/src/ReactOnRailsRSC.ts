@@ -12,7 +12,7 @@ import {
   streamServerRenderedComponent,
   transformRenderStreamChunksToResultObject,
 } from './streamServerRenderedReactComponent.ts';
-import loadReactClientManifest from './loadReactClientManifest.ts';
+import loadReactClientManifest from './loadReactClientManifest.cts';
 
 const stringToStream = (str: string) => {
   const stream = new PassThrough();
