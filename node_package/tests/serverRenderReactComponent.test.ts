@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 import * as React from 'react';
 import serverRenderReactComponent from '../src/serverRenderReactComponent';
 import ComponentRegistry from '../src/ComponentRegistry';
