@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -e
+
+yarn run clean
+yarn run tsc --declaration
+echo '{ "type": "module" }' > node_package/lib/esm/package.json
+yarn run tsc -p tsconfig.cjs.json --declaration
+echo '{ "type": "commonjs" }' > node_package/lib/cjs/package.json

@@ -2,17 +2,35 @@
   "name": "react-on-rails",
   "version": "15.0.0-alpha.2",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
-  "main": "node_package/lib/ReactOnRails.full.js",
+  "main": "node_package/lib/esm/ReactOnRails.full.js",
   "type": "commonjs",
   "exports": {
     ".": {
-      "react-server": "./node_package/lib/ReactOnRailsRSC.js",
-      "node": "./node_package/lib/ReactOnRails.node.js",
-      "default": "./node_package/lib/ReactOnRails.full.js"
+      "react-server": {
+        "import": "./node_package/lib/esm/ReactOnRailsRSC.js",
+        "require": "./node_package/lib/cjs/ReactOnRailsRSC.js"
+      },
+      "node": {
+        "import": "./node_package/lib/esm/ReactOnRails.node.js",
+        "require": "./node_package/lib/cjs/ReactOnRails.node.js"
+      },
+      "default": {
+        "import": "./node_package/lib/esm/ReactOnRails.full.js",
+        "require": "./node_package/lib/cjs/ReactOnRails.full.js"
+      }
     },
-    "./client": "./node_package/lib/ReactOnRails.client.js",
-    "./registerServerComponent/client": "./node_package/lib/registerServerComponent/client.js",
-    "./registerServerComponent/server": "./node_package/lib/registerServerComponent/server.js"
+    "./client": {
+      "import": "./node_package/lib/esm/ReactOnRails.client.js",
+      "require": "./node_package/lib/cjs/ReactOnRails.client.js"
+    },
+    "./registerServerComponent/client": {
+      "import": "./node_package/lib/esm/registerServerComponent/client.js",
+      "require": "./node_package/lib/cjs/registerServerComponent/client.js"
+    },
+    "./registerServerComponent/server": {
+      "import": "./node_package/lib/esm/registerServerComponent/server.js",
+      "require": "./node_package/lib/cjs/registerServerComponent/server.js"
+    }
   },
   "directories": {
     "doc": "docs"
@@ -75,8 +93,8 @@
     "prepack": "nps build.prepack",
     "prepare": "nps build.prepack",
     "prepublishOnly": "yarn run build",
-    "build": "yarn run clean && yarn run tsc --declaration",
-    "build-watch": "yarn run clean && yarn run tsc --watch",
+    "build": "node_package/scripts/build",
+    "build-watch": "yarn run clean && yarn run tsc --watch --no-declaration",
     "lint": "nps eslint",
     "check": "yarn run lint && yarn run test && yarn run type-check",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",
