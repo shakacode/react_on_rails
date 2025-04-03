@@ -2,6 +2,11 @@ const nodeVersion = parseInt(process.version.slice(1), 10);
 
 module.exports = {
   preset: 'ts-jest/presets/js-with-ts',
+  globals: {
+    'ts-jest': {
+      tsconfig: 'tsconfig.jest.json',
+    },
+  },
   testEnvironment: 'jsdom',
   setupFiles: ['<rootDir>/node_package/tests/jest.setup.js'],
   // React Server Components tests are compatible with React 19
