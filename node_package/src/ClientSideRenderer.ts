@@ -1,7 +1,6 @@
 /* eslint-disable max-classes-per-file */
-/* eslint-disable react/no-deprecated,@typescript-eslint/no-deprecated -- while we need to support React 16 */
+/* eslint-disable @typescript-eslint/no-deprecated -- while we need to support React 16 */
 
-import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
 import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './_types.ts';
 
@@ -13,6 +12,19 @@ import { supportsRootApi } from './reactApis.ts';
 import { debugTurbolinks } from './turbolinksUtils.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
+
+// Can't just import react-dom because that breaks ESM under React 19
+let reactDom: typeof import('react-dom');
+
+const getReactDom = () => {
+  try {
+    // eslint-disable-next-line global-require,@typescript-eslint/no-require-imports
+    reactDom ||= require('react-dom') as typeof import('react-dom');
+    return reactDom;
+  } catch (_e) {
+    return undefined;
+  }
+};
 
 async function delegateToRenderer(
   componentObj: RegisteredComponent,
@@ -101,8 +113,7 @@ class ComponentRenderer {
         }
 
         // Hydrate if available and was server rendered
-        // @ts-expect-error potentially present if React 18 or greater
-        const shouldHydrate = !!(ReactDOM.hydrate || ReactDOM.hydrateRoot) && !!domNode.innerHTML;
+        const shouldHydrate = (supportsRootApi || !!getReactDom()?.hydrate) && !!domNode.innerHTML;
 
         const reactElementOrRouterResult = createReactOutput({
           componentObj,
@@ -154,7 +165,7 @@ You should return a React.Component always for the client side entry point.`);
       }
 
       try {
-        ReactDOM.unmountComponentAtNode(domNode);
+        getReactDom()?.unmountComponentAtNode(domNode);
       } catch (e: unknown) {
         const error = e instanceof Error ? e : new Error('Unknown error');
         console.info(
