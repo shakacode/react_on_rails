@@ -1,8 +1,7 @@
 import { renderToPipeableStream } from 'react-on-rails-rsc/server.node';
 import { PassThrough, Readable } from 'stream';
-import type { ReactElement } from 'react';
 
-import { RSCRenderParams, StreamRenderState } from './types';
+import { RSCRenderParams, StreamRenderState, StreamableComponentResult } from './types';
 import ReactOnRails from './ReactOnRails.full';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
@@ -22,7 +21,7 @@ const stringToStream = (str: string) => {
 };
 
 const streamRenderRSCComponent = (
-  reactRenderingResult: ReactElement | Promise<ReactElement | string>,
+  reactRenderingResult: StreamableComponentResult,
   options: RSCRenderParams,
 ): Readable => {
   const { throwJsErrors, reactClientManifestFileName } = options;

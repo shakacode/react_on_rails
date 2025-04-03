@@ -1,7 +1,6 @@
 import * as React from 'react';
 import * as ReactDOMServer from 'react-dom/server';
 import { PassThrough, Readable } from 'stream';
-import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
 import createReactOutput from './createReactOutput';
@@ -9,7 +8,7 @@ import { isPromise, isServerRenderHash } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
-import type { RenderParams, StreamRenderState } from './types';
+import type { RenderParams, StreamRenderState, StreamableComponentResult } from './types';
 
 type BufferedEvent = {
   event: 'data' | 'error' | 'end';
@@ -123,7 +122,7 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
 };
 
 const streamRenderReactComponent = (
-  reactRenderingResult: ReactElement | Promise<ReactElement | string>,
+  reactRenderingResult: StreamableComponentResult,
   options: RenderParams,
 ) => {
   const { name: componentName, throwJsErrors, domNodeId } = options;
@@ -188,10 +187,7 @@ const streamRenderReactComponent = (
   return readableStream;
 };
 
-type StreamRenderer<T, P extends RenderParams> = (
-  reactElement: ReactElement | Promise<ReactElement | string>,
-  options: P,
-) => T;
+type StreamRenderer<T, P extends RenderParams> = (reactElement: StreamableComponentResult, options: P) => T;
 
 export const streamServerRenderedComponent = <T, P extends RenderParams>(
   options: P,
