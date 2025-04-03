@@ -69,6 +69,8 @@ type RenderFunctionAsyncResult = Promise<string | ServerRenderHashRenderedHtml |
 
 type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult;
 
+type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
+
 /**
  * Render functions are used to create dynamic React components or server-rendered HTML with side effects.
  * They receive two arguments: props and railsContext.
@@ -117,6 +119,7 @@ export type {
   CreateReactOutputAsyncResult,
   RenderFunctionSyncResult,
   RenderFunctionAsyncResult,
+  StreamableComponentResult,
 };
 
 export interface RegisteredComponent {
