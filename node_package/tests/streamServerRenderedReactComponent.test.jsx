@@ -5,7 +5,7 @@
 import * as React from 'react';
 import * as PropTypes from 'prop-types';
 import streamServerRenderedReactComponent from '../src/streamServerRenderedReactComponent';
-import ComponentRegistry from '../src/ComponentRegistry';
+import * as ComponentRegistry from '../src/ComponentRegistry';
 
 const AsyncContent = async ({ throwAsyncError }) => {
   await new Promise((resolve) => {
