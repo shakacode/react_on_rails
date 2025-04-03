@@ -84,7 +84,7 @@ Async script loading can be done like this (starting with Shakapacker 8.2):
   <%= javascript_include_tag 'application', async: Rails.env.production? %>
 ```
 
-If you use `document.addEventListener("turbolinks:load", function() {...});` somewhere in your code, you will notice that Turbolinks 5 does not fire `turbolinks:load` on initial page load. A quick workaround for React on Rails <15 is to use `defer` instead of `async`:
+If you use `document.addEventListener("turbolinks:load", function() {...});` somewhere in your code, you will notice that Turbolinks 5 does not fire `turbolinks:load` on initial page load. A quick workaround for React on Rails earlier than 15 is to use `defer` instead of `async`:
 
 ```erb
   <%= javascript_include_tag 'application', defer: Rails.env.production? %>
