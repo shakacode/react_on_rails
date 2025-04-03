@@ -14,7 +14,8 @@ const MyComponent = (props, _railsContext) => {
 };
 ```
 
-> [!NOTE] Ensure to return a React component (a function or class) and not a React element (the result of calling `React.createElement` or JSX).
+> [!NOTE]
+> Ensure to return a React component (a function or class) and not a React element (the result of calling `React.createElement` or JSX).
 
 ### 2. Objects with `renderedHtml` string property
 
