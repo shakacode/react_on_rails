@@ -1,7 +1,7 @@
 /* eslint-disable global-require,@typescript-eslint/no-require-imports */
 import type { ReactElement } from 'react';
 import type { RenderReturnType } from './_types.ts';
-import { supportsRootApi } from './reactApis.ts';
+import { supportsRootApi } from './reactApis.cts';
 
 type HydrateOrRenderType = (domNode: Element, reactElement: ReactElement) => RenderReturnType;
 

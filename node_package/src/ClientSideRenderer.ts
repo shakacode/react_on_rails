@@ -7,24 +7,11 @@ import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './
 import { getContextAndRailsContext, resetContextAndRailsContext, type Context } from './context.ts';
 import createReactOutput from './createReactOutput.ts';
 import { isServerRenderHash } from './isServerRenderResult.ts';
-import reactHydrateOrRender from './reactHydrateOrRender.ts';
-import { supportsRootApi } from './reactApis.ts';
+import reactHydrateOrRender from './reactHydrateOrRender.cts';
+import { canHydrate, unmountComponentAtNode, supportsRootApi } from './reactApis.cts';
 import { debugTurbolinks } from './turbolinksUtils.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
-
-// Can't just import react-dom because that breaks ESM under React 19
-let reactDom: typeof import('react-dom');
-
-const getReactDom = () => {
-  try {
-    // eslint-disable-next-line global-require,@typescript-eslint/no-require-imports
-    reactDom ||= require('react-dom') as typeof import('react-dom');
-    return reactDom;
-  } catch (_e) {
-    return undefined;
-  }
-};
 
 async function delegateToRenderer(
   componentObj: RegisteredComponent,
@@ -113,7 +100,7 @@ class ComponentRenderer {
         }
 
         // Hydrate if available and was server rendered
-        const shouldHydrate = (supportsRootApi || !!getReactDom()?.hydrate) && !!domNode.innerHTML;
+        const shouldHydrate = canHydrate && !!domNode.innerHTML;
 
         const reactElementOrRouterResult = createReactOutput({
           componentObj,
@@ -165,7 +152,7 @@ You should return a React.Component always for the client side entry point.`);
       }
 
       try {
-        getReactDom()?.unmountComponentAtNode(domNode);
+        unmountComponentAtNode(domNode);
       } catch (e: unknown) {
         const error = e instanceof Error ? e : new Error('Unknown error');
         console.info(

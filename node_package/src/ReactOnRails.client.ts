@@ -17,7 +17,7 @@ import type {
   StoreGenerator,
   ReactOnRailsOptions,
 } from './_types.ts';
-import reactHydrateOrRender from './reactHydrateOrRender.ts';
+import reactHydrateOrRender from './reactHydrateOrRender.cts';
 
 const ctx = context();
 
