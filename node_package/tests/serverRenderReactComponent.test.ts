@@ -77,7 +77,7 @@ describe('serverRenderReactComponent', () => {
 
   it('serverRenderReactComponent renders html renderedHtml property', () => {
     const expectedHtml = '<div>Hello</div>';
-    const X3: RenderFunction = (): { renderedHtml: string } => ({
+    const X3: RenderFunction = () => ({
       renderedHtml: expectedHtml,
     });
     X3.renderFunction = true;

@@ -1,18 +1,20 @@
 # React on Rails Render Functions: Usage Guide
 
-Based on the test file `serverRenderReactComponent.test.ts` and the existing documentation, I'll clarify how render functions work in React on Rails and how to use them with each Ruby helper method.
+This guide explains how render functions work in React on Rails and how to use them with Ruby helper methods.
 
 ## Types of Render Functions and Their Return Values
 
-Looking at the test file, render functions can return several types of values:
+Render functions can return several types of values:
 
-### 1. React Components (JSX)
+### 1. React Components
 
 ```jsx
 const MyComponent = (props, _railsContext) => {
-  return <div>Hello {props.name}</div>;
+  return () => <div>Hello {props.name}</div>;
 };
 ```
+
+> [!NOTE] Ensure to return a React component (a function or class) and not a React element (the result of calling `React.createElement` or JSX).
 
 ### 2. Objects with renderedHtml Property
 
@@ -24,14 +26,16 @@ const MyComponent = (props, _railsContext) => {
 };
 ```
 
-### 3. Objects with Multiple HTML Properties
+### 3. Objects with renderedHtml as object containing componentHtml and other properties if needed
 
 ```jsx
 const MyComponent = (props, _railsContext) => {
   return {
-    componentHtml: <div>Hello {props.name}</div>,
-    title: `<title>${props.title}</title>`,
-    metaTags: `<meta name="description" content="${props.description}" />`,
+    renderedHtml: {
+      componentHtml: <div>Hello {props.name}</div>,
+      title: `<title>${props.title}</title>`,
+      metaTags: `<meta name="description" content="${props.description}" />`,
+    },
   };
 };
 ```
@@ -45,58 +49,61 @@ const MyComponent = async (props, _railsContext) => {
 };
 ```
 
-### 5. Promises of Objects
+### 5. Promises of Objects containing componentHtml and other properties if needed
 
 ```jsx
 const MyComponent = async (props, _railsContext) => {
   const data = await fetchData();
   return {
     componentHtml: `<div>Hello ${data.name}</div>`,
+    title: `<title>${data.title}</title>`,
+    metaTags: `<meta name="description" content="${data.description}" />`,
   };
 };
 ```
 
-### 6. Redirect Information
+### 6. Promises of React Components
+
+```jsx
+const MyComponent = async (props, _railsContext) => {
+  const data = await fetchData();
+  return () => <div>Hello {data.name}</div>;
+};
+```
+
+### 7. Redirect Information
+
+> [!NOTE] React on Rails will not handle the actual redirection to another page. It will just return an empty component and depend on the front end to handle the redirection when it renders the router on the front end.
 
 ```jsx
 const MyComponent = (props, _railsContext) => {
   return {
-    redirectLocation: '/new-path',
-    error: null,
-    renderedHtml: null,
+    redirectLocation: { pathname: '/new-path', search: '' },
   };
 };
 ```
 
-## Important Limitations Observed in Tests
+## Important Rendering Behavior
 
-The test file reveals some important limitations:
+Based on tests in [serverRenderReactComponent.test.ts](https://github.com/shakacode/react_on_rails/blob/master/node_package/tests/serverRenderReactComponent.test.ts):
 
-1. **Direct String Returns Don't Work** - Returning a raw HTML string directly from a render function causes an error. The test `doesn't render html string returned directly from render function` demonstrates this.
+1. **Direct String Returns Don't Work** - Returning a raw HTML string directly from a render function causes an error. Always wrap HTML strings in `{ renderedHtml: '...' }`.
 
-2. **Non-Promise Objects Need renderedHtml** - Non-promise objects must include a `renderedHtml` property to be valid, as shown in the test `doesn't render object without renderedHtml property`.
+2. **Objects Require Specific Properties** - Non-promise objects must include a `renderedHtml` property to be valid when used with `react_component`.
 
-3. **Async Functions Have Different Behavior** - Interestingly, the test `returns the object returned by async render function even if it doesn't have renderedHtml property` shows that Promise-returning functions can return objects without a `renderedHtml` property and they will still work.
+3. **Async Functions Support All Return Types** - Async functions can return React components, strings, or objects with any property structure due to special handling in the server renderer, but it doesn't support properties like redirectLocation and routingError that can be returned by sync render function.
 
-## Ruby Helper Functions with Render Functions
+## Ruby Helper Functions
 
 ### 1. react_component
 
-The `react_component` helper is used for rendering a single React component. It accepts various return types from render functions:
+The `react_component` helper renders a single React component in your view.
 
 ```ruby
-# Basic usage with a component
 <%= react_component("MyComponent", props: { name: "John" }) %>
-
-# With a render function that returns JSX
-<%= react_component("MyRenderFunction", props: { name: "John" }) %>
-
-# With a render function that returns an object with renderedHtml
-<%= react_component("MyRenderFunction", props: { name: "John" }) %>
-
-# With a render function that returns a Promise
-<%= react_component("MyAsyncRenderFunction", props: { name: "John" }) %>
 ```
+
+This helper accepts render functions that return React components, objects with a `renderedHtml` property, or promises that resolve to React components, or strings.
 
 #### When to use:
 
@@ -107,7 +114,7 @@ The `react_component` helper is used for rendering a single React component. It 
 #### Not suitable for:
 
 - When your render function returns an object with multiple HTML strings
-- When you need to insert content in different parts of the page
+- When you need to insert content in different parts of the page, such as meta tags & style tags
 
 ### 2. react_component_hash
 
@@ -130,6 +137,8 @@ The `react_component_hash` helper is used when your render function returns an o
 </div>
 ```
 
+This helper accepts render functions that return objects with a `renderedHtml` property containing `componentHtml` and any other necessary properties. It also supports promises that resolve to objects with `componentHtml` and other properties if needed.
+
 #### When to use:
 
 - When your render function returns multiple HTML strings in an object
@@ -148,28 +157,18 @@ The `react_component_hash` helper is used when your render function returns an o
 - The object MUST include a `componentHtml` key
 - All other keys are optional and can be accessed in your Rails view
 
-## Best Practices Based on the Tests
-
-1. **Always Use Objects for Multiple HTML Parts**: If you need multiple HTML strings, return an object with named properties, and use `react_component_hash` to access them.
-
-2. **Don't Return Raw HTML Strings**: Tests show that returning a raw HTML string directly causes errors - either use JSX or wrap in a `{ renderedHtml: '...' }` object.
-
-3. **Async Functions Work with Objects**: For async render functions, you can return both strings and objects (with or without a `renderedHtml` property).
-
-4. **Use Redirect Object Format**: For redirects, return an object with `{ redirectLocation, error, renderedHtml: null }`.
-
-## Example: Different Return Types with Appropriate Helper Methods
+## Examples with Appropriate Helper Methods
 
 ### Return Type 1: React Component
 
 ```jsx
 // JavaScript
-const SimpleComponent = (props) => <div>Hello {props.name}</div>;
+const SimpleComponent = (props, _railsContext) => () => <div>Hello {props.name}</div>;
 ReactOnRails.register({ SimpleComponent });
 ```
 
 ```erb
-<%# Ruby - Either helper works %>
+<%# Ruby %>
 <%= react_component("SimpleComponent", props: { name: "John" }) %>
 ```
 
@@ -177,26 +176,28 @@ ReactOnRails.register({ SimpleComponent });
 
 ```jsx
 // JavaScript
-const RenderedHtmlComponent = (props) => {
+const RenderedHtmlComponent = (props, _railsContext) => {
   return { renderedHtml: `<div>Hello ${props.name}</div>` };
 };
 ReactOnRails.register({ RenderedHtmlComponent });
 ```
 
 ```erb
-<%# Ruby - Either helper works %>
+<%# Ruby %>
 <%= react_component("RenderedHtmlComponent", props: { name: "John" }) %>
 ```
 
-### Return Type 3: Object with Multiple HTML Properties
+### Return Type 3: Object with componentHtml and other properties if needed
 
 ```jsx
 // JavaScript
 const HelmetComponent = (props) => {
   return {
-    componentHtml: <div>Hello {props.name}</div>,
-    title: `<title>${props.title}</title>`,
-    metaTags: `<meta name="description" content="${props.description}" />`,
+    renderedHtml: {
+      componentHtml: <div>Hello {props.name}</div>,
+      title: `<title>${props.title}</title>`,
+      metaTags: `<meta name="description" content="${props.description}" />`,
+    },
   };
 };
 HelmetComponent.renderFunction = true;
@@ -235,7 +236,7 @@ ReactOnRails.register({ AsyncStringComponent });
 <%= react_component("AsyncStringComponent", props: { dataUrl: "/api/data" }) %>
 ```
 
-### Return Type 5: Promise of Object
+### Return Type 5: Promise of Object containing componentHtml and other properties if needed
 
 ```jsx
 // JavaScript
@@ -265,19 +266,34 @@ ReactOnRails.register({ AsyncObjectComponent });
 </div>
 ```
 
-### Return Type 6: Redirect Object
+### Return Type 6: Promise of React Component
+
+```jsx
+// JavaScript
+const AsyncReactComponent = async (props) => {
+  const data = await fetchData();
+  return () => <div>Hello {data.name}</div>;
+};
+AsyncReactComponent.renderFunction = true;
+ReactOnRails.register({ AsyncReactComponent });
+```
+
+```erb
+<%# Ruby %>
+<%= react_component("AsyncReactComponent", props: { dataUrl: "/api/data" }) %>
+```
+
+### Return Type 7: Redirect Object
 
 ```jsx
 const RedirectComponent = (props, railsContext) => {
   if (!railsContext.currentUser) {
     return {
-      redirectLocation: { pathname: '/login', search: '' }, // Object with pathname and search
-      error: null,
-      renderedHtml: null, // Use renderedHtml for consistency
+      redirectLocation: { pathname: '/login', search: '' },
     };
   }
   return {
-    renderedHtml: <div>Welcome {railsContext.currentUser.name}</div>, // Use renderedHtml for consistency
+    renderedHtml: <div>Welcome {railsContext.currentUser.name}</div>,
   };
 };
 RedirectComponent.renderFunction = true;
@@ -285,8 +301,8 @@ ReactOnRails.register({ RedirectComponent });
 ```
 
 ```erb
-<%# Ruby - Either helper works %>
+<%# Ruby %>
 <%= react_component("RedirectComponent") %>
 ```
 
-By understanding the different return types and which helper to use with each, you can create sophisticated server-rendered React components that fully integrate with your Rails views.
+By understanding these return types and which helper to use with each, you can create sophisticated server-rendered React components that fully integrate with your Rails views.
