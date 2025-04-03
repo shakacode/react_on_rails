@@ -19,8 +19,8 @@ You can find it here:
 
 By the time you read this, the latest may have changed. Be sure to check the versions here:
 
-- <https://rubygems.org/gems/react_on_rails>
-- <https://www.npmjs.com/package/react-on-rails>
+- [https://rubygems.org/gems/react_on_rails](https://rubygems.org/gems/react_on_rails)
+- [https://www.npmjs.com/package/react-on-rails](https://www.npmjs.com/package/react-on-rails)
 
 # Table of Content:
 
