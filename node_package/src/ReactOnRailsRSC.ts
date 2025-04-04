@@ -1,8 +1,7 @@
 import { renderToPipeableStream } from 'react-on-rails-rsc/server.node';
 import { PassThrough, Readable } from 'stream';
-import type { ReactElement } from 'react';
 
-import { RSCRenderParams, StreamRenderState } from './types';
+import { RSCRenderParams, StreamRenderState, StreamableComponentResult } from './types';
 import ReactOnRails from './ReactOnRails.full';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
@@ -21,7 +20,10 @@ const stringToStream = (str: string) => {
   return stream;
 };
 
-const streamRenderRSCComponent = (reactElement: ReactElement, options: RSCRenderParams): Readable => {
+const streamRenderRSCComponent = (
+  reactRenderingResult: StreamableComponentResult,
+  options: RSCRenderParams,
+): Readable => {
   const { throwJsErrors, reactClientManifestFileName } = options;
   const renderState: StreamRenderState = {
     result: null,
@@ -31,8 +33,8 @@ const streamRenderRSCComponent = (reactElement: ReactElement, options: RSCRender
 
   const { pipeToTransform, readableStream, emitError } =
     transformRenderStreamChunksToResultObject(renderState);
-  loadReactClientManifest(reactClientManifestFileName)
-    .then((reactClientManifest) => {
+  Promise.all([loadReactClientManifest(reactClientManifestFileName), reactRenderingResult])
+    .then(([reactClientManifest, reactElement]) => {
       const rscStream = renderToPipeableStream(reactElement, reactClientManifest, {
         onError: (err) => {
           const error = convertToError(err);
