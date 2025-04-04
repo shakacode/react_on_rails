@@ -34,7 +34,7 @@ export type RailsContext = {
   pathname: string;
   search: string | null;
   httpAcceptLanguage: string;
-  rscPayloadGenerationUrl: string;
+  rscPayloadGenerationUrl?: string;
 } & (
   | {
       serverSide: false;
