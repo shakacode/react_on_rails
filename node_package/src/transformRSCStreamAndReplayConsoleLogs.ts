@@ -1,7 +1,7 @@
 import { RSCPayloadChunk } from './types/index.ts';
 
 export default function transformRSCStreamAndReplayConsoleLogs(
-  stream: ReadableStream<Uint8Array | RenderResult>,
+  stream: ReadableStream<Uint8Array | RSCPayloadChunk>,
 ) {
   return new ReadableStream({
     async start(controller) {
@@ -12,7 +12,7 @@ export default function transformRSCStreamAndReplayConsoleLogs(
       let lastIncompleteChunk = '';
       let { value, done } = await reader.read();
 
-      const handleJsonChunk = (chunk: RenderResult) => {
+      const handleJsonChunk = (chunk: RSCPayloadChunk) => {
         const { html, consoleReplayScript = '' } = chunk;
         controller.enqueue(encoder.encode(html ?? ''));
 
