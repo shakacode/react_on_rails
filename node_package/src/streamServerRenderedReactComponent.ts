@@ -4,7 +4,7 @@ import { PassThrough, Readable } from 'stream';
 
 import ComponentRegistry from './ComponentRegistry';
 import createReactOutput from './createReactOutput';
-import { isServerRenderHash } from './isServerRenderResult';
+import { isServerRenderHash, isPromise } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
