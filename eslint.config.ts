@@ -145,11 +145,7 @@ const config = tsEslint.config([
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: [
-            'eslint.config.ts',
-            'knip.ts',
-            'node_package/tests/serverRenderReactComponent.test.ts',
-          ],
+          allowDefaultProject: ['eslint.config.ts', 'knip.ts', 'node_package/tests/*.test.ts'],
           // Needed because `import * as ... from` instead of `import ... from` doesn't work in this file
           // for some imports.
           defaultProject: 'tsconfig.eslint.json',
