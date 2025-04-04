@@ -375,7 +375,7 @@ module ReactOnRails
           i18nDefaultLocale: I18n.default_locale,
           rorVersion: ReactOnRails::VERSION,
           # TODO: v13 just use the version if existing
-          rorPro: ReactOnRails::Utils.react_on_rails_pro?,
+          rorPro: ReactOnRails::Utils.react_on_rails_pro?
         }
 
         if ReactOnRails::Utils.react_on_rails_pro?
