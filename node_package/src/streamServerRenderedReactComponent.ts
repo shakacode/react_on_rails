@@ -105,6 +105,12 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
       const jsonChunk = JSON.stringify(createResultObject(htmlChunk, '', renderState));
       this.push(`${jsonChunk}\n`);
 
+      // Reset the render state to ensure that the error is not carried over to the next chunk
+      // eslint-disable-next-line no-param-reassign
+      renderState.error = undefined;
+      // eslint-disable-next-line no-param-reassign
+      renderState.hasErrors = false;
+
       clearTimeout(consoleReplayTimeoutId);
       consoleReplayTimeoutId = setTimeout(() => {
         const consoleReplayChunk = buildConsoleReplayChunk();
