@@ -1,20 +1,20 @@
-# React on Rails Render Functions: Usage Guide
+# React on Rails Render-Functions: Usage Guide
 
-This guide explains how render functions work in React on Rails and how to use them with Ruby helper methods.
+This guide explains how render-functions work in React on Rails and how to use them with Ruby helper methods.
 
-## Types of Render Functions and Their Return Values
+## Types of Render-Functions and Their Return Values
 
-Render functions take two parameters:
+Render-functions take two parameters:
 
 1. `props`: The props passed from the Ruby helper methods (via the `props:` parameter), which become available in your JavaScript.
 2. `railsContext`: Rails contextual information like current pathname, locale, etc. See the [Render-Functions and the Rails Context](https://www.shakacode.com/react-on-rails/docs/guides/render-functions-and-railscontext/) documentation for more details.
 
-### Identifying Render Functions
+### Identifying Render-Functions
 
-React on Rails needs to identify which functions are render functions (as opposed to regular React components). There are two ways to mark a function as a render function:
+React on Rails needs to identify which functions are render-functions (as opposed to regular React components). There are two ways to mark a function as a render function:
 
-1. Accept two parameters in your function definition: `(props, railsContext)` - React on Rails will detect this signature
-2. Add a `renderFunction = true` property to your function - This is useful when your function doesn't need the railsContext
+1. Accept two parameters in your function definition: `(props, railsContext)` - React on Rails will detect this signature (the parameter names don't matter).
+2. Add a `renderFunction = true` property to your function - This is useful when your function doesn't need the railsContext.
 
 ```jsx
 // Method 1: Use signature with two parameters
@@ -35,7 +35,7 @@ MyOtherComponent.renderFunction = true;
 ReactOnRails.register({ MyComponent, MyOtherComponent });
 ```
 
-Render functions can return several types of values:
+Render-functions can return several types of values:
 
 ### 1. React Components
 
@@ -139,7 +139,7 @@ The `react_component` helper renders a single React component in your view.
 <%= react_component("MyComponent", props: { name: "John" }) %>
 ```
 
-This helper accepts render functions that return React components, objects with a `renderedHtml` property, or promises that resolve to React components, or strings.
+This helper accepts render-functions that return React components, objects with a `renderedHtml` property, or promises that resolve to React components, or strings.
 
 #### When to use:
 
@@ -173,7 +173,7 @@ The `react_component_hash` helper is used when your render function returns an o
 </div>
 ```
 
-This helper accepts render functions that return objects with a `renderedHtml` property containing `componentHtml` and any other necessary properties. It also supports promises that resolve to a server-side hash.
+This helper accepts render-functions that return objects with a `renderedHtml` property containing `componentHtml` and any other necessary properties. It also supports promises that resolve to a server-side hash.
 
 #### When to use:
 
