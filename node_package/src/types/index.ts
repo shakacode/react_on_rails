@@ -72,7 +72,7 @@ type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult
 type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
 
 /**
- * Render functions are used to create dynamic React components or server-rendered HTML with side effects.
+ * Render-functions are used to create dynamic React components or server-rendered HTML with side effects.
  * They receive two arguments: props and railsContext.
  *
  * @param props - The component props passed to the render function
@@ -133,7 +133,7 @@ export interface RegisteredComponent {
   // Indicates if the registered component is a Renderer function.
   // Renderer function handles DOM rendering or hydration with 3 args: (props, railsContext, domNodeId)
   // Supported on the client side only.
-  // All renderer functions are render functions, but not all render functions are renderer functions.
+  // All renderer functions are render-functions, but not all render-functions are renderer functions.
   isRenderer: boolean;
 }
 
