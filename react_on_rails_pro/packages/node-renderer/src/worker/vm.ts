@@ -32,6 +32,9 @@ interface VMContext {
 // Store contexts by their bundle file paths
 const vmContexts = new Map<string, VMContext>();
 
+// Track VM creation promises to handle concurrent buildVM requests
+const vmCreationPromises = new Map<string, Promise<boolean>>();
+
 /**
  * Returns all bundle paths that have a VM context
  */
@@ -42,7 +45,7 @@ export function hasVMContextForBundle(bundlePath: string) {
 /**
  * Get a specific VM context by bundle path
  */
-function getVMContext(bundlePath: string): VMContext | undefined {
+export function getVMContext(bundlePath: string): VMContext | undefined {
   return vmContexts.get(bundlePath);
 }
 
@@ -93,6 +96,11 @@ function manageVMPoolSize() {
 }
 
 export async function buildVM(filePath: string) {
+  // Return existing promise if VM is already being created
+  if (vmCreationPromises.has(filePath)) {
+    return vmCreationPromises.get(filePath);
+  }
+
   // Check if VM for this bundle already exists
   const vmContext = vmContexts.get(filePath);
   if (vmContext) {
@@ -101,142 +109,154 @@ export async function buildVM(filePath: string) {
     return Promise.resolve(true);
   }
 
-  try {
-    const { supportModules, stubTimers, additionalContext } = getConfig();
-    const additionalContextIsObject = additionalContext !== null && additionalContext.constructor === Object;
-    const sharedConsoleHistory = new SharedConsoleHistory();
-    const contextObject = { sharedConsoleHistory };
+  // Create a new promise for this VM creation
+  const vmCreationPromise = (async () => {
+    try {
+      const { supportModules, stubTimers, additionalContext } = getConfig();
+      const additionalContextIsObject =
+        additionalContext !== null && additionalContext.constructor === Object;
+      const sharedConsoleHistory = new SharedConsoleHistory();
+      const contextObject = { sharedConsoleHistory };
 
-    if (supportModules) {
-      // IMPORTANT: When adding anything to this object, update:
-      // 1. docs/node-renderer/js-configuration.md
-      // 2. packages/node-renderer/src/shared/configBuilder.ts
-      extendContext(contextObject, {
-        Buffer,
-        TextDecoder,
-        TextEncoder,
-        URLSearchParams,
-        ReadableStream,
-        process,
-        setTimeout,
-        setInterval,
-        setImmediate,
-        clearTimeout,
-        clearInterval,
-        clearImmediate,
-        queueMicrotask,
-      });
-    }
+      if (supportModules) {
+        // IMPORTANT: When adding anything to this object, update:
+        // 1. docs/node-renderer/js-configuration.md
+        // 2. packages/node-renderer/src/shared/configBuilder.ts
+        extendContext(contextObject, {
+          Buffer,
+          TextDecoder,
+          TextEncoder,
+          URLSearchParams,
+          ReadableStream,
+          process,
+          setTimeout,
+          setInterval,
+          setImmediate,
+          clearTimeout,
+          clearInterval,
+          clearImmediate,
+          queueMicrotask,
+        });
+      }
 
-    if (additionalContextIsObject) {
-      extendContext(contextObject, additionalContext);
-    }
-    const context = vm.createContext(contextObject);
+      if (additionalContextIsObject) {
+        extendContext(contextObject, additionalContext);
+      }
+      const context = vm.createContext(contextObject);
 
-    // Store the new context with timestamp
-    vmContexts.set(filePath, {
-      context,
-      sharedConsoleHistory,
-      lastUsed: Date.now(),
-    });
+      // Create explicit reference to global context, just in case (some libs can use it):
+      vm.runInContext('global = this', context);
 
-    // Manage pool size after adding new VM
-    manageVMPoolSize();
-
-    // Create explicit reference to global context, just in case (some libs can use it):
-    vm.runInContext('global = this', context);
-
-    // Reimplement console methods for replaying on the client:
-    vm.runInContext(
-      `
-    console = {
-      get history() {
-        return sharedConsoleHistory.getConsoleHistory();
-      },
-      set history(value) {
-        // Do nothing. It's just for the backward compatibility.
-      },
-    };
-    ['error', 'log', 'info', 'warn'].forEach(function (level) {
-      console[level] = function () {
-        var argArray = Array.prototype.slice.call(arguments);
-        if (argArray.length > 0) {
-          argArray[0] = '[SERVER] ' + argArray[0];
-        }
-        sharedConsoleHistory.addToConsoleHistory({level: level, arguments: argArray});
+      // Reimplement console methods for replaying on the client:
+      vm.runInContext(
+        `
+      console = {
+        get history() {
+          return sharedConsoleHistory.getConsoleHistory();
+        },
+        set history(value) {
+          // Do nothing. It's just for the backward compatibility.
+        },
       };
-    });`,
-      context,
-    );
+      ['error', 'log', 'info', 'warn'].forEach(function (level) {
+        console[level] = function () {
+          var argArray = Array.prototype.slice.call(arguments);
+          if (argArray.length > 0) {
+            argArray[0] = '[SERVER] ' + argArray[0];
+          }
+          sharedConsoleHistory.addToConsoleHistory({level: level, arguments: argArray});
+        };
+      });`,
+        context,
+      );
 
-    // Define global getStackTrace() function:
-    vm.runInContext(
-      `
-    function getStackTrace() {
-      var stack;
-      try {
-        throw new Error('');
+      // Define global getStackTrace() function:
+      vm.runInContext(
+        `
+      function getStackTrace() {
+        var stack;
+        try {
+          throw new Error('');
+        }
+        catch (error) {
+          stack = error.stack || '';
+        }
+        stack = stack.split('\\n').map(function (line) { return line.trim(); });
+        return stack.splice(stack[0] == 'Error' ? 2 : 1);
+      }`,
+        context,
+      );
+
+      if (stubTimers) {
+        // Define timer polyfills:
+        vm.runInContext(`function setInterval() {}`, context);
+        vm.runInContext(`function setTimeout() {}`, context);
+        vm.runInContext(`function setImmediate() {}`, context);
+        vm.runInContext(`function clearTimeout() {}`, context);
+        vm.runInContext(`function clearInterval() {}`, context);
+        vm.runInContext(`function clearImmediate() {}`, context);
+        vm.runInContext(`function queueMicrotask() {}`, context);
       }
-      catch (error) {
-        stack = error.stack || '';
+
+      // Run bundle code in created context:
+      const bundleContents = await readFileAsync(filePath, 'utf8');
+
+      // If node-specific code is provided then it must be wrapped into a module wrapper. The bundle
+      // may need the `require` function, which is not available when running in vm unless passed in.
+      if (additionalContextIsObject || supportModules) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        vm.runInContext(m.wrap(bundleContents), context)(
+          exports,
+          require,
+          module,
+          filePath,
+          path.dirname(filePath),
+        );
+      } else {
+        vm.runInContext(bundleContents, context);
       }
-      stack = stack.split('\\n').map(function (line) { return line.trim(); });
-      return stack.splice(stack[0] == 'Error' ? 2 : 1);
-    }`,
-      context,
-    );
 
-    if (stubTimers) {
-      // Define timer polyfills:
-      vm.runInContext(`function setInterval() {}`, context);
-      vm.runInContext(`function setTimeout() {}`, context);
-      vm.runInContext(`function setImmediate() {}`, context);
-      vm.runInContext(`function clearTimeout() {}`, context);
-      vm.runInContext(`function clearInterval() {}`, context);
-      vm.runInContext(`function clearImmediate() {}`, context);
-      vm.runInContext(`function queueMicrotask() {}`, context);
+      // Only now, after VM is fully initialized, store the context
+      vmContexts.set(filePath, {
+        context,
+        sharedConsoleHistory,
+        lastUsed: Date.now(),
+      });
+
+      // Manage pool size after adding new VM
+      manageVMPoolSize();
+
+      // isWorker check is required for JS unit testing:
+      if (cluster.isWorker && cluster.worker !== undefined) {
+        log.debug(`Built VM for worker #${cluster.worker.id} with bundle ${filePath}`);
+      }
+
+      if (log.level === 'debug') {
+        log.debug(
+          'Required objects now in VM sandbox context: %s',
+          vm.runInContext('global.ReactOnRails', context) !== undefined,
+        );
+        log.debug(
+          'Required objects should not leak to the global context (true means OK): %s',
+          !!global.ReactOnRails,
+        );
+      }
+
+      return true;
+    } catch (error) {
+      log.error('Caught Error when creating context in buildVM, %O', error);
+      errorReporter.error(error as Error);
+      throw error;
+    } finally {
+      // Always remove the promise from the map when done
+      vmCreationPromises.delete(filePath);
     }
+  })();
 
-    // Run bundle code in created context:
-    const bundleContents = await readFileAsync(filePath, 'utf8');
+  // Store the promise
+  vmCreationPromises.set(filePath, vmCreationPromise);
 
-    // If node-specific code is provided then it must be wrapped into a module wrapper. The bundle
-    // may need the `require` function, which is not available when running in vm unless passed in.
-    if (additionalContextIsObject || supportModules) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      vm.runInContext(m.wrap(bundleContents), context)(
-        exports,
-        require,
-        module,
-        filePath,
-        path.dirname(filePath),
-      );
-    } else {
-      vm.runInContext(bundleContents, context);
-    }
-
-    // isWorker check is required for JS unit testing:
-    if (cluster.isWorker && cluster.worker !== undefined) {
-      log.debug(`Built VM for worker #${cluster.worker.id} with bundle ${filePath}`);
-    }
-
-    if (log.level === 'debug') {
-      log.debug(
-        'Required objects now in VM sandbox context: %s',
-        vm.runInContext('global.ReactOnRails', context) !== undefined,
-      );
-      log.debug(
-        'Required objects should not leak to the global context (true means OK): %s',
-        !!global.ReactOnRails,
-      );
-    }
-
-    return Promise.resolve(true);
-  } catch (error) {
-    log.error('Caught Error when creating context in buildVM, %O', error);
-    errorReporter.error(error as Error);
-    return Promise.reject(error as Error);
-  }
+  return vmCreationPromise;
 }
 
 /**
@@ -253,6 +273,11 @@ export async function runInVM(
   const { bundlePath } = getConfig();
 
   try {
+    // Wait for VM creation if it's in progress
+    if (vmCreationPromises.has(filePath)) {
+      await vmCreationPromises.get(filePath);
+    }
+
     // Get the correct VM context based on the provided bundle path
     const vmContext = getVMContext(filePath);
 

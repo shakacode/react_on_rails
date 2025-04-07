@@ -6,7 +6,7 @@ import {
   createVmBundle,
   resetForTest,
 } from './helper';
-import { buildVM, hasVMContextForBundle, resetVM, runInVM } from '../src/worker/vm';
+import { buildVM, hasVMContextForBundle, resetVM, runInVM, getVMContext } from '../src/worker/vm';
 import { getConfig } from '../src/shared/configBuilder';
 import { isErrorRenderResult } from '../src/shared/utils';
 
@@ -522,6 +522,46 @@ describe('buildVM and runInVM', () => {
       expect(otherRequestResult).not.toContain(
         `console.log.apply(console, [\\"[SERVER] [${otherRequestId}] Console log from Async Server after calling async functions\\"]);`,
       );
+    });
+
+    test('calling multiple buildVM in parallel creates the same VM context', async () => {
+      const buildAndGetVmContext = async () => {
+        await prepareVM(true);
+        return getVMContext(serverBundlePath);
+      };
+
+      const [vmContext1, vmContext2] = await Promise.all([buildAndGetVmContext(), buildAndGetVmContext()]);
+      expect(vmContext1).toBe(vmContext2);
+    });
+
+    test('running runInVM before buildVM', async () => {
+      resetVM();
+      void prepareVM(true);
+      // If the bundle is parsed, ReactOnRails object will be globally available and has the serverRenderReactComponent method
+      const ReactOnRails = await runInVM(
+        'typeof ReactOnRails !== "undefined" && ReactOnRails && typeof ReactOnRails.serverRenderReactComponent',
+        serverBundlePath,
+      );
+      expect(ReactOnRails).toEqual('function');
+    });
+
+    test("running multiple buildVM in parallel doesn't cause runInVM to return partial results", async () => {
+      resetVM();
+      void Promise.all([prepareVM(true), prepareVM(true), prepareVM(true), prepareVM(true)]);
+      // If the bundle is parsed, ReactOnRails object will be globally available and has the serverRenderReactComponent method
+      const runCodeInVM = () =>
+        runInVM(
+          'typeof ReactOnRails !== "undefined" && ReactOnRails && typeof ReactOnRails.serverRenderReactComponent',
+          serverBundlePath,
+        );
+      const [runCodeInVM1, runCodeInVM2, runCodeInVM3] = await Promise.all([
+        runCodeInVM(),
+        runCodeInVM(),
+        runCodeInVM(),
+      ]);
+      expect(runCodeInVM1).toEqual('function');
+      expect(runCodeInVM2).toEqual('function');
+      expect(runCodeInVM3).toEqual('function');
     });
   });
 });
