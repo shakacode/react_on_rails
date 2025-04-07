@@ -62,7 +62,7 @@ function processPromise(
 ): RenderStateHtml {
   if (!renderingReturnsPromises) {
     console.error(
-      'Your render function returned a Promise, which is only supported by a node renderer, not ExecJS.',
+      'Your render function returned a Promise, which is only supported by the React on Rails Pro Node renderer, not ExecJS.',
     );
     // If the app is using server rendering with ExecJS, then the promise will not be awaited.
     // And when a promise is passed to JSON.stringify, it will be converted to '{}'.

@@ -76,6 +76,8 @@ const MyComponent = (props, _railsContext) => {
 
 ### 4. Promises of Strings
 
+This and other promise options below are only available in React on Rails Pro with the Node renderer.
+
 ```jsx
 const MyComponent = async (props, _railsContext) => {
   const data = await fetchData();
