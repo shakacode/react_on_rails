@@ -154,6 +154,10 @@ jobs:
         run: cd spec/dummy && yalc add react-on-rails
       - name: Install Node modules with Yarn for dummy app
         run: cd spec/dummy && yarn install --no-progress --no-emoji
+      - name: Dummy JS tests
+        run: |
+          cd spec/dummy
+          yarn run test:js
       - name: Install Ruby Gems for package
         run: |
           bundle lock --add-platform 'x86_64-linux'
