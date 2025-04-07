@@ -42,6 +42,7 @@ const config = tsEslint.config([
     '**/node_modules/',
     // fixtures
     '**/fixtures/',
+    '**/.yalc/**/*',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],
