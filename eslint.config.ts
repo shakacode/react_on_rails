@@ -36,6 +36,7 @@ const config = tsEslint.config([
     '**/bundle/',
     // dependencies
     '**/node_modules/**/*',
+    '**/.yalc/**/*',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],
