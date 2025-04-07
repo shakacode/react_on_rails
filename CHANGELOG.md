@@ -27,6 +27,8 @@ Changes since the last non-beta release.
 
 - Configuration option `generated_component_packs_loading_strategy` to control how generated component packs are loaded. It supports `sync`, `async`, and `defer` strategies. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- Support for returning React component from async render-function. [PR 1720](https://github.com/shakacode/react_on_rails/pull/1720) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ### Removed (Breaking Changes)
 
 - Deprecated `defer_generated_component_packs` configuration option. You should use `generated_component_packs_loading_strategy` instead. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).

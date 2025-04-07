@@ -1,6 +1,13 @@
-import type { CreateReactOutputResult, ServerRenderResult } from './types/index';
+import type {
+  CreateReactOutputResult,
+  ServerRenderResult,
+  RenderFunctionResult,
+  RenderStateHtml,
+} from './types/index';
 
-export function isServerRenderHash(testValue: CreateReactOutputResult): testValue is ServerRenderResult {
+export function isServerRenderHash(
+  testValue: CreateReactOutputResult | RenderFunctionResult,
+): testValue is ServerRenderResult {
   return !!(
     (testValue as ServerRenderResult).renderedHtml ||
     (testValue as ServerRenderResult).redirectLocation ||
@@ -10,7 +17,7 @@ export function isServerRenderHash(testValue: CreateReactOutputResult): testValu
 }
 
 export function isPromise<T>(
-  testValue: CreateReactOutputResult | Promise<T> | string | null,
+  testValue: CreateReactOutputResult | RenderFunctionResult | Promise<T> | RenderStateHtml | string | null,
 ): testValue is Promise<T> {
   return !!(testValue as Promise<T> | null)?.then;
 }

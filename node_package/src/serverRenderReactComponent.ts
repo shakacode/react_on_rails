@@ -1,3 +1,4 @@
+import * as React from 'react';
 import * as ReactDOMServer from 'react-dom/server';
 import type { ReactElement } from 'react';
 
@@ -14,6 +15,8 @@ import type {
   RenderState,
   RenderOptions,
   ServerRenderResult,
+  CreateReactOutputAsyncResult,
+  RenderStateHtml,
 } from './types';
 
 function processServerRenderHash(result: ServerRenderResult, options: RenderOptions): RenderState {
@@ -24,7 +27,7 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
     console.error(`React Router ERROR: ${JSON.stringify(routeError)}`);
   }
 
-  let htmlResult: string;
+  let htmlResult;
   if (redirectLocation) {
     if (options.trace) {
       const redirectPath = redirectLocation.pathname + redirectLocation.search;
@@ -36,25 +39,10 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
     // Possibly, someday, we could have the Rails server redirect.
     htmlResult = '';
   } else {
-    htmlResult = result.renderedHtml as string;
+    htmlResult = result.renderedHtml;
   }
 
-  return { result: htmlResult, hasErrors };
-}
-
-function processPromise(
-  result: Promise<string>,
-  renderingReturnsPromises: boolean,
-): Promise<string> | string {
-  if (!renderingReturnsPromises) {
-    console.error(
-      'Your render function returned a Promise, which is only supported by a node renderer, not ExecJS.',
-    );
-    // If the app is using server rendering with ExecJS, then the promise will not be awaited.
-    // And when a promise is passed to JSON.stringify, it will be converted to '{}'.
-    return '{}';
-  }
-  return result;
+  return { result: htmlResult ?? null, hasErrors };
 }
 
 function processReactElement(result: ReactElement): string {
@@ -66,6 +54,26 @@ calls renderToString, that takes one parameter. You need to add an extra unused 
 as a renderFunction and not a simple React Function Component.`);
     throw error;
   }
+}
+
+function processPromise(
+  result: CreateReactOutputAsyncResult,
+  renderingReturnsPromises: boolean,
+): RenderStateHtml {
+  if (!renderingReturnsPromises) {
+    console.error(
+      'Your render function returned a Promise, which is only supported by the React on Rails Pro Node renderer, not ExecJS.',
+    );
+    // If the app is using server rendering with ExecJS, then the promise will not be awaited.
+    // And when a promise is passed to JSON.stringify, it will be converted to '{}'.
+    return '{}';
+  }
+  return result.then((promiseResult) => {
+    if (React.isValidElement(promiseResult)) {
+      return processReactElement(promiseResult);
+    }
+    return promiseResult;
+  });
 }
 
 function processRenderingResult(result: CreateReactOutputResult, options: RenderOptions): RenderState {
@@ -91,7 +99,7 @@ function handleRenderingError(e: unknown, options: { componentName: string; thro
 }
 
 async function createPromiseResult(
-  renderState: RenderState & { result: Promise<string> },
+  renderState: RenderState,
   componentName: string,
   throwJsErrors: boolean,
 ): Promise<RenderResult> {

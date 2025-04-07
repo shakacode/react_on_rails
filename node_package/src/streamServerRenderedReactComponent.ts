@@ -1,6 +1,6 @@
+import * as React from 'react';
 import * as ReactDOMServer from 'react-dom/server';
 import { PassThrough, Readable } from 'stream';
-import type { ReactElement } from 'react';
 
 import ComponentRegistry from './ComponentRegistry';
 import createReactOutput from './createReactOutput';
@@ -8,14 +8,7 @@ import { isPromise, isServerRenderHash } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
-import type { RenderParams, StreamRenderState } from './types';
-
-const stringToStream = (str: string): Readable => {
-  const stream = new PassThrough();
-  stream.write(str);
-  stream.end();
-  return stream;
-};
+import type { RenderParams, StreamRenderState, StreamableComponentResult } from './types';
 
 type BufferedEvent = {
   event: 'data' | 'error' | 'end';
@@ -128,7 +121,10 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   return { readableStream, pipeToTransform, writeChunk, emitError, endStream };
 };
 
-const streamRenderReactComponent = (reactRenderingResult: ReactElement, options: RenderParams) => {
+const streamRenderReactComponent = (
+  reactRenderingResult: StreamableComponentResult,
+  options: RenderParams,
+) => {
   const { name: componentName, throwJsErrors, domNodeId } = options;
   const renderState: StreamRenderState = {
     result: null,
@@ -139,42 +135,59 @@ const streamRenderReactComponent = (reactRenderingResult: ReactElement, options:
   const { readableStream, pipeToTransform, writeChunk, emitError, endStream } =
     transformRenderStreamChunksToResultObject(renderState);
 
-  const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderingResult, {
-    onShellError(e) {
-      const error = convertToError(e);
-      renderState.hasErrors = true;
-      renderState.error = error;
+  const reportError = (error: Error) => {
+    renderState.hasErrors = true;
+    renderState.error = error;
 
-      if (throwJsErrors) {
-        emitError(error);
-      }
+    if (throwJsErrors) {
+      emitError(error);
+    }
+  };
 
-      const errorHtml = handleError({ e: error, name: componentName, serverSide: true });
-      writeChunk(errorHtml);
-      endStream();
-    },
-    onShellReady() {
-      renderState.isShellReady = true;
-      pipeToTransform(renderingStream);
-    },
-    onError(e) {
-      if (!renderState.isShellReady) {
+  const sendErrorHtml = (error: Error) => {
+    const errorHtml = handleError({ e: error, name: componentName, serverSide: true });
+    writeChunk(errorHtml);
+    endStream();
+  };
+
+  Promise.resolve(reactRenderingResult)
+    .then((reactRenderedElement) => {
+      if (typeof reactRenderedElement === 'string') {
+        console.error(
+          `Error: stream_react_component helper received a string instead of a React component for component "${componentName}".\n` +
+            'To benefit from React on Rails Pro streaming feature, your render function should return a React component.\n' +
+            'Do not call ReactDOMServer.renderToString() inside the render function as this defeats the purpose of streaming.\n',
+        );
+
+        writeChunk(reactRenderedElement);
+        endStream();
         return;
       }
+
+      const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderedElement, {
+        onShellError(e) {
+          sendErrorHtml(convertToError(e));
+        },
+        onShellReady() {
+          renderState.isShellReady = true;
+          pipeToTransform(renderingStream);
+        },
+        onError(e) {
+          reportError(convertToError(e));
+        },
+        identifierPrefix: domNodeId,
+      });
+    })
+    .catch((e: unknown) => {
       const error = convertToError(e);
-      if (throwJsErrors) {
-        emitError(error);
-      }
-      renderState.hasErrors = true;
-      renderState.error = error;
-    },
-    identifierPrefix: domNodeId,
-  });
+      reportError(error);
+      sendErrorHtml(error);
+    });
 
   return readableStream;
 };
 
-type StreamRenderer<T, P extends RenderParams> = (reactElement: ReactElement, options: P) => T;
+type StreamRenderer<T, P extends RenderParams> = (reactElement: StreamableComponentResult, options: P) => T;
 
 export const streamServerRenderedComponent = <T, P extends RenderParams>(
   options: P,
@@ -194,22 +207,40 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
       railsContext,
     });
 
-    if (isServerRenderHash(reactRenderingResult) || isPromise(reactRenderingResult)) {
-      throw new Error('Server rendering of streams is not supported for server render hashes or promises.');
+    if (isServerRenderHash(reactRenderingResult)) {
+      throw new Error('Server rendering of streams is not supported for server render hashes.');
+    }
+
+    if (isPromise(reactRenderingResult)) {
+      const promiseAfterRejectingHash = reactRenderingResult.then((result) => {
+        if (!React.isValidElement(result)) {
+          throw new Error(
+            `Invalid React element detected while rendering ${componentName}. If you are trying to stream a component registered as a render function, ` +
+              `please ensure that the render function returns a valid React component, not a server render hash. ` +
+              `This error typically occurs when the render function does not return a React element or returns an incorrect type.`,
+          );
+        }
+        return result;
+      });
+      return renderStrategy(promiseAfterRejectingHash, options);
     }
 
     return renderStrategy(reactRenderingResult, options);
   } catch (e) {
+    const { readableStream, writeChunk, emitError, endStream } = transformRenderStreamChunksToResultObject({
+      hasErrors: true,
+      isShellReady: false,
+      result: null,
+    });
     if (throwJsErrors) {
-      throw e;
+      emitError(e);
     }
 
     const error = convertToError(e);
     const htmlResult = handleError({ e: error, name: componentName, serverSide: true });
-    const jsonResult = JSON.stringify(
-      createResultObject(htmlResult, buildConsoleReplay(), { hasErrors: true, error, result: null }),
-    );
-    return stringToStream(jsonResult) as T;
+    writeChunk(htmlResult);
+    endStream();
+    return readableStream as T;
   }
 };
 

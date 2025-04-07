@@ -45,19 +45,34 @@ type AuthenticityHeaders = Record<string, string> & {
 
 type StoreGenerator = (props: Record<string, unknown>, railsContext: RailsContext) => Store;
 
+type ServerRenderHashRenderedHtml = {
+  componentHtml: string;
+  [key: string]: string;
+};
+
 interface ServerRenderResult {
-  renderedHtml?: string | { componentHtml: string; [key: string]: string };
+  renderedHtml?: string | ServerRenderHashRenderedHtml;
   redirectLocation?: { pathname: string; search: string };
   routeError?: Error;
   error?: Error;
 }
 
-type CreateReactOutputResult = ServerRenderResult | ReactElement | Promise<string>;
+type CreateReactOutputSyncResult = ServerRenderResult | ReactElement<unknown>;
 
-type RenderFunctionResult = ReactComponent | ServerRenderResult | Promise<string>;
+type CreateReactOutputAsyncResult = Promise<string | ServerRenderHashRenderedHtml | ReactElement<unknown>>;
+
+type CreateReactOutputResult = CreateReactOutputSyncResult | CreateReactOutputAsyncResult;
+
+type RenderFunctionSyncResult = ReactComponent | ServerRenderResult;
+
+type RenderFunctionAsyncResult = Promise<string | ServerRenderHashRenderedHtml | ReactComponent>;
+
+type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult;
+
+type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
 
 /**
- * Render functions are used to create dynamic React components or server-rendered HTML with side effects.
+ * Render-functions are used to create dynamic React components or server-rendered HTML with side effects.
  * They receive two arguments: props and railsContext.
  *
  * @param props - The component props passed to the render function
@@ -99,6 +114,12 @@ export type {
   StoreGenerator,
   CreateReactOutputResult,
   ServerRenderResult,
+  ServerRenderHashRenderedHtml,
+  CreateReactOutputSyncResult,
+  CreateReactOutputAsyncResult,
+  RenderFunctionSyncResult,
+  RenderFunctionAsyncResult,
+  StreamableComponentResult,
 };
 
 export interface RegisteredComponent {
@@ -112,7 +133,7 @@ export interface RegisteredComponent {
   // Indicates if the registered component is a Renderer function.
   // Renderer function handles DOM rendering or hydration with 3 args: (props, railsContext, domNodeId)
   // Supported on the client side only.
-  // All renderer functions are render functions, but not all render functions are renderer functions.
+  // All renderer functions are render-functions, but not all render-functions are renderer functions.
   isRenderer: boolean;
 }
 
@@ -155,12 +176,18 @@ export interface ErrorOptions {
 
 export type RenderingError = Pick<Error, 'message' | 'stack'>;
 
+export type FinalHtmlResult = string | ServerRenderHashRenderedHtml;
+
 export interface RenderResult {
-  html: string | null;
+  html: FinalHtmlResult | null;
   consoleReplayScript: string;
   hasErrors: boolean;
   renderingError?: RenderingError;
   isShellReady?: boolean;
+}
+
+export interface RSCPayloadChunk extends RenderResult {
+  html: string;
 }
 
 // from react-dom 18
@@ -351,8 +378,10 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   options: ReactOnRailsOptions;
 }
 
+export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult>;
+
 export type RenderState = {
-  result: null | string | Promise<string>;
+  result: null | RenderStateHtml;
   hasErrors: boolean;
   error?: RenderingError;
 };
