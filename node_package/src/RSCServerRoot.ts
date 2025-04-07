@@ -10,7 +10,7 @@ declare global {
   function generateRSCPayload(
     componentName: string,
     props: Record<string, unknown>,
-    serverSideRSCPayloadParameters: unknown,
+    railsContext: RailsContext,
   ): Promise<NodeJS.ReadableStream>;
 }
 
@@ -76,11 +76,10 @@ const RSCServerRoot: RenderFunction = async (
     !railsContext?.reactServerClientManifestFileName
   ) {
     throw new Error(
-      `${
-        'serverClientManifestFileName and reactServerClientManifestFileName are required. ' +
+      'serverClientManifestFileName and reactServerClientManifestFileName are required. ' +
         'Please ensure that React Server Component webpack configurations are properly set ' +
-        'as stated in the React Server Component tutorial. The received rails context is: '
-      }${JSON.stringify(railsContext)}`,
+        'as stated in the React Server Component tutorial. ' +
+        'Ensure to use "stream_react_component" instead of "react_component" to SSR a server component.',
     );
   }
 
@@ -96,11 +95,7 @@ const RSCServerRoot: RenderFunction = async (
     railsContext.reactServerClientManifestFileName,
     railsContext.reactClientManifestFileName,
   );
-  const rscPayloadStream = await generateRSCPayload(
-    componentName,
-    componentProps,
-    railsContext.serverSideRSCPayloadParameters,
-  );
+  const rscPayloadStream = await generateRSCPayload(componentName, componentProps, railsContext);
 
   // Tee the stream to pass it to the server component and the payload container
   const rscPayloadStream1 = new PassThrough();
