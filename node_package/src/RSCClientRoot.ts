@@ -17,7 +17,7 @@ if (typeof use !== 'function') {
 
 declare global {
   interface Window {
-    __FLIGHT_DATA: unknown[];
+    REACT_ON_RAILS_RSC_PAYLOAD: unknown[];
   }
 }
 
@@ -53,11 +53,11 @@ const createRSCStreamFromPage = () => {
       const handleChunk = (chunk: unknown) => {
         controller.enqueue(chunk as RSCPayloadChunk);
       };
-      if (!window.__FLIGHT_DATA) {
-        window.__FLIGHT_DATA = [];
+      if (!window.REACT_ON_RAILS_RSC_PAYLOAD) {
+        window.REACT_ON_RAILS_RSC_PAYLOAD = [];
       }
-      window.__FLIGHT_DATA.forEach(handleChunk);
-      window.__FLIGHT_DATA.push = (...chunks: unknown[]) => {
+      window.REACT_ON_RAILS_RSC_PAYLOAD.forEach(handleChunk);
+      window.REACT_ON_RAILS_RSC_PAYLOAD.push = (...chunks: unknown[]) => {
         chunks.forEach(handleChunk);
         return chunks.length;
       };

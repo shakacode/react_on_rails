@@ -27,7 +27,7 @@ const RSCPayloadContainer = ({
 
   const scriptElement = React.createElement('script', {
     dangerouslySetInnerHTML: {
-      __html: escapeScript(`(self.__FLIGHT_DATA||=[]).push(${chunk.chunk})`),
+      __html: escapeScript(`(self.REACT_ON_RAILS_RSC_PAYLOAD||=[]).push(${chunk.chunk})`),
     },
     key: `script-${chunkIndex}`,
   });
