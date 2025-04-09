@@ -3,7 +3,7 @@
   "version": "15.0.0-alpha.2",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "node_package/lib/ReactOnRails.full.js",
-  "type": "commonjs",
+  "type": "module",
   "exports": {
     ".": {
       "react-server": "./node_package/lib/ReactOnRailsRSC.js",
