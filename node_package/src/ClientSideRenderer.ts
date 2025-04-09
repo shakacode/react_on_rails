@@ -61,7 +61,7 @@ class ComponentRenderer {
     const storeDependencies = el.getAttribute('data-store-dependencies');
     const storeDependenciesArray = storeDependencies ? (JSON.parse(storeDependencies) as string[]) : [];
 
-    const { railsContext } = getRailsContext();
+    const railsContext = getRailsContext();
     if (!railsContext) return;
 
     // Wait for all store dependencies to be loaded
@@ -181,7 +181,7 @@ class StoreRenderer {
 
   constructor(storeDataElement: Element) {
     this.state = 'hydrating';
-    const { railsContext } = getRailsContext();
+    const railsContext = getRailsContext();
     if (!railsContext) {
       return;
     }

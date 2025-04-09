@@ -47,7 +47,7 @@ export default class CallbackRegistry<T> {
     };
 
     onPageLoaded(() => {
-      const registryTimeout = getRailsContext().railsContext?.componentRegistryTimeout;
+      const registryTimeout = getRailsContext()?.componentRegistryTimeout;
       if (!registryTimeout) return;
 
       timeoutId = setTimeout(triggerTimeout, registryTimeout);
