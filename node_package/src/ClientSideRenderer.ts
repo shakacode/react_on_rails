@@ -1,5 +1,4 @@
 /* eslint-disable max-classes-per-file */
-/* eslint-disable react/no-deprecated,@typescript-eslint/no-deprecated -- while we need to support React 16 */
 
 import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
@@ -8,8 +7,8 @@ import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './
 import { getRailsContext, resetRailsContext } from './context.ts';
 import createReactOutput from './createReactOutput.ts';
 import { isServerRenderHash } from './isServerRenderResult.ts';
-import reactHydrateOrRender from './reactHydrateOrRender.ts';
 import { supportsRootApi } from './reactApis.ts';
+import reactHydrateOrRender from './reactHydrateOrRender.ts';
 import { debugTurbolinks } from './turbolinksUtils.ts';
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
@@ -103,8 +102,7 @@ class ComponentRenderer {
         }
 
         // Hydrate if available and was server rendered
-        // @ts-expect-error potentially present if React 18 or greater
-        const shouldHydrate = !!(ReactDOM.hydrate || ReactDOM.hydrateRoot) && !!domNode.innerHTML;
+        const shouldHydrate = (supportsRootApi || 'hydrate' in ReactDOM) && !!domNode.innerHTML;
 
         const reactElementOrRouterResult = createReactOutput({
           componentObj,
@@ -156,7 +154,9 @@ You should return a React.Component always for the client side entry point.`);
       }
 
       try {
-        ReactDOM.unmountComponentAtNode(domNode);
+        const unmountComponentAtNode = 'unmountComponentAtNode';
+        // eslint-disable-next-line @typescript-eslint/no-deprecated
+        ReactDOM[unmountComponentAtNode](domNode);
       } catch (e: unknown) {
         const error = e instanceof Error ? e : new Error('Unknown error');
         console.info(
