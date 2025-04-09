@@ -6,8 +6,6 @@
     // needed for Jest tests even though we don't use .tsx
     "jsx": "react-jsx",
     "lib": ["dom", "es2020"],
-    "module": "es2020",
-    "moduleResolution": "bundler",
     "noImplicitAny": true,
     "outDir": "node_package/lib",
     "allowImportingTsExtensions": true,
