@@ -1,9 +1,8 @@
-import { type Context, isWindow } from './context';
 import {
-  renderOrHydrateForceLoadedComponents,
-  renderOrHydrateAllComponents,
-  hydrateForceLoadedStores,
   hydrateAllStores,
+  hydrateForceLoadedStores,
+  renderOrHydrateAllComponents,
+  renderOrHydrateForceLoadedComponents,
   unmountAll,
 } from './ClientSideRenderer';
 import { onPageLoaded, onPageUnloaded } from './pageLifecycle';
@@ -19,20 +18,20 @@ function reactOnRailsPageUnloaded(): void {
   unmountAll();
 }
 
-export function clientStartup(context: Context) {
+export function clientStartup() {
   // Check if server rendering
-  if (!isWindow(context)) {
+  if (globalThis.document === undefined) {
     return;
   }
 
   // Tried with a file local variable, but the install handler gets called twice.
   // eslint-disable-next-line no-underscore-dangle
-  if (context.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__) {
+  if (globalThis.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__) {
     return;
   }
 
   // eslint-disable-next-line no-underscore-dangle
-  context.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
+  globalThis.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
 
   // Force loaded components and stores are rendered and hydrated immediately.
   // The hydration process can handle the concurrent hydration of components and stores,

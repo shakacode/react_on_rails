@@ -1,5 +1,3 @@
-import { reactOnRailsContext } from './context';
-
 declare global {
   namespace Turbolinks {
     interface TurbolinksStatic {
@@ -18,8 +16,7 @@ export function debugTurbolinks(...msg: unknown[]): void {
     return;
   }
 
-  const context = reactOnRailsContext();
-  if (context.ReactOnRails?.option('traceTurbolinks')) {
+  if (globalThis.ReactOnRails?.option('traceTurbolinks')) {
     console.log('TURBO:', ...msg);
   }
 }
@@ -29,11 +26,7 @@ export function turbolinksInstalled(): boolean {
 }
 
 export function turboInstalled() {
-  const context = reactOnRailsContext();
-  if (context.ReactOnRails) {
-    return context.ReactOnRails.option('turbo') === true;
-  }
-  return false;
+  return globalThis.ReactOnRails?.option('turbo') === true;
 }
 
 export function turbolinksVersion5(): boolean {
