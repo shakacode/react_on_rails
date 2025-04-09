@@ -18,6 +18,25 @@ function escapeScript(script: string) {
   return script.replace(/<!--/g, '<\\!--').replace(/<\/(script)/gi, '</\\$1');
 }
 
+/**
+ * RSCPayloadContainer is a React component that handles the server-to-client transfer
+ * of React Server Component (RSC) payloads. It works in conjunction with RSCClientRoot
+ * to ensure reliable delivery of RSC chunks.
+ *
+ * How it works:
+ * 1. Receives a NodeJS.ReadableStream containing RSC payload chunks from the server
+ * 2. Creates a series of promises to handle each chunk asynchronously
+ * 3. For each chunk:
+ *    - Creates a script tag that pushes the chunk to window.REACT_ON_RAILS_RSC_PAYLOAD
+ *    - Uses React.use() to handle the async chunk loading
+ *    - Recursively renders the next chunk using Suspense
+ *
+ * The component ensures that:
+ * - Chunks are processed in order
+ * - Server-side console logs are preserved
+ * - The transfer is resilient to network conditions
+ * - The client receives all chunks reliably
+ */
 const RSCPayloadContainer = ({
   chunkIndex,
   getChunkPromise,
@@ -27,6 +46,9 @@ const RSCPayloadContainer = ({
 
   const scriptElement = React.createElement('script', {
     dangerouslySetInnerHTML: {
+      // Ensure the array is never reassigned.
+      // Even at the RSCClientRoot component, the array is assigned
+      // only if it's not already assigned by this script.
       __html: escapeScript(`(self.REACT_ON_RAILS_RSC_PAYLOAD||=[]).push(${chunk.chunk})`),
     },
     key: `script-${chunkIndex}`,
