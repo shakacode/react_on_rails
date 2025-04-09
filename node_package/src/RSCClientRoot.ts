@@ -1,7 +1,5 @@
 'use client';
 
-/* eslint-disable no-underscore-dangle */
-
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
 import { createFromReadableStream } from 'react-on-rails-rsc/client';
@@ -17,7 +15,7 @@ if (typeof use !== 'function') {
 
 declare global {
   interface Window {
-    REACT_ON_RAILS_RSC_PAYLOAD: unknown[];
+    REACT_ON_RAILS_RSC_PAYLOAD: RSCPayloadChunk[];
   }
 }
 
@@ -50,14 +48,29 @@ const createRSCStreamFromPage = () => {
       if (typeof window === 'undefined') {
         return;
       }
-      const handleChunk = (chunk: unknown) => {
-        controller.enqueue(chunk as RSCPayloadChunk);
+      const handleChunk = (chunk: RSCPayloadChunk) => {
+        controller.enqueue(chunk);
       };
+
+      // The RSC payload transfer mechanism works in two possible scenarios:
+      // 1. RSCClientRoot executes first:
+      //    - Initializes REACT_ON_RAILS_RSC_PAYLOAD as an empty array
+      //    - Overrides the push function to handle incoming chunks
+      //    - When server scripts run later, they use the overridden push function
+      // 2. Server scripts execute first:
+      //    - Initialize REACT_ON_RAILS_RSC_PAYLOAD as an empty array
+      //    - Buffer RSC payload chunks in the array
+      //    - When RSCClientRoot runs, it reads buffered chunks and overrides push
+      //
+      // Key points:
+      // - The array is never reassigned, ensuring data consistency
+      // - The push function override ensures all chunks are properly handled
+      // - Execution order is irrelevant - both scenarios work correctly
       if (!window.REACT_ON_RAILS_RSC_PAYLOAD) {
         window.REACT_ON_RAILS_RSC_PAYLOAD = [];
       }
       window.REACT_ON_RAILS_RSC_PAYLOAD.forEach(handleChunk);
-      window.REACT_ON_RAILS_RSC_PAYLOAD.push = (...chunks: unknown[]) => {
+      window.REACT_ON_RAILS_RSC_PAYLOAD.push = (...chunks) => {
         chunks.forEach(handleChunk);
         return chunks.length;
       };
