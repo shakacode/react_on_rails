@@ -9,9 +9,9 @@ import { screen, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import * as path from 'path';
 import * as fs from 'fs';
-import { createNodeReadableStream, getNodeVersion } from './testUtils';
+import { createNodeReadableStream, getNodeVersion } from './testUtils.js';
 
-import RSCClientRoot from '../src/RSCClientRoot';
+import RSCClientRoot from '../src/RSCClientRoot.ts';
 
 enableFetchMocks();
 
@@ -43,7 +43,7 @@ enableFetchMocks();
 
     expect(() => {
       // Re-import to trigger the check
-      jest.requireActual('../src/RSCClientRoot');
+      jest.requireActual('../src/RSCClientRoot.ts');
     }).toThrow('React.use is not defined');
   });
 

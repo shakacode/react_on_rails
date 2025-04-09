@@ -3,16 +3,16 @@
 
 import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
-import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './types';
+import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './types/index.ts';
 
-import { getRailsContext, resetRailsContext } from './context';
-import createReactOutput from './createReactOutput';
-import { isServerRenderHash } from './isServerRenderResult';
-import reactHydrateOrRender from './reactHydrateOrRender';
-import { supportsRootApi } from './reactApis';
-import { debugTurbolinks } from './turbolinksUtils';
-import * as StoreRegistry from './StoreRegistry';
-import * as ComponentRegistry from './ComponentRegistry';
+import { getRailsContext, resetRailsContext } from './context.ts';
+import createReactOutput from './createReactOutput.ts';
+import { isServerRenderHash } from './isServerRenderResult.ts';
+import reactHydrateOrRender from './reactHydrateOrRender.ts';
+import { supportsRootApi } from './reactApis.ts';
+import { debugTurbolinks } from './turbolinksUtils.ts';
+import * as StoreRegistry from './StoreRegistry.ts';
+import * as ComponentRegistry from './ComponentRegistry.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 

@@ -4,7 +4,7 @@
 import { createStore } from 'redux';
 import * as React from 'react';
 import * as createReactClass from 'create-react-class';
-import ReactOnRails from '../src/ReactOnRails.client';
+import ReactOnRails from '../src/ReactOnRails.client.ts';
 
 describe('ReactOnRails', () => {
   expect.assertions(14);

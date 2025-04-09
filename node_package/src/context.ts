@@ -1,4 +1,4 @@
-import type { ReactOnRailsInternal, RailsContext } from './types';
+import type { ReactOnRailsInternal, RailsContext } from './types/index.ts';
 
 declare global {
   /* eslint-disable no-var,vars-on-top,no-underscore-dangle */

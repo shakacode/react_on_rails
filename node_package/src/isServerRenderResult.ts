@@ -3,7 +3,7 @@ import type {
   ServerRenderResult,
   RenderFunctionResult,
   RenderStateHtml,
-} from './types/index';
+} from './types/index.ts';
 
 export function isServerRenderHash(
   testValue: CreateReactOutputResult | RenderFunctionResult,

@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import * as ReactDOM from 'react-dom';
-import type { RenderReturnType } from './types';
-import { supportsRootApi } from './reactApis';
+import type { RenderReturnType } from './types/index.ts';
+import { supportsRootApi } from './reactApis.ts';
 
 type HydrateOrRenderType = (domNode: Element, reactElement: ReactElement) => RenderReturnType;
 

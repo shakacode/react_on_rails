@@ -10,6 +10,8 @@
     "moduleResolution": "bundler",
     "noImplicitAny": true,
     "outDir": "node_package/lib",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "strict": true,
     "incremental": true,
     "target": "es2020",
