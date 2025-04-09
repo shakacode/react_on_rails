@@ -14,6 +14,14 @@ type RSCPayloadContainerInnerProps = {
   getChunkPromise: (chunkIndex: number) => Promise<StreamChunk>;
 };
 
+// In JavaScript, when an escape sequence with a backslash (\) is followed by a character
+// that isn't a recognized escape character, the backslash is ignored, and the character
+// is treated as-is.
+// This behavior allows us to use the backslash to escape characters that might be
+// interpreted as HTML tags, preventing them from being processed by the HTML parser.
+// For example, we can escape the comment tag <!-- as <\!-- and the script tag </script>
+// as <\/script>.
+// This ensures that these tags are not prematurely closed or misinterpreted by the browser.
 function escapeScript(script: string) {
   return script.replace(/<!--/g, '<\\!--').replace(/<\/(script)/gi, '</\\$1');
 }
@@ -104,7 +112,7 @@ export default function RSCPayloadContainerWrapper({ RSCPayloadStream }: RSCPayl
 
   const getChunkPromise = React.useCallback(
     (chunkIndex: number) => {
-      if (chunkIndex > chunkPromises.length) {
+      if (chunkIndex >= chunkPromises.length) {
         throw new Error('React on Rails Error: RSC Chunk index out of bounds');
       }
 
