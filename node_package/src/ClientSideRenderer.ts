@@ -11,6 +11,8 @@ import { isServerRenderHash } from './isServerRenderResult';
 import reactHydrateOrRender from './reactHydrateOrRender';
 import { supportsRootApi } from './reactApis';
 import { debugTurbolinks } from './turbolinksUtils';
+import * as StoreRegistry from './StoreRegistry';
+import * as ComponentRegistry from './ComponentRegistry';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
@@ -66,7 +68,7 @@ class ComponentRenderer {
 
     // Wait for all store dependencies to be loaded
     this.renderPromise = Promise.all(
-      storeDependenciesArray.map((storeName) => globalThis.ReactOnRails.getOrWaitForStore(storeName)),
+      storeDependenciesArray.map((storeName) => StoreRegistry.getOrWaitForStore(storeName)),
     ).then(() => {
       if (this.state === 'unmounted') return Promise.resolve();
       return this.render(el, railsContext);
@@ -87,7 +89,7 @@ class ComponentRenderer {
     try {
       const domNode = document.getElementById(domNodeId);
       if (domNode) {
-        const componentObj = await globalThis.ReactOnRails.getOrWaitForComponent(name);
+        const componentObj = await ComponentRegistry.getOrWaitForComponent(name);
         if (this.state === 'unmounted') {
           return;
         }
@@ -195,13 +197,13 @@ class StoreRenderer {
   }
 
   private async hydrate(railsContext: RailsContext, name: string, props: Record<string, unknown>) {
-    const storeGenerator = await globalThis.ReactOnRails.getOrWaitForStoreGenerator(name);
+    const storeGenerator = await StoreRegistry.getOrWaitForStoreGenerator(name);
     if (this.state === 'unmounted') {
       return;
     }
 
     const store = storeGenerator(props, railsContext);
-    globalThis.ReactOnRails.setStore(name, store);
+    StoreRegistry.setStore(name, store);
     this.state = 'hydrated';
   }
 
