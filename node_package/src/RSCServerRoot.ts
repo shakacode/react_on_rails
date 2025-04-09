@@ -79,14 +79,14 @@ const RSCServerRoot: RenderFunction = async (
       'serverClientManifestFileName and reactServerClientManifestFileName are required. ' +
         'Please ensure that React Server Component webpack configurations are properly set ' +
         'as stated in the React Server Component tutorial. ' +
-        'Ensure to use "stream_react_component" instead of "react_component" to SSR a server component.',
+        'Make sure to use "stream_react_component" instead of "react_component" to SSR a server component.',
     );
   }
 
   if (typeof generateRSCPayload !== 'function') {
     throw new Error(
       'generateRSCPayload is not defined. Please ensure that you are using at least version 4.0.0 of ' +
-        'React on Rails Pro and the node renderer, and that ReactOnRailsPro.configuration.enable_rsc_support ' +
+        'React on Rails Pro and the Node renderer, and that ReactOnRailsPro.configuration.enable_rsc_support ' +
         'is set to true.',
     );
   }
