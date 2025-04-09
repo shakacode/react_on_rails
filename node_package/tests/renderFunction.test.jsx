@@ -5,7 +5,7 @@
 import * as React from 'react';
 import * as createReactClass from 'create-react-class';
 
-import isRenderFunction from '../src/isRenderFunction';
+import isRenderFunction from '../src/isRenderFunction.ts';
 
 describe('isRenderFunction', () => {
   expect.assertions(6);

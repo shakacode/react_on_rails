@@ -1,13 +1,13 @@
 import * as React from 'react';
-import serverRenderReactComponent from '../src/serverRenderReactComponent';
-import * as ComponentRegistry from '../src/ComponentRegistry';
+import serverRenderReactComponent from '../src/serverRenderReactComponent.ts';
+import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import type {
   RenderParams,
   RenderResult,
   RailsContext,
   RenderFunction,
   RenderFunctionResult,
-} from '../src/types';
+} from '../src/types/index.ts';
 
 const assertIsString: (value: unknown) => asserts value is string = (value: unknown) => {
   if (typeof value !== 'string') {

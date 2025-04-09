@@ -4,7 +4,7 @@ import type {
   RenderState,
   StreamRenderState,
   FinalHtmlResult,
-} from './types';
+} from './types/index.ts';
 
 export function createResultObject(
   html: FinalHtmlResult | null,
