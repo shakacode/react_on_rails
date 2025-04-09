@@ -33,6 +33,10 @@ Changes since the last non-beta release.
 
 - Deprecated `defer_generated_component_packs` configuration option. You should use `generated_component_packs_loading_strategy` instead. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+### Changed
+
+- The global context is now accessed using `globalThis`. [PR 1727](https://github.com/shakacode/react_on_rails/pull/1727) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
+
 ### [15.0.0-alpha.2] - 2025-03-07
 
 See [Release Notes](docs/release-notes/15.0.0.md) for full details.
