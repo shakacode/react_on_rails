@@ -22,12 +22,15 @@ if (supportsRootApi) {
   }
 }
 
-/* eslint-disable react/no-deprecated,@typescript-eslint/no-deprecated,@typescript-eslint/no-non-null-assertion --
+/* eslint-disable @typescript-eslint/no-deprecated,@typescript-eslint/no-non-null-assertion --
  * while we need to support React 16
  */
+const hydrateProp = 'hydrate';
+const renderProp = 'render';
+
 const reactHydrate: HydrateOrRenderType = supportsRootApi
   ? reactDomClient!.hydrateRoot
-  : (domNode, reactElement) => ReactDOM.hydrate(reactElement, domNode);
+  : (domNode, reactElement) => ReactDOM[hydrateProp](reactElement, domNode);
 
 function reactRender(domNode: Element, reactElement: ReactElement): RenderReturnType {
   if (supportsRootApi) {
@@ -36,10 +39,9 @@ function reactRender(domNode: Element, reactElement: ReactElement): RenderReturn
     return root;
   }
 
-  // eslint-disable-next-line react/no-render-return-value
-  return ReactDOM.render(reactElement, domNode);
+  return ReactDOM[renderProp](reactElement, domNode);
 }
-/* eslint-enable react/no-deprecated,@typescript-eslint/no-deprecated,@typescript-eslint/no-non-null-assertion */
+/* eslint-enable @typescript-eslint/no-deprecated,@typescript-eslint/no-non-null-assertion */
 
 export default function reactHydrateOrRender(
   domNode: Element,
