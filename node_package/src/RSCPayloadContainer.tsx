@@ -44,28 +44,28 @@ const RSCPayloadContainer = ({
   const chunkPromise = getChunkPromise(chunkIndex);
   const chunk = React.use(chunkPromise);
 
-  const scriptElement = React.createElement('script', {
-    dangerouslySetInnerHTML: {
-      // Ensure the array is never reassigned.
-      // Even at the RSCClientRoot component, the array is assigned
-      // only if it's not already assigned by this script.
-      __html: escapeScript(`(self.REACT_ON_RAILS_RSC_PAYLOAD||=[]).push(${chunk.chunk})`),
-    },
-    key: `script-${chunkIndex}`,
-  });
+  const scriptElement = (
+    <script
+      // eslint-disable-next-line react/no-danger
+      dangerouslySetInnerHTML={{
+        __html: escapeScript(`(self.REACT_ON_RAILS_RSC_PAYLOAD||=[]).push(${chunk.chunk})`),
+      }}
+      key={`script-${chunkIndex}`}
+    />
+  );
 
   if (chunk.isLastChunk) {
     return scriptElement;
   }
 
-  return React.createElement(React.Fragment, null, [
-    scriptElement,
-    React.createElement(
-      React.Suspense,
-      { fallback: null, key: `suspense-${chunkIndex}` },
-      React.createElement(RSCPayloadContainer, { chunkIndex: chunkIndex + 1, getChunkPromise }),
-    ),
-  ]);
+  return (
+    <>
+      {scriptElement}
+      <React.Suspense fallback={null} key={`suspense-${chunkIndex}`}>
+        <RSCPayloadContainer chunkIndex={chunkIndex + 1} getChunkPromise={getChunkPromise} />
+      </React.Suspense>
+    </>
+  );
 };
 
 export default function RSCPayloadContainerWrapper({ RSCPayloadStream }: RSCPayloadContainerProps) {
@@ -113,9 +113,9 @@ export default function RSCPayloadContainerWrapper({ RSCPayloadStream }: RSCPayl
     [chunkPromises],
   );
 
-  return React.createElement(
-    React.Suspense,
-    { fallback: null },
-    React.createElement(RSCPayloadContainer, { chunkIndex: 0, getChunkPromise }),
+  return (
+    <React.Suspense fallback={null}>
+      <RSCPayloadContainer chunkIndex={0} getChunkPromise={getChunkPromise} />
+    </React.Suspense>
   );
 }
