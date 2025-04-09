@@ -104,14 +104,12 @@ const RSCServerRoot: RenderFunction = async (
   rscPayloadStream.pipe(rscPayloadStream2);
   const serverComponentElement = createFromReactOnRailsNodeStream(rscPayloadStream1, ssrManifest);
 
-  return () =>
-    React.createElement(React.Fragment, null, [
-      React.createElement(React.Fragment, { key: 'serverComponentElement' }, use(serverComponentElement)),
-      React.createElement(RSCPayloadContainer, {
-        RSCPayloadStream: rscPayloadStream2,
-        key: 'rscPayloadContainer',
-      }),
-    ]);
+  return () => (
+    <>
+      <React.Fragment key="serverComponentElement">{use(serverComponentElement)}</React.Fragment>
+      <RSCPayloadContainer RSCPayloadStream={rscPayloadStream2} key="rscPayloadContainer" />
+    </>
+  );
 };
 
 export default RSCServerRoot;
