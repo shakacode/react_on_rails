@@ -9,8 +9,6 @@ import isRenderFunction from '../src/isRenderFunction';
 
 describe('isRenderFunction', () => {
   it('returns false for a ES5 React Component', () => {
-    expect.assertions(1);
-
     const es5Component = createReactClass({
       render() {
         return <div>ES5 React Component</div>;
@@ -21,8 +19,6 @@ describe('isRenderFunction', () => {
   });
 
   it('returns false for a ES6 React class', () => {
-    expect.assertions(1);
-
     class ES6Component extends React.Component {
       render() {
         return <div>ES6 Component</div>;
@@ -33,8 +29,6 @@ describe('isRenderFunction', () => {
   });
 
   it('returns false for a ES6 React subclass', () => {
-    expect.assertions(1);
-
     class ES6Component extends React.Component {
       render() {
         return <div>ES6 Component</div>;
@@ -51,24 +45,18 @@ describe('isRenderFunction', () => {
   });
 
   it('returns false for a stateless functional component with zero params', () => {
-    expect.assertions(1);
-
     const pureComponent = () => <h1>Hello</h1>;
 
     expect(isRenderFunction(pureComponent)).toBe(false);
   });
 
   it('returns false for a stateless functional component with one param', () => {
-    expect.assertions(1);
-
     const pureComponent = (props) => <h1>{props.title}</h1>;
 
     expect(isRenderFunction(pureComponent)).toBe(false);
   });
 
   it('returns true for a Render-Function (containing two params)', () => {
-    expect.assertions(1);
-
     const foobarComponent = () => <div>Component for Render-Function</div>;
     const foobarrenderFunction = (_props, _railsContext) => foobarComponent;
 
@@ -76,8 +64,6 @@ describe('isRenderFunction', () => {
   });
 
   it('returns false for simple object', () => {
-    expect.assertions(1);
-
     const foobarComponent = {
       hello() {
         return 'world';

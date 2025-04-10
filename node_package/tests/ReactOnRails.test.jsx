@@ -8,7 +8,6 @@ import ReactOnRails from '../src/ReactOnRails.client';
 
 describe('ReactOnRails', () => {
   it('render returns a virtual DOM element for component', () => {
-    expect.assertions(1);
     const R1 = createReactClass({
       render() {
         return <div> WORLD </div>;
@@ -29,7 +28,6 @@ describe('ReactOnRails', () => {
 
   it('accepts traceTurbolinks as an option true', () => {
     ReactOnRails.resetOptions();
-    expect.assertions(1);
     ReactOnRails.setOptions({ traceTurbolinks: true });
     const actual = ReactOnRails.option('traceTurbolinks');
     expect(actual).toBe(true);
@@ -37,7 +35,6 @@ describe('ReactOnRails', () => {
 
   it('accepts traceTurbolinks as an option false', () => {
     ReactOnRails.resetOptions();
-    expect.assertions(1);
     ReactOnRails.setOptions({ traceTurbolinks: false });
     const actual = ReactOnRails.option('traceTurbolinks');
     expect(actual).toBe(false);
@@ -45,7 +42,6 @@ describe('ReactOnRails', () => {
 
   it('not specified has traceTurbolinks as false', () => {
     ReactOnRails.resetOptions();
-    expect.assertions(1);
     ReactOnRails.setOptions({});
     const actual = ReactOnRails.option('traceTurbolinks');
     expect(actual).toBe(false);
@@ -53,13 +49,10 @@ describe('ReactOnRails', () => {
 
   it('setOptions method throws error for invalid options', () => {
     ReactOnRails.resetOptions();
-    expect.assertions(1);
     expect(() => ReactOnRails.setOptions({ foobar: true })).toThrow(/Invalid option/);
   });
 
   it('registerStore throws if passed a falsey object (null, undefined, etc)', () => {
-    expect.assertions(3);
-
     expect(() => ReactOnRails.registerStore(null)).toThrow(/null or undefined/);
 
     expect(() => ReactOnRails.registerStore(undefined)).toThrow(/null or undefined/);
@@ -68,7 +61,6 @@ describe('ReactOnRails', () => {
   });
 
   it('register store and getStoreGenerator allow registration', () => {
-    expect.assertions(2);
     function reducer() {
       return {};
     }
@@ -86,7 +78,6 @@ describe('ReactOnRails', () => {
   });
 
   it('setStore and getStore', () => {
-    expect.assertions(2);
     function reducer() {
       return {};
     }
@@ -108,7 +99,6 @@ describe('ReactOnRails', () => {
   });
 
   it('clearHydratedStores', () => {
-    expect.assertions(2);
     function reducer() {
       return {};
     }
