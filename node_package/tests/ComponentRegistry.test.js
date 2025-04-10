@@ -23,7 +23,7 @@ jest.mock('../src/pageLifecycle', () => ({
 }));
 
 jest.mock('../src/context', () => ({
-  getContextAndRailsContext: () => ({ railsContext: { componentRegistryTimeout: 100 } }),
+  getRailsContext: () => ({ componentRegistryTimeout: 100 }),
 }));
 
 describe('ComponentRegistry', () => {

@@ -6,7 +6,6 @@ import * as StoreRegistry from './StoreRegistry';
 import buildConsoleReplay from './buildConsoleReplay';
 import createReactOutput from './createReactOutput';
 import * as Authenticity from './Authenticity';
-import context from './context';
 import type {
   RegisteredComponent,
   RenderResult,
@@ -19,19 +18,11 @@ import type {
 } from './types';
 import reactHydrateOrRender from './reactHydrateOrRender';
 
-const ctx = context();
-
-if (ctx === undefined) {
-  throw new Error("The context (usually Window or NodeJS's Global) is undefined.");
-}
-
-if (ctx.ReactOnRails !== undefined) {
-  /* eslint-disable @typescript-eslint/no-base-to-string -- Window and Global both have useful toString() */
+if (globalThis.ReactOnRails !== undefined) {
   throw new Error(`\
-The ReactOnRails value exists in the ${ctx} scope, it may not be safe to overwrite it.
+The ReactOnRails value exists in the ${globalThis} scope, it may not be safe to overwrite it.
 This could be caused by setting Webpack's optimization.runtimeChunk to "true" or "multiple," rather than "single."
 Check your Webpack configuration. Read more at https://github.com/shakacode/react_on_rails/issues/1558.`);
-  /* eslint-enable @typescript-eslint/no-base-to-string */
 }
 
 const DEFAULT_OPTIONS = {
@@ -39,7 +30,7 @@ const DEFAULT_OPTIONS = {
   turbo: false,
 };
 
-ctx.ReactOnRails = {
+globalThis.ReactOnRails = {
   options: {},
 
   register(components: Record<string, ReactComponentOrRenderFunction>): void {
@@ -199,9 +190,9 @@ ctx.ReactOnRails = {
   },
 };
 
-ctx.ReactOnRails.resetOptions();
+globalThis.ReactOnRails.resetOptions();
 
-ClientStartup.clientStartup(ctx);
+ClientStartup.clientStartup();
 
 export * from './types';
-export default ctx.ReactOnRails;
+export default globalThis.ReactOnRails;

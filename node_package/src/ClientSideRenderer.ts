@@ -5,12 +5,14 @@ import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
 import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './types';
 
-import { getContextAndRailsContext, resetContextAndRailsContext, type Context } from './context';
+import { getRailsContext, resetRailsContext } from './context';
 import createReactOutput from './createReactOutput';
 import { isServerRenderHash } from './isServerRenderResult';
 import reactHydrateOrRender from './reactHydrateOrRender';
 import { supportsRootApi } from './reactApis';
 import { debugTurbolinks } from './turbolinksUtils';
+import * as StoreRegistry from './StoreRegistry';
+import * as ComponentRegistry from './ComponentRegistry';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
@@ -61,15 +63,15 @@ class ComponentRenderer {
     const storeDependencies = el.getAttribute('data-store-dependencies');
     const storeDependenciesArray = storeDependencies ? (JSON.parse(storeDependencies) as string[]) : [];
 
-    const { context, railsContext } = getContextAndRailsContext();
-    if (!context || !railsContext) return;
+    const railsContext = getRailsContext();
+    if (!railsContext) return;
 
     // Wait for all store dependencies to be loaded
     this.renderPromise = Promise.all(
-      storeDependenciesArray.map((storeName) => context.ReactOnRails.getOrWaitForStore(storeName)),
+      storeDependenciesArray.map((storeName) => StoreRegistry.getOrWaitForStore(storeName)),
     ).then(() => {
       if (this.state === 'unmounted') return Promise.resolve();
-      return this.render(el, context, railsContext);
+      return this.render(el, railsContext);
     });
   }
 
@@ -77,7 +79,7 @@ class ComponentRenderer {
    * Used for client rendering by ReactOnRails. Either calls ReactDOM.hydrate, ReactDOM.render, or
    * delegates to a renderer registered by the user.
    */
-  private async render(el: Element, context: Context, railsContext: RailsContext): Promise<void> {
+  private async render(el: Element, railsContext: RailsContext): Promise<void> {
     // This must match lib/react_on_rails/helper.rb
     const name = el.getAttribute('data-component-name') || '';
     const { domNodeId } = this;
@@ -87,7 +89,7 @@ class ComponentRenderer {
     try {
       const domNode = document.getElementById(domNodeId);
       if (domNode) {
-        const componentObj = await context.ReactOnRails.getOrWaitForComponent(name);
+        const componentObj = await ComponentRegistry.getOrWaitForComponent(name);
         if (this.state === 'unmounted') {
           return;
         }
@@ -181,8 +183,8 @@ class StoreRenderer {
 
   constructor(storeDataElement: Element) {
     this.state = 'hydrating';
-    const { context, railsContext } = getContextAndRailsContext();
-    if (!context || !railsContext) {
+    const railsContext = getRailsContext();
+    if (!railsContext) {
       return;
     }
 
@@ -191,22 +193,17 @@ class StoreRenderer {
       storeDataElement.textContent !== null
         ? (JSON.parse(storeDataElement.textContent) as Record<string, unknown>)
         : {};
-    this.hydratePromise = this.hydrate(context, railsContext, name, props);
+    this.hydratePromise = this.hydrate(railsContext, name, props);
   }
 
-  private async hydrate(
-    context: Context,
-    railsContext: RailsContext,
-    name: string,
-    props: Record<string, unknown>,
-  ) {
-    const storeGenerator = await context.ReactOnRails.getOrWaitForStoreGenerator(name);
+  private async hydrate(railsContext: RailsContext, name: string, props: Record<string, unknown>) {
+    const storeGenerator = await StoreRegistry.getOrWaitForStoreGenerator(name);
     if (this.state === 'unmounted') {
       return;
     }
 
     const store = storeGenerator(props, railsContext);
-    context.ReactOnRails.setStore(name, store);
+    StoreRegistry.setStore(name, store);
     this.state = 'hydrated';
   }
 
@@ -252,7 +249,7 @@ export const renderOrHydrateAllComponents = () =>
 function unmountAllComponents(): void {
   renderedRoots.forEach((root) => root.unmount());
   renderedRoots.clear();
-  resetContextAndRailsContext();
+  resetRailsContext();
 }
 
 const storeRenderers = new Map<string, StoreRenderer>();

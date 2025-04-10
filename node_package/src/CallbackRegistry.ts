@@ -1,6 +1,6 @@
 import { ItemRegistrationCallback } from './types';
 import { onPageLoaded, onPageUnloaded } from './pageLifecycle';
-import { getContextAndRailsContext } from './context';
+import { getRailsContext } from './context';
 
 /**
  * Represents information about a registered item including its value,
@@ -47,7 +47,7 @@ export default class CallbackRegistry<T> {
     };
 
     onPageLoaded(() => {
-      const registryTimeout = getContextAndRailsContext().railsContext?.componentRegistryTimeout;
+      const registryTimeout = getRailsContext()?.componentRegistryTimeout;
       if (!registryTimeout) return;
 
       timeoutId = setTimeout(triggerTimeout, registryTimeout);
