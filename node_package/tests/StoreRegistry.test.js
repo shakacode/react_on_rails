@@ -14,11 +14,13 @@ function storeGenerator2(props) {
   return createStore(reducer, props);
 }
 
-describe('', () => {
-  expect.assertions(11);
+describe('StoreRegistry', () => {
+  beforeEach(() => {
+    StoreRegistry.stores().clear();
+  });
+
   it('StoreRegistry throws error for registering null or undefined store', () => {
     expect.assertions(2);
-    StoreRegistry.stores().clear();
     expect(() => StoreRegistry.register({ storeGenerator: null })).toThrow(
       /Called ReactOnRails.registerStoreGenerators with a null or undefined as a value/,
     );
@@ -29,7 +31,6 @@ describe('', () => {
 
   it('StoreRegistry throws error for retrieving unregistered store', () => {
     expect.assertions(1);
-    StoreRegistry.stores().clear();
     expect(() => StoreRegistry.getStore('foobar')).toThrow(
       /There are no stores hydrated and you are requesting the store/,
     );
@@ -46,7 +47,7 @@ describe('', () => {
     expect(actual2).toEqual(expected2);
   });
 
-  it('StoreRegistry throws error for retrieving unregistered store', () => {
+  it('StoreRegistry throws error for retrieving unregistered store generator', () => {
     expect.assertions(1);
     expect(() => StoreRegistry.getStoreGenerator('foobar')).toThrow(
       /Could not find store generator registered with name foobar\. Registered store generator names include/,

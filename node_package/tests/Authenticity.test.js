@@ -8,10 +8,9 @@ meta.content = testToken;
 document.head.appendChild(meta);
 
 describe('authenticityToken', () => {
-  expect.assertions(2);
   it('exists in ReactOnRails API', () => {
     expect.assertions(1);
-    expect(typeof ReactOnRails.authenticityToken).toEqual('function');
+    expect(typeof ReactOnRails.authenticityToken).toBe('function');
   });
 
   it('can read Rails CSRF token from <meta>', () => {
@@ -22,10 +21,9 @@ describe('authenticityToken', () => {
 });
 
 describe('authenticityHeaders', () => {
-  expect.assertions(2);
   it('exists in ReactOnRails API', () => {
     expect.assertions(1);
-    expect(typeof ReactOnRails.authenticityHeaders).toEqual('function');
+    expect(typeof ReactOnRails.authenticityHeaders).toBe('function');
   });
 
   it('returns valid header with CSRF token', () => {

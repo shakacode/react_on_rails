@@ -176,10 +176,12 @@ describe('ComponentRegistry', () => {
 
   it('handles timeout for unregistered components', async () => {
     expect.assertions(1);
+    let error;
     try {
       await ComponentRegistry.getOrWaitForComponent('NonExistent');
-    } catch (error) {
-      expect(error.message).toMatch(/Could not find component/);
+    } catch (e) {
+      error = e;
     }
+    expect(error.message).toMatch(/Could not find component/);
   });
 });
