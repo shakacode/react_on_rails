@@ -41,18 +41,10 @@ const createSSRManifest = async (
     loadJsonFile(reactClientManifestFileName) as Promise<Record<string, { id: string }>>,
   ]);
 
-  const ssrManifest = {
-    // The `moduleLoading` property is utilized by the React runtime to load JavaScript modules.
-    // It can accept options such as `prefix` and `crossOrigin` to specify the path and crossorigin attribute for the modules.
-    // In our case, since the server code is bundled into a single bundle, there is no need to load additional JavaScript modules.
-    // As a result, we set this property to an empty object because it will not be used.
-    moduleLoading: {},
-    moduleMap: {} as Record<string, unknown>,
-  };
-
+  const moduleMap: Record<string, unknown> = {};
   Object.entries(reactClientManifest).forEach(([aboluteFileUrl, clientFileBundlingInfo]) => {
     const { id, chunks } = reactServerManifest[aboluteFileUrl];
-    ssrManifest.moduleMap[clientFileBundlingInfo.id] = {
+    moduleMap[clientFileBundlingInfo.id] = {
       '*': {
         id,
         chunks,
@@ -60,6 +52,15 @@ const createSSRManifest = async (
       },
     };
   });
+
+  const ssrManifest = {
+    // The `moduleLoading` property is utilized by the React runtime to load JavaScript modules.
+    // It can accept options such as `prefix` and `crossOrigin` to specify the path and crossorigin attribute for the modules.
+    // In our case, since the server code is bundled into a single bundle, there is no need to load additional JavaScript modules.
+    // As a result, we set this property to an empty object because it will not be used.
+    moduleLoading: {},
+    moduleMap,
+  };
 
   return ssrManifest;
 };
@@ -106,8 +107,8 @@ const RSCServerRoot: RenderFunction = async (
     const resolvedServerComponent = use(serverComponentElement);
     return (
       <>
-        <React.Fragment key="serverComponentElement">{resolvedServerComponent}</React.Fragment>
-        <RSCPayloadContainer RSCPayloadStream={rscPayloadStream2} key="rscPayloadContainer" />
+        {resolvedServerComponent}
+        <RSCPayloadContainer RSCPayloadStream={rscPayloadStream2} />
       </>
     );
   };

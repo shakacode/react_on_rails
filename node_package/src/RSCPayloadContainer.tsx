@@ -58,7 +58,6 @@ const RSCPayloadContainer = ({
       dangerouslySetInnerHTML={{
         __html: escapeScript(`(self.REACT_ON_RAILS_RSC_PAYLOAD||=[]).push(${chunk.chunk})`),
       }}
-      key={`script-${chunkIndex}`}
     />
   );
 
@@ -69,7 +68,7 @@ const RSCPayloadContainer = ({
   return (
     <>
       {scriptElement}
-      <React.Suspense fallback={null} key={`suspense-${chunkIndex}`}>
+      <React.Suspense fallback={null}>
         <RSCPayloadContainer chunkIndex={chunkIndex + 1} getChunkPromise={getChunkPromise} />
       </React.Suspense>
     </>
