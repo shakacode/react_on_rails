@@ -5,6 +5,9 @@ import type { RenderFunction, RailsContext } from './types';
 import transformRSCStream from './transformRSCNodeStream';
 import loadJsonFile from './loadJsonFile';
 import RSCPayloadContainer from './RSCPayloadContainer';
+import { ensureReactUseAvailable } from './reactApis';
+
+ensureReactUseAvailable();
 
 declare global {
   function generateRSCPayload(
@@ -18,12 +21,6 @@ type RSCServerRootProps = {
   componentName: string;
   componentProps: Record<string, unknown>;
 };
-
-if (!('use' in React && typeof React.use === 'function')) {
-  throw new Error(
-    'React.use is not defined. Please ensure you are using React 18 with experimental features enabled or React 19+ to use server components.',
-  );
-}
 
 const { use } = React;
 
@@ -40,24 +37,25 @@ const createSSRManifest = async (
   reactClientManifestFileName: string,
 ) => {
   const [reactServerManifest, reactClientManifest] = await Promise.all([
-    loadJsonFile(reactServerManifestFileName),
-    loadJsonFile(reactClientManifestFileName),
+    loadJsonFile(reactServerManifestFileName) as Promise<Record<string, { id: string; chunks: string[] }>>,
+    loadJsonFile(reactClientManifestFileName) as Promise<Record<string, { id: string }>>,
   ]);
 
   const ssrManifest = {
-    moduleLoading: {
-      prefix: '/webpack/development/',
-      crossOrigin: null,
-    },
+    // The `moduleLoading` property is utilized by the React runtime to load JavaScript modules.
+    // It can accept options such as `prefix` and `crossOrigin` to specify the path and crossorigin attribute for the modules.
+    // In our case, since the server code is bundled into a single bundle, there is no need to load additional JavaScript modules.
+    // As a result, we set this property to an empty object because it will not be used.
+    moduleLoading: {},
     moduleMap: {} as Record<string, unknown>,
   };
 
   Object.entries(reactClientManifest).forEach(([aboluteFileUrl, clientFileBundlingInfo]) => {
-    const serverFileBundlingInfo = reactServerManifest[aboluteFileUrl];
-    ssrManifest.moduleMap[(clientFileBundlingInfo as { id: string }).id] = {
+    const { id, chunks } = reactServerManifest[aboluteFileUrl];
+    ssrManifest.moduleMap[clientFileBundlingInfo.id] = {
       '*': {
-        id: (serverFileBundlingInfo as { id: string }).id,
-        chunks: (serverFileBundlingInfo as { chunks: string[] }).chunks,
+        id,
+        chunks,
         name: '*',
       },
     };
