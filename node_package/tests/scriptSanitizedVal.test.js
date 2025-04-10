@@ -1,7 +1,6 @@
 import scriptSanitizedVal from '../src/scriptSanitizedVal.ts';
 
 describe('scriptSanitizedVal', () => {
-  expect.assertions(5);
   it('returns no </script if spaces, uppercase 1', () => {
     expect.assertions(1);
     const input = '[SERVER] This is a script:"</div>"</script> <script>alert(\'WTF\')</  SCRIPT >';
