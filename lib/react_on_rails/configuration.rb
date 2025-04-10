@@ -305,11 +305,13 @@ module ReactOnRails
     def ensure_webpack_generated_files_exists
       return unless webpack_generated_files.empty?
 
-      files = ["manifest.json"]
-      files << server_bundle_js_file if server_bundle_js_file.present?
-      files << rsc_bundle_js_file if rsc_bundle_js_file.present?
-      files << react_client_manifest_file if react_client_manifest_file.present?
-      files << react_server_client_manifest_file if react_server_client_manifest_file.present?
+      self.webpack_generated_files = [
+        "manifest.json",
+        server_bundle_js_file,
+        rsc_bundle_js_file,
+        react_client_manifest_file,
+        react_server_client_manifest_file
+      ].compact_blank
 
       self.webpack_generated_files = files
     end
