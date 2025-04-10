@@ -3,7 +3,7 @@
 
 git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
-ruby '3.3.0'
+ruby '3.3.7'
 
 gem "react_on_rails", "15.0.0.alpha.2" # keep in sync with package.json files
 

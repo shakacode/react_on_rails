@@ -56,7 +56,7 @@ scripts:
   eslint:
     default:
       description: Run eslint.
-      script: eslint . --ext ".js,.mts,.mjs,.jsx,.ts,.tsx" --report-unused-disable-directives
+      script: eslint . --report-unused-disable-directives
     fix:
       description: Run eslint and auto-fix.
       script: nps "eslint --fix"
