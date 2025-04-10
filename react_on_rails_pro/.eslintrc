@@ -68,7 +68,7 @@ overrides:
       "@typescript-eslint/restrict-template-expressions": off
       "@typescript-eslint/no-unused-vars":
         - error
-        - { argsIgnorePattern: "^_" }
+        - { argsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }
       "@typescript-eslint/no-floating-promises":
         - error
         - allowForKnownSafePromises:

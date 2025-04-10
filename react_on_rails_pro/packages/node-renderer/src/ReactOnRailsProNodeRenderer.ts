@@ -26,7 +26,7 @@ and for "@fastify/..." dependencies in your package.json. Consider removing them
     );
   }
 
-  /* eslint-disable global-require,@typescript-eslint/no-var-requires --
+  /* eslint-disable global-require,@typescript-eslint/no-require-imports --
    * Using normal `import` fails before the check above.
    */
   if (cluster.isPrimary) {
@@ -34,5 +34,5 @@ and for "@fastify/..." dependencies in your package.json. Consider removing them
   } else {
     await (require('./worker') as typeof import('./worker')).default(config).ready();
   }
-  /* eslint-enable global-require,@typescript-eslint/no-var-requires */
+  /* eslint-enable global-require,@typescript-eslint/no-require-imports */
 }

@@ -5,10 +5,10 @@ let pretty = false;
 
 if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
   try {
-    // eslint-disable-next-line global-require
+    // eslint-disable-next-line global-require,@typescript-eslint/no-require-imports
     require('pino-pretty');
     pretty = true;
-  } catch (e) {
+  } catch (_e) {
     console.log('pino-pretty not found in development, using the default pino log settings');
   }
 }

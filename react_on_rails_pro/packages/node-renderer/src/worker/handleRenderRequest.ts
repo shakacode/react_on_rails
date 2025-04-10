@@ -42,7 +42,7 @@ async function prepareResult(
     }
 
     if (exceptionMessage) {
-      return Promise.resolve(errorResponseResult(exceptionMessage));
+      return errorResponseResult(exceptionMessage);
     }
 
     if (isReadableStream(result)) {
@@ -50,21 +50,21 @@ async function prepareResult(
         const msg = formatExceptionMessage(renderingRequest, error, 'Error in a rendering stream');
         errorReporter.message(msg);
       });
-      return Promise.resolve({
+      return {
         headers: { 'Cache-Control': 'public, max-age=31536000' },
         status: 200,
         stream: newStreamAfterHandlingError,
-      });
+      };
     }
 
-    return Promise.resolve({
+    return {
       headers: { 'Cache-Control': 'public, max-age=31536000' },
       status: 200,
       data: result,
-    });
+    };
   } catch (err) {
     const exceptionMessage = formatExceptionMessage(renderingRequest, err, 'Unknown error calling runInVM');
-    return Promise.resolve(errorResponseResult(exceptionMessage));
+    return errorResponseResult(exceptionMessage);
   }
 }
 
@@ -100,7 +100,7 @@ async function handleNewBundleProvided(
         errorMessage,
         `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
       );
-      return Promise.resolve(errorResponseResult(msg));
+      return errorResponseResult(msg);
     }
 
     try {
@@ -123,7 +123,7 @@ async function handleNewBundleProvided(
 to ${bundleFilePathPerTimestamp})`,
         );
         log.error(msg);
-        return Promise.resolve(errorResponseResult(msg));
+        return errorResponseResult(msg);
       }
       log.info(
         'File exists when trying to overwrite bundle %s. Assuming bundle written by other thread',
@@ -136,14 +136,14 @@ to ${bundleFilePathPerTimestamp})`,
       // file must be fully written
       log.info('buildVM, bundleFilePathPerTimestamp', bundleFilePathPerTimestamp);
       await buildVM(bundleFilePathPerTimestamp);
-      return prepareResult(renderingRequest, bundleFilePathPerTimestamp);
+      return await prepareResult(renderingRequest, bundleFilePathPerTimestamp);
     } catch (error) {
       const msg = formatExceptionMessage(
         renderingRequest,
         error,
         `Unexpected error when building the VM ${bundleFilePathPerTimestamp}`,
       );
-      return Promise.resolve(errorResponseResult(msg));
+      return errorResponseResult(msg);
     }
   } finally {
     if (lockAcquired) {
@@ -185,12 +185,12 @@ export = async function handleRenderRequest({
 
     // If the current VM has the correct bundle and is ready
     if (hasVMContextForBundle(bundleFilePathPerTimestamp)) {
-      return prepareResult(renderingRequest, bundleFilePathPerTimestamp);
+      return await prepareResult(renderingRequest, bundleFilePathPerTimestamp);
     }
 
     // If gem has posted updated bundle:
     if (providedNewBundle) {
-      return handleNewBundleProvided(
+      return await handleNewBundleProvided(
         bundleFilePathPerTimestamp,
         providedNewBundle,
         renderingRequest,
@@ -202,11 +202,11 @@ export = async function handleRenderRequest({
     const fileExists = await fileExistsAsync(bundleFilePathPerTimestamp);
     if (!fileExists) {
       log.info(`No saved bundle ${bundleFilePathPerTimestamp}. Requesting a new bundle.`);
-      return Promise.resolve({
+      return {
         headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
         status: 410,
         data: 'No bundle uploaded',
-      });
+      };
     }
 
     // The bundle exists, but the VM has not yet been created.
@@ -214,7 +214,7 @@ export = async function handleRenderRequest({
     log.info('Bundle %s exists. Building VM for worker %s.', bundleFilePathPerTimestamp, workerIdLabel());
     await buildVM(bundleFilePathPerTimestamp);
 
-    return prepareResult(renderingRequest, bundleFilePathPerTimestamp);
+    return await prepareResult(renderingRequest, bundleFilePathPerTimestamp);
   } catch (error) {
     const msg = formatExceptionMessage(
       renderingRequest,
