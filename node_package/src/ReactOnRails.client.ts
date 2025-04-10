@@ -1,11 +1,11 @@
 import type { ReactElement } from 'react';
 import * as ClientStartup from './clientStartup';
 import { renderOrHydrateComponent, hydrateStore } from './ClientSideRenderer';
-import ComponentRegistry from './ComponentRegistry';
-import StoreRegistry from './StoreRegistry';
+import * as ComponentRegistry from './ComponentRegistry';
+import * as StoreRegistry from './StoreRegistry';
 import buildConsoleReplay from './buildConsoleReplay';
 import createReactOutput from './createReactOutput';
-import Authenticity from './Authenticity';
+import * as Authenticity from './Authenticity';
 import context from './context';
 import type {
   RegisteredComponent,

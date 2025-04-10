@@ -2,7 +2,7 @@ import * as React from 'react';
 import * as ReactDOMServer from 'react-dom/server';
 import { PassThrough, Readable } from 'stream';
 
-import ComponentRegistry from './ComponentRegistry';
+import * as ComponentRegistry from './ComponentRegistry';
 import createReactOutput from './createReactOutput';
 import { isPromise, isServerRenderHash } from './isServerRenderResult';
 import buildConsoleReplay from './buildConsoleReplay';
