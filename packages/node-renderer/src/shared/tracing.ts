@@ -1,5 +1,6 @@
 import { message } from './errorReporter';
 
+/* eslint-disable @typescript-eslint/no-empty-object-type -- empty interfaces are used as targets for augmentation */
 /**
  * This contains the options necessary to start a unit of work (transaction/span/etc.).
  * Integrations should augment it using their name as the property.
@@ -21,6 +22,7 @@ export interface UnitOfWorkOptions {}
  * {@link import('@sentry/types').CaptureContext} parameter, and so it adds `{ sentry6: CaptureContext }`.
  */
 export interface TracingContext {}
+/* eslint-enable @typescript-eslint/no-empty-object-type */
 
 let setupRun = false;
 

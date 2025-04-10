@@ -319,7 +319,7 @@ ${smartTrim(result)}`);
       await writeFileAsync(debugOutputPathResult, result);
     }
 
-    return Promise.resolve(result);
+    return result;
   } catch (exception) {
     const exceptionMessage = formatExceptionMessage(renderingRequest, exception);
     log.debug('Caught exception in rendering request', exceptionMessage);

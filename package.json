@@ -85,7 +85,7 @@
     "sentry-testkit": "^5.0.6",
     "touch": "^3.1.0",
     "typescript": "^5.4.3",
-    "typescript-eslint": "^7.4.0",
+    "typescript-eslint": "^8.29.1",
     "yalc": "^1.0.0-pre.53"
   },
   "peerDependencies": {

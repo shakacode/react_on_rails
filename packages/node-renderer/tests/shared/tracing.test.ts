@@ -34,6 +34,7 @@ test('should run function and finish span', async () => {
     await fn();
   }, testTransactionContext);
   expect(savedSpan).toBeDefined();
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- the suggested replacement doesn't work
   expect(savedSpan?.name).toBe(spanName);
   expect(Sentry.getActiveSpan()).not.toBe(savedSpan);
   expect(fn.mock.calls).toHaveLength(1);
