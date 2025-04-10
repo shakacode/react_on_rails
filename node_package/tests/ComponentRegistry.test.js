@@ -37,7 +37,6 @@ describe('ComponentRegistry', () => {
   });
 
   it('registers and retrieves React function components', () => {
-    expect.assertions(1);
     const C1 = () => <div>HELLO</div>;
     ComponentRegistry.register({ C1 });
     const actual = ComponentRegistry.get('C1');
@@ -46,7 +45,6 @@ describe('ComponentRegistry', () => {
   });
 
   it('registers and retrieves Render-Function components where property renderFunction is set and zero params', () => {
-    expect.assertions(1);
     const C1 = () => <div>HELLO</div>;
     C1.renderFunction = true;
     ComponentRegistry.register({ C1 });
@@ -56,7 +54,6 @@ describe('ComponentRegistry', () => {
   });
 
   it('registers and retrieves ES5 class components', () => {
-    expect.assertions(1);
     const C2 = createReactClass({
       render() {
         return <div> WORLD </div>;
@@ -69,7 +66,6 @@ describe('ComponentRegistry', () => {
   });
 
   it('registers and retrieves ES6 class components', () => {
-    expect.assertions(1);
     class C3 extends React.Component {
       render() {
         return <div>Wow!</div>;
@@ -82,7 +78,6 @@ describe('ComponentRegistry', () => {
   });
 
   it('registers and retrieves renderers if 3 params', () => {
-    expect.assertions(1);
     const C4 = (a1, a2, a3) => null;
     ComponentRegistry.register({ C4 });
     const actual = ComponentRegistry.get('C4');
@@ -95,7 +90,6 @@ describe('ComponentRegistry', () => {
    * Thus, tests are cumulative.
    */
   it('registers and retrieves multiple components', () => {
-    expect.assertions(4);
     // Plain react stateless functional components
     const C5 = () => <div>WHY</div>;
     const C6 = () => <div>NOW</div>;
@@ -127,7 +121,6 @@ describe('ComponentRegistry', () => {
   });
 
   it('only detects a renderer function if it has three arguments', () => {
-    expect.assertions(2);
     const C7 = (a1, a2) => null;
     const C8 = (a1) => null;
     ComponentRegistry.register({ C7 });
@@ -148,20 +141,17 @@ describe('ComponentRegistry', () => {
   });
 
   it('throws error for retrieving unregistered component', () => {
-    expect.assertions(1);
     expect(() => ComponentRegistry.get('foobar')).toThrow(
       /Could not find component registered with name foobar/,
     );
   });
 
   it('throws error for setting null component', () => {
-    expect.assertions(1);
     const C9 = null;
     expect(() => ComponentRegistry.register({ C9 })).toThrow(/Called register with null component named C9/);
   });
 
   it('retrieves component asynchronously when registered later', async () => {
-    expect.assertions(1);
     const C1 = () => <div>HELLO</div>;
     const componentPromise = ComponentRegistry.getOrWaitForComponent('C1');
     ComponentRegistry.register({ C1 });
@@ -175,7 +165,6 @@ describe('ComponentRegistry', () => {
   });
 
   it('handles timeout for unregistered components', async () => {
-    expect.assertions(1);
     let error;
     try {
       await ComponentRegistry.getOrWaitForComponent('NonExistent');

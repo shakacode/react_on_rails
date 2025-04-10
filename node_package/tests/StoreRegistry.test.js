@@ -20,7 +20,6 @@ describe('StoreRegistry', () => {
   });
 
   it('StoreRegistry throws error for registering null or undefined store', () => {
-    expect.assertions(2);
     expect(() => StoreRegistry.register({ storeGenerator: null })).toThrow(
       /Called ReactOnRails.registerStoreGenerators with a null or undefined as a value/,
     );
@@ -30,14 +29,12 @@ describe('StoreRegistry', () => {
   });
 
   it('StoreRegistry throws error for retrieving unregistered store', () => {
-    expect.assertions(1);
     expect(() => StoreRegistry.getStore('foobar')).toThrow(
       /There are no stores hydrated and you are requesting the store/,
     );
   });
 
   it('StoreRegistry registers and retrieves Render-Function stores', () => {
-    expect.assertions(2);
     StoreRegistry.register({ storeGenerator, storeGenerator2 });
     const actual = StoreRegistry.getStoreGenerator('storeGenerator');
     const expected = storeGenerator;
@@ -48,14 +45,12 @@ describe('StoreRegistry', () => {
   });
 
   it('StoreRegistry throws error for retrieving unregistered store generator', () => {
-    expect.assertions(1);
     expect(() => StoreRegistry.getStoreGenerator('foobar')).toThrow(
       /Could not find store generator registered with name foobar\. Registered store generator names include/,
     );
   });
 
   it('StoreRegistry returns undefined for retrieving unregistered store, passing throwIfMissing = false', () => {
-    expect.assertions(1);
     StoreRegistry.setStore('foobarX', {});
     const actual = StoreRegistry.getStore('foobar', false);
     const expected = undefined;
@@ -63,7 +58,6 @@ describe('StoreRegistry', () => {
   });
 
   it('StoreRegistry getStore, setStore', () => {
-    expect.assertions(1);
     const store = storeGenerator({});
     StoreRegistry.setStore('storeGenerator', store);
     const actual = StoreRegistry.getStore('storeGenerator');
@@ -72,14 +66,12 @@ describe('StoreRegistry', () => {
   });
 
   it('StoreRegistry throws error for retrieving unregistered hydrated store', () => {
-    expect.assertions(1);
     expect(() => StoreRegistry.getStore('foobar')).toThrow(
       /Could not find hydrated store registered with name foobar\. Registered hydrated store names include/,
     );
   });
 
   it('StoreRegistry clearHydratedStores', () => {
-    expect.assertions(2);
     StoreRegistry.clearHydratedStores();
 
     const result = storeGenerator({});
