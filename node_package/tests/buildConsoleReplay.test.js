@@ -1,7 +1,6 @@
 import buildConsoleReplay, { consoleReplay } from '../src/buildConsoleReplay';
 
 describe('consoleReplay', () => {
-  expect.assertions(8);
   it('does not throw an exception if no console.history object', () => {
     expect.assertions(1);
     expect(() => consoleReplay()).not.toThrow(/Error/);
@@ -14,13 +13,7 @@ describe('consoleReplay', () => {
     expect(actual).toEqual(expected);
   });
 
-  it('does not throw an exception if console.history.length is zero', () => {
-    expect.assertions(1);
-    console.history = [];
-    expect(() => consoleReplay()).not.toThrow(/Error/);
-  });
-
-  it('returns empty string if no console.history object', () => {
+  it('returns empty string if console.history is empty', () => {
     expect.assertions(1);
     console.history = [];
     const actual = consoleReplay();
@@ -52,7 +45,7 @@ console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);`;
     expect(actual).toEqual(expected);
   });
 
-  it('replays converts script tag inside of object string to be safe ', () => {
+  it('replays converts script tag inside of object string to be safe', () => {
     expect.assertions(1);
     console.history = [
       {

@@ -7,7 +7,6 @@ import * as createReactClass from 'create-react-class';
 import ReactOnRails from '../src/ReactOnRails.client';
 
 describe('ReactOnRails', () => {
-  expect.assertions(14);
   it('render returns a virtual DOM element for component', () => {
     expect.assertions(1);
     const R1 = createReactClass({
@@ -25,7 +24,7 @@ describe('ReactOnRails', () => {
     document.body.appendChild(root);
     ReactOnRails.render('R1', {}, 'root');
 
-    expect(document.getElementById('root').textContent).toEqual(' WORLD ');
+    expect(document.getElementById('root').textContent).toBe(' WORLD ');
   });
 
   it('accepts traceTurbolinks as an option true', () => {

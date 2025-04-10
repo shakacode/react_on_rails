@@ -8,7 +8,6 @@ import * as createReactClass from 'create-react-class';
 import isRenderFunction from '../src/isRenderFunction';
 
 describe('isRenderFunction', () => {
-  expect.assertions(6);
   it('returns false for a ES5 React Component', () => {
     expect.assertions(1);
 
