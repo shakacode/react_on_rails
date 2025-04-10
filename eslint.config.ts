@@ -1,7 +1,9 @@
+import path from 'node:path';
 import { globalIgnores } from 'eslint/config';
 import prettierRecommended from 'eslint-plugin-prettier/recommended';
 import globals from 'globals';
 import tsEslint from 'typescript-eslint';
+import { includeIgnoreFile } from '@eslint/compat';
 import js from '@eslint/js';
 import { FlatCompat } from '@eslint/eslintrc';
 
@@ -12,6 +14,7 @@ const compat = new FlatCompat({
 });
 
 const config = tsEslint.config([
+  includeIgnoreFile(path.resolve(__dirname, '.gitignore')),
   globalIgnores([
     // compiled code
     'node_package/lib/',
@@ -26,16 +29,18 @@ const config = tsEslint.config([
     'spec/dummy/client/app/packs/server-bundle.js',
     '**/*.res.js',
     '**/coverage',
-    '**/assets/webpack/**/*',
-    '**/public/webpack/**/*',
-    '**/generated/**/*',
+    '**/assets/webpack/',
+    '**/public/webpack/',
+    '**/generated/',
     '**/app/assets/javascripts/application.js',
     '**/cable.js',
-    '**/public/packs*/*',
+    '**/public/packs*/',
     '**/gen-examples/',
     '**/bundle/',
     // dependencies
-    '**/node_modules/**/*',
+    '**/node_modules/',
+    // fixtures
+    '**/fixtures/',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],
