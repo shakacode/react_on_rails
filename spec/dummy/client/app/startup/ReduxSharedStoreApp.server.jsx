@@ -2,7 +2,7 @@
 // Compare this to the ./ReduxSharedStoreApp.client.jsx file which is used for client side rendering.
 
 import React from 'react';
-import ReactOnRails from 'react-on-rails';
+import { getStore } from 'react-on-rails';
 import { Provider } from 'react-redux';
 
 import HelloWorldContainer from '../components/HelloWorldContainer';
@@ -14,7 +14,7 @@ import HelloWorldContainer from '../components/HelloWorldContainer';
  */
 export default () => {
   // This is where we get the existing store.
-  const store = ReactOnRails.getStore('SharedReduxStore');
+  const store = getStore('SharedReduxStore');
 
   return (
     <Provider store={store}>

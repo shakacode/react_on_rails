@@ -1,4 +1,4 @@
-import ReactOnRails from 'react-on-rails';
+import * as ReactOnRails from 'react-on-rails';
 
 test('ReactOnRails', () => {
   expect(() => {
