@@ -1,6 +1,6 @@
 import * as React from 'react';
-import type { CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index';
-import { isServerRenderHash, isPromise } from './isServerRenderResult';
+import type { CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index.ts';
+import { isServerRenderHash, isPromise } from './isServerRenderResult.ts';
 
 function createReactElementFromRenderFunctionResult(
   renderFunctionResult: ReactComponent,

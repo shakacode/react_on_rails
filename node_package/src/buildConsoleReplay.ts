@@ -1,5 +1,5 @@
-import { wrapInScriptTags } from './RenderUtils';
-import scriptSanitizedVal from './scriptSanitizedVal';
+import { wrapInScriptTags } from './RenderUtils.ts';
+import scriptSanitizedVal from './scriptSanitizedVal.ts';
 
 declare global {
   interface Console {

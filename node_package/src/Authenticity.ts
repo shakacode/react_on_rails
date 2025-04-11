@@ -1,4 +1,4 @@
-import type { AuthenticityHeaders } from './types/index';
+import type { AuthenticityHeaders } from './types/index.ts';
 
 export function authenticityToken(): string | null {
   const token = document.querySelector('meta[name="csrf-token"]');

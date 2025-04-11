@@ -1,4 +1,4 @@
-import scriptSanitizedVal from '../src/scriptSanitizedVal';
+import scriptSanitizedVal from '../src/scriptSanitizedVal.ts';
 
 describe('scriptSanitizedVal', () => {
   expect.assertions(5);

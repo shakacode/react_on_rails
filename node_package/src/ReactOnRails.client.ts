@@ -1,11 +1,11 @@
 import type { ReactElement } from 'react';
-import * as ClientStartup from './clientStartup';
-import { renderOrHydrateComponent, hydrateStore } from './ClientSideRenderer';
-import * as ComponentRegistry from './ComponentRegistry';
-import * as StoreRegistry from './StoreRegistry';
-import buildConsoleReplay from './buildConsoleReplay';
-import createReactOutput from './createReactOutput';
-import * as Authenticity from './Authenticity';
+import * as ClientStartup from './clientStartup.ts';
+import { renderOrHydrateComponent, hydrateStore } from './ClientSideRenderer.ts';
+import * as ComponentRegistry from './ComponentRegistry.ts';
+import * as StoreRegistry from './StoreRegistry.ts';
+import buildConsoleReplay from './buildConsoleReplay.ts';
+import createReactOutput from './createReactOutput.ts';
+import * as Authenticity from './Authenticity.ts';
 import type {
   RegisteredComponent,
   RenderResult,
@@ -15,8 +15,8 @@ import type {
   Store,
   StoreGenerator,
   ReactOnRailsOptions,
-} from './types';
-import reactHydrateOrRender from './reactHydrateOrRender';
+} from './types/index.ts';
+import reactHydrateOrRender from './reactHydrateOrRender.ts';
 
 if (globalThis.ReactOnRails !== undefined) {
   throw new Error(`\
@@ -194,5 +194,5 @@ globalThis.ReactOnRails.resetOptions();
 
 ClientStartup.clientStartup();
 
-export * from './types';
+export * from './types/index.ts';
 export default globalThis.ReactOnRails;

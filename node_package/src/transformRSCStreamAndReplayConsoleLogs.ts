@@ -1,4 +1,4 @@
-import { RSCPayloadChunk } from './types';
+import { RSCPayloadChunk } from './types/index.ts';
 
 export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableStream<Uint8Array>) {
   return new ReadableStream({

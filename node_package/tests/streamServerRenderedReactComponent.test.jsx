@@ -4,8 +4,8 @@
 
 import * as React from 'react';
 import * as PropTypes from 'prop-types';
-import streamServerRenderedReactComponent from '../src/streamServerRenderedReactComponent';
-import * as ComponentRegistry from '../src/ComponentRegistry';
+import streamServerRenderedReactComponent from '../src/streamServerRenderedReactComponent.ts';
+import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 
 const AsyncContent = async ({ throwAsyncError }) => {
   await new Promise((resolve) => {
