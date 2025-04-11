@@ -1,5 +1,4 @@
-// TODO: move option to a separate file to avoid circular dependencies
-import { option } from './ReactOnRails.client';
+import { option } from './options.ts';
 
 declare global {
   namespace Turbolinks {
