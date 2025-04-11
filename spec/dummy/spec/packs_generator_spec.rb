@@ -195,6 +195,7 @@ module ReactOnRails
       it "generated pack for ComponentWithClientOnly uses client file for pack" do
         pack_content = File.read(component_pack)
 
+        expect(pack_content).to include("react-on-rails/client")
         expect(pack_content).to include("#{component_name}.client.jsx")
         expect(pack_content).not_to include("#{component_name}.jsx")
         expect(pack_content).not_to include("#{component_name}.server.jsx")
@@ -203,6 +204,7 @@ module ReactOnRails
       it "generated server bundle do not have ComponentWithClientOnly registered" do
         generated_server_bundle_content = File.read(generated_server_bundle_file_path)
 
+        expect(generated_server_bundle_content).not_to include("react-on-rails/client")
         expect(generated_server_bundle_content).not_to include("#{component_name}.jsx")
         expect(generated_server_bundle_content).not_to include("#{component_name}.client.jsx")
         expect(generated_server_bundle_content).not_to include("#{component_name}.server.jsx")
