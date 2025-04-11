@@ -8,6 +8,12 @@ import {
 import { onPageLoaded, onPageUnloaded } from './pageLifecycle.ts';
 import { debugTurbolinks } from './turbolinksUtils.ts';
 
+declare global {
+  /* eslint-disable no-var,vars-on-top,no-underscore-dangle */
+  var __REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__: boolean;
+  /* eslint-enable no-var,vars-on-top,no-underscore-dangle */
+}
+
 export async function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded');
   await Promise.all([hydrateAllStores(), renderOrHydrateAllComponents()]);

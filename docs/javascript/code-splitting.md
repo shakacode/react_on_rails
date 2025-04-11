@@ -39,7 +39,7 @@ Here's an example of how you might use this in practice:
 #### clientRegistration.js
 
 ```js
-import ReactOnRails from 'react-on-rails/client';
+import * as ReactOnRails from 'react-on-rails/client';
 import NavigationApp from './NavigationApp';
 
 // Note that we're importing a different RouterApp than in serverRegistration.js
@@ -57,7 +57,7 @@ ReactOnRails.register({
 #### serverRegistration.js
 
 ```js
-import ReactOnRails from 'react-on-rails';
+import * as ReactOnRails from 'react-on-rails';
 import NavigationApp from './NavigationApp';
 
 // Note that we're importing a different RouterApp than in clientRegistration.js
@@ -76,7 +76,7 @@ Note that you should not register a renderer on the server, since there won't be
 #### RouterAppRenderer.jsx
 
 ```jsx
-import ReactOnRails from 'react-on-rails/client';
+import * as ReactOnRails from 'react-on-rails/client';
 import React from 'react';
 import ReactDOM from 'react-dom';
 import Router from 'react-router/lib/Router';
