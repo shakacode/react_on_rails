@@ -35,6 +35,7 @@ Changes since the last non-beta release.
 
 ### Changed
 
+- **Breaking change**: The package is ESM-only now. Please see [Release Notes](docs/release-notes/15.0.0.md#esm-only-package) for more details.
 - The global context is now accessed using `globalThis`. [PR 1727](https://github.com/shakacode/react_on_rails/pull/1727) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
 ### [15.0.0-alpha.2] - 2025-03-07
