@@ -7,7 +7,7 @@ import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './
 import { getRailsContext, resetRailsContext } from './context.ts';
 import createReactOutput from './createReactOutput.ts';
 import { isServerRenderHash } from './isServerRenderResult.ts';
-import { supportsRootApi } from './reactApis.ts';
+import { supportsRootApi } from './reactApis.cts';
 import reactHydrateOrRender from './reactHydrateOrRender.ts';
 import { debugTurbolinks } from './turbolinksUtils.ts';
 import * as StoreRegistry from './StoreRegistry.ts';
