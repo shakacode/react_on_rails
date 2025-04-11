@@ -2,7 +2,6 @@ import { renderToPipeableStream } from 'react-on-rails-rsc/server.node';
 import { PassThrough, Readable } from 'stream';
 
 import { RSCRenderParams, StreamRenderState, StreamableComponentResult } from './types/index.ts';
-import ReactOnRails from './ReactOnRails.full.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
 import { convertToError, createResultObject } from './serverRenderUtils.ts';
@@ -59,13 +58,12 @@ const streamRenderRSCComponent = (
   return readableStream;
 };
 
-ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
+export * from './ReactOnRails.full.ts';
+
+export const serverRenderRSCReactComponent = (options: RSCRenderParams) => {
   try {
     return streamServerRenderedComponent(options, streamRenderRSCComponent);
   } finally {
     console.history = [];
   }
 };
-
-export * from './types/index.ts';
-export default ReactOnRails;

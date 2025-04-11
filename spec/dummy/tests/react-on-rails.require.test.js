@@ -1,5 +1,5 @@
-const ReactOnRails = require('react-on-rails').default;
+const { register } = require('react-on-rails');
 
 test('ReactOnRails', () => {
-  ReactOnRails.register({});
+  register({});
 });
