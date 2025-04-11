@@ -149,7 +149,7 @@ const config = tsEslint.config([
     },
   },
   {
-    files: ['**/*.ts', '**/*.tsx'],
+    files: ['**/*.ts{x,}', '**/*.[cm]ts'],
 
     extends: tsEslint.configs.strictTypeChecked,
 
