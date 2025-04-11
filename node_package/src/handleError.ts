@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as ReactDOMServer from 'react-dom/server';
+import { ReactDOMServer } from './reactApis.cts';
 import type { ErrorOptions } from './types/index.ts';
 
 function handleRenderFunctionIssue(options: ErrorOptions): string {

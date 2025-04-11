@@ -1,3 +1,4 @@
+/* eslint-disable global-require,@typescript-eslint/no-require-imports */
 import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
 import type { RenderReturnType } from './types/index.ts' with { 'resolution-mode': 'import' };
@@ -15,7 +16,6 @@ if (supportsRootApi) {
   // https://github.com/webpack/webpack/issues/339#issuecomment-47739112
   // Unfortunately, it only converts the error to a warning.
   try {
-    // eslint-disable-next-line global-require,@typescript-eslint/no-require-imports
     reactDomClient = require('react-dom/client') as typeof import('react-dom/client');
   } catch (_e) {
     // We should never get here, but if we do, we'll just use the default ReactDOM
@@ -23,6 +23,21 @@ if (supportsRootApi) {
     reactDomClient = ReactDOM as unknown as typeof import('react-dom/client');
   }
 }
+
+export const ReactDOMServer = (() => {
+  try {
+    // in react-dom v18+
+    return require('react-dom/server') as typeof import('react-dom/server');
+  } catch (_e) {
+    try {
+      // in react-dom v16 or 17
+      return require('react-dom/server.js') as typeof import('react-dom/server');
+    } catch (_e2) {
+      // this should never happen, one of the above requires should succeed
+      return undefined as unknown as typeof import('react-dom/server');
+    }
+  }
+})();
 
 type HydrateOrRenderType = (domNode: Element, reactElement: ReactElement) => RenderReturnType;
 
