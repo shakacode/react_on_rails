@@ -21,7 +21,7 @@ Changes since the last non-beta release.
 ### [14.2.1] - 2025-04-11
 
 #### Fixed
-- Fixed a bug where the `load` event was not firing in Safari. [PR 1729](https://github.com/shakacode/react_on_rails/pull/1729) by [Romex91](https://github.com/Romex91).
+- Fixed a bug where the `load` event was not firing in Safari by postponing hydration to the next JavaScript task using `setTimeout(callback, 0)`. [PR 1729](https://github.com/shakacode/react_on_rails/pull/1729) by [Romex91](https://github.com/Romex91).
 
 ### [14.2.0] - 2025-03-03
 
