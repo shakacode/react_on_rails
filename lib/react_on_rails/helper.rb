@@ -358,10 +358,14 @@ module ReactOnRails
     # second parameter passed to both component and store Render-Functions.
     # This method can be called from views and from the controller, as `helpers.rails_context`
     #
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def rails_context(server_side: true)
       # ALERT: Keep in sync with node_package/src/types/index.ts for the properties of RailsContext
       @rails_context ||= begin
+        rsc_url = if ReactOnRails::Utils.react_on_rails_pro?
+                    ReactOnRailsPro.configuration.rsc_payload_generation_url_path
+                  end
+
         result = {
           componentRegistryTimeout: ReactOnRails.configuration.component_registry_timeout,
           railsEnv: Rails.env,
@@ -373,8 +377,11 @@ module ReactOnRails
           # TODO: v13 just use the version if existing
           rorPro: ReactOnRails::Utils.react_on_rails_pro?
         }
+
         if ReactOnRails::Utils.react_on_rails_pro?
           result[:rorProVersion] = ReactOnRails::Utils.react_on_rails_pro_version
+
+          result[:rscPayloadGenerationUrl] = rsc_url if ReactOnRailsPro.configuration.enable_rsc_support
         end
 
         if defined?(request) && request.present?
@@ -432,7 +439,7 @@ module ReactOnRails
       append_stylesheet_pack_tag("generated/#{react_component_name}")
     end
 
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     private
 

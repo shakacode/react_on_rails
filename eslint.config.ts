@@ -41,6 +41,7 @@ const config = tsEslint.config([
     '**/node_modules/',
     // fixtures
     '**/fixtures/',
+    '**/.yalc/**/*',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],
@@ -74,7 +75,7 @@ const config = tsEslint.config([
         alias: [['Assets', './spec/dummy/client/app/assets']],
 
         node: {
-          extensions: ['.js', '.jsx', '.ts', '.d.ts'],
+          extensions: ['.js', '.jsx', '.ts', '.tsx', '.d.ts'],
         },
       },
     },
@@ -99,6 +100,7 @@ const config = tsEslint.config([
           js: 'never',
           jsx: 'never',
           ts: 'never',
+          tsx: 'never',
         },
       ],
 
@@ -131,6 +133,12 @@ const config = tsEslint.config([
       'react/jsx-props-no-spreading': 'off',
       'react/static-property-placement': 'off',
       'jsx-a11y/anchor-is-valid': 'off',
+      'react/jsx-filename-extension': [
+        'error',
+        {
+          extensions: ['.jsx', '.tsx'],
+        },
+      ],
     },
   },
   {
