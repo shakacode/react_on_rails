@@ -1,4 +1,4 @@
-import ReactOnRails from '../ReactOnRails.client';
+import { register } from '../ReactOnRails.client';
 import { ReactComponent } from '../types';
 
 /**
@@ -31,7 +31,7 @@ import { ReactComponent } from '../types';
  * ```
  */
 const registerServerComponent = (components: Record<string, ReactComponent>) => {
-  ReactOnRails.register(components);
+  register(components);
 };
 
 export default registerServerComponent;

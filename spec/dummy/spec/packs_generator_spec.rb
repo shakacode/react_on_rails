@@ -258,7 +258,7 @@ module ReactOnRails
           component_name = "ReactClientComponentWithClientAndServer"
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
-          expect(pack_content).to include("import ReactOnRails from 'react-on-rails';")
+          expect(pack_content).to include("import * as ReactOnRails from 'react-on-rails';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
         end
@@ -294,7 +294,7 @@ module ReactOnRails
           component_name = "ReactClientComponent"
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
-          expect(pack_content).to include("import ReactOnRails from 'react-on-rails';")
+          expect(pack_content).to include("import * as ReactOnRails from 'react-on-rails';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
         end
@@ -310,7 +310,7 @@ module ReactOnRails
           component_name = "ReactServerComponent"
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
-          expect(pack_content).to include("import ReactOnRails from 'react-on-rails';")
+          expect(pack_content).to include("import * as ReactOnRails from 'react-on-rails';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
         end
@@ -326,7 +326,7 @@ module ReactOnRails
           component_name = "ReactServerComponent"
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
-          expect(pack_content).to include("import ReactOnRails from 'react-on-rails';")
+          expect(pack_content).to include("import * as ReactOnRails from 'react-on-rails';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
         end
@@ -344,7 +344,7 @@ module ReactOnRails
           )
           generated_server_bundle_content = File.read(generated_server_bundle_path)
           expected_content = <<~CONTENT.strip
-            import ReactOnRails from 'react-on-rails';
+            import * as ReactOnRails from 'react-on-rails';
 
             import ReactClientComponent from '../components/ReactServerComponents/ror_components/ReactClientComponent.jsx';
             import ReactServerComponent from '../components/ReactServerComponents/ror_components/ReactServerComponent.jsx';

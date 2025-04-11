@@ -1,4 +1,4 @@
-import ReactOnRails from '../ReactOnRails.client';
+import { register } from '../ReactOnRails.client';
 import RSCClientRoot from '../RSCClientRoot';
 import { RegisterServerComponentOptions, RailsContext, ReactComponentOrRenderFunction } from '../types';
 
@@ -52,7 +52,7 @@ const registerServerComponent = (options: RegisterServerComponentOptions, ...com
         domNodeId,
       );
   }
-  ReactOnRails.register(componentsWrappedInRSCClientRoot);
+  register(componentsWrappedInRSCClientRoot);
 };
 
 export default registerServerComponent;
