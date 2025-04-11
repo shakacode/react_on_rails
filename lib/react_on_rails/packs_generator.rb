@@ -107,7 +107,7 @@ module ReactOnRails
       relative_component_path = relative_component_path_from_generated_pack(file_path)
 
       <<~FILE_CONTENT.strip
-        import ReactOnRails from 'react-on-rails';
+        import ReactOnRails from 'react-on-rails/client';
         import #{registered_component_name} from '#{relative_component_path}';
 
         ReactOnRails.register({#{registered_component_name}});

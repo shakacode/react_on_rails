@@ -1,4 +1,4 @@
-import ReactOnRails from 'react-on-rails';
+import ReactOnRails from 'react-on-rails/client';
 
 import <%= config[:component_name] %> from '<%= config[:app_relative_path] %>';
 

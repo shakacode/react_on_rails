@@ -36,6 +36,10 @@ Changes since the last non-beta release.
 ### Changed
 
 - The global context is now accessed using `globalThis`. [PR 1727](https://github.com/shakacode/react_on_rails/pull/1727) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
+- Generated client packs now import from `react-on-rails/client` instead of `react-on-rails`. [PR 1706](https://github.com/shakacode/react_on_rails/pull/1706) by [alexeyr-ci](https://github.com/alexeyr-ci).
+  - The "optimization opportunity" message when importing the server-side `react-on-rails` instead of `react-on-rails/client` in browsers is now a warning for two reasons:
+    - Make it more prominent
+    - Include a stack trace when clicked
 
 ### [15.0.0-alpha.2] - 2025-03-07
 
