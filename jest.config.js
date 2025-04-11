@@ -1,6 +1,13 @@
 const nodeVersion = parseInt(process.version.slice(1), 10);
 
-module.exports = {
+export default {
+  globals: {
+    'ts-jest': {
+      tsconfig: {
+        rewriteRelativeImportExtensions: false,
+      },
+    },
+  },
   preset: 'ts-jest/presets/js-with-ts',
   testEnvironment: 'jsdom',
   setupFiles: ['<rootDir>/node_package/tests/jest.setup.js'],
