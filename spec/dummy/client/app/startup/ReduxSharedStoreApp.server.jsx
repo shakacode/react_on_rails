@@ -1,5 +1,5 @@
-// Top level component for serer side.
-// Compare this to the ./ClientReduxSharedStoreApp.jsx file which is used for client side rendering.
+// Top level component for the server side.
+// Compare this to the ./ReduxSharedStoreApp.client.jsx file which is used for client side rendering.
 
 import React from 'react';
 import ReactOnRails from 'react-on-rails';

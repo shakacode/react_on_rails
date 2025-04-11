@@ -22,6 +22,10 @@ Changes since the last non-beta release.
 
 #### Fixed
 - Fixed a bug where the `load` event was not firing in Safari by postponing hydration to the next JavaScript task using `setTimeout(callback, 0)`. [PR 1729](https://github.com/shakacode/react_on_rails/pull/1729) by [Romex91](https://github.com/Romex91).
+- Generated client packs now import from `react-on-rails/client` instead of `react-on-rails`. [PR 1706](https://github.com/shakacode/react_on_rails/pull/1706) by [alexeyr-ci](https://github.com/alexeyr-ci).
+  - The "optimization opportunity" message when importing the server-side `react-on-rails` instead of `react-on-rails/client` in browsers is now a warning for two reasons:
+    - Make it more prominent
+    - Include a stack trace when clicked
 
 ### [14.2.0] - 2025-03-03
 
