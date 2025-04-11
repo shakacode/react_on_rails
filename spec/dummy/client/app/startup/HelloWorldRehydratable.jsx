@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import React from 'react';
-import ReactOnRails from 'react-on-rails';
+import ReactOnRails from 'react-on-rails/client';
 import RailsContext from '../components/RailsContext';
 
 class HelloWorldRehydratable extends React.Component {
