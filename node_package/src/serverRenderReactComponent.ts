@@ -1,5 +1,4 @@
 import * as React from 'react';
-import * as ReactDOMServer from 'react-dom/server';
 import type { ReactElement } from 'react';
 
 import * as ComponentRegistry from './ComponentRegistry.ts';
@@ -7,6 +6,7 @@ import createReactOutput from './createReactOutput.ts';
 import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
+import { ReactDOMServer } from './reactApis.cts';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
 import type {
   CreateReactOutputResult,
