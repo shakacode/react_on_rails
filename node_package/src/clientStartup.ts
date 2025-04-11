@@ -309,7 +309,9 @@ function isWindow(context: Context): context is Window {
 
 function onPageReady(callback: () => void) {
   if (document.readyState === "complete") {
-    callback();
+    // When hydrating React from the `readystatechange` listener, Safari skips the `load` event.
+    // To avoid this, we use a timeout to postpone the callback until after the `load` event.
+    setTimeout(callback, 0);
   } else {
     document.addEventListener("readystatechange", function onReadyStateChange() {
         onPageReady(callback);
