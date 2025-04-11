@@ -13,9 +13,9 @@ import type {
   AuthenticityHeaders,
   Store,
   StoreGenerator,
-  ReactOnRailsOptions,
 } from './types/index.ts';
 import reactHydrateOrRenderInternal from './reactHydrateOrRender.ts';
+import { resetOptions } from './options.ts';
 
 export { default as buildConsoleReplay } from './buildConsoleReplay.ts';
 
@@ -25,6 +25,7 @@ declare global {
   /* eslint-enable no-var,vars-on-top,no-underscore-dangle */
 }
 
+// eslint-disable-next-line no-underscore-dangle
 if (globalThis.__REACT_ON_RAILS_LOADED__) {
   throw new Error(`\
 The ReactOnRails value exists in the ${globalThis} scope, it may not be safe to overwrite it.
@@ -32,14 +33,8 @@ This could be caused by setting Webpack's optimization.runtimeChunk to "true" or
 Check your Webpack configuration. Read more at https://github.com/shakacode/react_on_rails/issues/1558.`);
 }
 
+// eslint-disable-next-line no-underscore-dangle
 globalThis.__REACT_ON_RAILS_LOADED__ = true;
-
-const DEFAULT_OPTIONS = {
-  traceTurbolinks: false,
-  turbo: false,
-};
-
-let options: ReactOnRailsOptions = {};
 
 // TODO: convert to re-exports if everything works fine
 export function register(components: Record<string, ReactComponentOrRenderFunction>): void {
@@ -83,26 +78,6 @@ export function reactHydrateOrRender(
   return reactHydrateOrRenderInternal(domNode, reactElement, hydrate);
 }
 
-export function setOptions(newOptions: Partial<ReactOnRailsOptions>): void {
-  if (typeof newOptions.traceTurbolinks !== 'undefined') {
-    options.traceTurbolinks = newOptions.traceTurbolinks;
-
-    // eslint-disable-next-line no-param-reassign
-    delete newOptions.traceTurbolinks;
-  }
-
-  if (typeof newOptions.turbo !== 'undefined') {
-    options.turbo = newOptions.turbo;
-
-    // eslint-disable-next-line no-param-reassign
-    delete newOptions.turbo;
-  }
-
-  if (Object.keys(newOptions).length > 0) {
-    throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`);
-  }
-}
-
 export function reactOnRailsPageLoaded() {
   return ClientStartup.reactOnRailsPageLoaded();
 }
@@ -126,10 +101,6 @@ export function authenticityHeaders(otherHeaders: Record<string, string> = {}): 
 // /////////////////////////////////////////////////////////////////////////////
 // INTERNALLY USED APIs
 // /////////////////////////////////////////////////////////////////////////////
-
-export function option<K extends keyof ReactOnRailsOptions>(key: K): ReactOnRailsOptions[K] | undefined {
-  return options[key];
-}
 
 export function getStoreGenerator(name: string): StoreGenerator {
   return StoreRegistry.getStoreGenerator(name);
@@ -201,10 +172,6 @@ export function stores(): Map<string, Store> {
   return StoreRegistry.stores();
 }
 
-export function resetOptions(): void {
-  options = { ...DEFAULT_OPTIONS };
-}
-
 export const isRSCBundle = false;
 
 resetOptions();
@@ -212,3 +179,4 @@ resetOptions();
 ClientStartup.clientStartup();
 
 export * from './types/index.ts';
+export * from './options.ts';
