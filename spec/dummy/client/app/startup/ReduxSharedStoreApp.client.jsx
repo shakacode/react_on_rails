@@ -1,5 +1,5 @@
-// Top level component for client side.
-// Compare this to the ./ServerApp.jsx file which is used for server side rendering.
+// Top level component for the client side.
+// Compare this to the ./ReduxSharedStoreApp.server.jsx file which is used for server side rendering.
 
 import React from 'react';
 import { Provider } from 'react-redux';
