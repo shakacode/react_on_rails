@@ -6,7 +6,7 @@ import * as React from 'react';
 import * as PropTypes from 'prop-types';
 import streamServerRenderedReactComponent from '../src/streamServerRenderedReactComponent.ts';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
-import ReactOnRails from '../src/ReactOnRails.node.ts';
+import { register } from '../src/ReactOnRails.node.ts';
 
 const AsyncContent = async ({ throwAsyncError }) => {
   await new Promise((resolve) => {
@@ -74,21 +74,21 @@ describe('streamServerRenderedReactComponent', () => {
   } = {}) => {
     switch (componentType) {
       case 'reactComponent':
-        ReactOnRails.register({ TestComponentForStreaming });
+        register({ TestComponentForStreaming });
         break;
       case 'renderFunction':
-        ReactOnRails.register({
+        register({
           TestComponentForStreaming: (props, _railsContext) => () => <TestComponentForStreaming {...props} />,
         });
         break;
       case 'asyncRenderFunction':
-        ReactOnRails.register({
+        register({
           TestComponentForStreaming: (props, _railsContext) => () =>
             Promise.resolve(<TestComponentForStreaming {...props} />),
         });
         break;
       case 'erroneousRenderFunction':
-        ReactOnRails.register({
+        register({
           TestComponentForStreaming: (_props, _railsContext) => {
             // The error happen inside the render function itself not inside the returned React component
             throw new Error('Sync Error from render function');
@@ -96,7 +96,7 @@ describe('streamServerRenderedReactComponent', () => {
         });
         break;
       case 'erroneousAsyncRenderFunction':
-        ReactOnRails.register({
+        register({
           TestComponentForStreaming: (_props, _railsContext) =>
             // The error happen inside the render function itself not inside the returned React component
             Promise.reject(new Error('Async Error from render function')),
@@ -325,7 +325,7 @@ describe('streamServerRenderedReactComponent', () => {
 
   it('streams a string from a Promise that resolves to a string', async () => {
     const StringPromiseComponent = () => Promise.resolve('<div>String from Promise</div>');
-    ReactOnRails.register({ StringPromiseComponent });
+    register({ StringPromiseComponent });
 
     const renderResult = streamServerRenderedReactComponent({
       name: 'StringPromiseComponent',

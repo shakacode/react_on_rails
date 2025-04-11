@@ -111,7 +111,7 @@ module ReactOnRails
       relative_component_path = relative_component_path_from_generated_pack(file_path)
 
       <<~FILE_CONTENT.strip
-        import ReactOnRails from 'react-on-rails/client';
+        import * as ReactOnRails from 'react-on-rails/client';
         import #{registered_component_name} from '#{relative_component_path}';
 
         ReactOnRails.register({#{registered_component_name}});
@@ -127,7 +127,7 @@ module ReactOnRails
 
     def build_server_pack_content(component_on_server_imports, server_components, client_components)
       content = <<~FILE_CONTENT
-        import ReactOnRails from 'react-on-rails';
+        import * as ReactOnRails from 'react-on-rails';
 
         #{component_on_server_imports.join("\n")}\n
       FILE_CONTENT

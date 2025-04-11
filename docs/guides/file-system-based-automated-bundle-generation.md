@@ -115,15 +115,15 @@ app/javascript:
       └── logo.svg
 ```
 
-Previously, many applications would use one pack (webpack entrypoint) for many components. In this example, the`application.js` file manually registers server components, `FooComponentOne`, `BarComponentOne` and `BarComponentTwo`.
+Previously, many applications would use one pack (webpack entrypoint) for many components. In this example, the `application.js` file manually registers server components, `FooComponentOne`, `BarComponentOne` and `BarComponentTwo`.
 
 ```jsx
-import ReactOnRails from 'react-on-rails';
+import { register } from 'react-on-rails';
 import FooComponentOne from '../src/Foo/FooComponentOne';
 import BarComponentOne from '../src/Foo/BarComponentOne';
 import BarComponentTwo from '../src/Foo/BarComponentTwo';
 
-ReactOnRails.register({ FooComponentOne, BarComponentOne, BarComponentTwo });
+register({ FooComponentOne, BarComponentOne, BarComponentTwo });
 ```
 
 Your layout would contain:

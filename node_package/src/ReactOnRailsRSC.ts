@@ -8,7 +8,6 @@ import {
   StreamRenderState,
   StreamableComponentResult,
 } from './types/index.ts';
-import ReactOnRails from './ReactOnRails.full.ts';
 import handleError from './handleError.ts';
 import { convertToError } from './serverRenderUtils.ts';
 
@@ -83,7 +82,9 @@ const streamRenderRSCComponent = (
   return readableStream;
 };
 
-ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
+export * from './ReactOnRails.full.ts';
+
+export const serverRenderRSCReactComponent = (options: RSCRenderParams) => {
   try {
     return streamServerRenderedComponent(options, streamRenderRSCComponent);
   } finally {
@@ -91,7 +92,4 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
   }
 };
 
-ReactOnRails.isRSCBundle = true;
-
-export * from './types/index.ts';
-export default ReactOnRails;
+export const isRSCBundle = true;

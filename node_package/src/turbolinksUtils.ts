@@ -1,3 +1,6 @@
+// TODO: move option to a separate file to avoid circular dependencies
+import { option } from './ReactOnRails.client';
+
 declare global {
   namespace Turbolinks {
     interface TurbolinksStatic {
@@ -16,7 +19,7 @@ export function debugTurbolinks(...msg: unknown[]): void {
     return;
   }
 
-  if (globalThis.ReactOnRails?.option('traceTurbolinks')) {
+  if (option('traceTurbolinks')) {
     console.log('TURBO:', ...msg);
   }
 }
@@ -26,7 +29,7 @@ export function turbolinksInstalled(): boolean {
 }
 
 export function turboInstalled() {
-  return globalThis.ReactOnRails?.option('turbo') === true;
+  return option('turbo') === true;
 }
 
 export function turbolinksVersion5(): boolean {

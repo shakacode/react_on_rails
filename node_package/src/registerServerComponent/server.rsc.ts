@@ -1,4 +1,4 @@
-import ReactOnRails from '../ReactOnRails.client.ts';
+import { register } from '../ReactOnRails.client.ts';
 import { ReactComponent, RenderFunction } from '../types/index.ts';
 
 /**
@@ -20,6 +20,6 @@ import { ReactComponent, RenderFunction } from '../types/index.ts';
  * ```
  */
 const registerServerComponent = (components: { [id: string]: ReactComponent | RenderFunction }) =>
-  ReactOnRails.register(components);
+  register(components);
 
 export default registerServerComponent;

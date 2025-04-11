@@ -1,5 +1,5 @@
 import * as React from 'react';
-import ReactOnRails from '../ReactOnRails.client.ts';
+import { register } from '../ReactOnRails.client.ts';
 import RSCRoute from '../RSCRoute.tsx';
 import { ReactComponent, RenderFunction } from '../types/index.ts';
 import wrapServerComponentRenderer from '../wrapServerComponentRenderer/server.tsx';
@@ -29,7 +29,7 @@ const registerServerComponent = (components: Record<string, ReactComponent>) => 
       <RSCRoute componentName={componentName} componentProps={props} />
     ));
   }
-  ReactOnRails.register(componentsWrappedInRSCRoute);
+  register(componentsWrappedInRSCRoute);
 };
 
 export default registerServerComponent;

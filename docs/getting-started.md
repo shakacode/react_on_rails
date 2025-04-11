@@ -90,9 +90,9 @@ issue.
 - The `component_name` parameter is a string matching the name you used to expose your React component globally. So, in the above examples, if you had a React component named "HelloWorld", you would register it with the following lines:
 
   ```js
-  import ReactOnRails from 'react-on-rails';
+  import { register } from 'react-on-rails';
   import HelloWorld from './HelloWorld';
-  ReactOnRails.register({ HelloWorld });
+  register({ HelloWorld });
   ```
 
   Exposing your component in this way allows you to reference the component from a Rails view. You can expose as many components as you like, but their names must be unique. See below for the details of how you expose your components via the React on Rails Webpack configuration. You may call `ReactOnRails.register` many times.
@@ -133,8 +133,8 @@ This is how to expose a component to the `react_component` view helper.
 ```javascript
 // app/javascript/packs/hello-world-bundle.js
 import HelloWorld from '../components/HelloWorld';
-import ReactOnRails from 'react-on-rails';
-ReactOnRails.register({ HelloWorld });
+import { register } from 'react-on-rails';
+register({ HelloWorld });
 ```
 
 #### Different Server-Side Rendering Code (and a Server-Specific Bundle)

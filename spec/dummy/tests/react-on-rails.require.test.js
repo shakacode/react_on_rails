@@ -1,7 +1,7 @@
-const ReactOnRails = require('react-on-rails').default;
+const { register } = require('react-on-rails');
 
 test('ReactOnRails', () => {
   expect(() => {
-    ReactOnRails.register({});
+    register({});
   }).not.toThrow();
 });

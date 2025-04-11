@@ -9,17 +9,17 @@ Many projects will have different entry points for client and server rendering. 
 Your Client Entry can look like this:
 
 ```js
-import ReactOnRails from 'react-on-rails/client';
+import { register } from 'react-on-rails/client';
 import App from './ClientApp';
-ReactOnRails.register({ App });
+register({ App });
 ```
 
 So your Server Entry can look like:
 
 ```js
-import ReactOnRails from 'react-on-rails';
+import { register } from 'react-on-rails';
 import App from './ServerApp';
-ReactOnRails.register({ App });
+register({ App });
 ```
 
 Note that the only difference is in the imports.

@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Provider } from 'react-redux';
-import ReactOnRails from 'react-on-rails/client';
+import { getStore } from 'react-on-rails/client';
 import ReactDOMClient from 'react-dom/client';
 
 import HelloWorldContainer from '../components/HelloWorldContainer';
@@ -24,7 +24,7 @@ export default (props, _railsContext, domNodeId) => {
   delete props.prerender;
 
   // This is where we get the existing store.
-  const store = ReactOnRails.getStore('SharedReduxStore');
+  const store = getStore('SharedReduxStore');
 
   // renderApp is a function required for hot reloading. see
   // https://github.com/retroalgic/react-on-rails-hot-minimal/blob/master/client/src/entry.js

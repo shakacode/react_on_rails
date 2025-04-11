@@ -1,9 +1,3 @@
-import handleError from './handleError.ts';
-import serverRenderReactComponent from './serverRenderReactComponent.ts';
-import type { RenderParams, RenderResult, ErrorOptions } from './types/index.ts';
-
-import Client from './ReactOnRails.client.ts';
-
 if (typeof window !== 'undefined') {
   // warn to include a collapsed stack trace
   console.warn(
@@ -11,10 +5,6 @@ if (typeof window !== 'undefined') {
   );
 }
 
-Client.handleError = (options: ErrorOptions): string | undefined => handleError(options);
-
-Client.serverRenderReactComponent = (options: RenderParams): null | string | Promise<RenderResult> =>
-  serverRenderReactComponent(options);
-
-export * from './types/index.ts';
-export default Client;
+export * from './ReactOnRails.client.ts';
+export { default as handleError } from './handleError.ts';
+export { default as serverRenderReactComponent } from './serverRenderReactComponent.ts';

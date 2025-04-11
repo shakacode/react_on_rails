@@ -46,7 +46,7 @@ import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { StaticRouter } from 'react-router';
 import { Provider } from 'react-redux';
-import ReactOnRails from 'react-on-rails';
+import * as ReactOnRails from 'react-on-rails';
 
 // App.jsx from src/client/App.jsx
 import App from '../App';
