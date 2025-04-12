@@ -1,13 +1,12 @@
 /* eslint-disable max-classes-per-file */
 
-import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
 import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './types/index.ts';
 
 import { getRailsContext, resetRailsContext } from './context.ts';
 import createReactOutput from './createReactOutput.ts';
 import { isServerRenderHash } from './isServerRenderResult.ts';
-import { supportsRootApi } from './reactApis.cts';
+import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from './reactApis.cts';
 import reactHydrateOrRender from './reactHydrateOrRender.ts';
 import { debugTurbolinks } from './turbolinksUtils.ts';
 import * as StoreRegistry from './StoreRegistry.ts';
@@ -102,7 +101,7 @@ class ComponentRenderer {
         }
 
         // Hydrate if available and was server rendered
-        const shouldHydrate = (supportsRootApi || 'hydrate' in ReactDOM) && !!domNode.innerHTML;
+        const shouldHydrate = supportsHydrate && !!domNode.innerHTML;
 
         const reactElementOrRouterResult = createReactOutput({
           componentObj,
@@ -154,9 +153,8 @@ You should return a React.Component always for the client side entry point.`);
       }
 
       try {
-        const unmountComponentAtNode = 'unmountComponentAtNode';
         // eslint-disable-next-line @typescript-eslint/no-deprecated
-        ReactDOM[unmountComponentAtNode](domNode);
+        unmountComponentAtNode(domNode);
       } catch (e: unknown) {
         const error = e instanceof Error ? e : new Error('Unknown error');
         console.info(

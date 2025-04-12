@@ -8,6 +8,8 @@ const reactMajorVersion = Number(ReactDOM.version?.split('.')[0]) || 16;
 // TODO: once we require React 18, we can remove this and inline everything guarded by it.
 export const supportsRootApi = reactMajorVersion >= 18;
 
+export const supportsHydrate = supportsRootApi || 'hydrate' in ReactDOM;
+
 // TODO: once React dependency is updated to >= 18, we can remove this and just
 // import ReactDOM from 'react-dom/client';
 let reactDomClient: typeof import('react-dom/client');
@@ -24,7 +26,7 @@ if (supportsRootApi) {
   }
 }
 
-export const ReactDOMServer = (() => {
+export const ReactDOMServer = /* #__PURE */ (() => {
   try {
     // in react-dom v18+
     return require('react-dom/server') as typeof import('react-dom/server');
@@ -41,15 +43,12 @@ export const ReactDOMServer = (() => {
 
 type HydrateOrRenderType = (domNode: Element, reactElement: ReactElement) => RenderReturnType;
 
-/* eslint-disable @typescript-eslint/no-deprecated,@typescript-eslint/no-non-null-assertion --
+/* eslint-disable @typescript-eslint/no-deprecated,@typescript-eslint/no-non-null-assertion,react/no-deprecated --
  * while we need to support React 16
  */
-const hydrateProp = 'hydrate';
-const renderProp = 'render';
-
 export const reactHydrate: HydrateOrRenderType = supportsRootApi
   ? reactDomClient!.hydrateRoot
-  : (domNode, reactElement) => ReactDOM[hydrateProp](reactElement, domNode);
+  : (domNode, reactElement) => ReactDOM.hydrate(reactElement, domNode);
 
 export function reactRender(domNode: Element, reactElement: ReactElement): RenderReturnType {
   if (supportsRootApi) {
@@ -58,6 +57,11 @@ export function reactRender(domNode: Element, reactElement: ReactElement): Rende
     return root;
   }
 
-  return ReactDOM[renderProp](reactElement, domNode);
+  // eslint-disable-next-line react/no-render-return-value
+  return ReactDOM.render(reactElement, domNode);
 }
-/* eslint-enable @typescript-eslint/no-deprecated,@typescript-eslint/no-non-null-assertion */
+
+export const unmountComponentAtNode: typeof ReactDOM.unmountComponentAtNode = supportsRootApi
+  ? // not used if we use root API
+    () => false
+  : ReactDOM.unmountComponentAtNode;
