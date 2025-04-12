@@ -10,6 +10,10 @@ export const supportsRootApi = reactMajorVersion >= 18;
 
 export const supportsHydrate = supportsRootApi || 'hydrate' in ReactDOM;
 
+// Depending on react-dom version, proper ESM import can be react-dom/server or react-dom/server.js
+// but this always works in this .cts file
+export { renderToPipeableStream, renderToString, type PipeableStream } from 'react-dom/server';
+
 // TODO: once React dependency is updated to >= 18, we can remove this and just
 // import ReactDOM from 'react-dom/client';
 let reactDomClient: typeof import('react-dom/client');
@@ -25,21 +29,6 @@ if (supportsRootApi) {
     reactDomClient = ReactDOM as unknown as typeof import('react-dom/client');
   }
 }
-
-export const ReactDOMServer = /* #__PURE */ (() => {
-  try {
-    // in react-dom v18+
-    return require('react-dom/server') as typeof import('react-dom/server');
-  } catch (_e) {
-    try {
-      // in react-dom v16 or 17
-      return require('react-dom/server.js') as typeof import('react-dom/server');
-    } catch (_e2) {
-      // this should never happen, one of the above requires should succeed
-      return undefined as unknown as typeof import('react-dom/server');
-    }
-  }
-})();
 
 type HydrateOrRenderType = (domNode: Element, reactElement: ReactElement) => RenderReturnType;
 

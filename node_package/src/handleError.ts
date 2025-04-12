@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ReactDOMServer } from './reactApis.cts';
+import { renderToString } from './reactApis.cts';
 import type { ErrorOptions } from './types/index.ts';
 
 function handleRenderFunctionIssue(options: ErrorOptions): string {
@@ -60,8 +60,8 @@ Message: ${e.message}
 ${e.stack}`;
 
     const reactElement = React.createElement('pre', null, msg);
-    if (typeof ReactDOMServer.renderToString === 'function') {
-      return ReactDOMServer.renderToString(reactElement);
+    if (typeof renderToString === 'function') {
+      return renderToString(reactElement);
     }
     return msg;
   }

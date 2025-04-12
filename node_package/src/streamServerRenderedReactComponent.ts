@@ -6,7 +6,7 @@ import createReactOutput from './createReactOutput.ts';
 import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
-import { ReactDOMServer } from './reactApis.cts';
+import { renderToPipeableStream, PipeableStream } from './reactApis.cts';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
 import type { RenderParams, StreamRenderState, StreamableComponentResult } from './types/index.ts';
 
@@ -101,8 +101,8 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
     },
   });
 
-  let pipedStream: ReactDOMServer.PipeableStream | null = null;
-  const pipeToTransform = (pipeableStream: ReactDOMServer.PipeableStream) => {
+  let pipedStream: PipeableStream | null = null;
+  const pipeToTransform = (pipeableStream: PipeableStream) => {
     pipeableStream.pipe(transformStream);
     pipedStream = pipeableStream;
   };
@@ -164,7 +164,7 @@ const streamRenderReactComponent = (
         return;
       }
 
-      const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderedElement, {
+      const renderingStream = renderToPipeableStream(reactRenderedElement, {
         onShellError(e) {
           sendErrorHtml(convertToError(e));
         },

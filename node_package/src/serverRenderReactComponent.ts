@@ -6,7 +6,7 @@ import createReactOutput from './createReactOutput.ts';
 import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
-import { ReactDOMServer } from './reactApis.cts';
+import { renderToString } from './reactApis.cts';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
 import type {
   CreateReactOutputResult,
@@ -47,7 +47,7 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
 
 function processReactElement(result: ReactElement): string {
   try {
-    return ReactDOMServer.renderToString(result);
+    return renderToString(result);
   } catch (error) {
     console.error(`Invalid call to renderToString. Possibly you have a renderFunction, a function that already
 calls renderToString, that takes one parameter. You need to add an extra unused parameter to identify this function
