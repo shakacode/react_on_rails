@@ -6,7 +6,7 @@ import createReactOutput from './createReactOutput.ts';
 import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
-import { renderToString } from './reactApis.cts';
+import { renderToString } from './ReactDOMServer.cts';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
 import type {
   CreateReactOutputResult,
