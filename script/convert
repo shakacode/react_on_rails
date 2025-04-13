@@ -8,10 +8,13 @@ def gsub_file_content(path, old_content, new_content)
   File.binwrite(path, content)
 end
 
-old_config = File.expand_path("../spec/dummy/config/shakapacker.yml", __dir__)
-new_config = File.expand_path("../spec/dummy/config/webpacker.yml", __dir__)
+def move(old_path, new_path)
+  old_path = File.expand_path(old_path, __dir__)
+  new_path = File.expand_path(new_path, __dir__)
+  File.rename(old_path, new_path)
+end
 
-File.rename(old_config, new_config)
+move("../spec/dummy/config/shakapacker.yml", "../spec/dummy/config/webpacker.yml")
 
 # Shakapacker
 gsub_file_content("../Gemfile.development_dependencies", /gem "shakapacker", "[^"]*"/, 'gem "shakapacker", "6.6.0"')
@@ -29,15 +32,23 @@ gsub_file_content("../package.json", %r{"@testing-library/dom": "[^"]*",}, "")
 gsub_file_content("../package.json", %r{"@testing-library/react": "[^"]*",}, "")
 
 # Switch to the oldest supported React version
-gsub_file_content("../package.json", /"react": "[^"]*",/, '"react": "16.0.0",')
-gsub_file_content("../package.json", /"react-dom": "[^"]*",/, '"react-dom": "16.0.0",')
-# TODO: can't change React version in spec/dummy as well, would need a separate react-16-dummy instead
+gsub_file_content("../package.json", /"react": "[^"]*",/, '"react": "16.14.0",')
+gsub_file_content("../package.json", /"react-dom": "[^"]*",/, '"react-dom": "16.14.0",')
+gsub_file_content("../spec/dummy/package.json", /"react": "[^"]*",/, '"react": "16.14.0",')
+gsub_file_content("../spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react-dom": "16.14.0",')
 gsub_file_content(
   "../package.json",
   "jest node_package/tests",
   'jest node_package/tests --testPathIgnorePatterns=\".*(RSC|stream|serverRenderReactComponent).*\"'
 )
 gsub_file_content("../tsconfig.json", "react-jsx", "react")
+gsub_file_content("../spec/dummy/babel.config.js", "runtime: 'automatic'", "runtime: 'classic'")
+# https://rescript-lang.org/docs/react/latest/migrate-react#configuration
+gsub_file_content("../spec/dummy/rescript.json", '"version": 4', '"version": 4, "mode": "classic"')
+# Find all files under app-react16 and replace the React 19 versions
+Dir.glob(File.expand_path("../spec/dummy/**/app-react16/**/*.*", __dir__)).each do |file|
+  move(file, file.gsub("-react16", ""))
+end
 
 gsub_file_content("../spec/dummy/config/webpack/commonWebpackConfig.js", /generateWebpackConfig(\(\))?/,
                   "webpackConfig")
