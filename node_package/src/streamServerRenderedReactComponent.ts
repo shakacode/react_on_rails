@@ -6,7 +6,7 @@ import createReactOutput from './createReactOutput.ts';
 import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
-import { renderToPipeableStream, PipeableStream } from './reactApis.cts';
+import { renderToPipeableStream, PipeableStream } from './ReactDOMServer.cts';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
 import type { RenderParams, StreamRenderState, StreamableComponentResult } from './types/index.ts';
 
