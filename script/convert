@@ -13,21 +13,31 @@ new_config = File.expand_path("../spec/dummy/config/webpacker.yml", __dir__)
 
 File.rename(old_config, new_config)
 
+# Shakapacker
 gsub_file_content("../Gemfile.development_dependencies", /gem "shakapacker", "[^"]*"/, 'gem "shakapacker", "6.6.0"')
+gsub_file_content("../spec/dummy/package.json", /"shakapacker": "[^"]*",/, '"shakapacker": "6.6.0",')
 
 # The below packages don't work on the oldest supported Node version and aren't needed there anyway
 gsub_file_content("../package.json", /"eslint": "[^"]*",/, "")
 gsub_file_content("../package.json", /"globals": "[^"]*",/, "")
 gsub_file_content("../package.json", /"knip": "[^"]*",/, "")
+gsub_file_content("../package.json", /"publint": "[^"]*",/, "")
 gsub_file_content("../package.json", /"typescript-eslint": "[^"]*",/, "")
 gsub_file_content("../package.json", %r{"@arethetypeswrong/cli": "[^"]*",}, "")
 gsub_file_content("../package.json", %r{"@eslint/compat": "[^"]*",}, "")
 gsub_file_content("../package.json", %r{"@testing-library/dom": "[^"]*",}, "")
 gsub_file_content("../package.json", %r{"@testing-library/react": "[^"]*",}, "")
-gsub_file_content("../package.json", /"knip": "[^"]*",/, "")
-gsub_file_content("../package.json", /"publint": "[^"]*",/, "")
 
-gsub_file_content("../spec/dummy/package.json", /"shakapacker": "[^"]*",/, '"shakapacker": "6.6.0",')
+# Switch to the oldest supported React version
+gsub_file_content("../package.json", /"react": "[^"]*",/, '"react": "16.0.0",')
+gsub_file_content("../package.json", /"react-dom": "[^"]*",/, '"react-dom": "16.0.0",')
+# TODO: can't change React version in spec/dummy as well, would need a separate react-16-dummy instead
+gsub_file_content(
+  "../package.json",
+  "jest node_package/tests",
+  'jest node_package/tests --testPathIgnorePatterns=\".*(RSC|stream|serverRenderReactComponent).*\"'
+)
+gsub_file_content("../tsconfig.json", "react-jsx", "react")
 
 gsub_file_content("../spec/dummy/config/webpack/commonWebpackConfig.js", /generateWebpackConfig(\(\))?/,
                   "webpackConfig")
