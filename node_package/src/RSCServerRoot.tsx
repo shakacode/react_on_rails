@@ -1,21 +1,11 @@
 import * as React from 'react';
 import { createFromNodeStream } from 'react-on-rails-rsc/client.node';
-import { PassThrough } from 'stream';
 import type { RenderFunction, RailsContext } from './types/index.ts';
 import transformRSCStream from './transformRSCNodeStream.ts';
 import loadJsonFile from './loadJsonFile.ts';
-import RSCPayloadContainer from './RSCPayloadContainer.tsx';
 import { ensureReactUseAvailable } from './reactApis.cts';
 
 ensureReactUseAvailable();
-
-declare global {
-  function generateRSCPayload(
-    componentName: string,
-    props: Record<string, unknown>,
-    railsContext: RailsContext,
-  ): Promise<NodeJS.ReadableStream>;
-}
 
 type RSCServerRootProps = {
   componentName: string;
@@ -82,11 +72,9 @@ const RSCServerRoot: RenderFunction = async (
     );
   }
 
-  if (typeof generateRSCPayload !== 'function') {
+  if (typeof ReactOnRails.getRSCPayloadStream !== 'function') {
     throw new Error(
-      'generateRSCPayload is not defined. Please ensure that you are using at least version 4.0.0 of ' +
-        'React on Rails Pro and the Node renderer, and that ReactOnRailsPro.configuration.enable_rsc_support ' +
-        'is set to true.',
+      'ReactOnRails.getRSCPayloadStream is not defined. This likely means that you are not building the server bundle correctly. Please ensure that your server bundle is targeting Node.js',
     );
   }
 
@@ -94,24 +82,14 @@ const RSCServerRoot: RenderFunction = async (
     railsContext.reactServerClientManifestFileName,
     railsContext.reactClientManifestFileName,
   );
-  const rscPayloadStream = await generateRSCPayload(componentName, componentProps, railsContext);
+  const rscPayloadStream = await ReactOnRails.getRSCPayloadStream(
+    componentName,
+    componentProps,
+    railsContext,
+  );
 
-  // Tee the stream to pass it to the server component and the payload container
-  const rscPayloadStream1 = new PassThrough();
-  rscPayloadStream.pipe(rscPayloadStream1);
-  const rscPayloadStream2 = new PassThrough();
-  rscPayloadStream.pipe(rscPayloadStream2);
-  const serverComponentElement = createFromReactOnRailsNodeStream(rscPayloadStream1, ssrManifest);
-
-  return () => {
-    const resolvedServerComponent = use(serverComponentElement);
-    return (
-      <>
-        {resolvedServerComponent}
-        <RSCPayloadContainer RSCPayloadStream={rscPayloadStream2} />
-      </>
-    );
-  };
+  const serverComponentElement = createFromReactOnRailsNodeStream(rscPayloadStream, ssrManifest);
+  return () => use(serverComponentElement);
 };
 
 export default RSCServerRoot;

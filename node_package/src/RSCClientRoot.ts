@@ -5,14 +5,14 @@ import * as ReactDOMClient from 'react-dom/client';
 import { createFromReadableStream } from 'react-on-rails-rsc/client';
 import { fetch } from './utils.ts';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
-import { RailsContext, RenderFunction, RSCPayloadChunk } from './types/index.ts';
+import { RailsContext, RenderFunction } from './types/index.ts';
 import { ensureReactUseAvailable } from './reactApis.cts';
 
 ensureReactUseAvailable();
 
 declare global {
   interface Window {
-    REACT_ON_RAILS_RSC_PAYLOAD?: RSCPayloadChunk[];
+    REACT_ON_RAILS_RSC_PAYLOAD?: string[];
   }
 }
 
@@ -39,13 +39,13 @@ const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath, componentProps }
 };
 
 const createRSCStreamFromPage = () => {
-  let streamController: ReadableStreamController<RSCPayloadChunk> | undefined;
-  const stream = new ReadableStream<RSCPayloadChunk>({
+  let streamController: ReadableStreamController<string> | undefined;
+  const stream = new ReadableStream<string>({
     start(controller) {
       if (typeof window === 'undefined') {
         return;
       }
-      const handleChunk = (chunk: RSCPayloadChunk) => {
+      const handleChunk = (chunk: string) => {
         controller.enqueue(chunk);
       };
 
@@ -67,9 +67,10 @@ const createRSCStreamFromPage = () => {
         window.REACT_ON_RAILS_RSC_PAYLOAD = [];
       }
       window.REACT_ON_RAILS_RSC_PAYLOAD.forEach(handleChunk);
+      const originalPush = window.REACT_ON_RAILS_RSC_PAYLOAD.push;
       window.REACT_ON_RAILS_RSC_PAYLOAD.push = (...chunks) => {
         chunks.forEach(handleChunk);
-        return chunks.length;
+        return originalPush.call(window.REACT_ON_RAILS_RSC_PAYLOAD, ...chunks);
       };
       streamController = controller;
     },
