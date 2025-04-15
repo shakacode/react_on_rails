@@ -9,6 +9,7 @@ import buildConsoleReplay from './buildConsoleReplay';
 import handleError from './handleError';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
 import type { RenderParams, StreamRenderState, StreamableComponentResult } from './types';
+import injectRSCPayload from './injectRSCPayload';
 
 type BufferedEvent = {
   event: 'data' | 'error' | 'end';
@@ -132,8 +133,8 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
     },
   });
 
-  let pipedStream: ReactDOMServer.PipeableStream | null = null;
-  const pipeToTransform = (pipeableStream: ReactDOMServer.PipeableStream) => {
+  let pipedStream: ReactDOMServer.PipeableStream | NodeJS.ReadableStream | null = null;
+  const pipeToTransform = (pipeableStream: ReactDOMServer.PipeableStream | NodeJS.ReadableStream) => {
     pipeableStream.pipe(transformStream);
     pipedStream = pipeableStream;
   };
@@ -147,7 +148,9 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   const writeChunk = (chunk: string) => transformStream.write(chunk);
   const endStream = () => {
     transformStream.end();
-    pipedStream?.abort();
+    if (pipedStream && 'abort' in pipedStream) {
+      pipedStream.abort();
+    }
   };
   return { readableStream, pipeToTransform, writeChunk, emitError, endStream };
 };
@@ -181,6 +184,11 @@ const streamRenderReactComponent = (
     endStream();
   };
 
+  const { railsContext } = options;
+  if (!railsContext) {
+    throw new Error('railsContext is required to stream a React component');
+  }
+
   Promise.resolve(reactRenderingResult)
     .then((reactRenderedElement) => {
       if (typeof reactRenderedElement === 'string') {
@@ -201,7 +209,7 @@ const streamRenderReactComponent = (
         },
         onShellReady() {
           renderState.isShellReady = true;
-          pipeToTransform(renderingStream);
+          pipeToTransform(injectRSCPayload(renderingStream, railsContext));
         },
         onError(e) {
           reportError(convertToError(e));
@@ -214,7 +222,6 @@ const streamRenderReactComponent = (
       reportError(error);
       sendErrorHtml(error);
     });
-
   return readableStream;
 };
 
