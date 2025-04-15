@@ -396,6 +396,37 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * Indicates if the RSC bundle is being used.
    */
   isRSCBundle: boolean;
+
+  // These functions are intended for use in Node.js environments only. They should be used on the server side and excluded from client-side bundles to reduce bundle size.
+  /**
+   * Generates a ReadableStream for a given component's RSC payload.
+   * @param componentName - The name of the component.
+   * @param props - The properties to pass to the component.
+   * @param railsContext - The Rails context of the current rendering request.
+   * @returns A promise that resolves to a NodeJS.ReadableStream.
+   */
+  getRSCPayloadStream?: (
+    componentName: string,
+    props: Record<string, unknown>,
+    railsContext: RailsContext,
+  ) => Promise<NodeJS.ReadableStream>;
+
+  /**
+   /**
+    * Retrieves all React Server Component (RSC) payload streams generated for a specific rendering request.
+    * @param railsContext - The Rails context of the current rendering request.
+    * @returns An array of objects, each containing the component name and its corresponding NodeJS.ReadableStream.
+    */
+  getRSCPayloadStreams?: (railsContext: RailsContext) => {
+    componentName: string;
+    stream: NodeJS.ReadableStream;
+  }[];
+
+  /**
+   * Clears all RSC payload streams generated for the rendering request of the given Rails context.
+   * @param railsContext - The Rails context of the current rendering request.
+   */
+  clearRSCPayloadStreams?: (railsContext: RailsContext) => void;
 }
 
 export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult>;
