@@ -38,6 +38,7 @@ module ReactOnRails
         <<-JS
         (function() {
           var railsContext = #{rails_context};
+          railsContext.componentSpecificMetadata = {renderRequestId: '#{render_options.render_request_id}'};
         #{redux_stores}
           var props = #{props_string};
           return ReactOnRails.serverRenderReactComponent({

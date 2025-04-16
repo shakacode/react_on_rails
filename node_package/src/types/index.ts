@@ -35,6 +35,15 @@ export type RailsContext = {
   search: string | null;
   httpAcceptLanguage: string;
   rscPayloadGenerationUrl?: string;
+  componentSpecificMetadata?: {
+    // The renderRequestId serves as a unique identifier for each render request.
+    // We cannot rely solely on nodeDomId, as it should be unique for each component on the page,
+    // but the server can render the same page multiple times concurrently for different users.
+    // Therefore, we need an additional unique identifier that can be used both on the client and server.
+    // This ID can also be used to associate specific data with a particular rendered component
+    // on either the server or client.
+    renderRequestId: string;
+  };
 } & (
   | {
       serverSide: false;
