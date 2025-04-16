@@ -83,6 +83,18 @@ class ComponentRenderer {
     const { domNodeId } = this;
     const props = el.textContent !== null ? (JSON.parse(el.textContent) as Record<string, unknown>) : {};
     const trace = el.getAttribute('data-trace') === 'true';
+    const renderRequestId = el.getAttribute('data-render-request-id');
+
+    if (!renderRequestId) {
+      console.error(`renderRequestId is missing for ${name} in dom node with id: ${domNodeId}`);
+    }
+
+    const componentSpecificRailsContext = {
+      ...railsContext,
+      componentSpecificMetadata: {
+        renderRequestId: renderRequestId || '',
+      },
+    };
 
     try {
       const domNode = document.getElementById(domNodeId);
@@ -93,7 +105,7 @@ class ComponentRenderer {
         }
 
         if (
-          (await delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) ||
+          (await delegateToRenderer(componentObj, props, componentSpecificRailsContext, domNodeId, trace)) ||
           // @ts-expect-error The state can change while awaiting delegateToRenderer
           this.state === 'unmounted'
         ) {
@@ -108,7 +120,7 @@ class ComponentRenderer {
           props,
           domNodeId,
           trace,
-          railsContext,
+          railsContext: componentSpecificRailsContext,
           shouldHydrate,
         });
 
