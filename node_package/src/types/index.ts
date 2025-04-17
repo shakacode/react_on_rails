@@ -416,7 +416,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    */
   getRSCPayloadStream?: (
     componentName: string,
-    props: Record<string, unknown>,
+    props: unknown,
     railsContext: RailsContext,
   ) => Promise<NodeJS.ReadableStream>;
 
@@ -428,6 +428,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
     */
   getRSCPayloadStreams?: (railsContext: RailsContext) => {
     componentName: string;
+    props: unknown;
     stream: NodeJS.ReadableStream;
   }[];
 

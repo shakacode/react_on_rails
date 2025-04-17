@@ -2,95 +2,17 @@
 
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import { createFromReadableStream } from 'react-on-rails-rsc/client';
-import { fetch } from './utils.ts';
-import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
 import { RailsContext, RenderFunction } from './types/index.ts';
 import { ensureReactUseAvailable } from './reactApis.cts';
+import { createRSCProvider } from './RSCProvider.tsx';
+import { getReactServerComponent, getPreloadedReactServerComponents } from './getReactServerComponent.client.ts';
+import RSCRoute from './RSCRoute.ts';
 
 ensureReactUseAvailable();
 
-declare global {
-  interface Window {
-    REACT_ON_RAILS_RSC_PAYLOAD?: string[];
-  }
-}
-
 export type RSCClientRootProps = {
   componentName: string;
-  rscPayloadGenerationUrlPath: string;
   componentProps?: unknown;
-};
-
-const createFromFetch = async (fetchPromise: Promise<Response>) => {
-  const response = await fetchPromise;
-  const stream = response.body;
-  if (!stream) {
-    throw new Error('No stream found in response');
-  }
-  const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream);
-  return createFromReadableStream<React.ReactNode>(transformedStream);
-};
-
-const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath, componentProps }: RSCClientRootProps) => {
-  const propsString = JSON.stringify(componentProps);
-  const strippedUrlPath = rscPayloadGenerationUrlPath.replace(/^\/|\/$/g, '');
-  return createFromFetch(fetch(`/${strippedUrlPath}/${componentName}?props=${propsString}`));
-};
-
-const createRSCStreamFromPage = () => {
-  let streamController: ReadableStreamController<string> | undefined;
-  const stream = new ReadableStream<string>({
-    start(controller) {
-      if (typeof window === 'undefined') {
-        return;
-      }
-      const handleChunk = (chunk: string) => {
-        controller.enqueue(chunk);
-      };
-
-      // The RSC payload transfer mechanism works in two possible scenarios:
-      // 1. RSCClientRoot executes first:
-      //    - Initializes REACT_ON_RAILS_RSC_PAYLOAD as an empty array
-      //    - Overrides the push function to handle incoming chunks
-      //    - When server scripts run later, they use the overridden push function
-      // 2. Server scripts execute first:
-      //    - Initialize REACT_ON_RAILS_RSC_PAYLOAD as an empty array
-      //    - Buffer RSC payload chunks in the array
-      //    - When RSCClientRoot runs, it reads buffered chunks and overrides push
-      //
-      // Key points:
-      // - The array is never reassigned, ensuring data consistency
-      // - The push function override ensures all chunks are properly handled
-      // - Execution order is irrelevant - both scenarios work correctly
-      if (!window.REACT_ON_RAILS_RSC_PAYLOAD) {
-        window.REACT_ON_RAILS_RSC_PAYLOAD = [];
-      }
-      window.REACT_ON_RAILS_RSC_PAYLOAD.forEach(handleChunk);
-      const originalPush = window.REACT_ON_RAILS_RSC_PAYLOAD.push;
-      window.REACT_ON_RAILS_RSC_PAYLOAD.push = (...chunks) => {
-        chunks.forEach(handleChunk);
-        return originalPush.call(window.REACT_ON_RAILS_RSC_PAYLOAD, ...chunks);
-      };
-      streamController = controller;
-    },
-  });
-
-  if (typeof document !== 'undefined' && document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      streamController?.close();
-    });
-  } else {
-    streamController?.close();
-  }
-
-  return stream;
-};
-
-const createFromRSCStream = () => {
-  const stream = createRSCStreamFromPage();
-  const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream);
-  return createFromReadableStream<React.ReactNode>(transformedStream);
 };
 
 /**
@@ -107,10 +29,25 @@ const createFromRSCStream = () => {
  * @requires react-on-rails-rsc
  */
 const RSCClientRoot: RenderFunction = async (
-  { componentName, rscPayloadGenerationUrlPath, componentProps }: RSCClientRootProps,
-  _railsContext?: RailsContext,
+  { componentName, componentProps }: RSCClientRootProps,
+  railsContext?: RailsContext,
   domNodeId?: string,
 ) => {
+  if (!railsContext) {
+    throw new Error('RSCClientRoot: No railsContext provided');
+  }
+
+  const RSCProvider = await createRSCProvider({
+    railsContext,
+    getServerComponent: getReactServerComponent,
+    getPreloadedComponents: getPreloadedReactServerComponents,
+  });
+
+  // eslint-disable-next-line react/no-children-prop
+  const root = React.createElement(RSCProvider, {
+    children: React.createElement(RSCRoute, { componentName, componentProps }),
+  });
+
   if (!domNodeId) {
     throw new Error('RSCClientRoot: No domNodeId provided');
   }
@@ -119,10 +56,8 @@ const RSCClientRoot: RenderFunction = async (
     throw new Error(`RSCClientRoot: No DOM node found for id: ${domNodeId}`);
   }
   if (domNode.innerHTML) {
-    const root = await createFromRSCStream();
     ReactDOMClient.hydrateRoot(domNode, root);
   } else {
-    const root = await fetchRSC({ componentName, rscPayloadGenerationUrlPath, componentProps });
     ReactDOMClient.createRoot(domNode).render(root);
   }
   // Added only to satisfy the return type of RenderFunction

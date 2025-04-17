@@ -4,7 +4,7 @@ import { RailsContext } from './types';
 declare global {
   function generateRSCPayload(
     componentName: string,
-    props: Record<string, unknown>,
+    props: unknown,
     railsContext: RailsContext,
   ): Promise<NodeJS.ReadableStream>;
 }
@@ -13,13 +13,14 @@ const mapRailsContextToRSCPayloadStreams = new Map<
   RailsContext,
   {
     componentName: string;
+    props: unknown;
     stream: NodeJS.ReadableStream;
   }[]
 >();
 
 export const getRSCPayloadStream = async (
   componentName: string,
-  props: Record<string, unknown>,
+  props: unknown,
   railsContext: RailsContext,
 ): Promise<NodeJS.ReadableStream> => {
   if (typeof generateRSCPayload !== 'function') {
@@ -39,6 +40,7 @@ export const getRSCPayloadStream = async (
 
   streams.push({
     componentName,
+    props,
     stream: stream2,
   });
   mapRailsContextToRSCPayloadStreams.set(railsContext, streams);
@@ -49,6 +51,7 @@ export const getRSCPayloadStreams = (
   railsContext: RailsContext,
 ): {
   componentName: string;
+  props: unknown;
   stream: NodeJS.ReadableStream;
 }[] => mapRailsContextToRSCPayloadStreams.get(railsContext) ?? [];
 
