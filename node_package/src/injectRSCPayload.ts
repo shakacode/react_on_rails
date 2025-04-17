@@ -14,8 +14,10 @@ function escapeScript(script: string) {
   return script.replace(/<!--/g, '<\\!--').replace(/<\/(script)/gi, '</\\$1');
 }
 
-function writeChunk(chunk: string, transform: Transform) {
-  transform.push(`<script>${escapeScript(`(self.REACT_ON_RAILS_RSC_PAYLOAD||=[]).push(${chunk})`)}</script>`);
+function writeChunk(chunk: string, transform: Transform, cacheKey: string) {
+  transform.push(
+    `<script>${escapeScript(`((self.REACT_ON_RAILS_RSC_PAYLOADS||={})[${cacheKey}]||=[]).push(${chunk})`)}</script>`,
+  );
 }
 
 export default function injectRSCPayload(
@@ -33,14 +35,16 @@ export default function injectRSCPayload(
   // Start reading RSC stream immediately
   const startRSC = async () => {
     try {
-      for await (const chunk of ReactOnRails.getRSCPayloadStreams?.(railsContext)?.[0]?.stream ?? []) {
+      const { stream, props, componentName } = ReactOnRails.getRSCPayloadStreams?.(railsContext)?.[0] ?? {};
+      const cacheKey = `${componentName}-${JSON.stringify(props)}-${railsContext.componentSpecificMetadata?.renderRequestId}`;
+      for await (const chunk of stream ?? []) {
         try {
           const decodedChunk = typeof chunk === 'string' ? chunk : decoder.decode(chunk);
-          writeChunk(JSON.stringify(decodedChunk), resultStream);
+          writeChunk(JSON.stringify(decodedChunk), resultStream, cacheKey);
         } catch (_) {
           const decodedChunk = typeof chunk === 'string' ? chunk : String.fromCodePoint(...chunk);
           const base64 = JSON.stringify(btoa(decodedChunk));
-          writeChunk(`Uint8Array.from(atob(${base64}), m => m.codePointAt(0))`, resultStream);
+          writeChunk(`Uint8Array.from(atob(${base64}), m => m.codePointAt(0))`, resultStream, cacheKey);
         }
       }
     } catch (err) {
