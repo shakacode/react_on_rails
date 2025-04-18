@@ -66,10 +66,11 @@ enableFetchMocks();
     };
 
     // Execute the render
-    const render = () =>
-      act(async () => {
+    const render = async () => {
+      await act(async () => {
         await RSCClientRoot(props, undefined, mockDomNodeId);
       });
+    };
 
     return {
       render,
@@ -87,7 +88,7 @@ enableFetchMocks();
 
     await act(async () => {
       pushFirstChunk();
-      render();
+      await render();
     });
     expect(window.fetch).toHaveBeenCalledWith('/rsc-render/TestComponent?props=undefined');
     expect(window.fetch).toHaveBeenCalledTimes(1);
@@ -108,7 +109,7 @@ enableFetchMocks();
     const { render, pushFirstChunk, pushSecondChunk, endStream } = await mockRSCRequest();
 
     await act(async () => {
-      render();
+      await render();
       pushFirstChunk();
     });
     expect(consoleSpy).toHaveBeenCalledWith(
@@ -138,7 +139,7 @@ enableFetchMocks();
     const { render, pushFirstChunk, pushSecondChunk, endStream } = await mockRSCRequest('/rsc-render/');
 
     await act(async () => {
-      render();
+      await render();
       pushFirstChunk();
       pushSecondChunk();
       endStream();
