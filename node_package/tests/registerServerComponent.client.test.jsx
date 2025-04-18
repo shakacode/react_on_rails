@@ -17,7 +17,7 @@ import { clear as clearComponentRegistry } from '../src/ComponentRegistry.ts';
 enableFetchMocks();
 
 // React Server Components tests require React 19 and only run with Node version 18 (`newest` in our CI matrix)
-(getNodeVersion() >= 18 ? describe : describe.skip)('RSCClientRoot', () => {
+(getNodeVersion() >= 18 ? describe : describe.skip)('registerServerComponent', () => {
   let container;
   const mockDomNodeId = 'test-container';
 
@@ -70,11 +70,10 @@ enableFetchMocks();
     };
 
     // Execute the render
-    const render = () =>
-      act(async () => {
-        const Component = ReactOnRails.getComponent('TestComponent');
-        await Component.component({}, railsContext, mockDomNodeId);
-      });
+    const render = async () => {
+      const Component = ReactOnRails.getComponent('TestComponent');
+      await Component.component({}, railsContext, mockDomNodeId);
+    };
 
     return {
       render,
@@ -92,7 +91,7 @@ enableFetchMocks();
 
     await act(async () => {
       pushFirstChunk();
-      render();
+      await render();
     });
     expect(window.fetch).toHaveBeenCalledWith('/rsc-render/TestComponent?props=%7B%7D');
     expect(window.fetch).toHaveBeenCalledTimes(1);
@@ -113,7 +112,7 @@ enableFetchMocks();
     const { render, pushFirstChunk, pushSecondChunk, endStream } = await mockRSCRequest();
 
     await act(async () => {
-      render();
+      await render();
       pushFirstChunk();
     });
     expect(consoleSpy).toHaveBeenCalledWith(
@@ -143,7 +142,7 @@ enableFetchMocks();
     const { render, pushFirstChunk, pushSecondChunk, endStream } = await mockRSCRequest('/rsc-render/');
 
     await act(async () => {
-      render();
+      await render();
       pushFirstChunk();
       pushSecondChunk();
       endStream();
