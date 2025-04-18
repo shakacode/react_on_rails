@@ -8,6 +8,8 @@ on:
 
 jobs:
   build:
+    env:
+      BUNDLE_FROZEN: true
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -22,6 +24,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: yarn
+          cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
@@ -31,42 +35,32 @@ jobs:
           echo "Node version: "; node -v
           echo "Yarn version: "; yarn --version
           echo "Bundler version: "; bundle --version
-      - name: Save root node_modules to cache
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
       - name: Save root ruby gems to cache
         uses: actions/cache@v4
         with:
           path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-oldest
+          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-oldest
       - name: Install Node modules with Yarn for renderer package
         run: |
-          yarn install --no-progress --no-emoji
+          yarn install --no-progress --no-emoji --frozen-lockfile
           sudo yarn global add yalc
       - name: yalc publish for react-on-rails
         run: yalc publish
-      - name: Save spec/dummy/node_modules to cache
-        uses: actions/cache@v4
-        with:
-          path: spec/dummy/node_modules
-          key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-newest
       - name: yalc add react-on-rails
         run: cd spec/dummy && yalc add react-on-rails
       - name: Install Node modules with Yarn for dummy app
-        run: cd spec/dummy && yarn install --no-progress --no-emoji
+        run: cd spec/dummy && yarn install --no-progress --no-emoji --frozen-lockfile
       - name: Install Ruby Gems for package
         run: bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
       - name: Lint Ruby
         run: bundle exec rubocop
       - name: Install Node modules with Yarn for dummy app
-        run: cd spec/dummy && yarn install --ignore-scripts --no-progress --no-emoji
+        run: cd spec/dummy && yarn install --no-progress --no-emoji --frozen-lockfile
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
           path: spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-oldest
+          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-oldest
       - name: Install Ruby Gems for dummy app
         run: |
           cd spec/dummy
