@@ -66,6 +66,7 @@
   },
   "scripts": {
     "preinstall": "yarn run link-source && yalc add --link react-on-rails",
+    "install:ci": "yarn install --frozen-lockfile --no-progress --no-emoji",
     "link-source": "cd ../.. && yarn run build && yalc publish",
     "lint": "cd ../.. && yarn run lint",
     "format": "cd ../.. && yarn run nps format",

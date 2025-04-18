@@ -8,6 +8,8 @@ on:
 
 jobs:
   rspec-package-tests:
+    env:
+      BUNDLE_FROZEN: true
     strategy:
       fail-fast: false
       matrix:

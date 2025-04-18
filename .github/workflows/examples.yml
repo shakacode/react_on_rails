@@ -10,6 +10,7 @@ jobs:
   examples:
     env:
       SKIP_YARN_COREPACK_CHECK: 0
+      BUNDLE_FROZEN: true
     strategy:
       fail-fast: false
       matrix:
@@ -71,7 +72,7 @@ jobs:
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Install Node modules with Yarn for renderer package
         run: |
-          yarn install --no-progress --no-emoji
+          yarn run install:ci
           sudo yarn global add yalc
       - name: yalc publish for react-on-rails
         run: yalc publish

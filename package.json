@@ -70,6 +70,7 @@
     "node_package/lib"
   ],
   "scripts": {
+    "install:ci": "yarn install --frozen-lockfile --no-progress --no-emoji",
     "test": "jest node_package/tests",
     "clean": "rm -rf node_package/lib",
     "start": "nps",
