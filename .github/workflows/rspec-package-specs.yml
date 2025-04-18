@@ -12,6 +12,8 @@ jobs:
       fail-fast: false
       matrix:
         versions: ['oldest', 'newest']
+    env:
+      BUNDLE_FROZEN: ${{ matrix.versions == 'oldest' && 'false' || 'true' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
