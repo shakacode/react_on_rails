@@ -184,6 +184,12 @@ const config = tsEslint.config([
       '@typescript-eslint/restrict-template-expressions': 'off',
     },
   },
+  {
+    files: ['**/app-react16/**/*'],
+    rules: {
+      'react/no-deprecated': 'off',
+    },
+  },
   // must be the last config in the array
   // https://github.com/prettier/eslint-plugin-prettier?tab=readme-ov-file#configuration-new-eslintconfigjs
   prettierRecommended,
