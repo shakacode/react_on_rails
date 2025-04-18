@@ -46,6 +46,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: yarn
+          cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
@@ -58,11 +60,6 @@ jobs:
       - name: run conversion script to support shakapacker v6
         if: matrix.versions == 'oldest'
         run: script/convert
-      - name: Save root node_modules to cache
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
       - name: Save root ruby gems to cache
         uses: actions/cache@v4
         with:

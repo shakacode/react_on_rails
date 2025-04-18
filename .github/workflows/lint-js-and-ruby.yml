@@ -24,6 +24,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: yarn
+          cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
@@ -33,11 +35,6 @@ jobs:
           echo "Node version: "; node -v
           echo "Yarn version: "; yarn --version
           echo "Bundler version: "; bundle --version
-      - name: Save root node_modules to cache
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
       - name: Save root ruby gems to cache
         uses: actions/cache@v4
         with:
@@ -49,11 +46,6 @@ jobs:
           sudo yarn global add yalc
       - name: yalc publish for react-on-rails
         run: yalc publish
-      - name: Save spec/dummy/node_modules to cache
-        uses: actions/cache@v4
-        with:
-          path: spec/dummy/node_modules
-          key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/yarn.lock') }}-newest
       - name: yalc add react-on-rails
         run: cd spec/dummy && yalc add react-on-rails
       - name: Install Node modules with Yarn for dummy app
