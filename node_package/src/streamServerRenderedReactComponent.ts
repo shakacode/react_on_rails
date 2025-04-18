@@ -1,14 +1,14 @@
 import * as React from 'react';
-import * as ReactDOMServer from 'react-dom/server';
 import { PassThrough, Readable } from 'stream';
 
-import * as ComponentRegistry from './ComponentRegistry';
-import createReactOutput from './createReactOutput';
-import { isPromise, isServerRenderHash } from './isServerRenderResult';
-import buildConsoleReplay from './buildConsoleReplay';
-import handleError from './handleError';
-import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
-import type { RenderParams, StreamRenderState, StreamableComponentResult } from './types';
+import * as ComponentRegistry from './ComponentRegistry.ts';
+import createReactOutput from './createReactOutput.ts';
+import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
+import buildConsoleReplay from './buildConsoleReplay.ts';
+import handleError from './handleError.ts';
+import { renderToPipeableStream, PipeableStream } from './ReactDOMServer.cts';
+import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
+import type { RenderParams, StreamRenderState, StreamableComponentResult } from './types/index.ts';
 
 type BufferedEvent = {
   event: 'data' | 'error' | 'end';
@@ -101,8 +101,8 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
     },
   });
 
-  let pipedStream: ReactDOMServer.PipeableStream | null = null;
-  const pipeToTransform = (pipeableStream: ReactDOMServer.PipeableStream) => {
+  let pipedStream: PipeableStream | null = null;
+  const pipeToTransform = (pipeableStream: PipeableStream) => {
     pipeableStream.pipe(transformStream);
     pipedStream = pipeableStream;
   };
@@ -164,7 +164,7 @@ const streamRenderReactComponent = (
         return;
       }
 
-      const renderingStream = ReactDOMServer.renderToPipeableStream(reactRenderedElement, {
+      const renderingStream = renderToPipeableStream(reactRenderedElement, {
         onShellError(e) {
           sendErrorHtml(convertToError(e));
         },

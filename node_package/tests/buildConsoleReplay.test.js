@@ -1,4 +1,4 @@
-import buildConsoleReplay, { consoleReplay } from '../src/buildConsoleReplay';
+import buildConsoleReplay, { consoleReplay } from '../src/buildConsoleReplay.ts';
 
 describe('consoleReplay', () => {
   expect.assertions(8);

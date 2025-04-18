@@ -1,13 +1,13 @@
 import * as React from 'react';
-import * as ReactDOMServer from 'react-dom/server';
 import type { ReactElement } from 'react';
 
-import * as ComponentRegistry from './ComponentRegistry';
-import createReactOutput from './createReactOutput';
-import { isPromise, isServerRenderHash } from './isServerRenderResult';
-import buildConsoleReplay from './buildConsoleReplay';
-import handleError from './handleError';
-import { createResultObject, convertToError, validateComponent } from './serverRenderUtils';
+import * as ComponentRegistry from './ComponentRegistry.ts';
+import createReactOutput from './createReactOutput.ts';
+import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
+import buildConsoleReplay from './buildConsoleReplay.ts';
+import handleError from './handleError.ts';
+import { renderToString } from './ReactDOMServer.cts';
+import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
 import type {
   CreateReactOutputResult,
   RenderParams,
@@ -17,7 +17,7 @@ import type {
   ServerRenderResult,
   CreateReactOutputAsyncResult,
   RenderStateHtml,
-} from './types';
+} from './types/index.ts';
 
 function processServerRenderHash(result: ServerRenderResult, options: RenderOptions): RenderState {
   const { redirectLocation, routeError } = result;
@@ -47,7 +47,7 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
 
 function processReactElement(result: ReactElement): string {
   try {
-    return ReactDOMServer.renderToString(result);
+    return renderToString(result);
   } catch (error) {
     console.error(`Invalid call to renderToString. Possibly you have a renderFunction, a function that already
 calls renderToString, that takes one parameter. You need to add an extra unused parameter to identify this function

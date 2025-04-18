@@ -89,10 +89,8 @@ jobs:
       - name: Pack for attw and publint
         run: yarn pack -f react-on-rails.tgz
       - name: Lint package types
-        # --profile because we don't care about node10
-        # --ignore-rules CJS default export can't be resolved at the moment,
-        # revisit in 15.0.0
-        run: yarn run attw react-on-rails.tgz --profile node16 --ignore-rules cjs-only-exports-default
+        # our package is ESM-only
+        run: yarn run attw react-on-rails.tgz --profile esm-only
       - name: Lint package publishing
         run: yarn run publint --strict react-on-rails.tgz
       # We only download and run Actionlint if there is any difference in GitHub Action workflows

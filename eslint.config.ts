@@ -134,6 +134,12 @@ const config = tsEslint.config([
     },
   },
   {
+    files: ['node_package/**/*'],
+    rules: {
+      'import/extensions': ['error', 'ignorePackages'],
+    },
+  },
+  {
     files: ['lib/generators/react_on_rails/templates/**/*'],
     rules: {
       // It doesn't use package.json from the template
@@ -143,7 +149,7 @@ const config = tsEslint.config([
     },
   },
   {
-    files: ['**/*.ts', '**/*.tsx'],
+    files: ['**/*.ts{x,}', '**/*.[cm]ts'],
 
     extends: tsEslint.configs.strictTypeChecked,
 

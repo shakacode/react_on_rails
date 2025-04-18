@@ -6,12 +6,12 @@
 import * as React from 'react';
 import * as createReactClass from 'create-react-class';
 
-import * as ComponentRegistry from '../src/ComponentRegistry';
+import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 
 const onPageLoadedCallbacks = [];
 const onPageUnloadedCallbacks = [];
 
-jest.mock('../src/pageLifecycle', () => ({
+jest.mock('../src/pageLifecycle.ts', () => ({
   onPageLoaded: jest.fn((cb) => {
     onPageLoadedCallbacks.push(cb);
     cb();
@@ -22,7 +22,7 @@ jest.mock('../src/pageLifecycle', () => ({
   }),
 }));
 
-jest.mock('../src/context', () => ({
+jest.mock('../src/context.ts', () => ({
   getRailsContext: () => ({ componentRegistryTimeout: 100 }),
 }));
 

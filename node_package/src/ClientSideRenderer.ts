@@ -1,18 +1,16 @@
 /* eslint-disable max-classes-per-file */
-/* eslint-disable react/no-deprecated,@typescript-eslint/no-deprecated -- while we need to support React 16 */
 
-import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
-import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './types';
+import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './types/index.ts';
 
-import { getRailsContext, resetRailsContext } from './context';
-import createReactOutput from './createReactOutput';
-import { isServerRenderHash } from './isServerRenderResult';
-import reactHydrateOrRender from './reactHydrateOrRender';
-import { supportsRootApi } from './reactApis';
-import { debugTurbolinks } from './turbolinksUtils';
-import * as StoreRegistry from './StoreRegistry';
-import * as ComponentRegistry from './ComponentRegistry';
+import { getRailsContext, resetRailsContext } from './context.ts';
+import createReactOutput from './createReactOutput.ts';
+import { isServerRenderHash } from './isServerRenderResult.ts';
+import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from './reactApis.cts';
+import reactHydrateOrRender from './reactHydrateOrRender.ts';
+import { debugTurbolinks } from './turbolinksUtils.ts';
+import * as StoreRegistry from './StoreRegistry.ts';
+import * as ComponentRegistry from './ComponentRegistry.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
@@ -103,8 +101,7 @@ class ComponentRenderer {
         }
 
         // Hydrate if available and was server rendered
-        // @ts-expect-error potentially present if React 18 or greater
-        const shouldHydrate = !!(ReactDOM.hydrate || ReactDOM.hydrateRoot) && !!domNode.innerHTML;
+        const shouldHydrate = supportsHydrate && !!domNode.innerHTML;
 
         const reactElementOrRouterResult = createReactOutput({
           componentObj,
@@ -156,7 +153,8 @@ You should return a React.Component always for the client side entry point.`);
       }
 
       try {
-        ReactDOM.unmountComponentAtNode(domNode);
+        // eslint-disable-next-line @typescript-eslint/no-deprecated
+        unmountComponentAtNode(domNode);
       } catch (e: unknown) {
         const error = e instanceof Error ? e : new Error('Unknown error');
         console.info(
