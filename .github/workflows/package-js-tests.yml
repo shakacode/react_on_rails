@@ -37,7 +37,7 @@ jobs:
         run: script/convert
       - name: Install Node modules with Yarn for renderer package
         run: |
-          yarn install --no-progress --no-emoji
+          yarn install --no-progress --no-emoji ${{ matrix.versions == 'newest' && '--frozen-lockfile' || '' }}
           sudo yarn global add yalc
       - name: Run JS unit tests for Renderer package
         run: yarn test

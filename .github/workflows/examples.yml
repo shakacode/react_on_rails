@@ -8,12 +8,13 @@ on:
 
 jobs:
   examples:
-    env:
-      SKIP_YARN_COREPACK_CHECK: 0
     strategy:
       fail-fast: false
       matrix:
         versions: ['oldest', 'newest']
+    env:
+      SKIP_YARN_COREPACK_CHECK: 0
+      BUNDLE_FROZEN: ${{ matrix.versions == 'oldest' && 'false' || 'true' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -71,7 +72,7 @@ jobs:
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Install Node modules with Yarn for renderer package
         run: |
-          yarn install --no-progress --no-emoji
+          yarn install --no-progress --no-emoji ${{ matrix.versions == 'newest' && '--frozen-lockfile' || '' }}
           sudo yarn global add yalc
       - name: yalc publish for react-on-rails
         run: yalc publish
