@@ -1,14 +1,17 @@
+import { createJsWithTsPreset } from 'ts-jest';
+
 const nodeVersion = parseInt(process.version.slice(1), 10);
 
 export default {
-  globals: {
-    'ts-jest': {
-      tsconfig: {
-        rewriteRelativeImportExtensions: false,
-      },
+  ...createJsWithTsPreset({
+    tsconfig: {
+      // Relative imports in our TS code include `.ts` extensions.
+      // When compiling the package, TS rewrites them to `.js`,
+      // but ts-jest runs on the original code where the `.js` files don't exist,
+      // so this setting needs to be disabled here.
+      rewriteRelativeImportExtensions: false,
     },
-  },
-  preset: 'ts-jest/presets/js-with-ts',
+  }),
   testEnvironment: 'jsdom',
   setupFiles: ['<rootDir>/node_package/tests/jest.setup.js'],
   // React Server Components tests are compatible with React 19
