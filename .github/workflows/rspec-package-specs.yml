@@ -38,7 +38,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ matrix.versions }}
+          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-${{ matrix.versions }}
       - name: Install Ruby Gems for package
         run: bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
       - name: Git Stuff
