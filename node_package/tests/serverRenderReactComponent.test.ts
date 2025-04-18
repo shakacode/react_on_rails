@@ -245,7 +245,7 @@ describe('serverRenderReactComponent', () => {
     });
     assertIsPromise(renderResult);
     const result = await renderResult;
-    expect(result.html).toEqual('<div>Hello</div>');
+    expect(result.html).toBe('<div>Hello</div>');
   });
 
   it('serverRenderReactComponent renders an error if attempting to render a renderer', () => {
