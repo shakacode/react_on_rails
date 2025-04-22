@@ -128,6 +128,7 @@ module ReactOnRails
     def build_server_pack_content(component_on_server_imports, server_components, client_components)
       content = <<~FILE_CONTENT
         import * as ReactOnRails from 'react-on-rails';
+        globalThis.ReactOnRails = ReactOnRails;
 
         #{component_on_server_imports.join("\n")}\n
       FILE_CONTENT
