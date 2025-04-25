@@ -2,6 +2,7 @@
 
 import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
 import type { Readable } from 'stream';
+import { RSCPayloadCallback } from '../RSCPayloadGenerator';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
@@ -431,6 +432,13 @@ export interface ReactOnRailsInternal extends ReactOnRails {
     props: unknown;
     stream: NodeJS.ReadableStream;
   }[];
+
+  /**
+   * Registers a callback to be called when an RSC payload stream is generated for a specific rendering request.
+   * @param railsContext - The Rails context of the current rendering request.
+   * @param callback - The callback to be called when an RSC payload stream is generated.
+   */
+  onRSCPayloadGenerated?: (railsContext: RailsContext, callback: RSCPayloadCallback) => void;
 
   /**
    * Clears all RSC payload streams generated for the rendering request of the given Rails context.

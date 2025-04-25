@@ -1,6 +1,7 @@
-import RSCRoute from '../RSCRoute.ts';
-import { RegisterServerComponentOptions } from '../types/index.ts';
-import baseRegisterServerComponent from '../baseRegisterServerComponent/client.tsx';
+import * as React from 'react';
+import ReactOnRails from '../ReactOnRails.client';
+import RSCClientRoot from '../RSCClientRoot';
+import { RailsContext, ReactComponentOrRenderFunction, ReactComponent } from '../types';
 
 /**
  * Registers React Server Components (RSC) with React on Rails.
@@ -34,8 +35,25 @@ import baseRegisterServerComponent from '../baseRegisterServerComponent/client.t
  * // When ServerComponent1 renders, it will fetch from: /rsc_payload/ServerComponent1
  * ```
  */
-const registerServerComponent = (options: RegisterServerComponentOptions, ...componentNames: string[]) => {
-  baseRegisterServerComponent(RSCRoute, ...componentNames);
+const registerServerComponent = (WrapperComponent: ReactComponent, ...componentNames: string[]) => {
+  const componentsWrappedInRSCClientRoot: Record<string, ReactComponentOrRenderFunction> = {};
+  for (const name of componentNames) {
+    componentsWrappedInRSCClientRoot[name] = (
+      componentProps?: unknown,
+      railsContext?: RailsContext,
+      domNodeId?: string,
+    ) =>
+      RSCClientRoot(
+        {
+          ServerComponentContainer: () => (
+            <WrapperComponent componentName={name} componentProps={componentProps} />
+          ),
+        },
+        railsContext,
+        domNodeId,
+      );
+  }
+  ReactOnRails.register(componentsWrappedInRSCClientRoot);
 };
 
 export default registerServerComponent;

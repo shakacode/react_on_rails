@@ -43,7 +43,9 @@ const createSSRManifest = async (
     // It can accept options such as `prefix` and `crossOrigin` to specify the path and crossorigin attribute for the modules.
     // In our case, since the server code is bundled into a single bundle, there is no need to load additional JavaScript modules.
     // As a result, we set this property to an empty object because it will not be used.
-    moduleLoading: {},
+    moduleLoading: {
+      prefix: '/webpack/development/',
+    },
     moduleMap,
   };
 

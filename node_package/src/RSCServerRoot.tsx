@@ -2,15 +2,11 @@ import * as React from 'react';
 import type { RenderFunction, RailsContext } from './types/index.ts';
 import getReactServerComponent from './getReactServerComponent.server.ts';
 import { createRSCProvider } from './RSCProvider.tsx';
-import RSCRoute from './RSCRoute.ts';
 
-type RSCServerRootProps = {
-  componentName: string;
-  componentProps: unknown;
-};
+type RSCServerRootProps = { ServerComponentContainer: ReactComponent };
 
 const RSCServerRoot: RenderFunction = async (
-  { componentName, componentProps }: RSCServerRootProps,
+  { ServerComponentContainer }: RSCServerRootProps,
   railsContext?: RailsContext,
 ) => {
   if (!railsContext) {
@@ -22,10 +18,13 @@ const RSCServerRoot: RenderFunction = async (
     getServerComponent: getReactServerComponent,
   });
 
-  // eslint-disable-next-line react/no-children-prop
-  const root = React.createElement(RSCProvider, {
-    children: React.createElement(RSCRoute, { componentName, componentProps }),
-  });
+  const suspensableServerComponent = (
+    <React.Suspense fallback={null}>
+      <ServerComponentContainer />
+    </React.Suspense>
+  );
+
+  const root = <RSCProvider>{suspensableServerComponent}</RSCProvider>;
 
   return () => root;
 };

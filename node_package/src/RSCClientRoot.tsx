@@ -6,14 +6,10 @@ import { RailsContext, RenderFunction } from './types/index.ts';
 import { ensureReactUseAvailable } from './reactApis.cts';
 import { createRSCProvider } from './RSCProvider.tsx';
 import { getReactServerComponent, getPreloadedReactServerComponents } from './getReactServerComponent.client.ts';
-import RSCRoute from './RSCRoute.ts';
 
 ensureReactUseAvailable();
 
-export type RSCClientRootProps = {
-  componentName: string;
-  componentProps?: unknown;
-};
+export type RSCClientRootProps = { ServerComponentContainer: ReactComponent };
 
 /**
  * RSCClientRoot is a React component that handles client-side rendering of React Server Components (RSC).
@@ -29,7 +25,7 @@ export type RSCClientRootProps = {
  * @requires react-on-rails-rsc
  */
 const RSCClientRoot: RenderFunction = async (
-  { componentName, componentProps }: RSCClientRootProps,
+  { ServerComponentContainer }: RSCClientRootProps,
   railsContext?: RailsContext,
   domNodeId?: string,
 ) => {
@@ -43,10 +39,13 @@ const RSCClientRoot: RenderFunction = async (
     getPreloadedComponents: getPreloadedReactServerComponents,
   });
 
-  // eslint-disable-next-line react/no-children-prop
-  const root = React.createElement(RSCProvider, {
-    children: React.createElement(RSCRoute, { componentName, componentProps }),
-  });
+  const SuspensableRSCRoute = (
+    <React.Suspense fallback={null}>
+      <ServerComponentContainer />
+    </React.Suspense>
+  );
+
+  const root = <RSCProvider>{SuspensableRSCRoute}</RSCProvider>;
 
   if (!domNodeId) {
     throw new Error('RSCClientRoot: No domNodeId provided');

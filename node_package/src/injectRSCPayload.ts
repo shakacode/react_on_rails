@@ -15,8 +15,9 @@ function escapeScript(script: string) {
 }
 
 function writeChunk(chunk: string, transform: Transform, cacheKey: string) {
+  const stringifiedKey = JSON.stringify(cacheKey);
   transform.push(
-    `<script>${escapeScript(`((self.REACT_ON_RAILS_RSC_PAYLOADS||={})[${cacheKey}]||=[]).push(${chunk})`)}</script>`,
+    `<script>${escapeScript(`((self.REACT_ON_RAILS_RSC_PAYLOADS||={})[${stringifiedKey}]||=[]).push(${chunk})`)}</script>`,
   );
 }
 
@@ -35,18 +36,32 @@ export default function injectRSCPayload(
   // Start reading RSC stream immediately
   const startRSC = async () => {
     try {
-      const { stream, props, componentName } = ReactOnRails.getRSCPayloadStreams?.(railsContext)?.[0] ?? {};
-      const cacheKey = `${componentName}-${JSON.stringify(props)}-${railsContext.componentSpecificMetadata?.renderRequestId}`;
-      for await (const chunk of stream ?? []) {
-        try {
-          const decodedChunk = typeof chunk === 'string' ? chunk : decoder.decode(chunk);
-          writeChunk(JSON.stringify(decodedChunk), resultStream, cacheKey);
-        } catch (_) {
-          const decodedChunk = typeof chunk === 'string' ? chunk : String.fromCodePoint(...chunk);
-          const base64 = JSON.stringify(btoa(decodedChunk));
-          writeChunk(`Uint8Array.from(atob(${base64}), m => m.codePointAt(0))`, resultStream, cacheKey);
+      const rscPromises: Promise<void>[] = [];
+
+      ReactOnRails.onRSCPayloadGenerated?.(railsContext, (streamInfo) => {
+        const { stream, props, componentName } = streamInfo;
+        const cacheKey = `${componentName}-${JSON.stringify(props)}-${railsContext.componentSpecificMetadata?.renderRequestId}`;
+        rscPromises.push(
+          // eslint-disable-next-line @typescript-eslint/no-misused-promises, no-async-promise-executor
+          new Promise(async (resolve) => {
+            for await (const chunk of stream ?? []) {
+              const decodedChunk = typeof chunk === 'string' ? chunk : decoder.decode(chunk);
+              writeChunk(JSON.stringify(decodedChunk), resultStream, cacheKey);
+            }
+            resolve();
+          }),
+        );
+      });
+
+      await new Promise((resolve) => {
+        if (htmlStream.readableEnded) {
+          resolve(Promise.all(rscPromises));
+        } else {
+          htmlStream.on('end', () => {
+            resolve(Promise.all(rscPromises));
+          });
         }
-      }
+      });
     } catch (err) {
       resultStream.emit('error', err);
     }
@@ -83,7 +98,12 @@ export default function injectRSCPayload(
     if (!rscPromise) {
       rscPromise = startRSC();
     }
-    rscPromise.then(() => resultStream.end()).catch((err: unknown) => resultStream.emit('error', err));
+    rscPromise
+      .then(() => {
+        resultStream.end();
+        ReactOnRails.clearRSCPayloadStreams?.(railsContext);
+      })
+      .catch((err: unknown) => resultStream.emit('error', err));
   });
 
   return resultStream;

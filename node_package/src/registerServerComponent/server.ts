@@ -1,6 +1,6 @@
-import ReactOnRails from '../ReactOnRails.client.ts';
-import RSCServerRoot from '../RSCServerRoot.tsx';
-import { ReactComponent, RenderFunction, RailsContext } from '../types/index.ts';
+import RSCRoute from '../RSCRoute.ts';
+import baseRegisterServerComponent from '../baseRegisterServerComponent/server.tsx';
+import { ReactComponent } from '../types/index.ts';
 
 /**
  * Registers React Server Components (RSC) with React on Rails for the server bundle.
@@ -24,14 +24,7 @@ import { ReactComponent, RenderFunction, RailsContext } from '../types/index.ts'
  * ```
  */
 const registerServerComponent = (components: Record<string, ReactComponent>) => {
-  const componentsWrappedInRSCServerRoot: Record<string, RenderFunction> = {};
-  for (const [componentName] of Object.entries(components)) {
-    componentsWrappedInRSCServerRoot[componentName] = (
-      componentProps?: unknown,
-      railsContext?: RailsContext,
-    ) => RSCServerRoot({ componentName, componentProps }, railsContext);
-  }
-  ReactOnRails.register(componentsWrappedInRSCServerRoot);
+  baseRegisterServerComponent(RSCRoute, components);
 };
 
 export default registerServerComponent;

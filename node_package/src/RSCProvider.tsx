@@ -20,8 +20,14 @@ export const createRSCProvider = async ({
   getPreloadedComponents?: typeof getPreloadedReactServerComponents;
 }) => {
   const cachedComponents = (await getPreloadedComponents?.(railsContext)) ?? {};
+  const fetchRSCPromises: Record<string, Promise<React.ReactNode>> = {};
+
+  const generateCacheKey = (componentName: string, componentProps: unknown) => {
+    return `${componentName}-${JSON.stringify(componentProps)}-${railsContext.componentSpecificMetadata?.renderRequestId}`;
+  };
+
   const getCachedComponent = (componentName: string, componentProps: unknown) => {
-    const key = `${componentName}-${JSON.stringify(componentProps)}`;
+    const key = generateCacheKey(componentName, componentProps);
     return cachedComponents[key];
   };
 
@@ -30,7 +36,17 @@ export const createRSCProvider = async ({
     if (cachedComponent) {
       return cachedComponent;
     }
-    return getServerComponent({ componentName, componentProps, railsContext });
+    const key = generateCacheKey(componentName, componentProps);
+    if (key in fetchRSCPromises) {
+      return fetchRSCPromises[key];
+    }
+
+    const promise = getServerComponent({ componentName, componentProps, railsContext }).then((rsc) => {
+      cachedComponents[key] = rsc;
+      return rsc;
+    });
+    fetchRSCPromises[key] = promise;
+    return promise;
   };
 
   return ({ children }: { children: React.ReactNode }) => {

@@ -9,14 +9,27 @@ declare global {
   ): Promise<NodeJS.ReadableStream>;
 }
 
-const mapRailsContextToRSCPayloadStreams = new Map<
-  RailsContext,
-  {
-    componentName: string;
-    props: unknown;
-    stream: NodeJS.ReadableStream;
-  }[]
->();
+export type RSCPayloadStreamInfo = {
+  stream: NodeJS.ReadableStream;
+  props: unknown;
+  componentName: string;
+};
+
+export type RSCPayloadCallback = (streamInfo: RSCPayloadStreamInfo) => void;
+
+const mapRailsContextToRSCPayloadStreams = new Map<RailsContext, RSCPayloadStreamInfo[]>();
+
+const rscPayloadCallbacks = new Map<RailsContext, Array<RSCPayloadCallback>>();
+
+export const onRSCPayloadGenerated = (railsContext: RailsContext, callback: RSCPayloadCallback) => {
+  const callbacks = rscPayloadCallbacks.get(railsContext) || [];
+  callbacks.push(callback);
+  rscPayloadCallbacks.set(railsContext, callbacks);
+
+  // Call callback for any existing streams for this context
+  const existingStreams = mapRailsContextToRSCPayloadStreams.get(railsContext) || [];
+  existingStreams.forEach((streamInfo) => callback(streamInfo));
+};
 
 export const getRSCPayloadStream = async (
   componentName: string,
@@ -38,12 +51,18 @@ export const getRSCPayloadStream = async (
   const stream2 = new PassThrough();
   stream1.pipe(stream2);
 
-  streams.push({
+  const streamInfo: RSCPayloadStreamInfo = {
     componentName,
     props,
     stream: stream2,
-  });
+  };
+  streams.push(streamInfo);
   mapRailsContextToRSCPayloadStreams.set(railsContext, streams);
+
+  // Notify callbacks about the new stream
+  const callbacks = rscPayloadCallbacks.get(railsContext) || [];
+  callbacks.forEach((callback) => callback(streamInfo));
+
   return stream1;
 };
 
@@ -57,4 +76,5 @@ export const getRSCPayloadStreams = (
 
 export const clearRSCPayloadStreams = (railsContext: RailsContext) => {
   mapRailsContextToRSCPayloadStreams.delete(railsContext);
+  rscPayloadCallbacks.delete(railsContext);
 };

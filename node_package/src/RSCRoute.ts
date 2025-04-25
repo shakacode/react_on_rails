@@ -1,8 +1,12 @@
 import * as React from 'react';
-import { RSCClientRootProps } from './RSCClientRoot';
 import { useRSC } from './RSCProvider';
 
-const RSCRoute = ({ componentName, componentProps }: RSCClientRootProps) => {
+export type RSCRouteProps = {
+  componentName: string;
+  componentProps: unknown;
+};
+
+const RSCRoute = ({ componentName, componentProps }: RSCRouteProps) => {
   const { getComponent, getCachedComponent } = useRSC();
   let component = getCachedComponent(componentName, componentProps);
   if (!component) {
