@@ -84,15 +84,3 @@ export const getReactServerComponent = ({
   }
   return fetchRSC({ componentName, componentProps, railsContext });
 };
-
-export const getPreloadedReactServerComponents = (railsContext: RailsContext) => {
-  return Promise.all(
-    Object.entries(window.REACT_ON_RAILS_RSC_PAYLOADS ?? {})
-      .filter(([cacheKey]) =>
-        cacheKey.includes(railsContext.componentSpecificMetadata?.renderRequestId ?? ''),
-      )
-      .map(async ([cacheKey, payloads]) => ({
-        [cacheKey]: await createFromPreloadedPayloads(payloads),
-      })),
-  ).then((components) => Object.assign({}, ...components) as Record<string, React.ReactNode>);
-};

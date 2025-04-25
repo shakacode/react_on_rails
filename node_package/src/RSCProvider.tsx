@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { RailsContext } from './types';
-import { getReactServerComponent, getPreloadedReactServerComponents } from './getReactServerComponent.client';
+import { getReactServerComponent } from './getReactServerComponent.client';
 
 type RSCContextType = {
   getCachedComponent: (componentName: string, componentProps: unknown) => React.ReactNode;
@@ -10,16 +10,14 @@ type RSCContextType = {
 
 const RSCContext = React.createContext<RSCContextType | undefined>(undefined);
 
-export const createRSCProvider = async ({
+export const createRSCProvider = ({
   railsContext,
   getServerComponent,
-  getPreloadedComponents,
 }: {
   railsContext: RailsContext;
   getServerComponent: typeof getReactServerComponent;
-  getPreloadedComponents?: typeof getPreloadedReactServerComponents;
 }) => {
-  const cachedComponents = (await getPreloadedComponents?.(railsContext)) ?? {};
+  const cachedComponents: Record<string, React.ReactNode> = {};
   const fetchRSCPromises: Record<string, Promise<React.ReactNode>> = {};
 
   const generateCacheKey = (componentName: string, componentProps: unknown) => {

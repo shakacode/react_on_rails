@@ -5,7 +5,7 @@ import { createRSCProvider } from './RSCProvider.tsx';
 
 type RSCServerRootProps = { ServerComponentContainer: ReactComponent };
 
-const RSCServerRoot: RenderFunction = async (
+const RSCServerRoot: RenderFunction = (
   { ServerComponentContainer }: RSCServerRootProps,
   railsContext?: RailsContext,
 ) => {
@@ -13,7 +13,7 @@ const RSCServerRoot: RenderFunction = async (
     throw new Error('RSCClientRoot: No railsContext provided');
   }
 
-  const RSCProvider = await createRSCProvider({
+  const RSCProvider = createRSCProvider({
     railsContext,
     getServerComponent: getReactServerComponent,
   });

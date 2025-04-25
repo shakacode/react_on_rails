@@ -2,10 +2,10 @@
 
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import { RailsContext, RenderFunction } from './types/index.ts';
+import { RailsContext, RenderFunction, ReactComponent } from './types/index.ts';
 import { ensureReactUseAvailable } from './reactApis.cts';
 import { createRSCProvider } from './RSCProvider.tsx';
-import { getReactServerComponent, getPreloadedReactServerComponents } from './getReactServerComponent.client.ts';
+import { getReactServerComponent } from './getReactServerComponent.client.ts';
 
 ensureReactUseAvailable();
 
@@ -24,7 +24,7 @@ export type RSCClientRootProps = { ServerComponentContainer: ReactComponent };
  * @requires React 19+
  * @requires react-on-rails-rsc
  */
-const RSCClientRoot: RenderFunction = async (
+const RSCClientRoot: RenderFunction = (
   { ServerComponentContainer }: RSCClientRootProps,
   railsContext?: RailsContext,
   domNodeId?: string,
@@ -33,10 +33,9 @@ const RSCClientRoot: RenderFunction = async (
     throw new Error('RSCClientRoot: No railsContext provided');
   }
 
-  const RSCProvider = await createRSCProvider({
+  const RSCProvider = createRSCProvider({
     railsContext,
     getServerComponent: getReactServerComponent,
-    getPreloadedComponents: getPreloadedReactServerComponents,
   });
 
   const SuspensableRSCRoute = (
