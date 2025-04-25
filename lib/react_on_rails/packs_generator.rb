@@ -87,10 +87,29 @@ module ReactOnRails
       first_js_statement_in_code(content).match?(/^["']use client["'](?:;|\s|$)/)
     end
 
+    def router_entrypoint?(file_path)
+      content = File.read(file_path)
+      # has "use router" directive. It can be "use router" or 'use router'
+      first_js_statement_in_code(content).match?(/^["']use router["'](?:;|\s|$)/)
+    end
+
     def pack_file_contents(file_path)
       registered_component_name = component_name(file_path)
       load_server_components = ReactOnRails::Utils.react_on_rails_pro? &&
                                ReactOnRailsPro.configuration.enable_rsc_support
+
+      # Check for router component first
+      if load_server_components && router_entrypoint?(file_path)
+        relative_component_path = relative_component_path_from_generated_pack(file_path)
+        return <<~FILE_CONTENT.strip
+          import registerRouter from 'react-on-rails/registerRouter/client';
+          import #{registered_component_name} from '#{relative_component_path}';
+
+          registerRouter({
+            #{registered_component_name},
+          });
+        FILE_CONTENT
+      end
 
       if load_server_components && !client_entrypoint?(file_path)
         rsc_payload_generation_url_path = ReactOnRailsPro.configuration.rsc_payload_generation_url_path
@@ -121,11 +140,12 @@ module ReactOnRails
       puts(Rainbow("Generated Server Bundle: #{generated_server_bundle_file_path}").orange)
     end
 
-    def build_server_pack_content(component_on_server_imports, server_components, client_components)
+    def build_server_pack_content(component_on_server_imports, server_components, client_components, router_components)
       content = <<~FILE_CONTENT
         import ReactOnRails from 'react-on-rails';
 
         #{component_on_server_imports.join("\n")}\n
+        #{router_components.any? ? "import registerRouter from 'react-on-rails/registerRouter/server';" : ''}
       FILE_CONTENT
 
       if server_components.any?
@@ -135,10 +155,16 @@ module ReactOnRails
         FILE_CONTENT
       end
 
+      if router_components.any?
+        content += <<~FILE_CONTENT
+          registerRouter({#{router_components.join(",\n")}});\n
+        FILE_CONTENT
+      end
+
       content + "ReactOnRails.register({#{client_components.join(",\n")}});"
     end
 
-    def generated_server_pack_file_content
+    def generated_server_pack_file_content # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity
       common_components_for_server_bundle = common_component_to_path.delete_if { |k| server_component_to_path.key?(k) }
       component_for_server_registration_to_path = common_components_for_server_bundle.merge(server_component_to_path)
 
@@ -148,15 +174,24 @@ module ReactOnRails
 
       load_server_components = ReactOnRails::Utils.react_on_rails_pro? &&
                                ReactOnRailsPro.configuration.enable_rsc_support
+
+      # Identify router components
+      router_components = component_for_server_registration_to_path.keys.select do |name|
+        component_path = component_for_server_registration_to_path[name]
+        router_entrypoint?(component_path)
+      end
+
       server_components = component_for_server_registration_to_path.keys.delete_if do |name|
         next true unless load_server_components
+        next true if router_components.include?(name)
 
         component_path = component_for_server_registration_to_path[name]
         client_entrypoint?(component_path)
       end
-      client_components = component_for_server_registration_to_path.keys - server_components
 
-      build_server_pack_content(component_on_server_imports, server_components, client_components)
+      client_components = component_for_server_registration_to_path.keys - server_components - router_components
+
+      build_server_pack_content(component_on_server_imports, server_components, client_components, router_components)
     end
 
     def add_generated_pack_to_server_bundle

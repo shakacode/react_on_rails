@@ -16,7 +16,13 @@
       "react-server": "./node_package/lib/registerServerComponent/server.rsc.js",
       "default": "./node_package/lib/registerServerComponent/server.js"
     },
-    "./RSCServerRoot": "./node_package/lib/RSCServerRoot.js"
+    "./RSCServerRoot": "./node_package/lib/RSCServerRoot.js",
+    "./registerRouter/client": "./node_package/lib/registerRouter/client.js",
+    "./registerRouter/server": {
+      "react-server": "./node_package/lib/registerRouter/server.rsc.js",
+      "default": "./node_package/lib/registerRouter/server.js"
+    },
+    "./RSCRoute": "./node_package/lib/RSCRoute.js"
   },
   "directories": {
     "doc": "docs"
@@ -48,7 +54,6 @@
     "eslint-plugin-prettier": "^5.2.3",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.2.0",
-    "typescript-eslint": "^8.29.1",
     "globals": "^16.0.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
@@ -64,7 +69,8 @@
     "react-on-rails-rsc": "git+https://github.com/shakacode/react_on_rails_rsc.git#add-support-for-generating-client-components-manifest-for-server-bundle",
     "redux": "^4.2.1",
     "ts-jest": "^29.2.5",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.29.1"
   },
   "peerDependencies": {
     "react": ">= 16",
