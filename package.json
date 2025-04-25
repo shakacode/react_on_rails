@@ -17,10 +17,10 @@
       "default": "./node_package/lib/registerServerComponent/server.js"
     },
     "./RSCServerRoot": "./node_package/lib/RSCServerRoot.js",
-    "./registerRouter/client": "./node_package/lib/registerRouter/client.js",
-    "./registerRouter/server": {
-      "react-server": "./node_package/lib/registerRouter/server.rsc.js",
-      "default": "./node_package/lib/registerRouter/server.js"
+    "./wrapServerComponentRenderer/client": "./node_package/lib/wrapServerComponentRenderer/client.js",
+    "./wrapServerComponentRenderer/server": {
+      "react-server": "./node_package/lib/wrapServerComponentRenderer/server.rsc.js",
+      "default": "./node_package/lib/wrapServerComponentRenderer/server.js"
     },
     "./RSCRoute": "./node_package/lib/RSCRoute.js"
   },
