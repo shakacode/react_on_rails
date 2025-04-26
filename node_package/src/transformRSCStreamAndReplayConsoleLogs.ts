@@ -12,6 +12,12 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
 
       const handleJsonChunk = (chunk: RSCPayloadChunk) => {
         const { html, consoleReplayScript = '' } = chunk;
+        if (html.includes('client7.chunk.js')) {
+          console.log('received client7.chunk.js at chunk [DEBUG RSC]', chunk);
+        }
+        if (html.includes('client6.chunk.js')) {
+          console.log('received client6.chunk.js at chunk [DEBUG RSC]', chunk);
+        }
         controller.enqueue(encoder.encode(html ?? ''));
 
         const replayConsoleCode = consoleReplayScript
