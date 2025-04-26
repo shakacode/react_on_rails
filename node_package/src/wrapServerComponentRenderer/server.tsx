@@ -1,8 +1,8 @@
 import * as React from 'react';
-import type { RenderFunction, ReactComponentOrRenderFunction } from '../types';
-import getReactServerComponent from '../getReactServerComponent.server';
-import { createRSCProvider } from '../RSCProvider';
-import isRenderFunction from '../isRenderFunction';
+import type { RenderFunction, ReactComponentOrRenderFunction } from '../types/index.ts';
+import getReactServerComponent from '../getReactServerComponent.server.ts';
+import { createRSCProvider } from '../RSCProvider.tsx';
+import isRenderFunction from '../isRenderFunction.ts';
 
 const WrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOrRenderFunction) => {
   if (typeof componentOrRenderFunction !== 'function') {

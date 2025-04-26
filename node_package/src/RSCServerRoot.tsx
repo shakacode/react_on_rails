@@ -1,5 +1,5 @@
 import * as React from 'react';
-import type { RenderFunction, RailsContext } from './types/index.ts';
+import type { RenderFunction, RailsContext, ReactComponent } from './types/index.ts';
 import getReactServerComponent from './getReactServerComponent.server.ts';
 import { createRSCProvider } from './RSCProvider.tsx';
 

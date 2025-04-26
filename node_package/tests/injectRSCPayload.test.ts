@@ -1,6 +1,6 @@
 import { Readable, PassThrough } from 'stream';
-import ReactOnRails, { RailsContext } from '../src/ReactOnRails.node';
-import injectRSCPayload from '../src/injectRSCPayload';
+import ReactOnRails, { RailsContext } from '../src/ReactOnRails.node.ts';
+import injectRSCPayload from '../src/injectRSCPayload.ts';
 
 describe('injectRSCPayload', () => {
   const createMockStream = (chunks: (string | Buffer)[] | { [key: number]: string | string[] }) => {
@@ -40,7 +40,7 @@ describe('injectRSCPayload', () => {
 
     jest
       .spyOn(ReactOnRails, 'getRSCPayloadStreams')
-      .mockReturnValue([{ stream: mockRSC, componentName: 'test' }]);
+      .mockReturnValue([{ stream: mockRSC, componentName: 'test', props: {} }]);
 
     const result = injectRSCPayload(mockHTML, {} as RailsContext);
     const resultStr = await collectStreamData(result);
@@ -56,7 +56,7 @@ describe('injectRSCPayload', () => {
 
     jest
       .spyOn(ReactOnRails, 'getRSCPayloadStreams')
-      .mockReturnValue([{ stream: mockRSC, componentName: 'test' }]);
+      .mockReturnValue([{ stream: mockRSC, componentName: 'test', props: {} }]);
 
     const result = injectRSCPayload(mockHTML, {} as RailsContext);
     const resultStr = await collectStreamData(result);
@@ -77,7 +77,7 @@ describe('injectRSCPayload', () => {
     ]);
     jest
       .spyOn(ReactOnRails, 'getRSCPayloadStreams')
-      .mockReturnValue([{ stream: mockRSC, componentName: 'test' }]);
+      .mockReturnValue([{ stream: mockRSC, componentName: 'test', props: {} }]);
 
     const result = injectRSCPayload(mockHTML, {} as RailsContext);
     const resultStr = await collectStreamData(result);
@@ -98,7 +98,7 @@ describe('injectRSCPayload', () => {
     });
     jest
       .spyOn(ReactOnRails, 'getRSCPayloadStreams')
-      .mockReturnValue([{ stream: mockRSC, componentName: 'test' }]);
+      .mockReturnValue([{ stream: mockRSC, componentName: 'test', props: {} }]);
 
     const result = injectRSCPayload(mockHTML, {} as RailsContext);
     const resultStr = await collectStreamData(result);
@@ -122,7 +122,7 @@ describe('injectRSCPayload', () => {
     });
     jest
       .spyOn(ReactOnRails, 'getRSCPayloadStreams')
-      .mockReturnValue([{ stream: mockRSC, componentName: 'test' }]);
+      .mockReturnValue([{ stream: mockRSC, componentName: 'test', props: {} }]);
 
     const result = injectRSCPayload(mockHTML, {} as RailsContext);
     const resultStr = await collectStreamData(result);
