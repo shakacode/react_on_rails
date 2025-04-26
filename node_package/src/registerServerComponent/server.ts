@@ -1,5 +1,5 @@
 import ReactOnRails from '../ReactOnRails.client.ts';
-import RSCServerRoot from '../RSCServerRoot.ts';
+import RSCServerRoot from '../RSCServerRoot.tsx';
 import { ReactComponent, RenderFunction, RailsContext } from '../types/index.ts';
 
 /**
