@@ -80,6 +80,9 @@ const getReactServerComponent = async ({
     railsContext.reactServerClientManifestFileName,
     railsContext.reactClientManifestFileName,
   );
+  await new Promise((resolve) => {
+    setTimeout(resolve, 2000);
+  });
   const rscPayloadStream = await ReactOnRails.getRSCPayloadStream(
     componentName,
     componentProps,
