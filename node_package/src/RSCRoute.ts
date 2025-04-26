@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useRSC } from './RSCProvider';
+import { useRSC } from './RSCProvider.tsx';
 
 export type RSCRouteProps = {
   componentName: string;

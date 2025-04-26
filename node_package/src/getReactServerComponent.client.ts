@@ -1,8 +1,8 @@
 import * as React from 'react';
 import { createFromReadableStream } from 'react-on-rails-rsc/client';
-import { fetch } from './utils';
-import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs';
-import { RailsContext } from './types';
+import { fetch } from './utils.ts';
+import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
+import { RailsContext } from './types/index.ts';
 
 declare global {
   interface Window {

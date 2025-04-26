@@ -11,7 +11,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { createNodeReadableStream, getNodeVersion } from './testUtils.js';
 
-import RSCClientRoot from '../src/RSCClientRoot.ts';
+import RSCClientRoot from '../src/RSCClientRoot.tsx';
 
 enableFetchMocks();
 

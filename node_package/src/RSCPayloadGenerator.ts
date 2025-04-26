@@ -1,5 +1,5 @@
 import { PassThrough } from 'stream';
-import { RailsContext } from './types';
+import { RailsContext, RSCPayloadStreamInfo, RSCPayloadCallback } from './types/index.ts';
 
 declare global {
   function generateRSCPayload(
@@ -8,14 +8,6 @@ declare global {
     railsContext: RailsContext,
   ): Promise<NodeJS.ReadableStream>;
 }
-
-export type RSCPayloadStreamInfo = {
-  stream: NodeJS.ReadableStream;
-  props: unknown;
-  componentName: string;
-};
-
-export type RSCPayloadCallback = (streamInfo: RSCPayloadStreamInfo) => void;
 
 const mapRailsContextToRSCPayloadStreams = new Map<RailsContext, RSCPayloadStreamInfo[]>();
 

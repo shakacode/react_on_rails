@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { RailsContext } from './types';
-import { getReactServerComponent } from './getReactServerComponent.client';
+import { RailsContext } from './types/index.ts';
+import { getReactServerComponent } from './getReactServerComponent.client.ts';
 
 type RSCContextType = {
   getCachedComponent: (componentName: string, componentProps: unknown) => React.ReactNode;

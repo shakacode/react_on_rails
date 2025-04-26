@@ -1,6 +1,6 @@
 import { PipeableStream } from 'react-dom/server';
 import { PassThrough, Transform } from 'stream';
-import { RailsContext } from './types';
+import { RailsContext } from './types/index.ts';
 
 // In JavaScript, when an escape sequence with a backslash (\) is followed by a character
 // that isn't a recognized escape character, the backslash is ignored, and the character

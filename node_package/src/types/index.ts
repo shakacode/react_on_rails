@@ -2,7 +2,6 @@
 
 import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
 import type { Readable } from 'stream';
-import { RSCPayloadCallback } from '../RSCPayloadGenerator';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
@@ -297,6 +296,14 @@ export interface ReactOnRails {
    */
   authenticityHeaders(otherHeaders: Record<string, string>): AuthenticityHeaders;
 }
+
+export type RSCPayloadStreamInfo = {
+  stream: NodeJS.ReadableStream;
+  props: unknown;
+  componentName: string;
+};
+
+export type RSCPayloadCallback = (streamInfo: RSCPayloadStreamInfo) => void;
 
 /** Contains the parts of the `ReactOnRails` API intended for internal use only. */
 export interface ReactOnRailsInternal extends ReactOnRails {

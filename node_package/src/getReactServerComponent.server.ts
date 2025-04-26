@@ -1,7 +1,7 @@
 import { createFromNodeStream } from 'react-on-rails-rsc/client.node';
-import transformRSCStream from './transformRSCNodeStream';
-import loadJsonFile from './loadJsonFile';
-import { RailsContext } from './types';
+import transformRSCStream from './transformRSCNodeStream.ts';
+import loadJsonFile from './loadJsonFile.ts';
+import { RailsContext } from './types/index.ts';
 
 type RSCServerRootProps = {
   componentName: string;

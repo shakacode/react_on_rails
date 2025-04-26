@@ -1,10 +1,10 @@
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import { ReactComponentOrRenderFunction, RenderFunction } from '../types';
-import isRenderFunction from '../isRenderFunction';
-import { ensureReactUseAvailable } from '../reactApis';
-import { createRSCProvider } from '../RSCProvider';
-import { getReactServerComponent } from '../getReactServerComponent.client';
+import { ReactComponentOrRenderFunction, RenderFunction } from '../types/index.ts';
+import isRenderFunction from '../isRenderFunction.ts';
+import { ensureReactUseAvailable } from '../reactApis.cts';
+import { createRSCProvider } from '../RSCProvider.tsx';
+import { getReactServerComponent } from '../getReactServerComponent.client.ts';
 
 ensureReactUseAvailable();
 
