@@ -29,6 +29,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
+          cache: yarn
+          cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
@@ -41,31 +43,21 @@ jobs:
       - name: run conversion script to support shakapacker v6
         if: matrix.versions == 'oldest'
         run: script/convert
-      - name: Save root node_modules to cache
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
       - name: Install Node modules with Yarn for renderer package
         run: |
-          yarn install --no-progress --no-emoji
+          yarn install --no-progress --no-emoji ${{ matrix.versions == 'newest' && '--frozen-lockfile' || '' }}
           sudo yarn global add yalc
       - name: yalc publish for react-on-rails
         run: yalc publish
-      - name: Save spec/dummy/node_modules to cache
-        uses: actions/cache@v4
-        with:
-          path: spec/dummy/node_modules
-          key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-${{ matrix.versions }}
       - name: yalc add react-on-rails
         run: cd spec/dummy && yalc add react-on-rails
       - name: Install Node modules with Yarn for dummy app
-        run: cd spec/dummy && yarn install --no-progress --no-emoji
+        run: cd spec/dummy && yarn install --no-progress --no-emoji ${{ matrix.versions == 'newest' && '--frozen-lockfile' || '' }}
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
           path: spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
+          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-${{ matrix.versions }}
       - name: Install Ruby Gems for dummy app
         run: |
           cd spec/dummy
@@ -105,6 +97,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
+          cache: yarn
+          cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
@@ -117,26 +111,16 @@ jobs:
       - name: run conversion script to support shakapacker v6
         if: matrix.versions == 'oldest'
         run: script/convert
-      - name: Save root node_modules to cache
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: v5-package-node-modules-cache-${{ hashFiles('yarn.lock') }}
       - name: Save root ruby gems to cache
         uses: actions/cache@v4
         with:
           path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
+          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-${{ matrix.versions }}
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
           path: spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails.gemspec') }}-${{ hashFiles('Gemfile.development_dependencies') }}-${{ matrix.versions }}
-      - name: Save spec/dummy/node_modules to cache
-        uses: actions/cache@v4
-        with:
-          path: spec/dummy/node_modules
-          key: dummy-app-node-modules-cache-${{ hashFiles('spec/dummy/package.json') }}-${{ matrix.versions }}
+          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-${{ matrix.versions }}
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
@@ -146,14 +130,14 @@ jobs:
           key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-${{ matrix.versions }}
       - name: Install Node modules with Yarn
         run: |
-          yarn install --no-progress --no-emoji
+          yarn install --no-progress --no-emoji ${{ matrix.versions == 'newest' && '--frozen-lockfile' || '' }}
           sudo yarn global add yalc
       - name: yalc publish for react-on-rails
         run: yalc publish
       - name: yalc add react-on-rails
         run: cd spec/dummy && yalc add react-on-rails
       - name: Install Node modules with Yarn for dummy app
-        run: cd spec/dummy && yarn install --no-progress --no-emoji
+        run: cd spec/dummy && yarn install --no-progress --no-emoji ${{ matrix.versions == 'newest' && '--frozen-lockfile' || '' }}
       - name: Dummy JS tests
         run: |
           cd spec/dummy
