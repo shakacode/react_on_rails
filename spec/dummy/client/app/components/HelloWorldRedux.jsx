@@ -19,13 +19,14 @@ export default class HelloWorldRedux extends React.Component {
     this.handleChange = this.handleChange.bind(this);
   }
 
-  setNameDomRef(nameDomNode) {
-    this.nameDomRef = nameDomNode;
-  }
-
   handleChange() {
     const name = this.nameDomRef.value;
+    // eslint-disable-next-line react/destructuring-assignment
     this.props.actions.updateName(name);
+  }
+
+  setNameDomRef(nameDomNode) {
+    this.nameDomRef = nameDomNode;
   }
 
   render() {
@@ -35,7 +36,6 @@ export default class HelloWorldRedux extends React.Component {
     // If this creates an alert, we have a problem!
     // see file node_package/src/scriptSanitizedVal.js for the fix to this prior issue.
 
-    /* eslint-disable no-console */
     console.log('This is a script:"</div>"</script> <script>alert(\'WTF1\')</script>');
     console.log('Script2:"</div>"</script xx> <script>alert(\'WTF2\')</script xx>');
     console.log('Script3:"</div>"</  SCRIPT xx> <script>alert(\'WTF3\')</script xx>');

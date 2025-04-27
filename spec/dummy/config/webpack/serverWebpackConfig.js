@@ -1,7 +1,8 @@
+/* eslint-disable no-param-reassign */
 const { config } = require('shakapacker');
 const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
-const commonWebpackConfig = require('./commonWebpackConfig');
 const webpack = require('webpack');
+const commonWebpackConfig = require('./commonWebpackConfig');
 
 function extractLoader(rule, loaderName) {
   return rule.use.find((item) => {
@@ -80,7 +81,7 @@ const configureServer = () => {
   // Remove the mini-css-extract-plugin from the style loaders because
   // the client build will handle exporting CSS.
   // replace file-loader with null-loader
-  const rules = serverWebpackConfig.module.rules;
+  const { rules } = serverWebpackConfig.module;
   rules.forEach((rule) => {
     if (Array.isArray(rule.use)) {
       // remove the mini-css-extract-plugin and style-loader

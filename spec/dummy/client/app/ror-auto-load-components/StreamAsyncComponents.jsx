@@ -3,13 +3,17 @@
 import React, { useState, Suspense } from 'react';
 import css from '../components/HelloWorld.module.scss';
 
-const delayPromise = (promise, ms) => new Promise((resolve) => setTimeout(() => resolve(promise), ms));
+const delayPromise = (promise, ms) =>
+  new Promise((resolve) => {
+    setTimeout(() => resolve(promise), ms);
+  });
 
 const cachedFetches = {};
 
 const AsyncPost = async () => {
   console.log('Hello from AsyncPost');
-  const post = (cachedFetches['post'] ??= await delayPromise(
+  // eslint-disable-next-line no-multi-assign
+  const post = (cachedFetches.post ??= await delayPromise(
     fetch('https://jsonplaceholder.org/posts/1'),
     2000,
   ).then((response) => response.json()));
@@ -29,6 +33,7 @@ const AsyncPost = async () => {
 };
 
 const AsyncComment = async ({ commentId }) => {
+  // eslint-disable-next-line no-multi-assign
   const comment = (cachedFetches[commentId] ??= await delayPromise(
     fetch(`https://jsonplaceholder.org/comments/${commentId}`),
     2000 + commentId * 1000,
@@ -42,8 +47,8 @@ const AsyncComment = async ({ commentId }) => {
   );
 };
 
-function StreamAsyncComponents(props) {
-  const [name, setName] = useState(props.helloWorldData.name);
+function StreamAsyncComponents({ helloWorldData }) {
+  const [name, setName] = useState(helloWorldData.name);
 
   // Uncomment to test error handling during rendering the shell
   // throw new Error('Hello from StreamAsyncComponents');

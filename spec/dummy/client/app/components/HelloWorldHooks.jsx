@@ -6,8 +6,8 @@ import React, { useState } from 'react';
 // and client components that are used within server components.
 // import css from './HelloWorld.module.scss';
 
-function HelloWorldHooks(props) {
-  const [name, setName] = useState(props.helloWorldData.name);
+function HelloWorldHooks({ helloWorldData }) {
+  const [name, setName] = useState(helloWorldData.name);
   return (
     <div>
       <h3>Hello, {name}!</h3>

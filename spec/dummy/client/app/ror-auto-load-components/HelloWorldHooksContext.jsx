@@ -9,6 +9,7 @@ import RailsContext from '../components/RailsContext';
 const HelloWorldHooksContext = (props, railsContext) => {
   // You could pass props here or use the closure
   return () => {
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- only inside of this callback defines the component
     const [name, setName] = useState(props.helloWorldData.name);
     return (
       <>

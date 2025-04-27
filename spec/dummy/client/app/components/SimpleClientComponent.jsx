@@ -11,6 +11,7 @@ const SimpleClientComponent = ({ content }) => {
         onClick={() => {
           setShown(!shown);
         }}
+        type="button"
       >
         Toggle
       </button>

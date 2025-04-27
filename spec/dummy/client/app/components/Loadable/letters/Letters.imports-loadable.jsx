@@ -1,5 +1,4 @@
 import React from 'react';
-// eslint-disable-next-line import/no-extraneous-dependencies
 import loadable from '@loadable/component';
 
 const A = loadable(() => import('./A'));

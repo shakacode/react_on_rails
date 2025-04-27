@@ -1,4 +1,5 @@
 'use client';
+
 import React, { useState } from 'react';
 
 const ToggleContainer = ({ children, childrenTitle }) => {
@@ -7,7 +8,7 @@ const ToggleContainer = ({ children, childrenTitle }) => {
 
   return (
     <div style={{ border: '1px solid black', margin: '10px', padding: '10px' }}>
-      <button onClick={() => setIsVisible(!isVisible)} style={{ border: '1px solid black' }}>
+      <button onClick={() => setIsVisible(!isVisible)} style={{ border: '1px solid black' }} type="button">
         {showOrHideText}
       </button>
       {isVisible && children}

@@ -18,25 +18,22 @@ const compat = new FlatCompat({
 export default defineConfig([
   includeIgnoreFile(path.resolve(import.meta.dirname, '.gitignore')),
   globalIgnores([
-    '**/node_modules',
-    '**/coverage',
-    'gen-documentation/**/*',
+    'gen-documentation/',
     'spec/react_on_rails/dummy-for-generators',
-    'spec/dummy',
-    'spec/execjs-compatible-dummy',
+    // includes some generated code
+    'spec/dummy/client/app/packs/server-bundle.js',
     'packages/node-renderer/lib/',
     'packages/node-renderer/tests/fixtures',
-    'packages/node-renderer/webpack.config.js',
-    '**/node_modules/**/*',
-    '**/assets/webpack/**/*',
-    '**/generated/**/*',
+    '**/node_modules/',
+    '**/assets/webpack/',
+    '**/generated/',
     '**/app/assets/javascripts/application.js',
-    '**/coverage/**/*',
+    '**/coverage/',
     '**/cable.js',
-    '**/public/**/*',
-    '**/tmp/**/*',
-    '**/vendor',
-    '**/dist',
+    '**/public/',
+    '**/tmp/',
+    '**/vendor/',
+    '**/dist/',
     '**/.yalc/',
   ]),
   {
@@ -51,6 +48,10 @@ export default defineConfig([
       parserOptions: {
         // We have @babel/eslint-parser from eslint-config-shakacode, but don't use Babel in the main project
         requireConfigFile: false,
+
+        babelOptions: {
+          presets: ['@babel/preset-env', '@babel/preset-react'],
+        },
       },
     },
 
@@ -62,6 +63,7 @@ export default defineConfig([
       },
 
       'import/resolver': {
+        alias: [['Assets', './spec/dummy/client/app/assets']],
         node: true,
         typescript: true,
       },
@@ -69,7 +71,7 @@ export default defineConfig([
 
     rules: {
       'no-console': 'off',
-
+      'no-underscore-dangle': 'off',
       'no-void': [
         'error',
         {
@@ -94,6 +96,34 @@ export default defineConfig([
         },
       ],
       'no-mixed-operators': 'off',
+      'react/forbid-prop-types': 'off',
+      'react/function-component-definition': [
+        'error',
+        {
+          namedComponents: ['function-declaration', 'arrow-function'],
+          unnamedComponents: 'arrow-function',
+        },
+      ],
+      'react/jsx-filename-extension': [
+        'error',
+        {
+          extensions: ['.jsx', '.tsx'],
+        },
+      ],
+      'react/jsx-props-no-spreading': [
+        'error',
+        {
+          custom: 'ignore',
+        },
+      ],
+      'react/prop-types': 'off',
+      'react/static-property-placement': 'off',
+    },
+  },
+  {
+    files: ['spec/dummy/**/*', 'spec/execjs-compatible-dummy'],
+    languageOptions: {
+      globals: globals.browser,
     },
   },
   {
@@ -135,15 +165,9 @@ export default defineConfig([
     },
   },
   {
-    files: ['packages/node-renderer/tests/**'],
+    files: ['packages/node-renderer/tests/**', '**/*.test.{js,jsx,ts,tsx}'],
 
-    plugins: {
-      jest,
-    },
-
-    languageOptions: {
-      globals: globals.jest,
-    },
+    extends: [jest.configs['flat/recommended'], jest.configs['flat/style']],
 
     rules: {
       // Allows Jest mocks before import

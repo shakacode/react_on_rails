@@ -1,4 +1,5 @@
-/* eslint-disable react/prefer-es6-class */
+/* eslint-disable react/prefer-es6-class,react/destructuring-assignment,react/no-unused-class-component-methods */
+
 'use client';
 
 import PropTypes from 'prop-types';
@@ -15,13 +16,13 @@ const HelloWorldES5 = createReactClass({
     return this.props.helloWorldData;
   },
 
-  setNameDomRef(nameDomNode) {
-    this.nameDomRef = nameDomNode;
-  },
-
   handleChange() {
     const name = this.nameDomRef.value;
     this.setState({ name });
+  },
+
+  setNameDomRef(nameDomNode) {
+    this.nameDomRef = nameDomNode;
   },
 
   render() {

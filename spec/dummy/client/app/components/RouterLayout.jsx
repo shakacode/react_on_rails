@@ -1,8 +1,7 @@
-import PropTypes from 'prop-types';
 import React from 'react';
 import { Link, Outlet, useLoaderData } from 'react-router-dom';
 
-const RouterLayout = ({ children }) => {
+const RouterLayout = () => {
   console.log(
     `The result of react-router's loaderFunction (which is called when then route is initialized) is: ${useLoaderData()}`,
   );
@@ -27,10 +26,6 @@ const RouterLayout = ({ children }) => {
       <Outlet />
     </div>
   );
-};
-
-RouterLayout.propTypes = {
-  children: PropTypes.object,
 };
 
 export default RouterLayout;

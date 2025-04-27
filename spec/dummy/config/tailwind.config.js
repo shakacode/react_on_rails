@@ -1,4 +1,7 @@
 const defaultTheme = require('tailwindcss/defaultTheme');
+const forms = require('@tailwindcss/forms');
+const aspectRatio = require('@tailwindcss/aspect-ratio');
+const typography = require('@tailwindcss/typography');
 
 module.exports = {
   content: ['./app/helpers/**/*.rb', './app/javascript/**/*.js', './app/views/**/*.{erb,haml,html,slim}'],
@@ -9,9 +12,5 @@ module.exports = {
       },
     },
   },
-  plugins: [
-    require('@tailwindcss/forms'),
-    require('@tailwindcss/aspect-ratio'),
-    require('@tailwindcss/typography'),
-  ],
+  plugins: [forms, aspectRatio, typography],
 };

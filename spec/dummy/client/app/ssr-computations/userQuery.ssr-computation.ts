@@ -38,7 +38,11 @@ export const compute = (userId: number) => {
   return data ?? NoResult;
 };
 
-export const subscribe = (getCurrentResult: () => any, next: (result: any) => void, userId: number) => {
+export const subscribe = (
+  getCurrentResult: () => unknown,
+  next: (result: unknown) => void,
+  userId: number,
+) => {
   const apolloClient = getApolloClient();
   if (!apolloClient) {
     throw new Error('Apollo client not found');

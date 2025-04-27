@@ -28,6 +28,7 @@ const renderResult = {
   data: JSON.stringify({ html: 'Dummy Object' }),
 };
 
+// eslint-disable-next-line jest/valid-title
 describe(testName, () => {
   beforeEach(async () => {
     await resetForTest(testName);

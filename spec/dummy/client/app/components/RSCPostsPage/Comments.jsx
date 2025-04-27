@@ -6,7 +6,9 @@ import Comment from './Comment';
 
 const Comments = async ({ postId, artificialDelay }) => {
   const postComments = await (await fetch(`http://localhost:3000/api/posts/${postId}/comments`)).json();
-  await new Promise((resolve) => setTimeout(resolve, artificialDelay));
+  await new Promise((resolve) => {
+    setTimeout(resolve, artificialDelay);
+  });
 
   const prepareComment = (comment) => {
     const safeComment = _.pick(comment, ['body', 'user_id']);

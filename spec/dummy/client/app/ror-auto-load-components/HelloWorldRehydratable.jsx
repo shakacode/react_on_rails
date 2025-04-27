@@ -30,6 +30,11 @@ class HelloWorldRehydratable extends React.Component {
     document.removeEventListener('hydrate', this.forceClientHydration);
   }
 
+  handleChange() {
+    const name = this.nameDomRef.value;
+    this.setState({ name });
+  }
+
   setNameDomRef(nameDomNode) {
     this.nameDomRef = nameDomNode;
   }
@@ -50,11 +55,6 @@ class HelloWorldRehydratable extends React.Component {
       // Hydrate
       ReactOnRails.render(registeredComponentName, mergedProps, component.id, true);
     }
-  }
-
-  handleChange() {
-    const name = this.nameDomRef.value;
-    this.setState({ name });
   }
 
   render() {

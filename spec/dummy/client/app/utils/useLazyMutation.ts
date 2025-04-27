@@ -35,7 +35,10 @@ export const useLazyMutation = <TData, TVariables extends OperationVariables>(
       ]);
 
       if (!isMounted.current) return;
-      const result = await (apolloClient as ApolloClient<NormalizedCacheObject>).mutate<TData, TVariables>({
+      const mutationResult = await (apolloClient as ApolloClient<NormalizedCacheObject>).mutate<
+        TData,
+        TVariables
+      >({
         mutation,
         ...currentOptions.current,
         variables: {
@@ -43,8 +46,9 @@ export const useLazyMutation = <TData, TVariables extends OperationVariables>(
           ...variables,
         } as TVariables,
       });
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- awaiting can change it
       if (!isMounted.current) return;
-      setResult({ ...result, loading: false });
+      setResult({ ...mutationResult, loading: false });
     },
     [loadMutation],
   );
