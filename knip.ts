@@ -54,6 +54,7 @@ const config: KnipConfig = {
         // Declaring this as webpack.config instead doesn't work correctly
         'config/webpack/webpack.config.js',
       ],
+      ignore: ['**/app-react16/**/*'],
       project: ['**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}!', 'config/webpack/*.js'],
       paths: {
         'Assets/*': ['client/app/assets/*'],
