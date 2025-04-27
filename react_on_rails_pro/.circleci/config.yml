@@ -52,6 +52,12 @@ aliases:
       bundle config set --local disable_checksum_validation true
       cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
+  - &generate-dummy-app-packs
+    name: Generate file-system based entrypoints
+    command: |
+      cd spec/dummy
+      bundle exec rake react_on_rails:generate_packs
+
   # Install ruby gems unless existing set of gems is satisfying bundler.
   - &install-package-ruby-gems
     name: Install Ruby Gems for package
@@ -119,6 +125,15 @@ jobs:
       - restore_cache: *restore-package-gem-cache
       - restore_cache: *restore-dummy-app-node-modules-cache
       - run: *install-package-ruby-gems
+      - run: *install-package-node-modules
+      - run: *install-dummy-app-ruby-gems
+      - run: *install-dummy-app-node-modules
+      - run:
+          name: Install Node modules with Yarn for ExecJS dummy app
+          command: |
+            cd spec/execjs-compatible-dummy
+            yarn install --frozen-lockfile --no-progress --no-emoji
+      - run: *generate-dummy-app-packs
       - run: *lint-ruby
       - run: *lint-js
       - run: *format
@@ -200,9 +215,7 @@ jobs:
       - run: *install-package-node-modules
       - run: *install-dummy-app-node-modules
       - run: *install-dummy-app-ruby-gems
-      - run:
-          name: Generate file-system based entrypoints
-          command: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+      - run: *generate-dummy-app-packs
       - run:
           name: Build test bundles for dummy app
           command: cd spec/dummy && yarn run build:test

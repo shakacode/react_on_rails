@@ -542,7 +542,7 @@ describe('buildVM and runInVM', () => {
         'typeof ReactOnRails !== "undefined" && ReactOnRails && typeof ReactOnRails.serverRenderReactComponent',
         serverBundlePath,
       );
-      expect(ReactOnRails).toEqual('function');
+      expect(ReactOnRails).toBe('function');
     });
 
     test("running multiple buildVM in parallel doesn't cause runInVM to return partial results", async () => {
@@ -559,9 +559,9 @@ describe('buildVM and runInVM', () => {
         runCodeInVM(),
         runCodeInVM(),
       ]);
-      expect(runCodeInVM1).toEqual('function');
-      expect(runCodeInVM2).toEqual('function');
-      expect(runCodeInVM3).toEqual('function');
+      expect(runCodeInVM1).toBe('function');
+      expect(runCodeInVM2).toBe('function');
+      expect(runCodeInVM3).toBe('function');
     });
   });
 });

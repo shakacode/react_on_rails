@@ -5,7 +5,7 @@ import { ApolloProvider, ApolloClient, InMemoryCache, createHttpLink } from '@ap
 import { hydrateRoot } from 'react-dom/client';
 import ApolloGraphQL from '../components/ApolloGraphQL';
 
-export default (props, _railsContext, domNodeId) => {
+export default (_props, _railsContext, domNodeId) => {
   const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
   // fulfill the store with the server data
   const initialState = window.__APOLLO_STATE__;

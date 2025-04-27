@@ -4,6 +4,6 @@ import type { SSRCache } from '@shakacode/use-ssr-computation.runtime/lib/ssrCac
 declare global {
   interface Window {
     __APOLLO_STATE__: NormalizedCacheObject;
-    __SSR_COMPUTATION_CACHE: SSRCache;
+    __SSR_COMPUTATION_CACHE?: SSRCache;
   }
 }

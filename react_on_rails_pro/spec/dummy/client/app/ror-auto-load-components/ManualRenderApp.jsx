@@ -6,11 +6,11 @@ import { createRoot, hydrateRoot } from 'react-dom/client';
 const hydrateOrRender = (domEl, reactEl, prerender) => {
   if (prerender) {
     return hydrateRoot(domEl, reactEl);
-  } else {
-    const root = createRoot(domEl);
-    root.render(reactEl);
-    return root;
   }
+
+  const root = createRoot(domEl);
+  root.render(reactEl);
+  return root;
 };
 
 export default (props, _railsContext, domNodeId) => {

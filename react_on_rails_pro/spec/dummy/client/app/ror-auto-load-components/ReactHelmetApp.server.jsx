@@ -16,10 +16,9 @@ import ReactHelmet from '../components/ReactHelmet';
  *  This is imported as "ReactHelmetApp" by "serverRegistration.jsx". Note that rendered
  *  component markup must go under "componentHtml" key.
  */
-export default async (props, railsContext) => {
-  const portSuffix = railsContext.port ? `:${railsContext.port}` : '';
+export default async (props, _railsContext) => {
   const apiRequestResponse = await fetch(`https://api.nationalize.io/?name=ReactOnRails`)
-    .then(function (response) {
+    .then((response) => {
       if (response.status >= 400) {
         throw new Error('Bad response from server');
       }

@@ -1,12 +1,9 @@
-export const consistentKeysReplacer = <T>(key: string, value: T): T | Record<string, T> => {
+export const consistentKeysReplacer = (_key: string, value: unknown) => {
   if (value instanceof Object && !(value instanceof Array)) {
-    const sortedObject: Record<string, T> = Object.keys(value)
-      .sort()
-      .reduce((sorted: Record<string, T>, currentKey: string) => {
-        const keyValue = (value as Record<string, T>)[currentKey];
-        sorted[currentKey] = keyValue;
-        return sorted;
-      }, {});
+    const sortedKeys = Object.keys(value).sort();
+    const sortedObject = Object.fromEntries(
+      sortedKeys.map((key) => [key, (value as Record<string, unknown>)[key]]),
+    );
     return sortedObject;
   }
   return value;

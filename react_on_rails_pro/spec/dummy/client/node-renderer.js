@@ -2,7 +2,7 @@ const path = require('path');
 const Honeybadger = require('@honeybadger-io/js');
 const Sentry = require('@sentry/node');
 
-const env = process.env;
+const { env } = process;
 
 // Use this for package installation test:
 const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');

@@ -1,8 +1,8 @@
 import '../assets/styles/application.css';
 
 import ReactOnRails from 'react-on-rails';
-import SharedReduxStore from '../stores/SharedReduxStore';
 import Turbolinks from 'turbolinks';
+import SharedReduxStore from '../stores/SharedReduxStore';
 
 const urlParams = new URLSearchParams(window.location.search);
 const enableTurbolinks = urlParams.get('enableTurbolinks') === 'true';
@@ -19,6 +19,6 @@ ReactOnRails.setOptions({
   turbo: enableTurbolinks,
 });
 
-ReactOnRails.registerStore({
+ReactOnRails.registerStoreGenerators({
   SharedReduxStore,
 });

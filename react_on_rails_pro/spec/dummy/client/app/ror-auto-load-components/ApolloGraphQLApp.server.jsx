@@ -2,10 +2,10 @@
 
 import React from 'react';
 import { renderToString } from 'react-dom/server';
+import { ApolloProvider, ApolloClient, createHttpLink, InMemoryCache } from '@apollo/client';
 import { getMarkupFromTree } from '@apollo/client/react/ssr';
 import fetch from 'cross-fetch';
 import ApolloGraphQL from '../components/ApolloGraphQL';
-import { ApolloProvider, ApolloClient, createHttpLink, InMemoryCache } from '@apollo/client';
 
 export default async (props, _railsContext) => {
   const { csrf, sessionCookie } = props.ssrOnlyProps;
@@ -37,6 +37,7 @@ export default async (props, _railsContext) => {
   // you need to return additional property `apolloStateTag`, to fulfill the state for hydration
   const apolloStateTag = renderToString(
     <script
+      // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{
         __html: `window.__APOLLO_STATE__=${JSON.stringify(initialState).replace(/</g, '\\u003c')};`,
       }}

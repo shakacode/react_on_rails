@@ -47,10 +47,11 @@
     "lockfile": "^1.0.4"
   },
   "devDependencies": {
-    "@babel/core": "^7.12.3",
-    "@babel/eslint-parser": "^7.24.1",
-    "@babel/preset-env": "^7.12.1",
-    "@babel/preset-typescript": "^7.24.1",
+    "@babel/core": "^7.26.10",
+    "@babel/eslint-parser": "^7.27.0",
+    "@babel/preset-env": "^7.26.9",
+    "@babel/preset-react": "^7.26.3",
+    "@babel/preset-typescript": "^7.27.0",
     "@eslint/compat": "^1.2.8",
     "@honeybadger-io/js": "^6.10.1",
     "@sentry/node": "^7.120.0",
@@ -64,6 +65,7 @@
     "eslint": "^9.24.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-config-shakacode": "^19.0.0",
+    "eslint-import-resolver-alias": "^1.1.2",
     "eslint-import-resolver-typescript": "^4.3.2",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-jest": "^28.11.0",

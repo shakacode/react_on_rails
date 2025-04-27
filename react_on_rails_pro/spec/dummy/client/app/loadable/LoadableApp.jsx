@@ -8,10 +8,10 @@ import Letters from '../components/Loadable/letters';
 
 const basename = 'loadable';
 
-const LoadableApp = (props) => {
+const LoadableApp = ({ path }) => {
   if (typeof window === `undefined`) {
     return (
-      <StaticRouter basename={basename} location={props.path} context={{}}>
+      <StaticRouter basename={basename} location={path} context={{}}>
         <Header />
         <Routes />
         <Letters />

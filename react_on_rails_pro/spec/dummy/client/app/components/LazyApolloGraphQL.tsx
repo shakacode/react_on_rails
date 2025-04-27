@@ -11,7 +11,11 @@ const UserPanel = () => {
   const [userId, setUserId] = useState(1);
   const newNameInputRef = useRef<HTMLInputElement | null>(null);
 
-  const data = useSSRComputation('../ssr-computations/userQuery.ssr-computation', [userId], {});
+  const data = useSSRComputation('../ssr-computations/userQuery.ssr-computation', [userId], {}) as
+    | undefined
+    | {
+        user: { name: string; email: string };
+      };
   const [updateUserMutation, { errors: updateError, loading: updating }] = useLazyMutation(() =>
     import('../utils/lazyApolloOperations').then(
       (lazyApolloOperations) => lazyApolloOperations.UPDATE_USER_MUTATION,
@@ -38,7 +42,7 @@ const UserPanel = () => {
   const updateUser = () => {
     const newName = newNameInputRef.current?.value;
     if (!newName) return;
-    void updateUserMutation({ newName: newName, userId: userId });
+    void updateUserMutation({ newName, userId });
   };
 
   const buttonStyle = {
@@ -50,7 +54,7 @@ const UserPanel = () => {
   return (
     <div>
       {renderUserInfo()}
-      <button style={buttonStyle} onClick={changeUser}>
+      <button style={buttonStyle} onClick={changeUser} type="button">
         Change User
       </button>
       <br />
@@ -58,10 +62,17 @@ const UserPanel = () => {
       <div>
         <b>Update User</b>
       </div>
-      <label>New User Name: </label>
-      <input type="text" ref={newNameInputRef} />
+      <label htmlFor="newName">
+        New User Name:
+        <input id="newName" type="text" ref={newNameInputRef} />
+      </label>
       <br />
-      <button style={buttonStyle} className="bg-blue-500 hover:bg-blue-700" onClick={updateUser}>
+      <button
+        style={buttonStyle}
+        className="bg-blue-500 hover:bg-blue-700"
+        onClick={updateUser}
+        type="button"
+      >
         Update User
       </button>
 

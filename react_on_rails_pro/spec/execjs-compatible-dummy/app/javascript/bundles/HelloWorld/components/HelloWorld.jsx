@@ -1,7 +1,8 @@
 import PropTypes from 'prop-types';
 import React, { useState } from 'react';
 
-const HelloWorld = (props) => {
+function HelloWorld(props) {
+  // eslint-disable-next-line react/destructuring-assignment
   const [name, setName] = useState(props.name);
 
   return (
@@ -16,7 +17,7 @@ const HelloWorld = (props) => {
       </form>
     </div>
   );
-};
+}
 
 HelloWorld.propTypes = {
   name: PropTypes.string.isRequired, // this is passed from the Rails view

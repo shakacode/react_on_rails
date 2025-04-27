@@ -57,10 +57,10 @@ describe('worker', () => {
       .end();
     expect(res.statusCode).toBe(200);
     expect(res.headers['cache-control']).toBe('public, max-age=31536000');
-    expect(res.payload).toEqual('{"html":"Dummy Object"}');
-    expect(fs.existsSync(vmBundlePath(testName))).toEqual(true);
-    expect(fs.existsSync(assetPath(testName))).toEqual(true);
-    expect(fs.existsSync(assetPathOther(testName))).toEqual(true);
+    expect(res.payload).toBe('{"html":"Dummy Object"}');
+    expect(fs.existsSync(vmBundlePath(testName))).toBe(true);
+    expect(fs.existsSync(assetPath(testName))).toBe(true);
+    expect(fs.existsSync(assetPathOther(testName))).toBe(true);
   });
 
   test(
@@ -138,7 +138,7 @@ describe('worker', () => {
         .end();
       expect(res.statusCode).toBe(200);
       expect(res.headers['cache-control']).toBe('public, max-age=31536000');
-      expect(res.payload).toEqual('{"html":"Dummy Object"}');
+      expect(res.payload).toBe('{"html":"Dummy Object"}');
     },
   );
 
@@ -163,7 +163,7 @@ describe('worker', () => {
         });
       expect(res.headers['cache-control']).toBe('public, max-age=31536000');
       expect(res.statusCode).toBe(200);
-      expect(res.payload).toEqual('{"html":"Dummy Object"}');
+      expect(res.payload).toBe('{"html":"Dummy Object"}');
     },
   );
 
@@ -222,7 +222,7 @@ describe('worker', () => {
     });
     const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
     expect(res.statusCode).toBe(200);
-    expect(fs.existsSync(assetPath(testName))).toEqual(true);
-    expect(fs.existsSync(assetPathOther(testName))).toEqual(true);
+    expect(fs.existsSync(assetPath(testName))).toBe(true);
+    expect(fs.existsSync(assetPathOther(testName))).toBe(true);
   });
 });
